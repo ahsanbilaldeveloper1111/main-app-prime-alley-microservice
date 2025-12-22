@@ -5,7 +5,7 @@ import { nextAuthLogger } from '../../../utils/nextAuthLogger';
 
 // Constants
 const REFRESH_BUFFER_MS = 2 * 60 * 1000; // 2 minutes before expiry
-const SESSION_MAX_AGE = 15 * 60; // 15 minutes in seconds
+const SESSION_MAX_AGE = 2 * 60 * 60; // 2 hours in seconds (matches refresh token expiry)
 
 // Helper function to parse token expiry
 const parseTokenExpiry = (expires: unknown): number => {
@@ -204,13 +204,19 @@ export const authOptions: NextAuthOptions = {
 
       // Check if token needs refresh (within buffer time)
       if (accessTokenExpires > 0 && timeUntilExpiry <= REFRESH_BUFFER_MS) {
-        // Validate refresh token is still available and not expired
-        if (!token.refresh_token || refreshTokenExpires <= now) {
+        // Validate refresh token is still available and not expired (with 1 minute buffer)
+        const REFRESH_TOKEN_BUFFER = 60 * 1000; // 1 minute buffer
+        if (!token.refresh_token || refreshTokenExpires <= (now + REFRESH_TOKEN_BUFFER)) {
           nextAuthLogger.warn('Cannot refresh: Refresh token expired or missing', {
             hasRefreshToken: !!token.refresh_token,
-            refreshTokenExpired: refreshTokenExpires <= now,
+            refreshTokenExpired: refreshTokenExpires <= (now + REFRESH_TOKEN_BUFFER),
             timeUntilRefreshExpiry: refreshTokenExpires > 0 ? `${Math.floor((refreshTokenExpires - now) / 1000)}s` : 'N/A'
           });
+          // Remove tokens to invalidate session
+          delete token.access_token;
+          delete token.refresh_token;
+          delete token.access_token_expires;
+          delete token.refresh_token_expires;
           return token;
         }
 
@@ -237,6 +243,13 @@ export const authOptions: NextAuthOptions = {
               status: refreshResponse.status,
               statusText: refreshResponse.statusText
             });
+            // If refresh fails with 401/403, invalidate the session by removing tokens
+            if (refreshResponse.status === 401 || refreshResponse.status === 403) {
+              delete token.access_token;
+              delete token.refresh_token;
+              delete token.access_token_expires;
+              delete token.refresh_token_expires;
+            }
             return token;
           }
 
@@ -265,6 +278,13 @@ export const authOptions: NextAuthOptions = {
               code: refreshData.code,
               hasAccessToken: !!refreshData.data?.access_token
             });
+            // If refresh returns error code, invalidate session if it's an auth error
+            if (refreshData.code === 400 || refreshData.code === 401 || refreshData.code === 403) {
+              delete token.access_token;
+              delete token.refresh_token;
+              delete token.access_token_expires;
+              delete token.refresh_token_expires;
+            }
           }
         } catch (error) {
           nextAuthLogger.error('Token refresh error', error);

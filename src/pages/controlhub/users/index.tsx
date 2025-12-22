@@ -112,7 +112,7 @@ const Users = () => {
                             />
                         </div>
                     )}
-                    {activeTab === 'insight' && (
+                    {/* {activeTab === 'insight' && (
                         <div className="tab-pane fade show active" role="tabpanel">
                             <InsightTab
                                 summaryCards={summaryCards}
@@ -123,7 +123,7 @@ const Users = () => {
                                 userLocationChart={userLocationChart}
                             />
                         </div>
-                    )}
+                    )} */}
                 </div>
 
                 <UserDetailsModal

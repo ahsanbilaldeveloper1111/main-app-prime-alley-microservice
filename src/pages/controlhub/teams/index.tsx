@@ -134,6 +134,7 @@ const Teams = () => {
     const [selectedTeam, setSelectedTeam] = useState<any>(null);
     const [selectedTeamName, setSelectedTeamName] = useState<any>(null);
     const [showEditTeamModal, setShowEditTeamModal] = useState<boolean>(false);
+    const [isLoadingUpdateTeam, setIsLoadingUpdateTeam] = useState<boolean>(false);
 
     const handleEditTeam = (props: any) => {
         setSelectedTeam(props.id);
@@ -142,24 +143,30 @@ const Teams = () => {
     };
 
     const handleSubmitEditTeam = async () => {
-        
-        const response = await updateTeam(selectedTeam, selectedTeamName);
-        if(response){
-            setSelectedTeam(null);
-            setSelectedTeamName(null);
-            setShowEditTeamModal(false);
-            setSuccessModalTitle('Team Updated')
-            setSuccessModalDescription('Team has been updated successfully');
-            setTimeout(() => {
-                setShowSuccessfulModal(true);
-            }, 100);
-            setRefreshKey(prev => prev + 1); // Trigger refresh
+        setIsLoadingUpdateTeam(true);
+        try {
+            const response = await updateTeam(selectedTeam, selectedTeamName);
+            if(response){
+                setSelectedTeam(null);
+                setSelectedTeamName(null);
+                setShowEditTeamModal(false);
+                setSuccessModalTitle('Team Updated')
+                setSuccessModalDescription('Team has been updated successfully');
+                setTimeout(() => {
+                    setShowSuccessfulModal(true);
+                }, 100);
+                setRefreshKey(prev => prev + 1); // Trigger refresh
+            }
+        } catch (error) {
+            console.error('Error updating team:', error);
+            toast.error('Failed to update team');
+        } finally {
+            setIsLoadingUpdateTeam(false);
         }
-
-        
     };
 
     const [showDeleteTeamModal, setShowDeleteTeamModal] = useState<boolean>(false);
+    const [isLoadingDeleteTeam, setIsLoadingDeleteTeam] = useState<boolean>(false);
     
     const handleDeleteTeam = (props: any) => {
         setSelectedTeam(props.id);
@@ -168,36 +175,53 @@ const Teams = () => {
     };
 
     const handleSubmitDeleteTeam = async () => {
-        const response = await deleteTeam(selectedTeam);
-        if(response){
-            setSelectedTeam(null);
-            setSelectedTeamName(null);
-            setShowDeleteTeamModal(false);
-            setSuccessModalTitle('Team Deleted')
-            setSuccessModalDescription('Team has been deleted successfully');
-            setTimeout(() => {
-                setShowSuccessfulModal(true);
-            }, 100);
-            setRefreshKey(prev => prev + 1); 
+        setIsLoadingDeleteTeam(true);
+        try {
+            const response = await deleteTeam(selectedTeam);
+            if(response){
+                setSelectedTeam(null);
+                setSelectedTeamName(null);
+                setShowDeleteTeamModal(false);
+                setSuccessModalTitle('Team Deleted')
+                setSuccessModalDescription('Team has been deleted successfully');
+                setTimeout(() => {
+                    setShowSuccessfulModal(true);
+                }, 100);
+                setRefreshKey(prev => prev + 1); 
+            }
+        } catch (error) {
+            console.error('Error deleting team:', error);
+            toast.error('Failed to delete team');
+        } finally {
+            setIsLoadingDeleteTeam(false);
         }
     };
 
     const [showCreateTeamModal, setShowCreateTeamModal] = useState<boolean>(false);
     const [newTeamName, setNewTeamName] = useState<string>("");
+    const [isLoadingCreateTeam, setIsLoadingCreateTeam] = useState<boolean>(false);
 
     const handleSubmitCreateTeam = async () => {
-        const response = await addTeam(newTeamName);
-        if(response){
-            setNewTeamName("");
-            setShowCreateTeamModal(false);
-            
-            setSuccessModalTitle('Team Created')
-            setSuccessModalDescription('New Team has been added successfully');
-            setTimeout(() => {
-                setShowSuccessfulModal(true);
-            }, 100);
+        setIsLoadingCreateTeam(true);
+        try {
+            const response = await addTeam(newTeamName);
+            if(response){
+                setNewTeamName("");
+                setShowCreateTeamModal(false);
+                
+                setSuccessModalTitle('Team Created')
+                setSuccessModalDescription('New Team has been added successfully');
+                setTimeout(() => {
+                    setShowSuccessfulModal(true);
+                }, 100);
 
-            setRefreshKey(prev => prev + 1); 
+                setRefreshKey(prev => prev + 1); 
+            }
+        } catch (error) {
+            console.error('Error creating team:', error);
+            toast.error('Failed to create team');
+        } finally {
+            setIsLoadingCreateTeam(false);
         }
     };
 
@@ -214,6 +238,8 @@ const Teams = () => {
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
     const [isLoadingTeamUsers, setIsLoadingTeamUsers] = useState<boolean>(false);
+    const [isLoadingAssignUsers, setIsLoadingAssignUsers] = useState<boolean>(false);
+    const [isLoadingRemoveUsers, setIsLoadingRemoveUsers] = useState<boolean>(false);
 
     const handleAssignUsers = async (props: any) => {
         setSelectedTeam(props.id);
@@ -372,35 +398,51 @@ const Teams = () => {
             return;
         }
 
-        const userIds = selectedUsersToAssign.map(id => Number.parseInt(id, 10));
-        const ownerIds = selectedOwnersToAssign.length > 0 
-            ? selectedOwnersToAssign.map(id => Number.parseInt(id, 10))
-            : undefined;
-        const response = await assignUsersToTeam(selectedTeam, userIds, ownerIds);
-        
-        if (response) {
-            setSelectedUsersToAssign([]);
-            setSelectedOwnersToAssign([]);
-            await fetchTeamUsers(selectedTeam);
+        setIsLoadingAssignUsers(true);
+        try {
+            const userIds = selectedUsersToAssign.map(id => Number.parseInt(id, 10));
+            const ownerIds = selectedOwnersToAssign.length > 0 
+                ? selectedOwnersToAssign.map(id => Number.parseInt(id, 10))
+                : undefined;
+            const response = await assignUsersToTeam(selectedTeam, userIds, ownerIds);
             
-            // Close the assign users modal
-            //handleCloseAssignUsersModal();
-            
-            setRefreshKey(prev => prev + 1);
+            if (response) {
+                setSelectedUsersToAssign([]);
+                setSelectedOwnersToAssign([]);
+                await fetchTeamUsers(selectedTeam);
+                
+                // Close the assign users modal
+                //handleCloseAssignUsersModal();
+                
+                setRefreshKey(prev => prev + 1);
+            }
+        } catch (error) {
+            console.error('Error assigning users:', error);
+            toast.error('Failed to assign users');
+        } finally {
+            setIsLoadingAssignUsers(false);
         }
     };
 
     const handleRemoveUser = async (userId: number) => {
-        // Check if user is an owner
-        const isOwner = teamOwners.some(owner => owner.id === userId);
-        
-        const response = isOwner 
-            ? await removeOwnersFromTeam(selectedTeam, [userId])
-            : await removeUsersFromTeam(selectedTeam, [userId]);
+        setIsLoadingRemoveUsers(true);
+        try {
+            // Check if user is an owner
+            const isOwner = teamOwners.some(owner => owner.id === userId);
             
-        if (response) {
-            await fetchTeamUsers(selectedTeam);
-            setRefreshKey(prev => prev + 1);
+            const response = isOwner 
+                ? await removeOwnersFromTeam(selectedTeam, [userId])
+                : await removeUsersFromTeam(selectedTeam, [userId]);
+                
+            if (response) {
+                await fetchTeamUsers(selectedTeam);
+                setRefreshKey(prev => prev + 1);
+            }
+        } catch (error) {
+            console.error('Error removing user:', error);
+            toast.error('Failed to remove user');
+        } finally {
+            setIsLoadingRemoveUsers(false);
         }
     };
 
@@ -440,31 +482,39 @@ const Teams = () => {
             return;
         }
 
-        let success = true;
+        setIsLoadingRemoveUsers(true);
+        try {
+            let success = true;
 
-        // Remove owners
-        if (selectedOwnersToRemove.length > 0) {
-            const response = await removeOwnersFromTeam(selectedTeam, selectedOwnersToRemove);
-            if (!response) {
-                success = false;
+            // Remove owners
+            if (selectedOwnersToRemove.length > 0) {
+                const response = await removeOwnersFromTeam(selectedTeam, selectedOwnersToRemove);
+                if (!response) {
+                    success = false;
+                }
             }
-        }
 
-        // Remove users
-        if (selectedUsersToRemove.length > 0) {
-            const response = await removeUsersFromTeam(selectedTeam, selectedUsersToRemove);
-            if (!response) {
-                success = false;
+            // Remove users
+            if (selectedUsersToRemove.length > 0) {
+                const response = await removeUsersFromTeam(selectedTeam, selectedUsersToRemove);
+                if (!response) {
+                    success = false;
+                }
             }
-        }
 
-        if (success) {
-            setSelectedUsersToRemove([]);
-            setSelectedOwnersToRemove([]);
-            setShowRemoveUsersConfirmModal(false);
-            setShowRemoveOwnersConfirmModal(false);
-            await fetchTeamUsers(selectedTeam);
-            setRefreshKey(prev => prev + 1);
+            if (success) {
+                setSelectedUsersToRemove([]);
+                setSelectedOwnersToRemove([]);
+                setShowRemoveUsersConfirmModal(false);
+                setShowRemoveOwnersConfirmModal(false);
+                await fetchTeamUsers(selectedTeam);
+                setRefreshKey(prev => prev + 1);
+            }
+        } catch (error) {
+            console.error('Error removing users:', error);
+            toast.error('Failed to remove users');
+        } finally {
+            setIsLoadingRemoveUsers(false);
         }
     };
 
@@ -487,6 +537,8 @@ const Teams = () => {
     const [allModules, setAllModules] = useState<any[]>([]);
     const [isLoadingModules, setIsLoadingModules] = useState<boolean>(false);
     const [isLoadingTeamModules, setIsLoadingTeamModules] = useState<boolean>(false);
+    const [isLoadingAssignModules, setIsLoadingAssignModules] = useState<boolean>(false);
+    const [isLoadingRemoveModule, setIsLoadingRemoveModule] = useState<boolean>(false);
 
     const handleAssignModules = async (props: any) => {
         setSelectedTeam(props.id);
@@ -543,45 +595,61 @@ const Teams = () => {
             return;
         }
 
-        const selectedCount = selectedModulesToAssign.length;
-        const response = await updateTeamModules(selectedTeam, selectedModulesToAssign);
-        
-        if (response) {
-            // Clear selected modules immediately after successful submission
-            setSelectedModulesToAssign([]);
-            // Fetch updated team modules but don't re-populate selectedModulesToAssign since we're closing
-            setIsLoadingTeamModules(true);
-            try {
-                const modules = await getTeamModules(selectedTeam);
-                setTeamModules(modules || []);
-            } catch (error) {
-                console.error('Error fetching team modules:', error);
-                setTeamModules([]);
-            } finally {
-                setIsLoadingTeamModules(false);
-            }
+        setIsLoadingAssignModules(true);
+        try {
+            const selectedCount = selectedModulesToAssign.length;
+            const response = await updateTeamModules(selectedTeam, selectedModulesToAssign);
             
-            setSuccessModalTitle('Modules Updated')
-            setSuccessModalDescription(`${selectedCount} module(s) have been assigned to the team successfully`);
-            // Close the assign modules modal
-            handleCloseAssignModulesModal();
-            setTimeout(() => {
-                setShowSuccessfulModal(true);
-            }, 100);
-            setRefreshKey(prev => prev + 1);
+            if (response) {
+                // Clear selected modules immediately after successful submission
+                setSelectedModulesToAssign([]);
+                // Fetch updated team modules but don't re-populate selectedModulesToAssign since we're closing
+                setIsLoadingTeamModules(true);
+                try {
+                    const modules = await getTeamModules(selectedTeam);
+                    setTeamModules(modules || []);
+                } catch (error) {
+                    console.error('Error fetching team modules:', error);
+                    setTeamModules([]);
+                } finally {
+                    setIsLoadingTeamModules(false);
+                }
+                
+                setSuccessModalTitle('Modules Updated')
+                setSuccessModalDescription(`${selectedCount} module(s) have been assigned to the team successfully`);
+                // Close the assign modules modal
+                handleCloseAssignModulesModal();
+                setTimeout(() => {
+                    setShowSuccessfulModal(true);
+                }, 100);
+                setRefreshKey(prev => prev + 1);
+            }
+        } catch (error) {
+            console.error('Error assigning modules:', error);
+            toast.error('Failed to assign modules');
+        } finally {
+            setIsLoadingAssignModules(false);
         }
     };
 
     const handleRemoveModule = async (moduleId: number) => {
-        const response = await removeModulesFromTeam(selectedTeam, [moduleId]);
-        if (response) {
-            await fetchTeamModules(selectedTeam);
-            setSuccessModalTitle('Module Removed')
-            setSuccessModalDescription('Module has been removed from the team successfully');
-            setTimeout(() => {
-                setShowSuccessfulModal(true);
-            }, 100);
-            setRefreshKey(prev => prev + 1);
+        setIsLoadingRemoveModule(true);
+        try {
+            const response = await removeModulesFromTeam(selectedTeam, [moduleId]);
+            if (response) {
+                await fetchTeamModules(selectedTeam);
+                setSuccessModalTitle('Module Removed')
+                setSuccessModalDescription('Module has been removed from the team successfully');
+                setTimeout(() => {
+                    setShowSuccessfulModal(true);
+                }, 100);
+                setRefreshKey(prev => prev + 1);
+            }
+        } catch (error) {
+            console.error('Error removing module:', error);
+            toast.error('Failed to remove module');
+        } finally {
+            setIsLoadingRemoveModule(false);
         }
     };
 
@@ -666,7 +734,7 @@ const Teams = () => {
                             <Info size={14} />
                         </span>
                         </label>
-                        <input className="form-control" type="text" value={selectedTeamName} onChange={(e) => setSelectedTeamName(e.target.value)} />
+                        <input className="form-control" type="text" value={selectedTeamName} onChange={(e) => setSelectedTeamName(e.target.value)} disabled={isLoadingUpdateTeam} />
                         <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
                             <Info size={12} />
                             <span style={{ fontSize: '0.813rem' }}>
@@ -677,10 +745,11 @@ const Teams = () => {
                     </>
                 }
                 submitButtonText="Update Team"
-                isSubmitDisabled={!selectedTeamName}
+                isSubmitDisabled={!selectedTeamName || isLoadingUpdateTeam}
                 cancelButtonText="Cancel"
                 onSubmit={handleSubmitEditTeam}
                 onCancel={() => setShowEditTeamModal(false)}
+                isSubmitting={isLoadingUpdateTeam}
             />
 
 
@@ -695,6 +764,7 @@ const Teams = () => {
                 confirmButtonVariant="danger"
                 requireTextConfirmation={true}
                 requiredConfirmationText="delete"
+                loading={isLoadingDeleteTeam}
             />
 
 <FormModal
@@ -711,7 +781,7 @@ const Teams = () => {
                                     <Info size={14} />
                                 </span>
                                 </label>
-                                <input type="text" className="form-control" id="newTeamName"  value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} placeholder="Team Name" />
+                                <input type="text" className="form-control" id="newTeamName"  value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} placeholder="Team Name" disabled={isLoadingCreateTeam} />
                                 <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
                                     <Info size={12} />
                                     <span style={{ fontSize: '0.813rem' }}>
@@ -722,10 +792,11 @@ const Teams = () => {
                             </>
                         }
                         submitButtonText="Add Team"
-                        isSubmitDisabled={!newTeamName}
+                        isSubmitDisabled={!newTeamName || isLoadingCreateTeam}
                         cancelButtonText="Cancel"
                         onSubmit={handleSubmitCreateTeam}
                         onCancel={()=>setShowCreateTeamModal(false)}
+                        isSubmitting={isLoadingCreateTeam}
                     />
 
             {/* Assign Users Modal */}
@@ -833,7 +904,7 @@ const Teams = () => {
                                                             />
                                                         </td>
                                                         <td>
-                                                            <div style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={owner.name || 'N/A'}>
+                                                            <div>
                                                                 {owner.name || 'N/A'}
                                                             </div>
                                                         </td>
@@ -944,7 +1015,7 @@ const Teams = () => {
                                                             />
                                                         </td>
                                                         <td>
-                                                            <div style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={user.name || 'N/A'}>
+                                                            <div>
                                                                 {user.name || 'N/A'}
                                                             </div>
                                                         </td>
@@ -976,16 +1047,25 @@ const Teams = () => {
                     
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={handleCloseAssignUsersModal}>
+                    <Button variant="secondary" onClick={handleCloseAssignUsersModal} disabled={isLoadingAssignUsers || isLoadingRemoveUsers}>
                         Close
                     </Button>
                     <Button 
                         variant="primary" 
                         onClick={handleSubmitAssignUsers}
-                        disabled={selectedUsersToAssign.length === 0 && selectedOwnersToAssign.length === 0}
+                        disabled={(selectedUsersToAssign.length === 0 && selectedOwnersToAssign.length === 0) || isLoadingAssignUsers || isLoadingRemoveUsers}
                     >
-                        <UserPlus size={16} className="me-1" />
-                        Assign ({selectedUsersToAssign.length} users, {selectedOwnersToAssign.length} owners)
+                        {isLoadingAssignUsers ? (
+                            <>
+                                <div className="spinner-border spinner-border-sm me-1" role="status" />
+                                Assigning...
+                            </>
+                        ) : (
+                            <>
+                                <UserPlus size={16} className="me-1" />
+                                Assign ({selectedUsersToAssign.length} users, {selectedOwnersToAssign.length} owners)
+                            </>
+                        )}
                     </Button>
                 </Modal.Footer>
             </Modal>
@@ -1060,12 +1140,12 @@ const Teams = () => {
                                                 {teamModules.map((module) => (
                                                     <tr key={module.id || module.module_id}>
                                                         <td>
-                                                            <div style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={module.name || 'N/A'}>
+                                                            <div>
                                                                 {module.name || 'N/A'}
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            <div style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={module.description || 'N/A'}>
+                                                            <div>
                                                                 {module.description || 'N/A'}
                                                             </div>
                                                         </td>
@@ -1076,8 +1156,13 @@ const Teams = () => {
                                                                 onClick={() => handleRemoveModule(module.id || module.module_id)}
                                                                 title="Remove Module"
                                                                 className="p-1"
+                                                                disabled={isLoadingRemoveModule || isLoadingAssignModules}
                                                             >
-                                                                <Trash2 size={14} />
+                                                                {isLoadingRemoveModule ? (
+                                                                    <div className="spinner-border spinner-border-sm" role="status" />
+                                                                ) : (
+                                                                    <Trash2 size={14} />
+                                                                )}
                                                             </Button>
                                                         </td>
                                                     </tr>
@@ -1095,16 +1180,25 @@ const Teams = () => {
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={handleCloseAssignModulesModal}>
+                    <Button variant="secondary" onClick={handleCloseAssignModulesModal} disabled={isLoadingAssignModules || isLoadingRemoveModule}>
                         Close
                     </Button>
                     <Button 
                         variant="primary" 
                         onClick={handleSubmitAssignModules}
-                        disabled={selectedModulesToAssign.length === 0}
+                        disabled={selectedModulesToAssign.length === 0 || isLoadingAssignModules || isLoadingRemoveModule}
                     >
-                        <Package size={16} className="me-1" />
-                        Update Modules ({selectedModulesToAssign.length})
+                        {isLoadingAssignModules ? (
+                            <>
+                                <div className="spinner-border spinner-border-sm me-1" role="status" />
+                                Updating...
+                            </>
+                        ) : (
+                            <>
+                                <Package size={16} className="me-1" />
+                                Update Modules ({selectedModulesToAssign.length})
+                            </>
+                        )}
                     </Button>
                 </Modal.Footer>
             </Modal>
@@ -1128,21 +1222,14 @@ const Teams = () => {
                 targetName={selectedOwnersToRemove.length === 1 
                     ? teamOwners.find(o => o.id === selectedOwnersToRemove[0])?.name || 'this owner'
                     : `${selectedOwnersToRemove.length} owners`}
-                onConfirm={async () => {
-                    if (selectedOwnersToRemove.length > 0) {
-                        const response = await removeOwnersFromTeam(selectedTeam, selectedOwnersToRemove);
-                        if (response) {
-                            setSelectedOwnersToRemove([]);
-                            setShowRemoveOwnersConfirmModal(false);
-                            await fetchTeamUsers(selectedTeam);
-                            setRefreshKey(prev => prev + 1);
-                        }
-                    }
+                onConfirm={async (confirmationText: string) => {
+                    await handleConfirmRemoveUsers();
                 }}
                 confirmButtonText="Remove Owners"
                 confirmButtonVariant="danger"
                 requireTextConfirmation={true}
                 requiredConfirmationText="remove"
+                loading={isLoadingRemoveUsers}
             />
 
             {/* Remove Users Confirmation Modal */}
@@ -1157,21 +1244,14 @@ const Teams = () => {
                 targetName={selectedUsersToRemove.length === 1 
                     ? teamUsers.find(u => u.id === selectedUsersToRemove[0])?.name || 'this member'
                     : `${selectedUsersToRemove.length} members`}
-                onConfirm={async () => {
-                    if (selectedUsersToRemove.length > 0) {
-                        const response = await removeUsersFromTeam(selectedTeam, selectedUsersToRemove);
-                        if (response) {
-                            setSelectedUsersToRemove([]);
-                            setShowRemoveUsersConfirmModal(false);
-                            await fetchTeamUsers(selectedTeam);
-                            setRefreshKey(prev => prev + 1);
-                        }
-                    }
+                onConfirm={async (confirmationText: string) => {
+                    await handleConfirmRemoveUsers();
                 }}
                 confirmButtonText="Remove Members"
                 confirmButtonVariant="danger"
                 requireTextConfirmation={true}
                 requiredConfirmationText="remove"
+                loading={isLoadingRemoveUsers}
             />
         </React.Fragment>
     );

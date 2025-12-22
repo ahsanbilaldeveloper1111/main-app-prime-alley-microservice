@@ -1,11 +1,10 @@
 import NonLayout from "@layout/NonLayout";
 import Image from "next/image";
-import React, { ReactElement, useState, useEffect } from "react";
+import React, { ReactElement, useState, useEffect, useRef } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Script from "next/script";
-import dashboard from "@pages/dashboard";
 import { toast } from "react-toastify";
 import { FaSpinner } from "react-icons/fa";
 import "@assets/scss/login.scss";
@@ -23,9 +22,16 @@ const Signin = () => {
   const router = useRouter();
   const { callbackUrl } = router.query;
   const [showPassword, setShowPassword] = useState(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const statusRef = useRef<string>("loading");
 
   // Use NextAuth's useSession hook for frontend session management
   const { data: session, status } = useSession();
+  
+  // Keep status ref in sync
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,8 +112,24 @@ const Signin = () => {
 
   // Handle session loading and redirects
   useEffect(() => {
+    // Clear any existing timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+
     if (status === "loading") {
       setSessionLoading(true);
+      // Set a timeout to break out of loading state if it takes too long
+      // This prevents the page from being stuck in loading state indefinitely
+      loadingTimeoutRef.current = setTimeout(() => {
+        // If still loading after 5 seconds, assume unauthenticated
+        // This handles cases where NextAuth gets stuck checking session
+        if (statusRef.current === "loading") {
+          console.warn("Session check timeout - assuming unauthenticated");
+          setSessionLoading(false);
+        }
+      }, 5000);
     } else if (status === "authenticated" && session) {
       setSessionLoading(false);
       // User is already logged in, redirect them
@@ -118,6 +140,14 @@ const Signin = () => {
     } else if (status === "unauthenticated") {
       setSessionLoading(false);
     }
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+    };
   }, [status, session, callbackUrl, router]);
 
   // Cleanup particles on component unmount
@@ -223,7 +253,9 @@ const Signin = () => {
         <div id="particles-js"></div>
 
          {/* Session Loading Overlay */}
-         {(sessionLoading || (status === "authenticated" || status === "loading")) && (
+         {/* Only show loader if we're actually loading AND haven't timed out */}
+         {/* Don't show loader if authenticated (will redirect) or if we've determined unauthenticated */}
+         {sessionLoading && status === "loading" && (
           <PageLoader isLoading={true} />
          )}
 

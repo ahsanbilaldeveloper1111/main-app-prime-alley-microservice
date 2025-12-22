@@ -27,6 +27,10 @@ class TokenService {
   private checkInterval: NodeJS.Timeout | null = null;
   private isRefreshing = false;
   private refreshPromise: Promise<string | null> | null = null;
+  private consecutiveFailures = 0;
+  private readonly MAX_CONSECUTIVE_FAILURES = 3;
+  private lastFailureTime: number | null = null;
+  private readonly FAILURE_COOLDOWN = 60 * 1000; // 1 minute cooldown after failures
 
   // Helper function to decode JWT token and get expiration
   private decodeToken(token: string): { exp: number; iat: number } | null {
@@ -350,9 +354,29 @@ class TokenService {
       return;
     }
 
+    // Check if we've had too many consecutive failures - stop trying to refresh
+    const now = Date.now();
+    if (this.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILURES) {
+      if (this.lastFailureTime && (now - this.lastFailureTime) < this.FAILURE_COOLDOWN) {
+        // Still in cooldown period, don't attempt refresh
+        return;
+      } else {
+        // Reset failure count after cooldown
+        this.consecutiveFailures = 0;
+        this.lastFailureTime = null;
+      }
+    }
+
+    // Check if refresh token is expired - if so, stop trying to refresh
+    if (tokens.refreshTokenExpires > 0 && tokens.refreshTokenExpires <= now) {
+      //console.log('Refresh token expired, stopping token service');
+      this.stop();
+      this.handleTokenRefreshFailure(new Error('Refresh token expired'));
+      return;
+    }
+
     // Check if access token is expired or about to expire (2 minutes before expiry)
     // Since tokens last 15 minutes, we refresh when 2 minutes remain
-    const now = Date.now();
     const timeUntilExpiry = tokens.accessTokenExpires - now;
     const REFRESH_THRESHOLD = 2 * 60 * 1000; // 2 minutes before expiry
     
@@ -370,13 +394,22 @@ class TokenService {
         const newToken = await this.refreshPromise;
         if (!newToken) {
           // console.log('⚠️ Token refresh failed, but not clearing session immediately');
+          // Increment failure count
+          this.consecutiveFailures++;
+          this.lastFailureTime = Date.now();
           // Don't immediately clear session on refresh failure
           // Let the axios interceptor handle it
         } else {
           // console.log('✅ Token refreshed successfully in background');
+          // Reset failure count on success
+          this.consecutiveFailures = 0;
+          this.lastFailureTime = null;
         }
       } catch (error) {
         // console.error('❌ Token refresh error:', error);
+        // Increment failure count
+        this.consecutiveFailures++;
+        this.lastFailureTime = Date.now();
         // Don't immediately clear session on error
         // Let the axios interceptor handle it
       } finally {
@@ -505,6 +538,10 @@ class TokenService {
   public clearTokens(): void {
    // console.log('Clearing tokens...');
     this.stop();
+    
+    // Reset failure tracking
+    this.consecutiveFailures = 0;
+    this.lastFailureTime = null;
     
     if (typeof window !== 'undefined' && window.sessionStorage) {
       sessionStorage.removeItem('accessToken');

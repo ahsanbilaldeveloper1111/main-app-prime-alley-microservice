@@ -7,6 +7,7 @@ import { toast } from 'react-toastify'
 import permissionsData from '@common/JsonData/PermissionsData'
 import { useRouter } from 'next/router'
 import { viewRank, assignPermissions } from '@utils/roles'
+import { CheckSquare, Square, Select } from 'lucide-react'
 import '@assets/scss/common.scss';
 
 interface Permission {
@@ -172,6 +173,64 @@ const EditRolePermission = () => {
         setRolePermissions(updatedPermissions);
     };
 
+    const handleSelectAll = () => {
+        const updatedPermissions = rolePermissions.map((group: PermissionGroup) => {
+            const updatedGroup = {
+                ...group,
+                enableAll: true,
+                permissions: group.permissions.map((permission: Permission) => ({
+                    ...permission,
+                    enabled: true
+                }))
+            };
+            
+            // Handle subGroups if they exist
+            if ((group as any).subGroups) {
+                (updatedGroup as any).subGroups = (group as any).subGroups.map((subGroup: any) => ({
+                    ...subGroup,
+                    enableAll: true,
+                    permissions: subGroup.permissions.map((permission: Permission) => ({
+                        ...permission,
+                        enabled: true
+                    }))
+                }));
+            }
+            
+            return updatedGroup;
+        });
+        setRolePermissions(updatedPermissions);
+        toast.success("All permissions selected!");
+    };
+
+    const handleUnselectAll = () => {
+        const updatedPermissions = rolePermissions.map((group: PermissionGroup) => {
+            const updatedGroup = {
+                ...group,
+                enableAll: false,
+                permissions: group.permissions.map((permission: Permission) => ({
+                    ...permission,
+                    enabled: false
+                }))
+            };
+            
+            // Handle subGroups if they exist
+            if ((group as any).subGroups) {
+                (updatedGroup as any).subGroups = (group as any).subGroups.map((subGroup: any) => ({
+                    ...subGroup,
+                    enableAll: false,
+                    permissions: subGroup.permissions.map((permission: Permission) => ({
+                        ...permission,
+                        enabled: false
+                    }))
+                }));
+            }
+            
+            return updatedGroup;
+        });
+        setRolePermissions(updatedPermissions);
+        toast.success("All permissions unselected!");
+    };
+
     const handleUpdateRole = async () => {
         const payload = {
             role_id: id as string,
@@ -249,7 +308,7 @@ const EditRolePermission = () => {
             </Row>
 
             <Row className="mb-3">
-                <Col md={6}>
+                <Col md={5}>
                     <div className="d-flex align-items-center gap-2 flex-wrap">
                         <span className="fw-semibold">Filter by Action:</span>
                         <Button
@@ -296,7 +355,7 @@ const EditRolePermission = () => {
                         </Button>
                     </div>
                 </Col>
-                <Col md={6}>
+                <Col md={5}>
                     <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
                         <span className="fw-semibold">Severity Level:</span>
                         <Button variant="outline-primary" size="sm" onClick={() => setSelectedSeverityLevel('')}>All</Button>
@@ -305,6 +364,26 @@ const EditRolePermission = () => {
                         <Button variant="outline-warning" size="sm" onClick={() => setSelectedSeverityLevel('High')}>High</Button>
                         <Button variant="outline-danger" size="sm" onClick={() => setSelectedSeverityLevel('Critical')}>Critical</Button>
                     </div>
+                </Col>
+                <Col md={2} className="d-flex justify-content-end gap-2">
+                    <Button 
+                        variant="outline-primary" 
+                        size="sm" 
+                        onClick={handleSelectAll}
+                        className="d-flex align-items-center gap-1"
+                    >
+                        
+                        Select All
+                    </Button>
+                    <Button 
+                        variant="outline-primary" 
+                        size="sm" 
+                        onClick={handleUnselectAll}
+                        className="d-flex align-items-center gap-1"
+                    >
+                       
+                        Unselect All
+                    </Button>
                 </Col>
             </Row>
 
@@ -339,7 +418,9 @@ const EditRolePermission = () => {
                                                     <div className="mb-2">
                                                         <div className="row">
                                                             {nonSpecialPermissions.map((perm: Permission, permIdx: number) => {
-                                                                const originalIndex = group.permissions.findIndex(p => p.id === perm.id);
+                                                                // Find the original index in the unfiltered rolePermissions array
+                                                                const originalGroup = rolePermissions[groupIdx];
+                                                                const originalIndex = originalGroup?.permissions.findIndex(p => p.id === perm.id) ?? -1;
                                                                 const groupKey = group.group.toLowerCase().replace(/\s+/g, '');
                                                                 return (
                                                                     <div className="col-md-4 mb-3" key={permIdx}>
@@ -355,11 +436,15 @@ const EditRolePermission = () => {
                                                                                     id={`${perm.key}_${groupKey}`}
                                                                                     label={perm.name}
                                                                                     checked={perm.enabled}
-                                                                                    onChange={() => handlePermissionChange(
-                                                                                        groupIdx,
-                                                                                        null,
-                                                                                        originalIndex
-                                                                                    )}
+                                                                                    onChange={() => {
+                                                                                        if (originalIndex !== -1) {
+                                                                                            handlePermissionChange(
+                                                                                                groupIdx,
+                                                                                                null,
+                                                                                                originalIndex
+                                                                                            );
+                                                                                        }
+                                                                                    }}
                                                                                 />
                                                                                 {perm?.severity_level && perm?.severity_level !== "" && (
                                                                                     <span className={`status-badge ${getSeverityBadgeClass(perm.severity_level)} ms-1 small`}>
@@ -384,7 +469,9 @@ const EditRolePermission = () => {
                                                         </h6>
                                                         <div className="row">
                                                             {specialPermissions.map((perm: Permission, permIdx: number) => {
-                                                                const originalIndex = group.permissions.findIndex(p => p.id === perm.id);
+                                                                // Find the original index in the unfiltered rolePermissions array
+                                                                const originalGroup = rolePermissions[groupIdx];
+                                                                const originalIndex = originalGroup?.permissions.findIndex(p => p.id === perm.id) ?? -1;
                                                                 const groupKey = group.group.toLowerCase().replace(/\s+/g, '');
                                                                 return (
                                                                     <div className="col-md-4 mb-3" key={permIdx}>
@@ -400,11 +487,15 @@ const EditRolePermission = () => {
                                                                                     id={`${perm.key}_${groupKey}`}
                                                                                     label={perm.name}
                                                                                     checked={perm.enabled}
-                                                                                    onChange={() => handlePermissionChange(
-                                                                                        groupIdx,
-                                                                                        null,
-                                                                                        originalIndex
-                                                                                    )}
+                                                                                    onChange={() => {
+                                                                                        if (originalIndex !== -1) {
+                                                                                            handlePermissionChange(
+                                                                                                groupIdx,
+                                                                                                null,
+                                                                                                originalIndex
+                                                                                            );
+                                                                                        }
+                                                                                    }}
                                                                                 />
                                                                                 {perm?.severity_level && perm?.severity_level !== "" && (
                                                                                     <span className={`status-badge ${getSeverityBadgeClass(perm.severity_level)} ms-1 small`}>
