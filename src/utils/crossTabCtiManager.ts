@@ -12,6 +12,34 @@ const MASTER_TAB_TIMEOUT = 5000; // 5 seconds - if master doesn't heartbeat, ele
 const HEARTBEAT_INTERVAL = 2000; // 2 seconds - master tab sends heartbeat
 const BROADCAST_CHANNEL_NAME = 'cti-broadcast-channel';
 
+// Helper function to safely access localStorage (works in Next.js SSR)
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key: string, value: string): void => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      // Ignore errors (e.g., quota exceeded)
+    }
+  },
+  removeItem: (key: string): void => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // Ignore errors
+    }
+  }
+};
+
 export interface CtiEvent {
   type: 'cti_event' | 'state_update' | 'heartbeat' | 'master_election' | 'master_heartbeat';
   data?: any;
@@ -31,12 +59,16 @@ export class CrossTabCtiManager {
 
   constructor() {
     this.tabId = this.generateTabId();
-    this.isSupported = typeof BroadcastChannel !== 'undefined';
+    // Check if we're in browser environment and BroadcastChannel is available
+    this.isSupported = typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined';
     
     if (this.isSupported) {
       this.initializeChannel();
       this.electMaster();
       this.startMasterMonitoring();
+    } else {
+      // In SSR or unsupported environment, this tab is master (fallback)
+      this.isMaster = true;
     }
   }
 
@@ -52,11 +84,6 @@ export class CrossTabCtiManager {
       
       this.channel.onmessage = (event: MessageEvent<CtiEvent>) => {
         this.handleMessage(event.data);
-      };
-
-      // Handle channel errors
-      this.channel.onerror = (error) => {
-        console.error('[CrossTabCtiManager] BroadcastChannel error:', error);
       };
     } catch (error) {
       console.error('[CrossTabCtiManager] Failed to initialize BroadcastChannel:', error);
@@ -87,7 +114,7 @@ export class CrossTabCtiManager {
       case 'master_heartbeat':
         // Master tab is alive
         if (event.tabId === this.getMasterTabId()) {
-          localStorage.setItem(`${MASTER_TAB_KEY}_heartbeat`, Date.now().toString());
+          safeLocalStorage.setItem(`${MASTER_TAB_KEY}_heartbeat`, Date.now().toString());
         }
         break;
 
@@ -103,7 +130,7 @@ export class CrossTabCtiManager {
     }
 
     const currentMaster = this.getMasterTabId();
-    const lastHeartbeat = localStorage.getItem(`${MASTER_TAB_KEY}_heartbeat`);
+    const lastHeartbeat = safeLocalStorage.getItem(`${MASTER_TAB_KEY}_heartbeat`);
     
     // If no master exists or master hasn't sent heartbeat recently, become master
     if (!currentMaster || !lastHeartbeat) {
@@ -131,8 +158,8 @@ export class CrossTabCtiManager {
 
   private becomeMaster(): void {
     this.isMaster = true;
-    localStorage.setItem(MASTER_TAB_KEY, this.tabId);
-    localStorage.setItem(`${MASTER_TAB_KEY}_heartbeat`, Date.now().toString());
+    safeLocalStorage.setItem(MASTER_TAB_KEY, this.tabId);
+    safeLocalStorage.setItem(`${MASTER_TAB_KEY}_heartbeat`, Date.now().toString());
     
     // Broadcast master election
     this.broadcast({
@@ -151,7 +178,7 @@ export class CrossTabCtiManager {
 
     this.heartbeatInterval = setInterval(() => {
       if (this.isMaster) {
-        localStorage.setItem(`${MASTER_TAB_KEY}_heartbeat`, Date.now().toString());
+        safeLocalStorage.setItem(`${MASTER_TAB_KEY}_heartbeat`, Date.now().toString());
         
         this.broadcast({
           type: 'master_heartbeat',
@@ -187,8 +214,8 @@ export class CrossTabCtiManager {
       window.addEventListener('beforeunload', () => {
         if (this.isMaster) {
           // Clear master status so another tab can take over
-          localStorage.removeItem(MASTER_TAB_KEY);
-          localStorage.removeItem(`${MASTER_TAB_KEY}_heartbeat`);
+          safeLocalStorage.removeItem(MASTER_TAB_KEY);
+          safeLocalStorage.removeItem(`${MASTER_TAB_KEY}_heartbeat`);
         }
       });
     }
@@ -206,7 +233,7 @@ export class CrossTabCtiManager {
     }
 
     // Check if current master is alive
-    const lastHeartbeat = localStorage.getItem(`${MASTER_TAB_KEY}_heartbeat`);
+    const lastHeartbeat = safeLocalStorage.getItem(`${MASTER_TAB_KEY}_heartbeat`);
     if (!lastHeartbeat) {
       // No heartbeat, elect new master
       this.electMaster();
@@ -230,11 +257,7 @@ export class CrossTabCtiManager {
   }
 
   private getMasterTabId(): string | null {
-    try {
-      return localStorage.getItem(MASTER_TAB_KEY);
-    } catch {
-      return null;
-    }
+    return safeLocalStorage.getItem(MASTER_TAB_KEY);
   }
 
   private broadcast(event: CtiEvent): void {
@@ -337,8 +360,8 @@ export class CrossTabCtiManager {
     }
 
     if (this.isMaster) {
-      localStorage.removeItem(MASTER_TAB_KEY);
-      localStorage.removeItem(`${MASTER_TAB_KEY}_heartbeat`);
+      safeLocalStorage.removeItem(MASTER_TAB_KEY);
+      safeLocalStorage.removeItem(`${MASTER_TAB_KEY}_heartbeat`);
     }
 
     if (this.channel) {
