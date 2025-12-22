@@ -7,6 +7,7 @@ import { usePermissions } from '../utils/permissionUtils';
 import { toast } from 'react-toastify';
 import DeviceSelectionModal from './DeviceSelectionModal';
 import { useRouter } from 'next/router';
+import { useDialerModal } from '../contexts/DialerModalContext';
 
 // Add styles for the floating call bar
 const floatingBarStyles = `
@@ -49,10 +50,14 @@ const GlobalFloatingCallBar: React.FC = () => {
     isInitialized,
     userAddress,
     activeCalls,
+    dnsMap,
     formatDuration,
     makeCall,
     dialNumber, // Use dialNumber for simplified calls
     endCall,
+    holdCall,
+    resumeCall,
+    transferCall,
     getCallingDeviceInfo,
     getAllUserDevices,
     canDialNumber,
@@ -61,34 +66,39 @@ const GlobalFloatingCallBar: React.FC = () => {
   
   const { hasPermission } = usePermissions();
   const router = useRouter();
-  
-  const [showDialerModal, setShowDialerModal] = useState(false);
+  const { isOpen: showDialerModal, closeDialer } = useDialerModal();
   const [dialedNumber, setDialedNumber] = useState('');
   const [isDialing, setIsDialing] = useState(false);
   const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false);
   const [availableDevices, setAvailableDevices] = useState<any[]>([]);
   const [pendingDialedNumber, setPendingDialedNumber] = useState('');
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferTarget, setTransferTarget] = useState('');
+  const [extensionSearch, setExtensionSearch] = useState('');
   
-  // Get the first active call (for display) - prefer connected calls
+  // Get the first active call (for display) - prefer connected calls, include onHold
   const activeCall = Array.from(activeCalls.values())
-    .filter(call => ['connected', 'ringing', 'dialing'].includes(call.status))
+    .filter(call => ['connected', 'ringing', 'dialing', 'onHold'].includes(call.status))
     .sort((a, b) => {
-      // Prioritize connected calls
+      // Prioritize connected calls, then onHold, then ringing
       if (a.status === 'connected' && b.status !== 'connected') return -1;
       if (b.status === 'connected' && a.status !== 'connected') return 1;
+      if (a.status === 'onHold' && !['connected'].includes(b.status)) return -1;
+      if (b.status === 'onHold' && !['connected'].includes(a.status)) return 1;
       return 0;
     })[0];
   
   // Don't show if CTI is not initialized or user doesn't have permission
   // Also check if we're on the dialer or live-calls page itself (to avoid duplicate UI)
+  // Only show if there's an active call (dialer button is now in topbar)
   const hideOnPages = ['/cti/dialer', '/cti/live-calls'];
-  if (!isInitialized || !hasPermission('dial-call-cti') || hideOnPages.includes(router.pathname)) {
+  if (!isInitialized || !hasPermission('dial-call-cti') || hideOnPages.includes(router.pathname) || !activeCall) {
     return null;
   }
   
   const handleDialerClick = () => {
-    // Open dialer modal
-    setShowDialerModal(true);
+    // Open dialer modal - handled by context
+    // This is now triggered from topbar via context
   };
   
   const handleDial = async (numberToDial: string = dialedNumber) => {
@@ -105,7 +115,7 @@ const GlobalFloatingCallBar: React.FC = () => {
       if (result.success) {
         toast.success(`Calling ${numberToDial}...`);
         setDialedNumber('');
-        setShowDialerModal(false);
+        closeDialer();
       } else {
         toast.error(result.error || 'Failed to make call');
       }
@@ -148,7 +158,7 @@ const GlobalFloatingCallBar: React.FC = () => {
       if (result.success) {
         toast.success(`Calling ${pendingDialedNumber}...`);
         setDialedNumber('');
-        setShowDialerModal(false);
+        closeDialer();
       } else {
         toast.error(result.error || 'Failed to make call');
       }
@@ -190,6 +200,128 @@ const GlobalFloatingCallBar: React.FC = () => {
     }
   };
   
+  const handleHoldCall = async () => {
+    if (!activeCall || !activeCall.callId) {
+      toast.error('Call ID not available');
+      return;
+    }
+    
+    const callingDevice = getCallingDeviceInfo();
+    if (!callingDevice) {
+      toast.error('No calling device information available');
+      return;
+    }
+    
+    try {
+      const result = await holdCall({
+        callId: activeCall.callId,
+        callingAddress: callingDevice.callingAddress,
+        calledAddress: activeCall.calledAddress || activeCall.number,
+        callingDeviceType: callingDevice.callingDeviceType,
+        callingDeviceName: callingDevice.callingDeviceName
+      });
+      
+      if (result.success) {
+        toast.success('Call put on hold');
+      } else {
+        toast.error(result.error || 'Failed to hold call');
+      }
+    } catch (error) {
+      toast.error('Failed to hold call');
+    }
+  };
+  
+  const handleResumeCall = async () => {
+    if (!activeCall || !activeCall.callId) {
+      toast.error('Call ID not available');
+      return;
+    }
+    
+    const callingDevice = getCallingDeviceInfo();
+    if (!callingDevice) {
+      toast.error('No calling device information available');
+      return;
+    }
+    
+    try {
+      const result = await resumeCall({
+        callId: activeCall.callId,
+        callingAddress: callingDevice.callingAddress,
+        calledAddress: activeCall.calledAddress || activeCall.number,
+        callingDeviceType: callingDevice.callingDeviceType,
+        callingDeviceName: callingDevice.callingDeviceName
+      });
+      
+      if (result.success) {
+        toast.success('Call resumed');
+      } else {
+        toast.error(result.error || 'Failed to resume call');
+      }
+    } catch (error) {
+      toast.error('Failed to resume call');
+    }
+  };
+  
+  const handleTransferCall = async () => {
+    if (!activeCall || !activeCall.callId) {
+      toast.error('Call ID not available');
+      return;
+    }
+    
+    if (!transferTarget.trim()) {
+      toast.error('Please select a target extension');
+      return;
+    }
+    
+    const callingDevice = getCallingDeviceInfo();
+    if (!callingDevice) {
+      toast.error('No calling device information available');
+      return;
+    }
+    
+    // Check if target extension is available
+    const targetCall = Array.from(activeCalls.values()).find(c => 
+      c.number === transferTarget && ['connected', 'ringing', 'dialing'].includes(c.status)
+    );
+    
+    if (targetCall) {
+      toast.error(`Extension ${transferTarget} is currently busy`);
+      return;
+    }
+    
+    try {
+      const result = await transferCall({
+        callId: activeCall.callId,
+        transferAddress: activeCall.calledAddress || activeCall.number,
+        targetAddress: transferTarget,
+        mode: 'BLIND'
+        // transferInitiatorAddress, transferInitiatorDeviceType, transferInitiatorDeviceName 
+        // are optional and will be auto-filled by transferCall function
+      });
+      
+      if (result.success) {
+        toast.success(`Call transferred to ${transferTarget}`);
+        setShowTransferModal(false);
+        setTransferTarget('');
+        setExtensionSearch('');
+      } else {
+        toast.error(result.error || 'Failed to transfer call');
+      }
+    } catch (error) {
+      toast.error('Failed to transfer call');
+    }
+  };
+  
+  const getAvailableExtensionsForTransfer = () => {
+    return getAvailableExtensions().filter(ext => {
+      // Filter out extensions that are currently in calls
+      const isInCall = Array.from(activeCalls.values()).some(call => 
+        call.number === ext && ['connected', 'ringing', 'dialing'].includes(call.status)
+      );
+      return !isInCall;
+    });
+  };
+  
   const handleOpenFullDialer = () => {
     router.push('/cti/dialer');
   };
@@ -217,9 +349,8 @@ const GlobalFloatingCallBar: React.FC = () => {
           transition: 'all 0.3s ease',
           cursor: 'pointer'
         }}
-        onClick={!activeCall ? handleDialerClick : undefined}
       >
-        {activeCall ? (
+        {activeCall && (
           <>
             {/* Active Call Info */}
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -246,6 +377,12 @@ const GlobalFloatingCallBar: React.FC = () => {
                   {formatDuration(activeCall.duration)}
                 </div>
               )}
+              {activeCall.status === 'onHold' && (
+                <div style={{ fontSize: '12px', color: '#ff9800', fontWeight: 500 }}>
+                  <i className="material-icons-two-tone me-1" style={{ fontSize: '14px', verticalAlign: 'middle' }}>pause_circle</i>
+                  On Hold
+                </div>
+              )}
               {activeCall.status === 'ringing' && (
                 <div className="call-status-ringing" style={{ fontSize: '12px', color: '#ff9800', fontWeight: 500 }}>
                   <i className="material-icons-two-tone me-1" style={{ fontSize: '14px', verticalAlign: 'middle' }}>phone_in_talk</i>
@@ -260,38 +397,94 @@ const GlobalFloatingCallBar: React.FC = () => {
               )}
             </div>
             
-            {/* End Call Button */}
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={handleEndCall}
-              style={{
-                borderRadius: '8px',
-                padding: '8px 12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
-            >
-              <i className="material-icons-two-tone" style={{ fontSize: '18px', backgroundColor: '#fff' }}>
-                call_end
-              </i>
-            </Button>
-          </>
-        ) : (
-          <>
-            {/* Dialer Button */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontWeight: 500,
-              color: '#0d6efd'
-            }}>
-              <i className="material-icons-two-tone" style={{ fontSize: '24px', backgroundColor: '#fff' }}>
-                dialpad
-              </i>
-              <span style={{ fontSize: '14px' }}>Dial</span>
+            {/* Call Control Buttons */}
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {activeCall.status === 'connected' && (
+                <>
+                  <Button
+                    variant="warning"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleHoldCall();
+                    }}
+                    style={{
+                      borderRadius: '8px',
+                      padding: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Hold Call"
+                  >
+                    <i className="material-icons-two-tone" style={{ fontSize: '18px', backgroundColor: '#fff' }}>
+                      pause
+                    </i>
+                  </Button>
+                  <Button
+                    variant="info"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowTransferModal(true);
+                    }}
+                    style={{
+                      borderRadius: '8px',
+                      padding: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    title="Transfer Call"
+                  >
+                    <i className="material-icons-two-tone" style={{ fontSize: '18px', backgroundColor: '#fff' }}>
+                      call_made
+                    </i>
+                  </Button>
+                </>
+              )}
+              {activeCall.status === 'onHold' && (
+                <Button
+                  variant="success"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleResumeCall();
+                  }}
+                  style={{
+                    borderRadius: '8px',
+                    padding: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  title="Resume Call"
+                >
+                  <i className="material-icons-two-tone" style={{ fontSize: '18px', backgroundColor: '#fff' }}>
+                    play_arrow
+                  </i>
+                </Button>
+              )}
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEndCall();
+                }}
+                style={{
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                title="End Call"
+              >
+                <i className="material-icons-two-tone" style={{ fontSize: '18px', backgroundColor: '#fff' }}>
+                  call_end
+                </i>
+              </Button>
             </div>
           </>
         )}
@@ -301,7 +494,7 @@ const GlobalFloatingCallBar: React.FC = () => {
       <Modal
         show={showDialerModal}
         onHide={() => {
-          setShowDialerModal(false);
+          closeDialer();
           setDialedNumber('');
         }}
         centered
@@ -414,6 +607,91 @@ const GlobalFloatingCallBar: React.FC = () => {
         onSelectDevice={handleDeviceSelect}
         extensionNumber={userAddress || ''}
       />
+      
+      {/* Transfer Call Modal */}
+      <Modal
+        show={showTransferModal}
+        onHide={() => {
+          setShowTransferModal(false);
+          setTransferTarget('');
+          setExtensionSearch('');
+        }}
+        centered
+        size="sm"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="material-icons-two-tone me-2">call_made</i>
+            Transfer Call
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form.Group className="mb-3">
+            <Form.Label className="fw-semibold">Select Target Extension</Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="Search extensions..."
+              value={extensionSearch}
+              onChange={(e) => setExtensionSearch(e.target.value)}
+              className="mb-2"
+            />
+            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+              {getAvailableExtensionsForTransfer()
+                .filter(ext => 
+                  extensionSearch === '' || 
+                  ext.toLowerCase().includes(extensionSearch.toLowerCase())
+                )
+                .map((ext) => {
+                  const extensionData = dnsMap?.[ext];
+                  const deviceList = extensionData ? Object.values(extensionData.devices || {}) : [];
+                  const isOnline = deviceList.some((d: any) => d.terminalState === 'REGISTERED');
+                  
+                  return (
+                    <Button
+                      key={ext}
+                      variant={transferTarget === ext ? 'primary' : 'outline-primary'}
+                      size="sm"
+                      className="w-100 mb-2"
+                      onClick={() => setTransferTarget(ext)}
+                    >
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span className="fw-bold">{ext}</span>
+                        <small className={isOnline ? 'text-success' : 'text-muted'}>
+                          {isOnline ? 'ONLINE' : 'OFFLINE'}
+                        </small>
+                      </div>
+                    </Button>
+                  );
+                })}
+            </div>
+            {getAvailableExtensionsForTransfer().length === 0 && (
+              <div className="alert alert-warning py-2">
+                <i className="material-icons-two-tone me-2">warning</i>
+                <small>No available extensions for transfer</small>
+              </div>
+            )}
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowTransferModal(false);
+              setTransferTarget('');
+              setExtensionSearch('');
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleTransferCall}
+            disabled={!transferTarget}
+          >
+            Transfer
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 };

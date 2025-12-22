@@ -98,9 +98,9 @@ interface CtiContextType {
   
   transferCall: (params: {
     callId: string;
-    transferInitiatorAddress: string;
-    transferInitiatorDeviceType: string;
-    transferInitiatorDeviceName: string;
+    transferInitiatorAddress?: string;
+    transferInitiatorDeviceType?: string;
+    transferInitiatorDeviceName?: string;
     transferAddress: string;
     targetAddress: string;
     mode: string;

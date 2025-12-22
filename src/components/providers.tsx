@@ -8,6 +8,7 @@ import SessionHandler from './SessionHandler';
 // import { FirebaseNotificationProvider } from './FirebaseNotificationProvider'; // Disabled Firebase notifications
 import { NotificationProvider } from '../contexts/NotificationContext';
 import { CtiProvider } from '../contexts/CtiContext';
+import { DialerModalProvider } from '../contexts/DialerModalContext';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -26,21 +27,23 @@ export default function Providers({ children, store }: ProvidersProps) {
       refetchWhenOffline={false}
     >
       <CtiProvider>
-        <NotificationProvider>
-          {/* <FirebaseNotificationProvider> */}
-            <TokenServiceProvider>
-              <SessionHandler>
-                {store ? (
-                  <Provider store={store}>
-                    {children}
-                  </Provider>
-                ) : (
-                  children
-                )}
-              </SessionHandler>
-            </TokenServiceProvider>
-          {/* </FirebaseNotificationProvider> */}
-        </NotificationProvider>
+        <DialerModalProvider>
+          <NotificationProvider>
+            {/* <FirebaseNotificationProvider> */}
+              <TokenServiceProvider>
+                <SessionHandler>
+                  {store ? (
+                    <Provider store={store}>
+                      {children}
+                    </Provider>
+                  ) : (
+                    children
+                  )}
+                </SessionHandler>
+              </TokenServiceProvider>
+            {/* </FirebaseNotificationProvider> */}
+          </NotificationProvider>
+        </DialerModalProvider>
       </CtiProvider>
     </SessionProvider>
   );
