@@ -98,8 +98,7 @@ const GlobalFloatingCallBar: React.FC = () => {
   if (
     !isInitialized ||
     !hasPermission("dial-call-cti") ||
-    hideOnPages.includes(router.pathname) ||
-    !activeCall
+    hideOnPages.includes(router.pathname)
   ) {
     return null;
   }
@@ -366,203 +365,187 @@ const GlobalFloatingCallBar: React.FC = () => {
             cursor: "pointer",
           }}
         >
-          {activeCall && (
-            <>
-              {/* Active Call Info */}
-              <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Active Call Info */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: "14px",
+                fontWeight: 600,
+                color: "#333",
+                marginBottom: "4px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {activeCall.number}
+            </div>
+            {activeCall.status === "connected" &&
+              activeCall.duration !== undefined && (
                 <div
                   style={{
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    color: "#333",
-                    marginBottom: "4px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {activeCall.number}
-                </div>
-                {activeCall.status === "connected" &&
-                  activeCall.duration !== undefined && (
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "#666",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
-                    >
-                      <i
-                        className="material-icons-two-tone"
-                        style={{ fontSize: "14px" }}
-                      >
-                        call
-                      </i>
-                      {formatDuration(activeCall.duration)}
-                    </div>
-                  )}
-                {activeCall.status === "onHold" && (
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "#ff9800",
-                      fontWeight: 500,
-                    }}
-                  >
-                    <i
-                      className="material-icons-two-tone me-1"
-                      style={{ fontSize: "14px", verticalAlign: "middle" }}
-                    >
-                      pause_circle
-                    </i>
-                    On Hold
-                  </div>
-                )}
-                {activeCall.status === "ringing" && (
-                  <div
-                    className="call-status-ringing"
-                    style={{
-                      fontSize: "12px",
-                      color: "#ff9800",
-                      fontWeight: 500,
-                    }}
-                  >
-                    <i
-                      className="material-icons-two-tone me-1"
-                      style={{ fontSize: "14px", verticalAlign: "middle" }}
-                    >
-                      phone_in_talk
-                    </i>
-                    Ringing...
-                  </div>
-                )}
-                {activeCall.status === "dialing" && (
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "#ff9800",
-                      fontWeight: 500,
-                    }}
-                  >
-                    <i
-                      className="material-icons-two-tone me-1"
-                      style={{ fontSize: "14px", verticalAlign: "middle" }}
-                    >
-                      call_made
-                    </i>
-                    Dialing...
-                  </div>
-                )}
-              </div>
-
-              {/* Call Control Buttons */}
-              <div style={{ display: "flex", gap: "4px" }}>
-                {activeCall.status === "connected" && (
-                  <>
-                    <Button
-                      variant="warning"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleHoldCall();
-                      }}
-                      style={{
-                        borderRadius: "8px",
-                        padding: "8px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                      title="Hold Call"
-                    >
-                      <i
-                        className="material-icons-two-tone"
-                        style={{ fontSize: "18px", backgroundColor: "#fff" }}
-                      >
-                        pause
-                      </i>
-                    </Button>
-                    <Button
-                      variant="info"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowTransferModal(true);
-                      }}
-                      style={{
-                        borderRadius: "8px",
-                        padding: "8px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                      title="Transfer Call"
-                    >
-                      <i
-                        className="material-icons-two-tone"
-                        style={{ fontSize: "18px", backgroundColor: "#fff" }}
-                      >
-                        call_made
-                      </i>
-                    </Button>
-                  </>
-                )}
-                {activeCall.status === "onHold" && (
-                  <Button
-                    variant="success"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleResumeCall();
-                    }}
-                    style={{
-                      borderRadius: "8px",
-                      padding: "8px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                    title="Resume Call"
-                  >
-                    <i
-                      className="material-icons-two-tone"
-                      style={{ fontSize: "18px", backgroundColor: "#fff" }}
-                    >
-                      play_arrow
-                    </i>
-                  </Button>
-                )}
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEndCall();
-                  }}
-                  style={{
-                    borderRadius: "8px",
-                    padding: "8px 12px",
+                    fontSize: "12px",
+                    color: "#666",
                     display: "flex",
                     alignItems: "center",
                     gap: "4px",
                   }}
-                  title="End Call"
+                >
+                  <i
+                    className="material-icons-two-tone"
+                    style={{ fontSize: "14px" }}
+                  >
+                    call
+                  </i>
+                  {formatDuration(activeCall.duration)}
+                </div>
+              )}
+            {activeCall.status === "onHold" && (
+              <div
+                style={{ fontSize: "12px", color: "#ff9800", fontWeight: 500 }}
+              >
+                <i
+                  className="material-icons-two-tone me-1"
+                  style={{ fontSize: "14px", verticalAlign: "middle" }}
+                >
+                  pause_circle
+                </i>
+                On Hold
+              </div>
+            )}
+            {activeCall.status === "ringing" && (
+              <div
+                className="call-status-ringing"
+                style={{ fontSize: "12px", color: "#ff9800", fontWeight: 500 }}
+              >
+                <i
+                  className="material-icons-two-tone me-1"
+                  style={{ fontSize: "14px", verticalAlign: "middle" }}
+                >
+                  phone_in_talk
+                </i>
+                Ringing...
+              </div>
+            )}
+            {activeCall.status === "dialing" && (
+              <div
+                style={{ fontSize: "12px", color: "#ff9800", fontWeight: 500 }}
+              >
+                <i
+                  className="material-icons-two-tone me-1"
+                  style={{ fontSize: "14px", verticalAlign: "middle" }}
+                >
+                  call_made
+                </i>
+                Dialing...
+              </div>
+            )}
+          </div>
+
+          {/* Call Control Buttons */}
+          <div style={{ display: "flex", gap: "4px" }}>
+            {activeCall.status === "connected" && (
+              <>
+                <Button
+                  variant="warning"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleHoldCall();
+                  }}
+                  style={{
+                    borderRadius: "8px",
+                    padding: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  title="Hold Call"
                 >
                   <i
                     className="material-icons-two-tone"
                     style={{ fontSize: "18px", backgroundColor: "#fff" }}
                   >
-                    call_end
+                    pause
                   </i>
                 </Button>
-              </div>
-            </>
-          )}
+                <Button
+                  variant="info"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowTransferModal(true);
+                  }}
+                  style={{
+                    borderRadius: "8px",
+                    padding: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  title="Transfer Call"
+                >
+                  <i
+                    className="material-icons-two-tone"
+                    style={{ fontSize: "18px", backgroundColor: "#fff" }}
+                  >
+                    call_made
+                  </i>
+                </Button>
+              </>
+            )}
+            {activeCall.status === "onHold" && (
+              <Button
+                variant="success"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleResumeCall();
+                }}
+                style={{
+                  borderRadius: "8px",
+                  padding: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                title="Resume Call"
+              >
+                <i
+                  className="material-icons-two-tone"
+                  style={{ fontSize: "18px", backgroundColor: "#fff" }}
+                >
+                  play_arrow
+                </i>
+              </Button>
+            )}
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEndCall();
+              }}
+              style={{
+                borderRadius: "8px",
+                padding: "8px 12px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+              title="End Call"
+            >
+              <i
+                className="material-icons-two-tone"
+                style={{ fontSize: "18px", backgroundColor: "#fff" }}
+              >
+                call_end
+              </i>
+            </Button>
+          </div>
         </div>
       )}
-
+      {showDialerModal ? "ASDASD" : "DEFDEF"}
       {/* Quick Dialer Modal */}
       <Modal
         show={showDialerModal}
