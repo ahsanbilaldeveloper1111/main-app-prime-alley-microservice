@@ -51,12 +51,12 @@ const UsersHeader: React.FC<UsersHeaderProps> = ({
                                 </div> */}
                                 {/* <UsersFilters onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
                                
-                                {/* {session?.user?.permissions?.includes('create-useres') && ( */}
+                                {session?.user?.permissions?.includes('add-useres') && (
                                     <Button variant="primary" 
                                     onClick={() => router.push('/tms/profiling/user/create')}>
                                         <FiPlus size={16} className="me-2" /> Add User
                                     </Button>
-                                {/* )} */}
+                                )}
                                
                                 {session?.user?.permissions?.includes('sync-ldap') && (
                                     <Button variant="info" onClick={() => syncLdapUsers()}>

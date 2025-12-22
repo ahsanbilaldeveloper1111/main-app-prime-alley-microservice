@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Button } from 'react-bootstrap';
+import { CheckCircle } from 'lucide-react';
 
 interface SuccessfulModalProps {
   show: boolean;
@@ -12,6 +13,9 @@ interface SuccessfulModalProps {
   onConfirm?: () => void;
   onCancel?: () => void;
   showCloseButton?: boolean;
+  additionalInfo?: React.ReactNode;
+  loading?: boolean;
+  confirmButtonVariant?: 'primary' | 'danger' | 'warning' | 'success';
 }
 
 const SuccessfulModal: React.FC<SuccessfulModalProps> = ({
@@ -24,7 +28,10 @@ const SuccessfulModal: React.FC<SuccessfulModalProps> = ({
   cancelButtonText = "Cancel",
   onConfirm,
   onCancel,
-  showCloseButton = true
+  showCloseButton = true,
+  additionalInfo,
+  loading = false,
+  confirmButtonVariant = 'primary',
 }) => {
   const handleConfirm = () => {
     if (onConfirm) {
@@ -42,56 +49,56 @@ const SuccessfulModal: React.FC<SuccessfulModalProps> = ({
     }
   };
 
-  // if (!show) return null;
-
-  // return (
-  //   <div id="action-modal" className="modal customModal" style={{display: 'flex'}}>
-  //     <div className="modal-content">
-  //         {showCloseButton && (
-  //         <span className="close-btn" id="action-close-btn" onClick={onHide}>
-  //           <i className="fas fa-times"></i>
-  //         </span>
-  //       )}
-  //       <h2 id="action-modal-title">{title}</h2>
-  //       <p id="action-modal-text">{description}</p>
-  //       <div className="modal-footer">
-  //         {showCancelButton && (
-  //           <button 
-  //             className="btn btn-export" 
-  //             id="action-cancel-btn" 
-  //             onClick={handleCancel}
-  //           >
-  //             {cancelButtonText}
-  //           </button>
-  //         )}
-  //         <button 
-  //           className="btn btn-primary" 
-  //           id="action-confirm-btn" 
-  //           onClick={handleConfirm}
-  //         >
-  //           {confirmButtonText}
-  //         </button>
-  //       </div>
-  //     </div>
-  //   </div>
-  // );
+  const handleClose = () => {
+    onHide();
+  };
 
   return (
-    <Modal show={show} onHide={onHide} centered>
-      <Modal.Header closeButton={showCloseButton}>
+    <Modal
+      show={show}
+      onHide={handleClose}
+      centered
+    >
+      <Modal.Header closeButton={showCloseButton} className="border-bottom">
         <Modal.Title>{title}</Modal.Title>
       </Modal.Header>
-      <Modal.Body>
-        <p>{description}</p>
+      <Modal.Body className="p-4">
+        <div className="text-center">
+          <CheckCircle size={48} className="text-success mb-3" />
+          <p className="mb-0">
+            {description}
+          </p>
+          
+          {additionalInfo && (
+            <div className="mb-3">
+              {additionalInfo}
+            </div>
+          )}
+        </div>
       </Modal.Body>
-      <Modal.Footer>
+      <Modal.Footer className="border-top">
         {showCancelButton && (
-          <Button variant="secondary" onClick={handleCancel}>
+          <Button
+            variant="secondary"
+            onClick={handleCancel}
+            disabled={loading}
+          >
             {cancelButtonText}
           </Button>
         )}
-        <Button variant="primary" onClick={handleConfirm}>
-          {confirmButtonText}
+        <Button
+          variant={confirmButtonVariant}
+          onClick={handleConfirm}
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <div className="spinner-border spinner-border-sm me-1" role="status" />
+              {confirmButtonText}...
+            </>
+          ) : (
+            confirmButtonText
+          )}
         </Button>
       </Modal.Footer>
     </Modal>

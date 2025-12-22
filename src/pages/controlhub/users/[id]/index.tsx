@@ -268,7 +268,7 @@ const UserView = () => {
                             />
                         </Tab>
 
-                        {session?.user?.is_admin && (session?.user?.permissions?.includes('extend-permission-users') || session?.user?.permissions?.includes('block-permission-users')) && (
+                        {/* {session?.user?.is_admin && (session?.user?.permissions?.includes('extend-permission-users') || session?.user?.permissions?.includes('block-permission-users')) && (
                             <Tab eventKey="permissions" title="Permissions">
                                 <PermissionsTab
                                     allPermission={allPermission}
@@ -280,7 +280,7 @@ const UserView = () => {
                                     onPermissionsUpdate={fetchUserPermissions}
                                 />
                             </Tab>
-                        )}
+                        )} */}
 
                         {/* {session?.user?.is_admin && (session?.user?.permissions?.includes('link-users') || session?.user?.permissions?.includes('unlink-users')) && (
                             <Tab eventKey="linked-users" title="Linked Users">
@@ -307,6 +307,8 @@ const UserView = () => {
                                 />
                             </Tab>
                         )}
+                        
+                        {session?.user?.is_admin && (session?.user?.permissions?.includes('update-calling-access')) && (
 
                         <Tab eventKey="calling-access" title="Calling Access">
                             <Card>
@@ -436,6 +438,7 @@ const UserView = () => {
                                 </Card.Body>
                             </Card>
                         </Tab>
+                        )}
 
                         {/* {(session?.user?.permissions?.includes('company-link-users') || session?.user?.permissions?.includes('company-unlink-users')) && (
                             <Tab eventKey="linked-companies" title="Linked Companies">

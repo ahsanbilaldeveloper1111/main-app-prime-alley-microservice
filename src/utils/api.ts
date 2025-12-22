@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { getCurrentAccessToken, isTokenExpired } from './tokenUtils';
 import { clearAllLocalStorage } from './localStorageUtils';
+import { signOut } from 'next-auth/react';
 
 // Create axios instance with default configuration
 const apiClient = axios.create({
@@ -50,7 +51,16 @@ apiClient.interceptors.request.use(
               if (typeof window !== 'undefined') {
                 sessionStorage.clear();
                 clearAllLocalStorage();
-                window.location.href = '/auth/signin';
+                // Properly clear NextAuth session to prevent refresh loops
+                signOut({ 
+                  callbackUrl: '/auth/signin',
+                  redirect: false // We'll redirect manually
+                }).then(() => {
+                  window.location.href = '/auth/signin';
+                }).catch(() => {
+                  // If signOut fails, still redirect
+                  window.location.href = '/auth/signin';
+                });
               }
             }
             return config;
@@ -75,7 +85,16 @@ apiClient.interceptors.request.use(
           if (typeof window !== 'undefined') {
             sessionStorage.clear();
             clearAllLocalStorage();
-            window.location.href = '/auth/signin';
+            // Properly clear NextAuth session to prevent refresh loops
+            signOut({ 
+              callbackUrl: '/auth/signin',
+              redirect: false // We'll redirect manually
+            }).then(() => {
+              window.location.href = '/auth/signin';
+            }).catch(() => {
+              // If signOut fails, still redirect
+              window.location.href = '/auth/signin';
+            });
           }
         }
       } else {
@@ -119,7 +138,16 @@ apiClient.interceptors.response.use(
         if (typeof window !== 'undefined') {
           sessionStorage.clear();
           clearAllLocalStorage();
-          window.location.href = '/auth/signin';
+          // Properly clear NextAuth session to prevent refresh loops
+          signOut({ 
+            callbackUrl: '/auth/signin',
+            redirect: false // We'll redirect manually
+          }).then(() => {
+            window.location.href = '/auth/signin';
+          }).catch(() => {
+            // If signOut fails, still redirect
+            window.location.href = '/auth/signin';
+          });
         }
       }
     } else if (error.response?.status === 403) {
@@ -231,7 +259,17 @@ export const authAPI = {
       // If refresh fails, clear tokens and redirect to login
       if (typeof window !== 'undefined') {
         sessionStorage.clear();
-        window.location.href = '/auth/signin';
+        clearAllLocalStorage();
+        // Properly clear NextAuth session to prevent refresh loops
+        signOut({ 
+          callbackUrl: '/auth/signin',
+          redirect: false // We'll redirect manually
+        }).then(() => {
+          window.location.href = '/auth/signin';
+        }).catch(() => {
+          // If signOut fails, still redirect
+          window.location.href = '/auth/signin';
+        });
       }
       throw error;
     }

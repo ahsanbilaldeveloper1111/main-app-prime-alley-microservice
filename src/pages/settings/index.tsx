@@ -208,6 +208,7 @@ const Settings = () => {
               >
             
             {/* User Management Tab */}
+            {session?.user?.permissions?.includes(PERMISSIONS.CONTROL_HUB_SERVICES) && (
             <Tab eventKey="user-management" title="User Management">
               <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
                 <Row>
@@ -269,8 +270,10 @@ const Settings = () => {
                 </Row>
               </div>
             </Tab>
+            )}
             
             {/* CRM Tab */}
+            {session?.user?.permissions?.includes(PERMISSIONS.CRM_SERVICES) && (
             <Tab eventKey="crm" title="CRM Management">
               <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
                 <Row>
@@ -320,8 +323,10 @@ const Settings = () => {
                 </Row>
               </div>
             </Tab>
+            )}
 
             {/* Telco Gateway Tab */}
+            {session?.user?.permissions?.includes(PERMISSIONS.GSM_SERVICES) && (
             <Tab eventKey="telco-gateway" title="Telco Gateway">
               <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
                 <Row>
@@ -373,11 +378,13 @@ const Settings = () => {
                 </Row>
               </div>
             </Tab>
+            )}
 
             {/* Billing Tab */}
-            <Tab eventKey="billing" title="Billing & Payments">
-              <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
-                <Row>
+            {session?.user?.permissions?.includes(PERMISSIONS.ACCOUNTS_SERVICES) && (
+              <Tab eventKey="billing" title="Billing & Payments">
+                <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
+                  <Row>
                   <Col md={12}>
                     <div style={{ marginTop: '20px' }}>
                       {shouldRenderTab("billing") && session?.user?.permissions?.includes(PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING) && (
@@ -388,10 +395,12 @@ const Settings = () => {
                 </Row>
               </div>
             </Tab>
+            )}
 
             
 
             {/* Netops Tab */}
+            {session?.user?.permissions?.includes(PERMISSIONS.NETOPS_SERVICES) && (
             <Tab eventKey="devices-management" title="Devices Management (NetOps)">
               <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
                 <Row>
@@ -443,8 +452,10 @@ const Settings = () => {
                 </Row>
               </div>
             </Tab>
+            )}
 
             {/* Tickets Tab */}
+            {session?.user?.permissions?.includes(PERMISSIONS.TICKETS_SERVICES) && (
             <Tab eventKey="tickets" title="Tickets">
               <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
                 <Row>
@@ -515,6 +526,7 @@ const Settings = () => {
                 </Row>
               </div>
             </Tab>
+            )}
           </Tabs>
             </Card.Body>
           </Card>

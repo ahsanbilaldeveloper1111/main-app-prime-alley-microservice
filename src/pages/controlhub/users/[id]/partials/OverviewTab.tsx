@@ -131,20 +131,24 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                                     <p className="mb-0 small text-primary"><b>Rank</b></p>
                                     <p className="mb-2 text-capitalize d-flex justify-content-between">
                                         {currentUser?.role?.name || 'Rank not assigned'}
+                                        {session?.user?.permissions?.includes('assign-rank-users') && (
                                         <span>
                                             <i className="ti ti-edit" onClick={() => {
                                                 setShowChangeRoleModal(true);
                                             }} style={{ cursor: 'pointer' }}></i>
                                         </span>
+                                        )}
                                     </p>
                                     <p className="mb-0 small text-primary"><b>Group</b></p>
                                     <p className="mb-2 text-capitalize d-flex justify-content-between">
                                         {currentUser?.group?.name || 'Group not assigned'}
+                                        {session?.user?.permissions?.includes('assign-group-users') && (
                                         <span>
                                             <i className="ti ti-edit" onClick={() => {
                                                 setShowChangeGroupModal(true);
                                             }} style={{ cursor: 'pointer' }}></i>
                                         </span>
+                                        )}
                                     </p>
                                     {session?.user?.permissions?.includes('mark-company-admin-users') && (
                                         <div>
