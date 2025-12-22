@@ -107,6 +107,7 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import { ModuleSlug } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
+import { useCti } from "../../../contexts/CtiContext";
 
 // KPI Card Component (from crm-new.tsx design)
 interface KPICardData {
@@ -397,6 +398,7 @@ const getRandomColor = (name: string): string => {
 
 const CrmProspectsManagement = () => {
   const { data: session } = useSession();
+  const { dialNumber, isInitialized } = useCti();
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const requestIdRef = useRef(0);
@@ -1591,14 +1593,31 @@ const CrmProspectsManagement = () => {
   }, []);
 
   // Handle call button click
-  const handleCallClick = useCallback((item: CrmDataItem) => {
+  const handleCallClick = useCallback(async (item: CrmDataItem) => {
     const phone = item.phone;
     if (!phone) {
       toast.error("No phone number available for this entry");
       return;
     }
-    window.location.href = `tel://${phone}`;
-  }, []);
+    
+    if (!isInitialized) {
+      toast.error("CTI not initialized. Please wait...");
+      return;
+    }
+    
+    try {
+      const result = await dialNumber(phone);
+      
+      if (result.success) {
+        toast.success(`Calling ${item.name || phone}...`);
+      } else {
+        toast.error(result.error || "Failed to make call");
+      }
+    } catch (error) {
+      console.error("Call error:", error);
+      toast.error("Failed to make call");
+    }
+  }, [dialNumber, isInitialized]);
 
   // Handle recording playback
   const handlePlayRecording = useCallback((recordingUrl: string) => {

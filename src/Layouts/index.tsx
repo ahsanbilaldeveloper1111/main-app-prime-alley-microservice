@@ -11,6 +11,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useNotifications } from '../contexts/NotificationContext';
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 import ProfileSidebar from '@components/profile-sidebar';
+import { useDialerModal } from '../contexts/DialerModalContext';
 
 import CompanyLogo2 from "@assets/images/Prime3.png";
 import { 
@@ -37,6 +38,7 @@ const Layout = ({ children }: LayoutProps) => {
 	const router = useRouter();
 	const { data: session, status } = useSession();
 	const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotification } = useNotifications();
+	const { openDialer } = useDialerModal();
 
 	const [sidebarOpen, setSidebarOpen] = useState(true);
 	const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
@@ -130,12 +132,18 @@ const Layout = ({ children }: LayoutProps) => {
           </div>
           <div className="ms-auto d-flex align-items-center gap-3">
 
-{session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
-<Button variant="link" size="sm" className="text-dark position-relative" onClick={() => router.push('/cti/dialer')}>
-              <PhoneCall size={20} />
-             </Button>
-             )}
-
+            {/* Call Button - Opens Dialer Modal */}
+            {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
+              <Button 
+                variant="link" 
+                size="sm" 
+                className="text-dark position-relative" 
+                onClick={openDialer}
+                title="Open Dialer"
+              >
+                <PhoneCall size={20} />
+              </Button>
+            )}
 
 <Button variant="link" size="sm" className="text-dark position-relative">
               <Bell size={20} />
