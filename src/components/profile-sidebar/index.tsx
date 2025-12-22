@@ -62,13 +62,16 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
+          background: transparent;
           z-index: 1040;
-          display: none !important;
+          display: none;
+          opacity: 0;
+          transition: opacity 0.3s ease-in-out;
         }
 
         .profile-sidebar-overlay.show {
-          display: none !important;
+          display: block;
+          opacity: 1;
         }
 
         .profile-sidebar {
@@ -360,13 +363,18 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
       `}</style>
 
       {/* Overlay */}
-      <div 
-        className={`profile-sidebar-overlay ${isOpen ? 'show' : ''}`}
-        onClick={onClose}
-      />
+      {isOpen && onClose && (
+        <div 
+          className={`profile-sidebar-overlay ${isOpen ? 'show' : ''}`}
+          onClick={onClose}
+        />
+      )}
 
       {/* Sidebar */}
-      <div className={`profile-sidebar ${isOpen ? 'show' : ''}`}>
+      <div 
+        className={`profile-sidebar ${isOpen ? 'show' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="profile-sidebar-header">
           <h3 className="profile-sidebar-title">Profile</h3>

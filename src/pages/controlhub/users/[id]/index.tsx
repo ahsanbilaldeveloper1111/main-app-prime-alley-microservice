@@ -308,7 +308,7 @@ const UserView = () => {
                             </Tab>
                         )}
                         
-                        {session?.user?.is_admin && (session?.user?.permissions?.includes('update-calling-access')) && (
+                        {session?.user?.is_admin && (session?.user?.permissions?.includes('update-calling-access-users')) && (
 
                         <Tab eventKey="calling-access" title="Calling Access">
                             <Card>
