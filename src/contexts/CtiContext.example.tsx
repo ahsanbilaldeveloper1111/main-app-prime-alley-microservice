@@ -96,8 +96,11 @@ export const ActiveCallsList: React.FC = () => {
   const handleEndCall = async (callId: string, calledAddress: string) => {
     const result = await endCall({
       callId,
-      calledAddress
+      calledAddress,
       // Device info will be automatically retrieved
+      callingAddress: getCallingDeviceInfo()?.callingAddress || '',
+      callingDeviceType: getCallingDeviceInfo()?.callingDeviceType || '',
+      callingDeviceName: getCallingDeviceInfo()?.callingDeviceName || ''
     });
     
     if (result.success) {
