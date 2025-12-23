@@ -1,466 +1,624 @@
 import React,{ReactElement, useEffect, useState} from 'react'
 import Layout from '@layout/index'
-import ImageStatus6 from '@assets/images/widget/img-status-6.svg'
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/router';
-import Link from 'next/link';
-import { Button, Col, Row } from 'react-bootstrap';
-import AnimatedNumber from '@components/AnimatedNumber';
 import "@assets/scss/dashboard.scss";
 import "@assets/scss/common.scss";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import { HEADER_CONSTANTS } from '@constants/headerConstants';
-import { useFCM } from '@hooks/useFCM';
-const { BASE_URL, MENU_LABELS, SUBMENU_LABELS, ICONS, PERMISSIONS } = HEADER_CONSTANTS;
-
-interface Summary {
-    online_agents: number;
-    calls_handled: number;
-    active_calls: number;
-}
+import {  Row, Col, Card, Button, ProgressBar, Badge, Form } from 'react-bootstrap';
+import {
+  Search,
+  FileText,
+  Users,
+  ShoppingCart,
+  Phone,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertCircle,
+  MessageSquare,
+  PhoneCall,
+  AlertOctagon,
+  DollarSign,
+  Wrench,
+  Package,
+  Ban,
+} from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import TimezoneSearch from '@components/TimezoneSearch';
 
 const Dashboard = () => {
-    const { data: session, status } = useSession();
-    const router = useRouter();
-    const [permissions, setPermissions] = useState<string[]>([]);
-    const [isAdmin, setIsAdmin] = useState(false);
-    const { permission: notificationPermission, isSupported: isNotificationSupported, requestPermission } = useFCM(false, false);
-
-    const [summary, setSummary] = useState<Summary>({
-        online_agents: 22,
-        calls_handled: 550,
-        active_calls: 150,
-    });
-    const [summaryCards, setSummaryCards] = useState<SummaryCard[]>([
-        {
-            id: 'online-agents',
-            title: 'Online Agents',
-            value: summary.online_agents,
-            description: 'Online agents in the system',
-            delay: 0.1,
-        },
-        {
-            id: 'calls-handled',
-            title: 'Calls Handled',
-            value: summary.calls_handled,
-            description: 'Calls handled in the system',
-            delay: 0.2,
-        },
-        {
-            id: 'active-calls',
-            title: 'Active Calls',
-            value: summary.active_calls,
-            description: 'Active calls in the system',
-            delay: 0.3,
-        },
-    ]);
-
-    useEffect(() => {
-        if (status !== "loading") {
-            if (session && status === "authenticated") {
-                setPermissions(session.user?.permissions || []);
-                setIsAdmin(Boolean(session.user?.is_admin));
-            }
-        }
-    }, [status, session]);
-
-    const serviceCards = [
-        
-      
-        {
-            id: 'call-logs-services',
-            title: MENU_LABELS.CALL_HISTORY,
-            // subtitle: 'Call Logs',
-            description: 'Monitor, record, and manage all incoming and outgoing call history and activity.',
-            icon: <i className="ph-duotone ph-phone"></i>,
-            gradient: 'from-purple-500 to-violet-600',
-            link: '/call-logs/dashboard'
-        },
-        // {
-        //     id: 'call-recordings-services',
-        //     title: MENU_LABELS.CALL_RECORDINGS,
-        //     // subtitle: 'Voice Records',
-        //     description: 'Access and manage recorded calls for quality assurance and compliance.',
-        //     icon: <i className="ph-duotone ph-microphone"></i>,
-        //     gradient: 'from-orange-500 to-red-600',
-        //     link: '/call-recordings'
-        // },
-        {
-            id: 'health-care-services',
-            title: MENU_LABELS.NETOPS,
-            // subtitle: 'Accounts',
-            description: 'Track, monitor, and control all network operations seamlessly with NetOps',
-            icon: <i className="ph-duotone ph-brain"></i>,
-            gradient: 'from-pink-500 to-rose-600',
-            link: '/netops/dashboard'
-        },
-       
-        {
-            id: 'gsm-services',
-            title: MENU_LABELS.SIM_GATEWAY,
-            // subtitle: 'GSM Services',
-            description: 'Comprehensive SMS management and messaging services for your business.',
-            icon: <i className="ph-duotone ph-phone"></i>,
-            gradient: 'from-green-500 to-emerald-600',
-            link: '/gsm/dashboard'
-        },
-        
-        
-        // {
-        //     id: 'ai-ml-services',
-        //     title: 'Analytics',
-        //     // subtitle: 'AI & ML',
-        //     description: 'AI-driven insights that turn raw data into clear directions.',
-        //     icon: <i className="ph-duotone ph-brain"></i>,
-        //     gradient: 'from-pink-500 to-rose-600'
-        // },
-        // {
-        //     id: 'tms-services',
-        //     title: 'TMS',
-        //     // subtitle: 'Telephony Management System',
-        //     description: 'Centralized control for all your telephony operations. ',
-        //     icon: <i className="ph-duotone ph-phone"></i>,
-        //     gradient: 'from-pink-500 to-rose-600'
-        // },
-        
-        // {
-        //     id: 'sales-services',
-        //     title: 'Sales Management',
-        //     // subtitle: 'Sales Management',
-        //     description: 'Track leads, deals and sales performance with clarity.',
-        //     icon: <i className="ph-duotone ph-brain"></i>,
-        //     gradient: 'from-pink-500 to-rose-600',
-        //     link: '/coming-soon'
-        // },
-       
-        // {
-        //     id: 'dncr-servicess',
-        //     title: 'Do Not Call Registry',
-        //     // subtitle: 'Do Not Call Registry',
-        //     description: 'Keep your outreach compliant and protected.',
-        //     icon: <i className="ph-duotone ph-brain"></i>,
-        //     gradient: 'from-pink-500 to-rose-600',
-        //     link: '/coming-soon'
-        // },
-        // {
-        //     id: 'webrtc-servicess',
-        //     title: 'WebRTC',
-        //     // subtitle: 'Web Real-Time Communication',
-        //     description: 'Call directly through your browser with enterprise-grade clarity.',
-        //     icon: <i className="ph-duotone ph-brain"></i>,
-        //     gradient: 'from-pink-500 to-rose-600',
-        //     link: '/coming-soon'
-        // },
-        // {
-        //     id: 'omni-channel-servicess',
-        //     title: 'Omni Channel',
-        //     // subtitle: 'Omni Channel',
-        //     description: 'Voice, chat, email, and social, all connected in one window.',
-        //     icon: <i className="ph-duotone ph-brain"></i>,
-        //     gradient: 'from-pink-500 to-rose-600',
-        //     link: '/coming-soon'
-        // },
-        // {
-        //     id: 'hr-servicess',
-        //     title: 'Human Resources',
-        //     // subtitle: 'Human Resources',
-        //     description: 'Manage your employees, payroll, and benefits with ease.',
-        //     icon: <i className="ph-duotone ph-brain"></i>,
-        //     gradient: 'from-pink-500 to-rose-600',
-        //     link: '/coming-soon'
-        // },
-        {
-            id: 'accounts-servicess',
-            title: MENU_LABELS.BILLING,
-            // subtitle: 'Accounts',
-            description: 'Manage your accounts, payroll, and benefits with ease.',
-            icon: <i className="ph-duotone ph-brain"></i>,
-            gradient: 'from-pink-500 to-rose-600',
-            link: '/accounts'
-        },
-        {
-            id: 'crm-servicess',
-            title: MENU_LABELS.CRM,
-            // subtitle: 'Customer Relationship Management',
-            description: 'Instant access to customer profiles, interaction history, and key touch points, all in one place.',
-            icon: <i className="ph-duotone ph-brain"></i>,
-            gradient: 'from-pink-500 to-rose-600',
-            link: '/crm/dashboard'
-        },
-         {
-            id: 'cti-servicess',
-            title: MENU_LABELS.LIVE_CALLS,
-            // subtitle: 'Computer Telephony Integration',
-            description: 'Connect calls with external applications for quick access and context.',
-            icon: <i className="ph-duotone ph-brain"></i>,
-            gradient: 'from-pink-500 to-rose-600',
-            link: '/cti'
-        },
-      
-        
-        
-        
-    ];
+    
 
     return (
         <React.Fragment>
 
-            <p className='topTicker'>
-            🚀 New Feature: AI-Powered Call Summaries now available! Check it out
-            </p>
-            {/* {isNotificationSupported && notificationPermission !== 'granted' && (
-                <div className="container-fluid py-2">
-                    <div className="alert alert-warning alert-dismissible fade show d-flex align-items-center" role="alert">
-                        <div className="flex-grow-1">
-                            <strong className="d-block mb-2">
-                                <i className="fas fa-bell me-2"></i>
-                                Notification Permission Required
-                            </strong>
-                            <p className="mb-2">
-                                Please enable browser notifications to receive important updates and alerts.
-                                {notificationPermission === 'denied' && (
-                                    <span className="d-block mt-1 text-muted small">
-                                        You have previously denied notifications. Please enable them in your browser settings or click below to try again.
-                                    </span>
-                                )}
-                            </p>
-                            <button 
-                                type="button" 
-                                className="btn btn-primary btn-sm"
-                                onClick={async () => {
-                                    const result = await requestPermission();
-                                    if (result === 'granted') {
-                                        // Permission granted - alert will disappear automatically
-                                    }
-                                }}
-                            >
-                                <i className="fas fa-bell me-1"></i>
-                                {notificationPermission === 'denied' ? 'Request Permission Again' : 'Allow Notifications'}
-                            </button>
-                        </div>
-                        <button type="button" className="btn-close ms-2" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
+
+      {/* Main Content Area */}
+      <div className="content-wrapper crm-dashboard-content">
+        
+        {/* Header Navigation */}
+<Row className="mb-4">
+  <Col xs={12} md={6}>
+    <div className="d-flex gap-2 mb-3">
+      <Button variant="primary" size="sm">Today</Button>
+      <Button variant="outline-secondary" size="sm">This Week</Button>
+      <Button variant="outline-secondary" size="sm">This Month</Button>
+    </div>
+  </Col>
+  <Col xs={12} md={6}>
+    <div className="d-flex align-items-center bg-white border rounded" style={{ padding: '0' }}>
+      <div className="position-relative flex-grow-1">
+        <Search className="position-absolute" style={{ left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6c757d', zIndex: 10 }} size={18} />
+        <Form.Control
+          type="text"
+          placeholder="Search prospects, leads, deals, orders, calls..."
+          className="ps-5"
+          style={{ height: '40px', border: 'none', boxShadow: 'none' }}
+        />
+      </div>
+      <div style={{ borderLeft: '1px solid #e0e0e0', paddingLeft: '12px', paddingRight: '4px' }}>
+        <TimezoneSearch />
+      </div>
+    </div>
+  </Col>
+</Row>
+
+        {/* Title */}
+        <h4 className="mb-4 fw-bold">My CRM & Sales</h4>
+
+        {/* Top Row - Main Cards */}
+        <Row className="g-3 mb-3">
+          {/* Overdue Today */}
+          <Col xs={12} lg={3}>
+            <Card className="h-100 shadow-sm">
+              <Card.Body className="p-3 d-flex flex-column">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h6 className="mb-0 fw-bold">Overdue Today</h6>
+                  <span className="text-muted">•••</span>
                 </div>
-            )} */}
-            <div className="container-fluid  py-5">
-                {/* Header Section */}
-                <div className="row mb-2">
-                    <div className="col-12">
-                        <div className="d-flex align-items-center justify-content-between">
-                            <div>
-                                <h1 className="display-6 fw-bold text-dark mb-2">Hello, {session?.user?.name || 'User'} 👋                                </h1>
-                                <p className="text-muted fs-5">Welcome back! Here's an overview of your services.</p>
-                            </div>
-                            
-                        </div>
+                <div className="d-flex flex-column gap-2 mb-2 flex-grow-1">
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center gap-2">
+                      <AlertCircle className="text-danger" size={18} />
+                      <span style={{ fontSize: '0.9rem' }}>Overdue Tasks</span>
                     </div>
+                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>3</Badge>
+                  </div>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center gap-2">
+                      <Phone className="text-danger" size={18} />
+                      <span style={{ fontSize: '0.9rem' }}>Overdue Follow-Ups</span>
+                    </div>
+                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>2</Badge>
+                  </div>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center gap-2">
+                      <FileText className="text-warning" size={18} />
+                      <span style={{ fontSize: '0.9rem' }}>Overdue Proposals</span>
+                    </div>
+                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>1</Badge>
+                  </div>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center gap-2">
+                      <DollarSign className="text-warning" size={18} />
+                      <span style={{ fontSize: '0.9rem' }}>Pending Quotes</span>
+                    </div>
+                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>1</Badge>
+                  </div>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center gap-2">
+                      <Clock className="text-info" size={18} />
+                      <span style={{ fontSize: '0.9rem' }}>Scheduled Calls</span>
+                    </div>
+                    <Badge bg="info" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>2</Badge>
+                  </div>
                 </div>
-                
-                <Row className="mb-5">
-                    <Col md={12}>
-                        <div className="alert alert-primary dashboard-alert">
-                            <h1 className="alert-heading" style={{color:'white'}}>AI-Powered Insights for your business</h1>
-                            <p className="mb-3" style={{color:'white'}}>
-                                Transform your call operations with actionable analytics and automation designed for enterprise-grade performance.
-                            </p>
-                            <div>
-                            <button className="btn">Get Started</button>
-                            </div>
+                <Button variant="primary" className="mx-auto d-block mt-auto" style={{ width: '160px' }}>View Overdue</Button>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* This Month: Achieved vs Target */}
+          <Col xs={12} lg={3}>
+            <Card className="h-100 shadow-sm" style={{ background: 'linear-gradient(95deg, rgb(96 142 211) 0%, rgb(62 131 229) 100%)' }}>
+              <Card.Body className="p-3 d-flex flex-column">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h6 className="mb-0 fw-bold text-white">This Month: Achieved vs Target</h6>
+                  <span className="text-white">•••</span>
+                </div>
+                <div className="d-flex gap-3 mb-2 flex-grow-1">
+  {/* Chart Column */}
+  <div
+    className="d-flex flex-column align-items-center justify-content-center"
+    style={{ flex: 1 }}
+  >
+    <div
+      className="position-relative"
+      style={{ width: '120px', height: '120px' }}
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={[
+              { name: 'Achieved', value: 70 },
+              { name: 'Remaining', value: 30 }
+            ]}
+            cx="50%"
+            cy="50%"
+            innerRadius={42}
+            outerRadius={58}
+            startAngle={90}
+            endAngle={-270}
+            dataKey="value"
+            strokeWidth={0}
+          >
+            <Cell fill="#ffffff" />
+            <Cell fill="rgba(255, 255, 255, 0.25)" />
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+
+      {/* Center Text */}
+      <div className="position-absolute top-50 start-50 translate-middle d-flex flex-column align-items-center">
+        <span
+          className="fw-bold text-white"
+          style={{ fontSize: '2rem', lineHeight: 1 }}
+        >
+          70%
+        </span>
+      </div>
+    </div>
+    <small className="text-white mt-1" style={{ fontSize: '0.75rem', opacity: 0.9 }}>Complete</small>
+  </div>
+
+  {/* Stats Column */}
+  <div
+    className="d-flex flex-column justify-content-center gap-2"
+    style={{ flex: 1 }}
+  >
+    <div>
+      <div className="text-white small mb-1" style={{ opacity: 0.9 }}>
+        Achieved
+      </div>
+      <div className="h4 mb-0 fw-bold text-white">£4,200</div>
+    </div>
+
+    <div>
+      <div className="text-white small mb-1" style={{ opacity: 0.9 }}>
+        Target
+      </div>
+      <div className="h4 mb-0 fw-bold text-white">£6,000</div>
+    </div>
+  </div>
+</div>
+
+                <div className="mt-auto pt-2 border-top border-white border-opacity-25">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <small className="text-white" style={{ opacity: 0.9 }}><span className="fw-semibold">£1,800</span> Remaining</small>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* My Sales Summary */}
+          <Col xs={12} lg={3}>
+            <Card className="h-100 shadow-sm">
+              <Card.Body className="p-3">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h6 className="mb-0 fw-bold">My Sales Summary</h6>
+                  <span className="text-muted">•••</span>
+                </div>
+                <div className="d-flex flex-column gap-3">
+                  {/* Prospects */}
+                  <div>
+                    <div className="d-flex align-items-center justify-content-between mb-1">
+                      <div className="d-flex align-items-center gap-2">
+                        <FileText className="text-success" size={18} />
+                        <span className="small fw-semibold">Prospects</span>
+                      </div>
+                      <span className="fw-bold" style={{ fontSize: '0.85rem' }}>5/18</span>
+                    </div>
+                    <ProgressBar now={28} variant="success" style={{ height: '6px', borderRadius: '3px' }} />
+                    <div className="d-flex justify-content-between mt-1">
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>5 New</small>
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>28%</small>
+                    </div>
+                  </div>
+                  
+                  {/* Leads */}
+                  <div>
+                    <div className="d-flex align-items-center justify-content-between mb-1">
+                      <div className="d-flex align-items-center gap-2">
+                        <Users className="text-info" size={18} />
+                        <span className="small fw-semibold">Leads</span>
+                      </div>
+                      <span className="fw-bold" style={{ fontSize: '0.85rem' }}>4/13</span>
+                    </div>
+                    <ProgressBar now={31} variant="info" style={{ height: '6px', borderRadius: '3px' }} />
+                    <div className="d-flex justify-content-between mt-1">
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>4 New</small>
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>31%</small>
+                    </div>
+                  </div>
+                  
+                  {/* Orders */}
+                  <div>
+                    <div className="d-flex align-items-center justify-content-between mb-1">
+                      <div className="d-flex align-items-center gap-2">
+                        <ShoppingCart className="text-warning" size={18} />
+                        <span className="small fw-semibold">Orders</span>
+                      </div>
+                      <span className="fw-bold" style={{ fontSize: '0.85rem' }}>4/10</span>
+                    </div>
+                    <ProgressBar now={40} variant="warning" style={{ height: '6px', borderRadius: '3px' }} />
+                    <div className="d-flex justify-content-between mt-1">
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>4 Done</small>
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>40%</small>
+                    </div>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* Next Best Actions */}
+          <Col xs={12} lg={3}>
+            <Card className="h-100 shadow-sm">
+              <Card.Body className="p-3 d-flex flex-column">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h6 className="mb-0 fw-bold">Next Best Actions</h6>
+                  <span className="text-muted">•••</span>
+                </div>
+                <ul className="list-unstyled mb-2 flex-grow-1">
+                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Call: Next Lead</li>
+                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Update: Pending Deal</li>
+                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Follow-Up: Overdue Quote</li>
+                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Review: New Prospect</li>
+                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Send: Proposal Email</li>
+                </ul>
+                <Button variant="primary" className="mx-auto d-block mt-auto" style={{ width: '160px' }}>Start Work</Button>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+
+        {/* My Call Details */}
+        <h5 className="mb-2 fw-bold">My Call Details</h5>
+
+        {/* Call Details Row */}
+        <Row className="g-3 mb-3">
+          {/* Calls Today */}
+          <Col xs={12} md={6} lg={3}>
+            <Card className="h-100 shadow-sm">
+              <Card.Body className="p-3">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h6 className="mb-0 fw-bold">Calls Today</h6>
+                  <span className="text-muted">•••</span>
+                </div>
+                <div className="d-flex justify-content-around align-items-center">
+                  <div className="text-center">
+                    <div className="h3 fw-bold text-primary mb-0">25</div>
+                    <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Total Calls</small>
+                  </div>
+                  <div className="text-center">
+                    <div className="h3 fw-bold text-dark mb-0">12</div>
+                    <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Outbound</small>
+                  </div>
+                  <div className="text-center">
+                    <div className="h3 fw-bold text-dark mb-0">13</div>
+                    <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Inbound</small>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* Missed & Callbacks */}
+          <Col xs={12} md={6} lg={3}>
+            <Card className="h-100 shadow-sm">
+              <Card.Body className="p-3 d-flex flex-column">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h6 className="mb-0 fw-bold">Missed & Callbacks</h6>
+                  <span className="text-muted">•••</span>
+                </div>
+                <div className="d-flex flex-column gap-2 mb-2 flex-grow-1">
+                  <div className="d-flex align-items-center gap-2">
+                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>4</Badge>
+                    <span style={{ fontSize: '0.9rem' }}>Missed Calls</span>
+                  </div>
+                  <div className="d-flex align-items-center gap-2">
+                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>2</Badge>
+                    <span style={{ fontSize: '0.9rem' }}>Callbacks Due</span>
+                  </div>
+                  <div className="d-flex align-items-center gap-2">
+                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>3</Badge>
+                    <span style={{ fontSize: '0.9rem' }}>Voicemails</span>
+                  </div>
+                </div>
+                <div className="mb-2">
+                  <small className="text-muted" style={{ fontSize: '0.8rem' }}>Oldest: <span className="fw-semibold text-dark">1h 15m</span></small>
+                </div>
+                <Button variant="primary" className="mx-auto d-block mt-auto" style={{ width: '160px' }}>
+                  <Phone size={16} className="me-2" /> Start
+                </Button>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* Call Analytics - Merged Card */}
+          <Col xs={12} md={12} lg={6}>
+            <Card className="h-100 shadow-sm">
+              <Card.Body className="p-3 d-flex flex-column">
+                <Row className="g-3 mb-2 flex-grow-1">
+                  {/* Call Outcomes Section */}
+                  <Col xs={12} md={6}>
+                    <div className="d-flex flex-column h-100">
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <h6 className="mb-0 fw-bold">Call Outcomes</h6>
+                        <span className="text-muted">•••</span>
+                      </div>
+                      <div className="d-flex gap-2 mb-2 flex-grow-1">
+                        {/* Donut Chart */}
+                        <div className="d-flex align-items-center justify-content-center" style={{ flex: 1 }}>
+                          <div style={{ width: '110px', height: '110px' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={[
+                                    { name: 'Answered', value: 18, color: '#28a745' },
+                                    { name: 'No Answer', value: 4, color: '#dc3545' },
+                                    { name: 'Busy', value: 2, color: '#ffc107' },
+                                    { name: 'Voicemail', value: 3, color: '#17a2b8' },
+                                    { name: 'Failed', value: 1, color: '#6c757d' }
+                                  ]}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={28}
+                                  outerRadius={48}
+                                  paddingAngle={2}
+                                  dataKey="value"
+                                >
+                                  {['#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6c757d'].map((color, index) => (
+                                    <Cell key={index} fill={color} />
+                                  ))}
+                                </Pie>
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
                         </div>
-                    </Col>
+
+                        {/* Stats Summary */}
+                        <div className="d-flex flex-column justify-content-center" style={{ flex: 1, gap: '3px' }}>
+                          <div className="d-flex align-items-center gap-1">
+                            <CheckCircle className="text-success" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Answered</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>18</span>
+                          </div>
+                          <div className="d-flex align-items-center gap-1">
+                            <XCircle className="text-danger" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>No Answer</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>4</span>
+                          </div>
+                          <div className="d-flex align-items-center gap-1">
+                            <Clock className="text-warning" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Busy</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>2</span>
+                          </div>
+                          <div className="d-flex align-items-center gap-1">
+                            <Phone className="text-info" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Voicemail</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>3</span>
+                          </div>
+                          <div className="d-flex align-items-center gap-1">
+                            <XCircle className="text-secondary" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Failed</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>1</span>
+                          </div>
+                        </div>
+                      </div>
+                      <Button variant="primary" className="mx-auto d-block mt-auto" size="sm" style={{ width: '160px' }}>Open Call Log</Button>
+                    </div>
+                  </Col>
+
+                  {/* Vertical Divider */}
+                  <Col xs={12} md={6} className="border-start border-md-1 border-0">
+                    <div className="d-flex flex-column h-100">
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <h6 className="mb-0 fw-bold">Top Call Reasons</h6>
+                        <span className="text-muted">•••</span>
+                      </div>
+                      <div className="d-flex gap-2 flex-grow-1">
+                        {/* Donut Chart */}
+                        <div className="d-flex align-items-center justify-content-center" style={{ flex: 1 }}>
+                          <div style={{ width: '110px', height: '110px' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={[
+                                    { name: 'Billing Issue', value: 25, color: '#ffc107' },
+                                    { name: 'Pricing', value: 20, color: '#fd7e14' },
+                                    { name: 'Tech Support', value: 18, color: '#dc3545' },
+                                    { name: 'Order Status', value: 15, color: '#28a745' },
+                                    { name: 'Cancellation', value: 12, color: '#20c997' },
+                                    { name: 'General', value: 10, color: '#17a2b8' }
+                                  ]}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={28}
+                                  outerRadius={48}
+                                  paddingAngle={2}
+                                  dataKey="value"
+                                >
+                                  {['#ffc107', '#fd7e14', '#dc3545', '#28a745', '#20c997', '#17a2b8'].map((color, index) => (
+                                    <Cell key={index} fill={color} />
+                                  ))}
+                                </Pie>
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+
+                        {/* Stats Summary */}
+                        <div className="d-flex flex-column justify-content-center" style={{ flex: 1, gap: '3px' }}>
+                          <div className="d-flex align-items-center gap-1">
+                            <AlertCircle className="text-warning" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Billing Issue</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>25</span>
+                          </div>
+                          <div className="d-flex align-items-center gap-1">
+                            <DollarSign className="text-warning" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Pricing</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>20</span>
+                          </div>
+                          <div className="d-flex align-items-center gap-1">
+                            <Wrench className="text-warning" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Tech Support</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>18</span>
+                          </div>
+                          <div className="d-flex align-items-center gap-1">
+                            <Package className="text-success" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Order Status</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>15</span>
+                          </div>
+                          <div className="d-flex align-items-center gap-1">
+                            <Ban className="text-success" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Cancellation</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>12</span>
+                          </div>
+                          <div className="d-flex align-items-center gap-1">
+                            <Phone className="text-info" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>General</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>10</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Col>
                 </Row>
+              </Card.Body>
+            </Card>
+          </Col>
 
+        </Row>
 
-                <Row className="">
-                    <Col md={12}>
-                        <h2 className="mb-4 f-w-600">Your Insights</h2>
-                    </Col>
-                    
+        {/* Resources & Knowledge */}
+        <h5 className="mb-2 fw-bold">Resources & Knowledge</h5>
+
+        <Row className="g-3 mb-3">
+          {/* Quick Help */}
+          <Col xs={12} md={6} lg={3}>
+            <Card className="h-100 shadow-sm">
+              <Card.Body className="p-3">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h6 className="mb-0 fw-bold">Quick Help</h6>
+                  <span className="text-muted">•••</span>
+                </div>
+                <div className="d-flex gap-2">
+                  <Button variant="primary" size="sm">CRM Help</Button>
+                  <Button variant="primary" size="sm">Calling Help</Button>
+                  <Button variant="primary" size="sm">AI Help</Button>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* Recommended Guides */}
+          <Col xs={12} md={6} lg={3}>
+            <Card className="h-100 shadow-sm">
+              <Card.Body className="p-3">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h6 className="mb-0 fw-bold">Recommended Guides</h6>
+                  <span className="text-muted">•••</span>
+                </div>
+                <ul className="list-unstyled mb-0">
+                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Lead Follow-Up Tips</li>
+                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Effective Call Scripts</li>
+                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Handling Objections</li>
+                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Email Templates</li>
+                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Closing Techniques</li>
+                  <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Product Knowledge Base</li>
+                </ul>
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* Templates */}
+          <Col xs={12} md={6} lg={3}>
+            <Card className="h-100 shadow-sm">
+              <Card.Body className="p-3">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h6 className="mb-0 fw-bold">Templates</h6>
+                  <span className="text-muted">•••</span>
+                </div>
+                <Row className="g-2">
+                  <Col xs={4}>
+                    <div className="text-center p-3 border rounded" style={{ cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.borderColor = '#0d6efd'} onMouseLeave={(e) => e.currentTarget.style.borderColor = '#dee2e6'}>
+                      <MessageSquare className="text-primary mb-2" size={28} />
+                      <small className="d-block fw-semibold" style={{ fontSize: '0.7rem', lineHeight: '1.2' }}>Messages</small>
+                    </div>
+                  </Col>
+                  <Col xs={4}>
+                    <div className="text-center p-3 border rounded" style={{ cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.borderColor = '#0d6efd'} onMouseLeave={(e) => e.currentTarget.style.borderColor = '#dee2e6'}>
+                      <PhoneCall className="text-primary mb-2" size={28} />
+                      <small className="d-block fw-semibold" style={{ fontSize: '0.7rem', lineHeight: '1.2' }}>Call Script</small>
+                    </div>
+                  </Col>
+                  <Col xs={4}>
+                    <div className="text-center p-3 border rounded" style={{ cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.borderColor = '#0d6efd'} onMouseLeave={(e) => e.currentTarget.style.borderColor = '#dee2e6'}>
+                      <AlertOctagon className="text-primary mb-2" size={28} />
+                      <small className="d-block fw-semibold" style={{ fontSize: '0.7rem', lineHeight: '1.2' }}>Objection</small>
+                    </div>
+                  </Col>
                 </Row>
-                <PageSummaryGrid cards={summaryCards} />
+              </Card.Body>
+            </Card>
+          </Col>
 
-                {/* Service Cards Grid */}
-                <div className="row g-4 mt-2">
-
-                <div className="col-xs-12">
-                    <h2 className="mb-2 f-w-600">Your Services</h2>
+          {/* My Day Summary */}
+          <Col xs={12} md={6} lg={3}>
+            <Card className="h-100 shadow-sm">
+              <Card.Body className="p-3">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h6 className="mb-0 fw-bold">My Day Summary</h6>
                 </div>
-
-                    {serviceCards
-                        .filter(service => permissions.includes(service.id))
-                        .map((service, index) => (
-                        <div key={service.id} className="col-lg-4 col-md-4 col-sm-6 col-xs-12">
-                            <div className={`card h-100 border-0 shadow-lg position-relative overflow-hidden transition-all duration-300 hover:shadow-xl ${
-                                permissions.includes(service.id) 
-                                    ? `bg-gradient ${service.gradient} text-dark` 
-                                    : 'bg-white'
-                            }`}
-                            style={{
-                                borderRadius: '20px',
-                                transition: 'all 0.3s ease',
-                                cursor: 'pointer'
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-8px)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
-                                
-                                <div className="card-body p-4 d-flex flex-column h-100">
-                                    {/* Icon and Title */}
-                                    <div className="d-block mb-3">
-                                        <div className="d-flex justify-content-between align-items-center">
-                                            <h4 className={`fw-bold mb-1 serviceHeading  ${
-                                                permissions.includes(service.id) ? 'text-dark' : 'text-dark'
-                                            }`}>
-                                                
-                                               {service.title}
-                                            </h4>
-
-                                            {permissions.includes(service.id) && (
-                                                    <span className="badge bg-success rounded-pill px-3 py-2 service-badge">
-                                                    <i className="fas fa-check me-1"></i>
-                                                    Active
-                                                </span>
-                                                )}
-                                        </div>
-                                    </div>
-
-                                    
-                                    {/* Description */}
-                                    <p className="text-muted">
-                                        {service.description}
-                                    </p>
-
-                                    {/* Action Button */}
-                                    <div className="text-left mt-3">
-                                        <Link href={service.link || ''} className={`btnServices ${
-                                            permissions.includes(service.id)
-                                                ? ''
-                                                : ''
-                                        }`}
-                                            >
-                                            
-                                            Open
-                                        </Link>
-                                    </div>
-                                </div>
-
-                              
-                                
-                            </div>
-                        </div>
-                    ))}
+                <div className="mb-0">
+                  <div className="d-flex align-items-center gap-2 mb-1">
+                    <Badge bg="primary" pill className="d-flex align-items-center justify-content-center" style={{ width: '22px', height: '22px' }}>
+                      <Clock size={12} />
+                    </Badge>
+                    <span style={{ fontSize: '0.85rem' }}>Online Time</span>
+                    <span className="ms-auto fw-bold" style={{ fontSize: '0.9rem' }}>5h 20m</span>
+                  </div>
+                  <div className="d-flex align-items-center gap-2 mb-1">
+                    <Badge bg="primary" pill className="d-flex align-items-center justify-content-center" style={{ width: '22px', height: '22px' }}>
+                      <Phone size={12} />
+                    </Badge>
+                    <span style={{ fontSize: '0.85rem' }}>On-Call Time</span>
+                    <span className="ms-auto fw-bold" style={{ fontSize: '0.9rem' }}>2h 15m</span>
+                  </div>
+                  <div className="d-flex align-items-center gap-2 mb-1">
+                    <Badge bg="success" pill className="d-flex align-items-center justify-content-center" style={{ width: '22px', height: '22px' }}>
+                      <CheckCircle size={12} />
+                    </Badge>
+                    <span style={{ fontSize: '0.85rem' }}>Tasks Done</span>
+                    <span className="ms-auto fw-bold" style={{ fontSize: '0.9rem' }}>8/12</span>
+                  </div>
+                  <div className="d-flex align-items-center gap-2">
+                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '22px', height: '22px' }}>
+                      <ShoppingCart size={12} />
+                    </Badge>
+                    <span style={{ fontSize: '0.85rem' }}>Deals Closed</span>
+                    <span className="ms-auto fw-bold" style={{ fontSize: '0.9rem' }}>3</span>
+                  </div>
                 </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+     
+      </div>
 
-
-                 {/* Other Services Cards Grid */}
-                 <div className="row g-4 mt-5">
-
-<div className="col-xs-12">
-    <h2 className="mb-2 f-w-600">Explore More Services</h2>
-</div>
-
-    {serviceCards
-        .filter(service => !permissions.includes(service.id))
-        .map((service, index) => (
-        <div key={service.id} className="col-lg-4 col-md-4 col-sm-6 col-xs-12">
-            <div className={`card h-100 border-0 shadow-lg position-relative overflow-hidden transition-all duration-300 hover:shadow-xl ${
-                !permissions.includes(service.id) 
-                    ? `bg-gradient ${service.gradient} text-dark` 
-                    : 'bg-white'
-            }`}
-            style={{
-                borderRadius: '20px',
-                transition: 'all 0.3s ease',
-                cursor: 'pointer'
-            }}
-            onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-8px)';
-            }}
-            onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-            }}>
-                
-                <div className="card-body p-4 d-flex flex-column h-100">
-                    {/* Icon and Title */}
-                    <div className="d-block mb-3">
-                        <div className="d-flex justify-content-between align-items-center">
-                            <h4 className={`fw-bold mb-1 serviceHeading  ${
-                                permissions.includes(service.id) ? 'text-dark' : 'text-dark'
-                            }`}>
-                                
-                               {service.title}
-                            </h4>
-
-                            
-                                    <span className="badge bg-dark rounded-pill px-3 py-2 service-badge">
-                                    <i className="fas fa-lock me-1"></i>
-                                    Locked
-                                </span>
-                               
-                        </div>
-                    </div>
-
-                
-
-                    {/* Description */}
-                    <p className="text-muted">
-                        {service.description}
-                    </p>
-
-                    {/* Action Button */}
-                    <div className="text-left mt-3">
-                        <Link href="plan-upgrade" className="btn app-button btn-primary d-inline-block"
-                            >
-                            
-                            Upgrade to Unlock
-                        </Link>
-                    </div>
-                </div>
-
-              
-                
-            </div>
-        </div>
-    ))}
-</div>
-
-
- {/* Other Services Cards Grid */}
- <div className="row g-4 mt-5">
-    <div className="col-xs-12">
-        <h2 className="mb-2 f-w-600">Resources & Support</h2>
-    </div>
-
-
-    <div className="col-md-6">
-        <div className="card">
-            <div className="card-body">
-                <h5 className="card-title">Community Support</h5>
-                <p>Join our community to get help from other users.</p>
-                <Link href="/resources/contact-support" className='btn btn-primary app-button d-inline-block'>Visit Community</Link>
-            </div>
-        </div>
-    </div>
-
-    <div className="col-md-6">
-        <div className="card">
-            <div className="card-body">
-                <h5 className="card-title">Knowledge Base</h5>
-                <p>Find answers to common questions and tutorials.</p>
-                <Link href="/resources/help-materials" className='btn btn-primary app-button d-inline-block'>Visit Knowledge Base</Link>
-            </div>
-        </div>
-    </div>
-
-
-
-</div>
-
-              
-            </div>
+  
         </React.Fragment>
     )
 }
