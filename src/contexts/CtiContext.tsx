@@ -13,6 +13,7 @@ import {
   getCallingDeviceInfo,
   getAllUserDevices
 } from '../utils/dialer';
+import { getCrossTabCtiManager } from '../utils/crossTabCtiManager';
 
 interface CtiContextType {
   // Connection state
@@ -146,6 +147,9 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
   // Use the CTI STOMP hook with a global instance ID
   const ctiStomp = useCtiStomp('/ws', 'global-cti-instance', 'global');
   
+  // Cross-tab manager for action forwarding
+  const crossTabManagerRef = useRef(getCrossTabCtiManager());
+  
   // Active calls state (similar to dialer's activeCalls)
   const [activeCalls, setActiveCalls] = useState<Map<string, {
     id: string;
@@ -271,7 +275,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       intervals.forEach(interval => clearInterval(interval));
     };
   }, [activeCalls.size]);
-  
+
   // Wrapper functions for call operations that automatically get device info
   const makeCall = useCallback(async (params: {
     callingAddress?: string;
@@ -536,9 +540,8 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     return { canDial: true };
   }, [activeCalls]);
   
-  // Simplified dial function - just takes phone number
-  // This is the main function other pages should use to trigger calls
-  const dialNumber = useCallback(async (phoneNumber: string) => {
+  // Helper function to execute dial action (used by both master and forwarded requests)
+  const executeDialNumber = useCallback(async (phoneNumber: string) => {
     if (!phoneNumber || !phoneNumber.trim()) {
       return {
         success: false,
@@ -603,6 +606,110 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       callingDeviceName: deviceInfo.callingDeviceName
     });
   }, [ctiStomp.userAddress, ctiStomp.dnsMap, canDialNumber]);
+
+  // Simplified dial function - just takes phone number
+  // This is the main function other pages should use to trigger calls
+  // Forwards to master tab if not master
+  const dialNumber = useCallback(async (phoneNumber: string) => {
+    const manager = crossTabManagerRef.current;
+    
+    // If we're not the master tab and cross-tab is supported, forward to master
+    if (!manager.isMasterTab() && manager.isCrossTabSupported()) {
+      try {
+        const result = await manager.requestAction('dialNumber', { phoneNumber });
+        return result;
+      } catch (error: any) {
+        return {
+          success: false,
+          error: error.message || 'Failed to forward call request to master tab'
+        };
+      }
+    }
+    
+    // We're the master tab, execute directly
+    return await executeDialNumber(phoneNumber);
+  }, [executeDialNumber]);
+
+  // Listen for action requests from non-master tabs (master tab only)
+  // This must be after all function definitions
+  useEffect(() => {
+    const manager = crossTabManagerRef.current;
+    
+    if (!manager.isCrossTabSupported()) {
+      return;
+    }
+
+    // Only master tab listens for action requests
+    if (!manager.isMasterTab()) {
+      return;
+    }
+
+    const unsubscribe = manager.onActionRequest(async (event) => {
+      if (event.type !== 'action_request' || !event.data || !event.actionId) {
+        return;
+      }
+
+      const { actionType, actionData } = event.data;
+      
+      try {
+        let result: any;
+
+        switch (actionType) {
+          case 'dialNumber':
+            result = await executeDialNumber(actionData.phoneNumber);
+            break;
+          
+          case 'makeCall':
+            result = await makeCall(actionData);
+            break;
+          
+          case 'endCall':
+            result = await endCall(actionData);
+            break;
+          
+          case 'holdCall':
+            result = await holdCall(actionData);
+            break;
+          
+          case 'resumeCall':
+            result = await resumeCall(actionData);
+            break;
+          
+          case 'attendCall':
+            result = await attendCall(actionData);
+            break;
+          
+          case 'mergeCalls':
+            result = await mergeCalls(actionData);
+            break;
+          
+          case 'transferCall':
+            result = await transferCall(actionData);
+            break;
+          
+          default:
+            result = {
+              success: false,
+              error: `Unknown action type: ${actionType}`
+            };
+        }
+
+        // Send response back to requesting tab
+        manager.sendActionResponse(event.actionId!, result, result.error);
+      } catch (error: any) {
+        // Send error response
+        manager.sendActionResponse(
+          event.actionId!,
+          undefined,
+          error.message || 'Failed to execute action'
+        );
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [executeDialNumber, makeCall, endCall, holdCall, resumeCall, attendCall, mergeCalls, transferCall]);
   
   // Memoize the context value to prevent unnecessary re-renders
   const value = useMemo<CtiContextType>(() => ({
