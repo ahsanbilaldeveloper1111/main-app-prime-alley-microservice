@@ -524,7 +524,7 @@ const Groups = () => {
 
 
 
-            {session?.user?.permissions?.includes('list-groups') && (
+            {/* {session?.user?.permissions?.includes('list-groups') && ( */}
                  <GenericListPage
                  columns={columns}
                  fetchData={fetchGroups}
@@ -536,7 +536,7 @@ const Groups = () => {
                  search={true}
                  tableStyle="table-style-2"
              />
-            )}
+            {/* )} */}
 
             <FormModal
                 show={showEditGroupModal}

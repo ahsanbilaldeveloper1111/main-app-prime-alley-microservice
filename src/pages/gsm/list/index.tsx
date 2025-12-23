@@ -206,7 +206,6 @@ const GsmList = () => {
 
       // Calculate summary data when data is fetched
       if (response && response?.summary) {
-        console.log("REDASDA SETTING GSM SUMMARY", response.summary )
         setGsmSummary(response.summary);
       }
 

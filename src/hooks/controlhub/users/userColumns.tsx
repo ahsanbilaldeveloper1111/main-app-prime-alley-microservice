@@ -3,7 +3,7 @@ import { Column } from '@components/CustomDataTable';
 import { FiEdit } from 'react-icons/fi';
 import DatatableActionButton from '@components/DatatableActionButton';
 import { Button } from 'react-bootstrap';
-import { Edit, Key } from 'lucide-react';
+import { Edit, Eye, Key } from 'lucide-react';
 
 export const useUserColumns = (session: any, customFieldColumns: Column[]) => {
     // Memoize base columns to prevent recreation on every render
@@ -69,8 +69,8 @@ export const useUserColumns = (session: any, customFieldColumns: Column[]) => {
               )}
 
                 {session?.user?.permissions?.includes('edit-users') && (
-                    <Button variant="light"  className="btn-action-style-2 p-1 text-primary" title="Edit" onClick={() => window.location.href = `/controlhub/users/${props.encId}`}>
-                        <Edit size={16} />
+                    <Button variant="light"  className="btn-action-style-2 p-1 text-primary" title="View" onClick={() => window.location.href = `/controlhub/users/${props.encId}`}>
+                        <Eye size={16} />
                     </Button>
                 )}
             </div>

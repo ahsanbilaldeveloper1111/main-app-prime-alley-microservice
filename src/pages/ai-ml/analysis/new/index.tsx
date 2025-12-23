@@ -10,11 +10,8 @@ import { useAnalysisSSE } from '@hooks/useAnalysisSSE';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
-import { TextSkeleton, ListSkeleton, CategorySkeleton, TableSkeleton } from '@components/skeletons';
+import { TextSkeleton, ListSkeleton } from '@components/skeletons';
 import { formatDuration, decodeAnalysisData } from '@utils/Helper';
-
-// Utils
-import { GetTranscriptions,GetTranslations } from '@utils/aiml';
 import axiosInstance from '@utils/axios';
 
 // Assets
@@ -41,6 +38,7 @@ const STEP_CODES = {
   LEAD_QUALITY: '006',
   BUYER_INTENT: '007',
   FEEDBACK: '008',
+  TRANSLATIONS: '009',
   FROM_DATABAE:'100'
 } as const;
 
@@ -257,6 +255,12 @@ const CallAnalysis = () => {
       }
         break;
 
+      case STEP_CODES.TRANSLATIONS:
+        if (result.translations !== undefined) {
+          setChunksAnalysisData((prev: any) => ({ ...prev, translations: result.translations }));
+        }
+        break;
+
       default:
         console.log('Unknown step code:', stepCode);
         break;
@@ -345,6 +349,10 @@ const CallAnalysis = () => {
       Object.entries(result.feedback).forEach(([key, value]) => {
         tagsArray.push({ [key]: [value, ''] });
       });
+    }
+
+    if(result.translations !== undefined && result.translations !== null){
+      updates.translations = result.translations;
     }
     
     // Set tags if we have any
@@ -810,7 +818,6 @@ const CallAnalysis = () => {
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     handleGetCallAnalysis();
-    handleGetTranslations();
   };
 
   const renderAnalysisForm = () => (
@@ -1704,44 +1711,15 @@ const CallAnalysis = () => {
       </Col>
     </Row>
   );
-
-  useEffect(() => {
-    
-    if(validAnalysis){
-      if(uuid !== '' && callTranslation===true){
-        handleGetTranslations();
-      }
-    }
-  }, [uuid, callTranslation]);
-
-  const handleGetTranslations = async () => {
-    try {
-      const response = await GetTranslations(uuid);
-      setTranslations(response?.translations);
-
-  } catch (err) {
-      //setError(err instanceof Error ? err.message : 'An error occurred');
-      //console.error('Error fetching transcription:', err);
-  } finally {
-      setLoading(false);
-  }
-}
-
   
   const renderTranslate = () => (
     <Row>
       <Col md={12}>
       
 
-            {translations  && (
+            {chunksAnalysisData?.translations  && (
             <Row>
                 <Col md={12}>
-                    {isError && (
-                        <div className="alert alert-danger">
-                            {error}
-                        </div>
-                    )}
-
                    
                       <>
                      
@@ -1756,25 +1734,25 @@ const CallAnalysis = () => {
                           <p style={{whiteSpace: 'pre-wrap',
     fontFamily: 'monospace',
     fontSize: '20px'
-}}>{translations?.en}</p>
+}}>{chunksAnalysisData?.translations?.en}</p>
                       </Tab>
                       <Tab eventKey="ar" title="Arabic">
                           <p style={{whiteSpace: 'pre-wrap',
     fontFamily: 'monospace',
     fontSize: '20px'
-}}>{translations?.ar}</p>
+}}>{chunksAnalysisData?.translations?.ar}</p>
                       </Tab>
                       <Tab eventKey="ur" title="Urdu">
                           <p style={{whiteSpace: 'pre-wrap',
     fontFamily: 'monospace',
     fontSize: '20px'
-}}>{translations?.ur}</p>
+}}>{chunksAnalysisData?.translations?.ur}</p>
                       </Tab>
                       <Tab eventKey="hi" title="Hindi">
                           <p style={{whiteSpace: 'pre-wrap',
     fontFamily: 'monospace',
     fontSize: '20px'
-}}>{translations?.hi}</p>
+}}>{chunksAnalysisData?.translations?.hi}</p>
                       </Tab>
                       </Tabs>
                       </>

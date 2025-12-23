@@ -1,4 +1,4 @@
-import React,{ReactElement, useEffect, useState} from 'react'
+import React,{ReactElement, useEffect, useState, useMemo} from 'react'
 import Layout from '@layout/index'
 import BreadcrumbItem from '@common/BreadcrumbItem'
 import { Button, Card, Col, Form, Modal, Row } from 'react-bootstrap'
@@ -81,11 +81,11 @@ const GsmDashboard = () => {
       });
 
       // Create cards data for PageSummaryGrid
-      const summaryCards: SummaryCard[] = [
+      const summaryCards: SummaryCard[] = useMemo(() => [
         {
             id: 'total-gsms',
             title: 'Total GSMs',
-            value: summaryData.totalGsm,
+            value: summaryData.totalGsm || 0,
             description: 'Total devices in the system',
             delay: 0.1,
             showAnimatedNumber: true,
@@ -95,7 +95,7 @@ const GsmDashboard = () => {
         {
             id: 'assigned-gsms',
             title: 'Assigned GSMs',
-            value: summaryData.activeCompanies,
+            value: summaryData.activeCompanies || 0,
             description: 'GSMs linked to a company',
             delay: 0.3,
             showAnimatedNumber: true,
@@ -105,7 +105,7 @@ const GsmDashboard = () => {
         {
             id: 'unassigned-gsms',
             title: 'Unassigned GSMs',
-            value: summaryData.totalGsm - summaryData.activeCompanies,
+            value: Math.max(0, (summaryData.totalGsm || 0) - (summaryData.activeCompanies || 0)),
             description: 'GSMs awaiting assignment',
             delay: 0.5,
             showAnimatedNumber: true,
@@ -115,7 +115,7 @@ const GsmDashboard = () => {
         {
             id: 'total-ports',
             title: 'Total Ports',
-            value: summaryData.totalPorts,
+            value: summaryData.totalPorts || 0,
             description: 'Overall port capacity',
             delay: 0.7,
             showAnimatedNumber: true,
@@ -123,7 +123,7 @@ const GsmDashboard = () => {
             fontStyle: 'style-2'
         },
         
-      ];
+      ], [summaryData.totalGsm, summaryData.activeCompanies, summaryData.totalPorts]);
 
       const [gsmAssigment, setGsmAssigment] = useState<GsmAssigment[]>([]);
       const [chartFreePorts, setChartFreePorts] = useState<number[]>([]);
@@ -134,16 +134,15 @@ const GsmDashboard = () => {
       const [inboxItemsByDays, setInboxItemsByDays] = useState<{date: string; count: string}[]>([]);
       useEffect(() => {
         DashboardData().then((res) => {
-          console.log("REDASDA SETTING SUMMARY DATA", res);
           if(res){
             setSummaryData({
-              totalGsm: res.total_gsm,
-              activeCompanies: res.total_company,
-              portsInUse: res.used_port,
-              totalPorts: res.total_port,
-              inbox: res.inbox,
-              onlinePorts: res.online_port,
-              offlinePorts: res.offline_port,
+              totalGsm: res.total_gsm ?? 0,
+              activeCompanies: res.total_company ?? 0,
+              portsInUse: res.used_port ?? 0,
+              totalPorts: res.total_port ?? 0,
+              inbox: res.inbox ?? 0,
+              onlinePorts: res.online_port ?? 0,
+              offlinePorts: res.offline_port ?? 0,
             });
 
 
@@ -211,6 +210,7 @@ const GsmDashboard = () => {
                         show: false
                       }
                     },
+                    colors: ['#008ffb', '#00e396'],
                     plotOptions: {
                       bar: {
                         horizontal: false,
@@ -228,13 +228,29 @@ const GsmDashboard = () => {
                       colors: ['transparent']
                     },
                     xaxis: {
-                      categories: chartGsm,
+                      categories: chartGsm || [],
                     },
-                   
+                    yaxis: {
+                      title: {
+                        text: 'Port Count'
+                      }
+                    },
                     fill: {
                       opacity: 1
                     },
-                   
+                    tooltip: {
+                      enabled: true,
+                      y: {
+                        formatter: function (val: number) {
+                          return val + ' ports';
+                        }
+                      }
+                    },
+                    legend: {
+                      show: true,
+                      position: 'bottom',
+                      horizontalAlign: 'center'
+                    }
                   },
                 
               });
@@ -282,11 +298,13 @@ const GsmDashboard = () => {
                   show: false
                 }
               },
+              colors: ['#008ffb'],
               dataLabels: {
                 enabled: false
               },
               stroke: {
-                curve: 'straight'
+                curve: 'straight',
+                width: 2
               },
               grid: {
                 row: {
@@ -296,6 +314,24 @@ const GsmDashboard = () => {
               },
               xaxis: {
                 categories: dates
+              },
+              yaxis: {
+                title: {
+                  text: 'Message Count'
+                }
+              },
+              tooltip: {
+                enabled: true,
+                y: {
+                  formatter: function (val: number) {
+                    return val + ' messages';
+                  }
+                }
+              },
+              legend: {
+                show: true,
+                position: 'top',
+                horizontalAlign: 'right'
               }
             }
           });
@@ -313,13 +349,23 @@ const GsmDashboard = () => {
                   show: false
                 }
               },
+              colors: ['#00e396', '#ff4560'],
               legend: {
-                  position: 'bottom'
-                 },
-                 dataLabels: {
-                   enabled: false
-                 },
+                show: true,
+                position: 'bottom'
+              },
+              dataLabels: {
+                enabled: false
+              },
               labels: ['Online', 'Offline'],
+              tooltip: {
+                enabled: true,
+                y: {
+                  formatter: function (val: number) {
+                  return val + ' ports';
+                  }
+                }
+              },
               responsive: [{
                 breakpoint: 480,
                 options: {
@@ -327,6 +373,7 @@ const GsmDashboard = () => {
                     width: 200
                   },
                   legend: {
+                    show: true,
                     position: 'bottom'
                   }
                 }
@@ -349,12 +396,22 @@ const GsmDashboard = () => {
                   show: false
                 }
               },
+              colors: ['#008ffb', '#feb019'],
               labels: ['Assigned', 'UnAssigned'],
               legend: {
-               position: 'bottom'
+                show: true,
+                position: 'bottom'
               },
               dataLabels: {
                 enabled: false
+              },
+              tooltip: {
+                enabled: true,
+                y: {
+                  formatter: function (val: number) {
+                    return val + ' ports';
+                  }
+                }
               },
               responsive: [{
                 breakpoint: 480,
@@ -363,6 +420,7 @@ const GsmDashboard = () => {
                     width: 200
                   },
                   legend: {
+                    show: true,
                     position: 'bottom'
                   }
                 }
@@ -382,8 +440,9 @@ const GsmDashboard = () => {
               zoom: { enabled: boolean };
               toolbar: { show: boolean };
             };
+            colors?: string[];
             dataLabels: { enabled: boolean };
-            stroke: { curve: string };
+            stroke: { curve: string; width?: number };
             grid: {
               row: {
                 colors: string[];
@@ -391,6 +450,9 @@ const GsmDashboard = () => {
               };
             };
             xaxis: { categories: string[] };
+            yaxis?: { title: { text: string } };
+            tooltip?: { enabled: boolean; y: { formatter: (val: number) => string } };
+            legend?: { show: boolean; position: string; horizontalAlign: string };
           };
         }>({
           
@@ -409,21 +471,40 @@ const GsmDashboard = () => {
                   show: false
                 }
               },
+              colors: ['#008ffb'],
               dataLabels: {
                 enabled: false
               },
               stroke: {
-                curve: 'straight'
+                curve: 'straight',
+                width: 2
               },
-             
               grid: {
                 row: {
-                  colors: ['#f3f3f3', 'transparent'], // takes an array which will be repeated on columns
+                  colors: ['#f3f3f3', 'transparent'],
                   opacity: 0.5
                 },
               },
               xaxis: {
                 categories: [],
+              },
+              yaxis: {
+                title: {
+                  text: 'Message Count'
+                }
+              },
+              tooltip: {
+                enabled: true,
+                y: {
+                  formatter: function (val: number) {
+                    return val + ' messages';
+                  }
+                }
+              },
+              legend: {
+                show: true,
+                position: 'top',
+                horizontalAlign: 'right'
               }
             },
           
@@ -451,7 +532,7 @@ const GsmDashboard = () => {
                               </thead>
                               <tbody>
                                     {portData.length > 0 && portData.map((item: PortModalData) => (
-                                    <tr>
+                                    <tr key={item.port_number}>
                                           <td>{item.port_number}</td>
                                           <td>
                                                 {item.status !== 'null' && item.status === 'up' ? <span className="text-success"><i className="fas fa-circle"></i> Up</span> : <span className="text-danger"><i className="fas fa-circle"></i> Down</span>}
@@ -490,7 +571,13 @@ const GsmDashboard = () => {
                               
                               <Card.Body>
                               <h5 className="app-title-heading">GSM Port Status</h5>
-                                    <ReactApexChart options={gsmStatusChart.options as ApexOptions} series={gsmStatusChart.series} type="pie" height={200} />
+                                    {gsmStatusChart.series && gsmStatusChart.series.some(s => s > 0) ? (
+                                      <ReactApexChart options={gsmStatusChart.options as ApexOptions} series={gsmStatusChart.series} type="pie" height={200} />
+                                    ) : (
+                                      <div className="text-center py-4">
+                                        <p className="text-muted">No data available</p>
+                                      </div>
+                                    )}
                               </Card.Body>
                         </Card>
                   </Col>
@@ -499,7 +586,13 @@ const GsmDashboard = () => {
                         
                               <Card.Body>
                               <h5 className="app-title-heading">Port Utilization</h5>
-                                    <ReactApexChart options={portUtilizationChart.options as ApexOptions} series={portUtilizationChart.series} type="pie" height={200} />
+                                    {portUtilizationChart.series && portUtilizationChart.series.some(s => s > 0) ? (
+                                      <ReactApexChart options={portUtilizationChart.options as ApexOptions} series={portUtilizationChart.series} type="pie" height={200} />
+                                    ) : (
+                                      <div className="text-center py-4">
+                                        <p className="text-muted">No data available</p>
+                                      </div>
+                                    )}
                               </Card.Body>
                         </Card>
                   </Col>
@@ -509,7 +602,13 @@ const GsmDashboard = () => {
                         
                               <Card.Body>
                               <h5    className="app-title-heading">Inbox Messages Trend</h5>
-                                    <ReactApexChart options={gsmAssignmentsTrendChart.options as ApexOptions} series={gsmAssignmentsTrendChart.series} type="line" height={185} />
+                                    {gsmAssignmentsTrendChart.series && gsmAssignmentsTrendChart.series.length > 0 && gsmAssignmentsTrendChart.series[0]?.data && gsmAssignmentsTrendChart.series[0].data.length > 0 ? (
+                                      <ReactApexChart options={gsmAssignmentsTrendChart.options as ApexOptions} series={gsmAssignmentsTrendChart.series} type="line" height={185} />
+                                    ) : (
+                                      <div className="text-center py-4">
+                                        <p className="text-muted">No data available</p>
+                                      </div>
+                                    )}
                               </Card.Body>
                         </Card>
                   </Col>
@@ -534,7 +633,7 @@ const GsmDashboard = () => {
                                                 <tbody>
 
                                                       {gsmAssigment.length > 0 && gsmAssigment.map((item: GsmAssigment) => (
-                                                      <tr>
+                                                      <tr key={`${item.gsm_ip}-${item.company_name}`}>
                                                             <td>{item.gsm_ip}</td>
                                                             <td className="one-line-ellipsis">{item.company_name}</td>
                                                             <td>
@@ -583,8 +682,8 @@ const GsmDashboard = () => {
                                                 </thead>
                                                 <tbody>
                                                       
-                                                      {inboxData.length > 0 && inboxData.map((item: InboxData) => (
-                                                      <tr>
+                                                      {inboxData.length > 0 && inboxData.map((item: InboxData, index: number) => (
+                                                      <tr key={`${item.ip_address}-${item.port_number}-${item.created_at}-${index}`}>
                                                             <td>{moment(item.created_at).format('DD-MM-YYYY HH:mm:ss')}</td>
                                                             <td>{item.mobile_number}</td>
                                                             <td>{item.port_number}</td>
@@ -616,7 +715,7 @@ const GsmDashboard = () => {
                                                 </thead>
                                                 <tbody>
                                                       {profillingData.length > 0 && profillingData.map((item: ProfillingData) => (
-                                                      <tr>
+                                                      <tr key={item.company}>
                                                             <td>{item.company}</td>
                                                             <td>{item.gsm_count}</td>
                                                             <td>{item.port_count}</td>

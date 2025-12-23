@@ -4,12 +4,12 @@ import React, { ReactElement, useState, useEffect, useRef } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import Script from "next/script";
+import Link from "next/link";
 import { toast } from "react-toastify";
 import { FaSpinner } from "react-icons/fa";
 import "@assets/scss/login.scss";
-import Footer from "@components/Footer";
 import PageLoader from "@components/PageLoader";
+import logodark from "@assets/images/Prime3.png";
 
 const Signin = () => {
   const [credentials, setCredentials] = useState({
@@ -150,245 +150,149 @@ const Signin = () => {
     };
   }, [status, session, callbackUrl, router]);
 
-  // Cleanup particles on component unmount
-  useEffect(() => {
-    return () => {
-      if (typeof window !== "undefined" && window.pJSDom) {
-        window.pJSDom.forEach((pJS) => {
-          if (
-            pJS.pJS &&
-            pJS.pJS.fn &&
-            pJS.pJS.fn.vendors &&
-            pJS.pJS.fn.vendors.destroy
-          ) {
-            pJS.pJS.fn.vendors.destroy();
-          }
-        });
-      }
-    };
-  }, []);
 
   return (
     <React.Fragment>
       <Head>
         <title>Sign In - Business Contact Center</title>
-      </Head>
-      <Script
-        src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"
-        strategy="afterInteractive"
-        onLoad={() => {
-          // Initialize particles after script loads
-          if (typeof window !== "undefined" && window.particlesJS) {
-            window.particlesJS("particles-js", {
-              particles: {
-                number: {
-                  value: 40,
-                  density: {
-                    enable: true,
-                    value_area: 800,
-                  },
-                },
-                color: {
-                  value: "#1e70e3",
-                },
-                shape: {
-                  type: "circle",
-                },
-                opacity: {
-                  value: 1,
-                  random: false,
-                },
-                size: {
-                  value: 3,
-                  random: true,
-                },
-                line_linked: {
-                  enable: true,
-                  distance: 150,
-                  color: "#1e70e3",
-                  opacity: 0.2,
-                  width: 1,
-                },
-                move: {
-                  enable: true,
-                  speed: 3,
-                  direction: "none",
-                  random: false,
-                  straight: false,
-                  out_mode: "out",
-                  bounce: false,
-                },
-              },
-              interactivity: {
-                detect_on: "canvas",
-                events: {
-                  onhover: {
-                    enable: true,
-                    mode: "grab",
-                  },
-                  onclick: {
-                    enable: true,
-                    mode: "push",
-                  },
-                  resize: true,
-                },
-                modes: {
-                  grab: {
-                    distance: 140,
-                    line_linked: {
-                      opacity: 0.8,
-                    },
-                  },
-                  push: {
-                    particles_nb: 2,
-                  },
-                },
-              },
-              retina_detect: true,
-            });
+        <style>{`
+          #__next {
+            width: 100% !important;
+            height: 100% !important;
           }
-        }}
-      />
-      <div>
-        <div id="particles-js"></div>
+          html, body {
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0;
+            padding: 0;
+          }
+        `}</style>
+      </Head>
 
-         {/* Session Loading Overlay */}
-         {/* Only show loader if we're actually loading AND haven't timed out */}
-         {/* Don't show loader if authenticated (will redirect) or if we've determined unauthenticated */}
-         {sessionLoading && status === "loading" && (
-          <PageLoader isLoading={true} />
-         )}
+      {/* Session Loading Overlay */}
+      {sessionLoading && status === "loading" && (
+        <PageLoader isLoading={true} />
+      )}
 
-        {!sessionLoading && (
-          <React.Fragment>
-            <div className="login-main-container">
-              <header className="login-info-panel">
-                <div className="info-panel-content">
-                  <i
-                    className="fas fa-satellite-dish"
-                    style={{ fontSize: "3rem", marginBottom: "20px" }}
-                  ></i>
-                  <h1 className="text-white">Business Contact Center</h1>
+      {!sessionLoading && (
+        <div className="auth-main v2">
+          <div className="bg-overlay bg-dark"></div>
+          <div className="auth-wrapper">
+            <div className="auth-sidecontent">
+              <div className="auth-sidefooter">
+               
+                <h1 className="f-w-700 mb-1 text-white">Business Contact Center</h1>
+                <p className="mb-3 text-white">A new frontier in telecommunications and data management. Secure, efficient, and reliable.</p>
 
-                  {/* <br />
-                                    <Image src={Logo} alt="Business Contact Center" /> */}
-
-                  <p>
-                    A new frontier in telecommunications and data management.
-                    Secure, efficient, and reliable.
-                  </p>
+                <hr className="mb-3 mt-4" />
+                <div className="row">
+                  <div className="col my-1">
+                    <p className="m-0">
+                      © {new Date().getFullYear()} All rights reserved. Powered by{" "}
+                      <a
+                        href="https://primealley.com/"
+                        target="_blank"
+                        className="text-primary"
+                      >
+                        Prime Alley Technology LLC
+                      </a>
+                    </p>
+                  </div>
+                  <div className="col-auto my-1">
+                    {/* <ul className="list-inline footer-link mb-0">
+                      <li className="list-inline-item">
+                        <Link href="/">Home</Link>
+                      </li>
+                      <li className="list-inline-item">
+                        <Link href="https://primealley.com/" target="_blank">Documentation</Link>
+                      </li>
+                      <li className="list-inline-item">
+                        <Link href="https://primealley.com/" target="_blank">Support</Link>
+                      </li>
+                    </ul> */}
+                  </div>
                 </div>
-              </header>
-              <main className="login-form-panel">
-                <div className="login-form-card">
-                  <h1 className="login-title">Welcome Back</h1>
-
-                  <p className="login-subtitle">Sign in to your account</p>
-
-                  <form
-                    className="login-form"
-                    id="loginForm"
-                    onSubmit={handleSubmit}
-                  >
-                    <div className="input-group">
+              </div>
+            </div>
+            <div className="auth-form">
+              <div className="card my-5 mx-3">
+                <div className="card-body">
+                   <Image  
+                   src={logodark} className="img-brand img-fluid mb-3" alt="Business Contact Center"
+                   width={200}
+                    />
+                  <h4 className="f-w-500 mb-1">Welcome Back</h4>
+                  <p className="mb-3">Sign in to your account</p>
+                  
+                  <form onSubmit={handleSubmit}>
+                    <div className="form-group mb-3">
                       <input
                         type="text"
+                        className="form-control"
                         id="email"
-                        placeholder=" "
+                        placeholder="Username"
                         required
                         name="email"
                         value={credentials.email}
                         onChange={handleChange}
                       />
-                      <label htmlFor="email">Username</label>
-                      <small className="form-error" id="emailError"></small>
                     </div>
-                    <div className="input-group">
+                    <div className="form-group mb-3 position-relative">
                       <input
+                        type={showPassword ? "text" : "password"}
+                        className="form-control"
                         id="password"
-                        placeholder=""
+                        placeholder="Password"
                         required
                         name="password"
-                        type={showPassword ? "text" : "password"}
                         value={credentials.password}
                         onChange={handleChange}
                       />
-
-                      <label htmlFor="password">Password</label>
                       <span
-                        className="toggle-password"
+                        className="position-absolute"
+                        style={{
+                          right: "10px",
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          cursor: "pointer",
+                          zIndex: 10
+                        }}
                         onClick={() => setShowPassword((prev) => !prev)}
                       >
-                        <i className="fas fa-eye" id="passwordToggleIcon"></i>
+                        <i className={`fas ${showPassword ? "fa-eye-slash" : "fa-eye"}`}></i>
                       </span>
-                      <small className="form-error" id="passwordError">
-                        Password must be at least 6 characters.
-                      </small>
                     </div>
-                    {/* <div className="form-options">
-                                            <label for="remember-me" className="remember-me">
-                                                <input type="checkbox" id="remember-me" />
-                                                Remember me
-                                            </label>
-                                            <a href="#" className="forgot-password">Forgot password?</a>
-                                        </div> */}
-                    <button
-                      type="submit"
-                      className="btn-primary"
-                      id="loginButton"
-                      disabled={loading}
-                    >
-                      {!loading && (
-                        <span className="icon-text">
-                          <i className="fas fa-sign-in-alt"></i>
-                          Sign in
-                        </span>
-                      )}
-
-                      {loading && (
-                        <span className="icon-text">
-                          <FaSpinner className="fa-spin text-white" />
-                          Signing in...
-                        </span>
-                      )}
-                    </button>
+                    {error && (
+                      <div className="alert alert-danger" role="alert">
+                        {error}
+                      </div>
+                    )}
+                    <div className="d-grid mt-4">
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={loading}
+                      >
+                        {loading ? (
+                          <span className="d-flex align-items-center justify-content-center">
+                            <FaSpinner className="fa-spin me-2" />
+                            Signing in...
+                          </span>
+                        ) : (
+                          <span className="d-flex align-items-center justify-content-center">
+                            <i className="fas fa-sign-in-alt me-2"></i>
+                            Sign in
+                          </span>
+                        )}
+                      </button>
+                    </div>
                   </form>
-
-                  {/* <div className="or-divider">or</div>
-
-                                    <a href="#" className="btn-social">
-                                        <i className="fab fa-google"></i> Sign in with Google
-                                    </a> */}
                 </div>
-              </main>
-            </div>
-
-            <footer className="pc-footer m-0 mt-3">
-              <div className="row">
-                <div className="col-sm-12 my-1 text-center">
-                  <p className="m-0">
-                    © {new Date().getFullYear()} All rights reserved. Powered by{" "}
-                    <a
-                      href="https://ringedge.com/"
-                      target="_blank"
-                      className="text-primary"
-                    >
-                      {" "}
-                      Ring Edge
-                    </a>
-                  </p>
-                </div>
-                {/* <div className="col-sm-6 ms-auto my-1">
-                                <ul className="list-inline footer-link mb-0 justify-content-sm-end d-flex">
-                                  <li className="list-inline-item"><a href="#" target="_blank">Documentation</a></li>
-                                  <li className="list-inline-item"><a href="#" target="_blank">Support</a></li>
-                                </ul>
-                              </div> */}
               </div>
-            </footer>
-          </React.Fragment>
-        )}
-      </div>
+            </div>
+          </div>
+        </div>
+      )}
     </React.Fragment>
   );
 };

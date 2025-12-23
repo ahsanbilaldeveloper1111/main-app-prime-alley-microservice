@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Row, Col, Form, Button } from 'react-bootstrap';
+import { Row, Col, Form } from 'react-bootstrap';
+import { useSession } from 'next-auth/react';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import UsersList from './UsersList';
 import UserGrowthChart from './UserGrowthChart';
@@ -9,6 +10,7 @@ import { Column } from '@components/CustomDataTable';
 import BarFilters from '@components/BarFilters';
 
 interface OverviewTabProps {
+    
     summaryCards: SummaryCard[];
     columns: Column[];
     fetchUsers: (page?: number, perPage?: number, search?: string) => Promise<any>;
@@ -16,6 +18,7 @@ interface OverviewTabProps {
     currentFilters: any;
     handleFiltersChange: (filters: any) => void;
     hasListPermission: boolean;
+    showFilters?: boolean;
     growthChart: {
         series: Array<{ name: string; data: number[] }>;
         options: any;
@@ -34,9 +37,11 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
     currentFilters,
     handleFiltersChange,
     hasListPermission,
+    showFilters = true,
     growthChart,
     departmentChart
 }) => {
+    const { data: session } = useSession();
     const [searchValue, setSearchValue] = useState('');
     const [pendingFilters, setPendingFilters] = useState<Record<string, any>>(currentFilters || {});
 
@@ -53,8 +58,10 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
         <>
             <PageSummaryGrid cards={summaryCards} />
             
+           
             <BarFilters
                 searchValue={searchValue}
+                showFilters={session?.user?.permissions?.includes('filters-users') || false}
                 leftContent={
                     <>
                     <h5 className="mb-0">Users Directory</h5>
@@ -180,6 +187,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                     </>
                 }
             />
+            
             
             <UsersList
                 columns={columns}
