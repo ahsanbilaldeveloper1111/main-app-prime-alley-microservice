@@ -1,4 +1,5 @@
 import axios from "axios";
+import { signOut } from 'next-auth/react';
 import { toast } from "react-toastify";
 import tokenService from "./tokenService";
 
@@ -60,25 +61,25 @@ axiosInstance.interceptors.request.use(
       // console.log('FormData entries count:', Array.from(config.data.entries()).length);
     }
 
-    // Function to retry fetching token and setting Authorization header
-    const retryFetchingToken = async () => {
-      while (retryCount < MAX_RETRY) {
-        setAuthorizationHeader(config);
-        if (config.headers.Authorization) {
-          return config;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 500)); // Delay before retrying
-        retryCount++;
-      }
-      return config;
-    };
+    // // Function to retry fetching token and setting Authorization header
+    // const retryFetchingToken = async () => {
+    //   while (retryCount < MAX_RETRY) {
+    //     setAuthorizationHeader(config);
+    //     if (config.headers.Authorization) {
+    //       return config;
+    //     }
+    //     await new Promise((resolve) => setTimeout(resolve, 500)); // Delay before retrying
+    //     retryCount++;
+    //   }
+    //   return config;
+    // };
 
     setAuthorizationHeader(config);
 
     // Retry fetching token if it's not available in the headers
-    if (!config.headers.Authorization) {
-      return retryFetchingToken();
-    }
+    // if (!config.headers.Authorization) {
+    //   return retryFetchingToken();
+    // }
 
     // Only set content type to application/json if it's not already set AND if it's not FormData
     // FormData needs to set its own content type with boundary
@@ -126,6 +127,11 @@ axiosInstance.interceptors.response.use(
             // Token refresh failed, but don't immediately clear session
             // Let the user continue with their current session
             //console.log('Token refresh failed, but keeping session active');
+            // Logout user
+            signOut();
+            if (typeof window !== 'undefined') {
+              sessionStorage.clear();
+            }
             return Promise.reject(error);
           }
         } catch (refreshError) {
