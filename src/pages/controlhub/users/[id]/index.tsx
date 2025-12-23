@@ -50,17 +50,15 @@ const UserView = () => {
         const fetchStaticData = async () => {
             try {
                 // Fetch all static data in parallel
-                const [rolesData, groupsData, modulesData, companiesData] = await Promise.all([
+                const [rolesData, groupsData] = await Promise.all([
                     getAllRoles(),
                     getAllGroups(),
-                    GetModules(),
-                    GetCompanies()
                 ]);
 
                 if (rolesData) setRoles(rolesData);
                 if (groupsData) setGroups(groupsData);
-                if (modulesData) setModules(modulesData);
-                if (companiesData) setDataCompanies(companiesData);
+                // if (modulesData) setModules(modulesData);
+                // if (companiesData) setDataCompanies(companiesData);
             } catch (error) {
                 console.error('Error fetching static data:', error);
             }
@@ -77,27 +75,28 @@ const UserView = () => {
             setIsLoading(true);
             try {
                 // Fetch all user-specific data in parallel
-                const [userData, userPermissionsData, customFieldsData, parentUsersData] = await Promise.all([
+                //userPermissionsData, parentUsersData
+                const [userData, customFieldsData] = await Promise.all([
                     getUserById(id as string),
-                    getUserPermissions(id as string),
+                    //getUserPermissions(id as string),
                     GetCustomFields(id as string),
-                    getParentUsers()
+                    //getParentUsers()
                 ]);
 
                 // Set user data
                 if (userData) {
                     setCurrentUser(userData?.userData);
-                    setLinkedUsers(userData?.linkedUsers || []);
-                    setLinkedCompanies(userData?.linkedCompanies || []);
+                    //setLinkedUsers(userData?.linkedUsers || []);
+                    //setLinkedCompanies(userData?.linkedCompanies || []);
                 }
 
                 // Set permissions data
-                if (userPermissionsData) {
-                    setExtended(userPermissionsData?.extended_permissions?.map((p: any) => typeof p === 'string' ? Number.parseInt(p, 10) : p) || []);
-                    setBlocked(userPermissionsData?.blocked_permissions?.map((p: any) => typeof p === 'string' ? Number.parseInt(p, 10) : p) || []);
-                    setAllPermission(userPermissionsData?.role_excluded_permissions || []);
-                    setRolePermission(userPermissionsData?.rolePermissions || []);
-                }
+                // if (userPermissionsData) {
+                //     setExtended(userPermissionsData?.extended_permissions?.map((p: any) => typeof p === 'string' ? Number.parseInt(p, 10) : p) || []);
+                //     setBlocked(userPermissionsData?.blocked_permissions?.map((p: any) => typeof p === 'string' ? Number.parseInt(p, 10) : p) || []);
+                //     setAllPermission(userPermissionsData?.role_excluded_permissions || []);
+                //     setRolePermission(userPermissionsData?.rolePermissions || []);
+                // }
 
                 // Set custom fields
                 if (customFieldsData) {
@@ -105,9 +104,9 @@ const UserView = () => {
                 }
 
                 // Set parent users
-                if (parentUsersData) {
-                    setParentUsers(parentUsersData);
-                }
+                // if (parentUsersData) {
+                //     setParentUsers(parentUsersData);
+                // }
             } catch (error) {
                 console.error('Error fetching user data:', error);
             } finally {

@@ -181,7 +181,11 @@ const CallAnalysis = () => {
   };
 
   const handleStepDataUpdate = (stepCode: string, result: any) => {
-
+    // Normalize stepCode to string for comparison
+    const normalizedStepCode = String(stepCode).trim();
+    //console.log('handleStepDataUpdate - stepCode:', stepCode, 'normalized:', normalizedStepCode);
+    //console.log('handleStepDataUpdate - result:', result);
+    
     // Initialize tags array and merge lead_quality, buyer_intent, and feedback
     
     
@@ -189,11 +193,12 @@ const CallAnalysis = () => {
     // if(tagsArray.length > 0){
     //   updates.tags = tagsArray;
     // }
-    switch (stepCode) {
+    switch (normalizedStepCode) {
       case STEP_CODES.TRANSCRIPTION:
-        if (result.transcription !== undefined) {
+       
+        if (result.transcription !== undefined && result.transcription !== null) {
           setChunksAnalysisData((prev: any) => ({ ...prev, transcriptions: result.transcription }));
-        }
+        } 
         break;
 
       case STEP_CODES.ANALYSIS:
@@ -224,36 +229,63 @@ const CallAnalysis = () => {
 
       case STEP_CODES.SUMMARY:
         if (result.summary !== undefined) {
-          setChunksAnalysisData((prev: any) => ({ ...prev, summary: result.summary }));
+          setChunksAnalysisData((prev: any) => ({ ...prev, summary: result.summary?.summary }));
         }
         break;
 
-      case STEP_CODES.LEAD_QUALITY:
-        if(result.lead_quality !== undefined && result.lead_quality !== null){
-          Object.entries(result.lead_quality).forEach(([key, value]) => {
-            setTagsArrayProcessing((prev: any) => [...prev, { [key]: [value, ''] }]);
-          });
-        }
-        break;
+        case STEP_CODES.LEAD_QUALITY:
+          if(result.lead_quality !== undefined && result.lead_quality !== null){
+            const tempLeadQuality = {
+              status: result.lead_quality.good_lead ?? false,
+              name: 'Good Lead',
+              percentage: result.lead_quality.good_lead_percentage ?? 'N/A',
+              description: result.lead_quality.good_lead_description ?? 'N/A',
+            };
+            setChunksAnalysisData((prev: any) => ({ ...prev, tags: [...prev.tags, tempLeadQuality] }));
+          }
+          break;
 
-      case STEP_CODES.BUYER_INTENT:
-        // // Convert buyer_intent object to tags format
-        if(result.buyer_intent !== undefined && result.buyer_intent !== null){
-          Object.entries(result.buyer_intent).forEach(([key, value]) => {
-            setTagsArrayProcessing((prev: any) => [...prev, { [key]: [value, ''] }]);
-          });
-        }
-        break;
+          case STEP_CODES.BUYER_INTENT:
+            // // Convert buyer_intent object to tags format
+            if(result.buyer_intent !== undefined && result.buyer_intent !== null){
+              
+              const tempFastBuyer = {
+                status: result.buyer_intent.fast_buyer ?? false,
+                name: 'Fast Buyer',
+                percentage: result.buyer_intent.fast_buyer_percentage ?? 'N/A',
+                description: result.buyer_intent.fast_buyer_description ?? 'N/A',
+              };
+              const tempBigBudgetBuyer = {
+                status: result.buyer_intent.big_budget_buyer ?? false,
+                name: 'Big Budget Buyer',
+                percentage: result.buyer_intent.big_budget_buyer_percentage ?? 'N/A',
+                description: result.buyer_intent.big_budget_buyer_description ?? 'N/A',
+              };
+              const tempNotALead = {
+                status: result.buyer_intent.not_a_lead ?? false,
+                name: 'Not a Lead',
+                percentage: result.buyer_intent.not_a_lead_percentage ?? 'N/A',
+                description: result.buyer_intent.not_a_lead_description ?? 'N/A',
+              };
+    
+              setChunksAnalysisData((prev: any) => ({ ...prev, tags: [...prev.tags, tempFastBuyer, tempBigBudgetBuyer, tempNotALead] }));
+            }
+            break;
 
 
-      case STEP_CODES.FEEDBACK:
-       // // Convert feedback object to tags format
-      if(result.feedback !== undefined && result.feedback !== null){
-        Object.entries(result.feedback).forEach(([key, value]) => {
-          setTagsArrayProcessing((prev: any) => [...prev, { [key]: [value, ''] }]);
-        });
-      }
-        break;
+            case STEP_CODES.FEEDBACK:
+              // // Convert feedback object to tags format
+             if(result.feedback !== undefined && result.feedback !== null){
+       
+               const tempFeedback = {
+                 status: result.feedback.negative_feedback ?? false,
+                 name: 'Negative Feedback',
+                 percentage: result.feedback.negative_feedback_percentage ?? 'N/A',
+                 description: result.feedback.negative_feedback_description ?? 'N/A',
+               };
+               setChunksAnalysisData((prev: any) => ({ ...prev, tags: [...prev.tags, tempFeedback] }));
+             }
+               break;
 
       case STEP_CODES.TRANSLATIONS:
         if (result.translations !== undefined) {
@@ -300,7 +332,7 @@ const CallAnalysis = () => {
     }
     
     const result = parsedData.result;
-    console.log('Done status - Full result:', result);
+    //console.log('Done status - Full result:', result);
     
     // Build update object with all available data in a single update
     const updates: any = {};
@@ -324,7 +356,7 @@ const CallAnalysis = () => {
       updates.main_topic = result?.classification?.main_topic;
     }
     if(result.summary !== undefined && result.summary !== null){
-      updates.summary = result.summary;
+      updates.summary = result.summary?.summary;
     }
     
     // Initialize tags array and merge lead_quality, buyer_intent, and feedback
@@ -332,27 +364,52 @@ const CallAnalysis = () => {
     
     // Convert lead_quality object to tags format
     if(result.lead_quality !== undefined && result.lead_quality !== null){
-      Object.entries(result.lead_quality).forEach(([key, value]) => {
-        tagsArray.push({ [key]: [value, ''] });
-      });
+      const tempLeadQuality = {
+        status: result.lead_quality.good_lead ?? false,
+        name: 'Good Lead',
+        percentage: result.lead_quality.good_lead_percentage ?? 'N/A',
+        description: result.lead_quality.good_lead_description ?? 'N/A',
+      };
+      tagsArray.push(tempLeadQuality);
     }
     
     // Convert buyer_intent object to tags format
     if(result.buyer_intent !== undefined && result.buyer_intent !== null){
-      Object.entries(result.buyer_intent).forEach(([key, value]) => {
-        tagsArray.push({ [key]: [value, ''] });
-      });
+      const tempFastBuyer = {
+        status: result.buyer_intent.fast_buyer ?? false,
+        name: 'Fast Buyer',
+        percentage: result.buyer_intent.fast_buyer_percentage ?? 'N/A',
+        description: result.buyer_intent.fast_buyer_description ?? 'N/A',
+      };
+      const tempBigBudgetBuyer = {
+        status: result.buyer_intent.big_budget_buyer ?? false,
+        name: 'Big Budget Buyer',
+        percentage: result.buyer_intent.big_budget_buyer_percentage ?? 'N/A',
+        description: result.buyer_intent.big_budget_buyer_description ?? 'N/A',
+      };
+      const tempNotALead = {
+        status: result.buyer_intent.not_a_lead ?? false,
+        name: 'Not a Lead',
+        percentage: result.buyer_intent.not_a_lead_percentage ?? 'N/A',
+        description: result.buyer_intent.not_a_lead_description ?? 'N/A',
+      };
+      
+      tagsArray.push(tempFastBuyer, tempBigBudgetBuyer, tempNotALead);
     }
     
     // Convert feedback object to tags format
     if(result.feedback !== undefined && result.feedback !== null){
-      Object.entries(result.feedback).forEach(([key, value]) => {
-        tagsArray.push({ [key]: [value, ''] });
-      });
+      const tempFeedback = {
+        status: result.feedback.negative_feedback ?? false,
+        name: 'Negative Feedback',
+        percentage: result.feedback.negative_feedback_percentage ?? 'N/A',
+        description: result.feedback.negative_feedback_description ?? 'N/A',
+      };
+      tagsArray.push(tempFeedback);
     }
 
-    if(result.translations !== undefined && result.translations !== null){
-      updates.translations = result.translations;
+    if(result.translation !== undefined && result.translation !== null){
+      updates.translations = result.translation?.translations || [];
     }
     
     // Set tags if we have any
@@ -468,7 +525,7 @@ const CallAnalysis = () => {
       if (typeof data === 'string') {
         try {
           parsedData = JSON.parse(data);
-          console.log('Parsed string data to JSON:', parsedData);
+          //console.log('Parsed string data to JSON:', parsedData);
         } catch (e) {
           console.error('Failed to parse string data:', e);
           return;
@@ -492,12 +549,16 @@ const CallAnalysis = () => {
         // Set current step if it's processing or connecting
         if (parsedData.status === 'processing' || parsedData.status === 'connecting' || parsedData.status === 'connected') {
           setCurrentStep(parsedData.step);
-
-          // Update data based on step code
-          if (parsedData.result && parsedData.step_code) {
-            handleStepDataUpdate(parsedData.step_code, parsedData.result);
-          }
         }
+      }
+
+      // Update data based on step code whenever we have result and step_code, regardless of status or step field
+      // This handles cases where step_code and result are present but step field might be missing
+      if (parsedData.result && parsedData.step_code) {
+        // Update data based on step code
+        //console.log('parsedData.stepcode '.concat(parsedData.step_code), 'type:', typeof parsedData.step_code);
+        //console.log('parsedData.result '.concat(JSON.stringify(parsedData.result)), parsedData.result);
+        handleStepDataUpdate(String(parsedData.step_code), parsedData.result);
       }
 
       
@@ -1371,32 +1432,35 @@ const CallAnalysis = () => {
                       <table className="table-bordered table-sm w-100">
                         <thead>
                           <tr>
-                            <th>Icon</th>
+                            
                             <th>Name</th>
+                            <th>Percentage</th>
                             <th className="text-left">Description</th>
                           </tr>
                         </thead>
                         <tbody>
                           {chunksAnalysisData?.tags?.map((item: any, index: number) => {
-                            const key = Object.keys(item)[0];
-                            const valueArray = Object.values(item)[0] as any[];
-                            const isTrue = valueArray[0] === true;
-                            const description = valueArray || '';
+                            const isTrue = item.status === true;
                             return (
                               <tr key={index}>
-                                <td>
-                                  <div className="tboxIn"> 
+                                 <td className="text-capitalize">
+                                <div className="d-flex align-items-center gap-2">
+                                <div className="tboxIn"> 
                                     <div className={`ic_box small ${isTrue ? 'bg-success' : 'bg-danger'}`}>
                                       <i className={`material-icons-two-tone`}>
                                         {isTrue ? 'check' : 'close'}
                                       </i>
                                     </div>
                                   </div>
+                                  <div>{item.name || 'N/A'}</div>
+                                  </div>
                                 </td>
                                 <td className="text-capitalize">
-                                  {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                  {item.percentage || 'N/A'}
                                 </td>
-                                <td className="text-capitalize text-left">{description}</td>
+                                <td className="text-capitalize">
+                                  {item.description || 'N/A'}
+                                </td>
                               </tr>
                             );
                           })}

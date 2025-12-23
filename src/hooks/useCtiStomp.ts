@@ -118,38 +118,31 @@ export default function useCtiStomp(
     incomingEvents: 0,
   });
 
+  // Always call useRef unconditionally (React Hook rules requirement)
+  // Then conditionally use either global or local refs
+  const localClientRef = useRef<Client | null>(null);
+  const localEventSourceRef = useRef<EventSource | null>(null);
+  const localTokenRef = useRef<string | null>(null);
+  const localUserAddressRef = useRef<string | null>(null);
+  const localIsConnectingRef = useRef(false);
+  const localIsInitializedRef = useRef(false);
+  const localConnectionStartTimeRef = useRef<number | null>(null);
+  const localReconnectionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const localIsReconnectingRef = useRef(false);
+  const localIsGettingTokenRef = useRef(false);
+
   // Use shared refs for global instance, individual refs for other instances
-  const clientRef = isGlobalInstance
-    ? globalConnectionRefs.clientRef
-    : useRef<Client | null>(null);
-  const eventSourceRef = isGlobalInstance
-    ? globalConnectionRefs.eventSourceRef
-    : useRef<EventSource | null>(null);
-  const tokenRef = isGlobalInstance
-    ? globalConnectionRefs.tokenRef
-    : useRef<string | null>(null);
-  const userAddressRef = isGlobalInstance
-    ? globalConnectionRefs.userAddressRef
-    : useRef<string | null>(null);
+  const clientRef = isGlobalInstance ? globalConnectionRefs.clientRef : localClientRef;
+  const eventSourceRef = isGlobalInstance ? globalConnectionRefs.eventSourceRef : localEventSourceRef;
+  const tokenRef = isGlobalInstance ? globalConnectionRefs.tokenRef : localTokenRef;
+  const userAddressRef = isGlobalInstance ? globalConnectionRefs.userAddressRef : localUserAddressRef;
   const screenIdRef = useRef<string | undefined>(screenId);
-  const isConnectingRef = isGlobalInstance
-    ? globalConnectionRefs.isConnectingRef
-    : useRef(false);
-  const isInitializedRef = isGlobalInstance
-    ? globalConnectionRefs.isInitializedRef
-    : useRef(false);
-  const connectionStartTimeRef = isGlobalInstance
-    ? globalConnectionRefs.connectionStartTimeRef
-    : useRef<number | null>(null);
-  const reconnectionTimerRef = isGlobalInstance
-    ? globalConnectionRefs.reconnectionTimerRef
-    : useRef<NodeJS.Timeout | null>(null);
-  const isReconnectingRef = isGlobalInstance
-    ? globalConnectionRefs.isReconnectingRef
-    : useRef(false);
-  const isGettingTokenRef = isGlobalInstance
-    ? globalConnectionRefs.isGettingTokenRef
-    : useRef(false);
+  const isConnectingRef = isGlobalInstance ? globalConnectionRefs.isConnectingRef : localIsConnectingRef;
+  const isInitializedRef = isGlobalInstance ? globalConnectionRefs.isInitializedRef : localIsInitializedRef;
+  const connectionStartTimeRef = isGlobalInstance ? globalConnectionRefs.connectionStartTimeRef : localConnectionStartTimeRef;
+  const reconnectionTimerRef = isGlobalInstance ? globalConnectionRefs.reconnectionTimerRef : localReconnectionTimerRef;
+  const isReconnectingRef = isGlobalInstance ? globalConnectionRefs.isReconnectingRef : localIsReconnectingRef;
+  const isGettingTokenRef = isGlobalInstance ? globalConnectionRefs.isGettingTokenRef : localIsGettingTokenRef;
 
   // Store latest callback functions in refs to avoid stale closures
   // These will be initialized after the functions are defined
