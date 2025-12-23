@@ -41,10 +41,11 @@ const safeLocalStorage = {
 };
 
 export interface CtiEvent {
-  type: 'cti_event' | 'state_update' | 'heartbeat' | 'master_election' | 'master_heartbeat';
+  type: 'cti_event' | 'state_update' | 'heartbeat' | 'master_election' | 'master_heartbeat' | 'action_request' | 'action_response';
   data?: any;
   timestamp: number;
   tabId: string;
+  actionId?: string; // For action request/response correlation
 }
 
 export class CrossTabCtiManager {
@@ -55,6 +56,8 @@ export class CrossTabCtiManager {
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private eventListeners: Set<(event: CtiEvent) => void> = new Set();
   private stateListeners: Set<(state: any) => void> = new Set();
+  private actionListeners: Set<(event: CtiEvent) => void> = new Set();
+  private pendingActions: Map<string, { resolve: (value: any) => void; reject: (error: any) => void }> = new Map();
   private isSupported: boolean;
 
   constructor() {
@@ -115,6 +118,26 @@ export class CrossTabCtiManager {
         // Master tab is alive
         if (event.tabId === this.getMasterTabId()) {
           safeLocalStorage.setItem(`${MASTER_TAB_KEY}_heartbeat`, Date.now().toString());
+        }
+        break;
+
+      case 'action_request':
+        // Non-master tab is requesting an action - master should handle it
+        if (this.isMaster) {
+          this.actionListeners.forEach(listener => listener(event));
+        }
+        break;
+
+      case 'action_response':
+        // Master tab responded to an action request
+        if (event.actionId && this.pendingActions.has(event.actionId)) {
+          const { resolve, reject } = this.pendingActions.get(event.actionId)!;
+          this.pendingActions.delete(event.actionId);
+          if (event.data?.error) {
+            reject(new Error(event.data.error));
+          } else {
+            resolve(event.data?.result);
+          }
         }
         break;
 
@@ -329,6 +352,92 @@ export class CrossTabCtiManager {
     return () => {
       this.stateListeners.delete(listener);
     };
+  }
+
+  /**
+   * Subscribe to action requests from non-master tabs (master tab only)
+   */
+  public onActionRequest(listener: (event: CtiEvent) => void): () => void {
+    this.actionListeners.add(listener);
+    
+    // Return unsubscribe function
+    return () => {
+      this.actionListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Request an action from the master tab (non-master tabs use this)
+   * Returns a promise that resolves when the master tab completes the action
+   */
+  public async requestAction(actionType: string, actionData: any): Promise<any> {
+    if (this.isMaster) {
+      // If we're the master, we can't forward to ourselves
+      // This shouldn't happen, but handle it gracefully
+      throw new Error('Cannot request action from master tab - execute directly');
+    }
+
+    if (!this.isSupported) {
+      throw new Error('Cross-tab communication not supported');
+    }
+
+    const actionId = `${this.tabId}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    
+    return new Promise((resolve, reject) => {
+      // Set timeout for action response
+      const timeout = setTimeout(() => {
+        if (this.pendingActions.has(actionId)) {
+          this.pendingActions.delete(actionId);
+          reject(new Error('Action request timeout - master tab may be unavailable'));
+        }
+      }, 30000); // 30 second timeout
+
+      // Wrapper functions that clear timeout
+      const wrappedResolve = (value: any) => {
+        clearTimeout(timeout);
+        resolve(value);
+      };
+      const wrappedReject = (error: any) => {
+        clearTimeout(timeout);
+        reject(error);
+      };
+
+      // Store the promise handlers
+      this.pendingActions.set(actionId, { resolve: wrappedResolve, reject: wrappedReject });
+
+      // Send action request to master tab
+      this.broadcast({
+        type: 'action_request',
+        data: {
+          actionType,
+          actionData
+        },
+        tabId: this.tabId,
+        actionId,
+        timestamp: Date.now()
+      });
+    });
+  }
+
+  /**
+   * Send action response to requesting tab (master tab uses this)
+   */
+  public sendActionResponse(actionId: string, result?: any, error?: string): void {
+    if (!this.isMaster) {
+      console.warn('[CrossTabCtiManager] Only master tab can send action responses');
+      return;
+    }
+
+    this.broadcast({
+      type: 'action_response',
+      data: {
+        result,
+        error
+      },
+      tabId: this.tabId,
+      actionId,
+      timestamp: Date.now()
+    });
   }
 
   /**
