@@ -10,7 +10,7 @@ const Footer: React.FC = () => {
       <div className="footer-wrapper container-fluid">
         <div className="row">
           <div className="col-sm-12 text-center">
-            <p className="m-0">© {currentYear} All rights reserved. Powered by <a href="https://ringedge.com/" target="_blank" className="text-primary"> Ring Edge</a></p>
+            <p className="m-0">© {currentYear} All rights reserved. Powered by <a href="https://primealley.com/" target="_blank" className="text-primary"> Prime Alley Technology LLC</a></p>
           </div>
           {/* <div className="col-sm-6 ms-auto my-1">
             <ul className="list-inline footer-link mb-0 justify-content-sm-end d-flex">

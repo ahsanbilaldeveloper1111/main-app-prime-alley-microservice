@@ -315,13 +315,13 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
                         </div>
                       </div>
                     ))}
-                    {/* <Dropdown.Divider />
+                    <Dropdown.Divider />
                     <Dropdown.Item onClick={showAllColumns}>
-                      Show All
+                      Select All
                     </Dropdown.Item>
-                    <Dropdown.Item onClick={hideAllColumns}>
-                      Hide All
-                    </Dropdown.Item> */}
+                    <Dropdown.Item onClick={() => setVisibleColumns(columns.map(col => col.key))}>
+                      Reset to Default
+                    </Dropdown.Item>
                   </Dropdown.Menu>
                 </Dropdown>
               </div>
@@ -486,6 +486,13 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
                           </div>
                         </div>
                       ))}
+                      <Dropdown.Divider />
+                      <Dropdown.Item onClick={showAllColumns}>
+                        Select All
+                      </Dropdown.Item>
+                      <Dropdown.Item onClick={() => setVisibleColumns(columns.map(col => col.key))}>
+                        Reset to Default
+                      </Dropdown.Item>
                     </Dropdown.Menu>
                   </Dropdown>
                 </div>

@@ -369,12 +369,12 @@ const Signin = () => {
                   <p className="m-0">
                     © {new Date().getFullYear()} All rights reserved. Powered by{" "}
                     <a
-                      href="https://ringedge.com/"
+                      href="https://primealley.com/"
                       target="_blank"
                       className="text-primary"
                     >
                       {" "}
-                      Ring Edge
+                      Prime Alley Technology LLC
                     </a>
                   </p>
                 </div>

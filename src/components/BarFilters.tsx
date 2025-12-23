@@ -9,6 +9,7 @@ interface BarFiltersProps {
   onSearch: () => void;
   searchPlaceholder?: string;
   showSearch?: boolean;
+  showFilters?: boolean;
   filters?: Record<string, any>;
   filterContent?: React.ReactNode;
   onReset?: () => void;
@@ -22,6 +23,7 @@ const BarFilters: React.FC<BarFiltersProps> = ({
   onSearch,
   searchPlaceholder = "Search...",
   showSearch = true,
+  showFilters = true,
   filters = {},
   filterContent,
   onReset,
@@ -68,25 +70,27 @@ const BarFilters: React.FC<BarFiltersProps> = ({
                   </Button>
                 </InputGroup>
               )}
-              <Button 
-                variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
-                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="d-flex align-items-center flex-shrink-0"
-              >
-                <FiFilter size={16} className="me-2" />
-                Filters
-                {advancedFilterCount > 0 && (
-                  <Badge bg="light" text="dark" className="ms-2">
-                    {advancedFilterCount}
-                  </Badge>
-                )}
-              </Button>
+              {showFilters && (
+                <Button 
+                  variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  className="d-flex align-items-center flex-shrink-0"
+                >
+                  <FiFilter size={16} className="me-2" />
+                  Filters
+                  {advancedFilterCount > 0 && (
+                    <Badge bg="light" text="dark" className="ms-2">
+                      {advancedFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+              )}
             </div>
           </div>
         </Card.Body>
       </Card>
 
-      {showAdvancedFilters && filterContent && (
+      {showFilters && showAdvancedFilters && filterContent && (
         <Card className="border-0 shadow-sm mb-3">
           <Card.Body className="p-3">
             <Row className="g-3 align-items-end">
