@@ -3,11 +3,12 @@ import { Card, Col, Row, Button, Form } from 'react-bootstrap';
 import FormModal from '@pages/partial/FormModal';
 import { Country, State, City } from 'country-state-city';
 import { languages as languagesData } from '@config/languages';
-import { getUserProfileData, updateUserProfile } from '@utils/users';
+import { updateUserProfile } from '@utils/users';
 import parsePhoneNumber from 'libphonenumber-js';
 import { toast } from 'react-toastify';
 import Select from 'react-select';
 import PhoneContainer from '@components/PhoneContainer';
+import { getStorageImageUrl } from '@utils/imageUtils';
 
 // Custom styles to match Bootstrap form control height and styling
 const selectStyles = {
@@ -305,15 +306,18 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
         loadCities();
     }, [selectedCountryCode, selectedStateCode]);
 
-    // Fetch profile data when component mounts or currentUser changes
+    // Load profile data from currentUser.profile when component mounts or currentUser changes
     React.useEffect(() => {
-        const fetchProfileData = async () => {
-            if (!currentUser?.id || countries.length === 0) return;
+        const loadProfileData = () => {
+            if (!currentUser?.profile || countries.length === 0) return;
+            
             try {
                 setIsLoadingProfile(true);
-                const data = await getUserProfileData(currentUser.id.toString());
+                const data = currentUser.profile;
+                
                 if (data) {
                     setProfileData(data);
+                    
                     // Parse language from backend (could be comma-separated string or array)
                     const parsedLanguages = parseLanguageFromBackend(data.language);
                     
@@ -357,15 +361,16 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
                     }
                 }
             } catch (error) {
-                console.error('Error fetching profile data:', error);
+                console.error('Error loading profile data:', error);
             } finally {
                 setIsLoadingProfile(false);
             }
         };
+        
         if (countries.length > 0) {
-            fetchProfileData();
+            loadProfileData();
         }
-    }, [currentUser, countries]);
+    }, [currentUser?.profile, countries]);
 
     const handleCloseEditProfileModal = () => {
         setShowEditProfileModal(false);
@@ -623,37 +628,8 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
             if (response) {
                 setShowEditProfileModal(false);
                 onSuccess('Profile Updated', 'The profile has been updated successfully');
-                // Refresh profile data
-                const data = await getUserProfileData(currentUser.id.toString());
-                if (data) {
-                    setProfileData(data);
-                    // Parse language from backend (could be comma-separated string or array)
-                    const parsedLanguages = parseLanguageFromBackend(data.language);
-                    
-                    setProfileFormData({
-                        title: data.title || '',
-                        first_name: data.first_name || '',
-                        last_name: data.last_name || '',
-                        email: data.email || '',
-                        phone_number: data.phone_number || '',
-                        gender: data.gender || '',
-                        job_title: data.job_title || '',
-                        department: data.department || '',
-                        country: data.country || '',
-                        state: data.state || '',
-                        city: data.city || '',
-                        postal_code: data.postal_code || '',
-                        address: data.address || '',
-                        timezone: data.timezone || '',
-                        service_type: data.service_type || '',
-                        user_consent: data.user_consent || false,
-                        language: parsedLanguages
-                    });
-                    if (data.profile_picture_url) {
-                        setProfilePicturePreview(data.profile_picture_url);
-                    }
-                }
                 setProfilePicture(null);
+                // onUserUpdate will refresh currentUser which will trigger the useEffect to update profileData
                 onUserUpdate();
             }
         } catch (error) {
@@ -689,14 +665,29 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
                         ) : profileData ? (
                             <Row>
                                 <Col md={3} className="text-center mb-3">
-                                    {profilePicturePreview ? (
-                                        <img 
-                                            src={profilePicturePreview} 
-                                            alt="Profile" 
-                                            className="img-fluid rounded-circle"
-                                            style={{ width: '150px', height: '150px', objectFit: 'cover' }}
-                                        />
-                                    ) : (
+                                    {profileData?.profile_picture ? (() => {
+                                        const imageUrl = getStorageImageUrl(profileData.profile_picture);
+                                        
+                                        return (
+                                            <img 
+                                                src={imageUrl || undefined} 
+                                                alt="Profile" 
+                                                className="img-fluid rounded-circle"
+                                                style={{ width: '150px', height: '150px', objectFit: 'cover' }}
+                                                onError={(e) => {
+                                                    console.error('Image failed to load:', {
+                                                        originalUrl: profileData.profile_picture_url,
+                                                        transformedUrl: imageUrl,
+                                                        imgSrc: e.currentTarget.src,
+                                                        error: e
+                                                    });
+                                                }}
+                                                onLoad={() => {
+                                                    console.log('Image loaded successfully:', imageUrl);
+                                                }}
+                                            />
+                                        );
+                                    })() : (
                                         <div className="bg-light rounded-circle d-inline-flex align-items-center justify-content-center" 
                                              style={{ width: '150px', height: '150px' }}>
                                             <i className="material-icons-two-tone" style={{ fontSize: '80px' }}>person</i>

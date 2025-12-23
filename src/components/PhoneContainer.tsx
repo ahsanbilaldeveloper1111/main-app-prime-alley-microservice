@@ -45,12 +45,12 @@ const PhoneContainer: React.FC<PhoneContainerProps> = ({ phone, showBadge = true
   const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
 
   const phoneContent = (
-    <div className="d-flex align-items-center gap-2">
+    <span className="d-inline-flex align-items-center gap-2">
       {phoneNumber?.countryCode && (
         <img src={flagImgSrc} alt={phoneNumber.countryCode} />
       )}
       {phoneNumber.phone}
-    </div>
+    </span>
   );
 
   if (showBadge) {
