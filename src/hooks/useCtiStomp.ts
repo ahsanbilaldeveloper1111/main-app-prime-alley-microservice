@@ -1951,7 +1951,7 @@ export default function useCtiStomp(
                     if (isGlobalInstance && manager.isMasterTab() && manager.isCrossTabSupported()) {
                       manager.broadcastCtiEvent({
                         type: 'complete_state',
-                        data: grouped
+                        data: data.data
                       });
                     }
                   }
