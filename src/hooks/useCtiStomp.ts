@@ -695,7 +695,7 @@ export default function useCtiStomp(
   // Group devices by DN and deviceName
   const groupDevicesByDnAndDeviceName = useCallback(
     (deviceArray: CtiDevice[]) => {
-      return (deviceArray || []).reduce((acc, device) => {
+      return deviceArray.reduce((acc, device) => {
         const { dn, deviceName } = device;
         if (!acc[dn]) acc[dn] = { dn, devices: {} };
         acc[dn].devices[deviceName] = device;
@@ -1091,6 +1091,7 @@ export default function useCtiStomp(
                   groupDevicesByDnAndDeviceNameRef.current &&
                   updateSummaryDataRef.current
                 ) {
+                  console.log("complete_state", data.data);
                   const grouped = groupDevicesByDnAndDeviceNameRef.current(
                     data.data
                   );
@@ -1110,7 +1111,7 @@ export default function useCtiStomp(
                   if (isGlobalInstance && crossTabManagerRef.current.isMasterTab() && crossTabManagerRef.current.isCrossTabSupported()) {
                     crossTabManagerRef.current.broadcastCtiEvent({
                       type: 'complete_state',
-                      data: grouped
+                      data: data.data
                     });
                   }
                 }
@@ -1938,6 +1939,7 @@ export default function useCtiStomp(
                     groupDevicesByDnAndDeviceNameRef.current &&
                     updateSummaryDataRef.current
                   ) {
+                    console.log("complete_state 2", data.data);
                     const grouped = groupDevicesByDnAndDeviceNameRef.current(
                       data.data
                     );
@@ -2047,6 +2049,7 @@ export default function useCtiStomp(
             groupDevicesByDnAndDeviceNameRef.current &&
             updateSummaryDataRef.current
           ) {
+            console.log("complete_state 3", event);
             const grouped = groupDevicesByDnAndDeviceNameRef.current(
               event.data.data
             );
