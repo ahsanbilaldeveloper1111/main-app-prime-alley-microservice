@@ -62,6 +62,7 @@ const globalConnectionRefs = {
   connectionStartTimeRef: { current: null as number | null },
   reconnectionTimerRef: { current: null as NodeJS.Timeout | null },
   isReconnectingRef: { current: false },
+  isGettingTokenRef: { current: false }, // Track if getBearerToken is in progress
 };
 
 /**
@@ -145,6 +146,9 @@ export default function useCtiStomp(
     : useRef<NodeJS.Timeout | null>(null);
   const isReconnectingRef = isGlobalInstance
     ? globalConnectionRefs.isReconnectingRef
+    : useRef(false);
+  const isGettingTokenRef = isGlobalInstance
+    ? globalConnectionRefs.isGettingTokenRef
     : useRef(false);
 
   // Store latest callback functions in refs to avoid stale closures
@@ -781,38 +785,81 @@ export default function useCtiStomp(
     publishStompMessage,
   ]);
 
-  useEffect(() => {
-    const getBearerToken = async (): Promise<{
-      token: string;
-      userAddress: string;
-    } | null> => {
-      try {
-        const response = await axiosInstance.get("/cti/connect", {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (response.status === 200) {
-          const data = response.data;
-          const token = data.token || data.accessToken || data.bearerToken;
-          const userAddress = data.userAddress || data.user_address;
-
-          if (token && userAddress) {
-            // Store token and userAddress in refs
-            tokenRef.current = token;
-            userAddressRef.current = userAddress;
-            return { token, userAddress };
-          } else {
-            return null;
-          }
-        } else {
-          return null;
+  // Shared getBearerToken function - defined outside useEffect so it can be reused
+  // Uses isGettingTokenRef to prevent duplicate calls
+  const getBearerToken = useCallback(async (): Promise<{
+    token: string;
+    userAddress: string;
+  } | null> => {
+    // ATOMIC CHECK: If already getting token, wait for it to complete
+    if (isGettingTokenRef.current) {
+      console.log(`[${instanceIdRef.current}] Token request already in progress, waiting for completion...`);
+      // Wait with retries until token is available or timeout (max 10 seconds)
+      const maxWaitTime = 10000; // 10 seconds
+      const checkInterval = 100; // Check every 100ms
+      const startTime = Date.now();
+      
+      while (isGettingTokenRef.current && (Date.now() - startTime) < maxWaitTime) {
+        await new Promise((resolve) => setTimeout(resolve, checkInterval));
+        // If token became available, return it
+        if (tokenRef.current && userAddressRef.current) {
+          console.log(`[${instanceIdRef.current}] Token became available from concurrent request`);
+          return { token: tokenRef.current, userAddress: userAddressRef.current };
         }
-      } catch (error) {
+      }
+      
+      // If we exited the loop but flag is still set, something went wrong
+      if (isGettingTokenRef.current) {
+        console.error(`[${instanceIdRef.current}] Token request timed out after ${maxWaitTime}ms`);
         return null;
       }
-    };
+      
+      // If flag was cleared but no token, check one more time
+      if (tokenRef.current && userAddressRef.current) {
+        return { token: tokenRef.current, userAddress: userAddressRef.current };
+      }
+      
+      // No token available
+      console.log(`[${instanceIdRef.current}] No token available after waiting`);
+      return null;
+    }
+
+    // Set flag IMMEDIATELY before async operation
+    isGettingTokenRef.current = true;
+
+    try {
+      const response = await axiosInstance.get("/cti/connect", {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.status === 200) {
+        const data = response.data;
+        const token = data.token || data.accessToken || data.bearerToken;
+        const userAddress = data.userAddress || data.user_address;
+
+        if (token && userAddress) {
+          // Store token and userAddress in refs
+          tokenRef.current = token;
+          userAddressRef.current = userAddress;
+          isGettingTokenRef.current = false;
+          return { token, userAddress };
+        } else {
+          isGettingTokenRef.current = false;
+          return null;
+        }
+      } else {
+        isGettingTokenRef.current = false;
+        return null;
+      }
+    } catch (error) {
+      isGettingTokenRef.current = false;
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
 
     // Helper function to fully close and cleanup all connections
     const fullyCloseConnection = async (
@@ -857,6 +904,7 @@ export default function useCtiStomp(
       // Reset all connection state flags
       isConnectingRef.current = false;
       isInitializedRef.current = false;
+      isGettingTokenRef.current = false; // Reset token flag
       connectionStartTimeRef.current = null;
 
       // Only reset reconnecting flag if not preserving it
@@ -904,6 +952,7 @@ export default function useCtiStomp(
         // Reset connection state to ensure fresh start
         isConnectingRef.current = false;
         isInitializedRef.current = false;
+        isGettingTokenRef.current = false; // Reset token flag
         connectionStartTimeRef.current = null;
 
         // Clear reconnection timer if it exists
@@ -1278,6 +1327,7 @@ export default function useCtiStomp(
         }
         isConnectingRef.current = false;
         isInitializedRef.current = false;
+        isGettingTokenRef.current = false; // Reset token flag
         connectionStartTimeRef.current = null;
         isReconnectingRef.current = false;
       };
@@ -1287,31 +1337,45 @@ export default function useCtiStomp(
       const currentInstanceId = instanceIdRef.current;
       const manager = crossTabManagerRef.current;
 
-      // For global instance, check if already initialized to prevent duplicate connections
+      // For global instance, check if already initialized with an active connection
+      // This prevents duplicate connections but allows reconnection if connection is lost
       if (
         isGlobalInstance &&
         isInitializedRef.current &&
-        eventSourceRef.current
+        eventSourceRef.current &&
+        eventSourceRef.current.readyState === EventSource.OPEN
       ) {
         console.log(
-          `[${currentInstanceId}] Global instance already initialized, reusing existing connection...`
+          `[${currentInstanceId}] Global instance already initialized with active connection, reusing...`
         );
         setIsInitialized(true);
         setError(null);
         return null; // Don't create new connection
       }
 
+      // ATOMIC CHECK: Set connecting flag IMMEDIATELY to prevent race conditions
+      // This must happen before ANY async operations
+      if (isConnectingRef.current || isGettingTokenRef.current) {
+        console.log(`[${currentInstanceId}] Already connecting or getting token, skipping duplicate initialization...`);
+        return null;
+      }
+      
+      // Set connecting flag BEFORE any async operations to prevent race conditions
+      isConnectingRef.current = true;
+
       // For global instance with cross-tab support, check if we should be the master
       if (isGlobalInstance && manager.isCrossTabSupported()) {
-        // Wait a bit for master election to complete
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        
+        // Master election happens synchronously in constructor, but check immediately
+        // If not master yet, the useEffect will handle initialization when we become master
         const isMaster = manager.isMasterTab();
         
         if (!isMaster) {
           console.log(
             `[${currentInstanceId}] Not master tab, waiting for state from master tab...`
           );
+          // Reset connecting flag since we're not initializing
+          isConnectingRef.current = false;
+          isGettingTokenRef.current = false; // Reset token flag
           // Don't create connection - we'll receive state from master tab
           // Set initialized to true immediately so features work (they'll forward to master)
           // The actual state will be synced when we receive it from master
@@ -1329,13 +1393,18 @@ export default function useCtiStomp(
 
       // For global instance, don't close existing connection if it's already working
       // For other instances, always close first
+      // IMPORTANT: Preserve isConnectingRef flag during close, as we're actively initializing
+      const wasConnecting = isConnectingRef.current;
       if (!isGlobalInstance || !isInitializedRef.current) {
         await fullyCloseConnection();
+        // Restore connecting flag after close (we're still initializing)
+        isConnectingRef.current = wasConnecting;
       }
 
-      // Prevent multiple simultaneous initializations for this instance
-      if (isConnectingRef.current) {
-        console.log(`[${currentInstanceId}] Already connecting, skipping...`);
+      // Double-check we're still supposed to connect (in case something changed during async operations)
+      if (!isConnectingRef.current) {
+        console.log(`[${currentInstanceId}] Connection cancelled during setup, skipping...`);
+        isGettingTokenRef.current = false; // Reset token flag
         return null;
       }
 
@@ -1352,6 +1421,7 @@ export default function useCtiStomp(
       } else {
         setError("Service unavailable");
         isConnectingRef.current = false;
+        isGettingTokenRef.current = false; // Reset token flag on error
         return null;
       }
     };
@@ -1391,7 +1461,7 @@ export default function useCtiStomp(
       });
     };
     // Empty dependency array - only run once on mount
-  }, [isGlobalInstance]);
+  }, [isGlobalInstance, getBearerToken]);
 
   // Helper: Get devices array for a DN
   const getDevicesForDn = useCallback(
@@ -1616,7 +1686,9 @@ export default function useCtiStomp(
     };
   }, []);
 
-  // Cross-tab integration: Initialize connection when we become master
+  // Cross-tab integration: Monitor master status and handle transitions
+  // This effect only handles cleanup when we're not master, NOT initialization
+  // Initialization is handled by the main initialize() function
   useEffect(() => {
     if (!isGlobalInstance || !crossTabManagerRef.current.isCrossTabSupported()) {
       return;
@@ -1648,50 +1720,39 @@ export default function useCtiStomp(
       return;
     }
 
-    // If we're master and not initialized, initialize the connection
+    // If we're master but not initialized AND not connecting, initialize the connection
+    // This handles the case where we became master after the initial mount (master election took longer than 100ms)
+    // IMPORTANT: Check isConnectingRef FIRST and set it IMMEDIATELY to prevent race conditions
     if (
+      isMaster &&
       !isInitializedRef.current &&
-      !isConnectingRef.current &&
       !eventSourceRef.current
     ) {
+      // ATOMIC CHECK-AND-SET: Set connecting flag IMMEDIATELY to prevent race conditions
+      if (isConnectingRef.current || isGettingTokenRef.current) {
+        // Already connecting or getting token (probably from main initialize), skip
+        console.log(`[${currentInstanceId}] Already connecting or getting token, skipping duplicate...`);
+        return;
+      }
+      
+      // Set connecting flag BEFORE any async operations
+      isConnectingRef.current = true;
+
       console.log(
-        `[${currentInstanceId}] Master tab detected, initializing connection...`
+        `[${currentInstanceId}] Master tab detected (after initial mount), initializing connection...`
       );
 
-      const initializeAsMaster = async () => {
-        const getBearerToken = async (): Promise<{
-          token: string;
-          userAddress: string;
-        } | null> => {
-          try {
-            const response = await axiosInstance.get("/cti/connect", {
-              headers: {
-                "Content-Type": "application/json",
-              },
-            });
-
-            if (response.status === 200) {
-              const data = response.data;
-              const token = data.token || data.accessToken || data.bearerToken;
-              const userAddress = data.userAddress || data.user_address;
-
-              if (token && userAddress) {
-                tokenRef.current = token;
-                userAddressRef.current = userAddress;
-                return { token, userAddress };
-              } else {
-                return null;
-              }
-            } else {
-              return null;
-            }
-          } catch (error) {
-            return null;
+      // Use the shared getBearerToken function
+      getBearerToken()
+        .then(async (token) => {
+          if (!token) {
+            isConnectingRef.current = false;
+            isGettingTokenRef.current = false; // Reset token flag
+            setError("Service unavailable");
+            return;
           }
-        };
 
-        // Helper function to fully close connection
-        const fullyCloseConnection = async () => {
+          // Close any existing connection first
           if (eventSourceRef.current) {
             try {
               eventSourceRef.current.close();
@@ -1700,32 +1761,24 @@ export default function useCtiStomp(
             }
             eventSourceRef.current = null;
           }
-          isConnectingRef.current = false;
-          isInitializedRef.current = false;
-          connectionStartTimeRef.current = null;
-          if (reconnectionTimerRef.current) {
-            clearTimeout(reconnectionTimerRef.current);
-            reconnectionTimerRef.current = null;
-          }
-        };
+          await new Promise((resolve) => setTimeout(resolve, 500));
 
-        // Helper function to connect via SSE (simplified version)
-        const connectViaSSE = async (token: string, userAddress: string) => {
-          if (isConnectingRef.current) {
+          // Double-check we're still master and haven't lost master status
+          if (!manager.isMasterTab()) {
+            isConnectingRef.current = false;
+            isGettingTokenRef.current = false; // Reset token flag
             return;
           }
 
-          await fullyCloseConnection();
-          await new Promise((resolve) => setTimeout(resolve, 500));
-
-          isConnectingRef.current = true;
-          tokenRef.current = token;
-          userAddressRef.current = userAddress;
-          setUserAddress(userAddress);
+          // We're still master, proceed with connection
+          // isConnectingRef.current is already set to true before getBearerToken()
+          tokenRef.current = token.token;
+          userAddressRef.current = token.userAddress;
+          setUserAddress(token.userAddress);
 
           const params = new URLSearchParams();
-          params.append("token", token);
-          params.append("userAddress", userAddress);
+          params.append("token", token.token);
+          params.append("userAddress", token.userAddress);
           params.append("instanceId", currentInstanceId);
           if (screenIdRef.current) {
             params.append("screenId", screenIdRef.current);
@@ -1807,28 +1860,18 @@ export default function useCtiStomp(
             if (readyState === EventSource.CLOSED) {
               setIsInitialized(false);
               setError("SSE connection closed");
+              isConnectingRef.current = false;
             }
           };
-        };
-
-        const token = await getBearerToken();
-        if (token) {
-          await connectViaSSE(token.token, token.userAddress);
-        }
-      };
-
-      // Small delay to ensure master election is stable
-      const timeout = setTimeout(() => {
-        if (manager.isMasterTab() && !isInitializedRef.current) {
-          initializeAsMaster();
-        }
-      }, 500);
-
-      return () => {
-        clearTimeout(timeout);
-      };
+        })
+        .catch((error) => {
+          console.error(`[${currentInstanceId}] Error getting token:`, error);
+          isConnectingRef.current = false;
+          isGettingTokenRef.current = false; // Reset token flag
+          setError("Failed to get token");
+        });
     }
-  }, [isMasterTab, isGlobalInstance]);
+  }, [isMasterTab, isGlobalInstance, getBearerToken]);
 
   // Cross-tab integration: Listen to events from master tab
   useEffect(() => {
