@@ -44,6 +44,8 @@ interface CtiContextType {
   getCallStateForDevice: (dn: string, deviceName: string) => any;
   getAllCallIds: () => string[];
   getActiveCallIdsFromLocalStorage: () => string[];
+  getUserTeams: () => any;
+  getUserDataExtensions: () => any;
   
   // Call operations
   makeCall: (params: {
@@ -732,6 +734,8 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     getCallStateForDevice: ctiStomp.getCallStateForDevice,
     getAllCallIds: ctiStomp.getAllCallIds,
     getActiveCallIdsFromLocalStorage: ctiStomp.getActiveCallIdsFromLocalStorage,
+    getUserTeams: ctiStomp.getUserTeams,
+    getUserDataExtensions: ctiStomp.getUserDataExtensions,
     
     // Call operations
     makeCall,
@@ -770,6 +774,8 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     ctiStomp.getCallStateForDevice,
     ctiStomp.getAllCallIds,
     ctiStomp.getActiveCallIdsFromLocalStorage,
+    ctiStomp.getUserTeams,
+    ctiStomp.getUserDataExtensions,
     makeCall,
     dialNumber,
     endCall,

@@ -57,6 +57,8 @@ const globalConnectionRefs = {
   eventSourceRef: { current: null as EventSource | null },
   tokenRef: { current: null as string | null },
   userAddressRef: { current: null as string | null },
+  userTeamsRef: { current: null as any },
+  userDataExtensionsRef: { current: null as any },
   isConnectingRef: { current: false },
   isInitializedRef: { current: false },
   connectionStartTimeRef: { current: null as number | null },
@@ -124,6 +126,8 @@ export default function useCtiStomp(
   const localEventSourceRef = useRef<EventSource | null>(null);
   const localTokenRef = useRef<string | null>(null);
   const localUserAddressRef = useRef<string | null>(null);
+  const localUserTeamsRef = useRef<any>(null);
+  const localUserDataExtensionsRef = useRef<any>(null);
   const localIsConnectingRef = useRef(false);
   const localIsInitializedRef = useRef(false);
   const localConnectionStartTimeRef = useRef<number | null>(null);
@@ -136,6 +140,8 @@ export default function useCtiStomp(
   const eventSourceRef = isGlobalInstance ? globalConnectionRefs.eventSourceRef : localEventSourceRef;
   const tokenRef = isGlobalInstance ? globalConnectionRefs.tokenRef : localTokenRef;
   const userAddressRef = isGlobalInstance ? globalConnectionRefs.userAddressRef : localUserAddressRef;
+  const userTeamsRef = isGlobalInstance ? globalConnectionRefs.userTeamsRef : localUserTeamsRef;
+  const userDataExtensionsRef = isGlobalInstance ? globalConnectionRefs.userDataExtensionsRef : localUserDataExtensionsRef;
   const screenIdRef = useRef<string | undefined>(screenId);
   const isConnectingRef = isGlobalInstance ? globalConnectionRefs.isConnectingRef : localIsConnectingRef;
   const isInitializedRef = isGlobalInstance ? globalConnectionRefs.isInitializedRef : localIsInitializedRef;
@@ -832,10 +838,15 @@ export default function useCtiStomp(
         const token = data.token || data.accessToken || data.bearerToken;
         const userAddress = data.userAddress || data.user_address;
 
+        const userTeams = data?.teams;
+        const userDataExtensions = data?.extensions;
+
         if (token && userAddress) {
-          // Store token and userAddress in refs
+          // Store token, userAddress, userTeams, and userDataExtensions in refs
           tokenRef.current = token;
           userAddressRef.current = userAddress;
+          userTeamsRef.current = userTeams;
+          userDataExtensionsRef.current = userDataExtensions;
           isGettingTokenRef.current = false;
           return { token, userAddress };
         } else {
@@ -933,9 +944,11 @@ export default function useCtiStomp(
         isReconnectingRef.current = wasReconnecting;
       }
 
-      // Clear token and userAddress refs to force fresh token on next connection
+      // Clear token, userAddress, userTeams, and userDataExtensions refs to force fresh token on next connection
       tokenRef.current = null;
       userAddressRef.current = null;
+      userTeamsRef.current = null;
+      userDataExtensionsRef.current = null;
 
       // Reset UI state
       setIsInitialized(false);
@@ -2224,6 +2237,15 @@ export default function useCtiStomp(
     ]
   );
 
+  // Getter functions for userTeams and userDataExtensions
+  const getUserTeams = useCallback(() => {
+    return userTeamsRef.current;
+  }, []);
+
+  const getUserDataExtensions = useCallback(() => {
+    return userDataExtensionsRef.current;
+  }, []);
+
   return {
     dnsMap,
     callStateMap,
@@ -2243,5 +2265,7 @@ export default function useCtiStomp(
     getAllCallIds, // Get all call IDs from current state
     removeTerminatingCalls, // Remove calls with isTerminating: true from store
     onAllLoaded, // Function that runs when all things are loaded
+    getUserTeams, // Get user teams data
+    getUserDataExtensions, // Get user data extensions
   };
 }

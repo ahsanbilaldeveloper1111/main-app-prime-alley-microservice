@@ -3,7 +3,7 @@ import { Card, Row, Col, Alert } from 'react-bootstrap';
 import { getStorageImageUrl } from '@utils/imageUtils';
 
 const TestImageStorage = () => {
-  const imagePath = 'profiles/profile_2936_1765831932.jpg';
+  const imagePath = 'profiles/profile_236_1766402827.jpg';
   const transformedUrl = getStorageImageUrl(imagePath);
 
   const [imageError, setImageError] = useState(false);
