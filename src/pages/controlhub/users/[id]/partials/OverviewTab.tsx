@@ -87,14 +87,14 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                     <Card>
                         <Card.Body className="overview-card">
                             <Row className="align-items-center">
-                                <Col md={3}>
+                                <Col xs={3}>
                                     <div className="user-avatar">
                                         <div className="text">
                                             <i className="material-icons-two-tone">person</i>
                                         </div>
                                     </div>
                                 </Col>
-                                <Col md={9}>
+                                <Col xs={9}>
                                     <h4 className="text-white mb-1 text-capitalize">{currentUser?.name}</h4>
                                     <p className="text-white mb-0 text-opacity">User Name</p>
                                     <p className="text-white mb-2">{currentUser?.username}</p>

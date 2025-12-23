@@ -81,6 +81,37 @@ $primary-color: #1a6bc4;
       .text-opacity {
             opacity: 0.5;
       }
+
+      @media (max-width: 1199px) {
+            .user-avatar {
+                  width: 80px;
+                  height: 80px;
+            }
+            h4{font-size: 18px;}
+      }
+
+      @media (max-width: 1024px) {
+            .user-avatar {
+                  width: 70px;
+                  height: 70px;
+            }
+            h4{font-size: 18px;}
+      }
+      @media (max-width: 960px) {
+            .user-avatar {
+                  width: 60px;
+                  height: 60px;
+            }
+            h4{font-size: 18px;}
+      }
+      @media (max-width: 768px) {
+            .user-avatar {
+                  width: 50px;
+                  height: 50px;
+            }
+            h4{font-size: 16px;}
+      }
+      
 }
 
 .theme-hr {

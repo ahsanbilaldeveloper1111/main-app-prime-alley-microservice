@@ -104,7 +104,6 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
     }, [autoPlay]);
 
     const togglePlay = async () => {
-        console.log("REDASDA", audioRef.current);
         if (audioRef.current) {
             try {
                 setIsLoading(true);
@@ -112,7 +111,6 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                     audioRef.current.pause();
                 } else {
                     // Ensure audio is loaded before playing
-                    console.log("REDASDA 2", audioRef.current.readyState);
                     if (audioRef.current.readyState < 2) {
                         
                         await new Promise((resolve, reject) => {
@@ -132,7 +130,6 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(({
                             audio.load();
                         });
                     }
-                    console.log("REDASDA 3", audioRef.current.readyState);
                     await audioRef.current.play();
                 }
             } catch (error) {
