@@ -695,7 +695,7 @@ export default function useCtiStomp(
   // Group devices by DN and deviceName
   const groupDevicesByDnAndDeviceName = useCallback(
     (deviceArray: CtiDevice[]) => {
-      return deviceArray.reduce((acc, device) => {
+      return (deviceArray || []).reduce((acc, device) => {
         const { dn, deviceName } = device;
         if (!acc[dn]) acc[dn] = { dn, devices: {} };
         acc[dn].devices[deviceName] = device;
