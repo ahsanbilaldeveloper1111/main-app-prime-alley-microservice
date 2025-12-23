@@ -860,6 +860,31 @@ export default function useCtiStomp(
   }, []);
 
   useEffect(() => {
+    // CRITICAL: Early return if already initialized with active connection OR already connecting
+    // This prevents duplicate initialization if useEffect runs multiple times
+    // (e.g., due to React StrictMode double-mounting in development)
+    if (isGlobalInstance) {
+      // Check if already connecting (race condition prevention)
+      if (isConnectingRef.current || isGettingTokenRef.current) {
+        console.log(
+          `[${instanceIdRef.current}] useEffect triggered but already connecting/getting token, skipping...`
+        );
+        return;
+      }
+      
+      // Check if already initialized with active connection
+      if (
+        isInitializedRef.current &&
+        eventSourceRef.current &&
+        (eventSourceRef.current.readyState === EventSource.OPEN || 
+         eventSourceRef.current.readyState === EventSource.CONNECTING)
+      ) {
+        console.log(
+          `[${instanceIdRef.current}] useEffect triggered but already initialized with active/connecting connection, skipping...`
+        );
+        return;
+      }
+    }
 
     // Helper function to fully close and cleanup all connections
     const fullyCloseConnection = async (
@@ -988,10 +1013,30 @@ export default function useCtiStomp(
       }
       const sseUrl = `/api/cti-stomp-stream?${params.toString()}`;
 
+      // CRITICAL: Final check before creating EventSource - prevent duplicate connections
+      // This is the last line of defense against race conditions
+      if (isGlobalInstance && eventSourceRef.current) {
+        const existingState = eventSourceRef.current.readyState;
+        if (existingState === EventSource.CONNECTING || existingState === EventSource.OPEN) {
+          console.log(`[${currentInstanceId}] ⚠️ EventSource already exists with state ${existingState}, closing before creating new one...`);
+          try {
+            eventSourceRef.current.close();
+          } catch (err) {
+            // Ignore errors
+          }
+          eventSourceRef.current = null;
+          // Wait a bit to ensure it's fully closed
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }
+
       console.log(`[${currentInstanceId}] Creating fresh SSE connection...`);
 
       // Create EventSource for SSE connection
       const eventSource = new EventSource(sseUrl);
+      
+      // CRITICAL: Immediately store the EventSource to prevent duplicate creation
+      // This must happen synchronously before any other code can run
       eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
@@ -1059,6 +1104,15 @@ export default function useCtiStomp(
                       timestamp: new Date().toISOString(),
                     },
                   ]);
+                  
+                  // CRITICAL: Broadcast complete_state to non-master tabs
+                  // This ensures non-master tabs receive the initial data for live-calls page
+                  if (isGlobalInstance && crossTabManagerRef.current.isMasterTab() && crossTabManagerRef.current.isCrossTabSupported()) {
+                    crossTabManagerRef.current.broadcastCtiEvent({
+                      type: 'complete_state',
+                      data: grouped
+                    });
+                  }
                 }
               } catch (err) {
                 setError("Failed to process initial state");
@@ -1355,8 +1409,13 @@ export default function useCtiStomp(
 
       // ATOMIC CHECK: Set connecting flag IMMEDIATELY to prevent race conditions
       // This must happen before ANY async operations
-      if (isConnectingRef.current || isGettingTokenRef.current) {
-        console.log(`[${currentInstanceId}] Already connecting or getting token, skipping duplicate initialization...`);
+      // CRITICAL: Check BOTH flags and eventSource to prevent any possibility of duplicate connections
+      if (
+        isConnectingRef.current || 
+        isGettingTokenRef.current ||
+        (isGlobalInstance && eventSourceRef.current && eventSourceRef.current.readyState !== EventSource.CLOSED)
+      ) {
+        console.log(`[${currentInstanceId}] Already connecting, getting token, or has active connection - skipping duplicate initialization...`);
         return null;
       }
       
@@ -1410,6 +1469,20 @@ export default function useCtiStomp(
 
       const token = await getBearerToken();
       if (token) {
+        // CRITICAL: Double-check we're still supposed to connect after getting token
+        // Another initialization might have started in the meantime
+        if (isGlobalInstance && eventSourceRef.current) {
+          const existingState = eventSourceRef.current.readyState;
+          if (existingState === EventSource.CONNECTING || existingState === EventSource.OPEN) {
+            console.log(
+              `[${currentInstanceId}] Got token but connection already exists (state: ${existingState}), skipping...`
+            );
+            isConnectingRef.current = false;
+            isGettingTokenRef.current = false;
+            return null;
+          }
+        }
+        
         console.log(
           `[${currentInstanceId}] Got token, creating fresh connection...`
         );
@@ -1427,10 +1500,24 @@ export default function useCtiStomp(
     };
 
     // Initialize on mount
+    // CRITICAL: Check if already initialized before calling initialize()
+    // This prevents duplicate initialization if component mounts twice (e.g., React StrictMode)
     let cleanup: (() => void) | null = null;
-    initialize().then((cleanupFn) => {
-      cleanup = cleanupFn;
-    });
+    
+    if (
+      isGlobalInstance &&
+      isInitializedRef.current &&
+      eventSourceRef.current &&
+      eventSourceRef.current.readyState === EventSource.OPEN
+    ) {
+      console.log(
+        `[${instanceIdRef.current}] Already initialized with active connection, skipping initialization...`
+      );
+    } else {
+      initialize().then((cleanupFn) => {
+        cleanup = cleanupFn;
+      });
+    }
 
     // Cleanup on unmount
     return () => {
@@ -1461,7 +1548,9 @@ export default function useCtiStomp(
       });
     };
     // Empty dependency array - only run once on mount
-  }, [isGlobalInstance, getBearerToken]);
+    // isGlobalInstance is checked inside the effect, so we don't need it as a dependency
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Helper: Get devices array for a DN
   const getDevicesForDn = useCallback(
@@ -1723,13 +1812,17 @@ export default function useCtiStomp(
     // If we're master but not initialized AND not connecting, initialize the connection
     // This handles the case where we became master after the initial mount (master election took longer than 100ms)
     // IMPORTANT: Check isConnectingRef FIRST and set it IMMEDIATELY to prevent race conditions
+    // CRITICAL: Also check if eventSource already exists (might be created by main initialize)
     if (
       isMaster &&
       !isInitializedRef.current &&
-      !eventSourceRef.current
+      !eventSourceRef.current &&
+      !isConnectingRef.current &&
+      !isGettingTokenRef.current
     ) {
       // ATOMIC CHECK-AND-SET: Set connecting flag IMMEDIATELY to prevent race conditions
-      if (isConnectingRef.current || isGettingTokenRef.current) {
+      // Double-check after a microtask to ensure main initialize didn't start in the meantime
+      if (isConnectingRef.current || isGettingTokenRef.current || eventSourceRef.current) {
         // Already connecting or getting token (probably from main initialize), skip
         console.log(`[${currentInstanceId}] Already connecting or getting token, skipping duplicate...`);
         return;
@@ -1770,6 +1863,21 @@ export default function useCtiStomp(
             return;
           }
 
+          // CRITICAL: Double-check connection doesn't already exist after getting token
+          // Another initialization might have started in the meantime
+          if (eventSourceRef.current) {
+            const existingEventSource = eventSourceRef.current as EventSource;
+            const existingState = existingEventSource.readyState;
+            if (existingState === EventSource.CONNECTING || existingState === EventSource.OPEN) {
+              console.log(
+                `[${currentInstanceId}] Got token but connection already exists (state: ${existingState}), skipping...`
+              );
+              isConnectingRef.current = false;
+              isGettingTokenRef.current = false;
+              return;
+            }
+          }
+
           // We're still master, proceed with connection
           // isConnectingRef.current is already set to true before getBearerToken()
           tokenRef.current = token.token;
@@ -1785,8 +1893,29 @@ export default function useCtiStomp(
           }
           const sseUrl = `/api/cti-stomp-stream?${params.toString()}`;
 
+          // CRITICAL: Final check before creating EventSource - prevent duplicate connections
+          // This is the last line of defense against race conditions
+          if (eventSourceRef.current) {
+            const existingEventSource = eventSourceRef.current as EventSource;
+            const existingState = existingEventSource.readyState;
+            if (existingState === EventSource.CONNECTING || existingState === EventSource.OPEN) {
+              console.log(`[${currentInstanceId}] ⚠️ EventSource already exists with state ${existingState}, closing before creating new one...`);
+              try {
+                existingEventSource.close();
+              } catch (err) {
+                // Ignore errors
+              }
+              eventSourceRef.current = null;
+              // Wait a bit to ensure it's fully closed
+              await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+          }
+
           console.log(`[${currentInstanceId}] Creating SSE connection as master...`);
           const eventSource = new EventSource(sseUrl);
+          
+          // CRITICAL: Immediately store the EventSource to prevent duplicate creation
+          // This must happen synchronously before any other code can run
           eventSourceRef.current = eventSource;
 
           eventSource.onopen = () => {
@@ -1814,6 +1943,15 @@ export default function useCtiStomp(
                     );
                     setDnsMap(grouped);
                     updateSummaryDataRef.current(grouped);
+                    
+                    // CRITICAL: Broadcast complete_state to non-master tabs
+                    // This ensures non-master tabs receive the initial data for live-calls page
+                    if (isGlobalInstance && manager.isMasterTab() && manager.isCrossTabSupported()) {
+                      manager.broadcastCtiEvent({
+                        type: 'complete_state',
+                        data: grouped
+                      });
+                    }
                   }
                   break;
 
@@ -1831,6 +1969,15 @@ export default function useCtiStomp(
                     }
                     return updated;
                   });
+                  
+                  // CRITICAL: Broadcast dns_states to non-master tabs
+                  // This ensures non-master tabs receive device state updates
+                  if (isGlobalInstance && manager.isMasterTab() && manager.isCrossTabSupported()) {
+                    manager.broadcastCtiEvent({
+                      type: 'dns_states',
+                      data: s
+                    });
+                  }
                   break;
 
                 case "call_events":
@@ -1871,7 +2018,9 @@ export default function useCtiStomp(
           setError("Failed to get token");
         });
     }
-  }, [isMasterTab, isGlobalInstance, getBearerToken]);
+    // Only depend on isMasterTab and isGlobalInstance - getBearerToken is stable (memoized with empty deps)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMasterTab, isGlobalInstance]);
 
   // Cross-tab integration: Listen to events from master tab
   useEffect(() => {
@@ -1890,6 +2039,51 @@ export default function useCtiStomp(
       } else if (event.data?.event) {
         // Direct event object
         handleCallEvent(event.data.event);
+      } else if (event.data?.type === "complete_state" && event.data?.data) {
+        // CRITICAL: Handle complete_state from master tab
+        // This provides the initial data needed for live-calls page
+        try {
+          if (
+            groupDevicesByDnAndDeviceNameRef.current &&
+            updateSummaryDataRef.current
+          ) {
+            const grouped = groupDevicesByDnAndDeviceNameRef.current(
+              event.data.data
+            );
+            setDnsMap(grouped);
+            updateSummaryDataRef.current(grouped);
+            setEventLog((prev) => [
+              ...prev,
+              {
+                type: "initial-state",
+                data: grouped,
+                timestamp: new Date().toISOString(),
+              },
+            ]);
+            console.log(`[${instanceIdRef.current}] Received complete_state from master tab`);
+          }
+        } catch (err) {
+          console.error(`[${instanceIdRef.current}] Failed to process complete_state from master:`, err);
+        }
+      } else if (event.data?.type === "dns_states" && event.data?.data) {
+        // Handle dns_states from master tab
+        try {
+          const s = event.data.data;
+          setDnsMap((prev) => {
+            const updated = { ...prev };
+            const { dn, deviceName } = s;
+            if (!updated[dn]) {
+              updated[dn] = { dn, devices: {} };
+            }
+            updated[dn].devices[deviceName] = s;
+            if (updateSummaryDataRef.current) {
+              updateSummaryDataRef.current(updated);
+            }
+            return updated;
+          });
+        } catch (err) {
+          console.error(`[${instanceIdRef.current}] Failed to process dns_states from master:`, err);
+        }
       }
     });
 

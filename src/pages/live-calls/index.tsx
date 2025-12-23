@@ -8,7 +8,6 @@ import UserDummyImage from '@assets/images/user-dummy.jpg'
 import '@assets/scss/gsm-dashboard.scss'
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid'
 import moment from 'moment'
-import useCtiStomp from '../../hooks/useCtiStomp'
 import useGlobalCallTimer from '../../hooks/useGlobalCallTimer'
 import dynamic from 'next/dynamic'
 import PageLoader from '@components/PageLoader'
@@ -21,6 +20,7 @@ import { startMonitoring, stopMonitoring as stopMonitoringAPI, startBargeInMonit
 import '@assets/scss/common.scss';
 import '@assets/scss/live-calls.scss';
 import { FiX } from 'react-icons/fi'
+import { useCti } from '@hooks/useCti'
 
 
 interface CtiDevice {
@@ -66,10 +66,9 @@ const LiveCallDashboard = () => {
     getCallStatesForDn,
     eventLog,
     userAddress,
-    syncPersistedCallStates,
     getActiveCallIdsFromLocalStorage,
     getAllCallIds
-  } = useCtiStomp('/ws', undefined, 'liveView')
+  } = useCti()
 
   const [loading, setLoading] = useState(true)
   const [hover, setHover] = useState<string | null>(null)
