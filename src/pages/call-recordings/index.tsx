@@ -43,7 +43,7 @@ import imgStatus4 from '@assets/images/widget/img-status-4.svg';
 import router from 'next/router';
 import axiosInstance from '@utils/axios';
 import { toast } from 'react-toastify';
-import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, convertUTCDateToUserTimezone, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat, encodeAnalysisData } from '@utils/Helper';
+import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, convertUTCDateToUserTimezone, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat, encodeAnalysisData, getAutoTimezone, convertDateTimeWithOffsetToLocal } from '@utils/Helper';
 import PageLoader from '@components/PageLoader';
 import CircularProgressLoader from '@components/CircularProgressLoader';
 import CircularProgressCircle from '@components/CircularProgressCircle';
@@ -137,6 +137,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     perPage: 15,
   });
   const [socketExtensions, setSocketExtensions] = useState<number[]>([]);
+  const [currentTimezone, setCurrentTimezone] = useState<string>('');
 
   const [summary, setSummary] = useState<Summary>({
     numbers: 0,
@@ -249,7 +250,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       cell: (props: any) => {
         return (
           <div>
-            {formatDateTimeToLocal(props.DateTime, GlobalDateFormat)}
+            {convertDateTimeWithOffsetToLocal(props.DateTime, undefined, GlobalDateFormat)}
           </div>
         )
       }
@@ -262,7 +263,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       cell: (props: any) => {
         return (
           <div>
-            {formatDateTimeToLocal(props.DateTime, GlobalTimeFormat, 'YYYY-MM-DD HH:mm:ss.SSSSSSS')}
+            {convertDateTimeWithOffsetToLocal(props.DateTime, undefined, GlobalTimeFormat)}
           </div>
         )
       }
@@ -863,6 +864,12 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   // Initial data load is handled by GenericListPage component automatically
   // No need for manual useEffect here to avoid double API calls
 
+  // Get current timezone on component mount
+  useEffect(() => {
+    const timezone = getAutoTimezone();
+    setCurrentTimezone(timezone);
+  }, []);
+
 
 
   // Socket connection effect
@@ -961,6 +968,17 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Recordings" showPageLoader={showPageLoader} />
 
+      {/* {currentTimezone && (
+        <Row className="mb-2">
+          <Col md={12}>
+            <div className="d-flex justify-content-end align-items-center">
+              <small className="text-muted">
+                <strong>Current Timezone:</strong> {currentTimezone}
+              </small>
+            </div>
+          </Col>
+        </Row>
+      )} */}
       
       <Row className="mb-3">
             <Col md={12}>

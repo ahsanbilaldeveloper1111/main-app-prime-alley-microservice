@@ -126,7 +126,7 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
     const active = hasActiveCalls(dn)
     const section = categorizeDns(dn, deviceList, call, active)
     
-    sections[section].push({ dn, devices: deviceList, call, active })
+    sections[section as keyof typeof sections].push({ dn, devices: deviceList, call, active })
   })
 
   return (

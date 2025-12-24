@@ -1556,7 +1556,6 @@ export default function useCtiStomp(
     };
     // Empty dependency array - only run once on mount
     // isGlobalInstance is checked inside the effect, so we don't need it as a dependency
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Helper: Get devices array for a DN
@@ -2027,7 +2026,6 @@ export default function useCtiStomp(
         });
     }
     // Only depend on isMasterTab and isGlobalInstance - getBearerToken is stable (memoized with empty deps)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMasterTab, isGlobalInstance]);
 
   // Cross-tab integration: Listen to events from master tab

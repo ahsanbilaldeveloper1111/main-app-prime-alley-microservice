@@ -246,13 +246,36 @@ export const convertUTCDateToUserTimezone = (
 };
 
 /**
+ * Get user's current timezone automatically
+ * @returns Timezone string (e.g., "Asia/Karachi", "America/New_York")
+ */
+export const getAutoTimezone = (): string => {
+  try {
+    // Try to get timezone from browser/system
+    if (typeof Intl !== "undefined" && Intl.DateTimeFormat) {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (timezone) {
+        return timezone;
+      }
+    }
+    // Fallback: try to guess timezone using moment
+    // This is a fallback if Intl is not available
+    return moment.tz.guess() || "UTC";
+  } catch (error) {
+    console.warn("Could not detect timezone, falling back to UTC:", error);
+    return "UTC";
+  }
+};
+
+/**
  * Get user's current timezone information
  * @returns Object containing timezone details
  */
 export const getUserTimezoneInfo = () => {
   const now = moment();
+  const autoTimezone = getAutoTimezone();
   return {
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezone: autoTimezone,
     offset: now.format("Z"),
     offsetMinutes: now.utcOffset(),
     isDST: now.isDST(),
@@ -266,39 +289,41 @@ export const getUserTimezoneInfo = () => {
  * @returns Formatted duration string (e.g., "2h 30m 45s")
  */
 export const formatDuration = (seconds: number): string => {
-  if (!seconds || seconds < 0) return "0s";
+  if (!seconds || seconds < 0) return "00:00:00";
 
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
 
-  const parts = [];
-  if (hours > 0) parts.push(`${hours}h`);
-  if (minutes > 0) parts.push(`${minutes}m`);
-  if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
-
-  return parts.join(" ");
+  // Format with leading zeros (e.g., 00:00:03 instead of 0:0:3)
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
 /**
- * Simple datetime conversion to local timezone with custom format
+ * Simple datetime conversion to target timezone with custom format (auto-detects timezone)
  * @param datetime - The datetime string (any format)
  * @param format - The output format (e.g., 'YYYY-MM-DD', 'MM/DD/YYYY', 'hh:mm:ss A', 'YYYY-MM-DD hh:mm:ss A')
  * @param inputFormat - Optional input format if you know the specific format of the input datetime
- * @returns Formatted datetime string in user's local timezone
+ * @param targetTimezone - Target timezone (default: auto-detected from browser/system)
+ * @returns Formatted datetime string in target timezone
  *
  * @example
- * // Convert any datetime to local timezone
+ * // Convert any datetime to auto-detected timezone
  * formatDateTimeToLocal('2024-01-15 14:30:00', 'YYYY-MM-DD hh:mm:ss A')
  * formatDateTimeToLocal('2024-01-15T14:30:00Z', 'MM/DD/YYYY hh:mm A')
  * formatDateTimeToLocal('2024-01-15 14:30:00', 'YYYY-MM-DD', 'YYYY-MM-DD HH:mm:ss')
+ * formatDateTimeToLocal('2025-12-24 13:04:08 +04:00', 'YYYY-MM-DD hh:mm:ss A', undefined, 'Asia/Karachi')
  */
 export const formatDateTimeToLocal = (
   datetime: string | Date,
   format: string = "YYYY-MM-DD hh:mm:ss A",
-  inputFormat?: string
+  inputFormat?: string,
+  targetTimezone?: string
 ): string => {
   try {
+    // Auto-detect timezone if not provided
+    const timezone = targetTimezone || getAutoTimezone();
+    
     let momentObj: moment.Moment;
 
     if (datetime instanceof Date) {
@@ -307,13 +332,36 @@ export const formatDateTimeToLocal = (
       // Parse with specific input format as UTC
       momentObj = moment.utc(datetime, inputFormat);
     } else {
-      // Parse as UTC (server sends UTC times)
-      // Try common UTC formats first
-      momentObj = moment.utc(datetime, "YYYY-MM-DD HH:mm:ss");
+      // Check if datetime string contains timezone offset (e.g., +04:00, -05:00, Z)
+      const hasTimezone = /[+-]\d{2}:\d{2}$|Z$/.test(datetime);
+      
+      if (hasTimezone) {
+        // Parse with timezone offset - ZZ format handles +04:00 (with colon)
+        // Try ZZ first (handles +04:00), then Z (handles +0400), then auto-detect
+        momentObj = moment.parseZone(datetime, "YYYY-MM-DD HH:mm:ss ZZ");
+        
+        if (!momentObj.isValid()) {
+          momentObj = moment.parseZone(datetime, "YYYY-MM-DD HH:mm:ss Z");
+        }
+        
+        // If format parsing fails, try without format (for ISO formats)
+        if (!momentObj.isValid()) {
+          momentObj = moment.parseZone(datetime);
+        }
+        
+        // parseZone preserves the timezone offset
+        // Convert to UTC first, then we'll convert to target timezone
+        // This ensures proper timezone conversion
+        momentObj = momentObj.utc();
+      } else {
+        // Parse as UTC (server sends UTC times without offset)
+        // Try common UTC formats first
+        momentObj = moment.utc(datetime, "YYYY-MM-DD HH:mm:ss");
 
-      // If that fails, try auto-detect but still assume UTC
-      if (!momentObj.isValid()) {
-        momentObj = moment.utc(datetime);
+        // If that fails, try auto-detect but still assume UTC
+        if (!momentObj.isValid()) {
+          momentObj = moment.utc(datetime);
+        }
       }
     }
 
@@ -322,10 +370,69 @@ export const formatDateTimeToLocal = (
       return "Invalid Date";
     }
 
-    // Convert to user's local timezone and format
-    return momentObj.local().format(format);
+    // Convert to target timezone and format
+    // If momentObj is in parseZone mode (has timezone), convert to target timezone
+    // Otherwise, it's already in UTC mode, so convert to target timezone
+    if (momentObj.isValid()) {
+      return momentObj.tz(timezone).format(format);
+    }
+    
+    return "Invalid Date";
   } catch (error) {
     console.error("Error formatting datetime:", error);
+    return "Invalid Date";
+  }
+};
+
+/**
+ * Convert datetime string with timezone offset to specified timezone (auto-detects timezone)
+ * @param datetimeString - Datetime string with timezone offset (e.g., "2025-12-24 13:04:08 +04:00")
+ * @param targetTimezone - Target timezone (default: auto-detected from browser/system)
+ * @param outputFormat - Optional output format (default: "YYYY-MM-DD hh:mm:ss A")
+ * @returns Formatted datetime string in target timezone
+ * 
+ * @example
+ * convertDateTimeWithOffsetToLocal("2025-12-24 13:04:08 +04:00")
+ * // Returns: converted to auto-detected timezone
+ * 
+ * convertDateTimeWithOffsetToLocal("2025-12-24 13:04:08 +04:00", "Asia/Karachi", "YYYY-MM-DD HH:mm:ss")
+ * // Returns: "2025-12-24 14:04:08"
+ * 
+ * convertDateTimeWithOffsetToLocal("2025-12-24 13:04:08 +04:00", "America/New_York")
+ * // Returns: "2025-12-24 05:04:08 AM" (converted to America/New_York)
+ */
+export const convertDateTimeWithOffsetToLocal = (
+  datetimeString: string,
+  targetTimezone?: string,
+  outputFormat: string = "YYYY-MM-DD hh:mm:ss A"
+): string => {
+  try {
+    // Auto-detect timezone if not provided
+    const timezone = targetTimezone || getAutoTimezone();
+    
+    // Parse the datetime with timezone offset using parseZone to preserve the offset
+    // ZZ format handles +04:00 (with colon)
+    let momentObj = moment.parseZone(datetimeString, "YYYY-MM-DD HH:mm:ss ZZ");
+    
+    // If that fails, try Z format (handles +0400 without colon)
+    if (!momentObj.isValid()) {
+      momentObj = moment.parseZone(datetimeString, "YYYY-MM-DD HH:mm:ss Z");
+    }
+    
+    // If format parsing fails, try auto-detect
+    if (!momentObj.isValid()) {
+      momentObj = moment.parseZone(datetimeString);
+    }
+    
+    if (!momentObj.isValid()) {
+      console.warn("Invalid datetime format:", datetimeString);
+      return "Invalid Date";
+    }
+    
+    // Convert to target timezone and format
+    return momentObj.tz(timezone).format(outputFormat);
+  } catch (error) {
+    console.error("Error converting datetime with offset:", error);
     return "Invalid Date";
   }
 };
@@ -360,9 +467,9 @@ export const debugTimezoneConversion = (date: string, time: string) => {
   };
 };
 
-export const GlobalDateFormat = "DD-MM-YYYY";
+export const GlobalDateFormat = "d MMM YYYY";
 export const GlobalTimeFormat = "hh:mm:ss A";
-export const GlobalDateTimeFormat = "DD-MM-YYYY hh:mm:ss A";
+export const GlobalDateTimeFormat = "d MMM YYYY hh:mm:ss A";
 
 /**
  * Format date for table display (e.g., "13 Dec, 2025")
@@ -409,13 +516,16 @@ export const formatDateForTable = (
  * @returns Formatted duration string (e.g., "1m 20s", "20s")
  */
 export const formatMinutesAndSeconds = (seconds: number): string => {
-  if (!seconds || seconds < 0) return "0s";
+  if (!seconds || seconds < 0) return "00:00:00";
 
-  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
 
-  if (minutes === 0) return `${secs}s`;
-  return `${minutes}m ${secs}s`;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+  // if (minutes === 0) return `${secs}s`;
+  // return `${minutes}m ${secs}s`;
 };
 
 export const convertSecondsToHHMMSS = (seconds: number): string => {
