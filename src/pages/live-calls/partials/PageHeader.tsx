@@ -1,6 +1,6 @@
 import React from 'react'
 import { Button, Col, Row } from 'react-bootstrap'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, DiscAlbum, PhoneCall } from 'lucide-react'
 import Link from 'next/link'
 
 interface PageHeaderProps {
@@ -23,7 +23,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   const allCollapsed = Object.values(collapsedSections).every(val => val === true)
   
   return (
-    <Row className="mb-3">
+    <Row className={`mb-3 ${isFullscreen ? 'd-none' : ''}`}>
       <Col md={12}>
         <div className="page-header-title style-2">
           <Row className="d-flex justify-content-between align-items-center">
@@ -32,9 +32,9 @@ const PageHeader: React.FC<PageHeaderProps> = ({
             </Col>
 
             <Col md={7} className="d-flex justify-content-end">
-              <div className="action-buttons d-flex gap-2">
+              <div className="d-flex flex-wrap align-items-center gap-2 w-100 w-md-auto justify-content-start justify-content-md-end">
                 <Button 
-                  variant="outline-secondary" 
+                   variant="outline-secondary" 
                   size="sm"
                   onClick={() => {
                     if (allCollapsed) {
@@ -65,22 +65,52 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                 </Button>
                 
                 {session?.user?.permissions?.includes('dial-call-cti') && (
-                  <Link 
-                    href="/cti/dialer" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="btn btn-sm btn-primary d-flex align-items-center"
+                  <Button 
+                    variant="outline-secondary"
+                    size="sm"
+                    onClick={() => window.open('/cti/dialer', '_blank')}
+                    className="d-flex align-items-center"
+                    style={{ 
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      whiteSpace: 'nowrap',
+                      padding: '0.5rem 1rem'
+                    }}
                   >
-                    <i className="material-icons-two-tone me-2 text-white">open_in_new</i>
-                    Dialer
-                  </Link>
+                    <PhoneCall size={16} className="me-1" />
+                    <span className="">Dialer</span>
+                  </Button>
                 )}
                 
                 <Button
-                  variant="info"
-                  size="sm"
                   onClick={toggleFullscreen}
-                  className="d-flex align-items-center"
+                  // className="btn-icon-text"
+                  // style={{ 
+                  //   fontSize: '0.875rem',
+                  //   fontWeight: 500,
+                  //   whiteSpace: 'nowrap',
+                  //   display: 'inline-flex',
+                  //   alignItems: 'center',
+                  //   gap: '0.5rem',
+                  //   padding: '0.5rem 1rem',
+                  //   border: isFullscreen ? 'none' : '1px solid #e0e6ed',
+                  //   borderRadius: '0.375rem',
+                  //   background: isFullscreen ? 'linear-gradient(60deg, #ef5350, #e53935)' : '#ffffff',
+                  //   color: isFullscreen ? '#ffffff' : '#4c5667',
+                  //   boxShadow: isFullscreen ? '0 4px 20px 0 rgba(239, 83, 80, 0.3)' : '0 1px 3px rgba(0,0,0,0.06)',
+                  //   transition: 'all 0.3s ease',
+                  //   cursor: 'pointer',
+                  //   minWidth: 'fit-content'
+                  // }}
+                  variant="outline-secondary"
+                    size="sm"
+                    className="d-flex align-items-center"
+                    style={{ 
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      whiteSpace: 'nowrap',
+                      padding: '0.5rem 1rem'
+                    }}
                   title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

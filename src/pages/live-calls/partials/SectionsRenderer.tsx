@@ -27,6 +27,7 @@ interface SectionsRendererProps {
   isDnInActiveCall: (dn: string) => boolean
   loading: boolean
   selectedTeam: string
+  selectedStatus: string
   searchQuery: string
   collapsedSections: { [key: string]: boolean }
   toggleSection: (section: string) => void
@@ -55,6 +56,7 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
   isDnInActiveCall,
   loading,
   selectedTeam,
+  selectedStatus,
   searchQuery,
   collapsedSections,
   toggleSection
@@ -70,12 +72,16 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
   }, [getUserDataExtensions])
 
   // Filter function to check if DN matches filters
-  const matchesFilters = React.useCallback((dn: string) => {
+  const matchesFilters = React.useCallback((dn: string, section: string) => {
     // Search filter
     if (searchQuery && searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
       const dnLower = String(dn).toLowerCase()
-      if (!dnLower.includes(query)) {
+      const extensionData = userDataExtensions[dn] || userDataExtensions[String(dn)] || userDataExtensions[Number(dn)]
+      const userName = extensionData?.name || extensionData?.user_name || ''
+      const userNameLower = String(userName).toLowerCase()
+      
+      if (!dnLower.includes(query) && !userNameLower.includes(query)) {
         return false
       }
     }
@@ -107,8 +113,24 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
       }
     }
 
+    // Status filter
+    if (selectedStatus && selectedStatus !== 'all') {
+      // Map filter values to section keys
+      const statusMap: Record<string, string> = {
+        'supervision': 'supervision',
+        'oncall': 'onCall',
+        'active': 'activeIdle',
+        'offline': 'downOffline'
+      }
+      
+      const targetSection = statusMap[selectedStatus.toLowerCase()]
+      if (targetSection && section !== targetSection) {
+        return false
+      }
+    }
+
     return true
-  }, [selectedTeam, searchQuery, userDataExtensions])
+  }, [selectedTeam, selectedStatus, searchQuery, userDataExtensions])
 
   // Group DNs by sections and apply filters
   const dnsList = Object.values(dnsMap)
@@ -120,15 +142,15 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
   }
 
   dnsList.forEach(({ dn, devices }: any) => {
-    // Apply filters
-    if (!matchesFilters(dn)) {
-      return
-    }
-
     const deviceList = Object.values(devices || {}) as CtiDevice[]
     const call = getDnCallState(dn)
     const active = hasActiveCalls(dn)
     const section = categorizeDns(dn, deviceList, call, active)
+    
+    // Apply filters (including status filter which needs the section)
+    if (!matchesFilters(dn, section)) {
+      return
+    }
     
     sections[section as keyof typeof sections].push({ dn, devices: deviceList, call, active })
   })

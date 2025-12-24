@@ -865,12 +865,7 @@
     gap: 8px;
 }
 
-.btn {
-    padding: 6px 12px;
-    border-radius: 8px;
-    border: 1px solid transparent;
-    cursor: pointer;
-}
+
 
 .btn-secondary {
     background: #e9ecef;
@@ -1668,6 +1663,12 @@
         margin-left: 0px !important;
     }
     .pc-container{top: 0px !important;}
+    .sidebar-container{display: none !important;}
+}
+
+/* Also hide sidebar when body has fullscreen-mode class */
+body.fullscreen-mode .sidebar-container {
+    display: none !important;
 }
 
 /* Fullscreen button styles */

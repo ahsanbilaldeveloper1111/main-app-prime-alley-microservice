@@ -115,17 +115,19 @@ export const getDeviceIconClass = (deviceType: string): string => {
  * Get device type label
  */
 export const getDeviceTypeLabel = (type: string): string => {
-  switch (type) {
+  switch (type?.toUpperCase()) {
     case 'SOFT':
-      return 'Soft'
+      return 'Desktop'
     case 'HARD':
-      return 'Phone'
+      return 'Desk Phone'
+    case 'MOBILE':
+      return 'Mobile'
     case 'ANDROID':
       return 'Android'
     case 'IOS':
-      return 'iPhone'
+      return 'iOS'
     default:
-      return ''
+      return type || ''
   }
 }
 

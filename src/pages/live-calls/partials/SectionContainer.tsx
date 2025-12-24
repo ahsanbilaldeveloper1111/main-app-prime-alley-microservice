@@ -4,6 +4,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react'
 import { CtiDevice } from '@components/live-calls/utils/types'
 import UserCard from './UserCard'
 import { getSectionColor, getSectionIcon, getSectionTitle } from '@components/live-calls/utils/helpers'
+import { Eye, Phone, CheckCircle, AlertCircle, PhoneCall, Maximize2, ExternalLink, Volume2, Mic, Users, Headset, User, Bell, ChevronLeft, Menu, Search, Filter, ChevronUp, UserCheck, Clock, Timer, UserX, PhoneIncoming, Hourglass } from 'lucide-react';
 
 interface SectionContainerProps {
   sectionKey: string
@@ -75,15 +76,15 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
               style={{ fontSize: '1.1rem', fontWeight: '600' }}
             >
               {isCollapsed ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
-              <i 
-                className="material-icons-two-tone" 
-                style={{ 
-                  fontSize: '1.2rem',
-                  color: iconColor
-                }}
-              >
-                {sectionIcon}
-              </i>
+              
+              <div style={{ 
+                      color: sectionKey === 'supervision' ? '#f59e0b' : 
+                             sectionKey === 'onCall' ? '#22c55e' : 
+                             sectionKey === 'activeIdle' ? '#6b7280' : 
+                             sectionKey === 'downOffline' ? '#ef4444' : '#6b7280'
+                    }}>
+                      {sectionIcon === 'Eye' ? <Eye size={20} /> : sectionIcon === 'Phone' ? <Phone size={20} /> : sectionIcon === 'CheckCircle' ? <CheckCircle size={20} /> : sectionIcon === 'AlertCircle' ? <AlertCircle size={20} /> : sectionIcon === 'PhoneCall' ? <PhoneCall size={20} /> : null}
+                    </div>
               <span>{sectionTitle}</span>
             </Button>
             <Badge 
@@ -151,10 +152,18 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
         ) : (
           <Card className="border-0 shadow-sm">
             <Card.Body className="text-center py-5">
-              <i className="material-icons-two-tone mb-3" style={{ fontSize: '3rem', color: '#6c757d', opacity: 0.25 }}>
-                {sectionIcon}
-              </i>
-              <p className="mb-0 text-muted small">No agents in this category</p>
+              <div className="d-flex flex-column align-items-center justify-content-center gap-2">
+              <div style={{ 
+                      color: sectionKey === 'supervision' ? '#f59e0b' : 
+                             sectionKey === 'onCall' ? '#22c55e' : 
+                             sectionKey === 'activeIdle' ? '#6b7280' : 
+                             sectionKey === 'downOffline' ? '#ef4444' : '#6b7280'
+                    }}>
+                      {sectionIcon === 'Eye' ? <Eye size={20} /> : sectionIcon === 'Phone' ? <Phone size={20} /> : sectionIcon === 'CheckCircle' ? <CheckCircle size={20} /> : sectionIcon === 'AlertCircle' ? <AlertCircle size={20} /> : sectionIcon === 'PhoneCall' ? <PhoneCall size={20} /> : null}
+                    </div>
+              <div style={{ fontSize: '0.875rem', fontWeight: '600' }} className="mb-0 text-muted small">{sectionTitle}</div>
+              </div>
+              <div  className="mb-0 text-muted small">No agents in this category</div>
             </Card.Body>
           </Card>
         )

@@ -10,25 +10,25 @@ export const SECTION_ORDER = ['supervision', 'onCall', 'activeIdle', 'downOfflin
 export const SECTION_CONFIG = {
   supervision: {
     title: 'Live Coaching',
-    icon: 'visibility',
+    icon: 'Eye',
     color: '#ffc107',
     order: 0
   },
   onCall: {
     title: 'Live Calls',
-    icon: 'call',
+    icon: 'Phone',
     color: '#dc3545',
     order: 1
   },
   activeIdle: {
     title: 'Available & Idle',
-    icon: 'check_circle',
+    icon: 'CheckCircle',
     color: '#28a745',
     order: 2
   },
   downOffline: {
     title: 'Offline',
-    icon: 'error',
+    icon: 'AlertCircle',
     color: '#ef4444',
     order: 3
   }

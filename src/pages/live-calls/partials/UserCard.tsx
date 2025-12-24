@@ -498,7 +498,8 @@ const UserCard: React.FC<UserCardProps> = ({
                         cursor: (isDeviceActiveCall || isCurrentlyMonitored) ? 'pointer' : 'default',
                         opacity: isDeviceActiveCall ? 1 : 0.7
                       }}
-                      title={`${getDeviceTypeLabel(devType)} - ${deviceName}${isCurrentlyMonitored ? ' (Monitoring)' : ''}`}
+                      // title={`${getDeviceTypeLabel(devType)} - ${deviceName}${isCurrentlyMonitored ? ' (Monitoring)' : ''}`}
+                      title={`${getDeviceTypeLabel(devType)}`}
                       onClick={() => handleDeviceClick(deviceName, devType, terminalState)}
                     >
                       {devType === 'SOFT' ? (

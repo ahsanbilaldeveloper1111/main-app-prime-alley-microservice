@@ -588,6 +588,7 @@ const LiveCallDashboard = () => {
         isDnInActiveCall={isDnInActiveCall}
         loading={loading}
         selectedTeam={selectedTeam}
+        selectedStatus={selectedStatus}
         searchQuery={searchQuery}
         collapsedSections={collapsedSections}
         toggleSection={toggleSection}
