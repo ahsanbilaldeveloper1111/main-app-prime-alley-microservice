@@ -27,6 +27,7 @@ import {
   handleDeviceSelectionCancel as handleDeviceSelectionCancelHelper
 } from './partials/handlers'
 import { animateCardMove as animateCardMoveHelper } from './partials/animationHelpers'
+import { getLocalStorageCallStatesInfo } from './partials/helpers'
 
 const LiveCallDashboard = () => {
   const { data:session, status } = useSession();
@@ -201,7 +202,6 @@ const LiveCallDashboard = () => {
 
   // Check for restored call states on component mount
   useEffect(() => {
-    const { getLocalStorageCallStatesInfo } = require('./partials/helpers')
     const info = getLocalStorageCallStatesInfo()
     if (info.count > 0) {
       setRestoredCallStates(info.count)
