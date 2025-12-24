@@ -1,0 +1,22 @@
+import React from 'react'
+import useGlobalCallTimer from '../../../hooks/useGlobalCallTimer'
+
+interface CallTimerProps {
+  dn: string
+  isActive: boolean
+}
+
+const CallTimer: React.FC<CallTimerProps> = ({ dn, isActive }) => {
+  const { elapsedTime, isRunning } = useGlobalCallTimer(dn, isActive)
+  
+  if (!isActive) {
+    return null
+  }
+
+  return (
+    <p className={`call-timer ${isRunning ? 'running' : ''}`}>{elapsedTime}</p>
+  )
+}
+
+export default CallTimer
+
