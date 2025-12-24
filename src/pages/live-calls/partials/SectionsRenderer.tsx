@@ -28,6 +28,8 @@ interface SectionsRendererProps {
   loading: boolean
   selectedTeam: string
   searchQuery: string
+  collapsedSections: { [key: string]: boolean }
+  toggleSection: (section: string) => void
 }
 
 const SectionsRenderer: React.FC<SectionsRendererProps> = ({
@@ -53,7 +55,9 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
   isDnInActiveCall,
   loading,
   selectedTeam,
-  searchQuery
+  searchQuery,
+  collapsedSections,
+  toggleSection
 }) => {
   // Get user data extensions for filtering
   const userDataExtensions = React.useMemo(() => {
@@ -157,6 +161,8 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
                 stopMonitoring={stopMonitoring}
                 selectedTone={selectedTone}
                 isDnInActiveCall={isDnInActiveCall}
+                isCollapsed={collapsedSections[sectionKey] || false}
+                onToggle={() => toggleSection(sectionKey)}
               />
             )
           })}

@@ -291,13 +291,13 @@ const LiveCallDashboard = () => {
   const getSectionTitle = (section: string) => {
     switch (section) {
       case 'supervision':
-        return 'In Supervision'
+        return 'Live Coaching'
       case 'onCall':
-        return 'On Call'
+        return 'Live Calls'
       case 'activeIdle':
-        return 'Active/Idle'
+        return 'Available & Idle'
       case 'downOffline':
-        return 'Down/Offline'
+        return 'Offline'
       default:
         return 'Unknown'
     }

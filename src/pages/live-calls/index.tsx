@@ -136,6 +136,39 @@ const LiveCallDashboard = () => {
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false)
   
+  // Collapsible sections state
+  const [collapsedSections, setCollapsedSections] = useState<{ [key: string]: boolean }>({
+    supervision: false,
+    onCall: false,
+    activeIdle: false,
+    downOffline: false
+  })
+  
+  const toggleSection = (section: string) => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }))
+  }
+  
+  const expandAll = () => {
+    setCollapsedSections({
+      supervision: false,
+      onCall: false,
+      activeIdle: false,
+      downOffline: false
+    })
+  }
+  
+  const collapseAll = () => {
+    setCollapsedSections({
+      supervision: true,
+      onCall: true,
+      activeIdle: true,
+      downOffline: true
+    })
+  }
+  
   // Initialize previous sections when data is first loaded
   useEffect(() => {
     if (isInitialized && dnsMap && Object.keys(previousSectionsRef.current).length === 0) {
@@ -483,6 +516,9 @@ const LiveCallDashboard = () => {
         session={session}
         isFullscreen={isFullscreen}
         toggleFullscreen={toggleFullscreen}
+        collapsedSections={collapsedSections}
+        expandAll={expandAll}
+        collapseAll={collapseAll}
       />
 
           {/* Summary Dashboard */}
@@ -553,6 +589,8 @@ const LiveCallDashboard = () => {
         loading={loading}
         selectedTeam={selectedTeam}
         searchQuery={searchQuery}
+        collapsedSections={collapsedSections}
+        toggleSection={toggleSection}
       />
 
       {/* Device Options Popup Modal */}

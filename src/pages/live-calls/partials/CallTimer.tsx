@@ -14,7 +14,7 @@ const CallTimer: React.FC<CallTimerProps> = ({ dn, isActive }) => {
   }
 
   return (
-    <p className={`call-timer ${isRunning ? 'running' : ''}`}>{elapsedTime}</p>
+    <p style={{ margin: '0px',fontSize: '0.55rem',lineHeight: 'normal' }} className={`call-timer ${isRunning ? 'running' : ''}`}>{elapsedTime}</p>
   )
 }
 

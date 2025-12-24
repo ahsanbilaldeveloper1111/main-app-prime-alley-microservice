@@ -1,18 +1,27 @@
 import React from 'react'
 import { Button, Col, Row } from 'react-bootstrap'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
 
 interface PageHeaderProps {
   session: any
   isFullscreen: boolean
   toggleFullscreen: () => void
+  collapsedSections: { [key: string]: boolean }
+  expandAll: () => void
+  collapseAll: () => void
 }
 
 const PageHeader: React.FC<PageHeaderProps> = ({
   session,
   isFullscreen,
-  toggleFullscreen
+  toggleFullscreen,
+  collapsedSections,
+  expandAll,
+  collapseAll
 }) => {
+  const allCollapsed = Object.values(collapsedSections).every(val => val === true)
+  
   return (
     <Row className="mb-3">
       <Col md={12}>
@@ -24,6 +33,37 @@ const PageHeader: React.FC<PageHeaderProps> = ({
 
             <Col md={7} className="d-flex justify-content-end">
               <div className="action-buttons d-flex gap-2">
+                <Button 
+                  variant="outline-secondary" 
+                  size="sm"
+                  onClick={() => {
+                    if (allCollapsed) {
+                      expandAll()
+                    } else {
+                      collapseAll()
+                    }
+                  }}
+                  className="d-flex align-items-center"
+                  style={{ 
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    whiteSpace: 'nowrap',
+                    padding: '0.5rem 1rem'
+                  }}
+                >
+                  {allCollapsed ? (
+                    <>
+                      <ChevronDown size={16} className="me-1" />
+                      Expand All
+                    </>
+                  ) : (
+                    <>
+                      <ChevronUp size={16} className="me-1" />
+                      Collapse All
+                    </>
+                  )}
+                </Button>
+                
                 {session?.user?.permissions?.includes('dial-call-cti') && (
                   <Link 
                     href="/cti/dialer" 
