@@ -13,7 +13,9 @@ export const TokenServiceProvider: React.FC<TokenServiceProviderProps> = ({ chil
     // Initialize token service when session is available
     if (status === 'authenticated' && session) {
      // console.log('TokenServiceProvider: Initializing token service');
-      tokenService.initializeFromSession(session);
+      tokenService.initializeFromSession(session).catch((error) => {
+        console.error('Failed to initialize token service:', error);
+      });
     } else if (status === 'unauthenticated') {
       // console.log('TokenServiceProvider: User not authenticated, stopping token service');
       tokenService.stop();

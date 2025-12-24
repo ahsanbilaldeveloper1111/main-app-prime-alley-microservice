@@ -26,7 +26,9 @@ const SessionHandler: React.FC<SessionHandlerProps> = ({ children }) => {
     if (status === 'authenticated' && session) {
       // User is authenticated, initialize token service
       //console.log('Session authenticated, initializing token service');
-      tokenService.initializeFromSession(session);
+      tokenService.initializeFromSession(session).catch((error) => {
+        console.error('Failed to initialize token service:', error);
+      });
     } else if (status === 'unauthenticated') {
       // User is not authenticated, clear tokens and redirect
       //console.log('Session unauthenticated, clearing tokens');

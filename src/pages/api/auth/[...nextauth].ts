@@ -191,112 +191,19 @@ export const authOptions: NextAuthOptions = {
         return token;
       }
 
-      // Check if token was refreshed externally (client-side refresh)
-      // If the access token in the JWT is different from what's expected based on expiry,
-      // it might have been refreshed externally. We should check and sync.
-      // Note: This is a best-effort sync - the primary refresh mechanism is below
-      
-      // Token refresh check - refresh if expired or about to expire
-      const now = Date.now();
-      const accessTokenExpires = parseTokenExpiry(token.access_token_expires);
-      const refreshTokenExpires = parseTokenExpiry(token.refresh_token_expires);
-      const timeUntilExpiry = accessTokenExpires - now;
-
-      // Check if token needs refresh (within buffer time)
-      if (accessTokenExpires > 0 && timeUntilExpiry <= REFRESH_BUFFER_MS) {
-        // Validate refresh token is still available and not expired (with 1 minute buffer)
-        const REFRESH_TOKEN_BUFFER = 60 * 1000; // 1 minute buffer
-        if (!token.refresh_token || refreshTokenExpires <= (now + REFRESH_TOKEN_BUFFER)) {
-          nextAuthLogger.warn('Cannot refresh: Refresh token expired or missing', {
-            hasRefreshToken: !!token.refresh_token,
-            refreshTokenExpired: refreshTokenExpires <= (now + REFRESH_TOKEN_BUFFER),
-            timeUntilRefreshExpiry: refreshTokenExpires > 0 ? `${Math.floor((refreshTokenExpires - now) / 1000)}s` : 'N/A'
-          });
-          // Remove tokens to invalidate session
-          delete token.access_token;
-          delete token.refresh_token;
-          delete token.access_token_expires;
-          delete token.refresh_token_expires;
-          return token;
-        }
-
-        try {
-          nextAuthLogger.debug('Refreshing access token', {
-            timeUntilExpiry: `${Math.floor(timeUntilExpiry / 1000)}s`,
-            accessTokenExpiresAt: new Date(accessTokenExpires).toISOString()
-          });
-
-          const formData = new URLSearchParams();
-          formData.append('refresh_token', token.refresh_token as string);
-          
-          const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
-          const refreshResponse = await fetch(`${baseUrl}/api/token/refresh`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: formData.toString()
-          });
-
-          if (!refreshResponse.ok) {
-            nextAuthLogger.error('Token refresh failed', undefined, {
-              status: refreshResponse.status,
-              statusText: refreshResponse.statusText
-            });
-            // If refresh fails with 401/403, invalidate the session by removing tokens
-            if (refreshResponse.status === 401 || refreshResponse.status === 403) {
-              delete token.access_token;
-              delete token.refresh_token;
-              delete token.access_token_expires;
-              delete token.refresh_token_expires;
-            }
-            return token;
-          }
-
-          const refreshData = await refreshResponse.json();
-          
-          if (refreshData.code === 200 && refreshData.data?.access_token) {
-            // Update access token
-            token.access_token = refreshData.data.access_token;
-            token.access_token_expires = calculateTokenExpiry(refreshData.data.expires_in || 0, now);
-            
-            // Update refresh token if provided
-            if (refreshData.data.refresh_token?.access_token) {
-              token.refresh_token = refreshData.data.refresh_token.access_token;
-              token.refresh_token_expires = calculateTokenExpiry(
-                refreshData.data.refresh_token.expires_in || 0, 
-                now
-              );
-            }
-            
-            nextAuthLogger.info('Token refreshed successfully', {
-              newAccessTokenExpiresIn: `${Math.floor((refreshData.data.expires_in || 0) / 60)}m`,
-              refreshTokenUpdated: !!refreshData.data.refresh_token?.access_token
-            });
-          } else {
-            nextAuthLogger.error('Token refresh failed: Invalid response', undefined, {
-              code: refreshData.code,
-              hasAccessToken: !!refreshData.data?.access_token
-            });
-            // If refresh returns error code, invalidate session if it's an auth error
-            if (refreshData.code === 400 || refreshData.code === 401 || refreshData.code === 403) {
-              delete token.access_token;
-              delete token.refresh_token;
-              delete token.access_token_expires;
-              delete token.refresh_token_expires;
-            }
-          }
-        } catch (error) {
-          nextAuthLogger.error('Token refresh error', error);
-          // Don't throw - return token as-is so session doesn't break
-        }
-      }
+      // Note: Token refresh is now handled by tokenService on the client-side
+      // NextAuth no longer performs token refresh - it only reads tokens from JWT
+      // TokenService syncs refreshed tokens to cookies, which are read in session callback
+      // This eliminates race conditions and ensures single source of truth
 
       return token;
     },
 
     async session({ session, token }) {
       // Map token data to session user object
+      // Note: Tokens are managed by tokenService (sessionStorage) for axios
+      // NextAuth session provides initial tokens on login, but tokenService is the source of truth
+      // Client-side code reads from sessionStorage via tokenService, not from NextAuth session tokens
       if (session.user) {
         session.user = {
           id: token.id as string | null,
@@ -308,6 +215,8 @@ export const authOptions: NextAuthOptions = {
           login_as: token.login_as as string | null,
           phone: token.phone as string | null,
           permissions: (token.permissions as string[]) || [],
+          // Include tokens from JWT for initial session setup
+          // tokenService will sync these to sessionStorage on client-side
           access_token: token.access_token as string | undefined,
           access_token_expires: token.access_token_expires as number | string | undefined,
           refresh_token: token.refresh_token as string | undefined,

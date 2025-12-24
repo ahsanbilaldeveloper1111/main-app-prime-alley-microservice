@@ -87,7 +87,9 @@ const Header = ({ themeMode }: HeaderProps) => {
             //console.log('Setting user state with permissions:', userData.permissions);
             setUserState(userData);
                 if (typeof window !== "undefined") {
-                    tokenService.initializeFromSession(session);
+                    tokenService.initializeFromSession(session).catch((error) => {
+                        console.error('Failed to initialize token service:', error);
+                    });
                 }
             } else if (status === "unauthenticated") {
                 //console.log('Session is unauthenticated');

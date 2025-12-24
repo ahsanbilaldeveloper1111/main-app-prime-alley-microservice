@@ -103,6 +103,45 @@ class TokenService {
     }
   }
 
+  // Sync tokens to cookies for NextAuth to read
+  private async syncTokensToCookies(tokens: Partial<TokenData>): Promise<void> {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    // Get current tokens if partial tokens don't have all fields
+    const currentTokens = this.getTokens();
+    const tokensToSync: TokenData = {
+      accessToken: tokens.accessToken || currentTokens?.accessToken || '',
+      refreshToken: tokens.refreshToken || currentTokens?.refreshToken || '',
+      accessTokenExpires: tokens.accessTokenExpires || currentTokens?.accessTokenExpires || 0,
+      refreshTokenExpires: tokens.refreshTokenExpires || currentTokens?.refreshTokenExpires || 0,
+    };
+
+    if (!tokensToSync.accessToken || !tokensToSync.refreshToken) {
+      return;
+    }
+
+    try {
+      // Call sync endpoint to write tokens to cookies
+      await axiosInstance.post('/auth/sync-tokens', {
+        access_token: tokensToSync.accessToken,
+        refresh_token: tokensToSync.refreshToken,
+        access_token_expires: tokensToSync.accessTokenExpires,
+        refresh_token_expires: tokensToSync.refreshTokenExpires,
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: 5000, // 5 second timeout
+      });
+    } catch (error) {
+      // Log but don't throw - cookie sync is best effort
+      // NextAuth will still work, just might need to refresh on next session access
+      console.warn('Failed to sync tokens to cookies:', error);
+    }
+  }
+
   // Refresh token function with support for both session and refresh token
   private async refreshToken(forceRefreshToken: boolean = false): Promise<string | null> {
     //console.log('🔄 Token refresh requested:', { forceRefreshToken });
@@ -218,18 +257,30 @@ class TokenService {
         // });
 
         if (data.code === 200 && data.data?.access_token) {
+          const now = Date.now();
           const newTokens: Partial<TokenData> = {
             accessToken: data.data.access_token,
-            accessTokenExpires: Date.now() + (data.data.expires_in * 1000) // Convert seconds to milliseconds
+            accessTokenExpires: now + (data.data.expires_in * 1000) // Convert seconds to milliseconds
           };
 
           // If we got a new refresh token, update it
           if (data.data.refresh_token?.access_token) {
             newTokens.refreshToken = data.data.refresh_token.access_token;
-            newTokens.refreshTokenExpires = Date.now() + (data.data.refresh_token.expires_in * 1000); // Convert seconds to milliseconds
+            newTokens.refreshTokenExpires = now + (data.data.refresh_token.expires_in * 1000); // Convert seconds to milliseconds
+          } else {
+            // Keep existing refresh token if not provided
+            const currentTokens = this.getTokens();
+            if (currentTokens) {
+              newTokens.refreshToken = currentTokens.refreshToken;
+              newTokens.refreshTokenExpires = currentTokens.refreshTokenExpires;
+            }
           }
 
           this.saveTokens(newTokens);
+          
+          // Sync tokens to cookies for NextAuth
+          await this.syncTokensToCookies(newTokens);
+          
           this.setupTokenRefreshTimers();
           
           // console.log('Tokens refreshed successfully');
@@ -466,7 +517,13 @@ class TokenService {
   // Force refresh token (for manual refresh)
   public async forceRefresh(): Promise<string | null> {
     //console.log('Force refreshing token...');
-    return await this.refreshToken();
+    const token = await this.refreshToken();
+    if(typeof window !== 'undefined' && window.sessionStorage) {
+      sessionStorage.setItem('accessToken', token || '');
+    }
+    this.saveTokens({ accessToken: token || '' });
+
+    return token || null;
   }
 
   // Get current access token
@@ -484,7 +541,7 @@ class TokenService {
   }
 
   // Initialize tokens from session data
-  public initializeFromSession(session: any): void {
+  public async initializeFromSession(session: any): Promise<void> {
     if (!session?.user) {
     //  console.log('No session user data available');
       return;
@@ -527,6 +584,10 @@ class TokenService {
       }
       
       this.saveTokens(tokenData);
+      
+      // Sync tokens to cookies for NextAuth
+      await this.syncTokensToCookies(tokenData);
+      
       this.start();
     //  console.log('Token service initialized successfully');
     } else {

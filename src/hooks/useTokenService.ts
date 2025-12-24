@@ -9,7 +9,9 @@ export const useTokenService = () => {
   useEffect(() => {
     if (status === 'authenticated' && session) {
       //console.log('Initializing token service with session data');
-      tokenService.initializeFromSession(session);
+      tokenService.initializeFromSession(session).catch((error) => {
+        console.error('Failed to initialize token service:', error);
+      });
     } else if (status === 'unauthenticated') {
       //console.log('User not authenticated, stopping token service');
       tokenService.stop();
