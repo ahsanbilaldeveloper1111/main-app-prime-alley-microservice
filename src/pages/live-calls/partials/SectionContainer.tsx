@@ -23,6 +23,7 @@ interface SectionContainerProps {
   setShowPopup: React.Dispatch<React.SetStateAction<any>>
   setNotification: React.Dispatch<React.SetStateAction<{ type: string; message: string } | null>>
   stopMonitoring: (dn: string, type: string) => Promise<boolean>
+  startMonitoringLocal: (dn: string, monitorType: string, toneType: string | undefined, showPopup: any) => Promise<boolean>
   selectedTone: Record<string, string>
   isDnInActiveCall: (dn: string) => boolean
   isCollapsed: boolean
@@ -46,6 +47,7 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
   setShowPopup,
   setNotification,
   stopMonitoring,
+  startMonitoringLocal,
   selectedTone,
   isDnInActiveCall,
   isCollapsed,
@@ -66,7 +68,7 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
   return (
     <div className="mb-4" data-section={sectionKey}>
       {/* Section Header */}
-      <Card className="border-0 shadow-sm mb-3">
+      <Card className="border-0 shadow-sm mb-0">
         <Card.Body className="p-3">
           <div className="d-flex justify-content-between align-items-center">
             <Button
@@ -100,7 +102,7 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
       </Card>
 
       {/* Progress Bar */}
-      {!isCollapsed && sectionDns.length > 0 && (
+      {/* {!isCollapsed && sectionDns.length > 0 && (
         <div className="progress-container mb-3">
           <div className="progress" style={{ height: '6px', backgroundColor: '#e9ecef' }}>
             <div 
@@ -117,7 +119,7 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
             />
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Section Content */}
       {!isCollapsed && (
@@ -144,13 +146,14 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
                 setShowPopup={setShowPopup}
                 setNotification={setNotification}
                 stopMonitoring={stopMonitoring}
+                startMonitoringLocal={startMonitoringLocal}
                 selectedTone={selectedTone}
                 isDnInActiveCall={isDnInActiveCall}
               />
             ))}
           </div>
         ) : (
-          <Card className="border-0 shadow-sm">
+          <Card className="border-0 shadow-sm mt-3">
             <Card.Body className="text-center py-5">
               <div className="d-flex flex-column align-items-center justify-content-center gap-2">
               <div style={{ 

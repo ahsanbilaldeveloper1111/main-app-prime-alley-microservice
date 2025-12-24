@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Modal, Button, ListGroup, Badge } from 'react-bootstrap';
+import { getDeviceTypeLabel } from '@components/live-calls/utils/helpers';
+import { getStorageImageUrl } from '@utils/imageUtils';
+import UserDummyImage from '@assets/images/user-dummy.jpg';
 
 interface Device {
   deviceName: string;
@@ -18,6 +21,7 @@ interface DeviceSelectionModalProps {
   context?: 'monitoring' | 'dialing';
   monitorType?: string;
   toneType?: string;
+  getUserDataExtensions?: () => any;
 }
 
 const DeviceSelectionModal: React.FC<DeviceSelectionModalProps> = ({
@@ -28,9 +32,53 @@ const DeviceSelectionModal: React.FC<DeviceSelectionModalProps> = ({
   extensionNumber,
   context = 'dialing',
   monitorType,
-  toneType
+  toneType,
+  getUserDataExtensions
 }) => {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+
+  // Get user extension data (image and name)
+  const extensionData = useMemo(() => {
+    try {
+      if (!getUserDataExtensions || !extensionNumber) {
+        return null
+      }
+      
+      const userDataExtensions = getUserDataExtensions() || {}
+      const dnString = String(extensionNumber)
+      const dnNumber = Number(extensionNumber)
+      
+      // Try different DN formats to match the key
+      const data = userDataExtensions[extensionNumber] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null
+      
+      return data
+    } catch (error) {
+      console.error(`[DeviceSelectionModal ${extensionNumber}] Error getting extension data:`, error)
+      return null
+    }
+  }, [extensionNumber, getUserDataExtensions])
+
+  // Get user image URL
+  const userImageUrl = useMemo(() => {
+    if (!extensionData) {
+      return UserDummyImage.src
+    }
+    
+    const imagePath = extensionData?.image_path
+    if (imagePath) {
+      const url = getStorageImageUrl(imagePath)
+      return url || UserDummyImage.src
+    }
+    return UserDummyImage.src
+  }, [extensionData])
+
+  // Get user name
+  const userName = useMemo(() => {
+    if (!extensionData) {
+      return extensionNumber
+    }
+    return extensionData?.name || extensionData?.user_name || extensionNumber
+  }, [extensionData, extensionNumber])
 
   const handleDeviceSelect = (device: Device) => {
     setSelectedDevice(device);
@@ -69,11 +117,17 @@ const DeviceSelectionModal: React.FC<DeviceSelectionModalProps> = ({
         return 'success';
       case 'UNREGISTERED':
         return 'danger';
+      case 'STALE':
+        return 'warning';
       case 'BUSY':
         return 'warning';
       default:
         return 'secondary';
     }
+  };
+
+  const isDeviceEnabled = (device: Device) => {
+    return device.terminalState === 'REGISTERED';
   };
 
   const getModalTitle = () => {
@@ -99,52 +153,93 @@ const DeviceSelectionModal: React.FC<DeviceSelectionModalProps> = ({
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        <p className="text-muted mb-3">
-          {getModalDescription()}
-        </p>
-        
-        {context === 'monitoring' && monitorType && toneType && (
-          <div className="alert alert-info mb-3">
-            <strong>Monitoring Details:</strong><br />
-            Type: <span className="badge bg-primary">{monitorType}</span><br />
-            Tone: <span className="badge bg-secondary">{toneType}</span>
+        <div className="row g-4">
+          {/* First Column - User Info */}
+          <div className="col-md-4 border-end">
+            <div className="d-flex flex-column align-items-center text-center p-3">
+              {userImageUrl && (
+                <img 
+                  src={userImageUrl} 
+                  alt={userName}
+                  className="rounded-circle mb-3"
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    objectFit: 'cover',
+                    border: '2px solid #e5e7eb'
+                  }}
+                  onError={(e) => {
+                    e.currentTarget.src = UserDummyImage.src
+                  }}
+                />
+              )}
+              <div className="fw-bold mb-2" style={{ fontSize: '1.2rem' }}>{userName}</div>
+              <div className="text-muted" style={{ fontSize: '0.9rem' }}>
+                Extension: {extensionNumber}
+              </div>
+            </div>
           </div>
-        )}
-        
-        <ListGroup>
-          {devices.map((device, index) => (
-            <ListGroup.Item
-              key={index}
-              action
-              active={selectedDevice?.deviceName === device.deviceName}
-              onClick={() => handleDeviceSelect(device)}
-              className="d-flex justify-content-between align-items-center"
-              style={{ cursor: 'pointer' }}
-            >
-              <div className="d-flex align-items-center">
-                <span className="me-3 fs-4">{getDeviceTypeIcon(device.deviceType)}</span>
-                <div>
-                  <div className="fw-bold">{device.deviceName}</div>
-                  <small className="text-muted">
-                    Type: {device.deviceType} | 
-                    Last seen: {new Date(device.when).toLocaleString()}
-                  </small>
+          
+          {/* Second Column - Device List */}
+          <div className="col-md-8">
+            <p className="text-muted mb-3">
+              {getModalDescription()}
+            </p>
+            
+            <ListGroup>
+          {devices.map((device, index) => {
+            const isEnabled = isDeviceEnabled(device);
+            const isSelected = selectedDevice?.deviceName === device.deviceName;
+            
+            return (
+              <ListGroup.Item
+                key={index}
+                action={isEnabled}
+                active={isSelected && isEnabled}
+               
+                onClick={() => {
+                  if (isEnabled) {
+                    handleDeviceSelect(device);
+                  }
+                }}
+                className="d-flex justify-content-between align-items-center p-2"
+                style={{ 
+                  cursor: isEnabled ? 'pointer' : 'not-allowed',
+                  opacity: isEnabled ? 1 : 1,
+                  backgroundColor: !isEnabled ? '#f8f9fa' : undefined,
+                  borderLeft: !isEnabled ? '3px solid #dee2e6' : undefined
+                }}
+                disabled={!isEnabled}
+              >
+                <div className="d-flex align-items-center">
+                  <span className="me-3 fs-4" style={{ opacity: isEnabled ? 1 : 0.5 }}>{getDeviceTypeIcon(device.deviceType)}</span>
+                  <div>
+                    <div className="fw-bold" style={{ color: isEnabled ? '#212529' : '#6c757d' }}>{getDeviceTypeLabel(device.deviceType)}</div>
+                    {/* <small className="text-muted">
+                      Device: {device.deviceName} | 
+                      Last seen: {new Date(device.when).toLocaleString()}
+                    </small> */}
+                  </div>
                 </div>
-              </div>
-              <div className="d-flex flex-column align-items-end">
-                <Badge bg={getStatusBadgeVariant(device.terminalState)}>
-                  {device.terminalState}
-                </Badge>
-                {device.details && (
-                  <small className="text-muted mt-1">{device.details}</small>
-                )}
-              </div>
-            </ListGroup.Item>
-          ))}
-        </ListGroup>
+                <div className="d-flex flex-column align-items-end">
+                  <Badge bg={isEnabled ? 'success' : 'danger'}>
+                    {isEnabled ? 'Online' : 'Offline'}
+                  </Badge>
+                  {/* {!isEnabled && (
+                    <small className="text-danger mt-1" style={{ fontSize: '0.7rem' }}>
+                      Not available
+                    </small>
+                  )} */}
+                </div>
+              </ListGroup.Item>
+            );
+          })}
+            </ListGroup>
+          </div>
+        </div>
       </Modal.Body>
       <Modal.Footer>
-        <Button variant="secondary" onClick={handleClose}>
+        <Button variant="default  " onClick={handleClose}>
           Cancel
         </Button>
         <Button 

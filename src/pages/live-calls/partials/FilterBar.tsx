@@ -90,7 +90,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
             onChange={(e: any) => setSelectedStatus(e.target.value)}
             style={{ fontSize: '0.875rem' }}
           >
-            <option value="all">All Status</option>
+            <option value="">All Status</option>
             <option value="supervision">Live Coaching</option>
             <option value="oncall">Live Calls</option>
             <option value="active">Available & Idle</option>

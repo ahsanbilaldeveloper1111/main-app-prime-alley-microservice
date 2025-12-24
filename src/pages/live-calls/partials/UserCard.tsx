@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { Button, Card, Col } from 'react-bootstrap'
-import { Eye, Phone, CheckCircle, AlertCircle, Volume2, Mic, Users, Headset } from 'lucide-react'
+import { Eye, Phone, CheckCircle, AlertCircle, Volume2, Mic, Users, Headset, StopCircle } from 'lucide-react'
 import UserDummyImage from '@assets/images/user-dummy.jpg'
 import { getStorageImageUrl } from '@utils/imageUtils'
 import { CtiDevice, ActiveMonitoring, ShowPopup } from '@components/live-calls/utils/types'
@@ -28,6 +28,7 @@ interface UserCardProps {
   setShowPopup: React.Dispatch<React.SetStateAction<ShowPopup | null>>
   setNotification: React.Dispatch<React.SetStateAction<{ type: string; message: string } | null>>
   stopMonitoring: (dn: string, type: string) => Promise<boolean>
+  startMonitoringLocal: (dn: string, monitorType: string, toneType: string | undefined, showPopup: ShowPopup | null) => Promise<boolean>
   selectedTone: Record<string, string>
   isDnInActiveCall: (dn: string) => boolean
 }
@@ -51,6 +52,7 @@ const UserCard: React.FC<UserCardProps> = ({
   setShowPopup,
   setNotification,
   stopMonitoring,
+  startMonitoringLocal,
   selectedTone,
   isDnInActiveCall
 }) => {
@@ -529,84 +531,120 @@ const UserCard: React.FC<UserCardProps> = ({
 
             {showCallControls && (
               <div className="d-flex gap-1">
-                <Button 
-                  variant="light" 
-                  size="sm" 
-                  className="p-0 border" 
-                  style={{ 
-                    width: '24px', 
-                    height: '24px', 
-                    borderRadius: '4px',
-                    backgroundColor: '#dbeafe',
-                    color: '#1e40af',
-                    borderColor: '#bfdbfe',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.2s ease'
-                  }}
-                  title="Silent Monitor"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (primaryDevice) {
-                      handleDeviceClick(primaryDevice.deviceName, primaryDevice.deviceType, primaryDevice.terminalState)
-                    }
-                  }}
-                >
-                  <Volume2 size={8} />
-                </Button>
-                <Button 
-                  variant="light" 
-                  size="sm" 
-                  className="p-0 border" 
-                  style={{ 
-                    width: '24px', 
-                    height: '24px', 
-                    borderRadius: '4px',
-                    backgroundColor: '#e9d5ff',
-                    color: '#6b21a8',
-                    borderColor: '#d8b4fe',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.2s ease'
-                  }}
-                  title="Whisper"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (primaryDevice) {
-                      handleDeviceClick(primaryDevice.deviceName, primaryDevice.deviceType, primaryDevice.terminalState)
-                    }
-                  }}
-                >
-                  <Mic size={8} />
-                </Button>
-                <Button 
-                  variant="light" 
-                  size="sm" 
-                  className="p-0 border" 
-                  style={{ 
-                    width: '24px', 
-                    height: '24px', 
-                    borderRadius: '4px',
-                    backgroundColor: '#fed7aa',
-                    color: '#9a3412',
-                    borderColor: '#fdba74',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.2s ease'
-                  }}
-                  title="Barge In"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (primaryDevice) {
-                      handleDeviceClick(primaryDevice.deviceName, primaryDevice.deviceType, primaryDevice.terminalState)
-                    }
-                  }}
-                >
-                  <Users size={8} />
-                </Button>
+                {(() => {
+                  const isSilentActive = activeMonitoring.dn === dn && 
+                                        activeMonitoring.deviceName === primaryDevice?.deviceName && 
+                                        activeMonitoring.type === 'silent-monitor'
+                  
+                  return (
+                    <Button 
+                      variant="light" 
+                      size="sm" 
+                      className="p-0 border" 
+                      style={{ 
+                        width: '24px', 
+                        height: '24px', 
+                        borderRadius: '4px',
+                        backgroundColor: isSilentActive ? '#1e40af' : '#dbeafe',
+                        color: isSilentActive ? '#ffffff' : '#1e40af',
+                        borderColor: isSilentActive ? '#1e40af' : '#bfdbfe',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease'
+                      }}
+                      title={isSilentActive ? 'Stop Silent Monitor' : 'Silent Monitor'}
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (!primaryDevice) return
+                        
+                        if (isSilentActive) {
+                          await stopMonitoring(dn, 'silent-monitor')
+                        } else {
+                          await startMonitoringLocal(dn, 'SILENT', 'NONE', { dn, deviceName: primaryDevice.deviceName })
+                        }
+                      }}
+                    >
+                      {isSilentActive ? <StopCircle size={8} /> : <Volume2 size={8} />}
+                    </Button>
+                  )
+                })()}
+                {(() => {
+                  const isWhisperActive = activeMonitoring.dn === dn && 
+                                         activeMonitoring.deviceName === primaryDevice?.deviceName && 
+                                         activeMonitoring.type === 'whisper'
+                  
+                  return (
+                    <Button 
+                      variant="light" 
+                      size="sm" 
+                      className="p-0 border" 
+                      style={{ 
+                        width: '24px', 
+                        height: '24px', 
+                        borderRadius: '4px',
+                        backgroundColor: isWhisperActive ? '#6b21a8' : '#e9d5ff',
+                        color: isWhisperActive ? '#ffffff' : '#6b21a8',
+                        borderColor: isWhisperActive ? '#6b21a8' : '#d8b4fe',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease'
+                      }}
+                      title={isWhisperActive ? 'Stop Whisper' : 'Whisper'}
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (!primaryDevice) return
+                        
+                        if (isWhisperActive) {
+                          await stopMonitoring(dn, 'whisper')
+                        } else {
+                          await startMonitoringLocal(dn, 'WHISPER', 'NONE', { dn, deviceName: primaryDevice.deviceName })
+                        }
+                      }}
+                    >
+                      {isWhisperActive ? <StopCircle size={8} /> : <Mic size={8} />}
+                    </Button>
+                  )
+                })()}
+                {(() => {
+                  const isBargeActive = activeMonitoring.dn === dn && 
+                                      activeMonitoring.deviceName === primaryDevice?.deviceName && 
+                                      activeMonitoring.type === 'barge-in'
+                  
+                  return (
+                    <Button 
+                      variant="light" 
+                      size="sm" 
+                      className="p-0 border" 
+                      style={{ 
+                        width: '24px', 
+                        height: '24px', 
+                        borderRadius: '4px',
+                        backgroundColor: isBargeActive ? '#9a3412' : '#fed7aa',
+                        color: isBargeActive ? '#ffffff' : '#9a3412',
+                        borderColor: isBargeActive ? '#9a3412' : '#fdba74',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease'
+                      }}
+                      title={isBargeActive ? 'Stop Barge In' : 'Barge In'}
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (!primaryDevice) return
+                        
+                        if (isBargeActive) {
+                          await stopMonitoring(dn, 'barge-in')
+                        } else {
+                          await startMonitoringLocal(dn, 'BARGE_IN', 'NONE', { dn, deviceName: primaryDevice.deviceName })
+                        }
+                      }}
+                    >
+                      {isBargeActive ? <StopCircle size={8} /> : <Users size={8} />}
+                    </Button>
+                  )
+                })()}
               </div>
             )}
           </div>

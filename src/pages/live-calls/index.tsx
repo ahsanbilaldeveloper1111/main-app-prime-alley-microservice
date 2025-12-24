@@ -584,11 +584,13 @@ const LiveCallDashboard = () => {
         setShowPopup={setShowPopup}
         setNotification={setNotification}
         stopMonitoring={stopMonitoring}
+        startMonitoringLocal={startMonitoringLocal}
         selectedTone={selectedTone}
         isDnInActiveCall={isDnInActiveCall}
         loading={loading}
         selectedTeam={selectedTeam}
         selectedStatus={selectedStatus}
+        sortBy={sortBy}
         searchQuery={searchQuery}
         collapsedSections={collapsedSections}
         toggleSection={toggleSection}
@@ -626,6 +628,7 @@ const LiveCallDashboard = () => {
         context="monitoring"
         monitorType={pendingMonitoringData?.monitorType}
         toneType={pendingMonitoringData?.toneType}
+        getUserDataExtensions={getUserDataExtensions}
       />
 
     </>
