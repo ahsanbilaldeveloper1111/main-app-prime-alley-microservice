@@ -1,6 +1,6 @@
 import React from 'react'
-import { ShowPopup, PendingMonitoringData, CtiDevice } from './types'
-import { executeMonitoring } from './monitoringHelpers'
+import { ShowPopup, PendingMonitoringData, CtiDevice } from './_types'
+import { executeMonitoring } from './_monitoringHelpers'
 
 /**
  * Handle monitor type selection

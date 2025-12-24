@@ -1,5 +1,5 @@
-import { CtiDevice, ActiveMonitoring } from './types'
-import { SECTION_CONFIG } from './constants'
+import { CtiDevice, ActiveMonitoring } from './_types'
+import { SECTION_CONFIG } from './_constants'
 
 /**
  * Get card level status based on device states

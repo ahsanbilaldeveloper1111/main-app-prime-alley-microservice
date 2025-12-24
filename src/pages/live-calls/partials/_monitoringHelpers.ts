@@ -1,5 +1,5 @@
 import React from 'react'
-import { CtiDevice, ShowPopup, PendingMonitoringData, AvailableDevice } from './types'
+import { CtiDevice, ShowPopup, PendingMonitoringData, AvailableDevice } from './_types'
 import { startMonitoring, stopMonitoring as stopMonitoringAPI, startBargeInMonitoring, stopBargeInMonitoring as stopBargeInMonitoringAPI } from '@utils/dialer'
 
 /**

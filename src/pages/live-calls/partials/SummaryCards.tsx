@@ -1,7 +1,7 @@
 import React from 'react'
 import { Card, Col, Row } from 'react-bootstrap'
 import { Headset, PhoneCall, UserCheck, Clock, UserX, PhoneIncoming, Hourglass } from 'lucide-react'
-import { calculateLongestCallDuration } from './helpers'
+import { calculateLongestCallDuration } from './_helpers'
 
 interface SummaryCardsProps {
   supervisionCount: number

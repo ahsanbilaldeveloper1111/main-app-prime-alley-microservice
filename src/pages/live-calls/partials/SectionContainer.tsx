@@ -1,7 +1,7 @@
 import React from 'react'
-import { CtiDevice } from './types'
+import { CtiDevice } from './_types'
 import UserCard from './UserCard'
-import { getSectionColor, getSectionIcon, getSectionTitle } from './helpers'
+import { getSectionColor, getSectionIcon, getSectionTitle } from './_helpers'
 
 interface SectionContainerProps {
   sectionKey: string

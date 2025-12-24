@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo } from 'react'
 import { GetCallLegs } from '@utils/dialer'
-import { getLocalStorageCallStatesInfo } from './helpers'
+import { getLocalStorageCallStatesInfo } from './_helpers'
 
 /**
  * Custom hook for Live Calls effects

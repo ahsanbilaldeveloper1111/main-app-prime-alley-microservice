@@ -1,8 +1,8 @@
 import React from 'react'
 import { Button, Modal } from 'react-bootstrap'
 import { FiX } from 'react-icons/fi'
-import { ShowPopup, ActiveMonitoring } from './types'
-import { isDnInActiveCall } from './helpers'
+import { ShowPopup, ActiveMonitoring } from './_types'
+import { isDnInActiveCall } from './_helpers'
 
 interface MonitoringModalProps {
   show: boolean

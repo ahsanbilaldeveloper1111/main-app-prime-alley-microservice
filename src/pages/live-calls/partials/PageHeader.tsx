@@ -43,10 +43,10 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                   className="d-flex align-items-center"
                   title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
                 >
-                  <i className="material-icons-two-tone me-2" style={{ backgroundColor: '#fff' }}>
-                    {isFullscreen ? 'fullscreen_exit' : 'fullscreen'}
-                  </i>
-                  {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                      </svg>
+                  <span className="ms-2">{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
                 </Button>
               </div>
             </Col>

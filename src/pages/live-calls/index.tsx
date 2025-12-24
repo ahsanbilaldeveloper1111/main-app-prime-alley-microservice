@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react'
 import '@assets/scss/common.scss'
 import '@assets/scss/live-calls.scss'
 import { useCti } from '@hooks/useCti'
-import { CtiDevice } from './partials/types'
+import { CtiDevice } from './partials/_types'
 import SummaryCards from './partials/SummaryCards'
 import FilterBar from './partials/FilterBar'
 import MonitoringModal from './partials/MonitoringModal'
@@ -15,19 +15,19 @@ import PageHeader from './partials/PageHeader'
 import SectionsRenderer from './partials/SectionsRenderer'
 import { 
   categorizeDns as categorizeDnsHelper, 
-  isDnInActiveCall as isDnInActiveCallHelper
-} from './partials/helpers'
-import { CUSTOM_STYLES } from './partials/constants'
-import { useMonitoring } from './partials/useMonitoring'
+  isDnInActiveCall as isDnInActiveCallHelper,
+  getLocalStorageCallStatesInfo
+} from './partials/_helpers'
+import { CUSTOM_STYLES } from './partials/_constants'
+import { useMonitoring } from './partials/_useMonitoring'
 import { 
   handleMonitorSelect as handleMonitorSelectHelper,
   handleBargeInSelect as handleBargeInSelectHelper,
   resetMonitorSelection as resetMonitorSelectionHelper,
   handleDeviceSelect as handleDeviceSelectHelper,
   handleDeviceSelectionCancel as handleDeviceSelectionCancelHelper
-} from './partials/handlers'
-import { animateCardMove as animateCardMoveHelper } from './partials/animationHelpers'
-import { getLocalStorageCallStatesInfo } from './partials/helpers'
+} from './partials/_handlers'
+import { animateCardMove as animateCardMoveHelper } from './partials/_animationHelpers'
 
 const LiveCallDashboard = () => {
   const { data:session, status } = useSession();
