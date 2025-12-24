@@ -210,7 +210,27 @@ export const convertUTCSeparateDateTimeToUserTime = (
   time: string,
   timeFormat: string = "hh:mm:ss A"
 ): string => {
-  return convertDubaiDateTimeToUserTimezone(date, time, timeFormat);
+  try {
+    // Clean up the time string to remove extra decimal places
+    const cleanTime = time.split(".")[0]; // Remove microseconds
+
+    // Combine date and time
+    const utcDateTime = `${date} ${cleanTime}`;
+
+    // Parse as UTC and convert to user's timezone
+    const momentObj = moment.utc(utcDateTime, "YYYY-MM-DD HH:mm:ss");
+    if (!momentObj.isValid()) {
+      console.warn("Invalid datetime format:", { date, time, utcDateTime });
+      return "Invalid Date";
+    }
+
+    // Convert to user's local timezone
+    const userTimezone = momentObj.local();
+    return userTimezone.format(timeFormat);
+  } catch (error) {
+    console.error("Error converting separate UTC date/time:", error);
+    return "Invalid Date";
+  }
 };
 
 /**
@@ -225,7 +245,27 @@ export const convertUTCSeparateDateTimeToUserDate = (
   time: string,
   dateFormat: string = "YYYY-MM-DD"
 ): string => {
-  return convertDubaiDateTimeToUserTimezone(date, time, dateFormat);
+  try {
+    // Clean up the time string to remove extra decimal places
+    const cleanTime = time.split(".")[0]; // Remove microseconds
+
+    // Combine date and time
+    const utcDateTime = `${date} ${cleanTime}`;
+
+    // Parse as UTC and convert to user's timezone
+    const momentObj = moment.utc(utcDateTime, "YYYY-MM-DD HH:mm:ss");
+    if (!momentObj.isValid()) {
+      console.warn("Invalid datetime format:", { date, time, utcDateTime });
+      return "Invalid Date";
+    }
+
+    // Convert to user's local timezone
+    const userTimezone = momentObj.local();
+    return userTimezone.format(dateFormat);
+  } catch (error) {
+    console.error("Error converting separate UTC date/time:", error);
+    return "Invalid Date";
+  }
 };
 
 /**
