@@ -26,6 +26,7 @@ interface SectionContainerProps {
   startMonitoringLocal: (dn: string, monitorType: string, toneType: string | undefined, showPopup: any) => Promise<boolean>
   selectedTone: Record<string, string>
   isDnInActiveCall: (dn: string) => boolean
+  userAddress?: string | null
   isCollapsed: boolean
   onToggle: () => void
 }
@@ -50,6 +51,7 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
   startMonitoringLocal,
   selectedTone,
   isDnInActiveCall,
+  userAddress,
   isCollapsed,
   onToggle
 }) => {
@@ -149,6 +151,7 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
                 startMonitoringLocal={startMonitoringLocal}
                 selectedTone={selectedTone}
                 isDnInActiveCall={isDnInActiveCall}
+                userAddress={userAddress}
               />
             ))}
           </div>

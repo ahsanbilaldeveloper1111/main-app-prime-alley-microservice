@@ -26,6 +26,7 @@ interface SectionsRendererProps {
   startMonitoringLocal: (dn: string, monitorType: string, toneType: string | undefined, showPopup: any) => Promise<boolean>
   selectedTone: Record<string, string>
   isDnInActiveCall: (dn: string) => boolean
+  userAddress?: string | null
   loading: boolean
   selectedTeam: string
   selectedStatus: string
@@ -57,6 +58,7 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
   startMonitoringLocal,
   selectedTone,
   isDnInActiveCall,
+  userAddress,
   loading,
   selectedTeam,
   selectedStatus,
@@ -245,6 +247,7 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
                 startMonitoringLocal={startMonitoringLocal}
                 selectedTone={selectedTone}
                 isDnInActiveCall={isDnInActiveCall}
+                userAddress={userAddress}
                 isCollapsed={collapsedSections[sectionKey] || false}
                 onToggle={() => toggleSection(sectionKey)}
               />

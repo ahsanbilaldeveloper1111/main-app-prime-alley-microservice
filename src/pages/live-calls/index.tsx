@@ -75,7 +75,7 @@ const LiveCallDashboard = () => {
   const [selectedTone, setSelectedTone] = useState<Record<string, string>>({})
   const [tempMonitorSelection, setTempMonitorSelection] = useState<Record<string, string | null>>({})
   const [notification, setNotification] = useState<{ type: string; message: string } | null>(null)
-  const [activeMonitoring, setActiveMonitoring] = useState<{ dn: string | null; type: string | null; monitor?: string; deviceName?: string | null }>({
+  const [activeMonitoring, setActiveMonitoring] = useState<{ dn: string | null; type: string | null; monitor?: string; deviceName?: string | null; monitorDeviceType?: string; monitorDeviceName?: string }>({
     dn: null,
     type: null
   })
@@ -117,7 +117,8 @@ const LiveCallDashboard = () => {
     setSelectedMonitor,
     setSelectedTone,
     setTempMonitorSelection,
-    setShowPopup
+    setShowPopup,
+    activeMonitoring
   )
   
   // Helper function to categorize DNs into sections (wrapper for imported helper)
@@ -129,7 +130,8 @@ const LiveCallDashboard = () => {
       active,
       activeMonitoring,
       getCallStateForDevice,
-      getCallStatesForDn
+      getCallStatesForDn,
+      userAddress
     )
   }
   
@@ -587,6 +589,7 @@ const LiveCallDashboard = () => {
         startMonitoringLocal={startMonitoringLocal}
         selectedTone={selectedTone}
         isDnInActiveCall={isDnInActiveCall}
+        userAddress={userAddress}
         loading={loading}
         selectedTeam={selectedTeam}
         selectedStatus={selectedStatus}
@@ -625,6 +628,7 @@ const LiveCallDashboard = () => {
         devices={availableDevices}
         onSelectDevice={handleDeviceSelect}
         extensionNumber={pendingMonitoringData?.dn || ''}
+        userAddress={userAddress}
         context="monitoring"
         monitorType={pendingMonitoringData?.monitorType}
         toneType={pendingMonitoringData?.toneType}

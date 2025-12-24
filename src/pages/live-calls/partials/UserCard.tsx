@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { Button, Card, Col } from 'react-bootstrap'
-import { Eye, Phone, CheckCircle, AlertCircle, Volume2, Mic, Users, Headset, StopCircle } from 'lucide-react'
+import { Eye, Phone, CheckCircle, AlertCircle, Volume2, Mic, Users, Headset } from 'lucide-react'
 import UserDummyImage from '@assets/images/user-dummy.jpg'
 import { getStorageImageUrl } from '@utils/imageUtils'
 import { CtiDevice, ActiveMonitoring, ShowPopup } from '@components/live-calls/utils/types'
@@ -31,6 +31,7 @@ interface UserCardProps {
   startMonitoringLocal: (dn: string, monitorType: string, toneType: string | undefined, showPopup: ShowPopup | null) => Promise<boolean>
   selectedTone: Record<string, string>
   isDnInActiveCall: (dn: string) => boolean
+  userAddress?: string | null
 }
 
 const UserCard: React.FC<UserCardProps> = ({
@@ -54,7 +55,8 @@ const UserCard: React.FC<UserCardProps> = ({
   stopMonitoring,
   startMonitoringLocal,
   selectedTone,
-  isDnInActiveCall
+  isDnInActiveCall,
+  userAddress
 }) => {
 
   // Get user extension data (image and team names)
@@ -181,14 +183,66 @@ const UserCard: React.FC<UserCardProps> = ({
   const deviceType = primaryDevice ? (primaryDevice.deviceType === 'SOFT' ? 'soft' : 'phone') : 'soft'
   const deviceStatus = primaryDevice?.terminalState === 'REGISTERED' ? 'active' : 'offline'
 
-  // Get supervision type
-  const supervisionType = activeMonitoring.dn === dn && activeMonitoring.type 
-    ? (activeMonitoring.type === 'silent-monitor' ? 'silent-monitor' : 
-       activeMonitoring.type === 'whisper' ? 'whisper' : 'barge-in')
+  // Get supervision type - normalize monitoring type format
+  const getNormalizedMonitoringType = (type: string | null): string | undefined => {
+    if (!type) return undefined
+    const normalized = type.toLowerCase()
+    if (normalized === 'silent' || normalized === 'silent-monitor' || normalized === 'silent_monitor') {
+      return 'silent-monitor'
+    }
+    if (normalized === 'whisper') {
+      return 'whisper'
+    }
+    if (normalized === 'barge_in' || normalized === 'barge-in' || normalized === 'bargein') {
+      return 'barge-in'
+    }
+    return undefined
+  }
+
+  // Check if this card is a supervisor doing monitoring
+  const isSupervisorMonitoring = activeMonitoring.monitor === dn && activeMonitoring.type
+  const supervisionType = isSupervisorMonitoring 
+    ? getNormalizedMonitoringType(activeMonitoring.type)
     : undefined
 
   // Get user name
   const userName = extensionData?.name || extensionData?.user_name || dn
+
+  // Get monitored agent's data (when supervisor is monitoring)
+  const monitoredAgentDn = isSupervisorMonitoring ? activeMonitoring.dn : null
+  const monitoredAgentData = useMemo(() => {
+    if (!monitoredAgentDn || !getUserDataExtensions) {
+      return null
+    }
+    try {
+      const userDataExtensions = getUserDataExtensions() || {}
+      const dnString = String(monitoredAgentDn)
+      const dnNumber = Number(monitoredAgentDn)
+      const data = userDataExtensions[monitoredAgentDn] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null
+      return data
+    } catch (error) {
+      console.error(`[UserCard ${dn}] Error getting monitored agent data:`, error)
+      return null
+    }
+  }, [monitoredAgentDn, getUserDataExtensions])
+
+  const monitoredAgentName = monitoredAgentData?.name || monitoredAgentData?.user_name || monitoredAgentDn || 'N/A'
+
+  // Get monitored agent's call information
+  const monitoredAgentCall = useMemo(() => {
+    if (!isSupervisorMonitoring || !activeMonitoring.deviceName || !monitoredAgentDn) {
+      return null
+    }
+    try {
+      return getCallStateForDevice(monitoredAgentDn, activeMonitoring.deviceName)
+    } catch (error) {
+      console.error(`[UserCard ${dn}] Error getting monitored agent call:`, error)
+      return null
+    }
+  }, [isSupervisorMonitoring, activeMonitoring.deviceName, monitoredAgentDn, getCallStateForDevice, dn])
+
+  const monitoredAgentHasActiveCall = monitoredAgentCall && 
+    ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED'].includes(monitoredAgentCall.currentState || '')
 
   // Get call details
   const callFrom = call?.parties?.[0]?.callingAddress || 'N/A'
@@ -385,25 +439,27 @@ const UserCard: React.FC<UserCardProps> = ({
               border: 'none'
             }}
           >
-            {status === 'Live Coaching' && activeMonitoring.dn === dn && activeMonitoring.type ? (
+            {status === 'Live Coaching' && isSupervisorMonitoring ? (
               <>
                 <div className="d-flex justify-content-between mb-1">
                   <span className="text-muted">Supervisor:</span>
                   <span className="fw-semibold text-dark">{dn}</span>
                 </div>
-                {activeMonitoring.deviceName && (
+                {monitoredAgentDn && (
                   <div className="d-flex justify-content-between mb-1">
-                    <span className="text-muted">Device:</span>
-                    <span className="fw-semibold text-dark" style={{ fontSize: '0.6rem' }}>{activeMonitoring.deviceName}</span>
+                    <span className="text-muted">Supervising:</span>
+                    <span className="fw-semibold text-dark">
+                      {monitoredAgentName} ({monitoredAgentDn})
+                    </span>
                   </div>
                 )}
-                {active && call && (
+                {monitoredAgentHasActiveCall && monitoredAgentDn && (
                   <div className="d-flex justify-content-between mb-0">
                     <span className="text-muted">Duration:</span>
                     <span className="fw-semibold text-dark">
                       <CallTimer 
-                        dn={dn}
-                        isActive={active && call ? true : false} 
+                        dn={monitoredAgentDn}
+                        isActive={monitoredAgentHasActiveCall} 
                       />
                     </span>
                   </div>
@@ -438,16 +494,32 @@ const UserCard: React.FC<UserCardProps> = ({
             )}
           </div>
 
-          {/* Stop Monitoring Button */}
-          {activeMonitoring.dn === dn && activeMonitoring.type && (
+          {/* Stop Monitoring Button - Only on supervisor's card who is monitoring (current user only) */}
+          {activeMonitoring.monitor === dn && activeMonitoring.type && userAddress && dn === userAddress && (
             <div className="mb-2">
-              <Button
+              {/* <Button
                 variant="danger"
                 size="sm"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation()
-                  if (activeMonitoring.type) {
-                    stopMonitoring(dn, activeMonitoring.type)
+                  if (activeMonitoring.type && activeMonitoring.dn) {
+                    // Convert normalized type back to API format
+                    const normalizedType = getNormalizedMonitoringType(activeMonitoring.type)
+                    let stopType = 'SILENT' // default
+                    if (normalizedType === 'silent-monitor') {
+                      stopType = 'SILENT'
+                    } else if (normalizedType === 'whisper') {
+                      stopType = 'WHISPER'
+                    } else if (normalizedType === 'barge-in') {
+                      stopType = 'BARGE_IN'
+                    } else {
+                      // If already in API format, use as is
+                      const upperType = activeMonitoring.type.toUpperCase()
+                      if (upperType === 'SILENT' || upperType === 'WHISPER' || upperType === 'BARGE_IN') {
+                        stopType = upperType
+                      }
+                    }
+                    await stopMonitoring(activeMonitoring.dn, stopType)
                   }
                 }}
                 className="w-100"
@@ -457,7 +529,7 @@ const UserCard: React.FC<UserCardProps> = ({
                   stop
                 </i>
                 Stop Monitoring
-              </Button>
+              </Button> */}
             </div>
           )}
 
@@ -500,7 +572,6 @@ const UserCard: React.FC<UserCardProps> = ({
                         cursor: (isDeviceActiveCall || isCurrentlyMonitored) ? 'pointer' : 'default',
                         opacity: isDeviceActiveCall ? 1 : 0.7
                       }}
-                      // title={`${getDeviceTypeLabel(devType)} - ${deviceName}${isCurrentlyMonitored ? ' (Monitoring)' : ''}`}
                       title={`${getDeviceTypeLabel(devType)}`}
                       onClick={() => handleDeviceClick(deviceName, devType, terminalState)}
                     >
@@ -527,14 +598,132 @@ const UserCard: React.FC<UserCardProps> = ({
                     </div>
                   )
                 })}
+                {/* Show monitoring icon when active - only on supervisor's card who is monitoring (current user only) */}
+                {activeMonitoring.monitor === dn && activeMonitoring.type && userAddress && dn === userAddress && (() => {
+                  const normalizedType = getNormalizedMonitoringType(activeMonitoring.type)
+                  if (!normalizedType) return null
+                  
+                  return (
+                    <div 
+                      className="rounded-circle d-flex align-items-center justify-content-center position-relative"
+                      style={{ 
+                        width: '28px', 
+                        height: '28px',
+                        backgroundColor: normalizedType === 'silent-monitor' ? '#1e40af' : 
+                                       normalizedType === 'whisper' ? '#6b21a8' : '#9a3412',
+                        color: '#ffffff',
+                        border: `2px solid ${normalizedType === 'silent-monitor' ? '#1e40af' : 
+                                normalizedType === 'whisper' ? '#6b21a8' : '#9a3412'}`,
+                        cursor: 'pointer'
+                      }}
+                      title={`Stop ${normalizedType === 'silent-monitor' ? 'Silent Monitor' : 
+                              normalizedType === 'whisper' ? 'Whisper' : 'Barge In'}`}
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (activeMonitoring.type && activeMonitoring.dn) {
+                          // Convert normalized type back to API format
+                          let stopType = 'SILENT' // default
+                          if (normalizedType === 'silent-monitor') {
+                            stopType = 'SILENT'
+                          } else if (normalizedType === 'whisper') {
+                            stopType = 'WHISPER'
+                          } else if (normalizedType === 'barge-in') {
+                            stopType = 'BARGE_IN'
+                          } else {
+                            // If already in API format, use as is
+                            const upperType = activeMonitoring.type.toUpperCase()
+                            if (upperType === 'SILENT' || upperType === 'WHISPER' || upperType === 'BARGE_IN') {
+                              stopType = upperType
+                            }
+                          }
+                          await stopMonitoring(activeMonitoring.dn, stopType)
+                        }
+                      }}
+                    >
+                      {normalizedType === 'silent-monitor' ? (
+                        <Volume2 size={12} />
+                      ) : normalizedType === 'whisper' ? (
+                        <Mic size={12} />
+                      ) : (
+                        <Users size={12} />
+                      )}
+                    </div>
+                  )
+                })()}
             </div>
 
             {showCallControls && (
               <div className="d-flex gap-1">
                 {(() => {
-                  const isSilentActive = activeMonitoring.dn === dn && 
-                                        activeMonitoring.deviceName === primaryDevice?.deviceName && 
-                                        activeMonitoring.type === 'silent-monitor'
+                  const isMonitored = activeMonitoring.dn === dn // This card is being monitored
+                  const isSupervisorMonitoring = activeMonitoring.monitor === dn // This DN is a supervisor doing monitoring
+                  const isCurrentUser = userAddress && dn === userAddress // This is current user's card
+                  
+                  // If this is a supervisor monitoring (but not current user): disable buttons
+                  // If this is current user monitoring: hide buttons (stop button shown separately)
+                  // If this card is being monitored: disable buttons
+                  // Otherwise: show normal buttons
+                  
+                  if (isSupervisorMonitoring && !isCurrentUser) {
+                    // Another supervisor is monitoring - disable all buttons
+                    return (
+                      <Button 
+                        variant="light" 
+                        size="sm" 
+                        className="p-0 border" 
+                        disabled
+                        style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          borderRadius: '4px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#9ca3af',
+                          borderColor: '#e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'not-allowed',
+                          opacity: 0.5
+                        }}
+                        title="Silent Monitor (Disabled - Another Supervisor Monitoring)"
+                      >
+                        <Volume2 size={8} />
+                      </Button>
+                    )
+                  }
+                  
+                  if (isSupervisorMonitoring && isCurrentUser) {
+                    // Current user is monitoring - hide buttons (stop button shown separately)
+                    return null
+                  }
+                  
+                  if (isMonitored) {
+                    // Monitored agent's card - disable all monitoring buttons
+                    return (
+                      <Button 
+                        variant="light" 
+                        size="sm" 
+                        className="p-0 border" 
+                        disabled
+                        style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          borderRadius: '4px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#9ca3af',
+                          borderColor: '#e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'not-allowed',
+                          opacity: 0.5
+                        }}
+                        title="Silent Monitor (Disabled - Being Monitored)"
+                      >
+                        <Volume2 size={8} />
+                      </Button>
+                    )
+                  }
                   
                   return (
                     <Button 
@@ -545,34 +734,87 @@ const UserCard: React.FC<UserCardProps> = ({
                         width: '24px', 
                         height: '24px', 
                         borderRadius: '4px',
-                        backgroundColor: isSilentActive ? '#1e40af' : '#dbeafe',
-                        color: isSilentActive ? '#ffffff' : '#1e40af',
-                        borderColor: isSilentActive ? '#1e40af' : '#bfdbfe',
+                        backgroundColor: '#dbeafe',
+                        color: '#1e40af',
+                        borderColor: '#bfdbfe',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         transition: 'all 0.2s ease'
                       }}
-                      title={isSilentActive ? 'Stop Silent Monitor' : 'Silent Monitor'}
+                      title="Silent Monitor"
                       onClick={async (e) => {
                         e.stopPropagation()
                         if (!primaryDevice) return
-                        
-                        if (isSilentActive) {
-                          await stopMonitoring(dn, 'silent-monitor')
-                        } else {
-                          await startMonitoringLocal(dn, 'SILENT', 'NONE', { dn, deviceName: primaryDevice.deviceName })
-                        }
+                        await startMonitoringLocal(dn, 'SILENT', 'NONE', { dn, deviceName: primaryDevice.deviceName })
                       }}
                     >
-                      {isSilentActive ? <StopCircle size={8} /> : <Volume2 size={8} />}
+                      <Volume2 size={8} />
                     </Button>
                   )
                 })()}
                 {(() => {
-                  const isWhisperActive = activeMonitoring.dn === dn && 
-                                         activeMonitoring.deviceName === primaryDevice?.deviceName && 
-                                         activeMonitoring.type === 'whisper'
+                  const isMonitored = activeMonitoring.dn === dn
+                  const isSupervisorMonitoring = activeMonitoring.monitor === dn
+                  const isCurrentUser = userAddress && dn === userAddress
+                  
+                  if (isSupervisorMonitoring && !isCurrentUser) {
+                    return (
+                      <Button 
+                        variant="light" 
+                        size="sm" 
+                        className="p-0 border" 
+                        disabled
+                        style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          borderRadius: '4px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#9ca3af',
+                          borderColor: '#e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'not-allowed',
+                          opacity: 0.5
+                        }}
+                        title="Whisper (Disabled - Another Supervisor Monitoring)"
+                      >
+                        <Mic size={8} />
+                      </Button>
+                    )
+                  }
+                  
+                  if (isSupervisorMonitoring && isCurrentUser) {
+                    return null
+                  }
+                  
+                  if (isMonitored) {
+                    return (
+                      <Button 
+                        variant="light" 
+                        size="sm" 
+                        className="p-0 border" 
+                        disabled
+                        style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          borderRadius: '4px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#9ca3af',
+                          borderColor: '#e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'not-allowed',
+                          opacity: 0.5
+                        }}
+                        title="Whisper (Disabled - Being Monitored)"
+                      >
+                        <Mic size={8} />
+                      </Button>
+                    )
+                  }
                   
                   return (
                     <Button 
@@ -583,34 +825,87 @@ const UserCard: React.FC<UserCardProps> = ({
                         width: '24px', 
                         height: '24px', 
                         borderRadius: '4px',
-                        backgroundColor: isWhisperActive ? '#6b21a8' : '#e9d5ff',
-                        color: isWhisperActive ? '#ffffff' : '#6b21a8',
-                        borderColor: isWhisperActive ? '#6b21a8' : '#d8b4fe',
+                        backgroundColor: '#e9d5ff',
+                        color: '#6b21a8',
+                        borderColor: '#d8b4fe',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         transition: 'all 0.2s ease'
                       }}
-                      title={isWhisperActive ? 'Stop Whisper' : 'Whisper'}
+                      title="Whisper"
                       onClick={async (e) => {
                         e.stopPropagation()
                         if (!primaryDevice) return
-                        
-                        if (isWhisperActive) {
-                          await stopMonitoring(dn, 'whisper')
-                        } else {
-                          await startMonitoringLocal(dn, 'WHISPER', 'NONE', { dn, deviceName: primaryDevice.deviceName })
-                        }
+                        await startMonitoringLocal(dn, 'WHISPER', 'NONE', { dn, deviceName: primaryDevice.deviceName })
                       }}
                     >
-                      {isWhisperActive ? <StopCircle size={8} /> : <Mic size={8} />}
+                      <Mic size={8} />
                     </Button>
                   )
                 })()}
                 {(() => {
-                  const isBargeActive = activeMonitoring.dn === dn && 
-                                      activeMonitoring.deviceName === primaryDevice?.deviceName && 
-                                      activeMonitoring.type === 'barge-in'
+                  const isMonitored = activeMonitoring.dn === dn
+                  const isSupervisorMonitoring = activeMonitoring.monitor === dn
+                  const isCurrentUser = userAddress && dn === userAddress
+                  
+                  if (isSupervisorMonitoring && !isCurrentUser) {
+                    return (
+                      <Button 
+                        variant="light" 
+                        size="sm" 
+                        className="p-0 border" 
+                        disabled
+                        style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          borderRadius: '4px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#9ca3af',
+                          borderColor: '#e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'not-allowed',
+                          opacity: 0.5
+                        }}
+                        title="Barge In (Disabled - Another Supervisor Monitoring)"
+                      >
+                        <Users size={8} />
+                      </Button>
+                    )
+                  }
+                  
+                  if (isSupervisorMonitoring && isCurrentUser) {
+                    return null
+                  }
+                  
+                  if (isMonitored) {
+                    return (
+                      <Button 
+                        variant="light" 
+                        size="sm" 
+                        className="p-0 border" 
+                        disabled
+                        style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          borderRadius: '4px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#9ca3af',
+                          borderColor: '#e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'not-allowed',
+                          opacity: 0.5
+                        }}
+                        title="Barge In (Disabled - Being Monitored)"
+                      >
+                        <Users size={8} />
+                      </Button>
+                    )
+                  }
                   
                   return (
                     <Button 
@@ -621,27 +916,22 @@ const UserCard: React.FC<UserCardProps> = ({
                         width: '24px', 
                         height: '24px', 
                         borderRadius: '4px',
-                        backgroundColor: isBargeActive ? '#9a3412' : '#fed7aa',
-                        color: isBargeActive ? '#ffffff' : '#9a3412',
-                        borderColor: isBargeActive ? '#9a3412' : '#fdba74',
+                        backgroundColor: '#fed7aa',
+                        color: '#9a3412',
+                        borderColor: '#fdba74',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         transition: 'all 0.2s ease'
                       }}
-                      title={isBargeActive ? 'Stop Barge In' : 'Barge In'}
+                      title="Barge In"
                       onClick={async (e) => {
                         e.stopPropagation()
                         if (!primaryDevice) return
-                        
-                        if (isBargeActive) {
-                          await stopMonitoring(dn, 'barge-in')
-                        } else {
-                          await startMonitoringLocal(dn, 'BARGE_IN', 'NONE', { dn, deviceName: primaryDevice.deviceName })
-                        }
+                        await startMonitoringLocal(dn, 'BARGE_IN', 'NONE', { dn, deviceName: primaryDevice.deviceName })
                       }}
                     >
-                      {isBargeActive ? <StopCircle size={8} /> : <Users size={8} />}
+                      <Users size={8} />
                     </Button>
                   )
                 })()}

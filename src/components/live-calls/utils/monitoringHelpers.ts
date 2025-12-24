@@ -104,7 +104,10 @@ export const executeMonitoring = async (
       setActiveMonitoring({ 
         dn, 
         type: monitorType, 
-        deviceName: showPopup?.deviceName || undefined 
+        monitor: userAddress || undefined,
+        deviceName: showPopup?.deviceName || undefined,
+        monitorDeviceType: monitorDevice.deviceType,
+        monitorDeviceName: monitorDevice.deviceName
       })
       setMonitoringStartTime(prev => ({ ...prev, [dn]: new Date() }))
 
@@ -130,19 +133,19 @@ export const stopSilentMonitoring = async (
   dn: string,
   userAddress: string | null,
   dnsMap: Record<string, any>,
-  setShowPageLoader: (show: boolean) => void
+  setShowPageLoader: (show: boolean) => void,
+  activeMonitoring?: { dn: string | null; type: string | null; monitor?: string; deviceName?: string | null; monitorDeviceType?: string; monitorDeviceName?: string }
 ): Promise<boolean> => {
   try {
-    const userDevices = getUserDevices(userAddress, dnsMap)
-    if (userDevices.length === 0) {
-      console.error('No user devices available for stopping monitoring')
+    // Use the monitor device that was used when starting monitoring
+    if (!activeMonitoring?.monitorDeviceType || !activeMonitoring?.monitorDeviceName) {
+      console.error('Monitor device information not available')
       return false
     }
     
-    const monitorDevice = userDevices[0]
     const stopParams = {
-      monitorDeviceType: monitorDevice.deviceType,
-      monitorDeviceName: monitorDevice.deviceName,
+      monitorDeviceType: activeMonitoring.monitorDeviceType,
+      monitorDeviceName: activeMonitoring.monitorDeviceName,
       monitor: userAddress || ''
     }
 
@@ -172,19 +175,19 @@ export const stopWhisperMonitoring = async (
   dn: string,
   userAddress: string | null,
   dnsMap: Record<string, any>,
-  setShowPageLoader: (show: boolean) => void
+  setShowPageLoader: (show: boolean) => void,
+  activeMonitoring?: { dn: string | null; type: string | null; monitor?: string; deviceName?: string | null; monitorDeviceType?: string; monitorDeviceName?: string }
 ): Promise<boolean> => {
   try {
-    const userDevices = getUserDevices(userAddress, dnsMap)
-    if (userDevices.length === 0) {
-      console.error('No user devices available for stopping monitoring')
+    // Use the monitor device that was used when starting monitoring
+    if (!activeMonitoring?.monitorDeviceType || !activeMonitoring?.monitorDeviceName) {
+      console.error('Monitor device information not available')
       return false
     }
     
-    const monitorDevice = userDevices[0]
     const stopParams = {
-      monitorDeviceType: monitorDevice.deviceType,
-      monitorDeviceName: monitorDevice.deviceName,
+      monitorDeviceType: activeMonitoring.monitorDeviceType,
+      monitorDeviceName: activeMonitoring.monitorDeviceName,
       monitor: userAddress || ''
     }
 
@@ -215,19 +218,19 @@ export const stopBargeInMonitoringLocal = async (
   dn: string,
   userAddress: string | null,
   dnsMap: Record<string, any>,
-  setShowPageLoader: (show: boolean) => void
+  setShowPageLoader: (show: boolean) => void,
+  activeMonitoring?: { dn: string | null; type: string | null; monitor?: string; deviceName?: string | null; monitorDeviceType?: string; monitorDeviceName?: string }
 ): Promise<boolean> => {
   try {
-    const userDevices = getUserDevices(userAddress, dnsMap)
-    if (userDevices.length === 0) {
-      console.error('No user devices available for stopping monitoring')
+    // Use the monitor device that was used when starting monitoring
+    if (!activeMonitoring?.monitorDeviceType || !activeMonitoring?.monitorDeviceName) {
+      console.error('Monitor device information not available')
       return false
     }
     
-    const monitorDevice = userDevices[0]
     const stopParams = {
-      monitorDeviceType: monitorDevice.deviceType,
-      monitorDeviceName: monitorDevice.deviceName,
+      monitorDeviceType: activeMonitoring.monitorDeviceType,
+      monitorDeviceName: activeMonitoring.monitorDeviceName,
       monitor: userAddress || ''
     }
 
@@ -266,19 +269,20 @@ export const stopMonitoring = async (
   setSelectedTone: React.Dispatch<React.SetStateAction<Record<string, string>>>,
   setTempMonitorSelection: React.Dispatch<React.SetStateAction<Record<string, string | null>>>,
   setNotification: React.Dispatch<React.SetStateAction<{ type: string; message: string } | null>>,
-  setShowPopup: React.Dispatch<React.SetStateAction<ShowPopup | null>>
+  setShowPopup: React.Dispatch<React.SetStateAction<ShowPopup | null>>,
+  activeMonitoring?: { dn: string | null; type: string | null; monitor?: string; deviceName?: string | null; monitorDeviceType?: string; monitorDeviceName?: string }
 ): Promise<boolean> => {
   let success = false
 
   switch (type) {
     case 'SILENT':
-      success = await stopSilentMonitoring(dn, userAddress, dnsMap, setShowPageLoader)
+      success = await stopSilentMonitoring(dn, userAddress, dnsMap, setShowPageLoader, activeMonitoring)
       break
     case 'WHISPER':
-      success = await stopWhisperMonitoring(dn, userAddress, dnsMap, setShowPageLoader)
+      success = await stopWhisperMonitoring(dn, userAddress, dnsMap, setShowPageLoader, activeMonitoring)
       break
     case 'BARGE_IN':
-      success = await stopBargeInMonitoringLocal(dn, userAddress, dnsMap, setShowPageLoader)
+      success = await stopBargeInMonitoringLocal(dn, userAddress, dnsMap, setShowPageLoader, activeMonitoring)
       break
     default:
       console.error('Unknown monitoring type:', type)
@@ -286,7 +290,7 @@ export const stopMonitoring = async (
   }
 
   if (success) {
-    setActiveMonitoring({ dn: null, type: null, deviceName: null })
+    setActiveMonitoring({ dn: null, type: null, deviceName: null, monitorDeviceType: undefined, monitorDeviceName: undefined })
     setMonitoringStartTime(prev => {
       const newState = { ...prev }
       delete newState[dn]

@@ -21,22 +21,17 @@ export const categorizeDns = (
   active: boolean,
   activeMonitoring: ActiveMonitoring,
   getCallStateForDevice: (dn: string, deviceName: string) => any,
-  getCallStatesForDn: (dn: string) => any[]
+  getCallStatesForDn: (dn: string) => any[],
+  userAddress?: string | null
 ): string => {
   const cls = getCardLevelStatus(devices)
   
-  // Check if DN is being monitored (In Supervision) - only if call is still active
-  if (activeMonitoring.dn === dn && activeMonitoring.type && activeMonitoring.deviceName) {
-    const monitoredDevice = devices.find(d => d.deviceName === activeMonitoring.deviceName)
-    if (monitoredDevice) {
-      const deviceCall = getCallStateForDevice(dn, activeMonitoring.deviceName)
-      const isDeviceActiveCall = deviceCall && 
-        ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED', 'RINGING'].includes(deviceCall.currentState || '')
-      
-      if (isDeviceActiveCall) {
-        return 'supervision'
-      }
-    }
+  // Check if this DN is a supervisor doing monitoring - show in supervision section
+  // activeMonitoring.monitor = supervisor's DN who is monitoring
+  // activeMonitoring.dn = agent's DN being monitored
+  if (activeMonitoring.monitor && activeMonitoring.monitor === dn && activeMonitoring.type) {
+    // This DN is a supervisor doing monitoring - show in supervision section
+    return 'supervision'
   }
   
   // Check if DN has active calls (On Call)

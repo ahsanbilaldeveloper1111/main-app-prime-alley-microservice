@@ -18,6 +18,7 @@ interface DeviceSelectionModalProps {
   devices: Device[];
   onSelectDevice: (device: Device) => void;
   extensionNumber: string;
+  userAddress?: string | null;
   context?: 'monitoring' | 'dialing';
   monitorType?: string;
   toneType?: string;
@@ -30,6 +31,7 @@ const DeviceSelectionModal: React.FC<DeviceSelectionModalProps> = ({
   devices,
   onSelectDevice,
   extensionNumber,
+  userAddress,
   context = 'dialing',
   monitorType,
   toneType,
@@ -37,28 +39,28 @@ const DeviceSelectionModal: React.FC<DeviceSelectionModalProps> = ({
 }) => {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
 
-  // Get user extension data (image and name)
+  // Get supervisor's (userAddress) extension data (image and name) - not the monitored agent's
   const extensionData = useMemo(() => {
     try {
-      if (!getUserDataExtensions || !extensionNumber) {
+      if (!getUserDataExtensions || !userAddress) {
         return null
       }
       
       const userDataExtensions = getUserDataExtensions() || {}
-      const dnString = String(extensionNumber)
-      const dnNumber = Number(extensionNumber)
+      const dnString = String(userAddress)
+      const dnNumber = Number(userAddress)
       
       // Try different DN formats to match the key
-      const data = userDataExtensions[extensionNumber] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null
+      const data = userDataExtensions[userAddress] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null
       
       return data
     } catch (error) {
-      console.error(`[DeviceSelectionModal ${extensionNumber}] Error getting extension data:`, error)
+      console.error(`[DeviceSelectionModal ${userAddress}] Error getting extension data:`, error)
       return null
     }
-  }, [extensionNumber, getUserDataExtensions])
+  }, [userAddress, getUserDataExtensions])
 
-  // Get user image URL
+  // Get supervisor's image URL
   const userImageUrl = useMemo(() => {
     if (!extensionData) {
       return UserDummyImage.src
@@ -72,13 +74,13 @@ const DeviceSelectionModal: React.FC<DeviceSelectionModalProps> = ({
     return UserDummyImage.src
   }, [extensionData])
 
-  // Get user name
+  // Get supervisor's name
   const userName = useMemo(() => {
     if (!extensionData) {
-      return extensionNumber
+      return userAddress || 'Supervisor'
     }
-    return extensionData?.name || extensionData?.user_name || extensionNumber
-  }, [extensionData, extensionNumber])
+    return extensionData?.name || extensionData?.user_name || userAddress || 'Supervisor'
+  }, [extensionData, userAddress])
 
   const handleDeviceSelect = (device: Device) => {
     setSelectedDevice(device);
@@ -131,17 +133,19 @@ const DeviceSelectionModal: React.FC<DeviceSelectionModalProps> = ({
   };
 
   const getModalTitle = () => {
-    if (context === 'monitoring') {
-      return `Select Monitoring Device for Extension ${extensionNumber}`;
-    }
-    return `Select Device for Extension ${extensionNumber}`;
+    // if (context === 'monitoring') {
+    //   return `Select Monitoring Device for Extension ${extensionNumber}`;
+    // }
+    //return `Select Device for Extension ${extensionNumber}`;
+    return `Device Selection`;
   };
 
   const getModalDescription = () => {
-    if (context === 'monitoring') {
-      return `Extension ${extensionNumber} has multiple devices registered. Please select which device you want to use for ${monitorType?.toLowerCase().replace('_', ' ')} monitoring:`;
-    }
-    return `Extension ${extensionNumber} has multiple devices registered. Please select which device you want to use for this call:`;
+    // if (context === 'monitoring') {
+    //   return `Extension ${extensionNumber} has multiple devices registered. Please select which device you want to use for ${monitorType?.toLowerCase().replace('_', ' ')} monitoring:`;
+    // }
+    //return `Extension ${extensionNumber} has multiple devices registered. Please select which device you want to use for this call:`;
+    return `Please select which device you want to use for this call (monitoring or dialing):`;
   };
 
   return (
@@ -175,7 +179,7 @@ const DeviceSelectionModal: React.FC<DeviceSelectionModalProps> = ({
               )}
               <div className="fw-bold mb-2" style={{ fontSize: '1.2rem' }}>{userName}</div>
               <div className="text-muted" style={{ fontSize: '0.9rem' }}>
-                Extension: {extensionNumber}
+                Extension: {userAddress || extensionNumber}
               </div>
             </div>
           </div>
