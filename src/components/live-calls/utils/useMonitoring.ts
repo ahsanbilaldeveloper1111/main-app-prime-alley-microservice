@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { ShowPopup, PendingMonitoringData, AvailableDevice, CtiDevice } from './_types'
+import { ShowPopup, PendingMonitoringData, AvailableDevice, CtiDevice } from './types'
 import { 
   getUserDevices, 
   hasMultipleDevices, 
   executeMonitoring as executeMonitoringHelper,
   stopMonitoring as stopMonitoringHelper
-} from './_monitoringHelpers'
+} from './monitoringHelpers'
 
 /**
  * Custom hook for monitoring functionality

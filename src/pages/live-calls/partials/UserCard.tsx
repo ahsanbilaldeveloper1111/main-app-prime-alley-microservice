@@ -2,7 +2,7 @@ import React, { useMemo } from 'react'
 import { Button } from 'react-bootstrap'
 import UserDummyImage from '@assets/images/user-dummy.jpg'
 import { getStorageImageUrl } from '@utils/imageUtils'
-import { CtiDevice, ActiveMonitoring, ShowPopup } from './_types'
+import { CtiDevice, ActiveMonitoring, ShowPopup } from '@components/live-calls/utils/types'
 import CallTimer from './CallTimer'
 import { 
   getCardLevelStatus, 
@@ -12,7 +12,7 @@ import {
   getDeviceTypeLabel,
   getSectionColor,
   getSectionTitle
-} from './_helpers'
+} from '@components/live-calls/utils/helpers'
 
 interface UserCardProps {
   dn: string

@@ -1,8 +1,8 @@
 import React from 'react'
 import { Col, Row } from 'react-bootstrap'
 import SectionContainer from './SectionContainer'
-import { SECTION_ORDER } from './_constants'
-import { CtiDevice } from './_types'
+import { SECTION_ORDER } from '@components/live-calls/utils/constants'
+import { CtiDevice } from '@components/live-calls/utils/types'
 
 interface SectionsRendererProps {
   dnsMap: Record<string, any>
