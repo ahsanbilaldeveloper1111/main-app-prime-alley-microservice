@@ -483,33 +483,32 @@ export default function useCtiStomp(
               }
             }
           }
-
           // Fallback: If still no device type, try to infer from device name
           if (!party.callingDeviceType && party.callingDeviceName) {
-            let inferredType = "UNKNOWN";
+            let inferredType = "SOFT_HARD";
             const deviceName = party.callingDeviceName.toLowerCase();
 
             if (
               deviceName.includes("android") ||
               deviceName.includes("mobile")
             ) {
-              inferredType = "ANDROID";
+              inferredType = "MOBILE";
             } else if (
               deviceName.includes("soft") ||
               deviceName.includes("csf") ||
               deviceName.includes("web")
             ) {
-              inferredType = "SOFT";
+              inferredType = "SOFT_HARD";
             } else if (
               deviceName.includes("phone") ||
               deviceName.includes("ip")
             ) {
-              inferredType = "IP_PHONE";
+              inferredType = "SOFT_HARD";
             } else if (
               deviceName.includes("hard") ||
               deviceName.includes("desk")
             ) {
-              inferredType = "HARD";
+              inferredType = "SOFT_HARD";
             }
 
             party.callingDeviceType = inferredType;
@@ -1636,6 +1635,7 @@ export default function useCtiStomp(
   // Helper: Get devices array for a DN
   const getDevicesForDn = useCallback(
     (dn: string) => {
+      console.log("ZEZEZ getDevicesForDn", dn, dnsMap);
       const devices = dnsMap[dn] ? Object.values(dnsMap[dn].devices) : [];
       return devices;
     },

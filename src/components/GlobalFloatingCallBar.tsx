@@ -369,6 +369,56 @@ const GlobalFloatingCallBar: React.FC = () => {
     return baseStyles;
   }, [position, isDragging, dragPosition]);
 
+  // Helper function to get controller device info based on call and user role
+  const getControllerDeviceInfo = useCallback((call: typeof activeCall) => {
+    if (!call || !userAddress || !dnsMap) {
+      return null;
+    }
+
+    // Determine if user is caller or called party
+    const isCaller = call.callingAddress === userAddress;
+    const isCalled = call.calledAddress === userAddress;
+
+    if (!isCaller && !isCalled) {
+      return null;
+    }
+
+    // Get device information for the user from dnsMap
+    const userDeviceInfo = dnsMap[userAddress];
+    if (!userDeviceInfo || !userDeviceInfo.devices) {
+      return null;
+    }
+
+    const userDevices = Object.values(userDeviceInfo.devices);
+    if (userDevices.length === 0) {
+      return null;
+    }
+
+    let activeDevice: any = null;
+
+    // If user is the caller, try to match the device name from the call
+    if (isCaller && call.callingDeviceName) {
+      activeDevice = userDevices.find((device: any) => 
+        device.deviceName === call.callingDeviceName
+      );
+    }
+
+    // If device not found by name match, or user is called party, use registered device or first available
+    if (!activeDevice) {
+      activeDevice = userDevices.find((device: any) => device.terminalState === 'REGISTERED') || userDevices[0];
+    }
+
+    return {
+      // Controller fields for the user's device
+      controllerAddress: userAddress,
+      controllerDeviceName: activeDevice.deviceName || 'WebCTI',
+      controllerDeviceType: activeDevice.deviceType || 'SOFT_HARD',
+      // Calling device fields - use user's device info for callingDeviceName/Type
+      callingDeviceName: activeDevice.deviceName || 'WebCTI',
+      callingDeviceType: activeDevice.deviceType || 'SOFT_HARD',
+    };
+  }, [userAddress, dnsMap]);
+
   // Get the first active call (for display) - prefer connected calls, include onHold
   // Filter to only show calls involving the current user's phone number
   const activeCall = React.useMemo(() => {
@@ -615,27 +665,24 @@ const GlobalFloatingCallBar: React.FC = () => {
       return;
     }
 
-    const callingDevice = getCallingDeviceInfo();
-    if (!callingDevice) {
+    const controllerDevice = getControllerDeviceInfo(activeCall);
+    if (!controllerDevice) {
       toast.error("No calling device information available");
       return;
     }
 
     try {
-      console.log("ZEZE activeCall", activeCall, {
-        callId: activeCall.callId,
-        callingAddress: activeCall.callingAddress,
-        calledAddress: activeCall.calledAddress || activeCall.number,
-        callingDeviceType: activeCall.callingDeviceType,
-        callingDeviceName: activeCall.callingDeviceName,
-      });
       const result = await endCall({
         callId: activeCall.callId,
-        callingAddress: activeCall.callingAddress!,
+        callingAddress: activeCall.callingAddress!, // Keep original calling address
         calledAddress: activeCall.calledAddress || activeCall.number,
-        callingDeviceType: activeCall.callingDeviceType!,
-        callingDeviceName: activeCall.callingDeviceName!,
-      });
+        callingDeviceType: controllerDevice.callingDeviceType,
+        callingDeviceName: controllerDevice.callingDeviceName,
+        // Add controller fields if API supports them
+        controllerAddress: controllerDevice.controllerAddress,
+        controllerDeviceName: controllerDevice.controllerDeviceName,
+        controllerDeviceType: controllerDevice.controllerDeviceType,
+      } as any);
 
       if (result.success) {
         toast.success("Call ended");
@@ -653,8 +700,8 @@ const GlobalFloatingCallBar: React.FC = () => {
       return;
     }
 
-    const callingDevice = getCallingDeviceInfo();
-    if (!callingDevice) {
+    const controllerDevice = getControllerDeviceInfo(activeCall);
+    if (!controllerDevice) {
       toast.error("No calling device information available");
       return;
     }
@@ -662,11 +709,15 @@ const GlobalFloatingCallBar: React.FC = () => {
     try {
       const result = await holdCall({
         callId: activeCall.callId,
-        callingAddress: activeCall.callingAddress!,
+        callingAddress: activeCall.callingAddress!, // Keep original calling address
         calledAddress: activeCall.calledAddress || activeCall.number,
-        callingDeviceType: activeCall.callingDeviceType!,
-        callingDeviceName: activeCall.callingDeviceName!,
-      });
+        callingDeviceType: controllerDevice.callingDeviceType,
+        callingDeviceName: controllerDevice.callingDeviceName,
+        // Add controller fields if API supports them
+        controllerAddress: controllerDevice.controllerAddress,
+        controllerDeviceName: controllerDevice.controllerDeviceName,
+        controllerDeviceType: controllerDevice.controllerDeviceType,
+      } as any);
 
       if (result.success) {
         toast.success("Call put on hold");
@@ -684,8 +735,8 @@ const GlobalFloatingCallBar: React.FC = () => {
       return;
     }
 
-    const callingDevice = getCallingDeviceInfo();
-    if (!callingDevice) {
+    const controllerDevice = getControllerDeviceInfo(activeCall);
+    if (!controllerDevice) {
       toast.error("No calling device information available");
       return;
     }
@@ -693,11 +744,15 @@ const GlobalFloatingCallBar: React.FC = () => {
     try {
       const result = await resumeCall({
         callId: activeCall.callId,
-        callingAddress: activeCall.callingAddress!,
+        callingAddress: activeCall.callingAddress!, // Keep original calling address
         calledAddress: activeCall.calledAddress || activeCall.number,
-        callingDeviceType: activeCall.callingDeviceType!,
-        callingDeviceName: activeCall.callingDeviceName!,
-      });
+        callingDeviceType: controllerDevice.callingDeviceType,
+        callingDeviceName: controllerDevice.callingDeviceName,
+        // Add controller fields if API supports them
+        controllerAddress: controllerDevice.controllerAddress,
+        controllerDeviceName: controllerDevice.controllerDeviceName,
+        controllerDeviceType: controllerDevice.controllerDeviceType,
+      } as any);
 
       if (result.success) {
         toast.success("Call resumed");
@@ -720,8 +775,8 @@ const GlobalFloatingCallBar: React.FC = () => {
       return;
     }
 
-    const callingDevice = getCallingDeviceInfo();
-    if (!callingDevice) {
+    const controllerDevice = getControllerDeviceInfo(activeCall);
+    if (!controllerDevice) {
       toast.error("No calling device information available");
       return;
     }
@@ -744,8 +799,9 @@ const GlobalFloatingCallBar: React.FC = () => {
         transferAddress: activeCall.calledAddress || activeCall.number,
         targetAddress: transferTarget,
         mode: "BLIND",
-        // transferInitiatorAddress, transferInitiatorDeviceType, transferInitiatorDeviceName
-        // are optional and will be auto-filled by transferCall function
+        transferInitiatorAddress: controllerDevice.controllerAddress,
+        transferInitiatorDeviceType: controllerDevice.controllerDeviceType,
+        transferInitiatorDeviceName: controllerDevice.controllerDeviceName,
       });
 
       if (result.success) {
@@ -789,6 +845,32 @@ const GlobalFloatingCallBar: React.FC = () => {
       return;
     }
 
+    // Get controller device info from dnsMap for the user
+    const userDeviceInfo = dnsMap[userAddress];
+    if (!userDeviceInfo || !userDeviceInfo.devices) {
+      toast.error("No device information available");
+      return;
+    }
+
+    const userDevices = Object.values(userDeviceInfo.devices);
+    if (userDevices.length === 0) {
+      toast.error("No devices available");
+      return;
+    }
+
+    // Try to match device name from incomingCall if available
+    let activeDevice: any = null;
+    if (incomingCall.controllerDeviceName) {
+      activeDevice = userDevices.find((device: any) => 
+        device.deviceName === incomingCall.controllerDeviceName
+      );
+    }
+
+    // If device not found by name match, use registered device or first available device
+    if (!activeDevice) {
+      activeDevice = userDevices.find((device: any) => device.terminalState === 'REGISTERED') || userDevices[0];
+    }
+
     // Clear the timer
     if (incomingCallTimer) {
       clearTimeout(incomingCallTimer);
@@ -802,9 +884,9 @@ const GlobalFloatingCallBar: React.FC = () => {
         callId: incomingCall.callId,
         callingAddress: incomingCall.callingAddress,
         calledAddress: incomingCall.calledAddress,
-        controllerAddress: incomingCall.controllerAddress,
-        controllerDeviceName: incomingCall.controllerDeviceName,
-        controllerDeviceType: incomingCall.controllerDeviceType
+        controllerAddress: userAddress,
+        controllerDeviceName: activeDevice.deviceName || 'WebCTI',
+        controllerDeviceType: activeDevice.deviceType || 'SOFT_HARD'
       });
 
       if (result.success) {
@@ -1249,16 +1331,16 @@ const GlobalFloatingCallBar: React.FC = () => {
                       handleAttendCall();
                     } else {
                       // If no incomingCall state, try to attend using activeCall data
-                      const callingDevice = getCallingDeviceInfo();
-                      if (callingDevice && activeCall.callId) {
+                      const controllerDevice = getControllerDeviceInfo(activeCall);
+                      if (controllerDevice && activeCall.callId) {
                         setIsDialing(true);
                         attendCall({
                           callId: activeCall.callId,
                           callingAddress: activeCall.callingAddress || '',
                           calledAddress: activeCall.calledAddress || activeCall.number,
-                          controllerAddress: userAddress,
-                          controllerDeviceName: callingDevice.callingDeviceName,
-                          controllerDeviceType: callingDevice.callingDeviceType,
+                          controllerAddress: controllerDevice.controllerAddress,
+                          controllerDeviceName: controllerDevice.controllerDeviceName,
+                          controllerDeviceType: controllerDevice.controllerDeviceType,
                         })
                           .then((result) => {
                             if (result.success) {
@@ -1316,15 +1398,19 @@ const GlobalFloatingCallBar: React.FC = () => {
                     handleRejectCall();
                     // Also end the call if it exists in activeCalls
                     if (activeCall && activeCall.callId) {
-                      const callingDevice = getCallingDeviceInfo();
-                      if (callingDevice) {
+                      const controllerDevice = getControllerDeviceInfo(activeCall);
+                      if (controllerDevice) {
                         endCall({
                           callId: activeCall.callId,
-                          callingAddress: activeCall.callingAddress || userAddress,
+                          callingAddress: activeCall.callingAddress!, // Keep original calling address
                           calledAddress: activeCall.calledAddress || activeCall.number,
-                          callingDeviceType: callingDevice.callingDeviceType,
-                          callingDeviceName: callingDevice.callingDeviceName,
-                        }).catch(() => {
+                          callingDeviceType: controllerDevice.callingDeviceType,
+                          callingDeviceName: controllerDevice.callingDeviceName,
+                          // Add controller fields if API supports them
+                          controllerAddress: controllerDevice.controllerAddress,
+                          controllerDeviceName: controllerDevice.controllerDeviceName,
+                          controllerDeviceType: controllerDevice.controllerDeviceType,
+                        } as any).catch(() => {
                           // Silently fail if call already ended
                         });
                       }

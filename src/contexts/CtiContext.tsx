@@ -65,6 +65,9 @@ interface CtiContextType {
     calledAddress: string;
     callingDeviceType: string;
     callingDeviceName: string;
+    controllerAddress?: string;
+    controllerDeviceName?: string;
+    controllerDeviceType?: string;
   }) => Promise<any>;
   
   holdCall: (params: {
@@ -73,6 +76,9 @@ interface CtiContextType {
     calledAddress: string;
     callingDeviceType: string;
     callingDeviceName: string;
+    controllerAddress?: string;
+    controllerDeviceName?: string;
+    controllerDeviceType?: string;
   }) => Promise<any>;
   
   resumeCall: (params: {
@@ -81,6 +87,9 @@ interface CtiContextType {
     calledAddress: string;
     callingDeviceType: string;
     callingDeviceName: string;
+    controllerAddress?: string;
+    controllerDeviceName?: string;
+    controllerDeviceType?: string;
   }) => Promise<any>;
   
   attendCall: (params: {
@@ -446,6 +455,9 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     calledAddress: string;
     callingDeviceType?: string;
     callingDeviceName?: string;
+    controllerAddress?: string;
+    controllerDeviceName?: string;
+    controllerDeviceType?: string;
   }) => {
     // If device info is not provided, get it automatically
     let callingAddress = params.callingAddress;
@@ -465,13 +477,32 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       callingDeviceName = callingDeviceName || deviceInfo.callingDeviceName;
     }
     
+    // Get controller device info if not provided
+    let controllerAddress = params.controllerAddress;
+    let controllerDeviceName = params.controllerDeviceName;
+    let controllerDeviceType = params.controllerDeviceType;
+    
+    if (!controllerAddress || !controllerDeviceName || !controllerDeviceType) {
+      const deviceInfo = getCallingDeviceInfo(ctiStomp.userAddress, ctiStomp.dnsMap);
+      if (deviceInfo) {
+        controllerAddress = controllerAddress || ctiStomp.userAddress;
+        controllerDeviceName = controllerDeviceName || deviceInfo.callingDeviceName;
+        controllerDeviceType = controllerDeviceType || deviceInfo.callingDeviceType;
+      }
+    }
+    
     return await endCallAPI({
       callId: params.callId,
       callingAddress: callingAddress!,
       calledAddress: params.calledAddress,
       callingDeviceType: callingDeviceType!,
-      callingDeviceName: callingDeviceName!
-    });
+      callingDeviceName: callingDeviceName!,
+      ...(controllerAddress && controllerDeviceName && controllerDeviceType ? {
+        controllerAddress,
+        controllerDeviceName,
+        controllerDeviceType
+      } : {})
+    } as any);
   }, [ctiStomp.userAddress, ctiStomp.dnsMap]);
   
   const holdCall = useCallback(async (params: {
@@ -480,6 +511,9 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     calledAddress: string;
     callingDeviceType?: string;
     callingDeviceName?: string;
+    controllerAddress?: string;
+    controllerDeviceName?: string;
+    controllerDeviceType?: string;
   }) => {
     // If device info is not provided, get it automatically
     let callingAddress = params.callingAddress;
@@ -499,13 +533,32 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       callingDeviceName = callingDeviceName || deviceInfo.callingDeviceName;
     }
     
+    // Get controller device info if not provided
+    let controllerAddress = params.controllerAddress;
+    let controllerDeviceName = params.controllerDeviceName;
+    let controllerDeviceType = params.controllerDeviceType;
+    
+    if (!controllerAddress || !controllerDeviceName || !controllerDeviceType) {
+      const deviceInfo = getCallingDeviceInfo(ctiStomp.userAddress, ctiStomp.dnsMap);
+      if (deviceInfo) {
+        controllerAddress = controllerAddress || ctiStomp.userAddress;
+        controllerDeviceName = controllerDeviceName || deviceInfo.callingDeviceName;
+        controllerDeviceType = controllerDeviceType || deviceInfo.callingDeviceType;
+      }
+    }
+    
     return await holdCallAPI({
       callId: params.callId,
       callingAddress: callingAddress!,
       calledAddress: params.calledAddress,
       callingDeviceType: callingDeviceType!,
-      callingDeviceName: callingDeviceName!
-    });
+      callingDeviceName: callingDeviceName!,
+      ...(controllerAddress && controllerDeviceName && controllerDeviceType ? {
+        controllerAddress,
+        controllerDeviceName,
+        controllerDeviceType
+      } : {})
+    } as any);
   }, [ctiStomp.userAddress, ctiStomp.dnsMap]);
   
   const resumeCall = useCallback(async (params: {
@@ -514,6 +567,9 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     calledAddress: string;
     callingDeviceType?: string;
     callingDeviceName?: string;
+    controllerAddress?: string;
+    controllerDeviceName?: string;
+    controllerDeviceType?: string;
   }) => {
     // If device info is not provided, get it automatically
     let callingAddress = params.callingAddress;
@@ -533,13 +589,32 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       callingDeviceName = callingDeviceName || deviceInfo.callingDeviceName;
     }
     
+    // Get controller device info if not provided
+    let controllerAddress = params.controllerAddress;
+    let controllerDeviceName = params.controllerDeviceName;
+    let controllerDeviceType = params.controllerDeviceType;
+    
+    if (!controllerAddress || !controllerDeviceName || !controllerDeviceType) {
+      const deviceInfo = getCallingDeviceInfo(ctiStomp.userAddress, ctiStomp.dnsMap);
+      if (deviceInfo) {
+        controllerAddress = controllerAddress || ctiStomp.userAddress;
+        controllerDeviceName = controllerDeviceName || deviceInfo.callingDeviceName;
+        controllerDeviceType = controllerDeviceType || deviceInfo.callingDeviceType;
+      }
+    }
+    
     return await resumeCallAPI({
       callId: params.callId,
       callingAddress: callingAddress!,
       calledAddress: params.calledAddress,
       callingDeviceType: callingDeviceType!,
-      callingDeviceName: callingDeviceName!
-    });
+      callingDeviceName: callingDeviceName!,
+      ...(controllerAddress && controllerDeviceName && controllerDeviceType ? {
+        controllerAddress,
+        controllerDeviceName,
+        controllerDeviceType
+      } : {})
+    } as any);
   }, [ctiStomp.userAddress, ctiStomp.dnsMap]);
   
   const attendCall = useCallback(async (params: {
