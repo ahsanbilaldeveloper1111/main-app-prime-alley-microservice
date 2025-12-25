@@ -2212,7 +2212,7 @@ const InvoiceList = () => {
               <div className="d-flex gap-2 flex-wrap">
                 <Button
                   variant={activeStatusTab === null ? 'light' : 'link'}
-                  className={`custtabs border-1 text-decoration-none ${activeStatusTab === null ? 'bg-light' : ''}`}
+                  className={` text-decoration-none ${activeStatusTab === null ? 'bg-light' : ''}`}
                   onClick={() => {
                     setActiveStatusTab(null);
                     setCurrentFilters((prev) => {
@@ -2235,7 +2235,7 @@ const InvoiceList = () => {
 
                 <Button
                   variant={activeStatusTab === 'paid' ? 'light' : 'link'}
-                  className={`custtabs text-decoration-none ${activeStatusTab === 'paid' ? 'bg-light' : ''}`}
+                  className={` text-decoration-none ${activeStatusTab === 'paid' ? 'bg-light' : ''}`}
                   onClick={() => {
                     setActiveStatusTab('paid');
                     setCurrentFilters((prev) => ({ ...prev, status: 'paid' }));
@@ -2257,7 +2257,7 @@ const InvoiceList = () => {
 
                 <Button
                   variant={activeStatusTab === 'pending' ? 'light' : 'link'}
-                  className={`custtabs text-decoration-none ${activeStatusTab === 'pending' ? 'bg-light' : ''}`}
+                  className={` text-decoration-none ${activeStatusTab === 'pending' ? 'bg-light' : ''}`}
                   onClick={() => {
                     setActiveStatusTab('pending');
                     setCurrentFilters((prev) => ({ ...prev, status: 'pending' }));
@@ -2277,7 +2277,7 @@ const InvoiceList = () => {
 
                 <Button
                   variant={activeStatusTab === 'overdue' ? 'light' : 'link'}
-                  className={`custtabs text-decoration-none ${activeStatusTab === 'overdue' ? 'bg-light' : ''}`}
+                  className={` text-decoration-none ${activeStatusTab === 'overdue' ? 'bg-light' : ''}`}
                   onClick={() => {
                     setActiveStatusTab('overdue');
                     setCurrentFilters((prev) => ({ ...prev, status: 'overdue' }));
@@ -2298,7 +2298,7 @@ const InvoiceList = () => {
 
                 <Button
                   variant={activeStatusTab === 'cancelled' ? 'light' : 'link'}
-                  className={`custtabs text-decoration-none ${activeStatusTab === 'cancelled' ? 'bg-light' : ''}`}
+                  className={` text-decoration-none ${activeStatusTab === 'cancelled' ? 'bg-light' : ''}`}
                   onClick={() => {
                     setActiveStatusTab('cancelled');
                     setCurrentFilters((prev) => ({ ...prev, status: 'cancelled' }));

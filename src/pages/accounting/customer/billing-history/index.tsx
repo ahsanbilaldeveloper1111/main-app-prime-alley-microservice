@@ -160,7 +160,7 @@ const BillingHistory = () => {
               <div className="d-flex gap-2 flex-wrap">
                 <Button
                   variant={activeStatusTab === null ? 'light' : 'link'}
-                  className={`custtabs text-decoration-none ${activeStatusTab === null ? 'bg-light' : ''}`}
+                  className={` text-decoration-none ${activeStatusTab === null ? 'bg-light' : ''}`}
                   onClick={() => {
                     setActiveStatusTab(null);
                     setCurrentFilters({});
@@ -180,7 +180,7 @@ const BillingHistory = () => {
 
                 <Button
                   variant={activeStatusTab === 'completed' ? 'light' : 'link'}
-                  className={`custtabs text-decoration-none ${activeStatusTab === 'completed' ? 'bg-light' : ''}`}
+                  className={` text-decoration-none ${activeStatusTab === 'completed' ? 'bg-light' : ''}`}
                   onClick={() => {
                     setActiveStatusTab('completed');
                     setCurrentFilters({ status: 'completed' });
@@ -200,7 +200,7 @@ const BillingHistory = () => {
 
                 <Button
                   variant={activeStatusTab === 'cancelled' ? 'light' : 'link'}
-                  className={`custtabs text-decoration-none ${activeStatusTab === 'cancelled' ? 'bg-light' : ''}`}
+                  className={` text-decoration-none ${activeStatusTab === 'cancelled' ? 'bg-light' : ''}`}
                   onClick={() => {
                     setActiveStatusTab('cancelled');
                     setCurrentFilters({ status: 'cancelled' });
@@ -220,7 +220,7 @@ const BillingHistory = () => {
 
                 <Button
                   variant={activeStatusTab === 'failed' ? 'light' : 'link'}
-                  className={`custtabs text-decoration-none ${activeStatusTab === 'failed' ? 'bg-light' : ''}`}
+                  className={` text-decoration-none ${activeStatusTab === 'failed' ? 'bg-light' : ''}`}
                   onClick={() => {
                     setActiveStatusTab('failed');
                     setCurrentFilters({ status: 'failed' });

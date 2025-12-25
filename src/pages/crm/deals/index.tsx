@@ -2562,7 +2562,7 @@ const CrmDeals = () => {
                       gap: '10px'
                     }}>
                       <Building2 size={18} style={{ color: '#4680ff' }} />
-                      Company Information
+                      Client information
                     </div>
                     <div style={{
                       display: 'grid',
@@ -2582,7 +2582,7 @@ const CrmDeals = () => {
                           textTransform: 'uppercase',
                           letterSpacing: '0.5px',
                           marginBottom: '6px'
-                        }}>Company Name</div>
+                        }}>Client Name</div>
                         <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
                           <Building2 size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
                           {viewingDeal.company_name}

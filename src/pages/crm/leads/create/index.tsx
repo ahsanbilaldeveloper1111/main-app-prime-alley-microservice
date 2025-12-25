@@ -1587,7 +1587,7 @@ const CreateLead = () => {
                                       e.target.value
                                     )
                                   }
-                                  placeholder="Enter client name"
+                                  placeholder="Enter person name/company name"
                                 />
                               </Form.Group>
                             </Col>
@@ -1604,27 +1604,11 @@ const CreateLead = () => {
                                   }
                                 >
                                   <option value="">Select Industry</option>
-                                  <option value="Technology">Technology</option>
-                                  <option value="Healthcare">Healthcare</option>
-                                  <option value="Finance">Finance</option>
-                                  <option value="Banking & Financial Services">
-                                    Banking & Financial Services
-                                  </option>
-                                  <option value="Manufacturing">
-                                    Manufacturing
-                                  </option>
+                                  <option value="Individual/Residential">Individual/Residential</option>
+                                  <option value="Corporate">Corporate</option>
                                   <option value="Retail">Retail</option>
-                                  <option value="Education">Education</option>
-                                  <option value="Real Estate">
-                                    Real Estate
-                                  </option>
-                                  <option value="Telecommunications">
-                                    Telecommunications
-                                  </option>
-                                  <option value="Construction">
-                                    Construction
-                                  </option>
-                                  <option value="Other">Other</option>
+                                  <option value="Office">Office</option>
+                                  <option value="Mixed-use">Mixed-use</option>
                                 </Form.Select>
                               </Form.Group>
                             </Col>
@@ -1641,18 +1625,11 @@ const CreateLead = () => {
                                   }
                                 >
                                   <option value="">Select Type</option>
-                                  <option value="B2B">
-                                    B2B (Business to Business)
-                                  </option>
-                                  <option value="B2C">
-                                    B2C (Business to Consumer)
-                                  </option>
-                                  <option value="B2G">
-                                    B2G (Business to Government)
-                                  </option>
-                                  <option value="Non-profit / NGO">
-                                    Non-profit / NGO
-                                  </option>
+                                  <option value="Individual">Individual</option>
+                                  <option value="Family">Family</option>
+                                  <option value="SME">SME</option>
+                                  <option value="Corporate">Corporate</option>
+                                  <option value="Enterprise">Enterprise</option>
                                 </Form.Select>
                               </Form.Group>
                             </Col>

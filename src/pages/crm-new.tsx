@@ -5223,7 +5223,7 @@ const CRMPortal = () => {
                   </Col>
                   <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>Billing Model <span className="text-danger">*</span></Form.Label>
+                      <Form.Label>Payment Frequency <span className="text-danger">*</span></Form.Label>
                       <Form.Select defaultValue={editingDeal?.billingModel || ''} required>
                         <option value="">Select Model</option>
                         <option value="Monthly">Monthly</option>
@@ -7337,7 +7337,7 @@ const CRMPortal = () => {
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
                 marginBottom: '6px'
-              }}>Billing Model</div>
+              }}>Payment Frequency</div>
               <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
                 {viewingOrder.billingModel || 'N/A'}
               </div>
@@ -12614,7 +12614,7 @@ const CRMPortal = () => {
                       </Col>
                       <Col md={6}>
                         <Form.Group className="mb-3">
-                          <Form.Label>Billing Model <span className="text-danger">*</span></Form.Label>
+                          <Form.Label>Payment Frequency <span className="text-danger">*</span></Form.Label>
                           <Form.Select defaultValue={editingDeal?.billingModel || ''} required>
                             <option value="">Select Model</option>
                             <option value="Monthly">Monthly</option>
@@ -14141,7 +14141,7 @@ const CRMPortal = () => {
                 <Row>
                   <Col md={6}>
                     <Form.Group className="mb-3">
-                      <Form.Label>Billing Model <span className="text-danger">*</span></Form.Label>
+                      <Form.Label>Payment Frequency <span className="text-danger">*</span></Form.Label>
                       <Form.Select defaultValue={editingOrder?.billingModel || ''}>
                         <option value="">Select Model</option>
                         <option value="Monthly">Monthly</option>

@@ -1269,12 +1269,12 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       <style>{customStyles}</style>
 
       {/* Mobile Menu Button */}
-      <button
+      {/* <button
         className="mobile-menu-btn"
         onClick={() => setSidebarOpen(!sidebarOpen)}
       >
         {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-      </button>
+      </button> */}
 
       {/* Backdrop for mobile */}
       <div

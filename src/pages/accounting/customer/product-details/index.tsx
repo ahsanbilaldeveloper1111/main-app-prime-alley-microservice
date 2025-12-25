@@ -158,7 +158,7 @@ const ProductDetails = () => {
     const [currentFilters, setCurrentFilters] = useState({});
 
     const fetchProducts = useCallback(async (page = 1, perPage = 15, search = "") => {
-        const response = await GetProducts({ page, perPage, search, filters: currentFilters });
+        const response = await GetProducts({ page, perPage, search, ...currentFilters });
         console.log('response', response);
         return response;
     }, [currentFilters]);
@@ -209,35 +209,29 @@ const ProductDetails = () => {
        <Card className="mb-4">
            <Card.Body>
            <Row className="align-items-center">
-               <Col md={2}>
+               <Col md={4}>
                  <Form.Control type="search" placeholder="Search products..." onChange={(e) => setCurrentFilters({ ...currentFilters, search: e.target.value })} />
                </Col>
+               
                <Col md={2}>
-                 <Form.Select>
-                   <option>All Categories</option>
-                   <option>Gateway</option>
-                   <option>Policy</option>
-                   <option>SLA</option>
-                 </Form.Select>
-               </Col>
-               <Col md={2}>
-               <Form.Select>
-                   <option>All Status</option>
-                   <option>Active</option>
-                   <option>Trial</option>
-              <option>Inactive</option>
+               <Form.Select onChange={(e) => setCurrentFilters({ ...currentFilters, status: e.target.value })}>
+                   <option value="">All Status</option>
+                   <option value="Active">Active</option>
+                   <option value="Trial">Trial</option>
+                  <option value="Inactive">Inactive</option>
              </Form.Select>
               </Col>
              <Col md={2}>
-                <Form.Select>
-                 <option>All Types</option>
-                   <option>Monthly</option>
-                   <option>Annual</option>
-                   <option>One-time</option>
+                <Form.Select onChange={(e) => setCurrentFilters({ ...currentFilters, billing_cycle: e.target.value })}>
+                   <option value="">All Types</option>
+                   <option value="monthly">Monthly</option>
+                   <option value="quarterly">Quarterly</option>
+                   <option value="yearly">Yearly</option>
+                   <option value="one time">One-time</option>
                  </Form.Select>
                </Col>
                <Col md={2} className="ms-auto">
-  <Button variant="outline-primary" className="w-100">
+  <Button variant="outline-primary" className="w-100" onClick={() => setRefreshKey(refreshKey + 1)}>
     <Filter size={16} className="me-2" />
     Apply
   </Button>

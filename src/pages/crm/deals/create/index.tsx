@@ -229,7 +229,7 @@ const CreateDeal = () => {
       { field: 'deal_type' as const, name: 'Deal Type' },
       { field: 'contract_length' as const, name: 'Contract Length' },
       { field: 'billing_model' as const, name: 'Billing Model' },
-      { field: 'payment_terms' as const, name: 'Payment Terms' },
+      //{ field: 'payment_terms' as const, name: 'Payment Terms' },
       { field: 'risk_level' as const, name: 'Risk Level' },
     ];
     return checkRequiredFields(formData, requiredFields);
@@ -652,17 +652,11 @@ const CreateDeal = () => {
                           required
                         >
                           <option value="">Select Industry</option>
-                          <option value="Technology">Technology</option>
-                          <option value="Healthcare">Healthcare</option>
-                          <option value="Finance">Finance</option>
-                          <option value="Banking & Financial Services">Banking & Financial Services</option>
-                          <option value="Manufacturing">Manufacturing</option>
+                          <option value="Individual/Residential">Individual/Residential</option>
+                          <option value="Corporate">Corporate</option>
                           <option value="Retail">Retail</option>
-                          <option value="Education">Education</option>
-                          <option value="Real Estate">Real Estate</option>
-                          <option value="Telecommunications">Telecommunications</option>
-                          <option value="Construction">Construction</option>
-                          <option value="Other">Other</option>
+                          <option value="Office">Office</option>
+                          <option value="Mixed-use">Mixed-use</option>
                         </Form.Select>
                       </Form.Group>
                     </Col>
@@ -775,10 +769,9 @@ const CreateDeal = () => {
                           required
                         >
                           <option value="">Select Deal Type</option>
-                          <option value="new_sale">New Sale</option>
-                          <option value="renewal">Renewal</option>
-                          <option value="migration">Migration</option>
-                          <option value="upsell">Upsell</option>
+                          <option value="Residential lease">Residential lease</option>
+                          <option value="Commercial lease">Commercial lease</option>
+                          <option value="Property sale">Property sale</option>
                         </Form.Select>
                       </Form.Group>
                     </Col>
@@ -816,7 +809,7 @@ const CreateDeal = () => {
                     )}
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Billing Model <span className="text-danger">*</span></Form.Label>
+                        <Form.Label>Payment Frequency <span className="text-danger">*</span></Form.Label>
                         <Form.Select 
                           value={formData.billing_model}
                           onChange={(e) => setFormData({ ...formData, billing_model: e.target.value })}
@@ -833,7 +826,7 @@ const CreateDeal = () => {
                     </Col>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Payment Terms <span className="text-danger">*</span></Form.Label>
+                        <Form.Label>Payment Terms </Form.Label>
                         <Form.Select 
                           value={formData.payment_terms}
                           onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })}
@@ -877,7 +870,7 @@ const CreateDeal = () => {
                         </Form.Select>
                       </Form.Group>
                     </Col>
-                    <Col md={6}>
+                    {/* <Col md={6}>
                       <Form.Group className="mb-3">
                         <Form.Label>Competitors</Form.Label>
                         <Form.Control 
@@ -887,7 +880,7 @@ const CreateDeal = () => {
                           placeholder="Enter competitor names (comma separated)"
                         />
                       </Form.Group>
-                    </Col>
+                    </Col> */}
                   </Row>
                 </Card.Body>
               </Card>
