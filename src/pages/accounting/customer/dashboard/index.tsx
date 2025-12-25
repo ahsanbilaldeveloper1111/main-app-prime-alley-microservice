@@ -7,10 +7,10 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import { useState } from 'react';
-import { Card, Row, Col } from 'react-bootstrap';
-import {DollarSign, Package} from 'lucide-react';
+import { Card, Row, Col,Button,Badge, Form} from 'react-bootstrap';
+import {AlertCircle, Check, Clock, DollarSign, FileText,  Wallet, TrendingUp, Package} from 'lucide-react';
 import Link from 'next/link';
-import {BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,ResponsiveContainer} from 'recharts';
+import {BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,ResponsiveContainer,Legend} from 'recharts';
 import UAECurrencyLogo from "@assets/images/uae-currency-logo.jpg";
 import { formatNumber } from "@utils/Helper";
 
@@ -50,9 +50,12 @@ const CustomerDashboard = () => {
     value: any;
     icon: React.ReactElement;
     color: string;
-    change: string;
-    isPositive: boolean;
-    isImage: boolean;
+    change?: string;
+    isPositive?: boolean;
+    isImage?: boolean;
+    iconBg?: string;
+    iconColor?: string;
+    payNow?: boolean;
   }>>([]);
 
   useEffect(() => {
@@ -76,13 +79,71 @@ const CustomerDashboard = () => {
     setDashboardCounters(response);
     setSummaryCards(
       [
-        { title: 'Active Products', value: response?.products?.total, icon: <Package size={24} />, color: 'primary', change: '+12.5%', isPositive: true,isImage: false },
-      { title: 'Open Invoice Amount', value: currency + ' ' + formatNumber(response?.invoices?.total_amount), icon: <DollarSign size={24} />, color: 'info', change: '+15.3%', isPositive: true,isImage: true },
-      { title: 'Open Unpaid Amount', value: currency + ' ' + formatNumber(response?.invoices?.outstanding_amount), icon: <DollarSign size={24} />, color: 'warning', change: '-5.1%', isPositive: false,isImage: true },
-      { title: 'Paid Amount', value: currency + ' ' + formatNumber(response?.invoices?.paid_amount), icon: <DollarSign size={24} />, color: 'success', change: '+8.2%', isPositive: true,isImage: true }
+        { title: 'Active Subscriptions', value: response?.products?.total, icon: <Package size={24} />, color: 'primary', iconBg: 'rgba(59, 130, 246, 0.1)', iconColor: '#3b82f6' },
+        { title: 'Total Invoice Amount', value: response?.invoices?.total_amount, icon: <FileText size={24} />, color: 'primary', iconBg: 'rgba(59, 130, 246, 0.1)', iconColor: '#3b82f6' },
+        { title: 'Outstanding Amount', value: response?.invoices?.outstanding_amount, icon: <AlertCircle size={24} />, color: 'warning', iconBg: 'rgba(251, 191, 36, 0.1)', iconColor: '#fbbf24' },
+        { title: 'Est. Next Month', value: '0.00', icon: <Wallet size={24} />, color: 'info', iconBg: 'rgba(34, 211, 238, 0.1)', iconColor: '#22d3ee' },
+        { title: 'Overdue Invoices', value: response?.invoices?.overdue_invoices_count, icon: <Clock size={24} />, color: 'danger', iconBg: 'rgba(239, 68, 68, 0.1)', iconColor: '#ef4444', payNow: true },
+        { title: 'Overdue Amount', value: response?.invoices?.overdue_amount, icon: <AlertCircle size={24} />, color: 'warning', iconBg: 'rgba(251, 191, 36, 0.1)', iconColor: '#fbbf24', payNow: true }
       ]
     );
   
+  };
+
+   // Helper function to get status badge color
+   const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'Active': return 'success';
+      case 'Trial': return 'warning';
+      case 'Suspended': return 'secondary';
+      case 'In Progress': return 'info';
+      case 'Inactive': return 'secondary';
+      default: return 'primary';
+    }
+  };
+
+  // Helper function to get background color RGB for status
+  const getStatusBackgroundColor = (status: string) => {
+    switch (status) {
+      case 'Active': return '34, 197, 94'; // green
+      case 'Trial': return '251, 191, 36'; // yellow
+      case 'In Progress': return '59, 130, 246'; // blue
+      case 'Suspended': return '156, 163, 175'; // gray
+      case 'Inactive': return '107, 114, 128'; // darker gray
+      default: return '59, 130, 246'; // blue
+    }
+  };
+
+  // Helper function to get icon color for status
+  const getStatusIconColor = (status: string) => {
+    switch (status) {
+      case 'Active': return '#22c55e'; // green
+      case 'Trial': return '#fbbf24'; // yellow
+      case 'In Progress': return '#3b82f6'; // blue
+      case 'Suspended': return '#9ca3af'; // gray
+      case 'Inactive': return '#6b7280'; // darker gray
+      default: return '#3b82f6'; // blue
+    }
+  };
+
+  // Helper function to get icon for subscription status
+  const getSubscriptionIcon = (status: string) => {
+    switch (status) {
+      case 'Active':
+        return <Check size={18} />;
+      case 'Trial':
+        return <Clock size={18} />;
+      case 'Suspended':
+        return <AlertCircle size={18} />;
+      case 'In Progress':
+        return <TrendingUp size={18} />;
+      case 'Inactive':
+        return <AlertCircle size={18} />;
+      case 'Certiive':
+        return <Package size={18} />;
+      default:
+        return <FileText size={18} />;
+    }
   };
 
   const getProfitLossData = async () => {
@@ -167,10 +228,13 @@ const CustomerDashboard = () => {
           <XAxis dataKey="month" />
           <YAxis />
           <Tooltip content={<CustomTooltip />} />
+          <Legend />
           <Bar dataKey="total_amount" fill="#04a9f5" name="Total Amount" />
-          <Bar dataKey="paid_amount" fill="#1de9b6" name="Paid Amount" />
-          <Bar dataKey="outstanding_amount" fill="#f4c22b" name="Outstanding Amount" />
+          <Bar dataKey="paid_amount" fill="#28a745" name="Paid" />
+          <Bar dataKey="outstanding_amount" fill="#ffc107" name="Unpaid" />
         </BarChart>
+
+        
       </ResponsiveContainer>
     );
   };
@@ -190,61 +254,59 @@ const CustomerDashboard = () => {
                   </div>
                 </div>
         
-                {/* Summary Cards */}
-                <Row className="mb-4">
-                  {summaryCards.map((card, index) => (
-                    <Col lg={3} md={6} key={index} className="mb-3">
-                      <Card>
-                        <Card.Body>
-                          <div className="d-flex justify-content-between align-items-start mb-3">
-                            
-
-                            {card.isImage ===false && 
-                            <>
-                            <div className={`bg-${card.color} bg-opacity-10 rounded p-3`}>
-                            <div className={`text-${card.color}`}>{card.icon}</div>
-                            </div>
-                            </>
-
-                               }
-                              {card.isImage && 
-                              <>
-                              <div className={`bg-light  rounded p-3`}>
-                              <img src={UAECurrencyLogo.src} alt="Currency Logo" width={24} height={24} />
-                              </div>
-                              </>
-                              }
-
-                            {/* <Badge bg={card.isPositive ? 'success' : 'danger'} className="bg-opacity-10">
-                              {card.isPositive ? <ArrowUp size={12} className="me-1" /> : <ArrowDown size={12} className="me-1" />}
-                              <span className={`text-${card.isPositive ? 'success' : 'danger'}`}>{card.change}</span>
-                            </Badge> */}
-                          </div>
-                          <h3 className="mb-1">{card.value}</h3>
-                          <p className="text-muted mb-0 small">{card.title}</p>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  ))}
-                </Row>
+                {/* Summary Cards - 6 boxes in one row */}
+      <Row className="mb-4">
+        {summaryCards.map((card, index) => (
+          <Col xl={2} lg={4} md={6} key={index} className="mb-3">
+            <Card style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', position: 'relative' }}>
+              <Card.Body>
+                <div className="d-flex align-items-center gap-3">
+                  <div className="rounded p-2" style={{ backgroundColor: card.iconBg, flexShrink: 0 }}>
+                    <div style={{ color: card.iconColor }}>{card.icon}</div>
+                  </div>
+                  <div className="flex-grow-1">
+                    <h3 className="mb-1" style={{ fontSize: '1.5rem', fontWeight: '600' }}>{card.value}</h3>
+                    <p className="text-muted mb-0" style={{ fontSize: '0.8rem', lineHeight: '1.3' }}>{card.title}</p>
+                  </div>
+                </div>
+                {/* {card.payNow && (
+                  <div className="d-flex justify-content-end mt-2" style={{ position: 'absolute', top: '-25px', right: '0px' }}>
+                    <Button 
+                      variant="primary" 
+                      size="sm"
+                      style={{ 
+                        fontSize: '0.8rem', 
+                        padding: '0.35rem 0.9rem',
+                        fontWeight: '600'
+                      }}
+                    >
+                      Pay Now
+                    </Button>
+                  </div>
+                )} */}
+              </Card.Body>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+                
         
                 <Row>
                   {/* Spending Overview */}
                   <Col lg={8} className="mb-4">
                     <Card>
                       <Card.Body>
-                        <h5 className="mb-4">Payments History (Last 6 Months)</h5>
-                        {/* <div className="d-flex justify-content-between align-items-center mb-4">
-                          <h5 className="mb-0">Spending Overview</h5>
-                          <Form.Select size="sm" style={{ width: '150px' }}>
-                            <option>Last 6 months</option>
-                            <option>Last 12 months</option>
-                            <option>This year</option>
-                          </Form.Select>
-                        </div> */}
-                        <SpendingChart />
+                      <div className="d-flex justify-content-between align-items-center mb-4">
+                        <h5 className="mb-0" style={{ fontWeight: '600' }}>Spending Overview</h5>
+                        <Form.Select size="sm" style={{ width: '150px' }}>
+                          <option>Last 6 months</option>
+                          <option>Last 12 months</option>
+                          <option>This year</option>
+                        </Form.Select>
+                      </div>
+                      <SpendingChart />
 
-                        <Row className="mt-4">
+                        {/* <Row className="mt-4">
                           <Col lg={4}>
                             <div className="text-center border p-2 rounded">
                             <h6 className="mb-2 text-muted">Open Invoice Amount</h6>
@@ -263,36 +325,60 @@ const CustomerDashboard = () => {
                               <h4 className="fw-semibold text-success">{currency} {formatNumber(dashboardCounters?.invoices?.paid_amount)}</h4>
                             </div>
                           </Col>
-                        </Row>
+                        </Row> */}
                       </Card.Body>
                     </Card>
                   </Col>
-        
-                  {/* Active Products */}
-                  <Col lg={4} className="mb-4">
-                    <Card>
-                      <Card.Body>
-                        <h5 className="mb-4">Active Subscriptions</h5>
-                        {topProducts.map((product: any, index: number) => (
-                          <div key={index} className="mb-4 pb-4 border-bottom">
-                            <div className="d-flex justify-content-between align-items-start mb-2">
-                              <div>
-                                <h6 className="mb-1 text-capitalize">{product.name}</h6>
-                                {/* <small className="text-muted">Renewal: {product.renewal}</small> */}
-                              </div>
-                              {/* <Badge bg={product.status === 'Active' ? 'success' : 'warning'} className="bg-opacity-10 text-dark">
-                                {product.status}
-                              </Badge> */}
-                            </div>
-                            <div className="text-muted small">Total Revenue: <span className="fw-semibold">{currency} {formatNumber(product.total_revenue)}</span></div>
-                          </div>
-                        ))}
-                        <Link href="/accounting/customer/product-details" className="w-100 btn btn-outline-primary btn-sm">
-                          View All Products
-                        </Link>
-                      </Card.Body>
-                    </Card>
-                  </Col>
+
+
+                  {/* Active Subscriptions */}
+        <Col lg={4} className="mb-4">
+          <Card style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <Card.Body>
+              <h5 className="mb-4" style={{ fontWeight: '600' }}>Active Subscriptions</h5>
+              <div style={{ maxHeight: '367px', overflowY: 'auto' }}>
+                {topProducts.map((subscription, index) => (
+                  <div key={index} className="mb-3 pb-2 border-bottom">
+                    <div className="d-flex align-items-center gap-2">
+                      <div 
+                        className="rounded d-flex align-items-center justify-content-center" 
+                        style={{ 
+                          width: '36px', 
+                          height: '36px',
+                          backgroundColor: `rgba(${getStatusBackgroundColor(subscription?.status)}, 0.1)`,
+                          flexShrink: 0
+                        }}
+                      >
+                        <div style={{ color: getStatusIconColor(subscription?.status) }}>
+                          {getSubscriptionIcon(subscription?.status)}
+                        </div>
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <h6 className="mb-0 text-truncate text-capitalize" style={{ fontSize: '0.9rem', fontWeight: '500' }}>
+                          {subscription?.name}
+                        </h6>
+                      </div>
+                      <div style={{ marginLeft: '8px', flexShrink: 0 }}>
+                        <Badge 
+                          bg={getStatusBadgeColor(subscription?.status)}
+                          style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
+                        >
+                          {subscription?.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+
+
+
+
+
+
                 </Row>
               </div>
 

@@ -29,6 +29,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/help-center',permissions: ['']},
     {path:'/live-call-updated',permissions: ['']},
     {path:'/test-image-storage',permissions: ['']},
+    {path:'/billing',permissions: ['']},
 
     {
         path: '/dashboards',
@@ -42,7 +43,7 @@ export const routePermissions: RoutePermission[] = [
 
 
    // {path: '/reports',permissions: [PERMISSIONS.REPORTS_SERVICES]},
-    {path: '/billing',permissions: [PERMISSIONS.REPORTS_SERVICES]},
+   // {path: '/billing',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/reseller',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/vendor',permissions: [PERMISSIONS.REPORTS_SERVICES]},
     {path: '/crm-new',permissions: [PERMISSIONS.REPORTS_SERVICES]},

@@ -8,9 +8,12 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { formatNumber } from "@utils/Helper";
 import { useState } from 'react';
-import { Row, Col, Button} from 'react-bootstrap';
+import { Row, Col, Button, Badge, Card, Form} from 'react-bootstrap';
 import { 
-  Eye
+  Check,
+  ChevronRight,
+  Eye,
+  X
 } from 'lucide-react';
 
 import "@assets/scss/billing.scss";
@@ -52,7 +55,7 @@ const BillingHistory = () => {
          { key: 'amount', name: 'Amount', selector: (row: any) => row.amount, sortable: true,
           cell: (row: any) => {
             return <div>
-              <p className="fw-semibold text-primary">{row?.currency_code} {formatNumber(row?.amount)}</p>
+              <p>{row?.currency_code} {formatNumber(row?.amount)}</p>
             </div>
           }
          },
@@ -66,9 +69,7 @@ const BillingHistory = () => {
         
         { key: 'status', name: 'Status', selector: (row: any) => row.status, sortable: true,
           cell: (row: any) => {
-            return <div>
-              <p className={`bg-opacity-10 text-dark badge bg-${row?.status   ? 'success' : 'danger'}`}>{row?.status}</p>
-            </div>
+            return <Badge className={`badge text-uppercase bg-${row?.status === 'completed' ? 'success' : row?.status === 'cancelled' ? 'danger' : row?.status === 'failed' ? 'danger' : 'warning'}`}>{row?.status}</Badge>
           }
          },
         { key: 'payment_date', name: 'Date', selector: (row: any) => row.payment_date, sortable: true,
@@ -86,26 +87,35 @@ const BillingHistory = () => {
                 selector: (row: any) => row.id,
                 sortable: false,
                 cell: (props: any) => (
-                    <div className="d-flex gap-2">
-                       <Button variant="light" className="btn-action-style-2 p-1 text-info" title="View" onClick={() => handleViewPayment(props)}>
-                            <Eye size={16} />
-                        </Button>
-                        
-                    </div>
+                  
+<Button 
+variant="link" 
+size="sm" 
+className="p-2 view-receipt-btn "
+style={{ color: '#0d6efd', fontSize: '0.85rem', textDecoration: 'none' }}
+
+  onClick={() => { handleViewPayment(props);
+  
+}}
+>
+View Receipt
+</Button>
                 )
             }
       
     ];
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [currentFilters, setCurrentFilters] = useState<{ status?: string }>({});
+    const [currentFilters, setCurrentFilters] = useState<{ status?: string; search?: string }>({});
     const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
+    const [summary, setSummary] = useState<any | null>(null);
 
     const fetchPayments = useCallback(async (page = 1, perPage = 15, search = "") => {
         const params: any = {
             page,
             per_page: perPage,
-            search
+            search:search,
+            ...currentFilters
         };
         
         if (currentFilters.status) {
@@ -113,6 +123,9 @@ const BillingHistory = () => {
         }
         
         const response = await GetPayments(params);
+        console.log('response ss', response);
+        const summary = response?.summary;
+        setSummary(summary);
         console.log('response', response);
         return response;
     }, [currentFilters]);
@@ -138,84 +151,110 @@ const BillingHistory = () => {
         
       />
 
-      <Row className="mb-3">
-        <Col md={12}>
-          <ul id="system-tabs" className="mb-3 nav nav-tabs" role="tablist">
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === null ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab(null);
-                  setCurrentFilters({});
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                All
-              </button>
-            </li>
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === 'completed' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab('completed');
-                  setCurrentFilters({ status: 'completed' });
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                Completed
-              </button>
-            </li>
-            
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === 'refunded' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab('refunded');
-                  setCurrentFilters({ status: 'refunded' });
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                Refunded
-              </button>
-            </li>
-            
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === 'cancelled' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab('cancelled');
-                  setCurrentFilters({ status: 'cancelled' });
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                Cancelled
-              </button>
-            </li>
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === 'failed' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab('failed');
-                  setCurrentFilters({ status: 'failed' });
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                Failed
-              </button>
-            </li>
-          </ul>
-        </Col>
-      </Row>
+
+      {/* Filter Tabs & Search */}
+      <Card className="mb-4" style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <Card.Body className="p-3">
+          <Row className="align-items-center">
+            <Col lg={9} className="mb-3 mb-lg-0">
+              <div className="d-flex gap-2 flex-wrap">
+                <Button
+                  variant={activeStatusTab === null ? 'light' : 'link'}
+                  className={`custtabs text-decoration-none ${activeStatusTab === null ? 'bg-light' : ''}`}
+                  onClick={() => {
+                    setActiveStatusTab(null);
+                    setCurrentFilters({});
+                    setRefreshKey(prev => prev + 1);
+                  }}
+                  style={{ 
+                    fontWeight: activeStatusTab === null ? '600' : '400',
+                    color: activeStatusTab === null ? '#212529' : '#6c757d'
+                  }}
+                >
+                  All 
+                  <Badge bg="secondary" className="ms-2" style={{ fontSize: '0.7rem' }}>
+                    {summary?.total || 0}
+                  </Badge>
+                </Button>
+                
+
+                <Button
+                  variant={activeStatusTab === 'completed' ? 'light' : 'link'}
+                  className={`custtabs text-decoration-none ${activeStatusTab === 'completed' ? 'bg-light' : ''}`}
+                  onClick={() => {
+                    setActiveStatusTab('completed');
+                    setCurrentFilters({ status: 'completed' });
+                    setRefreshKey(prev => prev + 1);
+                  }}
+                  style={{ 
+                    fontWeight: activeStatusTab === 'completed' ? '600' : '400',
+                    color: activeStatusTab === 'completed' ? '#212529' : '#6c757d'
+                  }}
+                >
+                  <Check size={16} className="me-1" />
+                  Completed <Badge bg="success" className="ms-2" style={{ fontSize: '0.7rem' }}>
+                    {summary?.status_counts?.completed || 0}
+                  </Badge>
+                  {/* <ChevronRight size={14} className="ms-1" /> */}
+                </Button>
+
+                <Button
+                  variant={activeStatusTab === 'cancelled' ? 'light' : 'link'}
+                  className={`custtabs text-decoration-none ${activeStatusTab === 'cancelled' ? 'bg-light' : ''}`}
+                  onClick={() => {
+                    setActiveStatusTab('cancelled');
+                    setCurrentFilters({ status: 'cancelled' });
+                    setRefreshKey(prev => prev + 1);
+                  }}
+                  style={{ 
+                    fontWeight: activeStatusTab === 'cancelled' ? '600' : '400',
+                    color: activeStatusTab === 'cancelled' ? '#212529' : '#6c757d'
+                  }}
+                >
+                  <X size={16} className="me-1" />
+                  Cancelled
+                  <Badge bg="danger" className="ms-2" style={{ fontSize: '0.7rem' }}>
+                    {summary?.status_counts?.cancelled || 0}
+                  </Badge>
+                </Button>
+
+                <Button
+                  variant={activeStatusTab === 'failed' ? 'light' : 'link'}
+                  className={`custtabs text-decoration-none ${activeStatusTab === 'failed' ? 'bg-light' : ''}`}
+                  onClick={() => {
+                    setActiveStatusTab('failed');
+                    setCurrentFilters({ status: 'failed' });
+                    setRefreshKey(prev => prev + 1);
+                  }}
+                  style={{ 
+                    fontWeight: activeStatusTab === 'failed' ? '600' : '400',
+                    color: activeStatusTab === 'failed' ? '#212529' : '#6c757d'
+                  }}
+                >
+                  <X size={16} className="me-1" />
+                  Failed
+                  <Badge bg="danger" className="ms-2" style={{ fontSize: '0.7rem' }}>
+                    {summary?.status_counts?.failed || 0}
+                  </Badge>
+                </Button>
+
+
+
+
+              </div>
+
+
+            </Col>
+            <Col lg={3}>
+              <Form.Control 
+                type="search" 
+                placeholder="Search Invoices..." 
+                onChange={(e) => setCurrentFilters({ ...currentFilters, search: e.target.value })}
+              />
+            </Col>
+          </Row>
+        </Card.Body>
+      </Card>
 
             <GenericListPage
                  columns={columns}
@@ -225,7 +264,7 @@ const BillingHistory = () => {
                  defaultPageSize={15}
                  filters={currentFilters}
                  refreshKey={refreshKey}
-                 search={true}
+                 search={false}
                  tableStyle="table-style-2"
              />
 
@@ -233,8 +272,8 @@ const BillingHistory = () => {
               show={showViewPaymentModal}
               size="lg"
               onHide={() => setShowViewPaymentModal(false)}
-              title="Payment Details"
-              desc="View the payment details"
+              title="Invoice Details "
+              desc={`Invoice: ${selectedPaymentView?.invoice?.invoice_number}`}
               onSubmit={() => setShowViewPaymentModal(false)}
               submitButtonText="Close"
               cancelButtonText="Cancel"

@@ -53,6 +53,7 @@ interface TransformedResponse {
   recordsTotal: number;
   recordsFiltered: number;
   dataList: any[];
+  summary: any;
   meta: {
     total: number;
     limit: number;
@@ -75,6 +76,7 @@ const transformApiResponse = (apiResponse: any): TransformedResponse => {
       recordsTotal: response?.pagination?.total,
       recordsFiltered: response?.pagination?.total,
       dataList: response?.data,
+      summary: response?.summary,
       meta: {
         total: response?.pagination?.total,
         limit: response?.pagination?.limit,
@@ -95,6 +97,7 @@ const transformApiResponse = (apiResponse: any): TransformedResponse => {
       recordsTotal: 0,
       recordsFiltered: 0,
       dataList: [],
+      summary: null,
       meta: {
         total: 0,
         limit: 10,
