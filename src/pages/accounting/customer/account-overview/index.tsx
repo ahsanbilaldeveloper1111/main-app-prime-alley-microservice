@@ -9,7 +9,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import { useState } from 'react';
 import { Card, Row, Col, Button, Badge, Form, Modal } from 'react-bootstrap';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Clock, DollarSign, Edit, FileText, Wallet, Users, Mail, Phone, User, Package, Check, TrendingUp } from 'lucide-react';
 import { formatNumber } from "@utils/Helper";
 
 import "@assets/scss/billing.scss";
@@ -24,6 +24,89 @@ import ThemeSelect from "@components/ThemeSelect";
 import { toast } from "react-toastify";
 
 const AccountOverview = () => {
+
+  const [subscriptions, setSubscriptions] = useState([
+    { 
+      id: 1, 
+      name: 'Veeam Data Platform Essentials', 
+      description: "Vere's leer adicat, on time prcheucing",
+      status: 'Active', 
+      billingCycle: 'Yearly', 
+      renewalStart: '15-Dec-2025',
+      renewalEnd: '15-Dec-2026',
+      price: 'AED 230.73'
+    },
+    { 
+      id: 2, 
+      name: 'Microsoft Defender', 
+      description: "Heres leer adieting on time penesom",
+      status: 'Active', 
+      billingCycle: 'Yearly', 
+      renewalStart: '15-Dec-2025',
+      renewalEnd: '15-Dec-2026',
+      price: 'AED 88.35'
+    },
+    { 
+      id: 3, 
+      name: 'Exchange Online (Plan 2)', 
+      description: "Vere's leer eid Data Microsoft",
+      status: 'Active', 
+      billingCycle: 'Yearly', 
+      renewalStart: '24-Nov-2025',
+      renewalEnd: '24-Nov-2026',
+      price: 'AED 353.92'
+    },
+    { 
+      id: 4, 
+      name: 'Worry Free Services', 
+      description: "Vere's leer anticiency, on time archucing",
+      status: 'Trial', 
+      billingCycle: 'One Time', 
+      renewalStart: '15-Dec-2025',
+      renewalEnd: '15-Dec-2026',
+      price: 'AED 99.04'
+    },
+    { 
+      id: 5, 
+      name: 'Windows Server 2022', 
+      description: "Vere y leer eid Data rignoris",
+      status: 'In Progress', 
+      billingCycle: 'Yearly', 
+      renewalStart: '15-Dov-2025',
+      renewalEnd: '15-Dev-2026',
+      price: 'AED 1,913.60'
+    },
+    { 
+      id: 6, 
+      name: 'Exchange Online Archiving', 
+      description: "Jile a leer ari Data rgroris",
+      status: 'Suspended', 
+      billingCycle: 'Yearly', 
+      renewalStart: '15-Dec-2025',
+      renewalEnd: '15-Dec-2026',
+      price: 'AED 134.85'
+    },
+    { 
+      id: 7, 
+      name: 'UCaaS-Firewall 90G1', 
+      description: "Here's loer tsile ornari",
+      status: 'Active', 
+      billingCycle: 'Yearly', 
+      renewalStart: '24-Nov-2025',
+      renewalEnd: '24-Nov-2025',
+      price: 'AED 600.36'
+    },
+    { 
+      id: 8, 
+      name: 'UCaaS-Firewall', 
+      description: '',
+      status: 'Certiive', 
+      billingCycle: 'One Time', 
+      renewalStart: '15-Dec-2025',
+      renewalEnd: '15-Dov-2026',
+      price: 'AED 504.32'
+    }
+  ]);
 
   const [billingInfo, setBillingInfo] = useState<any>({
     name: '',
@@ -116,147 +199,460 @@ const AccountOverview = () => {
 
       <PageHeader
         title="Account Overview"
-        description="Manage your account and billing details"
+        description="Here's what's happening with your account today."
         showSearch={false}
       />
 
 <div>
          
-          <Row className="mb-4">
-            <Col lg={7} className="mb-4">
-              <Card style={{ minHeight: '274px' }}>
-                <Card.Body>
-                  {/* <h5 className="fw-semibold mb-2">RingEdge Account</h5> */}
-                  {/* <img src={CompanyLogo2.src} alt="logo" className="img-fluid" style={{marginTop: '21px',maxWidth: '200px'}} /> */}
-                  <h5 className="fw-semibold mb-2 text-capitalize">{companyDetails?.name}</h5>
-                  <div className="mb-5">
-                    {/* <Badge bg="secondary" pill className="px-3 py-2 me-2">Trial</Badge>
-                    <Badge bg="primary" pill className="px-3 py-2">Upgrade</Badge> */}
-                    <p className="text-muted mb-0 small">{companyDetails?.profile?.address}</p>
-                  </div>
-                  <hr className="my-3" />
-                  <div className="d-flex justify-content-end">
-                    {/* <Button variant="link" className="text-decoration-none">
-                      Manage Account <ChevronRight size={16} />
-                    </Button> */}
-                    <Button 
-                      variant="link" 
-                      className="text-decoration-none"
-                      onClick={() => setShowManageAccountModal(true)}
-                    >
-                      Manage Account <ChevronRight size={16} />
-                    </Button>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col lg={5} className="mb-4">
-              <Card>
-                <Card.Body>
-                  <h6 className="text-muted mb-3">Open Invoice Amount</h6>
-                  <h2 className="mb-1">{companyDetails?.profile?.currency} {formatNumber(dashboardCounters?.invoices?.total_amount)}</h2>
+          {/* Company Info & Invoice Section */}
+      <Row className="mb-3">
+        <Col lg={8} className="mb-3">
+          <Card style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <Card.Body className="p-3">
+              <div className="d-flex align-items-start gap-3 mb-3">
+                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
+                  width: '40px', 
+                  height: '40px', 
+                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                  flexShrink: 0 
+                }}>
+                  <Users size={20} style={{ color: '#3b82f6' }} />
+                </div>
+                <div className="flex-grow-1">
+                  <h5 className="mb-1" style={{ fontWeight: '600', fontSize: '1.1rem' }}>{companyDetails?.name}</h5>
+                  <p className="text-muted mb-0" style={{ fontSize: '0.85rem' }}>
+                  {companyDetails?.profile?.address}
+                  </p>
+                </div>
+                <Button 
+                  variant="outline-primary" 
+                  size="sm"
+                  onClick={() => setShowManageAccountModal(true)}
+                  style={{ fontSize: '0.75rem', padding: '0.35rem 0.7rem' }}
+                >
+                  <Edit size={12} className="me-1" />
+                  Edit
+                </Button>
+              </div>
+
+              <div className="p-2 rounded d-flex justify-content-between align-items-center" style={{ backgroundColor: '#f8f9fa' }}>
+                <div>
+                  <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Total Invoice Amount</small>
+                  <h4 className="mb-0" style={{ fontWeight: '700', fontSize: '1.5rem' }}>{companyDetails?.profile?.currency} {formatNumber(dashboardCounters?.invoices?.total_amount)}</h4>
                   <small className="text-muted">(Inclusive VAT)</small>
-                  
-                  <hr />
-                  <div className="d-flex justify-content-between mb-2">
-                    <span className="text-muted">Account credit limit</span>
-                    <span>{companyDetails?.profile?.currency} {formatNumber(companyDetails?.profile?.credit_limit)}</span>
+                </div>
+                <div className="d-flex gap-2">
+                  <Button 
+                    variant="primary"
+                    size="sm"
+                    style={{ fontSize: '0.85rem', padding: '0.4rem 1rem', fontWeight: '600' }}
+                  >
+                    Pay Now
+                  </Button>
+                  <Button 
+                    variant="outline-secondary"
+                    size="sm"
+                    style={{ fontSize: '0.85rem', padding: '0.4rem 1rem' }}
+                  >
+                    View Invoices
+                  </Button>
+                </div>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        <Col lg={4} className="mb-3">
+          <Card style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <Card.Body className="p-3">
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
+                  width: '32px', 
+                  height: '32px', 
+                  backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                  flexShrink: 0 
+                }}>
+                  <Wallet size={16} style={{ color: '#22c55e' }} />
+                </div>
+                <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.9rem' }}>Account Balance</h6>
+              </div>
+              
+              <div className="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <small className="text-muted" style={{ fontSize: '0.8rem' }}>Credit</small>
+                <span className="fw-semibold" style={{ fontSize: '0.9rem' }}>{companyDetails?.profile?.currency} {formatNumber(companyDetails?.profile?.credit_limit)}</span>
+              </div>
+              
+              <div className="d-flex justify-content-between align-items-center py-2">
+                <small className="text-muted" style={{ fontSize: '0.8rem' }}>Pending</small>
+                <span className="fw-semibold" style={{ fontSize: '0.9rem' }}>{companyDetails?.profile?.currency} {formatNumber(companyDetails?.profile?.outstanding_invoices)}</span>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
+
+       {/* Information Cards Grid */}
+       <Row>
+        {/* Tax Information */}
+        <Col md={6} lg={3} className="mb-3">
+          <Card className='billing-details-cards'>
+            <Card.Body className="p-2">
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
+                  width: '28px', 
+                  height: '28px', 
+                  backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                  flexShrink: 0 
+                }}>
+                  <FileText size={14} style={{ color: '#fbbf24' }} />
+                </div>
+                <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Tax Information</h6>
+              </div>
+              
+              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                <small className="text-muted" style={{ fontSize: '0.75rem' }}>VAT Number</small>
+                <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
+                {companyDetails?.profile?.tax_id || 'N/A'}
+                </span>
+              </div>
+              
+              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                <small className="text-muted" style={{ fontSize: '0.75rem' }}>VAT Rate</small>
+                <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
+                {companyDetails?.profile?.vat_rate} %
+                </span>
+              </div>
+              
+              <div className="d-flex justify-content-between align-items-center py-1">
+                <small className="text-muted" style={{ fontSize: '0.75rem' }}>Exemption</small>
+                <Badge bg="secondary" style={{ fontSize: '0.65rem', padding: '0.2rem 0.4rem' }}>
+                {companyDetails?.profile?.vat_exemption ? 'Yes' : 'No'}
+                </Badge>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        {/* Billing Contact */}
+        <Col md={6} lg={3} className="mb-3">
+          <Card className='billing-details-cards' >
+            <Card.Body className="p-2">
+              <div className="d-flex align-items-center justify-content-between gap-2 mb-2">
+                <div className="d-flex align-items-center gap-2">
+                  <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
+                    width: '28px', 
+                    height: '28px', 
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    flexShrink: 0 
+                  }}>
+                    <Users size={14} style={{ color: '#3b82f6' }} />
                   </div>
-                  <div className="d-flex justify-content-between mb-2">
-                    <span className="text-muted">Outstanding invoices</span>
-                    <span>{companyDetails?.profile?.currency} {formatNumber(companyDetails?.profile?.outstanding_invoices)}</span>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-  
-          <Row>
+                  <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Billing Contact</h6>
+                </div>
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="p-0 text-primary"
+                  onClick={() => setShowBillingEditModal(true)}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <Edit size={12} />
+                </Button>
+              </div>
 
-          <Col md={6} lg={3} className="mb-3">
-              <Card className='billing-details-cards'>
-                <Card.Body>
-                  <h6 className="text-muted mb-2">Tax information</h6>
-                  <p className="mb-1"><small className="text-muted">VAT number</small></p>
-                  <p className="fw-semibold mb-1">{companyDetails?.profile?.tax_id || 'N/A'}</p>
+              
+              <div className="d-flex align-items-center gap-2 py-1 border-bottom">
+                <User size={12} style={{ color: '#3b82f6' }} />
+                <p className="mb-0 text-truncate flex-grow-1 text-capitalize" style={{ fontSize: '0.75rem', fontWeight: '500' }}>
+                {companyDetails?.name}
+                </p>
+              </div>
+              
+              <div className="d-flex align-items-center gap-2 py-1 border-bottom">
+                <Mail size={12} style={{ color: '#3b82f6' }} />
+                <p className="mb-0 text-truncate flex-grow-1 text-lowercase" style={{ fontSize: '0.75rem', fontWeight: '500' }}>
+                {companyDetails?.email}
+                </p>
+              </div>
 
-                  <p className="mb-1"><small className="text-muted">VAT Rate (%)</small></p>
-                  <p className="fw-semibold mb-1">{formatNumber(companyDetails?.profile?.vat_rate) || 'N/A'}</p>
+              <div className="d-flex align-items-center gap-2 py-1">
+                <Phone size={12} style={{ color: '#3b82f6' }} />
+                <p className="mb-0 flex-grow-1" style={{ fontSize: '0.75rem', fontWeight: '500' }}>
+                {companyDetails?.phone}
+                </p>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
 
-                  <p className="mb-1"><small className="text-muted">VAT Exemption</small></p>
-                  <p className="fw-semibold mb-1">{companyDetails?.profile?.vat_exemption ? 'Yes' : 'No'}</p>
-                </Card.Body>
-              </Card>
-            </Col>
+        {/* Payment Terms */}
+        <Col md={6} lg={3} className="mb-3">
+          <Card className='billing-details-cards' >
+            <Card.Body className="p-2">
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
+                  width: '28px', 
+                  height: '28px', 
+                  backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                  flexShrink: 0 
+                }}>
+                  <Clock size={14} style={{ color: '#22d3ee' }} />
+                </div>
+                <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Payment Terms</h6>
+              </div>
+              
+              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                <small className="text-muted" style={{ fontSize: '0.75rem' }}>Payment Due</small>
+                <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
+                Net {companyDetails?.profile?.payment_terms} days
+                </span>
+              </div>
 
-            <Col md={6} lg={3} className="mb-3">
-              <Card className='billing-details-cards'>
-                <Card.Body>
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h6 className="text-muted mb-0">Billing contact</h6>
-                    {/* <Button variant="link" size="sm" className="p-0" onClick={() => setShowBillingEditModal(true)}>
-                      <Edit size={16} />
-                    </Button> */}
-                  </div>
-                  <p className="mb-1"><small className="text-muted">Name</small></p>
-                  <p className="fw-semibold mb-1">{companyDetails?.name}</p>
+              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                <small className="text-muted" style={{ fontSize: '0.75rem' }}>Late Fee</small>
+                <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
+                {formatNumber(companyDetails?.profile?.late_fee_rule)}
+                </span>
+              </div>
 
-                  <p className="mb-1"><small className="text-muted">Email</small></p>
-                  <p className="fw-semibold mb-1">{companyDetails?.email}</p>
+              <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                <small className="text-muted" style={{ fontSize: '0.75rem' }}>Payment Mode</small>
+                <span className="fw-semibold text-capitalize" style={{ fontSize: '0.8rem' }}>
+                {companyDetails?.profile?.payment_mode?.replace('_', ' ')}
+                </span>
+              </div>
 
-                  <p className="mb-1"><small className="text-muted">Phone</small></p>
-                  <p className="fw-semibold mb-1">{companyDetails?.phone}</p>
-                </Card.Body>
-              </Card>
-            </Col>
+              
+            </Card.Body>
+          </Card>
+        </Col>
 
+        {/* Payment Method */}
+        <Col md={6} lg={3} className="mb-3">
+          <Card className='billing-details-cards' >
+            <Card.Body className="p-2">
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
+                  width: '28px', 
+                  height: '28px', 
+                  backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                  flexShrink: 0 
+                }}>
+                  <DollarSign size={14} style={{ color: '#a855f7' }} />
+                </div>
+                <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Payment Method</h6>
+              </div>
 
-            <Col md={6} lg={3} className="mb-3">
-              <Card className='billing-details-cards'>
-                <Card.Body>
-                  <h6 className="text-muted mb-2">Terms & Rules</h6>
-                  <p className="mb-1"><small className="text-muted">Payment Terms (Days)</small></p>
-                  <p className="fw-semibold mb-1">Net {companyDetails?.profile?.payment_terms} days</p>
-                  <p className="mb-1"><small className="text-muted">Payment Mode</small></p>
-                  <p className="fw-semibold mb-1 text-capitalize">{companyDetails?.profile?.payment_mode?.replace('_', ' ')}</p>
-                  <p className="mb-1"><small className="text-muted">Late Fee Rule</small></p>
-                  <p className="fw-semibold mb-1">{formatNumber(companyDetails?.profile?.late_fee_rule)}</p>
-                </Card.Body>
-              </Card>
-            </Col>
-            {paymentMethods?.length > 0 && (
-            <Col md={6} lg={3} className="mb-3">
-              <Card className='billing-details-cards'>
-                <Card.Body>
-                  <h6 className="text-muted mb-2">Payment method</h6>
-                  
-                   {paymentMethods?.map((method: any) => (
+              {paymentMethods?.map((method: any) => (
                     <div key={method.id}>
                       {method.is_default ===true && (
                         <>
-                        <p className="mb-1"><small className="text-muted">Card number</small></p>
-                        <p className="fw-semibold mb-1">•••• {method.card?.last4}</p>
+                        
 
-                        {/* <p className="fw-semibold">{method.card?.brand}</p> */}
-                        <p className="mb-1"><small className="text-muted">Card Type</small></p>
-                        <p className="fw-semibold mb-1 text-capitalize">{method.card?.brand}</p>
+                        <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                <small className="text-muted" style={{ fontSize: '0.75rem' }}>Card</small>
+                <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>•••• {method.card?.last4}</span>
+              </div>
 
-                        <p className="mb-1"><small className="text-muted">Exp</small></p>
-                        <p className="fw-semibold mb-1">{method.card?.exp_month}/{method.card?.exp_year}</p>
+                        
+                        <div className="d-flex justify-content-between align-items-center py-1border-bottom">
+                <small className="text-muted" style={{ fontSize: '0.75rem' }}>Card Type</small>
+                <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
+                {method.card?.brand}
+                </span>
+              </div>
+
+                        <div className="d-flex justify-content-between align-items-center py-1">
+                <small className="text-muted" style={{ fontSize: '0.75rem' }}>Expiry</small>
+                <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
+                {method.card?.exp_month}/{method.card?.exp_year}
+                </span>
+              </div>
                         </>
                       )}
                     </div>
                   ))}
-                  
-                </Card.Body>
-              </Card>
-            </Col>
-            )}
+              
+              
 
-            
-            
-          </Row>
-  
+              
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
+
+
+
+
+       {/* Additional Information Row */}
+       <Row>
+        {/* Upcoming Renewals */}
+        <Col md={6} lg={4} className="mb-3">
+          <Card className='billing-details-cards' style={{ height: '100%' }}>
+            <Card.Body className="p-2">
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
+                  width: '28px', 
+                  height: '28px', 
+                  backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                  flexShrink: 0 
+                }}>
+                  <Clock size={14} style={{ color: '#fbbf24' }} />
+                </div>
+                <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Upcoming Renewals</h6>
+              </div>
+              
+              {subscriptions
+                .filter(sub => sub.status === 'Active' || sub.status === 'Trial')
+                .slice(0, 3)
+                .map((sub, index) => (
+                  <div key={sub.id} className={`py-1 ${index < 2 ? 'border-bottom' : ''}`}>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                        <small className="d-block text-truncate" style={{ fontSize: '0.75rem', fontWeight: '500' }}>
+                          {sub.name}
+                        </small>
+                        <small className="text-muted" style={{ fontSize: '0.7rem' }}>{sub.renewalEnd}</small>
+                      </div>
+                      <small className="fw-semibold ms-2" style={{ fontSize: '0.75rem', flexShrink: 0 }}>
+                        {sub.price}
+                      </small>
+                    </div>
+                  </div>
+                ))}
+            </Card.Body>
+          </Card>
+        </Col>
+
+        {/* Recent Activity */}
+        <Col md={6} lg={4} className="mb-3">
+          <Card className='billing-details-cards' style={{ height: '100%' }}>
+            <Card.Body className="p-2">
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
+                  width: '28px', 
+                  height: '28px', 
+                  backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                  flexShrink: 0 
+                }}>
+                  <TrendingUp size={14} style={{ color: '#22c55e' }} />
+                </div>
+                <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Recent Activity</h6>
+              </div>
+              
+              <div className="d-flex gap-2 py-1 border-bottom">
+                <Check size={12} className="mt-1 text-success" style={{ flexShrink: 0 }} />
+                <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                  <small className="d-block" style={{ fontSize: '0.75rem', fontWeight: '500' }}>Payment completed</small>
+                  <small className="text-muted" style={{ fontSize: '0.7rem' }}>2 hours ago</small>
+                </div>
+              </div>
+              
+              <div className="d-flex gap-2 py-1 border-bottom">
+                <FileText size={12} className="mt-1 text-info" style={{ flexShrink: 0 }} />
+                <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                  <small className="d-block" style={{ fontSize: '0.75rem', fontWeight: '500' }}>Invoice #INV-003 generated</small>
+                  <small className="text-muted" style={{ fontSize: '0.7rem' }}>Yesterday</small>
+                </div>
+              </div>
+
+              <div className="d-flex gap-2 py-1">
+                <Package size={12} className="mt-1 text-primary" style={{ flexShrink: 0 }} />
+                <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                  <small className="d-block" style={{ fontSize: '0.75rem', fontWeight: '500' }}>Subscription activated</small>
+                  <small className="text-muted" style={{ fontSize: '0.7rem' }}>3 days ago</small>
+                </div>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        {/* Quick Actions */}
+        <Col md={6} lg={4} className="mb-3">
+          <Card className='billing-details-cards' style={{ height: '100%' }}>
+            <Card.Body className="p-2">
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
+                  width: '28px', 
+                  height: '28px', 
+                  backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                  flexShrink: 0 
+                }}>
+                  <DollarSign size={14} style={{ color: '#a855f7' }} />
+                </div>
+                <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Quick Actions</h6>
+              </div>
+              
+              <div className="d-flex flex-column gap-2">
+                <div 
+                  className="d-flex align-items-center gap-2 py-2 px-2" 
+                  style={{ 
+                    border: '1px solid #dee2e6', 
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div className="rounded d-flex align-items-center justify-content-center" style={{ 
+                    width: '24px', 
+                    height: '24px', 
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    flexShrink: 0 
+                  }}>
+                    <FileText size={12} style={{ color: '#3b82f6' }} />
+                  </div>
+                  <small style={{ fontSize: '0.75rem', fontWeight: '500' }}>Download Invoices</small>
+                </div>
+
+                <div 
+                  className="d-flex align-items-center gap-2 py-2 px-2" 
+                  style={{ 
+                    border: '1px solid #dee2e6', 
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                 
+                >
+                  <div className="rounded d-flex align-items-center justify-content-center" style={{ 
+                    width: '24px', 
+                    height: '24px', 
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    flexShrink: 0 
+                  }}>
+                    <Wallet size={12} style={{ color: '#22c55e' }} />
+                  </div>
+                  <small style={{ fontSize: '0.75rem', fontWeight: '500' }}>Update Payment Method</small>
+                </div>
+
+                <div 
+                  className="d-flex align-items-center gap-2 py-2 px-2" 
+                  style={{ 
+                    border: '1px solid #dee2e6', 
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div className="rounded d-flex align-items-center justify-content-center" style={{ 
+                    width: '24px', 
+                    height: '24px', 
+                    backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                    flexShrink: 0 
+                  }}>
+                    <Package size={12} style={{ color: '#a855f7' }} />
+                  </div>
+                  <small style={{ fontSize: '0.75rem', fontWeight: '500' }}>View Subscriptions</small>
+                </div>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
          
         </div>
      
@@ -404,47 +800,7 @@ const AccountOverview = () => {
             </Form>
           </div>
 
-          <hr />
-
-          <div className="mb-4">
-            <h6 className="mb-3">Account Status</h6>
-            <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded mb-2">
-              <div>
-                <div className="fw-semibold">Account Type</div>
-                <small className="text-muted">Business Enterprise</small>
-              </div>
-              <Badge bg="success">Active</Badge>
-            </div>
-            <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded mb-2">
-              <div>
-                <div className="fw-semibold">Billing Cycle</div>
-                <small className="text-muted">Monthly</small>
-              </div>
-              <Button variant="link" size="sm">Change</Button>
-            </div>
-            <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded">
-              <div>
-                <div className="fw-semibold">Auto-renewal</div>
-                <small className="text-muted">Enabled for all products</small>
-              </div>
-              <Form.Check type="switch" defaultChecked />
-            </div>
-          </div>
-
-          <hr />
-
-          <div>
-            <h6 className="mb-3 text-danger">Danger Zone</h6>
-            <div className="p-3 border border-danger rounded">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <div className="fw-semibold">Cancel Account</div>
-                  <small className="text-muted">Permanently close your account and cancel all services</small>
-                </div>
-                <Button variant="outline-danger" size="sm">Cancel Account</Button>
-              </div>
-            </div>
-          </div>
+        
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-secondary" onClick={() => setShowManageAccountModal(false)}>

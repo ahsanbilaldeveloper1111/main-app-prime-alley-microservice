@@ -46,7 +46,7 @@ import { GetPaymentMethods } from "@utils/accounting";
 import { formatNumber } from "@utils/Helper";
 
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row, Form, Alert } from "react-bootstrap";
+import { Button, Modal, Row, Form, Alert, Card, Badge } from "react-bootstrap";
 import { Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
@@ -67,7 +67,7 @@ import PageHeader from "@components/PageHeader";
 
 import TableAction, { Action } from "@components/TableAction";
 import { Spinner } from "react-bootstrap";
-import { DollarSign, Download } from "lucide-react";
+import { Divide, DollarSign, Download } from "lucide-react";
 
 // Rich Text Editor Component for Terms and Conditions
 const RichTextEditor: React.FC<{
@@ -494,7 +494,7 @@ const InvoiceList = () => {
         sortable: true,
         cell: (props: InvoiceData) => (
           <div>
-            <div className="fw-bold text-primary">#{props.invoice_number}</div>
+            #{props.invoice_number}
           </div>
         ),
       },
@@ -505,7 +505,7 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.subtotal,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="fw-bold text-success">
+          <span >
             {props?.currency_code || "USD"} {formatNumber(parseFloat(props?.subtotal || "0"))}
           </span>
         ),
@@ -516,8 +516,8 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.tax_amount,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="text-warning">
-            {props?.currency_code || "USD"}{" "}
+          <span >
+            {props?.currency_code || "AED"}{" "}
             {formatNumber(parseFloat(props?.tax_amount || "0"))}
           </span>
         ),
@@ -528,8 +528,8 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.total_amount,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="fw-bold text-primary">
-            {props.currency_code || "USD"}{" "}
+          <span >
+            {props.currency_code || "AED"}
             {formatNumber(parseFloat(props?.total_amount || "0"))}
           </span>
         ),
@@ -540,7 +540,7 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.due_date,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="text-muted">
+          <span>
             {props.due_date
               ? moment(props.due_date).format("DD-MMM-YYYY")
               : "No due date"}
@@ -553,7 +553,7 @@ const InvoiceList = () => {
         selector: (row: InvoiceData) => row.invoice_date,
         sortable: true,
         cell: (props: InvoiceData) => (
-          <span className="text-muted">
+          <span >
             {moment(props.invoice_date).format("DD-MMM-YYYY")}
           </span>
         ),
@@ -605,15 +605,48 @@ const InvoiceList = () => {
           return (
             <>
           
-          <div className="d-flex gap-2"> 
+          <div className="d-flex py-3 px-4 gap-2"> 
             
               {props.status === STATUS_PENDING && session?.user?.permissions?.includes('pay-invoices-billing') && (
-                        <Button variant="light" className="btn-action-style-2 p-1 text-info" title="Pay" onClick={() => handlePayInvoice(props)}>
-                          <DollarSign size={16} />
-                        </Button>
+                       
+
+              <Button 
+              variant="info" 
+              size="sm"
+              style={{ 
+                backgroundColor: '#5bc0de', 
+                borderColor: '#5bc0de', 
+                color: 'white',
+                fontSize: '0.85rem',
+                padding: '0.375rem 0.75rem'
+              }}
+              onClick={() => handlePayInvoice(props)}
+              >
+              Pay Now
+              </Button>
+
+                        
               )}
              
-                        <Button variant="light" className="btn-action-style-2 p-1 text-info" title="Download PDF" onClick={() => handleDownloadPDF(props)}><Download size={16} /></Button>
+                       
+
+                        <Button 
+                          variant="light" 
+                          size="sm"
+                          style={{ 
+                            backgroundColor: '#e9ecef',
+                            borderColor: '#dee2e6',
+                            color: '#212529',
+                            fontSize: '0.85rem',
+                            padding: '0.375rem 0.75rem',
+                            fontWeight: '500'
+                          }}
+                          onClick={() => { 
+                            handleDownloadPDF(props)
+                          }}
+                        >
+                          View
+                        </Button>
                       
                         </div>
             </>
@@ -1034,6 +1067,7 @@ const InvoiceList = () => {
 
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
+  const [summary, setSummary] = useState<any | null>(null);
 
   const fetchInvoices = useCallback(
     async (page = 1, perPage = 15, search = "") => {
@@ -1044,6 +1078,9 @@ const InvoiceList = () => {
           search,
           ...memoizedFilters,
         });
+
+        const summary = response?.summary;
+        setSummary(summary);
 
         // The getInvoices function returns PaginationWrapper<InvoiceData>
         // which has the structure: { data: InvoiceData[], pagination: {...} }
@@ -2164,130 +2201,135 @@ const InvoiceList = () => {
 
       <PageHeader
         title="Invoices"
+        description="Manage your recurring services & renewals."
        
       />
 
-      <Row className="mb-3">
-        <Col md={12}>
-          <ul id="system-tabs" className="mb-3 nav nav-tabs" role="tablist">
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === null ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab(null);
-                  setCurrentFilters((prev) => {
-                    const { status, ...rest } = prev;
-                    return rest;
-                  });
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                All
-              </button>
-            </li>
-            {/* <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === 'draft' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab('draft');
-                  setCurrentFilters((prev) => ({ ...prev, status: 'draft' }));
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                Draft
-              </button>
-            </li>
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === 'sent' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab('sent');
-                  setCurrentFilters((prev) => ({ ...prev, status: 'sent' }));
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                Sent
-              </button>
-            </li> */}
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === 'paid' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab('paid');
-                  setCurrentFilters((prev) => ({ ...prev, status: 'paid' }));
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                Paid
-              </button>
-            </li>
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === 'pending' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab('pending');
-                  setCurrentFilters((prev) => ({ ...prev, status: 'pending' }));
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                Pending
-              </button>
-            </li>
-            {/* <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === 'partially_paid' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab('partially_paid');
-                  setCurrentFilters((prev) => ({ ...prev, status: 'partially_paid' }));
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                Partially Paid
-              </button>
-            </li> */}
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === 'overdue' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab('overdue');
-                  setCurrentFilters((prev) => ({ ...prev, status: 'overdue' }));
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                Overdue
-              </button>
-            </li>
-            <li className="nav-item" role="presentation">
-              <button
-                className={`nav-link ${activeStatusTab === 'cancelled' ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveStatusTab('cancelled');
-                  setCurrentFilters((prev) => ({ ...prev, status: 'cancelled' }));
-                  setRefreshKey(prev => prev + 1);
-                }}
-                type="button"
-                role="tab"
-              >
-                Cancelled
-              </button>
-            </li>
-          </ul>
-        </Col>
-      </Row>
+        {/* Filter Tabs & Search */}
+        <Card className="mb-4" style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <Card.Body className="p-3">
+          <Row className="align-items-center">
+            <Col lg={9} className="mb-3 mb-lg-0">
+              <div className="d-flex gap-2 flex-wrap">
+                <Button
+                  variant={activeStatusTab === null ? 'light' : 'link'}
+                  className={`custtabs text-decoration-none ${activeStatusTab === null ? 'bg-light' : ''}`}
+                  onClick={() => {
+                    setActiveStatusTab(null);
+                    setCurrentFilters((prev) => {
+                      const { status, ...rest } = prev;
+                      return rest;
+                    });
+                    setRefreshKey(prev => prev + 1);
+                  }}
+                  style={{ 
+                    fontWeight: activeStatusTab === null ? '600' : '400',
+                    color: activeStatusTab === null ? '#212529' : '#6c757d',
+                    padding: '0.5rem 1rem'
+                  }}
+                >
+                  All 
+                  <Badge bg="secondary" className="ms-2" style={{ fontSize: '0.7rem' }}>
+                    {summary?.total || 0}
+                  </Badge>
+                </Button>
+
+                <Button
+                  variant={activeStatusTab === 'paid' ? 'light' : 'link'}
+                  className={`custtabs text-decoration-none ${activeStatusTab === 'paid' ? 'bg-light' : ''}`}
+                  onClick={() => {
+                    setActiveStatusTab('paid');
+                    setCurrentFilters((prev) => ({ ...prev, status: 'paid' }));
+                    setRefreshKey(prev => prev + 1);
+                  }}
+                  style={{ 
+                    fontWeight: activeStatusTab === 'paid' ? '600' : '400',
+                    color: activeStatusTab === 'paid' ? '#212529' : '#6c757d',
+                    padding: '0.5rem 1rem'
+                  }}
+                >
+                  Paid
+                  <Badge bg="success" className="ms-2" style={{ fontSize: '0.7rem' }}>
+                    {summary?.status_counts?.paid || 0}
+                  </Badge>
+                </Button>
+                
+                
+
+                <Button
+                  variant={activeStatusTab === 'pending' ? 'light' : 'link'}
+                  className={`custtabs text-decoration-none ${activeStatusTab === 'pending' ? 'bg-light' : ''}`}
+                  onClick={() => {
+                    setActiveStatusTab('pending');
+                    setCurrentFilters((prev) => ({ ...prev, status: 'pending' }));
+                    setRefreshKey(prev => prev + 1);
+                  }}
+                  style={{ 
+                    fontWeight: activeStatusTab === 'pending' ? '600' : '400',
+                    color: activeStatusTab === 'pending' ? '#212529' : '#6c757d',
+                    padding: '0.5rem 1rem'
+                  }}
+                >
+                  Pending 
+                  <Badge bg="warning" className="ms-2" style={{ fontSize: '0.7rem' }}>
+                    {summary?.status_counts?.pending || 0}
+                  </Badge>
+                </Button>
+
+                <Button
+                  variant={activeStatusTab === 'overdue' ? 'light' : 'link'}
+                  className={`custtabs text-decoration-none ${activeStatusTab === 'overdue' ? 'bg-light' : ''}`}
+                  onClick={() => {
+                    setActiveStatusTab('overdue');
+                    setCurrentFilters((prev) => ({ ...prev, status: 'overdue' }));
+                    setRefreshKey(prev => prev + 1);
+                  }}
+                  style={{ 
+                    fontWeight: activeStatusTab === 'overdue' ? '600' : '400',
+                    color: activeStatusTab === 'overdue' ? '#212529' : '#6c757d',
+                    padding: '0.5rem 1rem'
+                  }}
+                >
+                  Overdue 
+                  <Badge bg="danger" className="ms-2" style={{ fontSize: '0.7rem' }}>
+                    {summary?.status_count?.overdue || 0}
+                  </Badge>
+                </Button>
+
+
+                <Button
+                  variant={activeStatusTab === 'cancelled' ? 'light' : 'link'}
+                  className={`custtabs text-decoration-none ${activeStatusTab === 'cancelled' ? 'bg-light' : ''}`}
+                  onClick={() => {
+                    setActiveStatusTab('cancelled');
+                    setCurrentFilters((prev) => ({ ...prev, status: 'cancelled' }));
+                    setRefreshKey(prev => prev + 1);
+                  }}
+                  style={{ 
+                    fontWeight: activeStatusTab === 'cancelled' ? '600' : '400',
+                    color: activeStatusTab === 'cancelled' ? '#212529' : '#6c757d',
+                    padding: '0.5rem 1rem'
+                  }}
+                >
+                  Cancelled 
+                  <Badge bg="secondary" className="ms-2" style={{ fontSize: '0.7rem' }}>
+                    {summary?.status_count?.cancelled || 0}
+                  </Badge>
+                </Button>
+
+               
+              </div>
+            </Col>
+            <Col lg={3}>
+              <Form.Control 
+                type="search" 
+                placeholder="Search invoices..." 
+                onChange={(e) => setCurrentFilters({ ...currentFilters, search: e.target.value })}
+              />
+            </Col>
+          </Row>
+        </Card.Body>
+      </Card>
       
       {/* {session?.user?.permissions?.includes('list-invoices-billing') && ( */}
       <GenericListPage
@@ -2298,7 +2340,7 @@ const InvoiceList = () => {
         defaultPageSize={15}
         filters={memoizedFilters}
         refreshKey={refreshKey}
-        search={true}
+        search={false}
         tableStyle="table-style-2"
       />
       {/* )} */}

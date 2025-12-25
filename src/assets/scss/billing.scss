@@ -2,7 +2,8 @@ body {
     background-color: #fff;
 }
 .billing-details-cards {
-    min-height: 220px;
+    height: 100%;
+    padding: 11px 17px 0 17px;
 }
 
 .table-responsive .table th:last-child, .table-responsive .table td:last-child {
@@ -20,7 +21,16 @@ body {
 .white-text {
     color: #fff !important;
 }
-  
+
+.custtabs {
+    border: 1px solid #ccc !important;
+}
+.view-receipt-btn {
+    border: 1px solid #ccc !important;
+    border-radius: 5px !important;
+    padding: 5px 10px !important;
+    background-color: #f5f0f0 !important;
+}
 // .customer-management-card {
 //     min-height: 200px;
 // }

@@ -569,7 +569,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
             {/* Section 5 */}
             <div className="profile-menu-section">
-              <li className="profile-menu-item">
+              {/* <li className="profile-menu-item">
                 <button className="profile-menu-button">
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
@@ -578,7 +578,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                     <span className="profile-menu-text">Add account</span>
                   </div>
                 </button>
-              </li>
+              </li> */}
 
               <li className="profile-menu-item">
                 <button className="profile-menu-button"

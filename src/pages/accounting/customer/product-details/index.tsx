@@ -8,7 +8,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import { useState } from 'react';
-import {  Row, Col, Badge} from 'react-bootstrap';
+import {  Row, Col, Badge, Form, Button, Card} from 'react-bootstrap';
 
 
 import "@assets/scss/billing.scss";
@@ -25,6 +25,7 @@ import { Column } from "@components/CustomDataTable";
 import moment from "moment";
 import FormModal from "@pages/partial/FormModal";
 import { formatNumber } from "@utils/Helper";
+import { Filter } from "lucide-react";
 
 interface Product {
       id: number;
@@ -43,20 +44,65 @@ const ProductDetails = () => {
   const { data:session, status } = useSession();
    
     const columns: Column[] = [
-        { key: 'name', name: 'Product Name', selector: (row: any) => row.product?.name, sortable: true,
+        { key: 'name', name: 'Subscription Name', selector: (row: any) => row.product?.name, sortable: true,
           cell: (row: any) => {
             return <div>
               <p className="fw-semibold">{row?.product?.name}</p>
             </div>
           }
          },
-        { key: 'category', name: 'Category', selector: (row: any) => row.product?.category?.name, sortable: true,
+
+         { key: 'status', name: 'Status', selector: (row: any) => row.product?.status, sortable: true,
           cell: (row: any) => {
             return <div>
-              <p>{row?.product?.category?.name}</p>
+              <Badge className={`badge bg-${row?.product?.is_active ? 'success' : 'danger'}`}>{row?.product?.is_active ? 'Active' : 'Suspended'}</Badge>
             </div>
           }
          },
+
+         { key: 'billing_cycle', name: 'Billing Cycle', selector: (row: any) => row.product?.billing_cycle, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              {row?.product?.billing_cycle || 'Yearly'}
+            </div>
+          }
+         },
+
+
+         { key: 'renewal_start_date', name: 'Renewal Start Date', selector: (row: any) => row.product?.renewal_start_date, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              15-Dec-2025
+            </div>
+          }
+         },
+
+
+         { key: 'renewal_end_date', name: 'Renewal End Date', selector: (row: any) => row.product?.renewal_end_date, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              15-Dec-2026
+            </div>
+          }
+         },
+
+
+         { key: 'subscriptions', name: 'Subscriptions', selector: (row: any) => row.product?.subscription, sortable: true,
+          cell: (row: any) => {
+            return <div>
+              10
+            </div>
+          }
+         },
+
+
+        // { key: 'category', name: 'Category', selector: (row: any) => row.product?.category?.name, sortable: true,
+        //   cell: (row: any) => {
+        //     return <div>
+        //       <p>{row?.product?.category?.name}</p>
+        //     </div>
+        //   }
+        //  },
 
         //  { key: 'base_price', name: 'Base Price', selector: (row: any) => row.product?.base_price, sortable: true,
         //   cell: (row: any) => {
@@ -66,10 +112,10 @@ const ProductDetails = () => {
         //   }
         //  },
 
-         { key: 'selling_price', name: 'Selling Price', selector: (row: any) => row?.selling_price, sortable: true,
+         { key: 'selling_price', name: 'Price', selector: (row: any) => row?.selling_price, sortable: true,
           cell: (row: any) => {
             return <div>
-              <p className="text-primary fw-semibold">{row?.company?.profile?.currency || row?.product?.currency || 'USD'} {formatNumber(row?.selling_price)}</p>
+              <p className="">{row?.company?.profile?.currency || row?.product?.currency || 'USD'} {formatNumber(row?.selling_price)}</p>
             </div>
           }
          },
@@ -82,13 +128,13 @@ const ProductDetails = () => {
             </div>
           }
          },
-        { key: 'created_at', name: 'Created', selector: (row: any) => row.product?.created_at, sortable: true,
-          cell: (row: any) => {
-            return <div>
-              <p className="text-muted">{moment(row?.product?.created_at).format('DD-MMM-YYYY')}</p>
-            </div>
-          }
-         },
+        // { key: 'created_at', name: 'Created', selector: (row: any) => row.product?.created_at, sortable: true,
+        //   cell: (row: any) => {
+        //     return <div>
+        //       <p className="text-muted">{moment(row?.product?.created_at).format('DD-MMM-YYYY')}</p>
+        //     </div>
+        //   }
+        //  },
 
         // ...(session?.user?.permissions?.includes('edit-groups') || session?.user?.permissions?.includes('delete-groups') ? [
         //     {
@@ -149,8 +195,8 @@ const ProductDetails = () => {
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
 
       <PageHeader
-        title="My Products"
-        description="Manage your subscriptions and services"
+        title="Subscriptions"
+        description="Manage your recurring services & renewals."
         showSearch={false}
         buttons={
           <>
@@ -158,6 +204,47 @@ const ProductDetails = () => {
           </>
         }
       />
+
+       {/* Filters */}
+       <Card className="mb-4">
+           <Card.Body>
+           <Row className="align-items-center">
+               <Col md={2}>
+                 <Form.Control type="search" placeholder="Search products..." onChange={(e) => setCurrentFilters({ ...currentFilters, search: e.target.value })} />
+               </Col>
+               <Col md={2}>
+                 <Form.Select>
+                   <option>All Categories</option>
+                   <option>Gateway</option>
+                   <option>Policy</option>
+                   <option>SLA</option>
+                 </Form.Select>
+               </Col>
+               <Col md={2}>
+               <Form.Select>
+                   <option>All Status</option>
+                   <option>Active</option>
+                   <option>Trial</option>
+              <option>Inactive</option>
+             </Form.Select>
+              </Col>
+             <Col md={2}>
+                <Form.Select>
+                 <option>All Types</option>
+                   <option>Monthly</option>
+                   <option>Annual</option>
+                   <option>One-time</option>
+                 </Form.Select>
+               </Col>
+               <Col md={2} className="ms-auto">
+  <Button variant="outline-primary" className="w-100">
+    <Filter size={16} className="me-2" />
+    Apply
+  </Button>
+</Col>
+             </Row>
+           </Card.Body>
+         </Card>
 
    
 
@@ -169,7 +256,7 @@ const ProductDetails = () => {
                  defaultPageSize={15}
                  filters={currentFilters}
                  refreshKey={refreshKey}
-                 search={true}
+                 search={false}
                  tableStyle="table-style-2"
              />
 
