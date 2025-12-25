@@ -81,27 +81,27 @@ const BillingHistory = () => {
          },
 
         
-            {
-                key: 'Action',
-                name: 'Actions',
-                selector: (row: any) => row.id,
-                sortable: false,
-                cell: (props: any) => (
+//             {
+//                 key: 'Action',
+//                 name: 'Actions',
+//                 selector: (row: any) => row.id,
+//                 sortable: false,
+//                 cell: (props: any) => (
                   
-<Button 
-variant="link" 
-size="sm" 
-className="p-2 view-receipt-btn "
-style={{ color: '#0d6efd', fontSize: '0.85rem', textDecoration: 'none' }}
+// <Button 
+// variant="link" 
+// size="sm" 
+// className="p-2 view-receipt-btn "
+// style={{ color: '#0d6efd', fontSize: '0.85rem', textDecoration: 'none' }}
 
-  onClick={() => { handleViewPayment(props);
+//   onClick={() => { handleViewPayment(props);
   
-}}
->
-View Receipt
-</Button>
-                )
-            }
+// }}
+// >
+// View Receipt
+// </Button>
+//                 )
+//             }
       
     ];
 

@@ -35,6 +35,7 @@ const CustomerDashboard = () => {
     name: string;
     total_revenue: string;
     status: string;
+    subscriptions: string;
   }>>([]);
   const [recentActivity, setRecentActivity] = useState<any>(null);
   const [analyticsByMonth, setAnalyticsByMonth] = useState<any>(null);
@@ -341,7 +342,7 @@ const CustomerDashboard = () => {
         <Col lg={4} className="mb-4">
           <Card style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
             <Card.Body>
-              <h5 className="mb-4" style={{ fontWeight: '600' }}>Active Subscriptions</h5>
+              <h5 className="mb-4" style={{ fontWeight: '600' }}>Subscriptions</h5>
               <div style={{ maxHeight: '367px', overflowY: 'auto' }}>
                 {topProducts.map((subscription, index) => (
                   <div key={index} className="mb-3 pb-2 border-bottom">
@@ -356,7 +357,7 @@ const CustomerDashboard = () => {
                         }}
                       >
                         <div style={{ color: getStatusIconColor(subscription?.status) }}>
-                          {getSubscriptionIcon(subscription?.status)}
+                          {subscription?.subscriptions || '0'}
                         </div>
                       </div>
                       <div style={{ minWidth: 0, flex: 1 }}>

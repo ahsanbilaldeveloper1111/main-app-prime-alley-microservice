@@ -99,9 +99,9 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     {
       id: 'dashboard-unified-workspace',
       key: 'dashboard-unified-workspace',
-      permission: '',
       icon: <LayoutDashboard size={20} />,
       color: MENU_COLORS.DASHBOARD,
+      permission: PERMISSIONS.VIEW_UNIFIED_WORKSPACE,
       title: "Unified Workspace",
       label: "Unified Workspace",
       url: '/unified-workspace',
@@ -1247,8 +1247,21 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }
   `;
 
-  const dashboardItems = filterMenuItems(mainMenuItems.slice(0, 2));
-  const servicesItems = filterMenuItems(mainMenuItems.slice(2, -2));
+
+  //const dashboardItems = filterMenuItems(mainMenuItems.slice(0, 2));
+  const dashboardItems = filterMenuItems(
+    hasPermission(PERMISSIONS.VIEW_UNIFIED_WORKSPACE) 
+      ? mainMenuItems.slice(0, 2) 
+      : mainMenuItems.slice(0, 1)
+  );
+
+  //const servicesItems = filterMenuItems(mainMenuItems.slice(1, -2));
+  const servicesItems = filterMenuItems(
+    hasPermission(PERMISSIONS.VIEW_UNIFIED_WORKSPACE) 
+      ? mainMenuItems.slice(2, -2) 
+      : mainMenuItems.slice(1, -2)
+  );
+
   const systemItems = filterMenuItems(mainMenuItems.slice(-2));
 
   return (

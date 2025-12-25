@@ -1559,7 +1559,7 @@ const CreateLead = () => {
                                       e.target.value
                                     )
                                   }
-                                  placeholder="Enter lead description or notes"
+                                  placeholder="Preferred area/location, Budget, move-in"
                                 />
                               </Form.Group>
                             </Col>
@@ -1572,12 +1572,12 @@ const CreateLead = () => {
                       <Card className="border-0 bg-light">
                         <Card.Body>
                           <h5 className="fw-bold mb-4 text-success">
-                            COMPANY INFORMATION
+                          Client Information
                           </h5>
                           <Row>
                             <Col md={6}>
                               <Form.Group className="mb-3">
-                                <Form.Label>Company Name</Form.Label>
+                                <Form.Label>Client Name</Form.Label>
                                 <Form.Control
                                   type="text"
                                   value={formData.company_name}
@@ -1587,7 +1587,7 @@ const CreateLead = () => {
                                       e.target.value
                                     )
                                   }
-                                  placeholder="Enter company name"
+                                  placeholder="Enter client name"
                                 />
                               </Form.Group>
                             </Col>

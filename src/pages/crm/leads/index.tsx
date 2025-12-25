@@ -2705,7 +2705,7 @@ const CrmLeads = () => {
                           )
                         }
                       >
-                        Company {renderSortIcon("company", leadsPagination)}
+                        Individual/Company {renderSortIcon("company", leadsPagination)}
                       </th>
                     )}
                     {selectedLeadsColumns.includes("email") && (

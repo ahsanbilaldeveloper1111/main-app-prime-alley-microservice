@@ -380,6 +380,9 @@ MENU_COLORS: {
     VIEW_GSM_SYNC: 'view-gsm-port-sync',
     VIEW_GSM_COMPANY_PROFILLING: 'view-gsm-company-profilling',
 
+    VIEW_UNIFIED_WORKSPACE: 'unified-workspace-services',
+    VIEW_USER_NOTIFICATIONS: 'notifications-users',
+
     
     
     

@@ -256,6 +256,8 @@ const Layout = ({ children }: LayoutProps) => {
               </Button>
             )}
 
+
+{session?.user?.permissions?.includes(PERMISSIONS.VIEW_USER_NOTIFICATIONS) && (
             <Dropdown 
               show={showNotificationDropdown} 
               onToggle={(isOpen) => setShowNotificationDropdown(isOpen)}
@@ -453,7 +455,7 @@ const Layout = ({ children }: LayoutProps) => {
                 </div>
               </Dropdown.Menu>
             </Dropdown>
-
+            )}
 
             <div 
               className="d-flex align-items-center gap-2" 

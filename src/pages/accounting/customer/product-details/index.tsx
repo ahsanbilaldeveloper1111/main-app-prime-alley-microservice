@@ -72,7 +72,7 @@ const ProductDetails = () => {
          { key: 'renewal_start_date', name: 'Renewal Start Date', selector: (row: any) => row.product?.renewal_start_date, sortable: true,
           cell: (row: any) => {
             return <div>
-              15-Dec-2025
+              <span>{moment(row?.product?.renewal_start_date).format('DD-MMM-YYYY')}</span>
             </div>
           }
          },
@@ -81,7 +81,7 @@ const ProductDetails = () => {
          { key: 'renewal_end_date', name: 'Renewal End Date', selector: (row: any) => row.product?.renewal_end_date, sortable: true,
           cell: (row: any) => {
             return <div>
-              15-Dec-2026
+               <span>{moment(row?.product?.renewal_end_date).format('DD-MMM-YYYY')}</span>
             </div>
           }
          },
@@ -90,7 +90,7 @@ const ProductDetails = () => {
          { key: 'subscriptions', name: 'Subscriptions', selector: (row: any) => row.product?.subscription, sortable: true,
           cell: (row: any) => {
             return <div>
-              10
+              {row?.product?.subscriptions || 'Yearly'}
             </div>
           }
          },
@@ -121,13 +121,13 @@ const ProductDetails = () => {
          },
        
         
-        { key: 'is_active', name: 'Status', selector: (row: any) => row.product?.is_active, sortable: true,
-          cell: (row: any) => {
-            return <div>
-              <p className={`bg-opacity-10 text-dark badge bg-${row?.product?.is_active ? 'success' : 'danger'}`}>{row?.product?.is_active ? 'Active' : 'Inactive'}</p>
-            </div>
-          }
-         },
+        // { key: 'is_active', name: 'Status', selector: (row: any) => row.product?.is_active, sortable: true,
+        //   cell: (row: any) => {
+        //     return <div>
+        //       <p className={`bg-opacity-10 text-dark badge bg-${row?.product?.is_active ? 'success' : 'danger'}`}>{row?.product?.is_active ? 'Active' : 'Inactive'}</p>
+        //     </div>
+        //   }
+        //  },
         // { key: 'created_at', name: 'Created', selector: (row: any) => row.product?.created_at, sortable: true,
         //   cell: (row: any) => {
         //     return <div>

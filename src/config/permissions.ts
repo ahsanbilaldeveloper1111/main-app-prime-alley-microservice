@@ -25,7 +25,7 @@ export const routePermissions: RoutePermission[] = [
     {path: '/resources/help-materials',permissions: ['']},
     {path: '/resources/contact-support',permissions: ['']},
     {path:'/manager-dashboard',permissions: ['']},
-    {path:'/unified-workspace',permissions: ['']},
+    {path:'/unified-workspace',permissions: [PERMISSIONS.VIEW_UNIFIED_WORKSPACE]},
     {path:'/help-center',permissions: ['']},
     {path:'/live-call-updated',permissions: ['']},
     {path:'/test-image-storage',permissions: ['']},
