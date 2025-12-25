@@ -30,6 +30,9 @@ declare module 'next-auth' {
       login_as?: string | null;
       phone?: string | null;
       role?: string | null;
+      user_type?: string | null;
+      country?: string | null;
+      profile_picture?: string | null;
       permissions?: string[];
       access_token?: string;
       access_token_expires?: number | string;
@@ -47,6 +50,9 @@ declare module 'next-auth' {
     is_admin?: string | null;
     login_as?: string | null;
     phone?: string | null;
+    user_type?: string | null;
+    country?: string | null;
+    profile_picture?: string | null;
     permissions?: string[];
     access_token?: string;
     access_token_expires?: number | string;
@@ -98,6 +104,7 @@ export const authOptions: NextAuthOptions = {
           });
         
           const jsonData = await res.json();
+          console.log(jsonData);
           
           if (jsonData.code === 400) {
             nextAuthLogger.warn('Login failed: Invalid credentials', { code: jsonData.code });
@@ -124,6 +131,9 @@ export const authOptions: NextAuthOptions = {
             username: jsonData.data?.username,
             role: jsonData.data?.role,
             phone: jsonData.data?.phone,
+            country: jsonData.data?.country,
+            user_type: jsonData.data?.user_type,
+            profile_picture: jsonData.data?.profile_picture,
             is_admin: jsonData.data?.is_admin || null,
             login_as: jsonData.data?.login_as || null,
             permissions: jsonData.data?.permissions || [],
@@ -176,6 +186,9 @@ export const authOptions: NextAuthOptions = {
           is_admin: user.is_admin,
           login_as: user.login_as,
           phone: user.phone,
+          user_type: user.user_type,
+          country: user.country,
+          profile_picture: user.profile_picture,
           role: user.role,
           permissions: user.permissions,
         });
@@ -214,6 +227,9 @@ export const authOptions: NextAuthOptions = {
           is_admin: token.is_admin as string | null,
           login_as: token.login_as as string | null,
           phone: token.phone as string | null,
+          user_type: token.user_type as string | null,
+          country: token.country as string | null,
+          profile_picture: token.profile_picture as string | null,
           permissions: (token.permissions as string[]) || [],
           // Include tokens from JWT for initial session setup
           // tokenService will sync these to sessionStorage on client-side

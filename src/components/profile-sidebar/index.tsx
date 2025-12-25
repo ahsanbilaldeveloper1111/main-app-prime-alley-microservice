@@ -14,11 +14,15 @@ import {
   Settings,
   PlusCircle,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  Ticket,
+  Shield,
+  History
 } from 'lucide-react';
 
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from 'next/router';
+import { getStorageImageUrl } from '@utils/imageUtils';
 
 interface ProfileSidebarProps {
   isOpen?: boolean;
@@ -38,6 +42,9 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
   const [loggedInName, setLoggedInName] = useState('');
 	const [loggedInUserRole, setLoggedInUserRole] = useState('');
 	const [loggedInUserUsername, setLoggedInUserUsername] = useState('');
+  const [loggedInUserProfilePicture, setLoggedInUserProfilePicture] = useState('');
+  const [loggedInUserUserType, setLoggedInUserUserType] = useState('');
+  const [loggedInUserCountry, setLoggedInUserCountry] = useState('');
 
 	useEffect(() => {
 		if (status !=="loading" && session) {
@@ -45,6 +52,9 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 		    setLoggedInName(session.user.name || '');
 		    setLoggedInUserUsername(session.user.username || '');
 		    setLoggedInUserRole(session.user.role || '');
+        setLoggedInUserProfilePicture(session.user?.profile_picture || '');
+        setLoggedInUserUserType(session.user.user_type || '');
+        setLoggedInUserCountry(session.user.country || '');
 		  }
 		}
 	    }, [ status, session]);
@@ -385,7 +395,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
           {/* User Card */}
           <div className="profile-user-card">
             <div className="profile-avatar">
-              <img src="https://i.pravatar.cc/150?img=12" alt="Carson Darrin" />
+              <img src={getStorageImageUrl(loggedInUserProfilePicture || '') || ''} alt="Carson Darrin" />
             </div>
             <div className="profile-user-info">
               <h5 className="profile-user-name">{loggedInName}</h5>
@@ -395,15 +405,20 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                     ) : (
                       <span>{loggedInUserUsername}</span>
                     )}
+                    
                 </small>
             </div>
-            <span className="profile-badge">PRO</span>
+            <span className="profile-badge">
+              {loggedInUserUserType}
+            </span>
           </div>
 
           {/* Menu */}
           <ul className="profile-menu">
             {/* Section 1 */}
+            
             <div className="profile-menu-section">
+              
               <li className="profile-menu-item">
                 <button className="profile-menu-button">
                   <div className="profile-menu-content">
@@ -419,17 +434,55 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                 <button className="profile-menu-button">
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
-                      <Mail size={20} />
+                      <Shield size={20} />
                     </div>
-                    <span className="profile-menu-text">Recently mail</span>
-                  </div>
-                  <div className="profile-menu-avatars">
-                    <div className="profile-menu-avatar profile-menu-avatar-1"></div>
-                    <div className="profile-menu-avatar profile-menu-avatar-2"></div>
-                    <div className="profile-menu-avatar profile-menu-avatar-3"></div>
+                    <span className="profile-menu-text">2FA / MFA</span>
                   </div>
                 </button>
               </li>
+
+              <li className="profile-menu-item">
+                <button className="profile-menu-button">
+                  <div className="profile-menu-content">
+                    <div className="profile-menu-icon">
+                      <History size={20} />
+                    </div>
+                    <span className="profile-menu-text">Login History</span>
+                  </div>
+                </button>
+              </li>
+            </div>
+
+            {/* Section 2 */}
+            
+
+            {/* Section 3 */}
+            <div className="profile-menu-section">
+              
+
+              <li className="profile-menu-item">
+                <button className="profile-menu-button">
+                  <div className="profile-menu-content">
+                    <div className="profile-menu-icon">
+                      <Flag size={20} />
+                    </div>
+                    <span className="profile-menu-text">{loggedInUserCountry ? loggedInUserCountry : 'Unknown'}</span>
+                  </div>
+                </button>
+              </li>
+
+{session?.user?.permissions?.includes('view-crm-tasks') && (
+              <li className="profile-menu-item">
+                <button className="profile-menu-button" onClick={() => router.push('/crm/tasks')} >
+                  <div className="profile-menu-content">
+                    <div className="profile-menu-icon">
+                      <Calendar size={20} />
+                    </div>
+                    <span className="profile-menu-text">Tasks</span>
+                  </div>
+                </button>
+              </li>
+              )}
 
               <li className="profile-menu-item">
                 <button className="profile-menu-button" >
@@ -441,80 +494,8 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                   </div>
                 </button>
               </li>
-            </div>
 
-            {/* Section 2 */}
-            <div className="profile-menu-section">
-              <li className="profile-menu-item">
-                <button className="profile-menu-button">
-                  <div className="profile-menu-content">
-                    <div className="profile-menu-icon">
-                      <Heart size={20} />
-                    </div>
-                    <span className="profile-menu-text">Favorite</span>
-                  </div>
-                </button>
-              </li>
-
-              <li className="profile-menu-item">
-                <button className="profile-menu-button" onClick={() => router.push('/dashboard')} >
-                  <div className="profile-menu-content">
-                    <div className="profile-menu-icon">
-                      <Download size={20} />
-                    </div>
-                    <span className="profile-menu-text">Download</span>
-                  </div>
-                  <span className="profile-menu-badge">10</span>
-                </button>
-              </li>
-            </div>
-
-            {/* Section 3 */}
-            <div className="profile-menu-section">
-              <li className="profile-menu-item">
-                <button className="profile-menu-button">
-                  <div className="profile-menu-content">
-                    <div className="profile-menu-icon">
-                      <Globe size={20} />
-                    </div>
-                    <span className="profile-menu-text">Languages</span>
-                  </div>
-                  <div className="profile-menu-select">
-                    <span>{selectedLanguage}</span>
-                    <ChevronDown className="chevron" size={16} />
-                  </div>
-                </button>
-              </li>
-
-              <li className="profile-menu-item">
-                <button className="profile-menu-button">
-                  <div className="profile-menu-content">
-                    <div className="profile-menu-icon">
-                      <Flag size={20} />
-                    </div>
-                    <span className="profile-menu-text">Country</span>
-                  </div>
-                </button>
-              </li>
-
-              <li className="profile-menu-item">
-                <button 
-                  className="profile-menu-button"
-                  onClick={() => setDarkMode(!darkMode)}
-                >
-                  <div className="profile-menu-content">
-                    <div className="profile-menu-icon">
-                      <Moon size={20} />
-                    </div>
-                    <span className="profile-menu-text">Dark mode</span>
-                  </div>
-                  <div 
-                    className={`profile-toggle-switch ${darkMode ? 'active' : ''}`}
-                  >
-                    <div className="profile-toggle-slider"></div>
-                  </div>
-                </button>
-              </li>
+             
             </div>
 
             {/* Section 4 */}
@@ -530,29 +511,21 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                 </button>
               </li>
 
-              <li className="profile-menu-item upgrade">
-                <button className="profile-menu-button">
-                  <div className="profile-menu-content">
-                    <div className="profile-menu-icon">
-                      <Star size={20} />
-                    </div>
-                    <span className="profile-menu-text">Upgrade account</span>
-                  </div>
-                  <span className="profile-menu-badge new">NEW</span>
-                </button>
-              </li>
 
+              {session?.user?.permissions?.includes('view-ticket-tickets') && (
               <li className="profile-menu-item">
-                <button className="profile-menu-button">
+                <button className="profile-menu-button"
+                  onClick={() => router.push('/tickets/list')}
+                >
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
-                      <Bell size={20} />
+                      <Ticket size={20} />
                     </div>
-                    <span className="profile-menu-text">Notifications</span>
+                    <span className="profile-menu-text">Raise a Ticket</span>
                   </div>
                 </button>
               </li>
-
+              )}
               <li className="profile-menu-item">
                 <button className="profile-menu-button"
                   onClick={() => router.push('/settings')}
