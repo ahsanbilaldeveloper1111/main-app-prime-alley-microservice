@@ -413,9 +413,6 @@ const GlobalFloatingCallBar: React.FC = () => {
       controllerAddress: userAddress,
       controllerDeviceName: activeDevice.deviceName || 'WebCTI',
       controllerDeviceType: activeDevice.deviceType || 'SOFT_HARD',
-      // Calling device fields - use user's device info for callingDeviceName/Type
-      callingDeviceName: activeDevice.deviceName || 'WebCTI',
-      callingDeviceType: activeDevice.deviceType || 'SOFT_HARD',
     };
   }, [userAddress, dnsMap]);
 
@@ -676,9 +673,9 @@ const GlobalFloatingCallBar: React.FC = () => {
         callId: activeCall.callId,
         callingAddress: activeCall.callingAddress!, // Keep original calling address
         calledAddress: activeCall.calledAddress || activeCall.number,
-        callingDeviceType: controllerDevice.callingDeviceType,
-        callingDeviceName: controllerDevice.callingDeviceName,
-        // Add controller fields if API supports them
+        callingDeviceType: activeCall.callingDeviceType || 'SOFT_HARD', // From active call
+        callingDeviceName: activeCall.callingDeviceName || 'WebCTI', // From active call
+        // Add controller fields from user's device
         controllerAddress: controllerDevice.controllerAddress,
         controllerDeviceName: controllerDevice.controllerDeviceName,
         controllerDeviceType: controllerDevice.controllerDeviceType,
@@ -711,9 +708,9 @@ const GlobalFloatingCallBar: React.FC = () => {
         callId: activeCall.callId,
         callingAddress: activeCall.callingAddress!, // Keep original calling address
         calledAddress: activeCall.calledAddress || activeCall.number,
-        callingDeviceType: controllerDevice.callingDeviceType,
-        callingDeviceName: controllerDevice.callingDeviceName,
-        // Add controller fields if API supports them
+        callingDeviceType: activeCall.callingDeviceType || 'SOFT_HARD', // From active call
+        callingDeviceName: activeCall.callingDeviceName || 'WebCTI', // From active call
+        // Add controller fields from user's device
         controllerAddress: controllerDevice.controllerAddress,
         controllerDeviceName: controllerDevice.controllerDeviceName,
         controllerDeviceType: controllerDevice.controllerDeviceType,
@@ -746,9 +743,9 @@ const GlobalFloatingCallBar: React.FC = () => {
         callId: activeCall.callId,
         callingAddress: activeCall.callingAddress!, // Keep original calling address
         calledAddress: activeCall.calledAddress || activeCall.number,
-        callingDeviceType: controllerDevice.callingDeviceType,
-        callingDeviceName: controllerDevice.callingDeviceName,
-        // Add controller fields if API supports them
+        callingDeviceType: activeCall.callingDeviceType || 'SOFT_HARD', // From active call
+        callingDeviceName: activeCall.callingDeviceName || 'WebCTI', // From active call
+        // Add controller fields from user's device
         controllerAddress: controllerDevice.controllerAddress,
         controllerDeviceName: controllerDevice.controllerDeviceName,
         controllerDeviceType: controllerDevice.controllerDeviceType,
@@ -1404,9 +1401,9 @@ const GlobalFloatingCallBar: React.FC = () => {
                           callId: activeCall.callId,
                           callingAddress: activeCall.callingAddress!, // Keep original calling address
                           calledAddress: activeCall.calledAddress || activeCall.number,
-                          callingDeviceType: controllerDevice.callingDeviceType,
-                          callingDeviceName: controllerDevice.callingDeviceName,
-                          // Add controller fields if API supports them
+                          callingDeviceType: activeCall.callingDeviceType || 'SOFT_HARD', // From active call
+                          callingDeviceName: activeCall.callingDeviceName || 'WebCTI', // From active call
+                          // Add controller fields from user's device
                           controllerAddress: controllerDevice.controllerAddress,
                           controllerDeviceName: controllerDevice.controllerDeviceName,
                           controllerDeviceType: controllerDevice.controllerDeviceType,
