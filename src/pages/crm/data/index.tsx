@@ -104,10 +104,13 @@ import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import FormModal from "../../partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import { ModuleSlug } from "@utils/Helper";
+import { ModuleSlug, formatDuration, formatDateTimeToLocal, GlobalDateFormat, GlobalTimeFormat } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
+import { ListCallLogs, DownloadCallRecording } from "@utils/calls";
+import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
+import CircularProgressCircle from "@components/CircularProgressCircle";
 
 // KPI Card Component (from crm-new.tsx design)
 interface KPICardData {
@@ -489,6 +492,15 @@ const CrmProspectsManagement = () => {
 
   // History modal state
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  // Call recordings state
+  const [callRecordings, setCallRecordings] = useState<any[]>([]);
+  const [callRecordingsLoading, setCallRecordingsLoading] = useState(false);
+  const [callRecordingsTotal, setCallRecordingsTotal] = useState(0);
+  const [selectedRecording, setSelectedRecording] = useState<any>(null);
+  const [showRecordingPlayerModal, setShowRecordingPlayerModal] = useState(false);
+  const [downloadingRecordings, setDownloadingRecordings] = useState<Set<string>>(new Set());
+  const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
 
   const [showProspectsAnalytics, setShowProspectsAnalytics] = useState(false);
   const [showAllProspectStats, setShowAllProspectStats] = useState(false);
@@ -1356,6 +1368,139 @@ const CrmProspectsManagement = () => {
   const handleViewData = useCallback((item: CrmDataItem) => {
     setSelectedDataItem(item);
     setShowViewModal(true);
+  }, []);
+
+  // Fetch call recordings (not call logs) for the selected prospect
+  // Filters by current user's extension and prospect's phone number
+  const fetchCallRecordings = useCallback(async (phoneNumber: string) => {
+    if (!phoneNumber) {
+      setCallRecordings([]);
+      return;
+    }
+    console.log(session?.user, "ZEZ");
+    const userExtension = (session?.user as any)?.phone;
+    if (!userExtension) {
+      setCallRecordings([]);
+      return;
+    }
+
+    setCallRecordingsLoading(true);
+    try {
+      const filters = {
+        remote_party_number: [phoneNumber],
+      };
+
+      // Use ListCallLogs with reportType 'recordings' to fetch call recordings
+      const response = await ListCallLogs(
+        {
+          page: 1,
+          perPage: 5,
+          search: "",
+          filters,
+          reportType: "recordings", // This ensures we get recordings, not logs
+          moduleSlug: ModuleSlug.CALL_RECORDINGS,
+        },
+        "call-logs/recordings" // Endpoint for call recordings
+      );
+
+      if (response?.dataList) {
+        setCallRecordings(response.dataList);
+      } else {
+        setCallRecordings([]);
+      }
+
+      // Store total count from pagination
+      if (response?.total !== undefined) {
+        setCallRecordingsTotal(response.total);
+      } else {
+        setCallRecordingsTotal(0);
+      }
+    } catch (error) {
+      console.error("Failed to fetch call recordings:", error);
+      setCallRecordings([]);
+      setCallRecordingsTotal(0);
+    } finally {
+      setCallRecordingsLoading(false);
+    }
+  }, [session]);
+
+  // Load call recordings when view modal opens
+  useEffect(() => {
+    if (showViewModal && selectedDataItem?.phone) {
+      fetchCallRecordings(selectedDataItem.phone);
+    } else {
+      setCallRecordings([]);
+      setCallRecordingsTotal(0);
+    }
+  }, [showViewModal, selectedDataItem, fetchCallRecordings]);
+
+  // Handle play call recording
+  const handlePlayCallRecording = useCallback((recording: any) => {
+    setSelectedRecording(recording);
+    setShowRecordingPlayerModal(true);
+  }, []);
+
+  // Handle download call recording
+  const handleDownloadCallRecording = useCallback(async (recording: any) => {
+    const { Id, AgentExtension } = recording;
+    
+    // Add to downloading set and initialize progress
+    setDownloadingRecordings(prev => new Set(prev).add(Id));
+    setDownloadProgress(prev => ({ ...prev, [Id]: 0 }));
+    
+    try {
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setDownloadProgress(prev => {
+          const currentProgress = prev[Id] || 0;
+          if (currentProgress < 90) {
+            return { ...prev, [Id]: currentProgress + Math.random() * 15 };
+          }
+          return prev;
+        });
+      }, 200);
+
+      await DownloadCallRecording(
+        Id,
+        AgentExtension,
+        'call-logs/recordings/download',
+        recording.imagicle
+      );
+      
+      // Complete the progress
+      clearInterval(progressInterval);
+      setDownloadProgress(prev => ({ ...prev, [Id]: 100 }));
+      
+      // Show completion briefly before hiding
+      setTimeout(() => {
+        setDownloadingRecordings(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(Id);
+          return newSet;
+        });
+        setDownloadProgress(prev => {
+          const newProgress = { ...prev };
+          delete newProgress[Id];
+          return newProgress;
+        });
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Download failed');
+      
+      // Remove from downloading set on error
+      setDownloadingRecordings(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(Id);
+        return newSet;
+      });
+      setDownloadProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[Id];
+        return newProgress;
+      });
+    }
   }, []);
 
   // Handle delete data item
@@ -4151,21 +4296,175 @@ const CrmProspectsManagement = () => {
               </>
             )} */}
 
-            {/* No Call History Message */}
-            {/* {getCallHistory(selectedDataItem.id).length === 0 && (
-              <div style={{
-                marginBottom: '30px',
-                padding: '20px',
-                background: '#f8f9fa',
-                borderRadius: '10px',
-                textAlign: 'center'
-              }}>
-                <History size={32} style={{ color: '#9ca3af', marginBottom: '12px' }} />
-                <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                  No call history available for this prospect
+            {/* Call Recordings Section */}
+            <div
+              style={{
+                fontSize: "16px",
+                fontWeight: 600,
+                color: "#1f2937",
+                marginBottom: "20px",
+                paddingBottom: "10px",
+                borderBottom: "2px solid #f8f9fa",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}
+            >
+              <History size={18} style={{ color: "#4680ff" }} />
+              Call Recordings ({callRecordingsTotal > 0 ? callRecordingsTotal : callRecordings.length})
+              {callRecordingsTotal > callRecordings.length && (
+                <span className="text-muted" style={{ fontSize: "14px", fontWeight: 400 }}>
+                  {" "}(Showing first {callRecordings.length})
+                </span>
+              )}
+            </div>
+
+            {callRecordingsLoading ? (
+              <div
+                style={{
+                  marginBottom: "30px",
+                  padding: "20px",
+                  background: "#f8f9fa",
+                  borderRadius: "10px",
+                  textAlign: "center",
+                }}
+              >
+                <Spinner animation="border" variant="primary" size="sm" />
+                <p className="mt-2 mb-0 text-muted">Loading call recordings...</p>
+              </div>
+            ) : callRecordings.length === 0 ? (
+              <div
+                style={{
+                  marginBottom: "30px",
+                  padding: "20px",
+                  background: "#f8f9fa",
+                  borderRadius: "10px",
+                  textAlign: "center",
+                }}
+              >
+                <History size={32} style={{ color: "#9ca3af", marginBottom: "12px" }} />
+                <div style={{ fontSize: "14px", color: "#6b7280" }}>
+                  No call recordings found for this prospect
                 </div>
               </div>
-            )} */}
+            ) : (
+              <div style={{ marginBottom: "30px" }}>
+                <Table hover responsive className="mb-0">
+                  <thead style={{ background: "#f8f9fa" }}>
+                    <tr>
+                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>
+                        Date
+                      </th>
+                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>
+                        Time
+                      </th>
+                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>
+                        Extension
+                      </th>
+                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>
+                        Remote Number
+                      </th>
+                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>
+                        Direction
+                      </th>
+                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>
+                        Duration
+                      </th>
+                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", width: "120px" }}>
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {callRecordings.map((recording: any, index: number) => {
+                      const duration =
+                        parseInt(recording.Duration?.toString() || "0") / 10000000 || 0;
+                      const isDownloading = downloadingRecordings.has(recording.Id);
+                      const progress = downloadProgress[recording.Id] || 0;
+                      
+                      return (
+                        <tr key={recording.Id || index}>
+                          <td style={{ fontSize: "14px", color: "#1f2937" }}>
+                            {formatDateTimeToLocal(
+                              recording.DateTime,
+                              GlobalDateFormat
+                            )}
+                          </td>
+                          <td style={{ fontSize: "14px", color: "#1f2937" }}>
+                            {formatDateTimeToLocal(
+                              recording.DateTime,
+                              GlobalTimeFormat,
+                              "YYYY-MM-DD HH:mm:ss.SSSSSSS"
+                            )}
+                          </td>
+                          <td style={{ fontSize: "14px", color: "#1f2937" }}>
+                            {recording.AgentExtension || "N/A"}
+                          </td>
+                          <td style={{ fontSize: "14px", color: "#1f2937" }}>
+                            {recording.RemotePartyNumber || "N/A"}
+                          </td>
+                          <td>
+                            <Badge
+                              bg={
+                                recording.Direction === "CALL_OUTGOING"
+                                  ? "primary"
+                                  : "success"
+                              }
+                              className="bg-opacity-10 text-dark"
+                            >
+                              {recording.Direction === "CALL_OUTGOING"
+                                ? "Outgoing"
+                                : recording.Direction === "CALL_INCOMING"
+                                ? "Incoming"
+                                : recording.Direction || "N/A"}
+                            </Badge>
+                          </td>
+                          <td style={{ fontSize: "14px", color: "#1f2937" }}>
+                            {formatDuration(duration)}
+                          </td>
+                          <td>
+                            <div className="d-flex gap-2 align-items-center">
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-1"
+                                title="Play Recording"
+                                onClick={() => handlePlayCallRecording(recording)}
+                              >
+                                <FiPlay size={16} className="text-info" />
+                              </Button>
+                              <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                {isDownloading ? (
+                                  <CircularProgressCircle 
+                                    progress={progress}
+                                    size="small" 
+                                    color="#28a745"
+                                    backgroundColor="#e9ecef"
+                                    textColor="#495057"
+                                    showPercentage={false}
+                                    className="circular-progress-inline"
+                                  />
+                                ) : (
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="p-1"
+                                    title="Download Recording"
+                                    onClick={() => handleDownloadCallRecording(recording)}
+                                  >
+                                    <Download size={16} className="text-info" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Table>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div
@@ -5247,6 +5546,16 @@ const CrmProspectsManagement = () => {
         onHide={() => setShowSuccessfulModal(false)}
         title={successModalTitle}
         description={successModalDescription}
+      />
+
+      {/* Call Recording Player Modal */}
+      <CallRecordingPlayerModal
+        show={showRecordingPlayerModal}
+        onHide={() => {
+          setShowRecordingPlayerModal(false);
+          setSelectedRecording(null);
+        }}
+        recording={selectedRecording}
       />
     </React.Fragment>
   );

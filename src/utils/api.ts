@@ -213,22 +213,43 @@ export const authAPI = {
           },
           timeout: 30000
         });
-
         if (response.data.code === 200 && response.data.data?.access_token) {
           // Update sessionStorage with new tokens
           sessionStorage.setItem('accessToken', response.data.data.access_token);
-          if (response.data.data.refresh_token?.access_token) {
-            sessionStorage.setItem('refreshToken', response.data.data.refresh_token.access_token);
+          
+          // Handle new refresh token format: refresh_token is now a direct string
+          // Support both new format (direct string) and old format (nested object) for backward compatibility
+          let newRefreshToken: string | undefined;
+          let newRefreshTokenExpires: number | undefined;
+
+          const refreshTokenValue = response.data.data.refresh_token;
+          const isEmptyObject = refreshTokenValue && typeof refreshTokenValue === 'object' && Object.keys(refreshTokenValue).length === 0;
+          console.log("ZEZEZE REFRESH TOKEN VALUE", refreshTokenValue);
+          if (typeof refreshTokenValue === 'string' && refreshTokenValue.length > 0) {
+            // New format: refresh_token is a direct string
+            newRefreshToken = refreshTokenValue;
+            if (response.data.data.refresh_token_expires_in) {
+              newRefreshTokenExpires = Date.now() + (response.data.data.refresh_token_expires_in * 1000);
+            }
+          } else if (!isEmptyObject && refreshTokenValue?.access_token && typeof refreshTokenValue.access_token === 'string') {
+            // Old format: refresh_token is nested object (backward compatibility)
+            newRefreshToken = refreshTokenValue.access_token;
+            if (refreshTokenValue.expires_in) {
+              newRefreshTokenExpires = Date.now() + (refreshTokenValue.expires_in * 1000);
+            }
+          }
+
+          if (newRefreshToken) {
+            sessionStorage.setItem('refreshToken', newRefreshToken);
+            if (newRefreshTokenExpires) {
+              sessionStorage.setItem('refreshTokenExpires', newRefreshTokenExpires.toString());
+            }
           }
           
           // Update token expiry if provided
           if (response.data.data.expires_in) {
             const expiresAt = Date.now() + (response.data.data.expires_in * 1000);
             sessionStorage.setItem('accessTokenExpires', expiresAt.toString());
-          }
-          if (response.data.data.refresh_token?.expires_in) {
-            const refreshExpiresAt = Date.now() + (response.data.data.refresh_token.expires_in * 1000);
-            sessionStorage.setItem('refreshTokenExpires', refreshExpiresAt.toString());
           }
 
           // Trigger NextAuth session update to sync the new token

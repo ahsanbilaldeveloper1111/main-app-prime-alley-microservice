@@ -46,18 +46,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // If refresh is successful, set a cookie with the new refresh token
     // This allows NextAuth JWT callback to sync the refresh token
-    if (response.data.code === 200 && response.data.data?.refresh_token?.access_token) {
-      const refreshToken = response.data.data.refresh_token.access_token;
-      const refreshTokenExpires = response.data.data.refresh_token.expires_in || 0;
-      
-      // Set cookie with refresh token (for NextAuth to sync)
-      // Cookie expires when refresh token expires
-      const cookieMaxAge = refreshTokenExpires > 0 ? refreshTokenExpires : 7 * 24 * 60 * 60; // Default 7 days
-      res.setHeader('Set-Cookie', [
-        `nextauth-refresh-token=${refreshToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${cookieMaxAge}`,
-        // Also set a flag to indicate token was refreshed
-        `nextauth-token-refreshed=true; Path=/; SameSite=Lax; Max-Age=60` // 1 minute flag
-      ]);
+    // Handle both new format (direct string) and old format (nested object) for backward compatibility
+    let refreshToken: string | undefined;
+    let refreshTokenExpires: number = 0;
+
+    if (response.data.code === 200 && response.data.data) {
+      const refreshTokenValue = response.data.data.refresh_token;
+      const isEmptyObject = refreshTokenValue && typeof refreshTokenValue === 'object' && Object.keys(refreshTokenValue).length === 0;
+
+      if (typeof refreshTokenValue === 'string' && refreshTokenValue.length > 0) {
+        // New format: refresh_token is a direct string
+        refreshToken = refreshTokenValue;
+        refreshTokenExpires = response.data.data.refresh_token_expires_in || 0;
+      } else if (!isEmptyObject && refreshTokenValue?.access_token && typeof refreshTokenValue.access_token === 'string') {
+        // Old format: refresh_token is nested object (backward compatibility)
+        refreshToken = refreshTokenValue.access_token;
+        refreshTokenExpires = refreshTokenValue.expires_in || 0;
+      }
+
+      if (refreshToken) {
+        // Set cookie with refresh token (for NextAuth to sync)
+        // Cookie expires when refresh token expires
+        const cookieMaxAge = refreshTokenExpires > 0 ? refreshTokenExpires : 7 * 24 * 60 * 60; // Default 7 days
+        res.setHeader('Set-Cookie', [
+          `nextauth-refresh-token=${refreshToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${cookieMaxAge}`,
+          // Also set a flag to indicate token was refreshed
+          `nextauth-token-refreshed=true; Path=/; SameSite=Lax; Max-Age=60` // 1 minute flag
+        ]);
+      }
     }
 
     return res.status(200).json(response.data);

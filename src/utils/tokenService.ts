@@ -60,18 +60,44 @@ class TokenService {
     return Date.now() >= (expiration - bufferTime);
   }
 
+  // Clean up corrupted tokens from sessionStorage
+  private cleanupCorruptedTokens(): void {
+    if (typeof window === 'undefined' || !window.sessionStorage) {
+      return;
+    }
+
+    const accessToken = sessionStorage.getItem('accessToken');
+    const refreshToken = sessionStorage.getItem('refreshToken');
+
+    // Remove corrupted tokens
+    if (accessToken === '[object Object]' || (accessToken && typeof accessToken !== 'string')) {
+      sessionStorage.removeItem('accessToken');
+      sessionStorage.removeItem('accessTokenExpires');
+    }
+    if (refreshToken === '[object Object]' || (refreshToken && typeof refreshToken !== 'string')) {
+      sessionStorage.removeItem('refreshToken');
+      sessionStorage.removeItem('refreshTokenExpires');
+    }
+  }
+
   // Get tokens from session storage
   private getTokens(): TokenData | null {
     if (typeof window === 'undefined' || !window.sessionStorage) {
       return null;
     }
 
+    // Clean up any corrupted tokens first
+    this.cleanupCorruptedTokens();
+
     const accessToken = sessionStorage.getItem('accessToken');
     const refreshToken = sessionStorage.getItem('refreshToken');
     const accessTokenExpires = sessionStorage.getItem('accessTokenExpires');
     const refreshTokenExpires = sessionStorage.getItem('refreshTokenExpires');
 
-    if (!accessToken || !refreshToken) {
+    // Filter out invalid tokens (objects converted to strings)
+    if (!accessToken || !refreshToken || 
+        accessToken === '[object Object]' || refreshToken === '[object Object]' ||
+        typeof accessToken !== 'string' || typeof refreshToken !== 'string') {
       return null;
     }
 
@@ -89,12 +115,25 @@ class TokenService {
       return;
     }
 
-    if (tokens.accessToken) {
+    // Ensure accessToken is a string before saving
+    if (tokens.accessToken && typeof tokens.accessToken === 'string') {
       sessionStorage.setItem('accessToken', tokens.accessToken);
+    } else if (tokens.accessToken) {
+      console.warn('Attempted to save non-string accessToken:', tokens.accessToken);
     }
-    if (tokens.refreshToken) {
+
+    // Ensure refreshToken is a string before saving - never save objects
+    if (tokens.refreshToken && typeof tokens.refreshToken === 'string' && tokens.refreshToken.length > 0) {
       sessionStorage.setItem('refreshToken', tokens.refreshToken);
+    } else if (tokens.refreshToken) {
+      console.warn('Attempted to save non-string refreshToken:', tokens.refreshToken);
+      // Don't save invalid refresh token - keep existing one if available
+      const currentTokens = this.getTokens();
+      if (currentTokens?.refreshToken && typeof currentTokens.refreshToken === 'string') {
+        sessionStorage.setItem('refreshToken', currentTokens.refreshToken);
+      }
     }
+
     if (tokens.accessTokenExpires) {
       sessionStorage.setItem('accessTokenExpires', tokens.accessTokenExpires.toString());
     }
@@ -111,9 +150,17 @@ class TokenService {
 
     // Get current tokens if partial tokens don't have all fields
     const currentTokens = this.getTokens();
+    
+    // Ensure refreshToken is always a string, never an object
+    let refreshTokenValue = tokens.refreshToken || currentTokens?.refreshToken || '';
+    if (typeof refreshTokenValue !== 'string') {
+      // If it's an object (including empty object), use current token or empty string
+      refreshTokenValue = currentTokens?.refreshToken || '';
+    }
+    
     const tokensToSync: TokenData = {
       accessToken: tokens.accessToken || currentTokens?.accessToken || '',
-      refreshToken: tokens.refreshToken || currentTokens?.refreshToken || '',
+      refreshToken: refreshTokenValue,
       accessTokenExpires: tokens.accessTokenExpires || currentTokens?.accessTokenExpires || 0,
       refreshTokenExpires: tokens.refreshTokenExpires || currentTokens?.refreshTokenExpires || 0,
     };
@@ -251,11 +298,12 @@ class TokenService {
         //   status: response.status,
         //   code: data.code,
         //   hasAccessToken: !!data.data?.access_token,
-        //   hasRefreshToken: !!data.data?.refresh_token?.access_token,
+        //   hasRefreshToken: typeof data.data?.refresh_token === 'string' || !!data.data?.refresh_token?.access_token,
         //   newExpiresIn: data.data?.expires_in,
-        //   newRefreshExpiresIn: data.data?.refresh_token?.expires_in
+        //   newRefreshExpiresIn: data.data?.refresh_token_expires_in || data.data?.refresh_token?.expires_in
         // });
 
+        console.log("ZEZEZE REFRESH DATA a", data);
         if (data.code === 200 && data.data?.access_token) {
           const now = Date.now();
           const newTokens: Partial<TokenData> = {
@@ -263,10 +311,41 @@ class TokenService {
             accessTokenExpires: now + (data.data.expires_in * 1000) // Convert seconds to milliseconds
           };
 
-          // If we got a new refresh token, update it
-          if (data.data.refresh_token?.access_token) {
-            newTokens.refreshToken = data.data.refresh_token.access_token;
-            newTokens.refreshTokenExpires = now + (data.data.refresh_token.expires_in * 1000); // Convert seconds to milliseconds
+          // Handle new refresh token format: refresh_token is now a direct string
+          // Support both new format (direct string) and old format (nested object) for backward compatibility
+          let newRefreshToken: string | undefined;
+          let newRefreshTokenExpires: number | undefined;
+
+          // Check if refresh_token exists and is not an empty object
+          const refreshTokenValue = data.data.refresh_token;
+          const isEmptyObject = refreshTokenValue && typeof refreshTokenValue === 'object' && Object.keys(refreshTokenValue).length === 0;
+
+          if (typeof refreshTokenValue === 'string' && refreshTokenValue.length > 0) {
+            // New format: refresh_token is a direct string
+            newRefreshToken = refreshTokenValue;
+            // Check for refresh_token_expires_in (new format) or refresh_token.expires_in (old format)
+            if (data.data.refresh_token_expires_in) {
+              newRefreshTokenExpires = now + (data.data.refresh_token_expires_in * 1000);
+            }
+          } else if (!isEmptyObject && refreshTokenValue?.access_token && typeof refreshTokenValue.access_token === 'string') {
+            // Old format: refresh_token is nested object (backward compatibility)
+            newRefreshToken = refreshTokenValue.access_token;
+            if (refreshTokenValue.expires_in) {
+              newRefreshTokenExpires = now + (refreshTokenValue.expires_in * 1000);
+            }
+          }
+
+          if (newRefreshToken) {
+            newTokens.refreshToken = newRefreshToken;
+            if (newRefreshTokenExpires) {
+              newTokens.refreshTokenExpires = newRefreshTokenExpires;
+            } else {
+              // If no expiry provided, keep existing expiry or use default
+              const currentTokens = this.getTokens();
+              if (currentTokens) {
+                newTokens.refreshTokenExpires = currentTokens.refreshTokenExpires;
+              }
+            }
           } else {
             // Keep existing refresh token if not provided
             const currentTokens = this.getTokens();
@@ -549,10 +628,13 @@ class TokenService {
 
     const tokenData: Partial<TokenData> = {};
     
-    if (session.user.access_token) {
+    // Ensure access_token is a string
+    if (session.user.access_token && typeof session.user.access_token === 'string') {
       tokenData.accessToken = session.user.access_token;
     }
-    if (session.user.refresh_token) {
+    
+    // Ensure refresh_token is a string, never save objects
+    if (session.user.refresh_token && typeof session.user.refresh_token === 'string' && session.user.refresh_token.length > 0) {
       tokenData.refreshToken = session.user.refresh_token;
     }
     if (session.user.access_token_expires) {
