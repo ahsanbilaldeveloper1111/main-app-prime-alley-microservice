@@ -8,6 +8,8 @@ import { toast } from "react-toastify";
 import DeviceSelectionModal from "./DeviceSelectionModal";
 import { useRouter } from "next/router";
 import { useDialerModal } from "../contexts/DialerModalContext";
+import moment from "moment-timezone";
+
 
 type CallBarPosition = "bottom" | "top" | "left" | "right";
 
@@ -135,11 +137,18 @@ const GlobalFloatingCallBar: React.FC = () => {
 
   // Format phone number for display
   const formatPhoneNumber = useCallback((number: string): string => {
+    // If it's an E.164 number (starts with +), return as-is
+    if (number.startsWith("+")) {
+      return number;
+    }
+    
     // Format as (XXX) XXX-XXXX if it's a 10-digit number
     const digits = number.replaceAll(/\D/g, "");
     if (digits.length === 10) {
       return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
     }
+    
+    // For extensions or other formats, return as-is
     return number;
   }, []);
 
@@ -347,18 +356,35 @@ const GlobalFloatingCallBar: React.FC = () => {
   }, [position, isDragging, dragPosition]);
 
   // Get the first active call (for display) - prefer connected calls, include onHold
-  const activeCall = Array.from(activeCalls.values())
-    .filter((call) =>
-      ["connected", "ringing", "dialing", "onHold"].includes(call.status)
-    )
-    .sort((a, b) => {
-      // Prioritize connected calls, then onHold, then ringing
-      if (a.status === "connected" && b.status !== "connected") return -1;
-      if (b.status === "connected" && a.status !== "connected") return 1;
-      if (a.status === "onHold" && !["connected"].includes(b.status)) return -1;
-      if (b.status === "onHold" && !["connected"].includes(a.status)) return 1;
-      return 0;
-    })[0];
+  // Filter to only show calls involving the current user's phone number
+  const activeCall = React.useMemo(() => {
+    const call = Array.from(activeCalls.values())
+      .filter((call) => {
+        // Only show calls where the user is involved (callingAddress or calledAddress matches userAddress)
+        const involvesUser = userAddress && (
+          call.callingAddress === userAddress || 
+          call.calledAddress === userAddress
+        );
+        
+        // Also filter by status
+        const hasValidStatus = ["connected", "ringing", "dialing", "onHold"].includes(call.status);
+        
+        return involvesUser && hasValidStatus;
+      })
+      .sort((a, b) => {
+        // Prioritize connected calls, then onHold, then ringing
+        if (a.status === "connected" && b.status !== "connected") return -1;
+        if (b.status === "connected" && a.status !== "connected") return 1;
+        if (a.status === "onHold" && !["connected"].includes(b.status)) return -1;
+        if (b.status === "onHold" && !["connected"].includes(a.status)) return 1;
+        return 0;
+      })[0];
+      if(call)
+      {
+        call.duration = moment().diff(moment(call?.startTime).tz('utc', true), 'seconds');
+      }
+      return call;
+  }, [activeCalls, userAddress]);
 
   // Don't show if CTI is not initialized or user doesn't have permission
   // Also check if we're on the dialer or live-calls page itself (to avoid duplicate UI)
@@ -457,12 +483,19 @@ const GlobalFloatingCallBar: React.FC = () => {
     }
 
     try {
+      console.log("ZEZE activeCall", activeCall, {
+        callId: activeCall.callId,
+        callingAddress: activeCall.callingAddress,
+        calledAddress: activeCall.calledAddress || activeCall.number,
+        callingDeviceType: activeCall.callingDeviceType,
+        callingDeviceName: activeCall.callingDeviceName,
+      });
       const result = await endCall({
         callId: activeCall.callId,
-        callingAddress: callingDevice.callingAddress,
+        callingAddress: activeCall.callingAddress!,
         calledAddress: activeCall.calledAddress || activeCall.number,
-        callingDeviceType: callingDevice.callingDeviceType,
-        callingDeviceName: callingDevice.callingDeviceName,
+        callingDeviceType: activeCall.callingDeviceType!,
+        callingDeviceName: activeCall.callingDeviceName!,
       });
 
       if (result.success) {
@@ -490,10 +523,10 @@ const GlobalFloatingCallBar: React.FC = () => {
     try {
       const result = await holdCall({
         callId: activeCall.callId,
-        callingAddress: callingDevice.callingAddress,
+        callingAddress: activeCall.callingAddress!,
         calledAddress: activeCall.calledAddress || activeCall.number,
-        callingDeviceType: callingDevice.callingDeviceType,
-        callingDeviceName: callingDevice.callingDeviceName,
+        callingDeviceType: activeCall.callingDeviceType!,
+        callingDeviceName: activeCall.callingDeviceName!,
       });
 
       if (result.success) {
@@ -521,10 +554,10 @@ const GlobalFloatingCallBar: React.FC = () => {
     try {
       const result = await resumeCall({
         callId: activeCall.callId,
-        callingAddress: callingDevice.callingAddress,
+        callingAddress: activeCall.callingAddress!,
         calledAddress: activeCall.calledAddress || activeCall.number,
-        callingDeviceType: callingDevice.callingDeviceType,
-        callingDeviceName: callingDevice.callingDeviceName,
+        callingDeviceType: activeCall.callingDeviceType!,
+        callingDeviceName: activeCall.callingDeviceName!,
       });
 
       if (result.success) {
@@ -1135,12 +1168,27 @@ const GlobalFloatingCallBar: React.FC = () => {
           <div className="mb-3">
             <Form.Control
               type="text"
-              placeholder="Enter number or extension"
+              placeholder="Enter number or extension (e.g., 103 or +15551234567)"
               value={dialedNumber}
               onChange={(e) => {
-                const value = e.target.value.replaceAll(/\D/g, "");
-                if (value.length <= 15) {
-                  setDialedNumber(value);
+                let value = e.target.value;
+                
+                // Allow + only at the beginning
+                if (value.startsWith("+")) {
+                  // Allow + followed by digits only
+                  const afterPlus = value.slice(1).replaceAll(/\D/g, "");
+                  value = "+" + afterPlus;
+                  // E.164 format: + followed by up to 15 digits
+                  if (afterPlus.length <= 15) {
+                    setDialedNumber(value);
+                  }
+                } else {
+                  // For extensions or numbers without +, allow digits only
+                  const digitsOnly = value.replaceAll(/\D/g, "");
+                  // Allow up to 15 digits for regular numbers, or shorter for extensions
+                  if (digitsOnly.length <= 15) {
+                    setDialedNumber(digitsOnly);
+                  }
                 }
               }}
               onKeyDown={(e) => {

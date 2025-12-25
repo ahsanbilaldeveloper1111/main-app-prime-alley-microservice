@@ -19,6 +19,7 @@ import {
   PhoneCall
     } from 'lucide-react';
 import { Badge, Button, Dropdown } from 'react-bootstrap';
+import { useCti } from '@hooks/useCti';
 
 interface LayoutProps {
 	children: ReactNode;
@@ -32,7 +33,7 @@ const Layout = ({ children }: LayoutProps) => {
 	const { data: session, status } = useSession();
 	const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
 	const { openDialer } = useDialerModal();
-
+  const { isInitialized } = useCti()
 	const [sidebarOpen, setSidebarOpen] = useState(true);
 	const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
 
@@ -247,6 +248,7 @@ const Layout = ({ children }: LayoutProps) => {
                 variant="link" 
                 size="sm" 
                 className="text-dark position-relative" 
+                disabled={!isInitialized}
                 onClick={openDialer}
                 title="Open Dialer"
               >

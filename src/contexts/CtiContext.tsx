@@ -14,6 +14,7 @@ import {
   getAllUserDevices
 } from '../utils/dialer';
 import { getCrossTabCtiManager } from '../utils/crossTabCtiManager';
+import moment from 'moment';
 
 interface CtiContextType {
   // Connection state
@@ -166,6 +167,135 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     duration?: number;
   }>>(new Map());
   
+  // Populate activeCalls from callStateMap on initialization (from complete_state or localStorage)
+  // This ensures in-progress calls are shown after page reload
+  // Processes ALL calls from callStateMap (filtering happens at component level)
+  useEffect(() => {
+    if (!ctiStomp.isInitialized || !ctiStomp.callStateMap) return;
+    
+    // Process all calls from callStateMap (not filtered by user - filtering happens in components)
+    const allCallStates = Object.values(ctiStomp.callStateMap).filter((call: any) => 
+      !call.isTerminating && call.parties && call.parties.length > 0
+    );
+    
+    setActiveCalls(prev => {
+      const newMap = new Map(prev);
+      
+      // Process all active calls from callStateMap
+      allCallStates.forEach((callState: any) => {
+        if (!callState.callId || !callState.parties || callState.parties.length === 0) return;
+        
+        // Get the first party (or find one that matches userAddress if available)
+        const firstParty = callState.parties[0];
+        if (!firstParty) return;
+        
+        const { callId, callingAddress, calledAddress, callingDeviceName, callingDeviceType, callStatus } = firstParty;
+        
+        // Determine call number from first party
+        const callNumber = calledAddress || callingAddress;
+        
+        // Map CTI status to local status
+        let localStatus = 'dialing';
+        if (callStatus) {
+          switch (callStatus) {
+            case 'RINGING': localStatus = 'ringing'; break;
+            case 'CONNECTED':
+            case 'ANSWERED':
+            case 'RETRIEVED': localStatus = 'connected'; break;
+            case 'ON_HOLD':
+            case 'HELD': localStatus = 'onHold'; break;
+            case 'ENDED':
+            case 'DISCONNECTED':
+            case 'DROPPED': localStatus = 'ended'; break;
+            default: localStatus = 'dialing';
+          }
+        } else if (callState.currentState) {
+          // Fallback to callState.currentState if party doesn't have callStatus
+          switch (callState.currentState) {
+            case 'RINGING': localStatus = 'ringing'; break;
+            case 'CONNECTED':
+            case 'ANSWERED':
+            case 'RETRIEVED': localStatus = 'connected'; break;
+            case 'ON_HOLD':
+            case 'HELD': localStatus = 'onHold'; break;
+            case 'ENDED':
+            case 'DISCONNECTED':
+            case 'DROPPED': localStatus = 'ended'; break;
+            default: localStatus = 'dialing';
+          }
+        }
+        
+        // Skip ended calls
+        if (localStatus === 'ended') {
+          // Remove from map if it exists
+          const existingCall = Array.from(newMap.values()).find(call => call.callId === callId);
+          if (existingCall) {
+            newMap.delete(existingCall.id);
+          }
+          return;
+        }
+        
+        // Use callId as the key for consistency
+        const callKey = callId || `call_${Date.now()}`;
+        
+        // Calculate startTime from eventTime if available, otherwise use current time
+        let startTime = new Date();
+        if (callState.eventTime) {
+          startTime = new Date(callState.eventTime);
+        }
+        
+        // Calculate duration if call is connected
+        let duration = 0;
+        if (localStatus === 'connected' && callState.eventTime) {
+          const now = new Date();
+          const eventTime = moment.utc(callState.eventTime).toDate();
+          duration = Math.max(0, Math.round((now.getTime() - eventTime.getTime()) / 1000));
+        }
+        
+        // Check if we already have this call in prev (to preserve any updates from eventLog)
+        const existingCall = Array.from(newMap.values()).find(call => 
+          call.callId === callId || 
+          (call.callingAddress === callingAddress && call.calledAddress === calledAddress)
+        );
+        if (existingCall) {
+          // Update existing call but preserve startTime if it was already set
+          newMap.set(existingCall.id, {
+            ...existingCall,
+            status: localStatus,
+            callId: callId || existingCall.callId,
+            callingAddress: callingAddress || existingCall.callingAddress,
+            calledAddress: calledAddress || existingCall.calledAddress,
+            callingDeviceName: callingDeviceName || existingCall.callingDeviceName,
+            callingDeviceType: callingDeviceType || existingCall.callingDeviceType,
+            startTime: existingCall.startTime || startTime,
+            duration: localStatus === 'connected' ? duration : existingCall.duration || 0
+          });
+        } else {
+          // Create new call entry
+          newMap.set(callKey, {
+            id: callKey,
+            number: callNumber,
+            status: localStatus,
+            startTime: startTime,
+            callId: callId,
+            callingAddress: callingAddress,
+            calledAddress: calledAddress,
+            callingDeviceName: callingDeviceName,
+            callingDeviceType: callingDeviceType,
+            duration: duration
+          });
+        }
+      });
+      
+      // Note: We don't remove calls that aren't in callStateMap here because:
+      // 1. eventLog processing will handle removals when calls end
+      // 2. This sync is primarily for initialization from complete_state/localStorage
+      // 3. Removing here could cause race conditions with eventLog updates
+      
+      return newMap;
+    });
+  }, [ctiStomp.isInitialized, ctiStomp.callStateMap]);
+  
   // Process CTI events to update active calls
   useEffect(() => {
     if (!ctiStomp.eventLog || ctiStomp.eventLog.length === 0) return;
@@ -178,9 +308,8 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     
     if (!callId || !callingAddress || !calledAddress) return;
     
-    // Determine if this is an incoming or outgoing call
-    const isIncoming = calledAddress === ctiStomp.userAddress;
-    const callNumber = isIncoming ? callingAddress : calledAddress;
+    // Determine call number
+    const callNumber = calledAddress || callingAddress;
     
     // Map CTI status to local status
     let localStatus = 'dialing';
@@ -230,7 +359,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
         }
       } else if (localStatus !== 'ended') {
         // Create new call entry
-        const newCallId = `${isIncoming ? 'incoming' : 'outgoing'}_${Date.now()}`;
+        const newCallId = `call_${Date.now()}`;
         newMap.set(newCallId, {
           id: newCallId,
           number: callNumber,

@@ -2,6 +2,7 @@ import { Client } from "@stomp/stompjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import axiosInstance from "@utils/axios";
 import { getCrossTabCtiManager } from "../utils/crossTabCtiManager";
+import { useAuth } from "./useAuth";
 
 interface CtiDevice {
   dn: string;
@@ -98,6 +99,9 @@ export default function useCtiStomp(
   // Cross-tab manager for sharing connection across tabs
   const crossTabManagerRef = useRef(getCrossTabCtiManager());
   const [isMasterTab, setIsMasterTab] = useState(false);
+
+  // Track authentication state to reinitialize connection after login
+  const { isAuthenticated, isInitialized: authInitialized } = useAuth();
 
   const [dnsMap, setDnsMap] = useState<
     Record<string, { dn: string; devices: Record<string, CtiDevice> }>
@@ -864,6 +868,77 @@ export default function useCtiStomp(
   }, []);
 
   useEffect(() => {
+    // Wait for authentication to be initialized before attempting connection
+    if (!authInitialized) {
+      console.log(
+        `[${instanceIdRef.current}] Authentication not initialized yet, waiting...`
+      );
+      return;
+    }
+
+    // If user is not authenticated, close any existing connection and return
+    if (!isAuthenticated) {
+      console.log(
+        `[${instanceIdRef.current}] User not authenticated, closing any existing connection...`
+      );
+      // Use fullyCloseConnection helper for consistent cleanup
+      const fullyCloseConnection = async () => {
+        const currentInstanceId = instanceIdRef.current;
+        
+        // Close EventSource connection
+        if (eventSourceRef.current) {
+          try {
+            eventSourceRef.current.close();
+          } catch (err) {
+            // Ignore errors during close
+          }
+          eventSourceRef.current = null;
+        }
+
+        // Clear STOMP client reference if it exists
+        if (clientRef.current) {
+          try {
+            if (clientRef.current.connected) {
+              clientRef.current.deactivate();
+            }
+          } catch (err) {
+            // Ignore errors during deactivation
+          }
+          clientRef.current = null;
+        }
+
+        // Clear reconnection timer
+        if (reconnectionTimerRef.current) {
+          clearTimeout(reconnectionTimerRef.current);
+          reconnectionTimerRef.current = null;
+        }
+
+        // Reset all connection state flags
+        isConnectingRef.current = false;
+        isInitializedRef.current = false;
+        isGettingTokenRef.current = false;
+        connectionStartTimeRef.current = null;
+        isReconnectingRef.current = false;
+
+        // Clear token, userAddress, userTeams, and userDataExtensions refs
+        tokenRef.current = null;
+        userAddressRef.current = null;
+        userTeamsRef.current = null;
+        userDataExtensionsRef.current = null;
+
+        // Reset UI state
+        setIsInitialized(false);
+        setError(null);
+      };
+      
+      // Close connection asynchronously but don't wait for it
+      fullyCloseConnection().catch(() => {
+        // Ignore errors during cleanup
+      });
+      
+      return;
+    }
+
     // CRITICAL: Early return if already initialized with active connection OR already connecting
     // This prevents duplicate initialization if useEffect runs multiple times
     // (e.g., due to React StrictMode double-mounting in development)
@@ -1554,9 +1629,9 @@ export default function useCtiStomp(
         console.log(`[${currentInstanceId}] Cleanup complete`);
       });
     };
-    // Empty dependency array - only run once on mount
+    // Depend on authentication state to reinitialize after login
     // isGlobalInstance is checked inside the effect, so we don't need it as a dependency
-  }, []);
+  }, [isAuthenticated, authInitialized]);
 
   // Helper: Get devices array for a DN
   const getDevicesForDn = useCallback(
