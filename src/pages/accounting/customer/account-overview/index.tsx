@@ -220,12 +220,12 @@ const AccountOverview = () => {
                   <Users size={20} style={{ color: '#3b82f6' }} />
                 </div>
                 <div className="flex-grow-1">
-                  <h5 className="mb-1" style={{ fontWeight: '600', fontSize: '1.1rem' }}>{companyDetails?.name}</h5>
-                  <p className="text-muted mb-0" style={{ fontSize: '0.85rem' }}>
+                  <h5 className="mb-1" style={{ fontWeight: '600', fontSize: '1rem' }}>{companyDetails?.name}</h5>
+                  <p className="text-muted mb-0" style={{ fontSize: '0.70rem' }}>
                   {companyDetails?.profile?.address}
                   </p>
                 </div>
-                <Button 
+                {/* <Button 
                   variant="outline-primary" 
                   size="sm"
                   onClick={() => setShowManageAccountModal(true)}
@@ -233,14 +233,14 @@ const AccountOverview = () => {
                 >
                   <Edit size={12} className="me-1" />
                   Edit
-                </Button>
+                </Button> */}
               </div>
 
               <div className="p-2 rounded d-flex justify-content-between align-items-center" style={{ backgroundColor: '#f8f9fa' }}>
                 <div>
                   <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Total Invoice Amount</small>
-                  <h4 className="mb-0" style={{ fontWeight: '700', fontSize: '1.5rem' }}>{companyDetails?.profile?.currency} {formatNumber(dashboardCounters?.invoices?.total_amount)}</h4>
-                  <small className="text-muted">(Inclusive VAT)</small>
+                  <h4 className="mb-0" style={{ fontWeight: '700', fontSize: '1.3rem' }}>{companyDetails?.profile?.currency} {formatNumber(dashboardCounters?.invoices?.total_amount)}</h4>
+                  {/* <small className="text-muted">(Inclusive VAT)</small> */}
                 </div>
                 <div className="d-flex gap-2">
                   <Button 
@@ -351,7 +351,7 @@ const AccountOverview = () => {
                   </div>
                   <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Billing Contact</h6>
                 </div>
-                <Button 
+                {/* <Button 
                   variant="link" 
                   size="sm" 
                   className="p-0 text-primary"
@@ -359,7 +359,7 @@ const AccountOverview = () => {
                   style={{ textDecoration: 'none' }}
                 >
                   <Edit size={12} />
-                </Button>
+                </Button> */}
               </div>
 
               

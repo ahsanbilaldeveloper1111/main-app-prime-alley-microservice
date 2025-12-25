@@ -22,6 +22,7 @@ import "@assets/scss/tabs.scss";
 
 import { GetDashboardCounters, GetProfitLossData, GetTopProducts, GetRecentActivity, GetAnalyticsByMonth, GetCompanyDetails } from "@utils/accounting";
 import { useSession } from "next-auth/react";
+import router from "next/router";
 
 
 const CustomerDashboard = () => {
@@ -79,67 +80,71 @@ const CustomerDashboard = () => {
     setDashboardCounters(response);
     setSummaryCards(
       [
-        { title: 'Active Subscriptions', value: response?.products?.total, icon: <Package size={24} />, color: 'primary', iconBg: 'rgba(59, 130, 246, 0.1)', iconColor: '#3b82f6' },
-        { title: 'Total Invoice Amount', value: response?.invoices?.total_amount, icon: <FileText size={24} />, color: 'primary', iconBg: 'rgba(59, 130, 246, 0.1)', iconColor: '#3b82f6' },
-        { title: 'Outstanding Amount', value: response?.invoices?.outstanding_amount, icon: <AlertCircle size={24} />, color: 'warning', iconBg: 'rgba(251, 191, 36, 0.1)', iconColor: '#fbbf24' },
-        { title: 'Est. Next Month', value: '0.00', icon: <Wallet size={24} />, color: 'info', iconBg: 'rgba(34, 211, 238, 0.1)', iconColor: '#22d3ee' },
-        { title: 'Overdue Invoices', value: response?.invoices?.overdue_invoices_count, icon: <Clock size={24} />, color: 'danger', iconBg: 'rgba(239, 68, 68, 0.1)', iconColor: '#ef4444', payNow: true },
-        { title: 'Overdue Amount', value: response?.invoices?.overdue_amount, icon: <AlertCircle size={24} />, color: 'warning', iconBg: 'rgba(251, 191, 36, 0.1)', iconColor: '#fbbf24', payNow: true }
+        { title: 'Subscriptions', value: currency + ' ' + formatNumber(response?.products?.total), icon: <Package size={24} />, color: 'primary', iconBg: 'rgba(59, 130, 246, 0.1)', iconColor: '#3b82f6' },
+        { title: 'Total Invoice Amount', value: currency + ' ' + formatNumber(response?.invoices?.total_amount), icon: <FileText size={24} />, color: 'primary', iconBg: 'rgba(59, 130, 246, 0.1)', iconColor: '#3b82f6' },
+        { title: 'Outstanding Amount', value: currency + ' ' + formatNumber(response?.invoices?.outstanding_amount), icon: <AlertCircle size={24} />, color: 'warning', iconBg: 'rgba(251, 191, 36, 0.1)', iconColor: '#fbbf24' },
+         { title: 'Est. Next Month', value: '0.00', icon: <Wallet size={24} />, color: 'info', iconBg: 'rgba(34, 211, 238, 0.1)', iconColor: '#22d3ee' },
+        { title: 'Overdue Invoices', value: response?.invoices?.overdue_invoices_count, icon: <Clock size={24} />, color: 'danger', iconBg: 'rgba(239, 68, 68, 0.1)', iconColor: '#ef4444', payNow: false },
+        { title: 'Overdue Amount', value: currency + ' ' + formatNumber(response?.invoices?.overdue_amount), icon: <AlertCircle size={24} />, color: 'warning', iconBg: 'rgba(251, 191, 36, 0.1)', iconColor: '#fbbf24', payNow: true }
       ]
     );
   
   };
 
    // Helper function to get status badge color
-   const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'Active': return 'success';
-      case 'Trial': return 'warning';
-      case 'Suspended': return 'secondary';
-      case 'In Progress': return 'info';
-      case 'Inactive': return 'secondary';
+   const getStatusBadgeColor = (status: string | null | undefined) => {
+    if (!status) return 'primary';
+    switch (status.toLowerCase()) {
+      case 'active': return 'success';
+      case 'trial': return 'warning';
+      case 'suspended': return 'secondary';
+      case 'in progress': return 'info';
+      case 'inactive': return 'secondary';
       default: return 'primary';
     }
   };
 
   // Helper function to get background color RGB for status
-  const getStatusBackgroundColor = (status: string) => {
-    switch (status) {
-      case 'Active': return '34, 197, 94'; // green
-      case 'Trial': return '251, 191, 36'; // yellow
-      case 'In Progress': return '59, 130, 246'; // blue
-      case 'Suspended': return '156, 163, 175'; // gray
-      case 'Inactive': return '107, 114, 128'; // darker gray
+  const getStatusBackgroundColor = (status: string | null | undefined) => {
+    if (!status) return '59, 130, 246'; // blue default
+    switch (status.toLowerCase()) {
+      case 'active': return '34, 197, 94'; // green
+      case 'trial': return '251, 191, 36'; // yellow
+      case 'in progress': return '59, 130, 246'; // blue
+      case 'suspended': return '156, 163, 175'; // gray
+      case 'inactive': return '107, 114, 128'; // darker gray
       default: return '59, 130, 246'; // blue
     }
   };
 
   // Helper function to get icon color for status
-  const getStatusIconColor = (status: string) => {
-    switch (status) {
-      case 'Active': return '#22c55e'; // green
-      case 'Trial': return '#fbbf24'; // yellow
-      case 'In Progress': return '#3b82f6'; // blue
-      case 'Suspended': return '#9ca3af'; // gray
-      case 'Inactive': return '#6b7280'; // darker gray
+  const getStatusIconColor = (status: string | null | undefined) => {
+    if (!status) return '#3b82f6'; // blue default
+    switch (status.toLowerCase()) {
+      case 'active': return '#22c55e'; // green
+      case 'trial': return '#fbbf24'; // yellow
+      case 'in progress': return '#3b82f6'; // blue
+      case 'suspended': return '#9ca3af'; // gray
+      case 'inactive': return '#6b7280'; // darker gray
       default: return '#3b82f6'; // blue
     }
   };
 
   // Helper function to get icon for subscription status
-  const getSubscriptionIcon = (status: string) => {
-    switch (status) {
-      case 'Active':
+  const getSubscriptionIcon = (status: string | null | undefined) => {
+    if (!status) return <FileText size={18} />;
+    switch (status.toLowerCase()) {
+      case 'active':
         return <Check size={18} />;
-      case 'Trial':
+      case 'trial':
         return <Clock size={18} />;
-      case 'Suspended':
+      case 'suspended':
         return <AlertCircle size={18} />;
-      case 'In Progress':
+      case 'in progress':
         return <TrendingUp size={18} />;
-      case 'Inactive':
+      case 'inactive':
         return <AlertCircle size={18} />;
-      case 'Certiive':
+      case 'certiive':
         return <Package size={18} />;
       default:
         return <FileText size={18} />;
@@ -257,7 +262,7 @@ const CustomerDashboard = () => {
                 {/* Summary Cards - 6 boxes in one row */}
       <Row className="mb-4">
         {summaryCards.map((card, index) => (
-          <Col xl={2} lg={4} md={6} key={index} className="mb-3">
+          <Col xl={3} lg={4} md={4} key={index} className="mb-3">
             <Card style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', position: 'relative' }}>
               <Card.Body>
                 <div className="d-flex align-items-center gap-3">
@@ -265,13 +270,14 @@ const CustomerDashboard = () => {
                     <div style={{ color: card.iconColor }}>{card.icon}</div>
                   </div>
                   <div className="flex-grow-1">
-                    <h3 className="mb-1" style={{ fontSize: '1.5rem', fontWeight: '600' }}>{card.value}</h3>
-                    <p className="text-muted mb-0" style={{ fontSize: '0.8rem', lineHeight: '1.3' }}>{card.title}</p>
+                    <h3 className="mb-1" style={{ fontSize: '1.1rem', fontWeight: '600' }}>{card.value}</h3>
+                    <p className="text-muted mb-0" style={{ fontSize: '0.7rem', lineHeight: '1.3' }}>{card.title}</p>
                   </div>
                 </div>
-                {/* {card.payNow && (
+                {card.payNow && (
                   <div className="d-flex justify-content-end mt-2" style={{ position: 'absolute', top: '-25px', right: '0px' }}>
                     <Button 
+                    onClick={() => router.push('/accounting/customer/invoices')}
                       variant="primary" 
                       size="sm"
                       style={{ 
@@ -283,7 +289,7 @@ const CustomerDashboard = () => {
                       Pay Now
                     </Button>
                   </div>
-                )} */}
+                )}
               </Card.Body>
             </Card>
           </Col>

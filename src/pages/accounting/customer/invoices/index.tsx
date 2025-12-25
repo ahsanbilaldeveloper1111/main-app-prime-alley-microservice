@@ -645,7 +645,7 @@ const InvoiceList = () => {
                             handleDownloadPDF(props)
                           }}
                         >
-                          View
+                          Download
                         </Button>
                       
                         </div>
@@ -2213,7 +2213,7 @@ const InvoiceList = () => {
               <div className="d-flex gap-2 flex-wrap">
                 <Button
                   variant={activeStatusTab === null ? 'light' : 'link'}
-                  className={`custtabs text-decoration-none ${activeStatusTab === null ? 'bg-light' : ''}`}
+                  className={`custtabs border-1 text-decoration-none ${activeStatusTab === null ? 'bg-light' : ''}`}
                   onClick={() => {
                     setActiveStatusTab(null);
                     setCurrentFilters((prev) => {
