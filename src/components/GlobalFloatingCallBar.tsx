@@ -79,6 +79,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     userAddress,
     activeCalls,
     dnsMap,
+    eventLog,
     formatDuration,
     makeCall,
     dialNumber, // Use dialNumber for simplified calls
@@ -86,7 +87,9 @@ const GlobalFloatingCallBar: React.FC = () => {
     holdCall,
     resumeCall,
     transferCall,
+    attendCall,
     getCallingDeviceInfo,
+    getAllUserDevices,
     getAvailableExtensions,
   } = useCti();
 
@@ -102,6 +105,17 @@ const GlobalFloatingCallBar: React.FC = () => {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferTarget, setTransferTarget] = useState("");
   const [extensionSearch, setExtensionSearch] = useState("");
+  const [incomingCall, setIncomingCall] = useState<{
+    callId: string;
+    callingAddress: string;
+    calledAddress: string;
+    controllerAddress: string;
+    controllerDeviceName: string;
+    controllerDeviceType: string;
+    startTime: Date;
+  } | null>(null);
+  const [showIncomingCallModal, setShowIncomingCallModal] = useState(false);
+  const [incomingCallTimer, setIncomingCallTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Drag and position state
   const [position, setPosition] = useState<CallBarPosition>("bottom");
@@ -386,6 +400,112 @@ const GlobalFloatingCallBar: React.FC = () => {
       return call;
   }, [activeCalls, userAddress]);
 
+  // Handle incoming call events
+  useEffect(() => {
+    if (!eventLog || eventLog.length === 0 || !userAddress) return;
+
+    const latestEvent = eventLog[eventLog.length - 1];
+    
+    // Handle INCOMING_CALL event
+    if (latestEvent.eventType === 'INCOMING_CALL' && latestEvent.parties) {
+      const eventData = latestEvent.parties[0];
+      
+      // Check if this is an incoming call to our user address
+      if (eventData.calledAddress === userAddress) {
+        // Clear any existing timer
+        if (incomingCallTimer) {
+          clearTimeout(incomingCallTimer);
+        }
+        
+        // Show incoming call modal with attend/reject options
+        setIncomingCall({
+          callId: eventData.callId || `incoming_${Date.now()}`,
+          callingAddress: eventData.callingAddress,
+          calledAddress: eventData.calledAddress,
+          controllerAddress: eventData.controllerAddress || userAddress,
+          controllerDeviceName: eventData.controllerDeviceName || 'WebCTI',
+          controllerDeviceType: eventData.controllerDeviceType || 'SOFT_HARD',
+          startTime: new Date()
+        });
+        setShowIncomingCallModal(true);
+        
+        // Set auto-dismiss timer (30 seconds)
+        const timer = setTimeout(() => {
+          setShowIncomingCallModal(false);
+          setIncomingCall(null);
+          toast.info('Incoming call timed out');
+        }, 30000);
+        setIncomingCallTimer(timer);
+      }
+    }
+    
+    // Handle RINGING event for incoming calls
+    if (latestEvent.eventType === 'RINGING' && latestEvent.parties) {
+      const eventData = latestEvent.parties[0];
+      
+      // Check if this is an incoming call to our user address
+      if (eventData.calledAddress === userAddress && !showIncomingCallModal) {
+        // Clear any existing timer
+        if (incomingCallTimer) {
+          clearTimeout(incomingCallTimer);
+        }
+        
+        // Get device information for user from dnsMap
+        const userDeviceInfo = dnsMap[userAddress];
+        const userDevices = userDeviceInfo ? Object.values(userDeviceInfo.devices || {}) : [];
+        const activeUserDevice = userDevices.find((device: any) => device.terminalState === 'REGISTERED');
+        
+        // Show incoming call modal with attend/reject options
+        setIncomingCall({
+          callId: eventData.callId || `incoming_${Date.now()}`,
+          callingAddress: eventData.callingAddress,
+          calledAddress: eventData.calledAddress,
+          controllerAddress: userAddress,
+          controllerDeviceName: activeUserDevice?.deviceName || '',
+          controllerDeviceType: activeUserDevice?.deviceType || '',
+          startTime: new Date()
+        });
+        setShowIncomingCallModal(true);
+        
+        // Set auto-dismiss timer (30 seconds)
+        const timer = setTimeout(() => {
+          setShowIncomingCallModal(false);
+          setIncomingCall(null);
+          toast.info('Incoming call timed out');
+        }, 30000);
+        setIncomingCallTimer(timer);
+      }
+    }
+    
+    // Handle call termination events for incoming calls
+    if (['DISCONNECTED', 'DROPPED', 'ENDED'].includes(latestEvent.eventType) && latestEvent.parties && incomingCall) {
+      const eventData = latestEvent.parties[0];
+      if (eventData.callId === incomingCall.callId || 
+          (eventData.callingAddress === incomingCall.callingAddress && eventData.calledAddress === incomingCall.calledAddress)) {
+        // Clear the timer
+        if (incomingCallTimer) {
+          clearTimeout(incomingCallTimer);
+          setIncomingCallTimer(null);
+        }
+        
+        // Close the incoming call modal
+        setShowIncomingCallModal(false);
+        setIncomingCall(null);
+        
+        toast.info('Incoming call ended by caller');
+      }
+    }
+  }, [eventLog, userAddress, dnsMap, showIncomingCallModal, incomingCall, incomingCallTimer]);
+
+  // Cleanup incoming call timer on unmount
+  useEffect(() => {
+    return () => {
+      if (incomingCallTimer) {
+        clearTimeout(incomingCallTimer);
+      }
+    };
+  }, [incomingCallTimer]);
+
   // Don't show if CTI is not initialized or user doesn't have permission
   // Also check if we're on the dialer or live-calls page itself (to avoid duplicate UI)
   // Only show if there's an active call (dialer button is now in topbar)
@@ -398,13 +518,31 @@ const GlobalFloatingCallBar: React.FC = () => {
     return null;
   }
 
-
   const handleDial = async (numberToDial: string = dialedNumber) => {
     if (!numberToDial.trim()) {
       toast.error("Please enter a number to dial");
       return;
     }
 
+    // Check if user has multiple devices
+    const userDevices = getAllUserDevices();
+    if (!userDevices) {
+      toast.error("No calling device information available");
+      return;
+    }
+
+    console.log("User devices found:", userDevices.length, userDevices);
+
+    // If user has multiple devices, show device selection modal
+    if (userDevices.length > 1) {
+      console.log("Multiple devices detected, showing device selection modal");
+      setAvailableDevices(userDevices);
+      setPendingDialedNumber(numberToDial);
+      setShowDeviceSelectionModal(true);
+      return;
+    }
+
+    // If only one device, proceed with dialing using dialNumber
     setIsDialing(true);
     try {
       // Use dialNumber - it handles device selection, number cleaning, and validation automatically
@@ -424,7 +562,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     }
   };
 
-  const handleDeviceSelect = (device: any) => {
+  const handleDeviceSelect = async (device: any) => {
     const callingDevice = {
       callingAddress: userAddress,
       callingDeviceType: device.deviceType,
@@ -443,31 +581,32 @@ const GlobalFloatingCallBar: React.FC = () => {
 
     setShowDeviceSelectionModal(false);
     setAvailableDevices([]);
+    
+    const numberToDial = pendingDialedNumber;
     setPendingDialedNumber("");
 
     // Proceed with dialing using selected device
     setIsDialing(true);
-    makeCall({
-      callingAddress: callingDevice.callingAddress,
-      calledAddress: pendingDialedNumber,
-      callingDeviceType: callingDevice.callingDeviceType,
-      callingDeviceName: callingDevice.callingDeviceName,
-    })
-      .then((result) => {
-        if (result.success) {
-          toast.success(`Calling ${pendingDialedNumber}...`);
-          setDialedNumber("");
-          closeDialer();
-        } else {
-          toast.error(result.error || "Failed to make call");
-        }
-      })
-      .catch((error) => {
-        toast.error("Failed to make call");
-      })
-      .finally(() => {
-        setIsDialing(false);
+    try {
+      const result = await makeCall({
+        callingAddress: callingDevice.callingAddress,
+        calledAddress: numberToDial,
+        callingDeviceType: callingDevice.callingDeviceType,
+        callingDeviceName: callingDevice.callingDeviceName,
       });
+
+      if (result.success) {
+        toast.success(`Calling ${numberToDial}...`);
+        setDialedNumber("");
+        closeDialer();
+      } else {
+        toast.error(result.error || "Failed to make call");
+      }
+    } catch (error) {
+      toast.error("Failed to make call");
+    } finally {
+      setIsDialing(false);
+    }
   };
 
   const handleEndCall = async () => {
@@ -636,6 +775,65 @@ const GlobalFloatingCallBar: React.FC = () => {
 
   const handleOpenFullDialer = () => {
     router.push("/cti/dialer");
+  };
+
+  const handleAttendCall = async () => {
+    // Check permission for attending calls
+    if (!hasPermission("dial-call-cti")) {
+      toast.error("You do not have permission to answer calls");
+      return;
+    }
+
+    if (!incomingCall) {
+      toast.error("No incoming call to attend");
+      return;
+    }
+
+    // Clear the timer
+    if (incomingCallTimer) {
+      clearTimeout(incomingCallTimer);
+      setIncomingCallTimer(null);
+    }
+
+    setIsDialing(true);
+    try {
+      // Call the attendCall API with the required payload
+      const result = await attendCall({
+        callId: incomingCall.callId,
+        callingAddress: incomingCall.callingAddress,
+        calledAddress: incomingCall.calledAddress,
+        controllerAddress: incomingCall.controllerAddress,
+        controllerDeviceName: incomingCall.controllerDeviceName,
+        controllerDeviceType: incomingCall.controllerDeviceType
+      });
+
+      if (result.success) {
+        // Close the incoming call modal
+        setShowIncomingCallModal(false);
+        setIncomingCall(null);
+        
+        toast.success("Call attended successfully");
+      } else {
+        toast.error(result.error || "Failed to attend call");
+      }
+    } catch (error) {
+      toast.error("Failed to attend call");
+    } finally {
+      setIsDialing(false);
+    }
+  };
+
+  const handleRejectCall = () => {
+    // Clear the timer
+    if (incomingCallTimer) {
+      clearTimeout(incomingCallTimer);
+      setIncomingCallTimer(null);
+    }
+    
+    // Close the incoming call modal without attending
+    setShowIncomingCallModal(false);
+    setIncomingCall(null);
+    toast.info("Call rejected");
   };
 
   const isVertical = position === "left" || position === "right";
@@ -1036,6 +1234,134 @@ const GlobalFloatingCallBar: React.FC = () => {
                   play_arrow
                 </i>
               </button>
+            )}
+
+            {/* Accept/Reject buttons for incoming ringing calls */}
+            {activeCall.status === "ringing" && activeCall.calledAddress === userAddress && (
+              <>
+                <button
+                  type="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Find the incoming call and attend it
+                    if (incomingCall) {
+                      handleAttendCall();
+                    } else {
+                      // If no incomingCall state, try to attend using activeCall data
+                      const callingDevice = getCallingDeviceInfo();
+                      if (callingDevice && activeCall.callId) {
+                        setIsDialing(true);
+                        attendCall({
+                          callId: activeCall.callId,
+                          callingAddress: activeCall.callingAddress || '',
+                          calledAddress: activeCall.calledAddress || activeCall.number,
+                          controllerAddress: userAddress,
+                          controllerDeviceName: callingDevice.callingDeviceName,
+                          controllerDeviceType: callingDevice.callingDeviceType,
+                        })
+                          .then((result) => {
+                            if (result.success) {
+                              toast.success("Call answered");
+                            } else {
+                              toast.error(result.error || "Failed to answer call");
+                            }
+                          })
+                          .catch(() => {
+                            toast.error("Failed to answer call");
+                          })
+                          .finally(() => {
+                            setIsDialing(false);
+                          });
+                      }
+                    }
+                  }}
+                  style={{
+                    background: "#2ecc71",
+                    border: "none",
+                    color: "#fff",
+                    cursor: "pointer",
+                    padding: isVertical ? "8px" : "10px 14px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "50%",
+                    width: isVertical ? "40px" : "40px",
+                    height: isVertical ? "40px" : "40px",
+                    transition: "background-color 0.2s, transform 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#27ae60";
+                    e.currentTarget.style.transform = "scale(1.05)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "#2ecc71";
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                  title="Answer Call"
+                  disabled={isDialing}
+                >
+                  <i
+                    className="material-icons-two-tone"
+                    style={{ fontSize: isVertical ? "20px" : "22px", color: "#fff" }}
+                  >
+                    call
+                  </i>
+                </button>
+                <button
+                  type="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRejectCall();
+                    // Also end the call if it exists in activeCalls
+                    if (activeCall && activeCall.callId) {
+                      const callingDevice = getCallingDeviceInfo();
+                      if (callingDevice) {
+                        endCall({
+                          callId: activeCall.callId,
+                          callingAddress: activeCall.callingAddress || userAddress,
+                          calledAddress: activeCall.calledAddress || activeCall.number,
+                          callingDeviceType: callingDevice.callingDeviceType,
+                          callingDeviceName: callingDevice.callingDeviceName,
+                        }).catch(() => {
+                          // Silently fail if call already ended
+                        });
+                      }
+                    }
+                  }}
+                  style={{
+                    background: "#F44236",
+                    border: "none",
+                    color: "#fff",
+                    cursor: "pointer",
+                    padding: isVertical ? "8px" : "10px 14px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "50%",
+                    width: isVertical ? "40px" : "40px",
+                    height: isVertical ? "40px" : "40px",
+                    transition: "background-color 0.2s, transform 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#DA190C";
+                    e.currentTarget.style.transform = "scale(1.05)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "#F44236";
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                  title="Reject Call"
+                >
+                  <i
+                    className="material-icons-two-tone"
+                    style={{ fontSize: isVertical ? "20px" : "22px", color: "#fff" }}
+                  >
+                    call_end
+                  </i>
+                </button>
+              </>
             )}
 
             {/* End Call Button */}
@@ -1483,6 +1809,138 @@ const GlobalFloatingCallBar: React.FC = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Incoming Call Modal */}
+      {showIncomingCallModal && incomingCall && (
+        <div
+          className="modal-overlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            zIndex: 1060,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            className="modal-content"
+            style={{
+              backgroundColor: "white",
+              borderRadius: "1rem",
+              padding: "2rem",
+              maxWidth: "400px",
+              width: "90%",
+              textAlign: "center",
+              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.3)",
+              position: "relative",
+            }}
+          >
+            <button
+              onClick={handleRejectCall}
+              disabled={isDialing}
+              style={{
+                position: "absolute",
+                top: "1rem",
+                right: "1rem",
+                background: "none",
+                border: "none",
+                cursor: isDialing ? "not-allowed" : "pointer",
+                padding: "0.5rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: isDialing ? 0.5 : 1,
+                transition: "opacity 0.2s",
+              }}
+              title="Close"
+            >
+              <i
+                className="material-icons-two-tone"
+                style={{ fontSize: "1.5rem", color: "#6c757d" }}
+              >
+                close
+              </i>
+            </button>
+            <div className="incoming-call-content">
+              <div className="mb-4">
+                <i
+                  className="material-icons-two-tone"
+                  style={{
+                    fontSize: "4rem",
+                    color: "#28a745",
+                    animation: "pulse 1.5s ease-in-out infinite",
+                  }}
+                >
+                  call
+                </i>
+              </div>
+
+              <h4 className="mb-3 text-primary">Incoming Call</h4>
+
+              <div className="mb-4">
+                <h5 className="mb-2">
+                  <i className="material-icons-two-tone me-2">phone</i>
+                  {incomingCall.callingAddress}
+                </h5>
+                <p className="text-muted mb-0">
+                  Calling to {incomingCall.calledAddress}
+                </p>
+                <small className="text-muted">
+                  Started: {incomingCall.startTime.toLocaleTimeString()}
+                </small>
+              </div>
+
+              <div className="mb-4">
+                <div className="row g-2">
+                  <div className="col-6">
+                    <Button
+                      variant="success"
+                      className="w-100 py-3"
+                      onClick={handleAttendCall}
+                      disabled={isDialing || !hasPermission("dial-call-cti")}
+                    >
+                      <i
+                        className="material-icons-two-tone me-2"
+                        style={{ backgroundColor: "#fff" }}
+                      >
+                        call
+                      </i>
+                      {isDialing ? "Answering..." : "Answer Call"}
+                    </Button>
+                  </div>
+                  <div className="col-6">
+                    <Button
+                      variant="secondary"
+                      className="w-100 py-3"
+                      onClick={handleRejectCall}
+                      disabled={isDialing}
+                    >
+                      <i
+                        className="material-icons-two-tone me-2"
+                        style={{ backgroundColor: "#fff" }}
+                      >
+                        call_end
+                      </i>
+                      Ignore Call
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="small text-muted">
+                <div>Call ID: {incomingCall.callId}</div>
+                <div>Controller: {incomingCall.controllerDeviceName}</div>
+                <div>Device Type: {incomingCall.controllerDeviceType}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
