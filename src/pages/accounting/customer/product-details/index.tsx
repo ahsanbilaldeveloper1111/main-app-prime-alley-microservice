@@ -87,10 +87,10 @@ const ProductDetails = () => {
          },
 
 
-         { key: 'subscriptions', name: 'Subscriptions', selector: (row: any) => row.product?.subscription, sortable: true,
+         { key: 'subscriptions', name: 'Subscriptions', selector: (row: any) => row?.subscriptions || 0, sortable: true,
           cell: (row: any) => {
             return <div>
-              {row?.product?.subscriptions || '0'}
+              {row?.subscriptions || '0'}
             </div>
           }
          },
