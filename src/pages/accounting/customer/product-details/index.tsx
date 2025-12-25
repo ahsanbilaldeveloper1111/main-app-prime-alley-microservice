@@ -90,7 +90,7 @@ const ProductDetails = () => {
          { key: 'subscriptions', name: 'Subscriptions', selector: (row: any) => row.product?.subscription, sortable: true,
           cell: (row: any) => {
             return <div>
-              {row?.product?.subscriptions || 'Yearly'}
+              {row?.product?.subscriptions || '0'}
             </div>
           }
          },

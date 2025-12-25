@@ -506,7 +506,7 @@ const InvoiceList = () => {
         sortable: true,
         cell: (props: InvoiceData) => (
           <span >
-            {props?.currency_code || "USD"} {formatNumber(parseFloat(props?.subtotal || "0"))}
+            {props?.currency_code || "USD"} {" "} {formatNumber(parseFloat(props?.subtotal || "0"))}
           </span>
         ),
       },
@@ -529,8 +529,7 @@ const InvoiceList = () => {
         sortable: true,
         cell: (props: InvoiceData) => (
           <span >
-            {props.currency_code || "AED"}
-            {formatNumber(parseFloat(props?.total_amount || "0"))}
+            {props.currency_code || "AED"} {" "} {formatNumber(parseFloat(props?.total_amount || "0"))}
           </span>
         ),
       },
@@ -605,7 +604,7 @@ const InvoiceList = () => {
           return (
             <>
           
-          <div className="d-flex py-3 px-4 gap-2"> 
+          <div className="d-flex gap-2"> 
             
               {props.status === STATUS_PENDING && session?.user?.permissions?.includes('pay-invoices-billing') && (
                        
@@ -2292,7 +2291,7 @@ const InvoiceList = () => {
                 >
                   Overdue 
                   <Badge bg="danger" className="ms-2" style={{ fontSize: '0.7rem' }}>
-                    {summary?.status_count?.overdue || 0}
+                    {summary?.status_counts?.overdue || 0}
                   </Badge>
                 </Button>
 
@@ -2313,7 +2312,7 @@ const InvoiceList = () => {
                 >
                   Cancelled 
                   <Badge bg="secondary" className="ms-2" style={{ fontSize: '0.7rem' }}>
-                    {summary?.status_count?.cancelled || 0}
+                    {summary?.status_counts?.cancelled || 0}
                   </Badge>
                 </Button>
 

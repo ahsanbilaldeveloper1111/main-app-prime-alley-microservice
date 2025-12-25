@@ -59,6 +59,11 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 		}
 	    }, [ status, session]);
 
+  // Get profile image URL, only if valid (not null, undefined, or empty string)
+  const profileImageUrl = loggedInUserProfilePicture 
+    ? (getStorageImageUrl(loggedInUserProfilePicture) || null)
+    : null;
+
   return (
     <>
       <style>{`
@@ -395,7 +400,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
           {/* User Card */}
           <div className="profile-user-card">
             <div className="profile-avatar">
-              <img src={getStorageImageUrl(loggedInUserProfilePicture || '') || ''} alt="Carson Darrin" />
+              {profileImageUrl && <img src={profileImageUrl} alt={loggedInName || ''} />}
             </div>
             <div className="profile-user-info">
               <h5 className="profile-user-name">{loggedInName}</h5>
@@ -408,9 +413,11 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                     
                 </small>
             </div>
-            <span className="profile-badge">
-              {loggedInUserUserType}
-            </span>
+            {loggedInUserUserType && (
+              <span className="profile-badge">
+                {loggedInUserUserType}
+              </span>
+            )}
           </div>
 
           {/* Menu */}

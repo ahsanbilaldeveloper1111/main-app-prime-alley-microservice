@@ -132,7 +132,7 @@ export const authOptions: NextAuthOptions = {
             role: jsonData.data?.role,
             phone: jsonData.data?.phone,
             country: jsonData.data?.country,
-            user_type: jsonData.data?.user_type,
+            user_type: jsonData.data?.userType,
             profile_picture: jsonData.data?.profile_picture,
             is_admin: jsonData.data?.is_admin || null,
             login_as: jsonData.data?.login_as || null,

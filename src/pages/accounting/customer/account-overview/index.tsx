@@ -22,6 +22,7 @@ import countries from "world-countries";
 import { GetCompanyDetails,GetPaymentMethods,UpdateCompanyDetails,GetDashboardCounters } from "@utils/accounting";
 import ThemeSelect from "@components/ThemeSelect";
 import { toast } from "react-toastify";
+import router from "next/router";
 
 const AccountOverview = () => {
 
@@ -244,19 +245,20 @@ const AccountOverview = () => {
                 </div>
                 <div className="d-flex gap-2">
                   <Button 
+                    onClick={() => router.push('/accounting/customer/invoices')}
                     variant="primary"
                     size="sm"
                     style={{ fontSize: '0.85rem', padding: '0.4rem 1rem', fontWeight: '600' }}
                   >
                     Pay Now
                   </Button>
-                  <Button 
+                  {/* <Button 
                     variant="outline-secondary"
                     size="sm"
                     style={{ fontSize: '0.85rem', padding: '0.4rem 1rem' }}
                   >
                     View Invoices
-                  </Button>
+                  </Button> */}
                 </div>
               </div>
             </Card.Body>
@@ -278,14 +280,26 @@ const AccountOverview = () => {
                 <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.9rem' }}>Account Balance</h6>
               </div>
               
-              <div className="d-flex justify-content-between align-items-center py-2 border-bottom">
+              {/* <div className="d-flex justify-content-between align-items-center py-2 border-bottom">
                 <small className="text-muted" style={{ fontSize: '0.8rem' }}>Credit</small>
                 <span className="fw-semibold" style={{ fontSize: '0.9rem' }}>{companyDetails?.profile?.currency} {formatNumber(companyDetails?.profile?.credit_limit)}</span>
-              </div>
+              </div> */}
               
               <div className="d-flex justify-content-between align-items-center py-2">
                 <small className="text-muted" style={{ fontSize: '0.8rem' }}>Pending</small>
                 <span className="fw-semibold" style={{ fontSize: '0.9rem' }}>{companyDetails?.profile?.currency} {formatNumber(companyDetails?.profile?.outstanding_invoices)}</span>
+
+                 
+              </div>
+              <div className="d-flex justify-content-end">
+              <Button 
+                onClick={() => router.push('/accounting/customer/invoices')}
+                    variant="outline-secondary"
+                    size="sm"
+                    style={{ fontSize: '0.85rem', padding: '0.4rem 1rem' }}
+                  >
+                    View Invoices
+                  </Button>
               </div>
             </Card.Body>
           </Card>
