@@ -184,6 +184,7 @@ const Layout = ({ children }: LayoutProps) => {
 	const [loggedInName, setLoggedInName] = useState('');
 	const [loggedInUserRole, setLoggedInUserRole] = useState('');
 	const [loggedInUserUsername, setLoggedInUserUsername] = useState('');
+	const [loggedInUserProfilePicture, setLoggedInUserProfilePicture] = useState('');
 
   const [showProfileSidebar, setShowProfileSidebar] = useState(false);
 
@@ -193,9 +194,15 @@ const Layout = ({ children }: LayoutProps) => {
 		    setLoggedInName(session.user.name || '');
 		    setLoggedInUserUsername(session.user.username || '');
 		    setLoggedInUserRole(session.user.role || '');
+		    setLoggedInUserProfilePicture(session.user?.profile_picture || '');
 		  }
 		}
 	    }, [ status, session]);
+
+	// Get profile image URL, only if valid (not null, undefined, or empty string)
+	const profileImageUrl = loggedInUserProfilePicture 
+		? (getStorageImageUrl(loggedInUserProfilePicture) || null)
+		: null;
 
 	// Calculate dialer popup position when it opens
 	useEffect(() => {
@@ -885,8 +892,16 @@ const Layout = ({ children }: LayoutProps) => {
               onClick={() => setShowProfileSidebar(!showProfileSidebar)}
               style={{ cursor: 'pointer' }}
             >
-              <div className="bg-primary bg-opacity-10 rounded-circle p-2">
-                <Users size={20} className="text-primary" />
+              <div className="bg-primary bg-opacity-10 rounded-circle p-2" style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                {profileImageUrl ? (
+                  <img 
+                    src={profileImageUrl} 
+                    alt={loggedInName || ''} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                  />
+                ) : (
+                  <Users size={20} className="text-primary" />
+                )}
               </div>
               <div className="d-none d-md-block">
                 <small className="d-block fw-semibold">{loggedInName}</small>

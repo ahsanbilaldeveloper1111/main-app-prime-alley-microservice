@@ -5,8 +5,26 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Col, Row, Tab, Tabs, Card } from "react-bootstrap";
+import { Col, Row, Card } from "react-bootstrap";
 import { useSession } from 'next-auth/react';
+import { 
+  Users as UsersIcon, 
+  Briefcase, 
+  Phone, 
+  CreditCard, 
+  Network, 
+  Ticket,
+  Megaphone,
+  Package,
+  Layers,
+  UserCheck,
+  Building2,
+  Shield,
+  Settings as SettingsIcon,
+  AlertCircle,
+  CheckCircle,
+  ArrowUp
+} from 'lucide-react';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -134,54 +152,202 @@ const Settings = () => {
     return true;
   };
 
+  // Define main tabs with icons and colors
+  const mainTabs = [
+    {
+      key: "user-management",
+      title: "User Management",
+      icon: UsersIcon,
+      color: "#6c757d",
+      permission: PERMISSIONS.CONTROL_HUB_SERVICES
+    },
+    {
+      key: "crm",
+      title: "CRM Management",
+      icon: Briefcase,
+      color: "#0d6efd",
+      permission: PERMISSIONS.CRM_SERVICES
+    },
+    {
+      key: "telco-gateway",
+      title: "Telco Gateway",
+      icon: Phone,
+      color: "#ff9800",
+      permission: PERMISSIONS.GSM_SERVICES
+    },
+    {
+      key: "billing",
+      title: "Billing & Payments",
+      icon: CreditCard,
+      color: "#9c27b0",
+      permission: PERMISSIONS.ACCOUNTS_SERVICES
+    },
+    {
+      key: "devices-management",
+      title: "Devices Management",
+      icon: Network,
+      color: "#f44336",
+      permission: PERMISSIONS.NETOPS_SERVICES
+    },
+    {
+      key: "tickets",
+      title: "Tickets",
+      icon: Ticket,
+      color: "#2196f3",
+      permission: PERMISSIONS.TICKETS_SERVICES
+    }
+  ];
+
+  // Define sub-tabs for each main tab
+  const subTabsConfig: Record<string, Array<{key: string, title: string, icon: any, color: string, permission: string}>> = {
+    "user-management": [
+      { key: "user-directory", title: "User Directory", icon: UsersIcon, color: "#6c757d", permission: PERMISSIONS.VIEW_USERS },
+      { key: "supervisor-teams", title: "Supervisor Teams", icon: UserCheck, color: "#0d6efd", permission: PERMISSIONS.VIEW_TEAMS },
+      { key: "management-groups", title: "Management Groups", icon: Building2, color: "#198754", permission: PERMISSIONS.VIEW_GROUPS },
+      { key: "ranks-and-permissions", title: "Ranks and Permissions", icon: Shield, color: "#ff9800", permission: PERMISSIONS.VIEW_RANKS }
+    ],
+    "crm": [
+      { key: "campaigns", title: "Campaigns", icon: Megaphone, color: "#0d6efd", permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS },
+      { key: "products", title: "Products", icon: Package, color: "#198754", permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
+      { key: "stages", title: "Stages", icon: Layers, color: "#ff9800", permission: PERMISSIONS.VIEW_CRM_STAGES }
+    ],
+    "telco-gateway": [
+      { key: "assign-devices", title: "Assign Devices", icon: SettingsIcon, color: "#0d6efd", permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT },
+      { key: "sync-gsm", title: "Sync GSM", icon: ArrowUp, color: "#198754", permission: PERMISSIONS.VIEW_GSM_SYNC },
+      { key: "company-profiling", title: "Company Profiling", icon: Building2, color: "#ff9800", permission: PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING }
+    ],
+    "devices-management": [
+      { key: "devices-list", title: "Devices List", icon: Network, color: "#0d6efd", permission: PERMISSIONS.VIEW_NETOPS_DEVICES },
+      { key: "services", title: "Services", icon: SettingsIcon, color: "#198754", permission: PERMISSIONS.VIEW_SERVICES_NETOPS },
+      { key: "alerts", title: "Alerts", icon: AlertCircle, color: "#f44336", permission: PERMISSIONS.VIEW_NETOPS_ALERTS }
+    ],
+    "tickets": [
+      { key: "statuses", title: "Statuses", icon: CheckCircle, color: "#0d6efd", permission: PERMISSIONS.VIEW_TICKETS_STATUS },
+      { key: "modules", title: "Modules", icon: Layers, color: "#198754", permission: PERMISSIONS.VIEW_TICKETS_MODULES },
+      { key: "categories", title: "Categories", icon: Package, color: "#ff9800", permission: PERMISSIONS.VIEW_TICKETS_CATEGORIES },
+      { key: "sub-categories", title: "Sub Categories", icon: Layers, color: "#9c27b0", permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES },
+      { key: "types", title: "Types", icon: Ticket, color: "#2196f3", permission: PERMISSIONS.VIEW_TICKETS_TYPES }
+    ]
+  };
+
+  const getActiveSubTab = (mainTab: string) => {
+    switch(mainTab) {
+      case "user-management": return activeUserManagementTab;
+      case "crm": return activeCrmTab;
+      case "tickets": return activeTicketsTab;
+      case "telco-gateway": return activeTelcoTab;
+      case "devices-management": return activeNetopsTab;
+      default: return "";
+    }
+  };
+
+  const handleSubTabClick = (mainTab: string, subTabKey: string) => {
+    switch(mainTab) {
+      case "user-management": handleUserManagementTabChange(subTabKey); break;
+      case "crm": handleCrmTabChange(subTabKey); break;
+      case "tickets": handleTicketsTabChange(subTabKey); break;
+      case "telco-gateway": handleTelcoTabChange(subTabKey); break;
+      case "devices-management": handleNetopsTabChange(subTabKey); break;
+    }
+  };
+
   return (
     <React.Fragment>
       <style>{`
-        #settings-tabs .nav-link {
-          font-weight: 500;
-          padding: 12px 24px;
-          margin-right: 8px;
-          border-radius: 8px 8px 0 0;
-          transition: all 0.3s ease;
-          color: #6c757d;
-          border: none;
-          background: transparent;
+        .settings-filter-buttons {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-bottom: 0;
+          padding: 0;
+          width: 100%;
         }
-        
-        #settings-tabs .nav-link:hover {
-          color: #0d6efd;
-          background-color: rgba(13, 110, 253, 0.05);
-        }
-        
-        #settings-tabs .nav-link.active {
-          color: #0d6efd;
-          background-color: #fff;
-          border-bottom: 3px solid #0d6efd;
-          font-weight: 600;
-        }
-        
-        .settings-sub-tabs .nav-link {
-          font-weight: 500;
+
+        .settings-filter-button {
+          display: flex;
+          align-items: center;
+          gap: 8px;
           padding: 10px 20px;
-          margin-right: 6px;
-          border-radius: 6px 6px 0 0;
-          transition: all 0.3s ease;
-          color: #6c757d;
-          border: none;
-          background: transparent;
-          font-size: 0.95rem;
+          border-radius: 8px;
+          border: 2px solid;
+          font-weight: 500;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          background: white;
+          white-space: nowrap;
         }
-        
-        .settings-sub-tabs .nav-link:hover {
-          color: #198754;
-          background-color: rgba(25, 135, 84, 0.05);
+
+        .settings-filter-button:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
-        
-        .settings-sub-tabs .nav-link.active {
-          color: #198754;
-          background-color: #fff;
-          border-bottom: 3px solid #198754;
-          font-weight: 600;
+
+        .settings-filter-button.active {
+          background: #198754;
+          color: white;
+          border-color: #198754;
+        }
+
+        .settings-filter-button.active .filter-icon {
+          color: white;
+        }
+
+        .settings-filter-button:not(.active) .filter-icon {
+          color: inherit;
+        }
+
+        .settings-sub-filter-buttons {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-bottom: 0;
+          padding: 0;
+          width: 100%;
+        }
+
+        .settings-sub-filter-button {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 16px;
+          border-radius: 8px;
+          border: 2px solid;
+          font-weight: 500;
+          font-size: 13px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          background: white;
+          white-space: nowrap;
+        }
+
+        .settings-sub-filter-button:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .settings-sub-filter-button.active {
+          background: #198754;
+          color: white;
+          border-color: #198754;
+        }
+
+        .settings-sub-filter-button.active .filter-icon {
+          color: white;
+        }
+
+        .settings-sub-filter-button:not(.active) .filter-icon {
+          color: inherit;
+        }
+
+        .filter-icon {
+          width: 18px;
+          height: 18px;
+          flex-shrink: 0;
         }
       `}</style>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Settings" />
@@ -194,340 +360,117 @@ const Settings = () => {
       <Row>
         <Col md={12}>
           <Card className="shadow-sm border-0">
-            <Card.Body className="p-0">
-              <Tabs
-                activeKey={activeTab}
-                onSelect={handleMainTabChange}
-                id="settings-tabs"
-                className="settings-main-tabs"
-                style={{
-                  borderBottom: '2px solid #e9ecef',
-                  padding: '0 20px',
-                  marginBottom: 0
-                }}
-              >
-            
-            {/* User Management Tab */}
-            {session?.user?.permissions?.includes(PERMISSIONS.CONTROL_HUB_SERVICES) && (
-            <Tab eventKey="user-management" title="User Management">
-              <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
-                <Row>
-                  <Col md={12}>
-                    <Tabs
-                      activeKey={activeUserManagementTab}
-                      onSelect={handleUserManagementTabChange}
-                      id="user-management-sub-tabs"
-                      className="settings-sub-tabs"
+            <Card.Body style={{ padding: 0 }}>
+              {/* Main Filter Buttons - At the top */}
+              <div >
+                <div className="settings-filter-buttons shadow px-3 py-3">
+                {mainTabs.map((tab) => {
+                  if (!session?.user?.permissions?.includes(tab.permission)) return null;
+                  const IconComponent = tab.icon;
+                  const isActive = activeTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      className={`settings-filter-button ${isActive ? 'active' : ''}`}
+                      onClick={() => handleMainTabChange(tab.key)}
                       style={{
-                        borderBottom: '2px solid #dee2e6',
-                        marginBottom: '20px'
+                        borderColor: isActive ? '#198754' : tab.color,
+                        color: isActive ? 'white' : tab.color
                       }}
                     >
-                     
-                     {session?.user?.permissions?.includes(PERMISSIONS.VIEW_USERS) && (
-                  <Tab eventKey="user-directory" title="User Directory">
-                        {shouldRenderTab("user-management", "user-directory") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <Users />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TEAMS) && (
-                      <Tab eventKey="supervisor-teams" title="Supervisor Teams">
-                        {shouldRenderTab("user-management", "supervisor-teams") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <Teams />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_GROUPS) && (
-                      
-                      <Tab eventKey="management-groups" title="Management Groups">
-                        {shouldRenderTab("user-management", "management-groups") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <Groups />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_RANKS) && (
-                      <Tab eventKey="ranks-and-permissions" title="Ranks and Permissions">
-                        {shouldRenderTab("user-management", "ranks-and-permissions") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <Ranks />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-                    </Tabs>
-                  </Col>
-                </Row>
+                      <IconComponent className="filter-icon" size={18} />
+                      <span>{tab.title}</span>
+                    </button>
+                  );
+                })}
+                </div>
               </div>
-            </Tab>
-            )}
-            
-            {/* CRM Tab */}
-            {session?.user?.permissions?.includes(PERMISSIONS.CRM_SERVICES) && (
-            <Tab eventKey="crm" title="CRM Management">
-              <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
-                <Row>
-                  <Col md={12}>
-                    <Tabs
-                      activeKey={activeCrmTab}
-                      onSelect={handleCrmTabChange}
-                      id="crm-sub-tabs"
-                      className="settings-sub-tabs"
-                      style={{
-                        borderBottom: '2px solid #dee2e6',
-                        marginBottom: '20px'
-                      }}
-                    >
 
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS) && (
-                      <Tab eventKey="campaigns" title="Campaigns">
-                        {shouldRenderTab("crm", "campaigns") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <Campaigns />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_PRODUCTS) && (
-                      <Tab eventKey="products" title="Products">
-                        {shouldRenderTab("crm", "products") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <Products />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-                      
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_STAGES) && (
-                      <Tab eventKey="stages" title="Stages">
-                        {shouldRenderTab("crm", "stages") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <Stages />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
+              {/* Sub Filter Buttons */}
+              {subTabsConfig[activeTab] && subTabsConfig[activeTab].length > 0 && (
+                <div >
+                  <div className="settings-sub-filter-buttons px-3 py-3 shadow">
+                  {subTabsConfig[activeTab].map((subTab) => {
+                    if (!session?.user?.permissions?.includes(subTab.permission)) return null;
+                    const SubIconComponent = subTab.icon;
+                    const isActive = getActiveSubTab(activeTab) === subTab.key;
+                    return (
+                      <button
+                        key={subTab.key}
+                        className={`settings-sub-filter-button ${isActive ? 'active' : ''}`}
+                        onClick={() => handleSubTabClick(activeTab, subTab.key)}
+                        style={{
+                          borderColor: isActive ? '#198754' : subTab.color,
+                          color: isActive ? 'white' : subTab.color
+                        }}
+                      >
+                        <SubIconComponent className="filter-icon" size={16} />
+                        <span>{subTab.title}</span>
+                      </button>
+                    );
+                  })}
+                  </div>
+                </div>
+              )}
 
-                    </Tabs>
-                  </Col>
-                </Row>
-              </div>
-            </Tab>
-            )}
+              {/* Tab Content */}
+              <div style={{ padding: '24px' }}>
+                {/* User Management Content */}
+                {activeTab === "user-management" && shouldRenderTab("user-management", activeUserManagementTab) && (
+                  <div>
+                    {activeUserManagementTab === "user-directory" && <Users />}
+                    {activeUserManagementTab === "supervisor-teams" && <Teams />}
+                    {activeUserManagementTab === "management-groups" && <Groups />}
+                    {activeUserManagementTab === "ranks-and-permissions" && <Ranks />}
+                  </div>
+                )}
+                {/* CRM Content */}
+                {activeTab === "crm" && shouldRenderTab("crm", activeCrmTab) && (
+                  <div>
+                    {activeCrmTab === "campaigns" && <Campaigns />}
+                    {activeCrmTab === "products" && <Products />}
+                    {activeCrmTab === "stages" && <Stages />}
+                  </div>
+                )}
 
-            {/* Telco Gateway Tab */}
-            {session?.user?.permissions?.includes(PERMISSIONS.GSM_SERVICES) && (
-            <Tab eventKey="telco-gateway" title="Telco Gateway">
-              <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
-                <Row>
-                  <Col md={12}>
-                    <Tabs
-                      activeKey={activeTelcoTab}
-                      onSelect={handleTelcoTabChange}
-                      id="telco-sub-tabs"
-                      className="settings-sub-tabs"
-                      style={{
-                        borderBottom: '2px solid #dee2e6',
-                        marginBottom: '20px'
-                      }}
-                    >
-                      
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_GSM_ASSIGNMENT) && (
-                      <Tab eventKey="assign-devices" title="Assign Devices">
-                        {shouldRenderTab("telco-gateway", "assign-devices") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <GsmAssign />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
+                {/* Telco Gateway Content */}
+                {activeTab === "telco-gateway" && shouldRenderTab("telco-gateway", activeTelcoTab) && (
+                  <div>
+                    {activeTelcoTab === "assign-devices" && <GsmAssign />}
+                    {activeTelcoTab === "sync-gsm" && <GsmSync />}
+                    {activeTelcoTab === "company-profiling" && <CompanyPO />}
+                  </div>
+                )}
 
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_GSM_SYNC) && (
-                      <Tab eventKey="sync-gsm" title="Sync GSM">
-                        {shouldRenderTab("telco-gateway", "sync-gsm") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <GsmSync />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING) && (
-
-                      <Tab eventKey="company-profiling" title="Company Profiling">
-                        {shouldRenderTab("telco-gateway", "company-profiling") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <CompanyPO />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-                    </Tabs>
-                  </Col>
-                </Row>
-              </div>
-            </Tab>
-            )}
-
-            {/* Billing Tab */}
-            {session?.user?.permissions?.includes(PERMISSIONS.ACCOUNTS_SERVICES) && (
-              <Tab eventKey="billing" title="Billing & Payments">
-                <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
-                  <Row>
-                  <Col md={12}>
-                    <div style={{ marginTop: '20px' }}>
-                      {shouldRenderTab("billing") && session?.user?.permissions?.includes(PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING) && (
-                      <PaymentMethods />
-                      )}
-                    </div>
-                  </Col>
-                </Row>
-              </div>
-            </Tab>
-            )}
+                {/* Billing Content */}
+                {activeTab === "billing" && shouldRenderTab("billing") && session?.user?.permissions?.includes(PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING) && (
+                  <div>
+                    <PaymentMethods />
+                  </div>
+                )}
 
             
 
-            {/* Netops Tab */}
-            {session?.user?.permissions?.includes(PERMISSIONS.NETOPS_SERVICES) && (
-            <Tab eventKey="devices-management" title="Devices Management (NetOps)">
-              <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
-                <Row>
-                  <Col md={12}>
-                    <Tabs
-                      activeKey={activeNetopsTab}
-                      onSelect={handleNetopsTabChange}
-                      id="netops-sub-tabs"
-                      className="settings-sub-tabs"
-                      style={{
-                        borderBottom: '2px solid #dee2e6',
-                        marginBottom: '20px'
-                      }}
-                    >
+                {/* Devices Management Content */}
+                {activeTab === "devices-management" && shouldRenderTab("devices-management", activeNetopsTab) && (
+                  <div>
+                    {activeNetopsTab === "devices-list" && <Devices />}
+                    {activeNetopsTab === "services" && <Services />}
+                    {activeNetopsTab === "alerts" && <Alerts />}
+                  </div>
+                )}
 
-{session?.user?.permissions?.includes(PERMISSIONS.VIEW_NETOPS_DEVICES) && (
-                      <Tab eventKey="devices-list" title="Devices List">
-                        {shouldRenderTab("devices-management", "devices-list") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <Devices />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SERVICES_NETOPS) && (
-                      <Tab eventKey="services" title="Services">
-                        {shouldRenderTab("devices-management", "services") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <Services />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_NETOPS_ALERTS) && (
-                      <Tab eventKey="alerts" title="Alerts">
-                        {shouldRenderTab("devices-management", "alerts") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <Alerts />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-
-                    </Tabs>
-                  </Col>
-                </Row>
+                {/* Tickets Content */}
+                {activeTab === "tickets" && shouldRenderTab("tickets", activeTicketsTab) && (
+                  <div>
+                    {activeTicketsTab === "statuses" && <TicketStatuses />}
+                    {activeTicketsTab === "modules" && <TicketModules />}
+                    {activeTicketsTab === "categories" && <ModuleCategories />}
+                    {activeTicketsTab === "sub-categories" && <ModuleSubCategories />}
+                    {activeTicketsTab === "types" && <TicketTypes />}
+                  </div>
+                )}
               </div>
-            </Tab>
-            )}
-
-            {/* Tickets Tab */}
-            {session?.user?.permissions?.includes(PERMISSIONS.TICKETS_SERVICES) && (
-            <Tab eventKey="tickets" title="Tickets">
-              <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
-                <Row>
-                  <Col md={12}>
-                    <Tabs
-                      activeKey={activeTicketsTab}
-                      onSelect={handleTicketsTabChange}
-                      id="tickets-sub-tabs"
-                      className="settings-sub-tabs"
-                      style={{
-                        borderBottom: '2px solid #dee2e6',
-                        marginBottom: '20px'
-                      }}
-                    >
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TICKETS_STATUS) && (
-                      <Tab eventKey="statuses" title="Statuses">
-                        {shouldRenderTab("tickets", "statuses") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <TicketStatuses />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TICKETS_MODULES) && (
-
-                      <Tab eventKey="modules" title="Modules">
-                        {shouldRenderTab("tickets", "modules") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <TicketModules />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TICKETS_CATEGORIES) && (
-                      <Tab eventKey="categories" title="Categories">
-                        {shouldRenderTab("tickets", "categories") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <ModuleCategories />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES) && (
-                      <Tab eventKey="sub-categories" title="Sub Categories">
-                        {shouldRenderTab("tickets", "sub-categories") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <ModuleSubCategories />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TICKETS_TYPES) && (
-                      <Tab eventKey="types" title="Types">
-                        {shouldRenderTab("tickets", "types") && (
-                          <div style={{ marginTop: '20px' }}>
-                            <TicketTypes />
-                          </div>
-                        )}
-                      </Tab>
-                      )}
-
-                    </Tabs>
-                  </Col>
-                </Row>
-              </div>
-            </Tab>
-            )}
-          </Tabs>
             </Card.Body>
           </Card>
         </Col>

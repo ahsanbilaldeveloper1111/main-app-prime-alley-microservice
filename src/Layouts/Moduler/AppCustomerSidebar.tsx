@@ -32,7 +32,19 @@ import {
   Server,
   Search,
   Menu,
-  X
+  X,
+  UserSearch,
+  Handshake,
+  Scroll,
+  Layers,
+  ReceiptText,
+  Activity,
+  Contact,
+  Voicemail,
+  Inbox,
+  Wifi,
+  ClipboardCheck,
+  ClipboardList
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -127,74 +139,39 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         {
           id: 'crm-data-management',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DATA_MANAGEMENT,
-          icon: <Database size={16} />,
+          icon: <UserSearch size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
           url: '/crm/data'
         },
         {
           id: 'crm-leads',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.LEADS,
-          icon: <Target size={16} />,
+          icon: <Contact size={16} />,
           permission: PERMISSIONS.VIEW_CRM_LEADS,
           url: '/crm/leads'
         },
         {
           id: 'crm-deals',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS,
-          icon: <Target size={16} />,
+          icon: <Handshake size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DEALS,
           url: '/crm/deals'
         },
         {
           id: 'crm-orders',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.ORDERS,
-          icon: <Target size={16} />,
+          icon: <ReceiptText size={16} />,
           permission: PERMISSIONS.VIEW_CRM_ORDERS,
           url: '/crm/orders'
         },
-        // {
-        //   id: 'crm-products',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.PRODUCTS,
-        //   icon: <Package size={16} />,
-        //   permission: PERMISSIONS.VIEW_CRM_PRODUCTS,
-        //   url: '/crm/products'
-        // },
-        // {
-        //   id: 'crm-tasks',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.TASKS,
-        //   icon: <BarChart3 size={16} />,
-        //   permission: PERMISSIONS.VIEW_CRM_TASKS,
-        //   url: '/crm/tasks'
-        // },
-        // {
-        //   id: 'crm-stages',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.STAGES,
-        //   icon: <BarChart3 size={16} />,
-        //   permission: PERMISSIONS.VIEW_CRM_STAGES,
-        //   url: '/crm/stages'
-        // },
-      
-        // {
-        //   id: 'crm-campaigns',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.CAMPAIGNS,
-        //   icon: <Megaphone size={16} />,
-        //   permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS,
-        //   url: '/crm/campaigns'
-        // },
         {
           id: 'crm-history',
           title: 'Activity Tracker',
-          icon: <History size={16} />,
+          icon: <Activity size={16} />,
           permission: PERMISSIONS.VIEW_CRM_HISTORY,
           url: '/crm/history'
         },
-        // {
-        //   id: 'crm-reports',
-        //   title: 'Reports',
-        //   icon: <BarChart3 size={16} />,
-        //   permission: PERMISSIONS.VIEW_CRM_REPORTS,
-        //   url: '/crm/reports'
-        // }
+       
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
 
@@ -243,7 +220,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'call-history',
       key: 'call-history',
       permission: PERMISSIONS.CALL_HISTORY_SERVICES,
-      icon: <History size={20} />,
+      icon: <Phone size={20} />,
       color: MENU_COLORS.CALL_HISTORY,
       title: 'Call Details',
       label: 'Call Details',
@@ -266,7 +243,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         {
           id: 'call-history-recordings',
           title: HEADER_CONSTANTS.MENU_LABELS.CALL_RECORDINGS,
-          icon: <Phone size={16} />,
+          icon: <Voicemail size={16} />,
           permission: PERMISSIONS.VIEW_CALL_RECORDINGS,
           url: '/call-recordings'
         },
@@ -330,28 +307,28 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         {
           id: 'gsm-list',
           title: "Devices List",
-          icon: <List size={16} />,
+          icon: <ClipboardList size={16} />,
           permission: PERMISSIONS.VIEW_GSM_MANAGEMENT,
           url: '/gsm/list'
         },
         {
           id: 'gsm-assign',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY_ASSIGN,
-          icon: <List size={16} />,
+          icon: <ClipboardCheck size={16} />,
           permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT,
           url: '/gsm/assign'
         },
         {
           id: 'gsm-ports',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.PORTS,
-          icon: <List size={16} />,
+          icon: <Wifi size={16} />,
           permission: PERMISSIONS.VIEW_GSM_PORTS,
           url: '/gsm/ports'
         },
         {
           id: 'gsm-inbox',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.INBOX,
-          icon: <List size={16} />,
+          icon: <Inbox size={16} />,
           permission: PERMISSIONS.VIEW_GSM_INBOX,
           url: '/gsm/inbox'
         },
