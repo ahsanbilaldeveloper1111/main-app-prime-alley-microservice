@@ -147,38 +147,50 @@ const ChartBar: React.FC<ChartBarProps> = ({
     : series;
 
   // Normalize data if useLogScale is enabled to make all bars visible
-  const normalizeData = (data: number[]): number[] => {
-    if (!useLogScale || data.length === 0) return data;
+  // Normalize across ALL series together to maintain relative differences between series
+  const normalizeDataAcrossAllSeries = (series: ChartSeries[]): ChartSeries[] => {
+    if (!useLogScale || series.length === 0) return series;
     
-    const maxValue = Math.max(...data);
-    const minValue = Math.min(...data.filter(v => v > 0)); // Get smallest non-zero value
-    if (maxValue === 0) return data;
-    
-    // Use a more balanced approach that maintains better visual proportions
-    // Scale based on the ratio of values while ensuring minimum visibility
-    return data.map(value => {
-      if (value === 0) return 0;
-      
-      // Calculate the ratio relative to the maximum value
-      const ratio = value / maxValue;
-      
-      // Use a power function to compress the range while maintaining proportions
-      // This will make smaller values more visible while keeping larger values dominant
-      const compressedRatio = Math.pow(ratio, 0.3); // 0.3 power makes small values more visible
-      
-      // Scale to chart width with minimum visibility
-      const scaledValue = compressedRatio * 300;
-      
-      // Ensure minimum visibility but maintain relative differences
-      return Math.max(scaledValue, 3);
+    // Collect all values from all series to find global min/max
+    const allValues: number[] = [];
+    series.forEach(s => {
+      s.data.forEach(v => {
+        if (v > 0) allValues.push(v);
+      });
     });
+    
+    if (allValues.length === 0) return series;
+    
+    const globalMax = Math.max(...allValues);
+    const globalMin = Math.min(...allValues);
+    
+    if (globalMax === 0) return series;
+    
+    // Use logarithmic normalization across all series
+    const logMax = Math.log10(globalMax);
+    const logMin = globalMin > 0 ? Math.log10(globalMin) : 0;
+    const logRange = logMax - logMin || 1;
+    
+    return series.map(s => ({
+      ...s,
+      data: s.data.map(value => {
+        if (value === 0) return 0;
+        
+        // Apply logarithmic scale
+        const logValue = Math.log10(value);
+        const normalizedLog = (logValue - logMin) / logRange;
+        
+        // Scale to chart width (300 is approximate chart width)
+        const scaledValue = normalizedLog * 300;
+        
+        // Ensure minimum visibility
+        return Math.max(scaledValue, 2);
+      })
+    }));
   };
 
   const normalizedSeries = useLogScale 
-    ? displayedSeries.map(s => ({
-        ...s,
-        data: normalizeData(s.data)
-      }))
+    ? normalizeDataAcrossAllSeries(displayedSeries)
     : displayedSeries;
 
   const chartOptions: ApexOptions = {
@@ -341,10 +353,7 @@ const ChartBar: React.FC<ChartBarProps> = ({
                 },
                 yaxis: chartOptions.yaxis
               }} 
-              series={useLogScale ? series.map(s => ({
-                ...s,
-                data: normalizeData(s.data)
-              })) : series} 
+              series={useLogScale ? normalizeDataAcrossAllSeries(series) : series} 
               type="bar" 
               height={350} 
             />

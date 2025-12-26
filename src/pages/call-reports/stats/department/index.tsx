@@ -934,19 +934,14 @@ const CallStatsDepartment = () => {
                   <Col md={4}>
                     <Form.Group>
                       <Form.Label>Departments</Form.Label>
-                      <SelectBox
-                        isMulti
-                        isSearchable={true}
-                        isDisabled={hierarchyLoading}
-                        value={(pendingFilters as any)?.department?.length > 0 ? (pendingFilters as any)?.department : null}
-                        onChange={(value) => {
-                          setPendingFilters({ ...pendingFilters, department: value ? (value as string[]) : [] });
+                      <Form.Control
+                        type="text"
+                        placeholder="Enter departments (comma separated)"
+                        value={((pendingFilters as any)?.department || []).join(', ')}
+                        onChange={(e) => {
+                          const values = e.target.value.split(',').map(v => v.trim()).filter(v => v);
+                          setPendingFilters({ ...pendingFilters, department: values });
                         }}
-                        options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
-                          value: dept.id,
-                          label: dept.name
-                        })) || []}
-                        placeholder="Select departments"
                       />
                     </Form.Group>
                   </Col>

@@ -457,12 +457,36 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         const ms = 10000000;
         dataExtension.forEach((item: any) => {
           newChartData.label.push(item.label);
-          newChartData.longest_call.push(item.longest_call / ms);
-          newChartData.shortest_call.push(item.shortest_call / ms);
-          newChartData.average_call.push(item.average_call / ms);
+          // Parse string values to numbers before division
+          const longestCall = typeof item.longest_call === 'string' 
+            ? parseFloat(item.longest_call) 
+            : Number(item.longest_call) || 0;
+          const shortestCall = typeof item.shortest_call === 'string' 
+            ? parseFloat(item.shortest_call) 
+            : Number(item.shortest_call) || 0;
+          const averageCall = typeof item.average_call === 'string' 
+            ? parseFloat(item.average_call) 
+            : Number(item.average_call) || 0;
+          
+          newChartData.longest_call.push(longestCall / ms);
+          newChartData.shortest_call.push(shortestCall / ms);
+          newChartData.average_call.push(averageCall / ms);
         });
 
-        console.log("Chart data", newChartData);
+        console.log("Chart data (raw)", dataExtension);
+        console.log("Chart data (processed)", newChartData);
+        console.log("Chart data (values check)", {
+          extension_101: {
+            shortest: newChartData.shortest_call[0],
+            average: newChartData.average_call[0],
+            longest: newChartData.longest_call[0]
+          },
+          extension_107: {
+            shortest: newChartData.shortest_call[1],
+            average: newChartData.average_call[1],
+            longest: newChartData.longest_call[1]
+          }
+        });
         setChartLoading(true);
 
         const dataLength = newChartData.label.length;
@@ -1252,19 +1276,24 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                   <Form.Control
                     type="datetime-local"
                     value={(currentFilters as any)?.start_date || ''}
+                    max={moment().format('YYYY-MM-DDTHH:mm')}
                     onChange={(e) => {
                       const datetimeValue = e.target.value;
-                      setCurrentFilters({ 
-                        ...currentFilters, 
+                      const endDate = (currentFilters as any)?.end_date || '';
+                      
+                      // If start date is greater than end date, adjust end date to start date
+                      let updatedFilters: any = {
+                        ...currentFilters,
                         start_date: datetimeValue
-                      });
+                      };
+                      
+                      if (datetimeValue && endDate && moment(datetimeValue).isAfter(moment(endDate))) {
+                        updatedFilters.end_date = datetimeValue;
+                      }
+                      
+                      setCurrentFilters(updatedFilters);
                     }}
                   />
-                  {currentTimezone && (
-                    <Form.Text className="text-muted">
-                      Timezone: {currentTimezone}
-                    </Form.Text>
-                  )}
                 </Form.Group>
               </Col>
 
@@ -1275,19 +1304,24 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                     type="datetime-local"
                     value={(currentFilters as any)?.end_date || ''}
                     min={(currentFilters as any)?.start_date || ''}
+                    max={moment().format('YYYY-MM-DDTHH:mm')}
                     onChange={(e) => {
                       const datetimeValue = e.target.value;
-                      setCurrentFilters({ 
-                        ...currentFilters, 
+                      const startDate = (currentFilters as any)?.start_date || '';
+                      
+                      // If end date is less than start date, adjust start date to end date
+                      let updatedFilters: any = {
+                        ...currentFilters,
                         end_date: datetimeValue
-                      });
+                      };
+                      
+                      if (datetimeValue && startDate && moment(datetimeValue).isBefore(moment(startDate))) {
+                        updatedFilters.start_date = datetimeValue;
+                      }
+                      
+                      setCurrentFilters(updatedFilters);
                     }}
                   />
-                  {currentTimezone && (
-                    <Form.Text className="text-muted">
-                      Timezone: {currentTimezone}
-                    </Form.Text>
-                  )}
                 </Form.Group>
             </Col>
           </>

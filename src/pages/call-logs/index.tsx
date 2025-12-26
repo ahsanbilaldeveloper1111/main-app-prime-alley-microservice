@@ -22,7 +22,7 @@ import PageLoader from '@components/PageLoader';
 
 import '@assets/scss/common.scss';
 
-import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat,formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
+import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat,formatDateTimeToLocal, GlobalDateTimeFormat, getAutoTimezone } from '@utils/Helper';
 import { ModuleSlug } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import BarFilters from '@components/BarFilters';
@@ -84,6 +84,7 @@ const CallLogs = () => {
     const [currentFilters, setCurrentFilters] = useState({});
     const [pendingFilters, setPendingFilters] = useState({});
     const [searchValue, setSearchValue] = useState<string>('');
+    const [currentTimezone, setCurrentTimezone] = useState<string>('');
     const [summary, setSummary] = useState<Summary>({
         users: 0,
         extensions: 0,
@@ -101,6 +102,37 @@ const CallLogs = () => {
     useEffect(() => {
         setTotalUsers(hierarchyDataUsers.length);
     }, [hierarchyDataUsers]);
+
+    // Get current timezone on component mount and set default date values
+    useEffect(() => {
+        const timezone = getAutoTimezone();
+        setCurrentTimezone(timezone);
+        
+        // Set default start_datetime (today 00:00) and end_datetime (today 23:59)
+        // Format for datetime-local input (YYYY-MM-DDTHH:mm)
+        const now = moment();
+        const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
+        const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
+        
+        // Format for API (with seconds and timezone offset, e.g., "2024-01-15T00:00:00-05:00")
+        const startDateApi = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm:ssZ');
+        const endDateApi = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm:ssZ');
+        
+        // Set default filters for input (without timezone key)
+        const defaultPendingFilters = {
+            start_datetime: startDateInput,
+            end_datetime: endDateInput
+        };
+        
+        // Set applied filters with API format (with timezone offset in datetime, no timezone key)
+        const defaultCurrentFilters = {
+            start_datetime: startDateApi,
+            end_datetime: endDateApi
+        };
+        
+        setPendingFilters(defaultPendingFilters);
+        setCurrentFilters(defaultCurrentFilters);
+    }, []);
 
     // Create cards data for PageSummaryGrid
     const summaryCards: SummaryCard[] = [
@@ -166,7 +198,53 @@ const CallLogs = () => {
     }, [currentFilters]);
 
     const handleFiltersChange = (filters: any) => {
-        setCurrentFilters(filters);
+        // Format datetime values to include seconds and timezone offset (remove timezone key)
+        const formattedFilters: any = { ...filters };
+        const timezone = currentTimezone || getAutoTimezone();
+        
+        if (formattedFilters.start_datetime) {
+            // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
+            let startMoment = moment(formattedFilters.start_datetime);
+            
+            if (formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+                // Format is YYYY-MM-DDTHH:mm, add :00 seconds
+                startMoment = moment(formattedFilters.start_datetime + ':00');
+            } else if (!formattedFilters.start_datetime.includes('T')) {
+                // If only date, set to 00:00:00
+                startMoment = moment(formattedFilters.start_datetime).startOf('day');
+            }
+            
+            // Format with timezone offset (e.g., "2024-01-15T00:00:00-05:00")
+            formattedFilters.start_datetime = startMoment.format('YYYY-MM-DDTHH:mm:ssZ');
+        }
+        
+        if (formattedFilters.end_datetime) {
+            // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
+            let endMoment = moment(formattedFilters.end_datetime);
+            
+            if (formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+                // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
+                const timePart = formattedFilters.end_datetime.split('T')[1];
+                if (timePart === '23:59') {
+                    endMoment = moment(formattedFilters.end_datetime + ':59');
+                } else {
+                    endMoment = moment(formattedFilters.end_datetime + ':00');
+                }
+            } else if (!formattedFilters.end_datetime.includes('T')) {
+                // If only date, set to 23:59:59
+                endMoment = moment(formattedFilters.end_datetime).endOf('day');
+            }
+            
+            // Format with timezone offset (e.g., "2024-01-15T23:59:59-05:00")
+            formattedFilters.end_datetime = endMoment.format('YYYY-MM-DDTHH:mm:ssZ');
+        }
+        
+        // Remove timezone key from payload (timezone is now included in datetime values)
+        delete formattedFilters.timezone;
+        
+        setCurrentFilters(formattedFilters);
+        // Trigger refresh for GenericListPage to fetch new data
+        setRefreshKey((prev) => prev + 1);
     };
 
     const handleExport = async (exportType: string, filters: Record<string, any>) => {
@@ -260,7 +338,6 @@ const CallLogs = () => {
                 showSearch={false}
                 filters={pendingFilters}
                 onSubmit={() => {
-                    setCurrentFilters(pendingFilters);
                     handleFiltersChange(pendingFilters);
                 }}
                 onReset={() => {
@@ -413,12 +490,26 @@ const CallLogs = () => {
                         {/* Date Range - Start */}
                         <Col md={4}>
                             <Form.Group>
-                                <Form.Label>Start Date Time</Form.Label>
+                                <Form.Label>Start Date & Time</Form.Label>
                                 <Form.Control
                                     type="datetime-local"
                                     value={(pendingFilters as any)?.start_datetime || ''}
+                                    max={moment().format('YYYY-MM-DDTHH:mm')}
                                     onChange={(e) => {
-                                        setPendingFilters({ ...pendingFilters, start_datetime: e.target.value });
+                                        const datetimeValue = e.target.value;
+                                        const endDate = (pendingFilters as any)?.end_datetime || '';
+                                        
+                                        // If start date is greater than end date, adjust end date to start date
+                                        let updatedFilters: any = {
+                                            ...pendingFilters,
+                                            start_datetime: datetimeValue
+                                        };
+                                        
+                                        if (datetimeValue && endDate && moment(datetimeValue).isAfter(moment(endDate))) {
+                                            updatedFilters.end_datetime = datetimeValue;
+                                        }
+                                        
+                                        setPendingFilters(updatedFilters);
                                     }}
                                 />
                             </Form.Group>
@@ -427,13 +518,27 @@ const CallLogs = () => {
                         {/* Date Range - End */}
                         <Col md={4}>
                             <Form.Group>
-                                <Form.Label>End Date Time</Form.Label>
+                                <Form.Label>End Date & Time</Form.Label>
                                 <Form.Control
                                     type="datetime-local"
                                     value={(pendingFilters as any)?.end_datetime || ''}
                                     min={(pendingFilters as any)?.start_datetime || ''}
+                                    max={moment().format('YYYY-MM-DDTHH:mm')}
                                     onChange={(e) => {
-                                        setPendingFilters({ ...pendingFilters, end_datetime: e.target.value });
+                                        const datetimeValue = e.target.value;
+                                        const startDate = (pendingFilters as any)?.start_datetime || '';
+                                        
+                                        // If end date is less than start date, adjust start date to end date
+                                        let updatedFilters: any = {
+                                            ...pendingFilters,
+                                            end_datetime: datetimeValue
+                                        };
+                                        
+                                        if (datetimeValue && startDate && moment(datetimeValue).isBefore(moment(startDate))) {
+                                            updatedFilters.start_datetime = datetimeValue;
+                                        }
+                                        
+                                        setPendingFilters(updatedFilters);
                                     }}
                                 />
                             </Form.Group>
