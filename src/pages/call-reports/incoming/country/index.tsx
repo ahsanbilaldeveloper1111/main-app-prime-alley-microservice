@@ -80,7 +80,7 @@ interface ChartData {
 
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
-import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal } from '@utils/Helper';
+import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 const CallIncomingCountry = () => {
@@ -182,7 +182,40 @@ const CallIncomingCountry = () => {
       is_incoming_only: 'true'
     });
     const [pendingFilters, setPendingFilters] = useState({});
+    const [currentTimezone, setCurrentTimezone] = useState<string>('');
     
+    // Get current timezone on component mount and set default date values
+    useEffect(() => {
+        const timezone = getAutoTimezone();
+        setCurrentTimezone(timezone);
+        
+        // Set default start_datetime (today 00:00) and end_datetime (today 23:59)
+        // Format for datetime-local input (YYYY-MM-DDTHH:mm) in local timezone
+        const now = moment();
+        const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
+        const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
+        
+        // Set default filters for input (local timezone)
+        const defaultPendingFilters = {
+            start_datetime: startDateInput,
+            end_datetime: endDateInput,
+            is_incoming_only: 'true'
+        };
+        
+        // Set applied filters with UTC format for API
+        const startDateUTC = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+        const endDateUTC = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+        
+        const defaultCurrentFilters = {
+            start_datetime: startDateUTC,
+            end_datetime: endDateUTC,
+            is_incoming_only: 'true'
+        };
+        
+        setPendingFilters(defaultPendingFilters);
+        setCurrentFilters(defaultCurrentFilters);
+    }, []);
+
     // Debug current filters state
     useEffect(() => {
         console.log('Current filters state changed:', currentFilters);
@@ -342,21 +375,63 @@ const CallIncomingCountry = () => {
 
     
     const handleFiltersChange = (filters: any) => {
-        console.log('Filters changed:', filters);
+        // Convert datetime values from local timezone to UTC before sending to API
+        const formattedFilters: any = { ...filters };
+        
+        if (formattedFilters.start_datetime) {
+            // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
+            // Convert to UTC ISO format
+            let startMoment = moment(formattedFilters.start_datetime);
+            
+            if (formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+                // Format is YYYY-MM-DDTHH:mm, add :00 seconds
+                startMoment = moment(formattedFilters.start_datetime + ':00');
+            } else if (!formattedFilters.start_datetime.includes('T')) {
+                // If only date, set to 00:00:00
+                startMoment = moment(formattedFilters.start_datetime).startOf('day');
+            }
+            
+            // Convert to UTC
+            formattedFilters.start_datetime = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+        }
+        
+        if (formattedFilters.end_datetime) {
+            // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
+            // Convert to UTC ISO format
+            let endMoment = moment(formattedFilters.end_datetime);
+            
+            if (formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+                // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
+                const timePart = formattedFilters.end_datetime.split('T')[1];
+                if (timePart === '23:59') {
+                    endMoment = moment(formattedFilters.end_datetime + ':59');
+                } else {
+                    endMoment = moment(formattedFilters.end_datetime + ':00');
+                }
+            } else if (!formattedFilters.end_datetime.includes('T')) {
+                // If only date, set to 23:59:59
+                endMoment = moment(formattedFilters.end_datetime).endOf('day');
+            }
+            
+            // Convert to UTC
+            formattedFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+        }
+        
+        console.log('Filters changed:', formattedFilters);
         console.log('Previous filters:', currentFilters);
-        console.log('New filters:', filters);
+        console.log('New filters:', formattedFilters);
         
         // Check if filters actually changed
-        const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(filters);
+        const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(formattedFilters);
         console.log('Filters actually changed:', filtersChanged);
         
         // Check if this is a complete clear (empty object or only has default values)
-        const isCompletelyCleared = Object.keys(filters).length === 0 || 
-            (Object.keys(filters).length === 1 && filters.hasOwnProperty('is_incoming_only'));
+        const isCompletelyCleared = Object.keys(formattedFilters).length === 0 || 
+            (Object.keys(formattedFilters).length === 1 && formattedFilters.hasOwnProperty('is_incoming_only'));
         
         console.log('Is completely cleared:', isCompletelyCleared);
         
-        setCurrentFilters(filters);
+        setCurrentFilters(formattedFilters);
         
         // Mark filters as ready when they are first set
         if (!filtersReady) {
@@ -931,9 +1006,11 @@ const CallIncomingCountry = () => {
               showSearch={false}
               filters={pendingFilters}
               onSubmit={() => {
+                // Convert and apply filters, then trigger all APIs
                 const filtersToApply = { ...pendingFilters, is_incoming_only: 'true' };
-                setCurrentFilters(filtersToApply);
                 handleFiltersChange(filtersToApply);
+                // fetchCallLogs will be triggered by refreshKey change
+                // Chart data will be triggered by useEffect watching currentFilters
               }}
               onReset={() => {
                 setPendingFilters({});
@@ -1047,19 +1124,13 @@ const CallIncomingCountry = () => {
                   <Col md={4}>
                     <Form.Group>
                       <Form.Label>Departments</Form.Label>
-                      <SelectBox
-                        isMulti
-                        isSearchable={true}
-                        isDisabled={hierarchyLoading}
-                        value={(pendingFilters as any)?.department?.length > 0 ? (pendingFilters as any)?.department : null}
-                        onChange={(value) => {
-                          setPendingFilters({ ...pendingFilters, department: value ? (value as string[]) : [] });
+                      <Form.Control
+                        type="text"
+                        placeholder="Enter department"
+                        value={(pendingFilters as any)?.department || ''}
+                        onChange={(e) => {
+                          setPendingFilters({ ...pendingFilters, department: e.target.value });
                         }}
-                        options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
-                          value: dept.id,
-                          label: dept.name
-                        })) || []}
-                        placeholder="Select departments"
                       />
                     </Form.Group>
                   </Col>
@@ -1067,12 +1138,26 @@ const CallIncomingCountry = () => {
                   {/* Date Range - Start */}
                   <Col md={4}>
                     <Form.Group>
-                      <Form.Label>Start Date Time</Form.Label>
+                      <Form.Label>Start Date & Time</Form.Label>
                       <Form.Control
                         type="datetime-local"
                         value={(pendingFilters as any)?.start_datetime || ''}
+                        max={moment().format('YYYY-MM-DDTHH:mm')}
                         onChange={(e) => {
-                          setPendingFilters({ ...pendingFilters, start_datetime: e.target.value });
+                          const datetimeValue = e.target.value;
+                          const endDate = (pendingFilters as any)?.end_datetime || '';
+                          
+                          // If start date is greater than end date, adjust end date to start date
+                          let updatedFilters: any = {
+                              ...pendingFilters,
+                              start_datetime: datetimeValue
+                          };
+                          
+                          if (datetimeValue && endDate && moment(datetimeValue).isAfter(moment(endDate))) {
+                              updatedFilters.end_datetime = datetimeValue;
+                          }
+                          
+                          setPendingFilters(updatedFilters);
                         }}
                       />
                     </Form.Group>
@@ -1081,13 +1166,27 @@ const CallIncomingCountry = () => {
                   {/* Date Range - End */}
                   <Col md={4}>
                     <Form.Group>
-                      <Form.Label>End Date Time</Form.Label>
+                      <Form.Label>End Date & Time</Form.Label>
                       <Form.Control
                         type="datetime-local"
                         value={(pendingFilters as any)?.end_datetime || ''}
                         min={(pendingFilters as any)?.start_datetime || ''}
+                        max={moment().format('YYYY-MM-DDTHH:mm')}
                         onChange={(e) => {
-                          setPendingFilters({ ...pendingFilters, end_datetime: e.target.value });
+                          const datetimeValue = e.target.value;
+                          const startDate = (pendingFilters as any)?.start_datetime || '';
+                          
+                          // If end date is less than start date, adjust start date to end date
+                          let updatedFilters: any = {
+                              ...pendingFilters,
+                              end_datetime: datetimeValue
+                          };
+                          
+                          if (datetimeValue && startDate && moment(datetimeValue).isBefore(moment(startDate))) {
+                              updatedFilters.start_datetime = datetimeValue;
+                          }
+                          
+                          setPendingFilters(updatedFilters);
                         }}
                       />
                     </Form.Group>

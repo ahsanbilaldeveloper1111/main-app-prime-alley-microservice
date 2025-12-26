@@ -1671,6 +1671,7 @@ const GlobalFloatingCallBar: React.FC = () => {
               style={{
                 padding: "0.625rem 1rem",
                 fontWeight: 500,
+                color:"#fff",
                 fontSize: "1rem",
                 boxShadow: "0 4px 6px -1px rgba(239,68,68,0.3)",
                 marginLeft: "0.5rem",
@@ -1685,7 +1686,7 @@ const GlobalFloatingCallBar: React.FC = () => {
             >
               <i
                 className="material-icons-two-tone"
-                style={{ fontSize: "1rem", color: "#fff" }}
+                style={{ fontSize: "1rem", color: "#fff",backgroundColor:"#fff" }}
               >
                 call_end
               </i>
