@@ -605,7 +605,7 @@ export const convertSecondsToHumanReadable = (seconds: number): string => {
 };
 
 export const ModuleSlug = {
-  CALL_REPORTS: "call-reports",
+  CALL_REPORTS: "reports",
   CALL_LOGS: "call-logs",
   CALL_RECORDINGS: "call-recordings",
   TICKET: "tickets",
