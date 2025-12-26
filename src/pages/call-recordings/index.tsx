@@ -599,8 +599,52 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   };
 
   const handleFiltersChange = (filters: any) => {
-    setCurrentFilters(filters);
-    setAppliedFilters(filters); // Update applied filters to trigger API
+    // Format datetime values to include seconds and timezone offset (remove timezone key)
+    const formattedFilters: any = { ...filters };
+    const timezone = currentTimezone || getAutoTimezone();
+    
+    if (formattedFilters.start_date) {
+      // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
+      let startMoment = moment(formattedFilters.start_date);
+      
+      if (formattedFilters.start_date.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+        // Format is YYYY-MM-DDTHH:mm, add :00 seconds
+        startMoment = moment(formattedFilters.start_date + ':00');
+      } else if (!formattedFilters.start_date.includes('T')) {
+        // If only date, set to 00:00:00
+        startMoment = moment(formattedFilters.start_date).startOf('day');
+      }
+      
+      // Format with timezone offset (e.g., "2024-01-15T00:00:00-05:00")
+      formattedFilters.start_date = startMoment.format('YYYY-MM-DDTHH:mm:ssZ');
+    }
+    
+    if (formattedFilters.end_date) {
+      // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
+      let endMoment = moment(formattedFilters.end_date);
+      
+      if (formattedFilters.end_date.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+        // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
+        const timePart = formattedFilters.end_date.split('T')[1];
+        if (timePart === '23:59') {
+          endMoment = moment(formattedFilters.end_date + ':59');
+        } else {
+          endMoment = moment(formattedFilters.end_date + ':00');
+        }
+      } else if (!formattedFilters.end_date.includes('T')) {
+        // If only date, set to 23:59:59
+        endMoment = moment(formattedFilters.end_date).endOf('day');
+      }
+      
+      // Format with timezone offset (e.g., "2024-01-15T23:59:59-05:00")
+      formattedFilters.end_date = endMoment.format('YYYY-MM-DDTHH:mm:ssZ');
+    }
+    
+    // Remove timezone key from payload (timezone is now included in datetime values)
+    delete formattedFilters.timezone;
+    
+    setCurrentFilters(filters); // Keep input format for display
+    setAppliedFilters(formattedFilters); // Use formatted filters for API (with timezone in datetime)
     // Trigger refresh for GenericListPage to fetch new data
     setRefreshKey((prev) => prev + 1);
     
@@ -864,10 +908,35 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   // Initial data load is handled by GenericListPage component automatically
   // No need for manual useEffect here to avoid double API calls
 
-  // Get current timezone on component mount
+  // Get current timezone on component mount and set default date values
   useEffect(() => {
     const timezone = getAutoTimezone();
     setCurrentTimezone(timezone);
+    
+    // Set default start_date (today 00:00) and end_date (today 23:59)
+    // Format for datetime-local input (YYYY-MM-DDTHH:mm)
+    const now = moment();
+    const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
+    const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
+    
+    // Format for API (with seconds and timezone offset, e.g., "2024-01-15T00:00:00-05:00")
+    const startDateApi = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm:ssZ');
+    const endDateApi = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm:ssZ');
+    
+    // Set default filters for input (without timezone key)
+    const defaultFilters = {
+      start_date: startDateInput,
+      end_date: endDateInput
+    };
+    
+    // Set applied filters with API format (with timezone offset in datetime, no timezone key)
+    const defaultAppliedFilters = {
+      start_date: startDateApi,
+      end_date: endDateApi
+    };
+    
+    setCurrentFilters(defaultFilters);
+    setAppliedFilters(defaultAppliedFilters);
   }, []);
 
 
@@ -1179,28 +1248,46 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
             {/* Date Range */}
             <Col md={4}>
                 <Form.Group>
-                  <Form.Label>Start Date</Form.Label>
+                  <Form.Label>Start Date & Time</Form.Label>
                   <Form.Control
-                    type="date"
+                    type="datetime-local"
                     value={(currentFilters as any)?.start_date || ''}
                     onChange={(e) => {
-                      setCurrentFilters({ ...currentFilters, start_date: e.target.value });
+                      const datetimeValue = e.target.value;
+                      setCurrentFilters({ 
+                        ...currentFilters, 
+                        start_date: datetimeValue
+                      });
                     }}
                   />
+                  {currentTimezone && (
+                    <Form.Text className="text-muted">
+                      Timezone: {currentTimezone}
+                    </Form.Text>
+                  )}
                 </Form.Group>
               </Col>
 
               <Col md={4}>
                 <Form.Group>
-                  <Form.Label>End Date</Form.Label>
+                  <Form.Label>End Date & Time</Form.Label>
                   <Form.Control
-                    type="date"
+                    type="datetime-local"
                     value={(currentFilters as any)?.end_date || ''}
                     min={(currentFilters as any)?.start_date || ''}
                     onChange={(e) => {
-                      setCurrentFilters({ ...currentFilters, end_date: e.target.value });
+                      const datetimeValue = e.target.value;
+                      setCurrentFilters({ 
+                        ...currentFilters, 
+                        end_date: datetimeValue
+                      });
                     }}
                   />
+                  {currentTimezone && (
+                    <Form.Text className="text-muted">
+                      Timezone: {currentTimezone}
+                    </Form.Text>
+                  )}
                 </Form.Group>
             </Col>
           </>

@@ -78,27 +78,57 @@ const Signin = () => {
       const timeout3 = setTimeout(checkAutofill, 1000);
       const timeout4 = setTimeout(checkAutofill, 2000);
       
+      // Also use MutationObserver to detect when browser autofills
+      const observer = new MutationObserver(() => {
+        checkAutofill();
+      });
+      
+      if (emailInputRef.current && passwordInputRef.current) {
+        observer.observe(emailInputRef.current, { attributes: true, attributeFilter: ['value'] });
+        observer.observe(passwordInputRef.current, { attributes: true, attributeFilter: ['value'] });
+      }
+      
       return () => {
         clearTimeout(timeout1);
         clearTimeout(timeout2);
         clearTimeout(timeout3);
         clearTimeout(timeout4);
+        observer.disconnect();
       };
     }
-  }, [sessionLoading, loading]);
+  }, [sessionLoading, loading, credentials.email, credentials.password]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const credentialsEmail = credentials.email.split("@")[0];
+    // Get values from input refs if state is empty (handles autofill case)
+    let emailValue = credentials.email;
+    let passwordValue = credentials.password;
+    
+    if (!emailValue && emailInputRef.current) {
+      emailValue = emailInputRef.current.value;
+    }
+    
+    if (!passwordValue && passwordInputRef.current) {
+      passwordValue = passwordInputRef.current.value;
+    }
+
+    // If still no values, return early
+    if (!emailValue || !passwordValue) {
+      setLoading(false);
+      setError("Please enter your username and password");
+      return;
+    }
+
+    const credentialsEmail = emailValue.split("@")[0];
     const userEmail = credentialsEmail + process.env.NEXT_PUBLIC_DOMAIN;
 
     try {
       const result = await signIn("credentials", {
         email: userEmail,
-        password: credentials.password,
+        password: passwordValue,
         redirect: false,
         callbackUrl: callbackUrl
           ? decodeURIComponent(callbackUrl as string)
@@ -326,11 +356,42 @@ const Signin = () => {
                         onChange={handleChange}
                         onInput={handleInput}
                         autoComplete="current-password"
+                        onFocus={() => {
+                          // Sync values when password field is focused (user might press Enter)
+                          if (emailInputRef.current && passwordInputRef.current) {
+                            const emailVal = emailInputRef.current.value;
+                            const passwordVal = passwordInputRef.current.value;
+                            
+                            if (emailVal && emailVal !== credentials.email) {
+                              const atIndex = emailVal.indexOf("@");
+                              const cleanEmail = atIndex === -1 ? emailVal.replace(/@/g, "") : emailVal.slice(0, atIndex);
+                              setCredentials(prev => ({ ...prev, email: cleanEmail }));
+                            }
+                            
+                            if (passwordVal && passwordVal !== credentials.password) {
+                              setCredentials(prev => ({ ...prev, password: passwordVal }));
+                            }
+                          }
+                        }}
                         onKeyDown={(e) => {
                           // Ensure Enter key submits the form
-                          if (e.key === 'Enter' && credentials.email && credentials.password && !loading) {
-                            e.preventDefault();
-                            handleSubmit(e as any);
+                          if (e.key === 'Enter' && !loading) {
+                            // Sync state from input refs before form submission
+                            const emailVal = emailInputRef.current?.value;
+                            const passwordVal = passwordInputRef.current?.value;
+                            
+                            if (emailVal && passwordVal) {
+                              // Sync state immediately if needed (handleSubmit will use refs if state is empty)
+                              if (emailVal !== credentials.email || passwordVal !== credentials.password) {
+                                const atIndex = emailVal.indexOf("@");
+                                const cleanEmail = atIndex === -1 ? emailVal.replace(/@/g, "") : emailVal.slice(0, atIndex);
+                                setCredentials({
+                                  email: cleanEmail,
+                                  password: passwordVal
+                                });
+                              }
+                              // Form will submit naturally - handleSubmit reads from refs if needed
+                            }
                           }
                         }}
                       />
