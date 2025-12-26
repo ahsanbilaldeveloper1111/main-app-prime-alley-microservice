@@ -30,6 +30,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/live-call-updated',permissions: ['']},
     {path:'/test-image-storage',permissions: ['']},
     {path:'/billing',permissions: ['']},
+    {path:'/dialpad-use',permissions: ['']},
 
     {
         path: '/dashboards',
