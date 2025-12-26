@@ -82,6 +82,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     userAddress,
     activeCalls,
     dnsMap,
+    callStateMap, // Add callStateMap to verify actual call status
     eventLog,
     formatDuration,
     makeCall,
@@ -500,12 +501,39 @@ const GlobalFloatingCallBar: React.FC = () => {
         if (b.status === "onHold" && !["connected"].includes(a.status)) return 1;
         return 0;
       })[0];
+      
       if(call)
       {
         call.duration = moment().diff(moment(call?.startTime).tz('utc', true), 'seconds');
+        
+        // CRITICAL: Verify actual call state from callStateMap to ensure status is accurate
+        // This prevents showing answer/decline buttons when call was answered externally
+        if (call.callId && callStateMap && callStateMap[call.callId]) {
+          const callState = callStateMap[call.callId];
+          if (callState.parties && callState.parties.length > 0) {
+            // Check actual party statuses - if any party is CONNECTED/ANSWERED, update status
+            const hasConnectedParty = callState.parties.some((p: any) => 
+              p.callStatus === 'CONNECTED' || 
+              p.callStatus === 'ANSWERED' || 
+              p.callStatus === 'RETRIEVED'
+            );
+            const hasRingingParty = callState.parties.some((p: any) => 
+              p.callStatus === 'RINGING'
+            );
+            
+            // If call has connected party and user is involved, it's connected (not ringing)
+            if (hasConnectedParty && !hasRingingParty) {
+              call.status = 'connected';
+            }
+            // If call has ringing party and user is the called party, it's ringing
+            else if (hasRingingParty && call.calledAddress === userAddress) {
+              call.status = 'ringing';
+            }
+          }
+        }
       }
       return call;
-  }, [activeCalls, userAddress]);
+  }, [activeCalls, userAddress, callStateMap]);
 
   // Get user extension data for the active call number
   const activeCallUserData = React.useMemo(() => {
@@ -1497,7 +1525,16 @@ const GlobalFloatingCallBar: React.FC = () => {
             )}
 
             {/* Accept/Reject buttons for incoming ringing calls */}
-            {activeCall.status === "ringing" && activeCall.calledAddress === userAddress && (
+            {/* CRITICAL: Only show answer/decline if call is actually still ringing (not answered externally) */}
+            {activeCall.status === "ringing" && 
+             activeCall.calledAddress === userAddress && 
+             activeCall.callId && 
+             callStateMap && 
+             callStateMap[activeCall.callId] && 
+             callStateMap[activeCall.callId].parties?.some((p: any) => 
+               p.callStatus === 'RINGING' && 
+               (p.calledAddress === userAddress || p.callingAddress === userAddress)
+             ) && (
               <>
                 <button
                   type="button"

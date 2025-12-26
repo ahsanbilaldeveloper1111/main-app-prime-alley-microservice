@@ -11,7 +11,8 @@ import {
   mergeCalls as mergeCallsAPI,
   transferCalls as transferCallsAPI,
   getCallingDeviceInfo,
-  getAllUserDevices
+  getAllUserDevices,
+  GetCallLegs
 } from '../utils/dialer';
 import { getCrossTabCtiManager } from '../utils/crossTabCtiManager';
 import moment from 'moment';
@@ -415,6 +416,124 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       intervals.forEach(interval => clearInterval(interval));
     };
   }, [activeCalls.size]);
+
+  // Verify calls from localStorage using GetCallLegs after page reload
+  const hasVerifiedCallsRef = useRef(false);
+  useEffect(() => {
+    // Only run once after initialization and when we have call IDs
+    if (!ctiStomp.isInitialized || hasVerifiedCallsRef.current) return;
+    
+    const verifyCalls = async () => {
+      try {
+        // Get active call IDs from localStorage
+        const activeCallIds = ctiStomp.getActiveCallIdsFromLocalStorage();
+        
+        if (!activeCallIds || activeCallIds.length === 0) {
+          hasVerifiedCallsRef.current = true;
+          return;
+        }
+        
+        // Call GetCallLegs to verify which calls are still active
+        const response = await GetCallLegs({ callIds: activeCallIds });
+        
+        if (response.success && response.data) {
+          // Extract active call IDs from the response
+          // The response structure may vary, but typically contains call legs with call IDs
+          const responseData = response.data.responseData || response.data.data || response.data;
+          
+          // Determine which call IDs are still active
+          // If responseData is an array, extract call IDs from active call legs
+          // If responseData is an object with call IDs as keys, use those keys
+          let activeCallIdsFromAPI: string[] = [];
+          
+          if (Array.isArray(responseData)) {
+            // If it's an array of call legs, extract callId from each active leg
+            activeCallIdsFromAPI = responseData
+              .filter((item: any) => {
+                // Filter out disconnected/dropped calls
+                const status = item.status || item.callStatus || item.currentState;
+                return status && 
+                       status !== 'DISCONNECTED' && 
+                       status !== 'DROPPED' && 
+                       status !== 'ENDED';
+              })
+              .map((item: any) => item.callId || item.call_id)
+              .filter((id: string) => id);
+          } else if (typeof responseData === 'object' && responseData !== null) {
+            // If it's an object, check if it has call IDs as keys or in a nested structure
+            if (responseData.callIds || responseData.call_ids) {
+              activeCallIdsFromAPI = responseData.callIds || responseData.call_ids || [];
+            } else {
+              // Try to extract call IDs from object values (object with callId as keys)
+              activeCallIdsFromAPI = Object.entries(responseData)
+                .filter(([key, item]: [string, any]) => {
+                  // Check if this is a call leg object with status
+                  if (item && typeof item === 'object') {
+                    const status = item.status || item.callStatus || item.currentState;
+                    return status && 
+                           status !== 'DISCONNECTED' && 
+                           status !== 'DROPPED' && 
+                           status !== 'ENDED';
+                  }
+                  // If not an object, assume it's a call ID (key is the callId)
+                  return true;
+                })
+                .map(([key, item]: [string, any]) => {
+                  // If item is an object, extract callId from it, otherwise use the key
+                  return (item && typeof item === 'object' && (item.callId || item.call_id)) || key;
+                })
+                .filter((id: string) => id);
+            }
+          }
+          
+          // If we couldn't extract call IDs, assume all calls in localStorage are still active
+          // This is a fail-safe to avoid removing calls incorrectly
+          if (activeCallIdsFromAPI.length === 0) {
+            console.warn('[CtiContext] Could not extract active call IDs from GetCallLegs response, keeping all calls');
+            hasVerifiedCallsRef.current = true;
+            return;
+          }
+          
+          // Remove calls from activeCalls that are no longer active according to the API
+          setActiveCalls(prev => {
+            const newMap = new Map(prev);
+            let removedCount = 0;
+            
+            // Remove calls whose callId is not in the active list from API
+            Array.from(newMap.entries()).forEach(([callKey, call]) => {
+              if (call.callId && !activeCallIdsFromAPI.includes(call.callId)) {
+                newMap.delete(callKey);
+                removedCount++;
+              }
+            });
+            
+            if (removedCount > 0) {
+              console.log(`[CtiContext] Removed ${removedCount} inactive call(s) after GetCallLegs verification`);
+            } else {
+              console.log(`[CtiContext] All ${activeCallIdsFromAPI.length} call(s) verified as active`);
+            }
+            
+            return newMap;
+          });
+        } else {
+          // If API call failed, log but don't remove calls (fail-safe)
+          console.warn('[CtiContext] GetCallLegs verification failed, keeping all calls from localStorage');
+        }
+      } catch (error) {
+        console.error('[CtiContext] Error verifying calls with GetCallLegs:', error);
+        // On error, keep all calls (fail-safe approach)
+      } finally {
+        hasVerifiedCallsRef.current = true;
+      }
+    };
+    
+    // Add a small delay to ensure callStateMap is populated from localStorage first
+    const timer = setTimeout(() => {
+      verifyCalls();
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [ctiStomp.isInitialized, ctiStomp.getActiveCallIdsFromLocalStorage]);
 
   // Wrapper functions for call operations that automatically get device info
   const makeCall = useCallback(async (params: {
