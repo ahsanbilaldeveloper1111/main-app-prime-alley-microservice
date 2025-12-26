@@ -91,7 +91,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
         .profile-sidebar {
           position: fixed;
-          top: 76px;
+          top: 85px;
           right: 0;
           width: 320px;
           height: calc(100vh - 76px);
@@ -391,9 +391,9 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="profile-sidebar-header">
+        {/* <div className="profile-sidebar-header">
           <h3 className="profile-sidebar-title">Profile</h3>
-        </div>
+        </div> */}
 
         {/* Body */}
         <div className="profile-sidebar-body">

@@ -1228,7 +1228,7 @@ const CtiDialer = () => {
           return newMap
         })
         
-        toast.success('Call attended successfully')
+       // toast.success('Call attended successfully')
       } else {
         setShowPageLoader(false);
         console.error('Attend call API error:', result.error)
