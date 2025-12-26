@@ -66,6 +66,9 @@ const globalConnectionRefs = {
   reconnectionTimerRef: { current: null as NodeJS.Timeout | null },
   isReconnectingRef: { current: false },
   isGettingTokenRef: { current: false }, // Track if getBearerToken is in progress
+  reconnectionAttemptsRef: { current: 0 }, // Track reconnection attempts
+  lastMessageTimeRef: { current: null as number | null }, // Track last message time for health check
+  healthCheckIntervalRef: { current: null as NodeJS.Timeout | null }, // Health check interval
 };
 
 /**
@@ -138,6 +141,9 @@ export default function useCtiStomp(
   const localReconnectionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const localIsReconnectingRef = useRef(false);
   const localIsGettingTokenRef = useRef(false);
+  const localReconnectionAttemptsRef = useRef(0);
+  const localLastMessageTimeRef = useRef<number | null>(null);
+  const localHealthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Use shared refs for global instance, individual refs for other instances
   const clientRef = isGlobalInstance ? globalConnectionRefs.clientRef : localClientRef;
@@ -153,6 +159,12 @@ export default function useCtiStomp(
   const reconnectionTimerRef = isGlobalInstance ? globalConnectionRefs.reconnectionTimerRef : localReconnectionTimerRef;
   const isReconnectingRef = isGlobalInstance ? globalConnectionRefs.isReconnectingRef : localIsReconnectingRef;
   const isGettingTokenRef = isGlobalInstance ? globalConnectionRefs.isGettingTokenRef : localIsGettingTokenRef;
+  const reconnectionAttemptsRef = isGlobalInstance ? globalConnectionRefs.reconnectionAttemptsRef : localReconnectionAttemptsRef;
+  const lastMessageTimeRef = isGlobalInstance ? globalConnectionRefs.lastMessageTimeRef : localLastMessageTimeRef;
+  const healthCheckIntervalRef = isGlobalInstance ? globalConnectionRefs.healthCheckIntervalRef : localHealthCheckIntervalRef;
+  
+  // Store attemptReconnection function in a ref so it can be accessed from multiple useEffects
+  const attemptReconnectionRef = useRef<((maxAttempts?: number) => Promise<void>) | null>(null);
 
   // Store latest callback functions in refs to avoid stale closures
   // These will be initialized after the functions are defined
@@ -691,7 +703,7 @@ export default function useCtiStomp(
         return updated;
       });
     },
-    [saveCallStatesToStorage]
+    [saveCallStatesToStorage, dnsMap] // Include dnsMap so non-master tabs have access to latest device info
   );
 
   // Group devices by DN and deviceName
@@ -1004,6 +1016,12 @@ export default function useCtiStomp(
         reconnectionTimerRef.current = null;
       }
 
+      // Clear health check interval
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+        healthCheckIntervalRef.current = null;
+      }
+
       // Reset all connection state flags
       isConnectingRef.current = false;
       isInitializedRef.current = false;
@@ -1031,6 +1049,92 @@ export default function useCtiStomp(
       // Wait a bit to ensure all connections are fully closed
       await new Promise((resolve) => setTimeout(resolve, 1000));
     };
+
+    // Reconnection function with exponential backoff and retry logic
+    const attemptReconnection = async (maxAttempts: number = 5) => {
+      const currentInstanceId = instanceIdRef.current;
+      const manager = crossTabManagerRef.current;
+
+      // Check if we're still supposed to reconnect
+      if (!isReconnectingRef.current) {
+        console.log(`[${currentInstanceId}] Reconnection cancelled (flag was reset)`);
+        return;
+      }
+
+      // Check if we're still master (for cross-tab)
+      if (isGlobalInstance && manager.isCrossTabSupported()) {
+        if (!manager.isMasterTab()) {
+          console.log(`[${currentInstanceId}] ⚠️ No longer master, cancelling reconnection`);
+          isReconnectingRef.current = false;
+          setIsInitialized(true); // Keep UI enabled
+          setError(null);
+          return;
+        }
+      }
+
+      // Calculate exponential backoff delay: 1s, 2s, 4s, 8s, 16s
+      const attempt = reconnectionAttemptsRef.current;
+      const delay = Math.min(1000 * Math.pow(2, attempt), 30000); // Max 30 seconds
+
+      if (attempt >= maxAttempts) {
+        console.error(`[${currentInstanceId}] ❌ Max reconnection attempts (${maxAttempts}) reached`);
+        isReconnectingRef.current = false;
+        reconnectionAttemptsRef.current = 0;
+        setError(`Failed to reconnect after ${maxAttempts} attempts. Please refresh the page.`);
+        return;
+      }
+
+      reconnectionAttemptsRef.current = attempt + 1;
+      console.log(
+        `[${currentInstanceId}] 🔄 Reconnection attempt ${reconnectionAttemptsRef.current}/${maxAttempts} in ${delay}ms...`
+      );
+
+      // Wait for backoff delay
+      await new Promise((resolve) => setTimeout(resolve, delay));
+
+      // Double-check we're still supposed to reconnect
+      if (!isReconnectingRef.current) {
+        console.log(`[${currentInstanceId}] Reconnection cancelled during backoff`);
+        return;
+      }
+
+      try {
+        // Fully close all connections first
+        await fullyCloseConnection(true);
+
+        // Double-check we're still supposed to reconnect after closing
+        if (!isReconnectingRef.current) {
+          console.log(`[${currentInstanceId}] Reconnection cancelled after closing connection`);
+          return;
+        }
+
+        // Get fresh token
+        console.log(`[${currentInstanceId}] 🔄 Getting fresh token for reconnection...`);
+        const freshToken = await getBearerToken();
+
+        if (!freshToken) {
+          console.error(`[${currentInstanceId}] ❌ Failed to get fresh token, will retry...`);
+          // Retry reconnection
+          await attemptReconnection(maxAttempts);
+          return;
+        }
+
+        // Reset reconnection attempts on successful token retrieval
+        reconnectionAttemptsRef.current = 0;
+        isReconnectingRef.current = false;
+
+        // Create new connection
+        console.log(`[${currentInstanceId}] ✅ Got fresh token, creating new connection...`);
+        await connectViaSSE(freshToken.token, freshToken.userAddress, true);
+      } catch (error: any) {
+        console.error(`[${currentInstanceId}] ❌ Error during reconnection attempt:`, error);
+        // Retry reconnection
+        await attemptReconnection(maxAttempts);
+      }
+    };
+
+    // Store attemptReconnection in ref so it can be accessed from other useEffects
+    attemptReconnectionRef.current = attemptReconnection;
 
     const connectViaSSE = async (
       token: string,
@@ -1128,6 +1232,8 @@ export default function useCtiStomp(
         setIsInitialized(true);
         setError(null);
         isReconnectingRef.current = false; // Reset reconnection flag
+        reconnectionAttemptsRef.current = 0; // Reset reconnection attempts
+        lastMessageTimeRef.current = Date.now(); // Initialize last message time
 
         // Track connection start time
         connectionStartTimeRef.current = Date.now();
@@ -1138,10 +1244,61 @@ export default function useCtiStomp(
           reconnectionTimerRef.current = null;
         }
 
+        // Clear any existing health check interval
+        if (healthCheckIntervalRef.current) {
+          clearInterval(healthCheckIntervalRef.current);
+          healthCheckIntervalRef.current = null;
+        }
+
+        // Set up health check to detect dead connections
+        // Check every 30 seconds if we've received a message in the last 2 minutes
+        healthCheckIntervalRef.current = setInterval(() => {
+          const currentInstanceId = instanceIdRef.current;
+          const manager = crossTabManagerRef.current;
+
+          // Skip health check if not master (for cross-tab)
+          if (isGlobalInstance && manager.isCrossTabSupported()) {
+            if (!manager.isMasterTab()) {
+              return;
+            }
+          }
+
+          // Skip if already reconnecting or connecting
+          if (isReconnectingRef.current || isConnectingRef.current) {
+            return;
+          }
+
+          // Check if connection exists and is open
+          if (!eventSourceRef.current || eventSourceRef.current.readyState !== EventSource.OPEN) {
+            console.log(`[${currentInstanceId}] ⚠️ Health check: Connection is not OPEN, triggering reconnection...`);
+            if (!isReconnectingRef.current) {
+              isReconnectingRef.current = true;
+              attemptReconnection();
+            }
+            return;
+          }
+
+          // Check if we've received a message recently (within last 2 minutes)
+          const now = Date.now();
+          const lastMessageTime = lastMessageTimeRef.current || connectionStartTimeRef.current || now;
+          const timeSinceLastMessage = now - lastMessageTime;
+
+          // If no message received in 2 minutes, connection might be dead
+          if (timeSinceLastMessage > 120000) {
+            console.log(
+              `[${currentInstanceId}] ⚠️ Health check: No message received in ${Math.round(timeSinceLastMessage / 1000)}s, triggering reconnection...`
+            );
+            if (!isReconnectingRef.current) {
+              isReconnectingRef.current = true;
+              attemptReconnection();
+            }
+          }
+        }, 30000); // Check every 30 seconds
+
         // Set up timer to reconnect after 2.5 hours (9000000ms)
         reconnectionTimerRef.current = setTimeout(async () => {
           console.log(
-            `[${currentInstanceId}] 🔄 15 minutes elapsed, fully closing connection and reconnecting with fresh token...`
+            `[${currentInstanceId}] 🔄 2.5 hours elapsed, fully closing connection and reconnecting with fresh token...`
           );
 
           // Fully close all connections and reset state
@@ -1161,6 +1318,9 @@ export default function useCtiStomp(
       };
 
       eventSource.onmessage = (event) => {
+        // Update last message time for health check
+        lastMessageTimeRef.current = Date.now();
+
         try {
           const data = JSON.parse(event.data);
 
@@ -1262,62 +1422,17 @@ export default function useCtiStomp(
                 console.log(
                   `[${instanceIdRef.current}] 🔄 Received reconnecting status from server`
                 );
-                // During reconnection, get fresh token and reconnect
+                // During reconnection, use retry logic with exponential backoff
                 if (!isReconnectingRef.current) {
                   const currentInstanceId = instanceIdRef.current;
                   isReconnectingRef.current = true;
                   console.log(
-                    `[${currentInstanceId}] 🔄 Server reconnecting, fully closing connection and getting fresh token...`
+                    `[${currentInstanceId}] 🔄 Server reconnecting, starting reconnection with retry logic...`
                   );
-
-                  // Fully close all connections and reset state, but preserve reconnecting flag
-                  fullyCloseConnection(true)
-                    .then(async () => {
-                      // Double-check we're still supposed to reconnect
-                      if (isReconnectingRef.current) {
-                        console.log(
-                          `[${currentInstanceId}] 🔄 Getting fresh token and creating new connection...`
-                        );
-                        const freshToken = await getBearerToken();
-                        if (freshToken) {
-                          console.log(
-                            `[${currentInstanceId}] ✅ Got fresh token, creating new connection...`
-                          );
-                          isReconnectingRef.current = false;
-                          await connectViaSSE(
-                            freshToken.token,
-                            freshToken.userAddress,
-                            true
-                          );
-                        } else {
-                          console.error(
-                            `[${currentInstanceId}] ❌ Failed to get fresh token for reconnection`
-                          );
-                          isReconnectingRef.current = false;
-                          setError(
-                            "Failed to reconnect: could not get fresh token"
-                          );
-                        }
-                      } else {
-                        console.log(
-                          `[${currentInstanceId}] ⚠️ Reconnection cancelled (flag was reset)`
-                        );
-                      }
-                    })
-                    .catch((error) => {
-                      console.error(
-                        `[${currentInstanceId}] ❌ Error during reconnection:`,
-                        error
-                      );
-                      isReconnectingRef.current = false;
-                      setError(
-                        "Failed to reconnect: " +
-                          (error.message || "unknown error")
-                      );
-                    });
+                  attemptReconnection();
                 } else {
                   console.log(
-                    `[${currentInstanceId}] ⚠️ Reconnection already in progress, ignoring duplicate message`
+                    `[${instanceIdRef.current}] ⚠️ Reconnection already in progress, ignoring duplicate message`
                   );
                 }
               }
@@ -1377,67 +1492,13 @@ export default function useCtiStomp(
           setIsInitialized(false);
           setError("SSE connection closed");
 
-          // Reconnect with fresh token after fully closing connection
+          // Reconnect with retry logic and exponential backoff
           if (!isReconnectingRef.current) {
             isReconnectingRef.current = true;
             console.log(
-              `[${currentInstanceId}] 🔄 Connection closed, fully closing and reconnecting with fresh token...`
+              `[${currentInstanceId}] 🔄 Connection closed, starting reconnection with retry logic...`
             );
-
-            // Fully close all connections and reset state, then reconnect
-            // Preserve reconnecting flag so the check in .then() works
-            fullyCloseConnection(true)
-              .then(async () => {
-                // Double-check we're still supposed to reconnect and still master
-                if (isReconnectingRef.current) {
-                  // Check if we're still master (for cross-tab)
-                  if (isGlobalInstance && manager.isCrossTabSupported()) {
-                    if (!manager.isMasterTab()) {
-                      console.log(
-                        `[${currentInstanceId}] ⚠️ No longer master, cancelling reconnection`
-                      );
-                      isReconnectingRef.current = false;
-                      setIsInitialized(true); // Keep UI enabled
-                      setError(null);
-                      return;
-                    }
-                  }
-
-                  console.log(
-                    `[${currentInstanceId}] 🔄 Getting fresh token and creating new connection...`
-                  );
-                  // Get fresh token and reconnect with fresh connection
-                  const freshToken = await getBearerToken();
-                  if (freshToken) {
-                    isReconnectingRef.current = false;
-                    await connectViaSSE(
-                      freshToken.token,
-                      freshToken.userAddress,
-                      true
-                    );
-                  } else {
-                    console.error(
-                      `[${currentInstanceId}] ❌ Failed to get fresh token for reconnection`
-                    );
-                    isReconnectingRef.current = false;
-                    setError("Failed to reconnect: could not get fresh token");
-                  }
-                } else {
-                  console.log(
-                    `[${currentInstanceId}] ⚠️ Reconnection cancelled (flag was reset)`
-                  );
-                }
-              })
-              .catch((error) => {
-                console.error(
-                  `[${currentInstanceId}] ❌ Error during reconnection:`,
-                  error
-                );
-                isReconnectingRef.current = false;
-                setError(
-                  "Failed to reconnect: " + (error.message || "unknown error")
-                );
-              });
+            attemptReconnection();
           }
         } else if (readyState === EventSource.CONNECTING) {
           // Don't set error yet, it's still trying to connect
@@ -1460,11 +1521,17 @@ export default function useCtiStomp(
           clearTimeout(reconnectionTimerRef.current);
           reconnectionTimerRef.current = null;
         }
+        if (healthCheckIntervalRef.current) {
+          clearInterval(healthCheckIntervalRef.current);
+          healthCheckIntervalRef.current = null;
+        }
         isConnectingRef.current = false;
         isInitializedRef.current = false;
         isGettingTokenRef.current = false; // Reset token flag
         connectionStartTimeRef.current = null;
         isReconnectingRef.current = false;
+        reconnectionAttemptsRef.current = 0;
+        lastMessageTimeRef.current = null;
       };
     };
 
@@ -2006,10 +2073,65 @@ export default function useCtiStomp(
             setIsInitialized(true);
             setError(null);
             isReconnectingRef.current = false;
+            reconnectionAttemptsRef.current = 0;
+            lastMessageTimeRef.current = Date.now();
             connectionStartTimeRef.current = Date.now();
+
+            // Clear any existing health check interval
+            if (healthCheckIntervalRef.current) {
+              clearInterval(healthCheckIntervalRef.current);
+              healthCheckIntervalRef.current = null;
+            }
+
+            // Set up health check to detect dead connections
+            healthCheckIntervalRef.current = setInterval(() => {
+              const currentInstanceId = instanceIdRef.current;
+              const manager = crossTabManagerRef.current;
+
+              // Skip health check if not master (for cross-tab)
+              if (isGlobalInstance && manager.isCrossTabSupported()) {
+                if (!manager.isMasterTab()) {
+                  return;
+                }
+              }
+
+              // Skip if already reconnecting or connecting
+              if (isReconnectingRef.current || isConnectingRef.current) {
+                return;
+              }
+
+              // Check if connection exists and is open
+              if (!eventSourceRef.current || eventSourceRef.current.readyState !== EventSource.OPEN) {
+                console.log(`[${currentInstanceId}] ⚠️ Health check: Connection is not OPEN, triggering reconnection...`);
+                if (!isReconnectingRef.current && attemptReconnectionRef.current) {
+                  isReconnectingRef.current = true;
+                  attemptReconnectionRef.current();
+                }
+                return;
+              }
+
+              // Check if we've received a message recently (within last 2 minutes)
+              const now = Date.now();
+              const lastMessageTime = lastMessageTimeRef.current || connectionStartTimeRef.current || now;
+              const timeSinceLastMessage = now - lastMessageTime;
+
+              // If no message received in 2 minutes, connection might be dead
+              if (timeSinceLastMessage > 120000) {
+                console.log(
+                  `[${currentInstanceId}] ⚠️ Health check: No message received in ${Math.round(timeSinceLastMessage / 1000)}s, triggering reconnection...`
+                );
+                if (!isReconnectingRef.current && attemptReconnectionRef.current) {
+                  isReconnectingRef.current = true;
+                  attemptReconnectionRef.current();
+                }
+              }
+            }, 30000); // Check every 30 seconds
           };
 
           eventSource.onmessage = (event) => {
+            // Update last message time for health check
+            lastMessageTimeRef.current = Date.now();
+
             try {
               const data = JSON.parse(event.data);
 
@@ -2085,11 +2207,54 @@ export default function useCtiStomp(
           };
 
           eventSource.onerror = (error) => {
+            const currentInstanceId = instanceIdRef.current;
             const readyState = eventSource.readyState;
+            const manager = crossTabManagerRef.current;
+
+            // For global instance with cross-tab support, check if we're still master
+            if (isGlobalInstance && manager.isCrossTabSupported()) {
+              const isMaster = manager.isMasterTab();
+              if (!isMaster) {
+                // We're no longer master, close connection and don't reconnect
+                console.log(
+                  `[${currentInstanceId}] ⚠️ No longer master tab, closing connection...`
+                );
+                if (eventSourceRef.current) {
+                  try {
+                    eventSourceRef.current.close();
+                  } catch (err) {
+                    // Ignore errors
+                  }
+                  eventSourceRef.current = null;
+                }
+                setIsInitialized(true); // Keep UI enabled, actions will forward
+                setError(null);
+                return;
+              }
+            }
+
+            // EventSource states: CONNECTING (0), OPEN (1), CLOSED (2)
             if (readyState === EventSource.CLOSED) {
+              console.log(`[${currentInstanceId}] ⚠️ SSE connection closed`);
               setIsInitialized(false);
               setError("SSE connection closed");
-              isConnectingRef.current = false;
+
+              // Reconnect with retry logic and exponential backoff
+              if (!isReconnectingRef.current && attemptReconnectionRef.current) {
+                isReconnectingRef.current = true;
+                console.log(
+                  `[${currentInstanceId}] 🔄 Connection closed, starting reconnection with retry logic...`
+                );
+                attemptReconnectionRef.current();
+              }
+            } else if (readyState === EventSource.CONNECTING) {
+              // Don't set error yet, it's still trying to connect
+              console.log(`[${currentInstanceId}] 🔄 Connection state: CONNECTING`);
+            } else if (readyState === EventSource.OPEN) {
+              // Connection is open, this might be a temporary error, don't close
+              console.log(
+                `[${currentInstanceId}] ⚠️ Temporary error on open connection`
+              );
             }
           };
         })
@@ -2184,6 +2349,32 @@ export default function useCtiStomp(
       if (state.userAddress) {
         setUserAddress(state.userAddress);
       }
+      // CRITICAL: Sync eventLog from master tab so non-master tabs have full event history
+      // This ensures components like GlobalFloatingCallBar can detect incoming calls
+      if (state.eventLog && Array.isArray(state.eventLog)) {
+        // Merge with existing eventLog, avoiding duplicates
+        setEventLog((prev) => {
+          // If master's eventLog is longer or different, use it (master is source of truth)
+          // Otherwise, merge new events that aren't in prev
+          const prevEventIds = new Set(prev.map((e: any) => 
+            e.callId && e.eventTime ? `${e.callId}-${e.eventTime}` : null
+          ).filter(Boolean));
+          
+          const newEvents = state.eventLog.filter((e: any) => {
+            const eventId = e.callId && e.eventTime ? `${e.callId}-${e.eventTime}` : null;
+            return eventId && !prevEventIds.has(eventId);
+          });
+          
+          // If master has significantly more events, use master's version (it's the source of truth)
+          if (state.eventLog.length > prev.length + 10) {
+            return state.eventLog.slice(-200); // Keep last 200 events
+          }
+          
+          // Otherwise, merge new events
+          const merged = [...prev, ...newEvents];
+          return merged.slice(-200); // Keep last 200 events
+        });
+      }
       // Always set initialized to true when we receive state from master
       // This ensures non-master tabs appear as initialized
       setIsInitialized(true);
@@ -2204,15 +2395,16 @@ export default function useCtiStomp(
       return;
     }
 
-    // Broadcast state updates to other tabs
+    // Broadcast state updates to other tabs (including eventLog for full sync)
     manager.broadcastStateUpdate({
       dnsMap,
       callStateMap,
       summaryData,
       userAddress,
+      eventLog, // Include eventLog so non-master tabs have full event history
       isInitialized: true, // Always true for master
     });
-  }, [dnsMap, callStateMap, summaryData, userAddress]);
+  }, [dnsMap, callStateMap, summaryData, userAddress, eventLog]);
 
   // Cross-tab integration: Broadcast CTI events when master tab
   useEffect(() => {
@@ -2223,9 +2415,11 @@ export default function useCtiStomp(
     }
 
     // Broadcast latest call events to other tabs
+    // This ensures non-master tabs receive events in real-time
     if (eventLog && eventLog.length > 0) {
       const latestEvent = eventLog[eventLog.length - 1];
-      if (latestEvent && latestEvent.callId) {
+      // Broadcast all events, not just those with callId (some events like complete_state don't have callId)
+      if (latestEvent) {
         manager.broadcastCtiEvent({
           type: 'call_event',
           event: latestEvent
