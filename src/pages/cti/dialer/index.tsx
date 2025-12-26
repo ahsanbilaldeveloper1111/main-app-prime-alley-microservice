@@ -1145,7 +1145,7 @@ const CtiDialer = () => {
         
         // Remove ended call after a delay
         setTimeout(() => removeCall(callId), 1000)
-        toast.success('Call ended successfully')
+        //toast.success('Call ended successfully')
       } else {
         setShowPageLoader(false);
         console.error('End call API error:', result.error)
@@ -1691,7 +1691,7 @@ const CtiDialer = () => {
           const timer = setTimeout(() => {
             setShowIncomingCallModal(false)
             setIncomingCall(null)
-            toast.info('Incoming call timed out')
+          //  toast.info('Incoming call timed out')
           }, 30000)
           setIncomingCallTimer(timer)
           
@@ -1699,7 +1699,7 @@ const CtiDialer = () => {
           const newCallId = createNewCall(eventData, 'ringing')
           if (newCallId) {
             setTimeout(() => {
-              toast.info(`Incoming call from ${eventData.callingAddress}`)
+             // toast.info(`Incoming call from ${eventData.callingAddress}`)
             }, 0)
           }
         }
@@ -1761,7 +1761,7 @@ const CtiDialer = () => {
           const timer = setTimeout(() => {
             setShowIncomingCallModal(false)
             setIncomingCall(null)
-            toast.info('Incoming call timed out')
+           // toast.info('Incoming call timed out')
           }, 30000)
           setIncomingCallTimer(timer)
           
@@ -1769,7 +1769,7 @@ const CtiDialer = () => {
           const newCallId = createNewCall(eventData, 'ringing')
           if (newCallId) {
             setTimeout(() => {
-              toast.info(`Incoming call from ${eventData.callingAddress}`)
+             // toast.info(`Incoming call from ${eventData.callingAddress}`)
             }, 0)
           }
         }
@@ -1923,7 +1923,7 @@ const CtiDialer = () => {
           setShowIncomingCallModal(false)
           setIncomingCall(null)
           
-          toast.info('Incoming call ended by caller')
+          //toast.info('Incoming call ended by caller')
           return
         }
       }

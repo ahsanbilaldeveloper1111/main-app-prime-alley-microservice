@@ -104,7 +104,7 @@ export const ActiveCallsList: React.FC = () => {
     });
     
     if (result.success) {
-      console.log('Call ended successfully');
+      //console.log('Call ended successfully');
     } else {
       console.error('Failed to end call:', result.error);
     }

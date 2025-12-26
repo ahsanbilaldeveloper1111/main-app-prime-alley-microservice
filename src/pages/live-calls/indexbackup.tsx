@@ -539,7 +539,7 @@ const LiveCallDashboard = () => {
 
     if (!isDeviceActiveCall) {
       // Call ended, clear monitoring state
-      console.log('Call ended, clearing monitoring state for:', monitoredDn, monitoredDeviceName)
+      //console.log('Call ended, clearing monitoring state for:', monitoredDn, monitoredDeviceName)
       setActiveMonitoring({ dn: null, type: null, deviceName: null })
       setMonitoringStartTime(prev => {
         const newState = { ...prev }

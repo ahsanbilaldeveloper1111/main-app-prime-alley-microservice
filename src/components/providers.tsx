@@ -9,6 +9,7 @@ import SessionHandler from './SessionHandler';
 import { NotificationProvider } from '../contexts/NotificationContext';
 import { CtiProvider } from '../contexts/CtiContext';
 import { DialerModalProvider } from '../contexts/DialerModalContext';
+import { IncomingCallProvider } from '../contexts/IncomingCallContext';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -27,7 +28,8 @@ export default function Providers({ children, store }: ProvidersProps) {
       refetchWhenOffline={false}
     >
       <CtiProvider>
-        <DialerModalProvider>
+        <IncomingCallProvider>
+          <DialerModalProvider>
           <NotificationProvider>
             {/* <FirebaseNotificationProvider> */}
               <TokenServiceProvider>
@@ -43,7 +45,8 @@ export default function Providers({ children, store }: ProvidersProps) {
               </TokenServiceProvider>
             {/* </FirebaseNotificationProvider> */}
           </NotificationProvider>
-        </DialerModalProvider>
+          </DialerModalProvider>
+        </IncomingCallProvider>
       </CtiProvider>
     </SessionProvider>
   );
