@@ -201,34 +201,34 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     {
       id: 'live-calls',
       key: 'live-calls',
-      permission: PERMISSIONS.CTI_SERVICES,
+      permission: PERMISSIONS.VIEW_CTI,
       icon: <PhoneCall size={20} />,
       color: MENU_COLORS.LIVE_CALLS,
       title: "Live Wallboards",
       label: "Live Wallboards",
-      url: '',
-      subItems: [
-        {
-          id: 'live-calls-dashboard',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.LIVE_VIEW,
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.VIEW_CTI,
-          url: '/live-calls'
-        },
-        {
-          id: 'live-calls-dashboard-new',
-          title: 'Live Call New',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.VIEW_CTI,
-          url: '/live-calls/new'
-        },
-        {
-          id: 'live-calls-monitoring',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.CALL_MONITORING,
-          icon: <Phone size={16} />,
-          permission: PERMISSIONS.CTI_MONITORING,
-          url: '/cti/monitoring'
-        },
+      url: '/live-calls'
+      // subItems: [
+      //   {
+      //     id: 'live-calls-dashboard',
+      //     title: HEADER_CONSTANTS.SUBMENU_LABELS.LIVE_VIEW,
+      //     icon: <LayoutDashboard size={16} />,
+      //     permission: PERMISSIONS.VIEW_CTI,
+      //     url: '/live-calls'
+      //   },
+      //   {
+      //     id: 'live-calls-dashboard-new',
+      //     title: 'Live Call New',
+      //     icon: <LayoutDashboard size={16} />,
+      //     permission: PERMISSIONS.VIEW_CTI,
+      //     url: '/live-calls/new'
+      //   },
+      //   {
+      //     id: 'live-calls-monitoring',
+      //     title: HEADER_CONSTANTS.SUBMENU_LABELS.CALL_MONITORING,
+      //     icon: <Phone size={16} />,
+      //     permission: PERMISSIONS.CTI_MONITORING,
+      //     url: '/cti/monitoring'
+      //   },
         // {
         //   id: 'live-calls-dialer',
         //   title: HEADER_CONSTANTS.SUBMENU_LABELS.DIALER,
@@ -236,7 +236,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         //   permission: PERMISSIONS.DIAL_CALL_CTI,
         //   url: '/cti/dialer'
         // }
-      ].filter(item => !item.permission || hasPermission(item.permission))
+      //].filter(item => !item.permission || hasPermission(item.permission))
     },
 
     {
@@ -827,6 +827,11 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
     // Check if a module has any active child
     const hasActiveChild = (module: MainMenuItem): boolean => {
+      // First check if the module itself matches the route (for direct URLs)
+      if (module.url && router.pathname === module.url) {
+        return true;
+      }
+      // Then check if any subItem matches
       if (!module.subItems || module.subItems.length === 0) {
         return false;
       }
@@ -851,30 +856,35 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       }
     });
 
-    // Update expanded modules - only keep the first matching module (only one open at a time)
-    if (modulesToExpand.length > 0) {
-      setExpandedModules(prev => {
-        // Only open the first matching module to respect "only one open at a time" rule
+    // Update expanded modules - collapse all that don't match, expand only the matching one
+    setExpandedModules(prev => {
+      // If there's a module to expand, only keep that one
+      if (modulesToExpand.length > 0) {
         const moduleToOpen = modulesToExpand[0];
-        // Only update if the module to open is different from current state
+        // Only update if different from current state
         if (prev.length === 1 && prev[0] === moduleToOpen) {
           return prev; // No change needed
         }
         return [moduleToOpen];
-      });
-    }
+      } else {
+        // If no module matches, collapse all
+        return [];
+      }
+    });
 
-    // Update expanded sub-modules
-    if (subModulesToExpand.length > 0) {
-      setExpandedSubModules(prev => {
-        const combined = [...prev, ...subModulesToExpand];
-        const newExpanded = Array.from(new Set(combined));
+    // Update expanded sub-modules - only keep those that match
+    setExpandedSubModules(prev => {
+      if (subModulesToExpand.length > 0) {
+        const newExpanded = Array.from(new Set(subModulesToExpand));
         // Only update state if there's an actual change to prevent infinite loops
         const hasChange = newExpanded.length !== prev.length || 
                          !newExpanded.every(id => prev.includes(id));
         return hasChange ? newExpanded : prev;
-      });
-    }
+      } else {
+        // If no sub-modules match, collapse all
+        return [];
+      }
+    });
   }, [router.pathname, mainMenuItems]);
 
   const customStyles = `
@@ -1530,7 +1540,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
           {/* System Section - Always at bottom */}
           <div className="sidebar-section system-section">
-            <div className="section-heading">System</div>
+            <div className="section-heading">Admin & Support</div>
             <ul className="menu-nav">
               {systemItems.map((module) => (
                 <li key={module.id} className="menu-item">

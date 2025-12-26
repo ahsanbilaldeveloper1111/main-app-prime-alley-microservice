@@ -1052,7 +1052,7 @@ const GlobalFloatingCallBar: React.FC = () => {
         setIncomingCall(null);
         setIncomingCallContext(null);
         
-        toast.success("Call attended successfully");
+       // toast.success("Call attended successfully");
       } else {
         toast.error(result.error || "Failed to attend call");
       }

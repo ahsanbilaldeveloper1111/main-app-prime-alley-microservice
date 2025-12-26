@@ -24,6 +24,8 @@ const Signin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const statusRef = useRef<string>("loading");
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
 
   // Use NextAuth's useSession hook for frontend session management
   const { data: session, status } = useSession();
@@ -32,6 +34,58 @@ const Signin = () => {
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
+
+  // Detect and sync autofilled values after page load
+  useEffect(() => {
+    if (!sessionLoading) {
+      // Check for autofilled values after a short delay (browsers autofill after render)
+      const checkAutofill = () => {
+        const emailInput = emailInputRef.current;
+        const passwordInput = passwordInputRef.current;
+        
+        if (emailInput && passwordInput) {
+          // Check if fields have autofilled values
+          const emailValue = emailInput.value;
+          const passwordValue = passwordInput.value;
+          
+          // If values exist but state doesn't match, sync them
+          if (emailValue && emailValue !== credentials.email) {
+            const atIndex = emailValue.indexOf("@");
+            const cleanEmail = atIndex === -1 ? emailValue.replace(/@/g, "") : emailValue.slice(0, atIndex);
+            setCredentials(prev => ({ ...prev, email: cleanEmail }));
+          }
+          
+          if (passwordValue && passwordValue !== credentials.password) {
+            setCredentials(prev => ({ ...prev, password: passwordValue }));
+          }
+          
+          // If both fields are filled, focus on password field so user can press Enter
+          if (emailValue && passwordValue && !loading) {
+            // Small delay to ensure autofill is complete
+            setTimeout(() => {
+              if (passwordInputRef.current) {
+                passwordInputRef.current.focus();
+              }
+            }, 100);
+          }
+        }
+      };
+      
+      // Check immediately and after delays (browsers autofill at different times)
+      checkAutofill();
+      const timeout1 = setTimeout(checkAutofill, 100);
+      const timeout2 = setTimeout(checkAutofill, 500);
+      const timeout3 = setTimeout(checkAutofill, 1000);
+      const timeout4 = setTimeout(checkAutofill, 2000);
+      
+      return () => {
+        clearTimeout(timeout1);
+        clearTimeout(timeout2);
+        clearTimeout(timeout3);
+        clearTimeout(timeout4);
+      };
+    }
+  }, [sessionLoading, loading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,6 +164,25 @@ const Signin = () => {
     });
   };
 
+  // Handle autofill events (input event fires for autofill too)
+  const handleInput = (e: React.FormEvent<HTMLInputElement>) => {
+    const target = e.currentTarget;
+    const { name, value } = target;
+    
+    // Sync autofilled values with state
+    if (name === "email") {
+      const atIndex = value.indexOf("@");
+      const cleanEmail = atIndex === -1 ? value.replace(/@/g, "") : value.slice(0, atIndex);
+      if (cleanEmail !== credentials.email) {
+        setCredentials(prev => ({ ...prev, email: cleanEmail }));
+      }
+    } else if (name === "password") {
+      if (value !== credentials.password) {
+        setCredentials(prev => ({ ...prev, password: value }));
+      }
+    }
+  };
+
   // Handle session loading and redirects
   useEffect(() => {
     // Clear any existing timeout
@@ -154,7 +227,7 @@ const Signin = () => {
   return (
     <React.Fragment>
       <Head>
-        <title>Sign In - Business Contact Center</title>
+        <title>Business Workspace AI-Powered </title>
         <style>{`
           #__next {
             width: 100% !important;
@@ -181,8 +254,8 @@ const Signin = () => {
             <div className="auth-sidecontent">
               <div className="auth-sidefooter">
                
-                <h1 className="f-w-700 mb-1 text-white">Business Contact Center</h1>
-                <p className="mb-3 text-white">A new frontier in telecommunications and data management. Secure, efficient, and reliable.</p>
+                <h1 className="f-w-700 mb-1 text-white">Business Workspace </h1>
+                <p className="mb-3 text-white">AI-Powered Business Suite for businesses worldwide—SMB to enterprise</p>
 
                 <hr className="mb-3 mt-4" />
                 <div className="row">
@@ -227,6 +300,7 @@ const Signin = () => {
                   <form onSubmit={handleSubmit}>
                     <div className="form-group mb-3">
                       <input
+                        ref={emailInputRef}
                         type="text"
                         className="form-control"
                         id="email"
@@ -235,10 +309,13 @@ const Signin = () => {
                         name="email"
                         value={credentials.email}
                         onChange={handleChange}
+                        onInput={handleInput}
+                        autoComplete="username"
                       />
                     </div>
                     <div className="form-group mb-3 position-relative">
                       <input
+                        ref={passwordInputRef}
                         type={showPassword ? "text" : "password"}
                         className="form-control"
                         id="password"
@@ -247,6 +324,15 @@ const Signin = () => {
                         name="password"
                         value={credentials.password}
                         onChange={handleChange}
+                        onInput={handleInput}
+                        autoComplete="current-password"
+                        onKeyDown={(e) => {
+                          // Ensure Enter key submits the form
+                          if (e.key === 'Enter' && credentials.email && credentials.password && !loading) {
+                            e.preventDefault();
+                            handleSubmit(e as any);
+                          }
+                        }}
                       />
                       <span
                         className="position-absolute"

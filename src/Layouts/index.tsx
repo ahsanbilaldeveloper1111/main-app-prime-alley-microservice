@@ -432,7 +432,7 @@ const Layout = ({ children }: LayoutProps) => {
 			if (result.success) {
 				setShowIncomingCallModal(false);
 				setIncomingCall(null);
-				toast.success("Call attended successfully");
+				//toast.success("Call attended successfully");
 			} else {
 				toast.error(result.error || "Failed to attend call");
 			}
@@ -659,7 +659,7 @@ const Layout = ({ children }: LayoutProps) => {
                 size="sm" 
                 className="text-dark position-relative pointer-cursor" 
                 style={{ cursor: 'pointer', padding: '0.5rem' }}
-                disabled={!isInitialized || !isDeviceRegistered}
+                disabled={!isInitialized}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -672,7 +672,7 @@ const Layout = ({ children }: LayoutProps) => {
                 <i className="material-icons-two-tone" style={{ 
                   cursor: 'pointer', 
                   fontSize: '1.5rem', 
-                  backgroundColor: isDeviceRegistered ? '#04a9f5' : '#000', 
+                  backgroundColor: '#04a9f5', 
                   pointerEvents: 'none',
                   
                 }}>dialpad</i>  

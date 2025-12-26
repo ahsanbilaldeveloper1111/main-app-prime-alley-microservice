@@ -1,31 +1,89 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Clock, X } from 'lucide-react';
 
+interface Timezone {
+  iana: string;
+  name: string;
+  city: string;
+}
+
 const TimezoneSearch = () => {
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
   const [timezoneSearch, setTimezoneSearch] = useState('');
-  const [selectedTimezone, setSelectedTimezone] = useState({
-    name: 'London',
-    offset: 'GMT',
-    offsetHours: 0
-  });
+  const [currentTime, setCurrentTime] = useState(new Date());
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Sample timezones - you can expand this list
-  const timezones = [
-    { name: 'London', offset: 'GMT', offsetHours: 0 },
-    { name: 'Dubai', offset: 'GMT+4', offsetHours: 4 },
-    { name: 'New York', offset: 'GMT-5', offsetHours: -5 },
-    { name: 'Tokyo', offset: 'GMT+9', offsetHours: 9 },
-    { name: 'Sydney', offset: 'GMT+11', offsetHours: 11 },
-    { name: 'Los Angeles', offset: 'GMT-8', offsetHours: -8 },
-    { name: 'Paris', offset: 'GMT+1', offsetHours: 1 },
-    { name: 'Mumbai', offset: 'GMT+5:30', offsetHours: 5.5 },
-    { name: 'Singapore', offset: 'GMT+8', offsetHours: 8 },
-    { name: 'Hong Kong', offset: 'GMT+8', offsetHours: 8 },
-  ];
+  // Get user's local timezone
+  const getUserTimezone = (): string => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      return 'UTC';
+    }
+  };
 
-  const [currentTime, setCurrentTime] = useState(new Date());
+  // Initialize selected timezone with user's local timezone
+  const [selectedTimezone, setSelectedTimezone] = useState<string>(() => getUserTimezone());
+
+  // Comprehensive list of real IANA timezones
+  const timezones: Timezone[] = [
+    { iana: 'America/New_York', name: 'Eastern Time', city: 'New York' },
+    { iana: 'America/Chicago', name: 'Central Time', city: 'Chicago' },
+    { iana: 'America/Denver', name: 'Mountain Time', city: 'Denver' },
+    { iana: 'America/Los_Angeles', name: 'Pacific Time', city: 'Los Angeles' },
+    { iana: 'America/Phoenix', name: 'Mountain Time', city: 'Phoenix' },
+    { iana: 'America/Anchorage', name: 'Alaska Time', city: 'Anchorage' },
+    { iana: 'Pacific/Honolulu', name: 'Hawaii Time', city: 'Honolulu' },
+    { iana: 'America/Toronto', name: 'Eastern Time', city: 'Toronto' },
+    { iana: 'America/Vancouver', name: 'Pacific Time', city: 'Vancouver' },
+    { iana: 'America/Mexico_City', name: 'Central Time', city: 'Mexico City' },
+    { iana: 'America/Sao_Paulo', name: 'Brasilia Time', city: 'São Paulo' },
+    { iana: 'America/Buenos_Aires', name: 'Argentina Time', city: 'Buenos Aires' },
+    { iana: 'America/Lima', name: 'Peru Time', city: 'Lima' },
+    { iana: 'Europe/London', name: 'Greenwich Mean Time', city: 'London' },
+    { iana: 'Europe/Paris', name: 'Central European Time', city: 'Paris' },
+    { iana: 'Europe/Berlin', name: 'Central European Time', city: 'Berlin' },
+    { iana: 'Europe/Rome', name: 'Central European Time', city: 'Rome' },
+    { iana: 'Europe/Madrid', name: 'Central European Time', city: 'Madrid' },
+    { iana: 'Europe/Amsterdam', name: 'Central European Time', city: 'Amsterdam' },
+    { iana: 'Europe/Stockholm', name: 'Central European Time', city: 'Stockholm' },
+    { iana: 'Europe/Zurich', name: 'Central European Time', city: 'Zurich' },
+    { iana: 'Europe/Vienna', name: 'Central European Time', city: 'Vienna' },
+    { iana: 'Europe/Prague', name: 'Central European Time', city: 'Prague' },
+    { iana: 'Europe/Warsaw', name: 'Central European Time', city: 'Warsaw' },
+    { iana: 'Europe/Athens', name: 'Eastern European Time', city: 'Athens' },
+    { iana: 'Europe/Istanbul', name: 'Turkey Time', city: 'Istanbul' },
+    { iana: 'Europe/Moscow', name: 'Moscow Time', city: 'Moscow' },
+    { iana: 'Asia/Dubai', name: 'Gulf Standard Time', city: 'Dubai' },
+    { iana: 'Asia/Riyadh', name: 'Arabia Standard Time', city: 'Riyadh' },
+    { iana: 'Asia/Kuwait', name: 'Arabia Standard Time', city: 'Kuwait' },
+    { iana: 'Asia/Bahrain', name: 'Arabia Standard Time', city: 'Bahrain' },
+    { iana: 'Asia/Qatar', name: 'Arabia Standard Time', city: 'Doha' },
+    { iana: 'Asia/Muscat', name: 'Gulf Standard Time', city: 'Muscat' },
+    { iana: 'Asia/Karachi', name: 'Pakistan Time', city: 'Karachi' },
+    { iana: 'Asia/Kolkata', name: 'India Standard Time', city: 'Mumbai' },
+    { iana: 'Asia/Dhaka', name: 'Bangladesh Time', city: 'Dhaka' },
+    { iana: 'Asia/Bangkok', name: 'Indochina Time', city: 'Bangkok' },
+    { iana: 'Asia/Singapore', name: 'Singapore Time', city: 'Singapore' },
+    { iana: 'Asia/Kuala_Lumpur', name: 'Malaysia Time', city: 'Kuala Lumpur' },
+    { iana: 'Asia/Jakarta', name: 'Western Indonesia Time', city: 'Jakarta' },
+    { iana: 'Asia/Manila', name: 'Philippine Time', city: 'Manila' },
+    { iana: 'Asia/Hong_Kong', name: 'Hong Kong Time', city: 'Hong Kong' },
+    { iana: 'Asia/Shanghai', name: 'China Standard Time', city: 'Shanghai' },
+    { iana: 'Asia/Taipei', name: 'Taipei Time', city: 'Taipei' },
+    { iana: 'Asia/Seoul', name: 'Korea Standard Time', city: 'Seoul' },
+    { iana: 'Asia/Tokyo', name: 'Japan Standard Time', city: 'Tokyo' },
+    { iana: 'Australia/Sydney', name: 'Australian Eastern Time', city: 'Sydney' },
+    { iana: 'Australia/Melbourne', name: 'Australian Eastern Time', city: 'Melbourne' },
+    { iana: 'Australia/Brisbane', name: 'Australian Eastern Time', city: 'Brisbane' },
+    { iana: 'Australia/Perth', name: 'Australian Western Time', city: 'Perth' },
+    { iana: 'Australia/Adelaide', name: 'Australian Central Time', city: 'Adelaide' },
+    { iana: 'Pacific/Auckland', name: 'New Zealand Time', city: 'Auckland' },
+    { iana: 'Africa/Cairo', name: 'Eastern European Time', city: 'Cairo' },
+    { iana: 'Africa/Johannesburg', name: 'South Africa Time', city: 'Johannesburg' },
+    { iana: 'Africa/Lagos', name: 'West Africa Time', city: 'Lagos' },
+    { iana: 'Africa/Nairobi', name: 'East Africa Time', city: 'Nairobi' },
+  ];
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -46,53 +104,152 @@ const TimezoneSearch = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const getTimeForTimezone = (offsetHours: number) => {
-    const utcTime = new Date(currentTime.getTime() + currentTime.getTimezoneOffset() * 60000);
-    const timezoneTime = new Date(utcTime.getTime() + offsetHours * 3600000);
-    return timezoneTime;
+  // Get timezone offset string (e.g., "GMT+4", "GMT-5")
+  const getTimezoneOffset = (iana: string): string => {
+    try {
+      const now = new Date();
+      
+      // Format the same moment in UTC and target timezone
+      const utcFormatter = new Intl.DateTimeFormat('en', {
+        timeZone: 'UTC',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: false
+      });
+      
+      const tzFormatter = new Intl.DateTimeFormat('en', {
+        timeZone: iana,
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: false
+      });
+      
+      const utcParts = utcFormatter.formatToParts(now);
+      const tzParts = tzFormatter.formatToParts(now);
+      
+      const utcHour = parseInt(utcParts.find(p => p.type === 'hour')?.value || '0');
+      const utcMin = parseInt(utcParts.find(p => p.type === 'minute')?.value || '0');
+      const utcSec = parseInt(utcParts.find(p => p.type === 'second')?.value || '0');
+      
+      const tzHour = parseInt(tzParts.find(p => p.type === 'hour')?.value || '0');
+      const tzMin = parseInt(tzParts.find(p => p.type === 'minute')?.value || '0');
+      const tzSec = parseInt(tzParts.find(p => p.type === 'second')?.value || '0');
+      
+      // Calculate offset in seconds
+      const utcTotalSeconds = utcHour * 3600 + utcMin * 60 + utcSec;
+      const tzTotalSeconds = tzHour * 3600 + tzMin * 60 + tzSec;
+      
+      let offsetSeconds = tzTotalSeconds - utcTotalSeconds;
+      
+      // Handle day boundaries (if difference is more than 12 hours, assume next/previous day)
+      if (offsetSeconds > 43200) offsetSeconds -= 86400;
+      if (offsetSeconds < -43200) offsetSeconds += 86400;
+      
+      const offsetHours = offsetSeconds / 3600;
+      
+      // Format offset
+      if (Math.abs(offsetHours) < 0.1) return 'GMT';
+      
+      const sign = offsetHours >= 0 ? '+' : '';
+      const hours = Math.abs(Math.floor(offsetHours));
+      const minutes = Math.abs(Math.floor((offsetHours % 1) * 60));
+      
+      if (minutes === 0) {
+        return `GMT${sign}${hours}`;
+      }
+      return `GMT${sign}${hours}:${minutes.toString().padStart(2, '0')}`;
+    } catch {
+      return 'GMT';
+    }
+  };
+
+  // Get formatted time for a timezone
+  const getTimeForTimezone = (iana: string): Date => {
+    try {
+      const formatter = new Intl.DateTimeFormat('en', {
+        timeZone: iana,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      
+      const parts = formatter.formatToParts(currentTime);
+      const year = parseInt(parts.find(p => p.type === 'year')?.value || '0');
+      const month = parseInt(parts.find(p => p.type === 'month')?.value || '0') - 1;
+      const day = parseInt(parts.find(p => p.type === 'day')?.value || '0');
+      const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+      const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+      const second = parseInt(parts.find(p => p.type === 'second')?.value || '0');
+      
+      return new Date(year, month, day, hour, minute, second);
+    } catch {
+      return currentTime;
+    }
   };
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('en-GB', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
   };
 
-  const formatDate = (date: Date, offset: string) => {
+  const formatDate = (date: Date, iana: string) => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const offset = getTimezoneOffset(iana);
     
-    return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()} ${offset !== 'GMT' ? `(${offset})` : ''}`;
+    return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}, ${date.getFullYear()}`;
   };
 
   const filteredTimezones = timezones.filter(tz => 
+    tz.city.toLowerCase().includes(timezoneSearch.toLowerCase()) ||
     tz.name.toLowerCase().includes(timezoneSearch.toLowerCase()) ||
-    tz.offset.toLowerCase().includes(timezoneSearch.toLowerCase())
+    tz.iana.toLowerCase().includes(timezoneSearch.toLowerCase()) ||
+    getTimezoneOffset(tz.iana).toLowerCase().includes(timezoneSearch.toLowerCase())
   );
 
-  const getCurrentDateTime = () => {
-    const time = getTimeForTimezone(selectedTimezone.offsetHours);
-    return formatTime(time);
-  };
-
-  const getCurrentDate = () => {
-    const time = getTimeForTimezone(selectedTimezone.offsetHours);
-    return formatDate(time, selectedTimezone.offset);
-  };
-  const getCurrentDateTimeGMT = (timeZone: string = 'Asia/Dubai') => {
-    const date = new Date();
+  // Get current date/time for selected timezone
+  const getCurrentDateTimeGMT = (iana: string) => {
+    const date = getTimeForTimezone(iana);
   
     const options: Intl.DateTimeFormatOptions = {
-      weekday: 'short',   // "short" | "long" | "narrow"
+      weekday: 'short',
       year: 'numeric',
-      month: 'short',     // "numeric" | "2-digit" | "long" | "short" | "narrow"
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      timeZone,           // string
-      timeZoneName: 'short' // "short" | "long"
+      timeZone: iana,
+      timeZoneName: 'short',
+      hour12: true
     };
   
-    return new Intl.DateTimeFormat('en-US', options).format(date);
+    return new Intl.DateTimeFormat('en-GB', options).format(currentTime);
+  };
+
+  // Get selected timezone info
+  const getSelectedTimezoneInfo = () => {
+    const tz = timezones.find(t => t.iana === selectedTimezone);
+    if (tz) {
+      return { ...tz, offset: getTimezoneOffset(tz.iana) };
+    }
+    // Fallback to user's timezone if not found
+    return {
+      iana: selectedTimezone,
+      city: selectedTimezone.split('/').pop()?.replace(/_/g, ' ') || 'Local',
+      name: 'Local Time',
+      offset: getTimezoneOffset(selectedTimezone)
+    };
   };
 
   return (
@@ -261,7 +418,7 @@ const TimezoneSearch = () => {
       >
         <Clock size={18} />
         <div className="timezone-trigger-text">
-        <span>{getCurrentDateTimeGMT('Asia/Dubai')} • Dubai</span>
+          <span>{getCurrentDateTimeGMT(selectedTimezone)} • {getSelectedTimezoneInfo().city}</span>
         </div>
       </div>
 
@@ -296,14 +453,20 @@ const TimezoneSearch = () => {
           </div>
 
           <div className="timezone-list">
-            {filteredTimezones.map((tz, index) => {
-              const tzTime = getTimeForTimezone(tz.offsetHours);
+            {filteredTimezones.map((tz) => {
+              const tzTime = getTimeForTimezone(tz.iana);
+              const offset = getTimezoneOffset(tz.iana);
+              const isSelected = selectedTimezone === tz.iana;
               return (
                 <div
-                  key={index}
+                  key={tz.iana}
                   className="timezone-item"
+                  style={{
+                    backgroundColor: isSelected ? '#e3f2fd' : 'transparent',
+                    fontWeight: isSelected ? 600 : 'normal'
+                  }}
                   onClick={() => {
-                    setSelectedTimezone(tz);
+                    setSelectedTimezone(tz.iana);
                     setShowTimezoneDropdown(false);
                   }}
                 >
@@ -312,14 +475,14 @@ const TimezoneSearch = () => {
                       <Clock size={16} style={{ color: '#0d6efd' }} />
                     </div>
                     <span className="timezone-item-name">
-                      ({tz.offset}) {tz.name}
+                      ({offset}) {tz.city}
                     </span>
                     <span className="timezone-item-time">
                       {formatTime(tzTime)}
                     </span>
                   </div>
                   <div className="timezone-item-date">
-                    {formatDate(tzTime, tz.offset)}
+                    {formatDate(tzTime, tz.iana)}
                   </div>
                 </div>
               );
