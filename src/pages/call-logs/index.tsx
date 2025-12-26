@@ -114,9 +114,9 @@ const CallLogs = () => {
         const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
         const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
         
-        // Format for API (with seconds and timezone offset, e.g., "2024-01-15T00:00:00-05:00")
-        const startDateApi = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm:ssZ');
-        const endDateApi = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm:ssZ');
+        // Format for API (UTC format)
+        const startDateApi = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+        const endDateApi = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
         
         // Set default filters for input (without timezone key)
         const defaultPendingFilters = {
@@ -214,8 +214,8 @@ const CallLogs = () => {
                 startMoment = moment(formattedFilters.start_datetime).startOf('day');
             }
             
-            // Format with timezone offset (e.g., "2024-01-15T00:00:00-05:00")
-            formattedFilters.start_datetime = startMoment.format('YYYY-MM-DDTHH:mm:ssZ');
+            // Convert to UTC
+            formattedFilters.start_datetime = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
         }
         
         if (formattedFilters.end_datetime) {
@@ -235,8 +235,8 @@ const CallLogs = () => {
                 endMoment = moment(formattedFilters.end_datetime).endOf('day');
             }
             
-            // Format with timezone offset (e.g., "2024-01-15T23:59:59-05:00")
-            formattedFilters.end_datetime = endMoment.format('YYYY-MM-DDTHH:mm:ssZ');
+            // Convert to UTC
+            formattedFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
         }
         
         // Remove timezone key from payload (timezone is now included in datetime values)

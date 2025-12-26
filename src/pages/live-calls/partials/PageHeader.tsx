@@ -64,7 +64,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                   )}
                 </Button>
                 
-                {session?.user?.permissions?.includes('dial-call-cti') && (
+                {/* {session?.user?.permissions?.includes('dial-call-cti') && (
                   <Button 
                     variant="outline-secondary"
                     size="sm"
@@ -80,7 +80,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                     <PhoneCall size={16} className="me-1" />
                     <span className="">Dialer</span>
                   </Button>
-                )}
+                )} */}
                 
                 <Button
                   onClick={toggleFullscreen}
