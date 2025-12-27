@@ -504,12 +504,12 @@ const GlobalFloatingCallBar: React.FC = () => {
       
       if(call)
       {
-        call.duration = moment().diff(moment(call?.startTime).tz('utc', true), 'seconds');
-        
         // CRITICAL: Verify actual call state from callStateMap to ensure status is accurate
         // This prevents showing answer/decline buttons when call was answered externally
         if (call.callId && callStateMap && callStateMap[call.callId]) {
           const callState = callStateMap[call.callId];
+          
+          // First, update status based on actual call state
           if (callState.parties && callState.parties.length > 0) {
             // Check actual party statuses - if any party is CONNECTED/ANSWERED, update status
             const hasConnectedParty = callState.parties.some((p: any) => 
@@ -529,6 +529,35 @@ const GlobalFloatingCallBar: React.FC = () => {
             else if (hasRingingParty && call.calledAddress === userAddress) {
               call.status = 'ringing';
             }
+          }
+          
+          // Calculate duration using eventTime from callStateMap (UTC) for accuracy
+          // This matches the approach in CtiContext - only calculate for connected calls
+          if (call.status === 'connected') {
+            if (callState.eventTime) {
+              // Use eventTime from callStateMap (UTC) - most accurate
+              const now = new Date();
+              const eventTime = moment.utc(callState.eventTime).toDate();
+              call.duration = Math.max(0, Math.round((now.getTime() - eventTime.getTime()) / 1000));
+            } else if (call.startTime) {
+              // Fallback: use startTime if eventTime not available
+              // Parse startTime as UTC if it's a string, otherwise use Date directly
+              const startTime = call.startTime instanceof Date 
+                ? call.startTime 
+                : moment.utc(call.startTime).toDate();
+              const now = new Date();
+              call.duration = Math.max(0, Math.round((now.getTime() - startTime.getTime()) / 1000));
+            }
+          }
+        } else {
+          // Fallback: calculate duration from startTime if callStateMap not available
+          // Only calculate for connected calls
+          if (call.status === 'connected' && call.startTime) {
+            const startTime = call.startTime instanceof Date 
+              ? call.startTime 
+              : moment.utc(call.startTime).toDate();
+            const now = new Date();
+            call.duration = Math.max(0, Math.round((now.getTime() - startTime.getTime()) / 1000));
           }
         }
       }

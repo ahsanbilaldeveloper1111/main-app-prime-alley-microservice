@@ -17,6 +17,10 @@ import {
 import { getCrossTabCtiManager } from '../utils/crossTabCtiManager';
 import moment from 'moment';
 
+// Local storage keys (matching useCtiStomp.ts)
+const CALL_STATES_STORAGE_KEY = "cti_call_states";
+const CALL_STATES_TIMESTAMP_KEY = "cti_call_states_timestamp";
+
 interface CtiContextType {
   // Connection state
   isInitialized: boolean;
@@ -437,61 +441,80 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
         const response = await GetCallLegs({ callIds: activeCallIds });
         
         if (response.success && response.data) {
-          // Extract active call IDs from the response
-          // The response structure may vary, but typically contains call legs with call IDs
+          // Extract response data - structure: { responseData: { "callId": { hasActiveParticipants: boolean, ... }, ... } }
           const responseData = response.data.responseData || response.data.data || response.data;
           
-          // Determine which call IDs are still active
-          // If responseData is an array, extract call IDs from active call legs
-          // If responseData is an object with call IDs as keys, use those keys
+          // Determine which call IDs are still active based on hasActiveParticipants field
+          // Response structure: keys are call IDs, values are call objects with hasActiveParticipants field
           let activeCallIdsFromAPI: string[] = [];
           
           if (Array.isArray(responseData)) {
-            // If it's an array of call legs, extract callId from each active leg
+            // If it's an array of call legs, check hasActiveParticipants field
             activeCallIdsFromAPI = responseData
               .filter((item: any) => {
-                // Filter out disconnected/dropped calls
+                // Check hasActiveParticipants field - if false, call has ended
+                const hasActiveParticipants = item.hasActiveParticipants !== undefined 
+                  ? item.hasActiveParticipants 
+                  : true; // Default to true if field is missing (fail-safe)
+                
+                // Also check status fields as fallback
                 const status = item.status || item.callStatus || item.currentState;
-                return status && 
-                       status !== 'DISCONNECTED' && 
-                       status !== 'DROPPED' && 
-                       status !== 'ENDED';
+                const isTerminating = item.isTerminating === true;
+                
+                return hasActiveParticipants && 
+                       !isTerminating &&
+                       (!status || (status !== 'DISCONNECTED' && status !== 'DROPPED' && status !== 'ENDED'));
               })
               .map((item: any) => item.callId || item.call_id)
               .filter((id: string) => id);
           } else if (typeof responseData === 'object' && responseData !== null) {
-            // If it's an object, check if it has call IDs as keys or in a nested structure
-            if (responseData.callIds || responseData.call_ids) {
-              activeCallIdsFromAPI = responseData.callIds || responseData.call_ids || [];
-            } else {
-              // Try to extract call IDs from object values (object with callId as keys)
-              activeCallIdsFromAPI = Object.entries(responseData)
-                .filter(([key, item]: [string, any]) => {
-                  // Check if this is a call leg object with status
-                  if (item && typeof item === 'object') {
-                    const status = item.status || item.callStatus || item.currentState;
-                    return status && 
-                           status !== 'DISCONNECTED' && 
-                           status !== 'DROPPED' && 
-                           status !== 'ENDED';
-                  }
-                  // If not an object, assume it's a call ID (key is the callId)
-                  return true;
-                })
-                .map(([key, item]: [string, any]) => {
-                  // If item is an object, extract callId from it, otherwise use the key
-                  return (item && typeof item === 'object' && (item.callId || item.call_id)) || key;
-                })
-                .filter((id: string) => id);
-            }
+            // If it's an object with call IDs as keys (expected structure)
+            activeCallIdsFromAPI = Object.entries(responseData)
+              .filter(([callId, callData]: [string, any]) => {
+                // Check hasActiveParticipants field - primary indicator of active calls
+                if (callData && typeof callData === 'object') {
+                  const hasActiveParticipants = callData.hasActiveParticipants !== undefined 
+                    ? callData.hasActiveParticipants 
+                    : true; // Default to true if field is missing (fail-safe)
+                  
+                  // Also check isTerminating field
+                  const isTerminating = callData.isTerminating === true;
+                  
+                  // Check status fields as fallback
+                  const status = callData.status || callData.callStatus || callData.currentState;
+                  
+                  // Call is active if hasActiveParticipants is true and not terminating
+                  return hasActiveParticipants && 
+                         !isTerminating &&
+                         (!status || (status !== 'DISCONNECTED' && status !== 'DROPPED' && status !== 'ENDED'));
+                }
+                // If not an object, assume it's a call ID (key is the callId)
+                return true;
+              })
+              .map(([callId, callData]: [string, any]) => {
+                // If callData is an object, use its callId field if available, otherwise use the key
+                return (callData && typeof callData === 'object' && (callData.callId || callData.call_id)) || callId;
+              })
+              .filter((id: string) => id);
           }
           
-          // If we couldn't extract call IDs, assume all calls in localStorage are still active
-          // This is a fail-safe to avoid removing calls incorrectly
-          if (activeCallIdsFromAPI.length === 0) {
-            console.warn('[CtiContext] Could not extract active call IDs from GetCallLegs response, keeping all calls');
-            hasVerifiedCallsRef.current = true;
-            return;
+          // Collect call IDs that should be removed (for localStorage cleanup)
+          const inactiveCallIds = new Set<string>();
+          
+          // First, check all calls in responseData to identify inactive ones
+          if (responseData && typeof responseData === 'object') {
+            Object.entries(responseData).forEach(([callId, callData]: [string, any]) => {
+              if (callData && typeof callData === 'object') {
+                // Check hasActiveParticipants field - if false, mark for removal
+                if (callData.hasActiveParticipants === false) {
+                  // Add both the key (callId) and the callId from the object if it exists
+                  inactiveCallIds.add(callId);
+                  if (callData.callId && callData.callId !== callId) {
+                    inactiveCallIds.add(callData.callId);
+                  }
+                }
+              }
+            });
           }
           
           // Remove calls from activeCalls that are no longer active according to the API
@@ -500,21 +523,88 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
             let removedCount = 0;
             
             // Remove calls whose callId is not in the active list from API
+            // Also check responseData directly for hasActiveParticipants = false
             Array.from(newMap.entries()).forEach(([callKey, call]) => {
-              if (call.callId && !activeCallIdsFromAPI.includes(call.callId)) {
+              if (!call.callId) return;
+              
+              // Check if call exists in responseData
+              const callData = responseData && typeof responseData === 'object' && responseData[call.callId];
+              
+              let shouldRemove = false;
+              
+              if (callData && typeof callData === 'object') {
+                // Check hasActiveParticipants field - if false, remove the call
+                if (callData.hasActiveParticipants === false) {
+                  shouldRemove = true;
+                  inactiveCallIds.add(call.callId);
+                }
+              }
+              
+              // Also check if callId is not in the active list
+              if (!shouldRemove && !activeCallIdsFromAPI.includes(call.callId)) {
+                shouldRemove = true;
+                inactiveCallIds.add(call.callId);
+              }
+              
+              if (shouldRemove) {
                 newMap.delete(callKey);
                 removedCount++;
               }
             });
             
             if (removedCount > 0) {
-              console.log(`[CtiContext] Removed ${removedCount} inactive call(s) after GetCallLegs verification`);
+              console.log(`[CtiContext] Removed ${removedCount} inactive call(s) from activeCalls after GetCallLegs verification (hasActiveParticipants=false or not in active list)`);
             } else {
               console.log(`[CtiContext] All ${activeCallIdsFromAPI.length} call(s) verified as active`);
             }
             
             return newMap;
           });
+          
+          // Remove inactive calls from localStorage to prevent them from showing on subsequent refreshes
+          // This checks ALL calls in localStorage, not just ones in activeCalls
+          if (inactiveCallIds.size > 0) {
+            try {
+              const storedCallStates = localStorage.getItem(CALL_STATES_STORAGE_KEY);
+              if (storedCallStates) {
+                const parsedCallStates = JSON.parse(storedCallStates);
+                let localStorageRemovedCount = 0;
+                
+                // Remove inactive call IDs from localStorage
+                inactiveCallIds.forEach(callId => {
+                  if (parsedCallStates[callId]) {
+                    delete parsedCallStates[callId];
+                    localStorageRemovedCount++;
+                  }
+                });
+                
+                // Also check all calls in localStorage against responseData
+                Object.keys(parsedCallStates).forEach(callId => {
+                  const callData = responseData && typeof responseData === 'object' && responseData[callId];
+                  if (callData && typeof callData === 'object' && callData.hasActiveParticipants === false) {
+                    delete parsedCallStates[callId];
+                    localStorageRemovedCount++;
+                  }
+                });
+                
+                // Save updated call states back to localStorage
+                if (Object.keys(parsedCallStates).length > 0) {
+                  localStorage.setItem(CALL_STATES_STORAGE_KEY, JSON.stringify(parsedCallStates));
+                  localStorage.setItem(CALL_STATES_TIMESTAMP_KEY, new Date().toISOString());
+                } else {
+                  // If no active calls remain, clear storage completely
+                  localStorage.removeItem(CALL_STATES_STORAGE_KEY);
+                  localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
+                }
+                
+                if (localStorageRemovedCount > 0) {
+                  console.log(`[CtiContext] Removed ${localStorageRemovedCount} inactive call(s) from localStorage`);
+                }
+              }
+            } catch (error) {
+              console.error('[CtiContext] Error removing inactive calls from localStorage:', error);
+            }
+          }
         } else {
           // If API call failed, log but don't remove calls (fail-safe)
           console.warn('[CtiContext] GetCallLegs verification failed, keeping all calls from localStorage');
