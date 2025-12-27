@@ -47,7 +47,7 @@ const MyApp: any = ({ Component, pageProps, ...rest }: AppPropsWithLayout) => {
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no"
         />
-        <title>Business Contact Center</title>
+        <title>Business Workspace AI-Powered</title>
       </Head>
       <Providers store={store}>
         {getLayout(<Component {...pageProps} />)}

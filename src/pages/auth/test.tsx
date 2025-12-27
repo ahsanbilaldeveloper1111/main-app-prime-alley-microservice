@@ -123,7 +123,7 @@ const Signin = () => {
   return (
     <React.Fragment>
       <Head>
-        <title>Sign In - Business Contact Center</title>
+        <title>Sign In - Business Workspace AI-Powered</title>
       </Head>
       <Script
         src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"
@@ -224,10 +224,10 @@ const Signin = () => {
                     className="fas fa-satellite-dish"
                     style={{ fontSize: "3rem", marginBottom: "20px" }}
                   ></i>
-                  <h1 className="text-white">Business Contact Center</h1>
+                  <h1 className="text-white">Business Workspace AI-Powered</h1>
 
                   {/* <br />
-                                    <Image src={Logo} alt="Business Contact Center" /> */}
+                                    <Image src={Logo} alt="Business Workspace AI-Powered" /> */}
 
                   <p>
                     A new frontier in telecommunications and data management.

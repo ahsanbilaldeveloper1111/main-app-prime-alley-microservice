@@ -199,7 +199,7 @@ const TimezoneSearch = () => {
       minute: '2-digit',
       second: '2-digit',
       hour12: true
-    });
+    }).replace(/\b(am|pm)\b/gi, (match) => match.toUpperCase());
   };
 
   const formatDate = (date: Date, iana: string) => {
@@ -234,7 +234,7 @@ const TimezoneSearch = () => {
       hour12: true
     };
   
-    return new Intl.DateTimeFormat('en-GB', options).format(currentTime);
+    return new Intl.DateTimeFormat('en-GB', options).format(currentTime).replace(/\b(am|pm)\b/gi, (match) => match.toUpperCase());
   };
 
   // Get selected timezone info
@@ -481,7 +481,7 @@ const TimezoneSearch = () => {
                       {formatTime(tzTime)}
                     </span>
                   </div>
-                  <div className="timezone-item-date">
+                  <div className="timezone-item-date text-uppercase">
                     {formatDate(tzTime, tz.iana)}
                   </div>
                 </div>

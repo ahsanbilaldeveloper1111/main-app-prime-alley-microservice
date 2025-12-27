@@ -5,7 +5,14 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Col, Row, Tab, Tabs, Card } from "react-bootstrap";
+import { Col, Row, Card } from "react-bootstrap";
+import { 
+  Ticket,
+  BookOpen,
+  HelpCircle,
+  FileText,
+  MessageSquare
+} from 'lucide-react';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -23,30 +30,94 @@ import ContactSupport from "@pages/resources/contact-support";
 const HelpCenter = () => {
   const [activeTab, setActiveTab] = useState<string>("tickets");
 
+  // Define tabs with icons and colors
+  const tabs = [
+    {
+      key: "tickets",
+      title: "Tickets",
+      icon: Ticket,
+      color: "#2196f3"
+    },
+    {
+      key: "resources",
+      title: "Resources",
+      icon: BookOpen,
+      color: "#0d6efd"
+    },
+    {
+      key: "faq",
+      title: "FAQ",
+      icon: HelpCircle,
+      color: "#ff9800"
+    },
+    {
+      key: "help-materials",
+      title: "Help Materials",
+      icon: FileText,
+      color: "#198754"
+    },
+    {
+      key: "contact-support",
+      title: "Contact Support",
+      icon: MessageSquare,
+      color: "#9c27b0"
+    }
+  ];
+
+  const handleTabChange = (key: string) => {
+    setActiveTab(key);
+  };
+
   return (
     <React.Fragment>
       <style>{`
-        #help-center-tabs .nav-link {
+        .help-center-filter-buttons {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-bottom: 0;
+          padding: 0;
+          width: 100%;
+        }
+
+        .help-center-filter-button {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 20px;
+          border-radius: 8px;
+          border: 1px solid;
           font-weight: 500;
-          padding: 12px 24px;
-          margin-right: 8px;
-          border-radius: 8px 8px 0 0;
-          transition: all 0.3s ease;
-          color: #6c757d;
-          border: none;
-          background: transparent;
+          font-size: 14px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          background: white;
+          white-space: nowrap;
         }
-        
-        #help-center-tabs .nav-link:hover {
-          color: #0d6efd;
-          background-color: rgba(13, 110, 253, 0.05);
+
+        .help-center-filter-button:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
-        
-        #help-center-tabs .nav-link.active {
-          color: #0d6efd;
-          background-color: #fff;
-          border-bottom: 3px solid #0d6efd;
-          font-weight: 600;
+
+        .help-center-filter-button.active {
+          color: white;
+        }
+
+        .help-center-filter-button.active .filter-icon {
+          color: white;
+        }
+
+        .help-center-filter-button:not(.active) .filter-icon {
+          color: inherit;
+        }
+
+        .filter-icon {
+          width: 18px;
+          height: 18px;
+          flex-shrink: 0;
         }
       `}</style>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Help Center" />
@@ -59,48 +130,64 @@ const HelpCenter = () => {
       <Row>
         <Col md={12}>
           <Card className="shadow-sm border-0">
-            <Card.Body className="p-0">
-              <Tabs
-                activeKey={activeTab}
-                onSelect={(k) => setActiveTab(k || "tickets")}
-                id="help-center-tabs"
-                className="help-center-main-tabs"
-                style={{
-                  borderBottom: '2px solid #e9ecef',
-                  padding: '0 20px',
-                  marginBottom: 0
-                }}
-              >
-                <Tab eventKey="tickets" title="Tickets">
-                  <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
+            <Card.Body style={{ padding: 0 }}>
+              {/* Main Filter Buttons */}
+              <div>
+                <div className="help-center-filter-buttons shadow px-3 py-3">
+                  {tabs.map((tab) => {
+                    const IconComponent = tab.icon;
+                    const isActive = activeTab === tab.key;
+                    return (
+                      <button
+                        key={tab.key}
+                        className={`help-center-filter-button ${isActive ? 'active' : ''}`}
+                        onClick={() => handleTabChange(tab.key)}
+                        style={{
+                          backgroundColor: isActive ? tab.color : 'white',
+                          borderColor: isActive ? tab.color : tab.color,
+                          color: isActive ? 'white' : tab.color
+                        }}
+                      >
+                        <IconComponent className="filter-icon" size={18} />
+                        <span>{tab.title}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Tab Content */}
+              <div style={{ padding: '24px' }}>
+                {activeTab === "tickets" && (
+                  <div>
                     <TicketsDashboard />
                   </div>
-                </Tab>
+                )}
 
-                <Tab eventKey="resources" title="Resources">
-                  <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
+                {activeTab === "resources" && (
+                  <div>
                     <Resources />
                   </div>
-                </Tab>
+                )}
 
-                <Tab eventKey="faq" title="FAQ">
-                  <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
+                {activeTab === "faq" && (
+                  <div>
                     <FAQ />
                   </div>
-                </Tab>
+                )}
 
-                <Tab eventKey="help-materials" title="Help Materials">
-                  <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
+                {activeTab === "help-materials" && (
+                  <div>
                     <HelpMaterials />
                   </div>
-                </Tab>
+                )}
 
-                <Tab eventKey="contact-support" title="Contact Support">
-                  <div style={{ padding: '20px', backgroundColor: '#f8f9fa', minHeight: '400px' }}>
+                {activeTab === "contact-support" && (
+                  <div>
                     <ContactSupport />
                   </div>
-                </Tab>
-              </Tabs>
+                )}
+              </div>
             </Card.Body>
           </Card>
         </Col>

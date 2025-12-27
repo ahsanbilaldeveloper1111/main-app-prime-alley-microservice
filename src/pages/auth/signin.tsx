@@ -321,7 +321,7 @@ const Signin = () => {
               <div className="card my-5 mx-3">
                 <div className="card-body">
                    <Image  
-                   src={logodark} className="img-brand img-fluid mb-3" alt="Business Contact Center"
+                   src={logodark} className="img-brand img-fluid mb-3" alt="Business Workspace AI-Powered"
                    width={200}
                     />
                   <h4 className="f-w-500 mb-1">Welcome Back</h4>

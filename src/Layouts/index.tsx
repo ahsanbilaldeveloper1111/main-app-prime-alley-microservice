@@ -17,7 +17,9 @@ import {
   Link,
   Phone,
   Search,
-  X
+  X,
+  PhoneCall,
+  User
     } from 'lucide-react';
 import { Badge, Button, Dropdown } from 'react-bootstrap';
 import { useCti } from '@hooks/useCti';
@@ -665,7 +667,7 @@ const Layout = ({ children }: LayoutProps) => {
                 variant="link" 
                 size="sm" 
                 className="text-dark position-relative pointer-cursor" 
-                style={{ cursor: 'pointer', padding: '0.5rem' }}
+                style={{ cursor: 'pointer', padding: '0.5rem',marginRight: '10px' }}
                 disabled={!isInitialized}
                 onClick={(e) => {
                   e.preventDefault();
@@ -679,7 +681,7 @@ const Layout = ({ children }: LayoutProps) => {
                 <i className="material-icons-two-tone" style={{ 
                   cursor: 'pointer', 
                   fontSize: '1.5rem', 
-                  backgroundColor: '#04a9f5', 
+                  backgroundColor: '#1976d2', 
                   pointerEvents: 'none',
                   
                 }}>dialpad</i>  
@@ -1143,6 +1145,16 @@ const Layout = ({ children }: LayoutProps) => {
 					>
 						{/* Header */}
 						<div className="d-flex align-items-center justify-content-between mb-3">
+							<div>
+								{/* <User 
+									size={20}
+									
+								/>
+								<span>
+									{loggedInName}
+								</span> */}
+							</div>
+							<div>
 							{isDeviceRegistered ? (
 								<span className="badge" style={{ 
 									padding: '0.375rem 1rem', 
@@ -1166,6 +1178,7 @@ const Layout = ({ children }: LayoutProps) => {
 									Offline
 								</span>
 							)}
+							</div>
 						</div>
 
 						{/* Active Call Info - Show at top if exists */}
@@ -1382,7 +1395,7 @@ const Layout = ({ children }: LayoutProps) => {
 								padding: "1rem",
 								fontSize: "1.125rem",
 								fontWeight: 600,
-								backgroundColor: isDeviceRegistered ? "#22c55e" : "#94a3b8",
+								background: "linear-gradient(135deg, #2374d4, #4facfe)",
 								border: "none",
 								color: "white",
 								cursor: (!dialedNumber.trim() || isDialing || !isDeviceRegistered) ? "not-allowed" : "pointer",
@@ -1390,12 +1403,12 @@ const Layout = ({ children }: LayoutProps) => {
 							}}
 							onMouseEnter={(e) => {
 								if (!e.currentTarget.disabled && isDeviceRegistered) {
-									e.currentTarget.style.backgroundColor = "#16a34a";
+									e.currentTarget.style.background = "linear-gradient(135deg, rgb(15 83 164), rgb(79, 172, 254))";
 								}
 							}}
 							onMouseLeave={(e) => {
 								if (!e.currentTarget.disabled && isDeviceRegistered) {
-									e.currentTarget.style.backgroundColor = "#22c55e";
+									e.currentTarget.style.background = "linear-gradient(135deg, #2374d4, #4facfe)";
 								}
 							}}
 							title={!isDeviceRegistered ? "Device is not registered. Please register your device to make calls." : ""}
@@ -1407,7 +1420,7 @@ const Layout = ({ children }: LayoutProps) => {
 								</>
 							) : (
 								<>
-									<i className="material-icons-two-tone" style={{ fontSize: "1.5rem", color: "#fff" }}>
+									<i className="material-icons-two-tone" style={{ fontSize: "1.5rem", color: "#fff" ,backgroundColor: '#fff'}}>
 										call
 									</i>
 									Call

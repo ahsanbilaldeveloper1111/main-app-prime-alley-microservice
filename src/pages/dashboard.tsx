@@ -37,20 +37,20 @@ const Dashboard = () => {
         
         {/* Header Navigation */}
 <Row className="mb-4">
-  <Col xs={12} md={5}>
+  <Col xs={12} md={6}>
     <div className="d-flex gap-2 mb-3">
       <Button variant="primary" size="sm">Today</Button>
       <Button variant="outline-secondary" size="sm">This Week</Button>
       <Button variant="outline-secondary" size="sm">This Month</Button>
     </div>
   </Col>
-  <Col xs={12} md={7}>
-    <div className="d-flex align-items-center bg-white border rounded" style={{ padding: '0' }}>
+  <Col xs={12} md={6}>
+    <div className="d-flex align-items-center justify-content-end bg-white border rounded" style={{ padding: '0' }}>
       <div className="position-relative flex-grow-1">
         <Search className="position-absolute" style={{ left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6c757d', zIndex: 10 }} size={18} />
         <Form.Control
           type="text"
-          placeholder="Search accross your workspace"
+          placeholder="Search across your workspace"
           className="ps-5"
           style={{ height: '40px', border: 'none', boxShadow: 'none' }}
         />
