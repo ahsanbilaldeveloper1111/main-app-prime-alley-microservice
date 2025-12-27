@@ -13,6 +13,7 @@ import {
 } from "react-bootstrap";
 import {
   getCrmDashboard,
+  getCrmDashboardOverview,
   getLeads,
   getDeals,
   getOrders,
@@ -147,6 +148,20 @@ const CrmDashboard = () => {
   const [leadToDealPercent, setLeadToDealPercent] = useState(0);
   const [dealToOrderPercent, setDealToOrderPercent] = useState(0);
 
+  const [dashboardOverview, setDashboardOverview] = useState<any>(null);
+  useEffect(() => {
+    fetchDashboardOverview();
+  }, []);
+
+  const fetchDashboardOverview = useCallback(async () => {
+    try {
+      const data = await getCrmDashboardOverview();
+      console.log("Dashboard Overview", data);
+      setDashboardOverview(data);
+    } catch (error) {
+      console.error("Failed to fetch dashboard overview data:", error);
+    }
+  }, []);
   // Fetch all dashboard data
   const fetchDashboardData = useCallback(async () => {
     try {

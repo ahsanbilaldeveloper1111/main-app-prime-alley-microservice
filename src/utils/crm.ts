@@ -205,6 +205,16 @@ export const getCrmDashboard = async () => {
   }
 };
 
+export const getCrmDashboardOverview = async () => {
+  try {
+    const response = await axiosInstance.get("/crm/dashboard/overview");
+    return extractData(response);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch dashboard data");
+    throw error;
+  }
+};
+
 // Lead Management
 export const getLeads = async (
   params: PaginationParams = {}
