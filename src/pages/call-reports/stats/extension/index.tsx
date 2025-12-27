@@ -225,6 +225,8 @@ const CallStatsExtension = () => {
     const initialFetchDone = React.useRef(false);
     // Use ref to track last filters used for charts to prevent unnecessary refetches
     const lastChartFilters = React.useRef<string>('');
+    // Use ref to track last refreshKey to prevent duplicate calls
+    const lastProcessedRefreshKey = React.useRef<number>(0);
     
     // Debug current filters state
     useEffect(() => {
@@ -338,6 +340,15 @@ const CallStatsExtension = () => {
             console.log('Not ready for data fetch:', { filtersReady, status, hasSession: !!session });
         }
     }, [filtersReady, status, session]);
+
+    // Trigger fetchCallLogs when refreshKey changes (filter applied)
+    useEffect(() => {
+        if (refreshKey > 0 && refreshKey !== lastProcessedRefreshKey.current && filtersReady && status === 'authenticated' && session && initialFetchDone.current) {
+            console.log('Refresh key changed, triggering fetchCallLogs:', refreshKey);
+            lastProcessedRefreshKey.current = refreshKey;
+            fetchCallLogs(1, 15, "");
+        }
+    }, [refreshKey, filtersReady, status, session, fetchCallLogs]);
     
     // Fallback: if filters haven't been marked as ready after 1 second, mark them as ready
     useEffect(() => {
