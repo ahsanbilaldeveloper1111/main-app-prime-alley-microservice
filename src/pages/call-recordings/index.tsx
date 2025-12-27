@@ -3,6 +3,7 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
 import { io, Socket } from "socket.io-client";
 import { Col, Button, Card, Modal, Row, Form } from 'react-bootstrap';
+import { BarChart3 } from 'lucide-react';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import type { NextPage } from 'next';
@@ -106,6 +107,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const [appliedFilters, setAppliedFilters] = useState({}); // Filters that trigger API calls
   const [searchValue, setSearchValue] = useState<string>('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
+  const [showAnalytics, setShowAnalytics] = useState<boolean>(false);
   
   // Use hierarchy data hook
   const { 
@@ -1086,16 +1088,21 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                     <Col md={8} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
-
-                    {showDateRange && startDateTime && endDateTime && moment(startDateTime).isValid() && moment(endDateTime).isValid() && (
-                            <>
-                            <p className="mb-0">
-                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
-                            </p>
-                          
-                            </>
-                          )}
-                    
+                      <Button
+                        variant={showAnalytics ? "primary" : "outline-secondary"}
+                        size="sm"
+                        onClick={() => setShowAnalytics(!showAnalytics)}
+                        className="d-flex align-items-center"
+                        style={{ 
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap',
+                          padding: '0.5rem 1rem'
+                        }}
+                      >
+                        <BarChart3 size={16} className="me-1" />
+                        <span>{showAnalytics ? 'Hide Analytics' : 'Show Analytics'}</span>
+                      </Button>
                     </div>
 
 
@@ -1113,6 +1120,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       <PageSummaryGrid cards={summaryCards} />
 
       {/* Charts */}
+      {showAnalytics && (
       <Row className="mb-3">
         <Col md={6}>
           <Card>
@@ -1175,6 +1183,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           </Card>
         </Col>
       </Row>
+      )}
 
       
 

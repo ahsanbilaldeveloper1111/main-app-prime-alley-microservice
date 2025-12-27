@@ -373,7 +373,7 @@ const GlobalFloatingCallBar: React.FC = () => {
       } else {
         baseStyles.flexDirection = "row";
         baseStyles.borderRadius = "1.5rem";
-        baseStyles.padding = "1.25rem";
+        baseStyles.padding = "0.5rem 1rem";
         baseStyles.gap = "1rem";
         baseStyles.minWidth = "320px";
         baseStyles.maxWidth = "625px";
@@ -387,7 +387,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     const isVertical = position === "left" || position === "right";
     
     baseStyles.borderRadius = "1.5rem";
-    baseStyles.padding = isVertical ? "1rem 0.75rem" : "1.25rem";
+    baseStyles.padding = isVertical ? "1rem 0.75rem" : "1rem";
     baseStyles.gap = isVertical ? "0.75rem" : "1rem";
 
     if (isVertical) {
@@ -783,14 +783,14 @@ const GlobalFloatingCallBar: React.FC = () => {
 
   const handleDial = async (numberToDial: string = dialedNumber) => {
     if (!numberToDial.trim()) {
-      toast.error("Please enter a number to dial");
+      //toast.error("Please enter a number to dial");
       return;
     }
 
     // Check if user has multiple devices
     const userDevices = getAllUserDevices();
     if (!userDevices) {
-      toast.error("No calling device information available");
+      //toast.error("No calling device information available");
       return;
     }
 
@@ -812,14 +812,14 @@ const GlobalFloatingCallBar: React.FC = () => {
       const result = await dialNumber(numberToDial);
 
       if (result.success) {
-        toast.success(`Calling ${numberToDial}...`);
+        //toast.success(`Calling ${numberToDial}...`);
         setDialedNumber("");
         closeDialer();
       } else {
-        toast.error(result.error || "Failed to make call");
+        //toast.error(result.error || "Failed to make call");
       }
     } catch (error) {
-      toast.error("Failed to make call");
+      //toast.error("Failed to make call");
     } finally {
       setIsDialing(false);
     }
@@ -859,14 +859,14 @@ const GlobalFloatingCallBar: React.FC = () => {
       });
 
       if (result.success) {
-        toast.success(`Calling ${numberToDial}...`);
+        //toast.success(`Calling ${numberToDial}...`);
         setDialedNumber("");
         closeDialer();
       } else {
-        toast.error(result.error || "Failed to make call");
+        //toast.error(result.error || "Failed to make call");
       }
     } catch (error) {
-      toast.error("Failed to make call");
+      //toast.error("Failed to make call");
     } finally {
       setIsDialing(false);
     }
@@ -874,13 +874,13 @@ const GlobalFloatingCallBar: React.FC = () => {
 
   const handleEndCall = async () => {
     if (!activeCall || !activeCall.callId) {
-      toast.error("Call ID not available");
+      //toast.error("Call ID not available");
       return;
     }
 
     const controllerDevice = getControllerDeviceInfo(activeCall);
     if (!controllerDevice) {
-      toast.error("No calling device information available");
+      //toast.error("No calling device information available");
       return;
     }
 
@@ -900,22 +900,22 @@ const GlobalFloatingCallBar: React.FC = () => {
       if (result.success) {
        // toast.success("Call ended");
       } else {
-        toast.error(result.error || "Failed to end call");
+        //toast.error(result.error || "Failed to end call");
       }
     } catch (error) {
-      toast.error("Failed to end call");
+      //toast.error("Failed to end call");
     }
   };
 
   const handleHoldCall = async () => {
     if (!activeCall || !activeCall.callId) {
-      toast.error("Call ID not available");
+      //toast.error("Call ID not available");
       return;
     }
 
     const controllerDevice = getControllerDeviceInfo(activeCall);
     if (!controllerDevice) {
-      toast.error("No calling device information available");
+      //toast.error("No calling device information available");
       return;
     }
 
@@ -933,24 +933,24 @@ const GlobalFloatingCallBar: React.FC = () => {
       } as any);
 
       if (result.success) {
-        toast.success("Call put on hold");
+        //toast.success("Call put on hold");
       } else {
-        toast.error(result.error || "Failed to hold call");
+        //toast.error(result.error || "Failed to hold call");
       }
     } catch (error) {
-      toast.error("Failed to hold call");
+      //toast.error("Failed to hold call");
     }
   };
 
   const handleResumeCall = async () => {
     if (!activeCall || !activeCall.callId) {
-      toast.error("Call ID not available");
+     // toast.error("Call ID not available");
       return;
     }
 
     const controllerDevice = getControllerDeviceInfo(activeCall);
     if (!controllerDevice) {
-      toast.error("No calling device information available");
+      //toast.error("No calling device information available");
       return;
     }
 
@@ -968,29 +968,29 @@ const GlobalFloatingCallBar: React.FC = () => {
       } as any);
 
       if (result.success) {
-        toast.success("Call resumed");
+        //toast.success("Call resumed");
       } else {
-        toast.error(result.error || "Failed to resume call");
+        //toast.error(result.error || "Failed to resume call");
       }
     } catch (error) {
-      toast.error("Failed to resume call");
+      //toast.error("Failed to resume call");
     }
   };
 
   const handleTransferCall = async () => {
     if (!activeCall || !activeCall.callId) {
-      toast.error("Call ID not available");
+      //toast.error("Call ID not available");
       return;
     }
 
     if (!transferTarget.trim()) {
-      toast.error("Please select a target extension");
+      //toast.error("Please select a target extension");
       return;
     }
 
     const controllerDevice = getControllerDeviceInfo(activeCall);
     if (!controllerDevice) {
-      toast.error("No calling device information available");
+      //toast.error("No calling device information available");
       return;
     }
 
@@ -1002,7 +1002,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     );
 
     if (targetCall) {
-      toast.error(`Extension ${transferTarget} is currently busy`);
+      //toast.error(`Extension ${transferTarget} is currently busy`);
       return;
     }
 
@@ -1018,15 +1018,15 @@ const GlobalFloatingCallBar: React.FC = () => {
       });
 
       if (result.success) {
-        toast.success(`Call transferred to ${transferTarget}`);
+        //toast.success(`Call transferred to ${transferTarget}`);
         setShowTransferModal(false);
         setTransferTarget("");
         setExtensionSearch("");
       } else {
-        toast.error(result.error || "Failed to transfer call");
+       // toast.error(result.error || "Failed to transfer call");
       }
     } catch (error) {
-      toast.error("Failed to transfer call");
+      //toast.error("Failed to transfer call");
     }
   };
 
@@ -1049,25 +1049,25 @@ const GlobalFloatingCallBar: React.FC = () => {
   const handleAttendCall = async () => {
     // Check permission for attending calls
     if (!hasPermission("dial-call-cti")) {
-      toast.error("You do not have permission to answer calls");
+     // toast.error("You do not have permission to answer calls");
       return;
     }
 
     if (!incomingCall) {
-      toast.error("No incoming call to attend");
+     // toast.error("No incoming call to attend");
       return;
     }
 
     // Get controller device info from dnsMap for the user
     const userDeviceInfo = dnsMap[userAddress];
     if (!userDeviceInfo || !userDeviceInfo.devices) {
-      toast.error("No device information available");
+      //toast.error("No device information available");
       return;
     }
 
     const userDevices = Object.values(userDeviceInfo.devices);
     if (userDevices.length === 0) {
-      toast.error("No devices available");
+     // toast.error("No devices available");
       return;
     }
 
@@ -1111,10 +1111,10 @@ const GlobalFloatingCallBar: React.FC = () => {
         
        // toast.success("Call attended successfully");
       } else {
-        toast.error(result.error || "Failed to attend call");
+       // toast.error(result.error || "Failed to attend call");
       }
     } catch (error) {
-      toast.error("Failed to attend call");
+      //toast.error("Failed to attend call");
     } finally {
       setIsDialing(false);
     }
@@ -1132,7 +1132,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     setShowIncomingCallModalContext(false);
     setIncomingCall(null);
     setIncomingCallContext(null);
-    toast.info("Call rejected");
+    //toast.info("Call rejected");
   };
 
   const isVertical = position === "left" || position === "right";
@@ -1218,9 +1218,9 @@ const GlobalFloatingCallBar: React.FC = () => {
             <div
               className="position-relative"
               style={{
-                width: isVertical ? "3rem" : "5rem",
-                height: isVertical ? "3rem" : "5rem",
-                minWidth: isVertical ? "3rem" : "5rem",
+                width: isVertical ? "3rem" : "3rem",
+                height: isVertical ? "3rem" : "3rem",
+                minWidth: isVertical ? "3rem" : "3rem",
                 flexShrink: 0,
               }}
             >
@@ -1259,7 +1259,7 @@ const GlobalFloatingCallBar: React.FC = () => {
               <div style={{ flex: 1 }}>
                 <h3
                   style={{
-                    fontSize: "1.5rem",
+                    fontSize: "1rem",
                     fontWeight: 600,
                     color: "#334155",
                     marginBottom: "0.25rem",
@@ -1272,7 +1272,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                 </h3>
                 <div
                   style={{
-                    fontSize: "1rem",
+                    fontSize: "0.7rem",
                     color: "#94a3b8",
                     marginBottom: "0.25rem",
                     overflow: "hidden",
@@ -1288,7 +1288,7 @@ const GlobalFloatingCallBar: React.FC = () => {
             {activeCall.status === "connected" && (
               <div
                 style={{
-                  fontSize: isVertical ? "0.875rem" : "0.875rem",
+                  fontSize: isVertical ? "0.75rem" : "0.75rem",
                   color: "#334155",
                   fontWeight: 500,
                   display: "flex",
@@ -1341,7 +1341,7 @@ const GlobalFloatingCallBar: React.FC = () => {
             {activeCall.status === "onHold" && (
               <div
                 style={{
-                  fontSize: isVertical ? "0.875rem" : "0.875rem",
+                  fontSize: isVertical ? "0.75rem" : "0.75rem",
                   color: "#F4C22B",
                   fontWeight: 500,
                   display: "flex",
@@ -1363,7 +1363,7 @@ const GlobalFloatingCallBar: React.FC = () => {
               <div
                 className="call-status-ringing"
                 style={{
-                  fontSize: isVertical ? "0.875rem" : "0.875rem",
+                  fontSize: isVertical ? "0.75rem" : "0.75rem",
                   color: "#334155",
                   fontWeight: 500,
                   display: "flex",
@@ -1380,7 +1380,7 @@ const GlobalFloatingCallBar: React.FC = () => {
             {activeCall.status === "dialing" && (
               <div
                 style={{
-                  fontSize: isVertical ? "0.875rem" : "0.875rem",
+                  fontSize: isVertical ? "0.75rem" : "0.75rem",
                   color: "#334155",
                   fontWeight: 500,
                   display: "flex",
@@ -1588,13 +1588,13 @@ const GlobalFloatingCallBar: React.FC = () => {
                         })
                           .then((result) => {
                             if (result.success) {
-                              toast.success("Call answered");
+                              //toast.success("Call answered");
                             } else {
-                              toast.error(result.error || "Failed to answer call");
+                             // toast.error(result.error || "Failed to answer call");
                             }
                           })
                           .catch(() => {
-                            toast.error("Failed to answer call");
+                            //toast.error("Failed to answer call");
                           })
                           .finally(() => {
                             setIsDialing(false);

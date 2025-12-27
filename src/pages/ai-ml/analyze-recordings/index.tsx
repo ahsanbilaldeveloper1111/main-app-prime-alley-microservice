@@ -16,8 +16,9 @@ import AnimatedNumber from '@components/AnimatedNumber';
 import EmptyState from '@components/EmptyState';
 import { formatDateTimeToLocal, GlobalDateTimeFormat ,formatDuration, encodeAnalysisData} from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
-import CreatableSelect from 'react-select/creatable';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
+import BarFilters from '@components/BarFilters';
+import SelectBox from '@components/SelectBox';
 import axiosInstance from '@utils/axios';
 import '@assets/scss/common.scss';
 
@@ -36,9 +37,6 @@ import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import { motion } from 'framer-motion';
 import CircularProgressCircle from '@components/CircularProgressCircle';
 
-import dynamic from 'next/dynamic';
-import { ApexOptions } from 'apexcharts';
-const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 interface GeneralStats {
     totalCalls: number;
@@ -68,20 +66,9 @@ interface TrendByCountry {
   AvgCost: string;
 }
 
-// Helper function to format seconds to HH:MM:SS
-const formatSecondsToTime = (seconds: number): string => {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-};
 
 const AnalyzeRecordings = () => {
     const { data:session, status } = useSession();
-    const [showCountryChartModal, setShowCountryChartModal] = useState(false);
-    const [showDepartmentChartModal, setShowDepartmentChartModal] = useState(false);
-    const [showExtensionChartModal, setShowExtensionChartModal] = useState(false);
     const [loading, setLoading] = useState(false);
     const [filterLoading, setFilterLoading] = useState(false);
     const [showDateRange, setShowDateRange] = useState(false);
@@ -97,7 +84,7 @@ const AnalyzeRecordings = () => {
     const audioPlayerRef = useRef<AudioPlayerRef>(null);
     
     const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [currentFilters, setCurrentFilters] = useState({
+    const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({
       start_date: moment().subtract(1, 'day').startOf('day').format('YYYY-MM-DD hh:mm:ss A'),
       end_date: moment().endOf('day').format('YYYY-MM-DD hh:mm:ss A'),
     });
@@ -164,62 +151,18 @@ const AnalyzeRecordings = () => {
             animationDuration: 1000,
             fontStyle: 'style-2'
         },
-        {
-            id: 'avg-ring-time',
-            title: 'Avg Ring Time',
-            value: generalStats.totalAvgRingTime,
-            description: 'Avg ring time in the system',
-            delay: 1.1,
-            showAnimatedNumber: true,
-            animationDuration: 1000,
-            fontStyle: 'style-2',
-            valueType: 'seconds',
-        },
-        {
-            id: 'avg-duration',
-            title: 'Avg Duration',
-            value: generalStats.totalAvgDuration,
-            description: 'Avg duration in the system',
-            delay: 1.3,
-            showAnimatedNumber: true,
-            animationDuration: 1000,
-            fontStyle: 'style-2',
-            valueType: 'seconds',
-        },
-        {
-            id: 'avg-cost',
-            title: 'Avg Cost',
-            value: generalStats.totalAvgCost,
-            description: 'Avg cost in the system',
-            delay: 1.5,
-            showAnimatedNumber: true,
-            animationDuration: 1000,
-            fontStyle: 'style-2',
-            prefix: '$',
-        }
+        
     ];
 
     const [perPage, setPerPage] = useState(5);
     const [page, setPage] = useState(1);
 
-    const [showExtensionChart, setShowExtensionChart] = useState(true);
-    const [showDepartmentChart, setShowDepartmentChart] = useState(true);
-    const [showCountryChart, setShowCountryChart] = useState(true);
-
-    const [countryChartData, setCountryChartData] = useState<any[]>([]);
-    const [departmentChartData, setDepartmentChartData] = useState<any[]>([]);
-    const [extensionChartData, setExtensionChartData] = useState<any[]>([]);
-
     const [startDateTime, setStartDateTime] = useState<string>('');
     const [endDateTime, setEndDateTime] = useState<string>('');
-
-    // Direct filter states
-    const [selectedExtensions, setSelectedExtensions] = useState<string[]>([]);
-    const [selectedDirection, setSelectedDirection] = useState<string>('');
-    const [selectedStatus, setSelectedStatus] = useState<string>('');
-    const [dateRange, setDateRange] = useState({
-        start: moment().subtract(1, 'day').format('YYYY-MM-DD'),
-        end: moment().format('YYYY-MM-DD')
+    const [searchValue, setSearchValue] = useState<string>('');
+    const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>({
+        start_date: moment().subtract(1, 'day').startOf('day').format('YYYY-MM-DDTHH:mm'),
+        end_date: moment().endOf('day').format('YYYY-MM-DDTHH:mm'),
     });
 
     // Get hierarchy data for extensions
@@ -400,379 +343,9 @@ const AnalyzeRecordings = () => {
 
             setStartDateTime(dataFilters?.start_datetime);
             setEndDateTime(dataFilters?.end_datetime);
-
-            // Extract and map chart data
-            const chartExtension = responseData?.chart_data?.extension;
-            if(chartExtension){
-                setShowExtensionChart(true);
-                setExtensionChartData(chartExtension);
-                
-                // Map extension data to chart format
-                const extensionLabels = chartExtension.map((item: any) => item.label || 'Unknown');
-                const shortestData = chartExtension.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
-                const longestData = chartExtension.map((item: any) => item.longest ? parseInt(item.longest) : 0);
-                
-                setExtensionChart({
-                    series: [{
-                        name: 'Shortest',
-                        data: shortestData
-                    }, {
-                        name: 'Longest', 
-                        data: longestData
-                    }],
-                    options: {
-                        ...ExtensionChart.options,
-                        xaxis: {
-                            ...ExtensionChart.options.xaxis,
-                            categories: extensionLabels,
-                            labels: {
-                                show: true,
-                                formatter: function(value: string) {
-                                    const numValue = parseFloat(value);
-                                    return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                                },
-                                style: {
-                                    fontSize: '11px',
-                                    colors: '#666'
-                                }
-                            }
-                        },
-                        tooltip: {
-                            ...ExtensionChart.options.tooltip,
-                            y: {
-                                formatter: function(value: number) {
-                                    return formatSecondsToTime(value);
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-            
-            const chartDepartment = responseData?.chart_data?.department;
-            if(chartDepartment){
-                setShowDepartmentChart(true);
-                setDepartmentChartData(chartDepartment);
-                
-                // Map department data to chart format
-                const departmentLabels = chartDepartment.map((item: any) => item.label || 'Unknown');
-                const shortestData = chartDepartment.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
-                const longestData = chartDepartment.map((item: any) => item.longest ? parseInt(item.longest) : 0);
-                const averageData = chartDepartment.map((item: any) => item.average ? parseInt(item.average) : 0);
-                
-                setDepartmentChart({
-                    series: [{
-                        name: 'Shortest',
-                        data: shortestData
-                    }, {
-                        name: 'Average',
-                        data: averageData
-                    }, {
-                        name: 'Longest',
-                        data: longestData
-                    }],
-                    options: {
-                        ...DepartmentChart.options,
-                        xaxis: {
-                            ...DepartmentChart.options.xaxis,
-                            categories: departmentLabels as string[],
-                            labels: {
-                                show: true,
-                                formatter: function(value: string) {
-                                    const numValue = parseFloat(value);
-                                    return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                                },
-                                style: {
-                                    fontSize: '11px',
-                                    colors: '#666'
-                                }
-                            }
-                        },
-                        yaxis: {
-                            ...DepartmentChart.options.yaxis,
-                            show: true,
-                            labels: {
-                                show: true,
-                                style: {
-                                    fontSize: '11px',
-                                    colors: '#666'
-                                }
-                            }
-                        },
-                        chart: {
-                            ...DepartmentChart.options.chart
-                        },
-                        plotOptions: {
-                            bar: {
-                                borderRadius: 4,
-                                borderRadiusApplication: 'end',
-                                horizontal: true,
-                                columnHeight: '2px',
-                            }
-                        },
-                        dataLabels: {
-                            enabled: false,
-                        },
-                        tooltip: {
-                            y: {
-                                formatter: function(value: number) {
-                                    return formatSecondsToTime(value);
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-            
-            const chartCountry = responseData?.chart_data?.country;
-            if(chartCountry){
-                setShowCountryChart(true);
-                setCountryChartData(chartCountry);
-                
-                // Map country data to chart format
-                const countryLabels = chartCountry.map((item: any) => item.label || 'Unknown');
-                const shortestData = chartCountry.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
-                const longestData = chartCountry.map((item: any) => item.longest ? parseInt(item.longest) : 0);
-                const averageData = chartCountry.map((item: any) => item.average ? parseInt(item.average) : 0);
-                
-                setCountryChart({
-                    series: [
-                        {
-                            name: 'Shortest',
-                            data: shortestData
-                        },
-                        {
-                            name: 'Average',
-                            data: averageData
-                        },
-                        {
-                            name: 'Longest',
-                            data: longestData
-                        }
-                    ],
-                    options: {
-                        ...CountryChart.options,
-                        xaxis: {
-                            ...CountryChart.options.xaxis,
-                            categories: countryLabels,
-                            labels: {
-                                show: true,
-                                formatter: function(value: string) {
-                                    const numValue = parseFloat(value);
-                                    return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                                },
-                                style: {
-                                    fontSize: '11px',
-                                    colors: '#666'
-                                }
-                            }
-                        },
-                        tooltip: {
-                            y: {
-                                formatter: function(value: number) {
-                                    return formatSecondsToTime(value);
-                                }
-                            }
-                        }
-                    }
-                });
-            }
         }
     };
 
-    const [CountryChart, setCountryChart] = React.useState({
-        series: [{
-            name: '',
-            data: [] as number[]
-        }],
-        options: {
-            chart: {
-                type: 'bar' as const,
-                toolbar: {
-                    show: false
-                },
-            },
-            plotOptions: {
-                bar: {
-                    borderRadius: 4,
-                    borderRadiusApplication: 'end',
-                    horizontal: true,
-                    columnHeight: '2px',
-                }
-            },
-            legend: {
-                show: true,
-                position: 'bottom'
-            },
-            dataLabels: {
-                enabled: false
-            },
-            tooltip: {
-                y: {
-                    formatter: function(value: number) {
-                        return formatSecondsToTime(value);
-                    }
-                }
-            },
-            xaxis: {
-                categories: [] as string[],
-                labels: {
-                    show: true,
-                    formatter: function(value: string) {
-                        const numValue = parseFloat(value);
-                        return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                    },
-                    style: {
-                        fontSize: '11px',
-                        colors: '#666'
-                    }
-                }
-            },
-            yaxis: {
-                title: {
-                    text: '',
-                    style: {
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        color: '#263238',
-                        marginRight: '10px'
-                    }
-                }
-            }
-        },
-    }); 
-
-    const [DepartmentChart, setDepartmentChart] = React.useState({
-        series: [] as any[],
-        options: {
-            chart: {
-                type: 'bar',
-                toolbar: {
-                    show: false
-                }
-            },
-            plotOptions: {
-                bar: {
-                    borderRadius: 4,
-                    borderRadiusApplication: 'end',
-                    horizontal: true,
-                    columnHeight: '2px',
-                }
-            },
-            legend: {
-                show: true,
-                position: 'bottom'
-            },
-            dataLabels: {
-                enabled: false
-            },
-            tooltip: {
-                y: {
-                    formatter: function(value: number) {
-                        return formatSecondsToTime(value);
-                    }
-                }
-            },
-            xaxis: {
-                categories: [] as string[],
-                labels: {
-                    show: true,
-                    formatter: function(value: string) {
-                        const numValue = parseFloat(value);
-                        return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                    },
-                    style: {
-                        fontSize: '11px',
-                        colors: '#666'
-                    }
-                }
-            },
-            yaxis: {
-                show: true,
-                title: {
-                    text: 'Duration',
-                    style: {
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        color: '#263238',
-                        marginRight: '10px'
-                    }
-                },
-                labels: {
-                    show: true,
-                    style: {
-                        fontSize: '11px',
-                        colors: '#666'
-                    }
-                }
-            },
-            fill: {
-                opacity: 1
-            },
-        },
-    });  
-
-    const [ExtensionChart, setExtensionChart] = React.useState({
-        series: [] as any[],
-        options: {
-            chart: {
-                type: 'bar' as const,
-                toolbar: {
-                    show: false
-                }
-            },
-            plotOptions: {
-                bar: {
-                    horizontal: true,
-                    dataLabels: {
-                        show: true,
-                        position: 'top',
-                    },
-                }
-            },
-            dataLabels: {
-                enabled: false,
-            },
-            stroke: {
-                show: true,
-                width: 1,
-                colors: ['#fff']
-            },
-            tooltip: {
-                shared: false,
-                intersect: false,
-                y: {
-                    formatter: function(value: number) {
-                        return formatSecondsToTime(value);
-                    }
-                }
-            },
-            xaxis: {
-                categories: [] as string[],
-                labels: {
-                    show: true,
-                    formatter: function(value: string) {
-                        const numValue = parseFloat(value);
-                        return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                    },
-                    style: {
-                        fontSize: '11px',
-                        colors: '#666'
-                    }
-                }
-            },
-            yaxis: {
-                title: {
-                    text: '',
-                },
-            },
-            legend: {
-                position: 'bottom' as const,
-                horizontalAlign: 'center' as const,
-                offsetX: 40
-            }
-        },
-    });
 
     // Fetch table data function for call recordings
     const fetchTableData = useCallback(async (page = 1, perPage = 15, search = "") => {
@@ -809,63 +382,40 @@ const AnalyzeRecordings = () => {
         }
     }, [currentFilters]);
 
-    const handleFiltersChange = (filters: any) => {
-        setCurrentFilters(filters);
-        // Only refresh table data if filters actually changed
-        if (Object.keys(filters).length > 0) {
-        fetchTableData(1, 15, '');
-        }
-    };
-
-    // Handle direct filter changes
-    const handleDirectFilterChange = async () => {
+    const handleFiltersChange = async (filters: any) => {
         setFilterLoading(true);
         
         try {
-            const filters: any = {
-                start_date: `${dateRange.start} 00:00:00`,
-                end_date: `${dateRange.end} 23:59:59`
-            };
+            // Convert datetime-local format to API format
+            const apiFilters: any = {};
+            
+            if (filters.start_date) {
+                apiFilters.start_date = moment(filters.start_date).format('YYYY-MM-DD hh:mm:ss A');
+            }
+            if (filters.end_date) {
+                apiFilters.end_date = moment(filters.end_date).format('YYYY-MM-DD hh:mm:ss A');
+            }
+            
+            if (filters.extension_number && filters.extension_number.length > 0) {
+                apiFilters.extension_number = filters.extension_number;
+            }
+            if (filters.call_direction) {
+                apiFilters.call_direction = filters.call_direction;
+            }
+            if (filters.is_answered !== undefined && filters.is_answered !== '') {
+                apiFilters.is_answered = filters.is_answered;
+            }
 
-            // Add optional filters only if they have values
-            if (selectedExtensions.length > 0) {
-                filters.extension_number = selectedExtensions;
-            }
-            if (selectedDirection) {
-                filters.call_direction = selectedDirection;
-            }
-            if (selectedStatus) {
-                filters.is_answered = selectedStatus;
-            }
-
-            setCurrentFilters(filters);
-            await fetchTableData(1, 15, '');
+            setCurrentFilters(apiFilters);
+            setAppliedFilters(filters);
+            await fetchTableData(1, 15, searchValue);
+            await fetchGeneralStats();
         } catch (error) {
             console.error('Error applying filters:', error);
             toast.error('Failed to apply filters. Please try again.');
         } finally {
             setFilterLoading(false);
         }
-    };
-
-    // Handle individual filter changes
-    const handleExtensionChange = (extensions: string[]) => {
-        setSelectedExtensions(extensions);
-    };
-
-    const handleDirectionChange = (direction: string) => {
-        setSelectedDirection(direction);
-    };
-
-    const handleStatusChange = (status: string) => {
-        setSelectedStatus(status);
-    };
-
-    const handleDateRangeChange = (field: 'start' | 'end', value: string) => {
-        setDateRange(prev => ({
-            ...prev,
-            [field]: value
-        }));
     };
 
 
@@ -1065,14 +615,7 @@ const AnalyzeRecordings = () => {
                             <Col md={8} className="d-flex justify-content-end">
                                 <div className="action-buttons">
                                     <div className="d-flex align-items-center gap-2">
-                                        {showDateRange && (
-                                            <>
-                                                <p className="mb-0">
-                                                    Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
-                                                </p>
-                                                <i className="material-icons-two-tone" style={{cursor: 'pointer'}} onClick={() => refreshData()}>refresh</i>
-                                            </>
-                                        )}
+                                       
                                     </div>
                                 </div>
                             </Col>
@@ -1083,279 +626,158 @@ const AnalyzeRecordings = () => {
 
             <PageSummaryGrid cards={summaryCards} />
 
-            <Row>
-                {showCountryChart && (
-                    <Col md={4}>
-                        <div className="card">
-                            <div className="card-body">
-                                {countryChartData.length === 0 ? (
-                                    <EmptyState
-                                        title="No Calls by Country Data"
-                                        description="Chart data will appear here when available."
-                                        className="table-empty-state"
-                                    />
-                                ) : (
-                                    <>
-                                        <div className="d-flex justify-content-between align-items-center mb-3">
-                                            <h5 className="mb-0 app-title-heading">Calls by Country</h5>
-                                            <button 
-                                                className="btn btn-sm btn-light"
-                                                onClick={() => setShowCountryChartModal(true)}
-                                            >
-                                                <i className="material-icons-two-tone">open_in_full</i>
-                                            </button>
-                                        </div>
-                                        <ReactApexChart 
-                                            options={CountryChart.options as ApexOptions} 
-                                            series={CountryChart.series} 
-                                            type="bar" 
-                                            height={200} 
-                                        />
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </Col>
-                )}
+            <BarFilters
+                searchValue={searchValue}
+                onSearchChange={(value) => setSearchValue(value)}
+                onSearch={() => {
+                    handleFiltersChange({ ...appliedFilters, search: searchValue });
+                }}
+                leftContent={
+                    <>
+                        {showDateRange && (
+                            <>
+                                <p className="mb-0">
+                                    Date Range : <span className="status-badge primary">
+                                        {formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}
+                                    </span> to <span className="status-badge primary">
+                                        {formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}
+                                    </span>
+                                </p>
+                            </>
+                        )}
+                    </>
+                }
+                searchPlaceholder="Search call recordings..."
+                showSearch={false}
+                filters={appliedFilters}
+                onSubmit={() => {
+                    handleFiltersChange(appliedFilters);
+                }}
+                onReset={() => {
+                    const defaultFilters = {
+                        start_date: moment().subtract(1, 'day').startOf('day').format('YYYY-MM-DDTHH:mm'),
+                        end_date: moment().endOf('day').format('YYYY-MM-DDTHH:mm'),
+                    };
+                    setAppliedFilters(defaultFilters);
+                    handleFiltersChange(defaultFilters);
+                }}
+                filterContent={
+                    <>
+                        {/* Date Range */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Start Date & Time</Form.Label>
+                                <Form.Control
+                                    type="datetime-local"
+                                    value={(appliedFilters as any)?.start_date || ''}
+                                    max={moment().format('YYYY-MM-DDTHH:mm')}
+                                    onChange={(e) => {
+                                        const datetimeValue = e.target.value;
+                                        const endDate = (appliedFilters as any)?.end_date || '';
+                                        
+                                        let updatedFilters: any = {
+                                            ...appliedFilters,
+                                            start_date: datetimeValue
+                                        };
+                                        
+                                        if (datetimeValue && endDate && moment(datetimeValue).isAfter(moment(endDate))) {
+                                            updatedFilters.end_date = datetimeValue;
+                                        }
+                                        
+                                        setAppliedFilters(updatedFilters);
+                                    }}
+                                />
+                            </Form.Group>
+                        </Col>
 
-                {showDepartmentChart && (
-                    <Col md={4}>
-                        <div className="card">
-                            <div className="card-body">
-                                {departmentChartData.length === 0 ? (
-                                    <EmptyState
-                                        title="No Calls by Department Data"
-                                        description="Chart data will appear here when available."
-                                        className="table-empty-state"
-                                    />
-                                ) : (
-                                    <>
-                                        <div className="d-flex justify-content-between align-items-center mb-3">
-                                            <h5 className="mb-0 app-title-heading">Call by Department</h5>
-                                            <button 
-                                                className="btn btn-sm btn-light"
-                                                onClick={() => setShowDepartmentChartModal(true)}
-                                            >
-                                                <i className="material-icons-two-tone">open_in_full</i>
-                                            </button>
-                                        </div>
-                                        <ReactApexChart 
-                                            options={DepartmentChart.options as ApexOptions} 
-                                            series={DepartmentChart.series} 
-                                            type="bar" 
-                                            height={200} 
-                                        />
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </Col>
-                )}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>End Date & Time</Form.Label>
+                                <Form.Control
+                                    type="datetime-local"
+                                    value={(appliedFilters as any)?.end_date || ''}
+                                    min={(appliedFilters as any)?.start_date || ''}
+                                    max={moment().format('YYYY-MM-DDTHH:mm')}
+                                    onChange={(e) => {
+                                        const datetimeValue = e.target.value;
+                                        const startDate = (appliedFilters as any)?.start_date || '';
+                                        
+                                        let updatedFilters: any = {
+                                            ...appliedFilters,
+                                            end_date: datetimeValue
+                                        };
+                                        
+                                        if (datetimeValue && startDate && moment(datetimeValue).isBefore(moment(startDate))) {
+                                            updatedFilters.start_date = datetimeValue;
+                                        }
+                                        
+                                        setAppliedFilters(updatedFilters);
+                                    }}
+                                />
+                            </Form.Group>
+                        </Col>
 
-                {showExtensionChart && (
-                    <Col md={4}>
-                        <div className="card">
-                            <div className="card-body">
-                                {extensionChartData.length === 0 ? (
-                                    <EmptyState
-                                        title="No Calls by Extension Data"
-                                        description="Chart data will appear here when available."
-                                        className="table-empty-state"
-                                    />
-                                ) : (
-                                    <>
-                                        <div className="d-flex justify-content-between align-items-center mb-3">
-                                            <h5 className="mb-0 app-title-heading">Call by Extension</h5>
-                                            <button 
-                                                className="btn btn-sm btn-light"
-                                                onClick={() => setShowExtensionChartModal(true)}
-                                            >
-                                                <i className="material-icons-two-tone">open_in_full</i>
-                                            </button>
-                                        </div>
-                                        <ReactApexChart 
-                                            options={ExtensionChart.options} 
-                                            series={ExtensionChart.series} 
-                                            type="bar" 
-                                            height={200} 
-                                        />
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </Col>
-                )}
-            </Row>
+                        {/* Extension */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Extension</Form.Label>
+                                <SelectBox
+                                    isMulti
+                                    isSearchable={true}
+                                    isDisabled={hierarchyLoading}
+                                    value={(appliedFilters as any)?.extension_number?.length > 0 ? (appliedFilters as any)?.extension_number : null}
+                                    onChange={(value) => {
+                                        setAppliedFilters({ ...appliedFilters, extension_number: value ? (value as string[]) : [] });
+                                    }}
+                                    options={(hierarchyDataExtensions as any)?.map((ext: any) => ({
+                                        value: ext.id,
+                                        label: ext.name
+                                    })) || []}
+                                    placeholder="Select extensions"
+                                />
+                            </Form.Group>
+                        </Col>
 
-            {/* Direct Filters Section */}
-            <Row className="mb-3">
-                <Col md={12}>
-                    <div className="card">
-                        <div className="card-body">
-                            <h5 className="mb-3 app-title-heading">Filters</h5>
-                            <Row className="g-3">
-                                {/* Date Range */}
-                                <Col md={3}>
-                                    <Form.Group>
-                                        <Form.Label>Start Date</Form.Label>
-                                        <Form.Control
-                                            type="date"
-                                            value={dateRange.start}
-                                            onChange={(e) => handleDateRangeChange('start', e.target.value)}
-                                        />
-                                    </Form.Group>
-                                </Col>
-                                <Col md={3}>
-                                    <Form.Group>
-                                        <Form.Label>End Date</Form.Label>
-                                        <Form.Control
-                                            type="date"
-                                            value={dateRange.end}
-                                            onChange={(e) => handleDateRangeChange('end', e.target.value)}
-                                        />
-                                    </Form.Group>
-                                </Col>
+                        {/* Call Direction */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Call Direction</Form.Label>
+                                <SelectBox
+                                    isSearchable={false}
+                                    value={(appliedFilters as any)?.call_direction || null}
+                                    onChange={(value) => {
+                                        setAppliedFilters({ ...appliedFilters, call_direction: value as string || '' });
+                                    }}
+                                    options={[
+                                        { value: 'OUTGOING', label: 'Outgoing' },
+                                        { value: 'INCOMING', label: 'Incoming' }
+                                    ]}
+                                    placeholder="Select call direction"
+                                />
+                            </Form.Group>
+                        </Col>
 
-                                {/* Extensions */}
-                                <Col md={3}>
-                                    <Form.Group>
-                                        <Form.Label>Extensions</Form.Label>
-                                        <CreatableSelect
-                                            isMulti
-                                            onChange={(selected) => {
-                                                const values = (selected || []).map((opt: any) => opt.value);
-                                                handleExtensionChange(values);
-                                            }}
-                                            value={selectedExtensions.map(ext => ({ value: ext, label: ext }))}
-                                            placeholder="Select extensions..."
-                                            options={hierarchyDataExtensions?.map((ext: any) => ({
-                                                value: ext.id,
-                                                label: ext.name
-                                            })) || []}
-                                            styles={{
-                                                control: (base, state) => ({
-                                                    ...base,
-                                                    borderColor: state.isFocused ? '#80bdff' : '#ced4da',
-                                                    boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(0, 123, 255, 0.25)' : 'none',
-                                                    fontSize: '14px',
-                                                    fontWeight: 'normal',
-                                                    minHeight: '38px',
-                                                    height: '48px',
-                                                    border: '1px solid #ced4da',
-                                                    borderRadius: '0.375rem',
-                                                    '&:hover': {
-                                                        borderColor: '#ced4da'
-                                                    }
-                                                }),
-                                                valueContainer: (base) => ({
-                                                    ...base,
-                                                    padding: '2px 8px',
-                                                    height: '34px',
-                                                    alignItems: 'center'
-                                                }),
-                                                input: (base) => ({
-                                                    ...base,
-                                                    margin: '0px',
-                                                    padding: '0px',
-                                                    height: '30px'
-                                                }),
-                                                multiValue: (base) => ({
-                                                    ...base,
-                                                    fontSize: '12px',
-                                                    backgroundColor: '#e9ecef',
-                                                    borderRadius: '0.25rem',
-                                                    margin: '1px'
-                                                }),
-                                                multiValueLabel: (base) => ({
-                                                    ...base,
-                                                    fontSize: '12px',
-                                                    padding: '2px 6px'
-                                                }),
-                                                multiValueRemove: (base) => ({
-                                                    ...base,
-                                                    fontSize: '12px',
-                                                    padding: '2px 4px'
-                                                }),
-                                                placeholder: (base) => ({
-                                                    ...base,
-                                                    fontSize: '14px',
-                                                    color: '#6c757d'
-                                                }),
-                                                dropdownIndicator: (base) => ({
-                                                    ...base,
-                                                    padding: '8px'
-                                                }),
-                                                clearIndicator: (base) => ({
-                                                    ...base,
-                                                    padding: '8px'
-                                                }),
-                                                menu: (base) => ({
-                                                    ...base,
-                                                    fontSize: '14px'
-                                                }),
-                                                option: (base) => ({
-                                                    ...base,
-                                                    fontSize: '14px',
-                                                    padding: '8px 12px'
-                                                })
-                                            }}
-                                        />
-                                    </Form.Group>
-                                </Col>
-
-                                {/* Call Direction */}
-                                <Col md={3}>
-                                    <Form.Group>
-                                        <Form.Label>Call Direction</Form.Label>
-                                        <Form.Select
-                                            value={selectedDirection}
-                                            onChange={(e) => handleDirectionChange(e.target.value)}
-                                        >
-                                            <option value="">All</option>
-                                            <option value="INCOMING">Incoming</option>
-                                            <option value="OUTGOING">Outgoing</option>
-                                        </Form.Select>
-                                    </Form.Group>
-                                </Col>
-
-                                {/* Call Status */}
-                                <Col md={3}>
-                                    <Form.Group>
-                                        <Form.Label>Call Status</Form.Label>
-                                        <Form.Select
-                                            value={selectedStatus}
-                                            onChange={(e) => handleStatusChange(e.target.value)}
-                                        >
-                                            <option value="">All</option>
-                                            <option value="true">Answered</option>
-                                            <option value="false">Not Answered</option>
-                                        </Form.Select>
-                                    </Form.Group>
-                                </Col>
-
-                                {/* Apply Button */}
-                                <Col md={3} className="d-flex align-items-end">
-                                    <Button 
-                                        variant="primary" 
-                                        onClick={handleDirectFilterChange}
-                                        className="w-100"
-                                        disabled={filterLoading}
-                                    >
-                                        {filterLoading ? (
-                                            <>
-                                                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                                Loading...
-                                            </>
-                                        ) : (
-                                            'Apply Filters'
-                                        )}
-                                    </Button>
-                                </Col>
-                            </Row>
-                        </div>
-                    </div>
-                </Col>
-            </Row>
+                        {/* Call Status */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Call Status</Form.Label>
+                                <SelectBox
+                                    isSearchable={false}
+                                    value={(appliedFilters as any)?.is_answered !== undefined && (appliedFilters as any)?.is_answered !== '' ? (appliedFilters as any)?.is_answered : null}
+                                    onChange={(value) => {
+                                        setAppliedFilters({ ...appliedFilters, is_answered: value as string || '' });
+                                    }}
+                                    options={[
+                                        { value: 'true', label: 'Answered' },
+                                        { value: 'false', label: 'Not Answered' }
+                                    ]}
+                                    placeholder="Select call status"
+                                />
+                            </Form.Group>
+                        </Col>
+                    </>
+                }
+            />
 
             {/* Data Table */}
             {session?.user?.permissions?.includes('transcriptions-analysis-aiml') && (
@@ -1371,102 +793,6 @@ const AnalyzeRecordings = () => {
                                     tableStyle='table-style-2'
                                 />
                             )}
-
-            {/* Country Chart Modal */}
-            <Modal 
-                show={showCountryChartModal} 
-                onHide={() => setShowCountryChartModal(false)}
-                size="xl"
-                centered
-                className="chart-modal"
-            >
-                <Modal.Header closeButton>
-                    <Modal.Title>Calls by Country</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <div className="chart-container" style={{ minHeight: '500px' }}>
-                        <ReactApexChart 
-                            options={{
-                                ...CountryChart.options as ApexOptions,
-                                chart: {
-                                    ...CountryChart.options.chart,
-                                    height: 500,
-                                    toolbar: {
-                                        show: true
-                                    }
-                                }
-                            }} 
-                            series={CountryChart.series} 
-                            type="bar" 
-                            height={500} 
-                        />
-                    </div>
-                </Modal.Body>
-            </Modal>
-
-            {/* Department Chart Modal */}
-            <Modal 
-                show={showDepartmentChartModal} 
-                onHide={() => setShowDepartmentChartModal(false)}
-                size="xl"
-                centered
-                className="chart-modal"
-            >
-                <Modal.Header closeButton>
-                    <Modal.Title>Calls by Department</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <div className="chart-container" style={{ minHeight: '500px' }}>
-                        <ReactApexChart 
-                            options={{
-                                ...DepartmentChart.options as ApexOptions,
-                                chart: {
-                                    ...DepartmentChart.options.chart as ApexChart,
-                                    height: 500,
-                                    toolbar: {
-                                        show: true
-                                    }
-                                }
-                            }} 
-                            series={DepartmentChart.series} 
-                            type="bar" 
-                            height={500} 
-                        />
-                    </div>
-                </Modal.Body>
-            </Modal>
-
-            {/* Extension Chart Modal */}
-            <Modal 
-                show={showExtensionChartModal} 
-                onHide={() => setShowExtensionChartModal(false)}
-                size="xl"
-                centered
-                className="chart-modal"
-            >
-                <Modal.Header closeButton>
-                    <Modal.Title>Calls by Extension</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <div className="chart-container" style={{ minHeight: '500px' }}>
-                        <ReactApexChart 
-                            options={{
-                                ...ExtensionChart.options,
-                                chart: {
-                                    ...ExtensionChart.options.chart as ApexChart,
-                                    height: 500,
-                                    toolbar: {
-                                        show: true
-                                    }
-                                }
-                            }} 
-                            series={ExtensionChart.series} 
-                            type="bar" 
-                            height={500} 
-                        />
-                    </div>
-                </Modal.Body>
-            </Modal>
 
             {/* Media Player Modal */}
             <Modal

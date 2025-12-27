@@ -395,24 +395,24 @@ const Layout = ({ children }: LayoutProps) => {
 	// Handle attend call
 	const handleAttendCall = async () => {
 		if (!hasPermission("dial-call-cti")) {
-			toast.error("You do not have permission to answer calls");
+			//toast.error("You do not have permission to answer calls");
 			return;
 		}
 
 		if (!incomingCall) {
-			toast.error("No incoming call to attend");
+			//toast.error("No incoming call to attend");
 			return;
 		}
 
 		const userDeviceInfo = dnsMap?.[userAddress || ''];
 		if (!userDeviceInfo || !userDeviceInfo.devices) {
-			toast.error("No device information available");
+			//toast.error("No device information available");
 			return;
 		}
 
 		const userDevices = Object.values(userDeviceInfo.devices);
 		if (userDevices.length === 0) {
-			toast.error("No devices available");
+			//toast.error("No devices available");
 			return;
 		}
 
@@ -443,10 +443,10 @@ const Layout = ({ children }: LayoutProps) => {
 				setIncomingCall(null);
 				//toast.success("Call attended successfully");
 			} else {
-				toast.error(result.error || "Failed to attend call");
+				//toast.error(result.error || "Failed to attend call");
 			}
 		} catch (error) {
-			toast.error("Failed to attend call");
+			//toast.error("Failed to attend call");
 		} finally {
 			setIsDialing(false);
 		}
@@ -456,7 +456,7 @@ const Layout = ({ children }: LayoutProps) => {
 	const handleRejectCall = () => {
 		setShowIncomingCallModal(false);
 		setIncomingCall(null);
-		toast.info("Call rejected");
+		//toast.info("Call rejected");
 	};
 
 	// Dialer handlers
@@ -466,14 +466,14 @@ const Layout = ({ children }: LayoutProps) => {
 
 	const handleDial = async (numberToDial: string = dialedNumber) => {
 		if (!numberToDial.trim()) {
-			toast.error("Please enter a number to dial");
+			//toast.error("Please enter a number to dial");
 			return;
 		}
 
 		// Check if user has multiple devices
 		const userDevices = getAllUserDevices();
 		if (!userDevices) {
-			toast.error("No calling device information available");
+			//toast.error("No calling device information available");
 			return;
 		}
 
@@ -499,10 +499,10 @@ const Layout = ({ children }: LayoutProps) => {
 				setDialedNumber("");
 				closeDialer();
 			} else {
-				toast.error(result.error || "Failed to make call");
+				//toast.error(result.error || "Failed to make call");
 			}
 		} catch (error) {
-			toast.error("Failed to make call");
+			//toast.error("Failed to make call");
 		} finally {
 			setIsDialing(false);
 		}
@@ -542,14 +542,14 @@ const Layout = ({ children }: LayoutProps) => {
 			});
 
 			if (result.success) {
-				toast.success(`Calling ${numberToDial}...`);
+				//toast.success(`Calling ${numberToDial}...`);
 				setDialedNumber("");
 				closeDialer();
 			} else {
-				toast.error(result.error || "Failed to make call");
+				//toast.error(result.error || "Failed to make call");
 			}
 		} catch (error) {
-			toast.error("Failed to make call");
+			//toast.error("Failed to make call");
 		} finally {
 			setIsDialing(false);
 		}

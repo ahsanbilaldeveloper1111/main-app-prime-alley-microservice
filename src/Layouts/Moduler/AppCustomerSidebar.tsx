@@ -44,7 +44,8 @@ import {
   Inbox,
   Wifi,
   ClipboardCheck,
-  ClipboardList
+  ClipboardList,
+  MonitorCheck
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -179,7 +180,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'live-calls',
       key: 'live-calls',
       permission: PERMISSIONS.VIEW_CTI,
-      icon: <PhoneCall size={20} />,
+      icon: <MonitorCheck size={20} />,
       color: MENU_COLORS.LIVE_CALLS,
       title: "Live Wallboards",
       label: "Live Wallboards",
