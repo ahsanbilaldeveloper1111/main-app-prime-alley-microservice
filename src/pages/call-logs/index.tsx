@@ -1,5 +1,5 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useCallback } from 'react';
+import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
@@ -22,8 +22,7 @@ import PageLoader from '@components/PageLoader';
 
 import '@assets/scss/common.scss';
 
-import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat,formatDateTimeToLocal, GlobalDateTimeFormat, getAutoTimezone } from '@utils/Helper';
-import { ModuleSlug } from '@utils/Helper';
+import { convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat, formatDateTimeToLocal, GlobalDateTimeFormat, ModuleSlug } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import BarFilters from '@components/BarFilters';
 import SelectBox from '@components/SelectBox';
@@ -81,10 +80,37 @@ const CallLogs = () => {
     ];
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [currentFilters, setCurrentFilters] = useState({});
-    const [pendingFilters, setPendingFilters] = useState({});
+    
+    // Initialize filters with default values immediately to prevent first API call without dates
+    const getDefaultFilters = () => {
+        const now = moment();
+        const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
+        const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
+        const startDateApi = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+        const endDateApi = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+        return {
+            pending: {
+                start_datetime: startDateInput,
+                end_datetime: endDateInput
+            },
+            current: {
+                start_datetime: startDateApi,
+                end_datetime: endDateApi
+            }
+        };
+    };
+    
+    const defaultFilters = getDefaultFilters();
+    const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(defaultFilters.current);
+    const [pendingFilters, setPendingFilters] = useState<Record<string, any>>(defaultFilters.pending);
     const [searchValue, setSearchValue] = useState<string>('');
-    const [currentTimezone, setCurrentTimezone] = useState<string>('');
+    
+    // Refs to prevent duplicate API calls
+    const currentFiltersRef = useRef<Record<string, any>>(defaultFilters.current);
+    const isFetchingRef = useRef(false);
+    const lastFetchTimeRef = useRef(0);
+    const lastFetchParamsRef = useRef<string>('');
+    
     const [summary, setSummary] = useState<Summary>({
         users: 0,
         extensions: 0,
@@ -94,7 +120,6 @@ const CallLogs = () => {
 
     const {
         hierarchyDataUsers,
-        hierarchyDataDepartments,
         hierarchyDataExtensions,
         loading: hierarchyLoading
     } = useHierarchyData(ModuleSlug.CALL_LOGS);
@@ -102,37 +127,6 @@ const CallLogs = () => {
     useEffect(() => {
         setTotalUsers(hierarchyDataUsers.length);
     }, [hierarchyDataUsers]);
-
-    // Get current timezone on component mount and set default date values
-    useEffect(() => {
-        const timezone = getAutoTimezone();
-        setCurrentTimezone(timezone);
-        
-        // Set default start_datetime (today 00:00) and end_datetime (today 23:59)
-        // Format for datetime-local input (YYYY-MM-DDTHH:mm)
-        const now = moment();
-        const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
-        const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
-        
-        // Format for API (UTC format)
-        const startDateApi = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        const endDateApi = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        
-        // Set default filters for input (without timezone key)
-        const defaultPendingFilters = {
-            start_datetime: startDateInput,
-            end_datetime: endDateInput
-        };
-        
-        // Set applied filters with API format (with timezone offset in datetime, no timezone key)
-        const defaultCurrentFilters = {
-            start_datetime: startDateApi,
-            end_datetime: endDateApi
-        };
-        
-        setPendingFilters(defaultPendingFilters);
-        setCurrentFilters(defaultCurrentFilters);
-    }, []);
 
     // Create cards data for PageSummaryGrid
     const summaryCards: SummaryCard[] = [
@@ -179,28 +173,52 @@ const CallLogs = () => {
     ];
     
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
-        setShowPageLoader(true);
-        const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, moduleSlug: ModuleSlug.CALL_LOGS }, 'call-logs/list');
-        setShowPageLoader(false);
-        //console.log(response);
-        if(response?.summary){
-
-            setShowDateRange(true);
-            const dataFilters = response?.filters;
-            setStartDateTime(dataFilters?.start_datetime);
-            setEndDateTime(dataFilters?.end_datetime);
-
-            setSummary(response.summary);
-            //console.log(summary);
+        // Prevent duplicate calls
+        const now = Date.now();
+        const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(currentFiltersRef.current)}`;
+        
+        // Skip if already fetching with same params within 500ms
+        if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
+            return;
         }
         
-        return response;
-    }, [currentFilters]);
+        // Skip if same params were fetched recently (within 100ms)
+        if (lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 100) {
+            return;
+        }
+        
+        isFetchingRef.current = true;
+        lastFetchTimeRef.current = now;
+        lastFetchParamsRef.current = paramsKey;
+        
+        setShowPageLoader(true);
+        try {
+            const response = await ListCallLogs({ 
+                page, 
+                perPage, 
+                search, 
+                filters: currentFiltersRef.current, 
+                moduleSlug: ModuleSlug.CALL_LOGS 
+            }, 'call-logs/list');
+            
+            if(response?.summary){
+                setShowDateRange(true);
+                const dataFilters = response?.filters;
+                setStartDateTime(dataFilters?.start_datetime);
+                setEndDateTime(dataFilters?.end_datetime);
+                setSummary(response.summary);
+            }
+            
+            return response;
+        } finally {
+            setShowPageLoader(false);
+            isFetchingRef.current = false;
+        }
+    }, []);
 
     const handleFiltersChange = (filters: any) => {
         // Format datetime values to include seconds and timezone offset (remove timezone key)
         const formattedFilters: any = { ...filters };
-        const timezone = currentTimezone || getAutoTimezone();
         
         if (formattedFilters.start_datetime) {
             // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
@@ -242,7 +260,10 @@ const CallLogs = () => {
         // Remove timezone key from payload (timezone is now included in datetime values)
         delete formattedFilters.timezone;
         
+        // Update both state and ref immediately
         setCurrentFilters(formattedFilters);
+        currentFiltersRef.current = formattedFilters;
+        
         // Trigger refresh for GenericListPage to fetch new data
         setRefreshKey((prev) => prev + 1);
     };
@@ -341,10 +362,20 @@ const CallLogs = () => {
                     handleFiltersChange(pendingFilters);
                 }}
                 onReset={() => {
-                    setPendingFilters({});
-                    setCurrentFilters({});
+                    // Preserve current date filters, clear all other filters
+                    const resetPendingFilters: Record<string, any> = {
+                        start_datetime: (pendingFilters as any)?.start_datetime || defaultFilters.pending.start_datetime,
+                        end_datetime: (pendingFilters as any)?.end_datetime || defaultFilters.pending.end_datetime,
+                    };
+                    const resetCurrentFilters: Record<string, any> = {
+                        start_datetime: (currentFilters as any)?.start_datetime || defaultFilters.current.start_datetime,
+                        end_datetime: (currentFilters as any)?.end_datetime || defaultFilters.current.end_datetime,
+                    };
+                    setPendingFilters(resetPendingFilters);
+                    setCurrentFilters(resetCurrentFilters);
+                    currentFiltersRef.current = resetCurrentFilters;
                     setSearchValue('');
-                    handleFiltersChange({});
+                    handleFiltersChange(resetPendingFilters);
                 }}
                 filterContent={
                     <>
@@ -397,7 +428,7 @@ const CallLogs = () => {
                                     placeholder="Enter called numbers (comma separated)"
                                     value={((pendingFilters as any)?.called_numbers || []).join(', ')}
                                     onChange={(e) => {
-                                        const values = e.target.value.split(',').map(v => v.trim()).filter(v => v);
+                                        const values = e.target.value.split(',').map(v => v.trim()).filter(Boolean);
                                         setPendingFilters({ ...pendingFilters, called_numbers: values });
                                     }}
                                 />

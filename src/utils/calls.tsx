@@ -217,3 +217,13 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
     throw error;
   }
 };
+
+export const GetTranscriptionOverview = async () => {
+  try {
+      
+    return await axiosInstance.get(`call-logs/analytics/dashboard-overview`);
+    
+  } catch (error) {
+    throw error;
+  }
+};

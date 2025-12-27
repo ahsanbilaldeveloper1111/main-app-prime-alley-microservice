@@ -198,8 +198,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
             />
 
             <Row className="mt-3">
-                <UserGrowthChart chartData={growthChart} />
-                <DepartmentDistributionChart chartData={departmentChart} />
+                {/* <UserGrowthChart chartData={growthChart} />
+                <DepartmentDistributionChart chartData={departmentChart} /> */}
                 <RecentActivities />
             </Row>
         </>

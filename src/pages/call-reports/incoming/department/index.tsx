@@ -775,7 +775,7 @@ const CallIncomingDepartment = () => {
                                     series={simpleDonut.series} 
                                     labels={simpleDonut.labels}
                                     dataType="calls"
-                                    height={250}
+                                    height={200}
                                     width={500}
                                     showDataLabels={true}
                                     dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}

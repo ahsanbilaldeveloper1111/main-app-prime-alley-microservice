@@ -1,11 +1,11 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useCallback } from 'react';
+import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { ListCallLogs, ExportCallLogs, DownloadStreamingExport } from '@utils/calls';
 import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row, Tab, Tabs, Form } from 'react-bootstrap';
+import { Modal, Row, Tab, Tabs, Form } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
@@ -26,7 +26,7 @@ import '@assets/scss/tabs.scss';
 import { motion, AnimatePresence } from "framer-motion";
 import { easeInOut, easeOut, easeIn } from "framer-motion";
 import moment from 'moment';
-import { formatCurrency, GlobalDateTimeFormat, formatDateTimeToLocal, ModuleSlug, getAutoTimezone } from '@utils/Helper';
+import { formatCurrency, GlobalDateTimeFormat, formatDateTimeToLocal, ModuleSlug } from '@utils/Helper';
 import { formatMinutesAndSeconds } from '@utils/Helper';
 
 import "@assets/scss/common.scss";
@@ -74,20 +74,44 @@ const CallStatsCountry = () => {
 
 
 
+  // Initialize filters with default values immediately to prevent first API call without dates
+  const getDefaultFilters = () => {
+    const now = moment();
+    const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
+    const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
+    const startDateUTC = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+    const endDateUTC = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+    return {
+      pending: {
+        start_datetime: startDateInput,
+        end_datetime: endDateInput,
+        is_incoming_only: 'false'
+      },
+      current: {
+        start_datetime: startDateUTC,
+        end_datetime: endDateUTC,
+        is_incoming_only: 'false'
+      }
+    };
+  };
+  
+  const defaultFilters = getDefaultFilters();
+  
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('calls_chart');
-  const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({
-    is_incoming_only: 'false'
-  });
-  const [pendingFilters, setPendingFilters] = useState({});
+  const [refreshKey, setRefreshKey] = useState<number>(1); // Start at 1 to ensure initial fetch
+  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(defaultFilters.current);
+  const [pendingFilters, setPendingFilters] = useState<Record<string, any>>(defaultFilters.pending);
   const [dataLoaded, setDataLoaded] = useState(false);
-  const [filtersReady, setFiltersReady] = useState(false);
-  const [currentTimezone, setCurrentTimezone] = useState<string>('');
+  const filtersReady = true; // Always ready since filters are initialized immediately
+  
+  // Refs to prevent duplicate API calls
+  const currentFiltersRef = useRef<Record<string, any>>(defaultFilters.current);
+  const isFetchingRef = useRef(false);
+  const lastFetchTimeRef = useRef(0);
+  const lastFetchParamsRef = useRef<string>('');
   
   const {
-    hierarchyDataUsers,
-    hierarchyDataDepartments,
     hierarchyDataExtensions,
     loading: hierarchyLoading
   } = useHierarchyData(ModuleSlug.CALL_REPORTS);
@@ -138,10 +162,23 @@ const CallStatsCountry = () => {
 
   const [showPageLoader, setShowPageLoader] = useState(false);
   const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
+    // Prevent duplicate calls - but always allow the first call
+    const now = Date.now();
+    const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(currentFiltersRef.current)}`;
     
-    if (!filtersReady) {
+    // Skip if already fetching with same params within 500ms
+    if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
       return;
     }
+    
+    // Skip if same params were fetched recently (within 100ms) - but allow first call (when lastFetchParamsRef is empty string)
+    if (lastFetchParamsRef.current !== '' && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 100) {
+      return;
+    }
+    
+    isFetchingRef.current = true;
+    lastFetchTimeRef.current = now;
+    lastFetchParamsRef.current = paramsKey;
     
     setLoading(true);
     setShowPageLoader(true);
@@ -151,12 +188,10 @@ const CallStatsCountry = () => {
         page, 
         perPage, 
         search, 
-        filters: currentFilters, 
+        filters: currentFiltersRef.current, 
         reportType: 'statsCountry',
         moduleSlug: ModuleSlug.CALL_REPORTS
-      }, 'call-logs/statsByCountry').finally(() => {
-        setShowPageLoader(false);
-      });
+      }, 'call-logs/statsByCountry');
       
       if (response?.summary) {
 
@@ -174,14 +209,16 @@ const CallStatsCountry = () => {
       
       setLoading(false);
       return response;
-    } catch (error: unknown) {
-      console.error('Error fetching call logs:', error);
+    } catch {
       setLoading(false);
       setDataLoaded(true);
       toast.error('Failed to fetch call data');
       return null;
+    } finally {
+      setShowPageLoader(false);
+      isFetchingRef.current = false;
     }
-  }, [currentFilters, filtersReady]);
+  }, []);
 
   const handleExport = async (exportType: string, filters: Record<string, any>) => {
     try {
@@ -193,7 +230,6 @@ const CallStatsCountry = () => {
         );
       }
     } catch (error: unknown) {
-      console.error('Export error:', error);
       toast.error('Export failed');
     }
   };
@@ -245,11 +281,9 @@ const CallStatsCountry = () => {
     const isCompletelyCleared = Object.keys(formattedFilters).length === 0 || 
       (Object.keys(formattedFilters).length === 1 && formattedFilters.hasOwnProperty('is_incoming_only'));
     
+    // Update both state and ref immediately
     setCurrentFilters(formattedFilters);
-    
-    if (!filtersReady) {
-      setFiltersReady(true);
-    }
+    currentFiltersRef.current = formattedFilters;
     
     if ((filtersChanged && filtersReady) || isCompletelyCleared) {
       // Reset chart filters ref to allow chart refetch
@@ -258,16 +292,18 @@ const CallStatsCountry = () => {
     }
   };
 
+  // Ensure initial fetch happens when session is ready
   useEffect(() => {
-    if (filtersReady && session && !initialFetchDone.current) {
+    if (session && session.user?.permissions?.includes('list-call-logs')) {
       initialFetchDone.current = true;
-      fetchCallLogs(1, 15, "");
+      // Ensure refreshKey triggers GenericListPage to fetch
+      // GenericListPage will call fetchCallLogs when it mounts with filters and refreshKey
     }
-  }, [filtersReady, session]);
+  }, [session]);
   
   // Separate useEffect for chart data when filters change
   useEffect(() => {
-    if (filtersReady && session && initialFetchDone.current) {
+    if (session && initialFetchDone.current) {
       // Check if filters have actually changed
       const currentFiltersString = JSON.stringify(currentFilters);
       const filtersChanged = lastChartFilters.current !== currentFiltersString;
@@ -399,48 +435,6 @@ const CallStatsCountry = () => {
     }
   }, [currentFilters, filtersReady, session]);
 
-  // Get current timezone on component mount and set default date values
-  useEffect(() => {
-    const timezone = getAutoTimezone();
-    setCurrentTimezone(timezone);
-    
-    // Set default start_datetime (today 00:00) and end_datetime (today 23:59)
-    // Format for datetime-local input (YYYY-MM-DDTHH:mm) in local timezone
-    const now = moment();
-    const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
-    const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
-    
-    // Set default filters for input (local timezone)
-    const defaultPendingFilters = {
-      start_datetime: startDateInput,
-      end_datetime: endDateInput,
-      is_incoming_only: 'false'
-    };
-    
-    // Set applied filters with UTC format for API
-    const startDateUTC = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-    const endDateUTC = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-    
-    const defaultCurrentFilters = {
-      start_datetime: startDateUTC,
-      end_datetime: endDateUTC,
-      is_incoming_only: 'false'
-    };
-    
-    setPendingFilters(defaultPendingFilters);
-    setCurrentFilters(defaultCurrentFilters);
-  }, []);
-
-  // Fallback: if filters haven't been marked as ready after 1 second
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!filtersReady) {
-        setFiltersReady(true);
-      }
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, [filtersReady]);
 
   const [simpleDonut, setSimpleDonut] = useState<{ series: number[]; labels: string[] } | null>(null);
   const [chartCalls, setChartCalls] = useState<{ series: any[]; categories: string[] } | null>(null);
@@ -620,7 +614,7 @@ const CallStatsCountry = () => {
                     series={simpleDonut.series} 
                     labels={simpleDonut.labels}
                     dataType="calls"
-                    height={250}
+                    height={200}
                     width={500}
                     showDataLabels={true}
                     dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
@@ -838,39 +832,6 @@ const CallStatsCountry = () => {
 
       {session?.user?.permissions?.includes('list-call-logs') && (
         <>
-          {!dataLoaded ? (
-            <Row>
-              <Col md={12}>
-                <div className="card report-shadow">
-                  <div className="card-body">
-                    <h5 className="card-title">Call Logs</h5>
-                    <div className="d-flex align-items-center justify-content-center" style={{ height: '200px' }}>
-                      <div className="spinner-border text-primary" role="status">
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                      <span className="ms-2">Loading call logs...</span>
-                    </div>
-                  </div>
-                </div>
-              </Col>
-            </Row>
-          ) : dataLoaded && summary.total_calls === 0 ? (
-            <Row>
-              <Col md={12}>
-                <div className="card report-shadow">
-                  <div className="card-body">
-                    <h5 className="card-title">Call Logs</h5>
-                    <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '200px' }}>
-                      <i className="fa fa-list fa-3x text-muted mb-3"></i>
-                      <h6 className="text-muted mb-2">No Call Logs Available</h6>
-                      <p className="text-muted mb-0">No call logs found for the selected filters and date range.</p>
-                    </div>
-                  </div>
-                </div>
-              </Col>
-            </Row>
-          ) : (
-            <>
             <BarFilters
             leftContent={
               <>
@@ -894,10 +855,21 @@ const CallStatsCountry = () => {
                 // Chart data will be triggered by useEffect watching currentFilters
               }}
               onReset={() => {
-                setPendingFilters({});
-                const resetFilters = { is_incoming_only: 'false' };
-                setCurrentFilters(resetFilters);
-                handleFiltersChange(resetFilters);
+                // Preserve current date filters, clear all other filters
+                const resetPendingFilters: Record<string, any> = {
+                  start_datetime: (pendingFilters as any)?.start_datetime || defaultFilters.pending.start_datetime,
+                  end_datetime: (pendingFilters as any)?.end_datetime || defaultFilters.pending.end_datetime,
+                  is_incoming_only: 'false'
+                };
+                const resetCurrentFilters: Record<string, any> = {
+                  start_datetime: (currentFilters as any)?.start_datetime || defaultFilters.current.start_datetime,
+                  end_datetime: (currentFilters as any)?.end_datetime || defaultFilters.current.end_datetime,
+                  is_incoming_only: 'false'
+                };
+                setPendingFilters(resetPendingFilters);
+                setCurrentFilters(resetCurrentFilters);
+                currentFiltersRef.current = resetCurrentFilters;
+                handleFiltersChange(resetPendingFilters);
               }}
               filterContent={
                 <>
@@ -932,7 +904,7 @@ const CallStatsCountry = () => {
                         placeholder="Enter called numbers (comma separated)"
                         value={((pendingFilters as any)?.called_numbers || []).join(', ')}
                         onChange={(e) => {
-                          const values = e.target.value.split(',').map(v => v.trim()).filter(v => v);
+                          const values = e.target.value.split(',').map(v => v.trim()).filter(Boolean);
                           setPendingFilters({ ...pendingFilters, called_numbers: values });
                         }}
                       />
@@ -1091,8 +1063,6 @@ const CallStatsCountry = () => {
               search={false}
               tableStyle='table-style-2'
             />
-            </>
-          )}
         </>
       )}
 

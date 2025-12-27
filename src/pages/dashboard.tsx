@@ -67,52 +67,64 @@ const Dashboard = () => {
 
         {/* Top Row - Main Cards */}
         <Row className="g-3 mb-3">
-          {/* Overdue Today */}
+
+          {/* My Sales Summary */}
           <Col xs={12} lg={3}>
             <Card className="h-100 shadow-sm">
-              <Card.Body className="p-3 d-flex flex-column">
+              <Card.Body className="p-3">
                 <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="mb-0 fw-bold">Overdue Today</h6>
+                  <h6 className="mb-0 fw-bold">My Sales Summary</h6>
                   <span className="text-muted">•••</span>
                 </div>
-                <div className="d-flex flex-column gap-2 mb-2 flex-grow-1">
-                  <div className="d-flex align-items-center justify-content-between">
-                    <div className="d-flex align-items-center gap-2">
-                      <AlertCircle className="text-danger" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Overdue Tasks</span>
+                <div className="d-flex flex-column gap-3">
+                  {/* Prospects */}
+                  <div>
+                    <div className="d-flex align-items-center justify-content-between mb-1">
+                      <div className="d-flex align-items-center gap-2">
+                        <FileText className="text-success" size={18} />
+                        <span className="small fw-semibold">Prospects</span>
+                      </div>
+                      <span className="fw-bold" style={{ fontSize: '0.85rem' }}>5/18</span>
                     </div>
-                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>3</Badge>
+                    <ProgressBar now={28} variant="success" style={{ height: '6px', borderRadius: '3px' }} />
+                    <div className="d-flex justify-content-between mt-1">
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>5 New</small>
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>28%</small>
+                    </div>
                   </div>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <div className="d-flex align-items-center gap-2">
-                      <Phone className="text-danger" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Overdue Follow-Ups</span>
+                  
+                  {/* Leads */}
+                  <div>
+                    <div className="d-flex align-items-center justify-content-between mb-1">
+                      <div className="d-flex align-items-center gap-2">
+                        <Users className="text-info" size={18} />
+                        <span className="small fw-semibold">Leads</span>
+                      </div>
+                      <span className="fw-bold" style={{ fontSize: '0.85rem' }}>4/13</span>
                     </div>
-                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>2</Badge>
+                    <ProgressBar now={31} variant="info" style={{ height: '6px', borderRadius: '3px' }} />
+                    <div className="d-flex justify-content-between mt-1">
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>4 New</small>
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>31%</small>
+                    </div>
                   </div>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <div className="d-flex align-items-center gap-2">
-                      <FileText className="text-warning" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Overdue Proposals</span>
+                  
+                  {/* Orders */}
+                  <div>
+                    <div className="d-flex align-items-center justify-content-between mb-1">
+                      <div className="d-flex align-items-center gap-2">
+                        <ShoppingCart className="text-warning" size={18} />
+                        <span className="small fw-semibold">Orders</span>
+                      </div>
+                      <span className="fw-bold" style={{ fontSize: '0.85rem' }}>4/10</span>
                     </div>
-                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>1</Badge>
-                  </div>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <div className="d-flex align-items-center gap-2">
-                      <DollarSign className="text-warning" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Pending Quotes</span>
+                    <ProgressBar now={40} variant="warning" style={{ height: '6px', borderRadius: '3px' }} />
+                    <div className="d-flex justify-content-between mt-1">
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>4 Done</small>
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>40%</small>
                     </div>
-                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>1</Badge>
-                  </div>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <div className="d-flex align-items-center gap-2">
-                      <Clock className="text-info" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Scheduled Calls</span>
-                    </div>
-                    <Badge bg="info" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>2</Badge>
                   </div>
                 </div>
-                <Button variant="primary" className="mx-auto d-block mt-auto" style={{ width: '160px' }}>View Overdue</Button>
               </Card.Body>
             </Card>
           </Col>
@@ -200,63 +212,53 @@ const Dashboard = () => {
             </Card>
           </Col>
 
-          {/* My Sales Summary */}
+          
+          {/* Overdue Today */}
           <Col xs={12} lg={3}>
             <Card className="h-100 shadow-sm">
-              <Card.Body className="p-3">
+              <Card.Body className="p-3 d-flex flex-column">
                 <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="mb-0 fw-bold">My Sales Summary</h6>
+                  <h6 className="mb-0 fw-bold">Overdue Today</h6>
                   <span className="text-muted">•••</span>
                 </div>
-                <div className="d-flex flex-column gap-3">
-                  {/* Prospects */}
-                  <div>
-                    <div className="d-flex align-items-center justify-content-between mb-1">
-                      <div className="d-flex align-items-center gap-2">
-                        <FileText className="text-success" size={18} />
-                        <span className="small fw-semibold">Prospects</span>
-                      </div>
-                      <span className="fw-bold" style={{ fontSize: '0.85rem' }}>5/18</span>
+                <div className="d-flex flex-column gap-2 mb-2 flex-grow-1">
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center gap-2">
+                      <AlertCircle className="text-danger" size={18} />
+                      <span style={{ fontSize: '0.9rem' }}>Overdue Tasks</span>
                     </div>
-                    <ProgressBar now={28} variant="success" style={{ height: '6px', borderRadius: '3px' }} />
-                    <div className="d-flex justify-content-between mt-1">
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>5 New</small>
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>28%</small>
-                    </div>
+                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>3</Badge>
                   </div>
-                  
-                  {/* Leads */}
-                  <div>
-                    <div className="d-flex align-items-center justify-content-between mb-1">
-                      <div className="d-flex align-items-center gap-2">
-                        <Users className="text-info" size={18} />
-                        <span className="small fw-semibold">Leads</span>
-                      </div>
-                      <span className="fw-bold" style={{ fontSize: '0.85rem' }}>4/13</span>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center gap-2">
+                      <Phone className="text-danger" size={18} />
+                      <span style={{ fontSize: '0.9rem' }}>Overdue Follow-Ups</span>
                     </div>
-                    <ProgressBar now={31} variant="info" style={{ height: '6px', borderRadius: '3px' }} />
-                    <div className="d-flex justify-content-between mt-1">
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>4 New</small>
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>31%</small>
-                    </div>
+                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>2</Badge>
                   </div>
-                  
-                  {/* Orders */}
-                  <div>
-                    <div className="d-flex align-items-center justify-content-between mb-1">
-                      <div className="d-flex align-items-center gap-2">
-                        <ShoppingCart className="text-warning" size={18} />
-                        <span className="small fw-semibold">Orders</span>
-                      </div>
-                      <span className="fw-bold" style={{ fontSize: '0.85rem' }}>4/10</span>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center gap-2">
+                      <FileText className="text-warning" size={18} />
+                      <span style={{ fontSize: '0.9rem' }}>Overdue Proposals</span>
                     </div>
-                    <ProgressBar now={40} variant="warning" style={{ height: '6px', borderRadius: '3px' }} />
-                    <div className="d-flex justify-content-between mt-1">
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>4 Done</small>
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>40%</small>
+                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>1</Badge>
+                  </div>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center gap-2">
+                      <DollarSign className="text-warning" size={18} />
+                      <span style={{ fontSize: '0.9rem' }}>Pending Quotes</span>
                     </div>
+                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>1</Badge>
+                  </div>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center gap-2">
+                      <Clock className="text-info" size={18} />
+                      <span style={{ fontSize: '0.9rem' }}>Scheduled Calls</span>
+                    </div>
+                    <Badge bg="info" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>2</Badge>
                   </div>
                 </div>
+                <Button variant="primary" className="mx-auto d-block mt-auto" style={{ width: '160px' }}>View Overdue</Button>
               </Card.Body>
             </Card>
           </Col>
@@ -264,7 +266,7 @@ const Dashboard = () => {
           {/* Next Best Actions */}
           <Col xs={12} lg={3}>
             <Card className="h-100 shadow-sm">
-              <Card.Body className="p-3 d-flex flex-column">
+              {/* <Card.Body className="p-3 d-flex flex-column">
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <h6 className="mb-0 fw-bold">Next Best Actions</h6>
                   <span className="text-muted">•••</span>
@@ -277,6 +279,31 @@ const Dashboard = () => {
                   <li className="mb-1" style={{ fontSize: '0.9rem' }}>• Send: Proposal Email</li>
                 </ul>
                 <Button variant="primary" className="mx-auto d-block mt-auto" style={{ width: '160px' }}>Start Work</Button>
+              </Card.Body> */}
+
+<Card.Body className="p-3">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <h6 className="mb-0 fw-bold">Quick Help</h6>
+                  <span className="text-muted">•••</span>
+                </div>
+                <div className="row g-2">
+                  <div className="col-6">
+                    <Button variant="primary" size="sm" className="w-100">CRM</Button>
+                  </div>
+                  <div className="col-6">
+                    <Button variant="primary" size="sm" className="w-100">Live Calls</Button>
+                  </div>
+                  
+                  <div className="col-6">
+                    <Button variant="primary" size="sm" className="w-100">AI Insights</Button>
+                  </div>
+                  <div className="col-6">
+                    <Button variant="primary" size="sm" className="w-100">Live Wallboards</Button>
+                  </div>
+                  <div className="col-6">
+                    <Button variant="primary" size="sm" className="w-100">Control Hub</Button>
+                  </div>
+                </div>
               </Card.Body>
             </Card>
           </Col>
@@ -508,15 +535,28 @@ const Dashboard = () => {
           {/* Quick Help */}
           <Col xs={12} md={6} lg={3}>
             <Card className="h-100 shadow-sm">
-              <Card.Body className="p-3">
+            <Card.Body className="p-3">
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <h6 className="mb-0 fw-bold">Quick Help</h6>
                   <span className="text-muted">•••</span>
                 </div>
-                <div className="d-flex gap-2">
-                  <Button variant="primary" size="sm">CRM Help</Button>
-                  <Button variant="primary" size="sm">Calling Help</Button>
-                  <Button variant="primary" size="sm">AI Help</Button>
+                <div className="row g-2">
+                  <div className="col-6">
+                    <Button variant="primary" size="sm" className="w-100">CRM</Button>
+                  </div>
+                  <div className="col-6">
+                    <Button variant="primary" size="sm" className="w-100">Live Calls</Button>
+                  </div>
+                  
+                  <div className="col-6">
+                    <Button variant="primary" size="sm" className="w-100">AI Insights</Button>
+                  </div>
+                  <div className="col-6">
+                    <Button variant="primary" size="sm" className="w-100">Live Wallboards</Button>
+                  </div>
+                  <div className="col-6">
+                    <Button variant="primary" size="sm" className="w-100">Control Hub</Button>
+                  </div>
                 </div>
               </Card.Body>
             </Card>

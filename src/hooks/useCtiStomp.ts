@@ -2067,7 +2067,7 @@ export default function useCtiStomp(
           eventSourceRef.current = eventSource;
 
           eventSource.onopen = () => {
-            console.log(`[${currentInstanceId}] ✅ Master tab connection opened`);
+           // console.log(`[${currentInstanceId}] ✅ Master tab connection opened`);
             isConnectingRef.current = false;
             isInitializedRef.current = true;
             setIsInitialized(true);
@@ -2141,7 +2141,7 @@ export default function useCtiStomp(
                     groupDevicesByDnAndDeviceNameRef.current &&
                     updateSummaryDataRef.current
                   ) {
-                    console.log("complete_state 2", data.data);
+                    //console.log("complete_state 2", data.data);
                     const grouped = groupDevicesByDnAndDeviceNameRef.current(
                       data.data
                     );

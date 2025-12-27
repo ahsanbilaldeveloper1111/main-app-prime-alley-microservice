@@ -94,10 +94,10 @@ const Users = () => {
                     syncLdapUsers={syncLdapUsers}
                 />
 
-                <UsersTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+                {/* <UsersTabs activeTab={activeTab} setActiveTab={setActiveTab} /> */}
 
                 <div className="tab-content">
-                    {activeTab === 'overview' && (
+                    {/* {activeTab === 'overview' && ( */}
                         <div className="tab-pane fade show active" role="tabpanel">
                             <OverviewTab
                                 summaryCards={summaryCards}
@@ -111,7 +111,7 @@ const Users = () => {
                                 departmentChart={departmentChart}
                             />
                         </div>
-                    )}
+                     {/* )} */}
                     {/* {activeTab === 'insight' && (
                         <div className="tab-pane fade show active" role="tabpanel">
                             <InsightTab

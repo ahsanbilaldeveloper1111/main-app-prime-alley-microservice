@@ -1840,7 +1840,7 @@ const CallAnalysis = () => {
           <div className="page-header-title">
             <Row className="align-items-center">
               <Col md={3}>
-                <h2 className="mb-0 d-flex align-items-center">Call Analysis (New)</h2>
+                <h2 className="mb-0 d-flex align-items-center">Call Analysis</h2>
               </Col>
               <Col md={9} className="text-end">
                 {/* Connection status hidden for cleaner UI */}

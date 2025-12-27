@@ -410,3 +410,145 @@ export const GetFilteredData = async (params: any) => {
     throw error;
   }
 };
+
+
+
+interface PaginationParams {
+  page?: number;
+  perPage?: number;
+  search?: string;
+  draw?: number;
+  filters?: any;
+  isExport?: boolean;
+  exportType?: string;
+  reportType?: string;
+  moduleSlug?: string;
+}
+
+export const ListCallLogs = async (params: PaginationParams = {}, endpoint: string) => {
+  try {
+    const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '', reportType = '', moduleSlug = '' } = params;
+    
+    // Create base query parameters
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      perPage: perPage.toString(),
+      search: search,
+      draw: draw.toString(),
+      isExport: isExport.toString(),
+      exportType: exportType,
+      reportType: reportType,
+      moduleSlug: moduleSlug
+    });
+    
+    // Flatten filters and add each key-value pair as separate query parameters
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        // Handle arrays by converting them to JSON strings for proper format
+        if (Array.isArray(value)) {
+          queryParams.append(key, JSON.stringify(value));
+        }
+        // Handle objects by converting them to JSON strings
+        else if (typeof value === 'object') {
+          queryParams.append(key, JSON.stringify(value));
+        } else {
+          queryParams.append(key, value.toString());
+        }
+      }
+    });
+
+    if(isExport === true){
+      const response = await axiosInstance.get(`${endpoint}?${queryParams.toString()}`, {
+        responseType: 'blob',
+        headers: {
+          'Accept': exportType === 'xlsx' 
+            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*'
+            : 'audio/*, application/octet-stream, */*'
+        }
+      });
+
+      return response.data;
+    } else {
+      const response = await axiosInstance.get(`${endpoint}?${queryParams.toString()}`);
+      //console.log('response call logs:', response);
+      return response.data;
+     
+    }
+  } catch (error) {
+    throw error;
+  }
+};
+
+
+export const GetImagicalTranscriptions = async (params: any = {}) => {
+  try {
+    const { page = 1, perPage = 15, search = "", start_datetime = '', end_datetime = '', filters = {} } = params;
+
+    // Build query parameters manually to handle arrays correctly
+    // Use a Map to ensure each key appears only once
+    const paramsMap = new Map<string, string>();
+    
+    // Add base parameters
+    paramsMap.set('page', page.toString());
+    paramsMap.set('perPage', perPage.toString());
+    if (search) paramsMap.set('search', search);
+    // Always include datetime parameters (they have fallback values in the calling function)
+    if (start_datetime) paramsMap.set('start_datetime', start_datetime);
+    if (end_datetime) paramsMap.set('end_datetime', end_datetime);
+    
+    // Handle filters - convert arrays to JSON strings
+    // Skip keys that are already in the base parameters
+    const baseKeys = new Set(['page', 'perPage', 'search', 'start_datetime', 'end_datetime']);
+    
+    Object.entries(filters).forEach(([key, value]) => {
+      // Skip if already in base parameters
+      if (baseKeys.has(key)) {
+        return;
+      }
+      
+      // Skip if value is invalid (but allow empty strings for some fields if needed)
+      if (value === undefined || value === null) {
+        return;
+      }
+      
+      // Skip if it's an empty array
+      if (Array.isArray(value) && value.length === 0) {
+        return;
+      }
+      
+      // Skip empty strings (but this should not affect local_parties or direction if they have values)
+      if (typeof value === 'string' && value.trim() === '') {
+        return;
+      }
+      
+      // Handle arrays by converting them to JSON strings for proper format
+      if (Array.isArray(value)) {
+        paramsMap.set(key, JSON.stringify(value));
+      }
+      // Handle objects by converting them to JSON strings
+      else if (typeof value === 'object') {
+        paramsMap.set(key, JSON.stringify(value));
+      } else {
+        paramsMap.set(key, value.toString());
+      }
+    });
+    
+    // Convert Map to URLSearchParams (this ensures no duplicates)
+    const queryParams = new URLSearchParams();
+    paramsMap.forEach((value, key) => {
+      queryParams.set(key, value);
+    });
+
+    const response = await axiosInstance.get(`aiml/imagical-transcriptions?${queryParams.toString()}`);
+    if(response.data){
+      const responseData = response.data;
+      return responseData;
+    }else{
+      toast.error('Failed to get transcriptions');
+      return false;
+    }
+    
+  } catch (error) {
+    throw error;
+  }
+};
