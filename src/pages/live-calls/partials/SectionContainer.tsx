@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Card, Button, Badge } from 'react-bootstrap'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { CtiDevice } from '@components/live-calls/utils/types'
@@ -67,6 +67,14 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
                     sectionKey === 'activeIdle' ? '#6b7280' : 
                     sectionKey === 'offline' ? '#ef4444' : '#ef4444'
 
+  // Auto-collapse section if no agents available
+  useEffect(() => {
+    if (!hasContent && !isCollapsed) {
+      onToggle()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasContent, isCollapsed])
+
   return (
     <div className="mb-4" data-section={sectionKey}>
       {/* Section Header */}
@@ -79,7 +87,7 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
               onClick={onToggle}
               style={{ fontSize: '1.1rem', fontWeight: '600' }}
             >
-              {isCollapsed ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
+              {(!hasContent || isCollapsed) ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
               
               <div style={{ 
                       color: sectionKey === 'supervision' ? '#f59e0b' : 
@@ -124,55 +132,36 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
       )} */}
 
       {/* Section Content */}
-      {!isCollapsed && (
-        hasContent ? (
-          <div className="row g-3 justify-content-left align-items-left m-0">
-            {sectionDns.map(({ dn, devices: deviceList, call, active }) => (
-              <UserCard
-                key={dn}
-                dn={dn}
-                devices={deviceList}
-                call={call}
-                active={active}
-                sectionKey={sectionKey}
-                animatingCards={animatingCards}
-                cardAnimations={cardAnimations}
-                activeMonitoring={activeMonitoring}
-                showPopup={showPopup}
-                session={session}
-                getUserDataExtensions={getUserDataExtensions}
-                getCallStateForDevice={getCallStateForDevice}
-                setSelectedMonitor={setSelectedMonitor}
-                setTempMonitorSelection={setTempMonitorSelection}
-                setSelectedTone={setSelectedTone}
-                setShowPopup={setShowPopup}
-                setNotification={setNotification}
-                stopMonitoring={stopMonitoring}
-                startMonitoringLocal={startMonitoringLocal}
-                selectedTone={selectedTone}
-                isDnInActiveCall={isDnInActiveCall}
-                userAddress={userAddress}
-              />
-            ))}
-          </div>
-        ) : (
-          <Card className="border-0 shadow-sm mt-3">
-            <Card.Body className="text-center py-5">
-              <div className="d-flex flex-column align-items-center justify-content-center gap-2">
-              <div style={{ 
-                      color: sectionKey === 'supervision' ? '#f59e0b' : 
-                             sectionKey === 'onCall' ? '#22c55e' : 
-                             sectionKey === 'activeIdle' ? '#6b7280' : 
-                             sectionKey === 'downOffline' ? '#ef4444' : '#6b7280'
-                    }}>
-                      {sectionIcon === 'Eye' ? <Eye size={20} /> : sectionIcon === 'Phone' ? <Phone size={20} /> : sectionIcon === 'CheckCircle' ? <CheckCircle size={20} /> : sectionIcon === 'AlertCircle' ? <AlertCircle size={20} /> : sectionIcon === 'PhoneCall' ? <PhoneCall size={20} /> : null}
-                    </div>
-              <div style={{ fontSize: '0.875rem', fontWeight: '600' }} className="mb-0 text-muted small">{sectionTitle}</div>
-              </div>
-              <div  className="mb-0 text-muted small">No agents in this category</div>
-            </Card.Body>
-          </Card>
-        )
+      {hasContent && !isCollapsed && (
+        <div className="row g-3 justify-content-left align-items-left m-0">
+          {sectionDns.map(({ dn, devices: deviceList, call, active }) => (
+            <UserCard
+              key={dn}
+              dn={dn}
+              devices={deviceList}
+              call={call}
+              active={active}
+              sectionKey={sectionKey}
+              animatingCards={animatingCards}
+              cardAnimations={cardAnimations}
+              activeMonitoring={activeMonitoring}
+              showPopup={showPopup}
+              session={session}
+              getUserDataExtensions={getUserDataExtensions}
+              getCallStateForDevice={getCallStateForDevice}
+              setSelectedMonitor={setSelectedMonitor}
+              setTempMonitorSelection={setTempMonitorSelection}
+              setSelectedTone={setSelectedTone}
+              setShowPopup={setShowPopup}
+              setNotification={setNotification}
+              stopMonitoring={stopMonitoring}
+              startMonitoringLocal={startMonitoringLocal}
+              selectedTone={selectedTone}
+              isDnInActiveCall={isDnInActiveCall}
+              userAddress={userAddress}
+            />
+          ))}
+        </div>
       )}
     </div>
   )
