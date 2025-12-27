@@ -2405,7 +2405,7 @@ const CrmProspectsManagement = () => {
               onClick={() => setShowUploadModal(true)}
             >
               <Download size={16} className="me-2" />
-              Upload CSV
+              Import Contacts
             </Button>
           )}
         </div>
@@ -3597,7 +3597,7 @@ const CrmProspectsManagement = () => {
           centered
         >
           <Modal.Header closeButton className="border-bottom bg-light">
-            <Modal.Title>Upload CSV - Import Prospects</Modal.Title>
+            <Modal.Title>Import Contacts - Prospects</Modal.Title>
           </Modal.Header>
           <Modal.Body className="p-4">
             <div className="alert alert-info mb-4">

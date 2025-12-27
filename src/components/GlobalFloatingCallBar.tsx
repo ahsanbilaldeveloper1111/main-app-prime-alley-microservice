@@ -2170,7 +2170,7 @@ const GlobalFloatingCallBar: React.FC = () => {
               {/* Right - Controls */}
               {/* <div className="d-flex flex-column gap-3">
                 {/* Bottom Row - Decline and Answer Buttons */}
-                <div className="d-flex align-items-center gap-2">
+                {/* <div className="d-flex align-items-center gap-2">
                   <button
                     onClick={handleRejectCall}
                     disabled={isDialing}
@@ -2233,7 +2233,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                     </i>
                     {isDialing ? "Answering..." : "Answer"}
                   </button>
-                </div>
+                </div> */}
               {/* </div> */}
             {/* </div>
           </div>

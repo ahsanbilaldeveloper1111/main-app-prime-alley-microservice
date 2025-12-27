@@ -1087,7 +1087,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                       
                     <div className="action-buttons">
 
-                    {showDateRange && (
+                    {showDateRange && startDateTime && endDateTime && moment(startDateTime).isValid() && moment(endDateTime).isValid() && (
                             <>
                             <p className="mb-0">
                             Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
