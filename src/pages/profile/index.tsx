@@ -9,6 +9,7 @@ import { GetUserProfile } from '@utils/users'
 
 import '@assets/scss/tabs.scss'
 import '@assets/scss/common.scss'
+import { getStorageImageUrl } from '@utils/imageUtils'
 
 // Import partial components
 import UserProfileTab from '@pages/controlhub/users/[id]/partials/UserProfileTab'
@@ -31,12 +32,14 @@ const ProfileView = () => {
         }
     }, [session]);
 
+    const [profilePicture, setProfilePicture] = useState<string>('');
     const fetchUser = async () => {
         setIsLoading(true);
         try {
         const getUser = await GetUserProfile(session?.user?.id as string, false);
         if(getUser){
             setCurrentUser(getUser);
+            setProfilePicture(getUser?.profile?.profile_picture);
         }
         } catch (error) {
             console.error('Error fetching user:', error);
@@ -88,9 +91,10 @@ const ProfileView = () => {
                                             <Row className="align-items-center">
                                                 <Col xs={3}>
                                                     <div className="user-avatar">
-                                                        <div className="text">
+                                                        {profilePicture ? 
+                                                        <img src={getStorageImageUrl(profilePicture) || ''} alt="Profile" className="img-fluid rounded-circle" /> : <div className="text">
                                                         <i className="material-icons-two-tone">person</i>
-                                                        </div>
+                                                        </div>}
                                                     </div>
                                                 </Col>
                                                 <Col xs={9}>
