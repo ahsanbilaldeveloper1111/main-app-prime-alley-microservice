@@ -229,10 +229,10 @@ export const GetTranscriptionOverview = async () => {
     if(response && response?.data && response?.data?.success === true){
       return response?.data?.data;
     } else {
-      toast.error("Failed to fetch transcription overview");
+    //  toast.error("Failed to fetch transcription overview");
     }
   } catch (error) {
-    toast.error("Failed to fetch transcription overview");
+   // toast.error("Failed to fetch transcription overview");
     throw error;
   }
 };
