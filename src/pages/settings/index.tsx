@@ -165,35 +165,35 @@ const Settings = () => {
       key: "crm",
       title: "CRM Management",
       icon: Briefcase,
-      color: "#0d6efd",
+      color: "#6c757d",
       permission: PERMISSIONS.CRM_SERVICES
     },
     {
       key: "telco-gateway",
       title: "Telco Gateway",
       icon: Phone,
-      color: "#ff9800",
+      color: "#6c757d",
       permission: PERMISSIONS.GSM_SERVICES
     },
     {
       key: "billing",
       title: "Billing & Payments",
       icon: CreditCard,
-      color: "#9c27b0",
+      color: "#6c757d",
       permission: PERMISSIONS.ACCOUNTS_SERVICES
     },
     {
       key: "devices-management",
       title: "Devices Management",
       icon: Network,
-      color: "#f44336",
+      color: "#6c757d",
       permission: PERMISSIONS.NETOPS_SERVICES
     },
     {
       key: "tickets",
       title: "Tickets",
       icon: Ticket,
-      color: "#2196f3",
+      color: "#6c757d",
       permission: PERMISSIONS.TICKETS_SERVICES
     }
   ];
@@ -202,31 +202,31 @@ const Settings = () => {
   const subTabsConfig: Record<string, Array<{key: string, title: string, icon: any, color: string, permission: string}>> = {
     "user-management": [
       { key: "user-directory", title: "User Directory", icon: UsersIcon, color: "#6c757d", permission: PERMISSIONS.VIEW_USERS },
-      { key: "supervisor-teams", title: "Supervisor Teams", icon: UserCheck, color: "#0d6efd", permission: PERMISSIONS.VIEW_TEAMS },
-      { key: "management-groups", title: "Management Groups", icon: Building2, color: "#198754", permission: PERMISSIONS.VIEW_GROUPS },
-      { key: "ranks-and-permissions", title: "Ranks and Permissions", icon: Shield, color: "#ff9800", permission: PERMISSIONS.VIEW_RANKS }
+      { key: "supervisor-teams", title: "Supervisor Teams", icon: UserCheck, color: "#6c757d", permission: PERMISSIONS.VIEW_TEAMS },
+      { key: "management-groups", title: "Management Groups", icon: Building2, color: "#6c757d", permission: PERMISSIONS.VIEW_GROUPS },
+      { key: "ranks-and-permissions", title: "Ranks and Permissions", icon: Shield, color: "#6c757d", permission: PERMISSIONS.VIEW_RANKS }
     ],
     "crm": [
-      { key: "campaigns", title: "Campaigns", icon: Megaphone, color: "#0d6efd", permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS },
-      { key: "products", title: "Products", icon: Package, color: "#198754", permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
-      { key: "stages", title: "Stages", icon: Layers, color: "#ff9800", permission: PERMISSIONS.VIEW_CRM_STAGES }
+      { key: "campaigns", title: "Campaigns", icon: Megaphone, color: "#6c757d", permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS },
+      { key: "products", title: "Products", icon: Package, color: "#6c757d", permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
+      { key: "stages", title: "Stages", icon: Layers, color: "#6c757d", permission: PERMISSIONS.VIEW_CRM_STAGES }
     ],
     "telco-gateway": [
-      { key: "assign-devices", title: "Assign Devices", icon: SettingsIcon, color: "#0d6efd", permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT },
-      { key: "sync-gsm", title: "Sync GSM", icon: ArrowUp, color: "#198754", permission: PERMISSIONS.VIEW_GSM_SYNC },
-      { key: "company-profiling", title: "Company Profiling", icon: Building2, color: "#ff9800", permission: PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING }
+      { key: "assign-devices", title: "Assign Devices", icon: SettingsIcon, color: "#6c757d", permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT },
+      { key: "sync-gsm", title: "Sync GSM", icon: ArrowUp, color: "#6c757d", permission: PERMISSIONS.VIEW_GSM_SYNC },
+      { key: "company-profiling", title: "Company Profiling", icon: Building2, color: "#6c757d", permission: PERMISSIONS.VIEW_GSM_COMPANY_PROFILLING }
     ],
     "devices-management": [
-      { key: "devices-list", title: "Devices List", icon: Network, color: "#0d6efd", permission: PERMISSIONS.VIEW_NETOPS_DEVICES },
-      { key: "services", title: "Services", icon: SettingsIcon, color: "#198754", permission: PERMISSIONS.VIEW_SERVICES_NETOPS },
-      { key: "alerts", title: "Alerts", icon: AlertCircle, color: "#f44336", permission: PERMISSIONS.VIEW_NETOPS_ALERTS }
+      { key: "devices-list", title: "Devices List", icon: Network, color: "#6c757d", permission: PERMISSIONS.VIEW_NETOPS_DEVICES },
+      { key: "services", title: "Services", icon: SettingsIcon, color: "#6c757d", permission: PERMISSIONS.VIEW_SERVICES_NETOPS },
+      { key: "alerts", title: "Alerts", icon: AlertCircle, color: "#6c757d", permission: PERMISSIONS.VIEW_NETOPS_ALERTS }
     ],
     "tickets": [
-      { key: "statuses", title: "Statuses", icon: CheckCircle, color: "#0d6efd", permission: PERMISSIONS.VIEW_TICKETS_STATUS },
-      { key: "modules", title: "Modules", icon: Layers, color: "#198754", permission: PERMISSIONS.VIEW_TICKETS_MODULES },
-      { key: "categories", title: "Categories", icon: Package, color: "#ff9800", permission: PERMISSIONS.VIEW_TICKETS_CATEGORIES },
-      { key: "sub-categories", title: "Sub Categories", icon: Layers, color: "#9c27b0", permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES },
-      { key: "types", title: "Types", icon: Ticket, color: "#2196f3", permission: PERMISSIONS.VIEW_TICKETS_TYPES }
+      { key: "statuses", title: "Statuses", icon: CheckCircle, color: "#6c757d", permission: PERMISSIONS.VIEW_TICKETS_STATUS },
+      { key: "modules", title: "Modules", icon: Layers, color: "#6c757d", permission: PERMISSIONS.VIEW_TICKETS_MODULES },
+      { key: "categories", title: "Categories", icon: Package, color: "#6c757d", permission: PERMISSIONS.VIEW_TICKETS_CATEGORIES },
+      { key: "sub-categories", title: "Sub Categories", icon: Layers, color: "#6c757d", permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES },
+      { key: "types", title: "Types", icon: Ticket, color: "#6c757d", permission: PERMISSIONS.VIEW_TICKETS_TYPES }
     ]
   };
 
@@ -286,9 +286,9 @@ const Settings = () => {
         }
 
         .settings-filter-button.active {
-          background: #198754;
+          background: #0d6efd;
           color: white;
-          border-color: #198754;
+          border-color: #0d6efd;
         }
 
         .settings-filter-button.active .filter-icon {
@@ -331,9 +331,9 @@ const Settings = () => {
         }
 
         .settings-sub-filter-button.active {
-          background: #198754;
+          background: #0d6efd;
           color: white;
-          border-color: #198754;
+          border-color: #0d6efd;
         }
 
         .settings-sub-filter-button.active .filter-icon {
@@ -374,7 +374,7 @@ const Settings = () => {
                       className={`settings-filter-button ${isActive ? 'active' : ''}`}
                       onClick={() => handleMainTabChange(tab.key)}
                       style={{
-                        borderColor: isActive ? '#198754' : tab.color,
+                        borderColor: isActive ? '#0d6efd' : tab.color,
                         color: isActive ? 'white' : tab.color
                       }}
                     >
@@ -400,7 +400,7 @@ const Settings = () => {
                         className={`settings-sub-filter-button ${isActive ? 'active' : ''}`}
                         onClick={() => handleSubTabClick(activeTab, subTab.key)}
                         style={{
-                          borderColor: isActive ? '#198754' : subTab.color,
+                          borderColor: isActive ? '#0d6efd' : subTab.color,
                           color: isActive ? 'white' : subTab.color
                         }}
                       >
