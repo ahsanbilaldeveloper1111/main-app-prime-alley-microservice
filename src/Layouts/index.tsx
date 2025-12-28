@@ -29,6 +29,7 @@ import { toast } from 'react-toastify';
 import UserDummyImage from "@assets/images/user-dummy.jpg";
 import { getStorageImageUrl } from "@utils/imageUtils";
 import DeviceSelectionModal from '../components/DeviceSelectionModal';
+import GlobalFloatingCallBar from '../components/GlobalFloatingCallBar';
 
 interface LayoutProps {
 	children: ReactNode;
@@ -47,6 +48,7 @@ const Layout = ({ children }: LayoutProps) => {
 		userAddress, 
 		dnsMap, 
 		attendCall, 
+		endCall,
 		getUserDataExtensions,
 		activeCalls,
 		formatDuration,
@@ -453,10 +455,67 @@ const Layout = ({ children }: LayoutProps) => {
 	};
 
 	// Handle reject call
-	const handleRejectCall = () => {
-		setShowIncomingCallModal(false);
-		setIncomingCall(null);
-		//toast.info("Call rejected");
+	const handleRejectCall = async () => {
+		if (!incomingCall) {
+			setShowIncomingCallModal(false);
+			setIncomingCall(null);
+			return;
+		}
+
+		try {
+			// Check if there's an active call with matching callId (like GlobalFloatingCallBar does)
+			const matchingActiveCall = Array.from(activeCalls.values()).find((call: any) => 
+				call.callId === incomingCall.callId ||
+				(call.callingAddress === incomingCall.callingAddress && call.calledAddress === incomingCall.calledAddress)
+			);
+
+			// Get device information for rejecting the call
+			const userDeviceInfo = dnsMap?.[userAddress || ''];
+			if (userDeviceInfo && userDeviceInfo.devices) {
+				const userDevices = Object.values(userDeviceInfo.devices);
+				if (userDevices.length > 0) {
+					// Find controller device first
+					let controllerDevice: any = null;
+					if (incomingCall.controllerDeviceName) {
+						controllerDevice = userDevices.find((device: any) => 
+							device.deviceName === incomingCall.controllerDeviceName
+						);
+					}
+
+					if (!controllerDevice) {
+						controllerDevice = userDevices.find((device: any) => device.terminalState === 'REGISTERED') || userDevices[0];
+					}
+
+					// Get calling device info from active call (if available) or use default
+					// This matches GlobalFloatingCallBar which uses activeCall.callingDeviceName
+					const callingDeviceName = matchingActiveCall?.callingDeviceName || '';
+					const callingDeviceType = matchingActiveCall?.callingDeviceType || '';
+
+					// Reject the call through CTI - match GlobalFloatingCallBar format exactly
+					if (controllerDevice && incomingCall.callId) {
+						await endCall({
+							callId: incomingCall.callId,
+							callingAddress: incomingCall.callingAddress,
+							calledAddress: incomingCall.calledAddress,
+							callingDeviceType: callingDeviceType,
+							callingDeviceName: callingDeviceName,
+							controllerAddress: userAddress || '',
+							controllerDeviceName: controllerDevice.deviceName || '',
+							controllerDeviceType: controllerDevice.deviceType || ''
+						} as any).catch(() => {
+							// Silently fail if call already ended or rejected
+						});
+					}
+				}
+			}
+		} catch (error) {
+			console.error("Unable to reject call");
+		} finally {
+			// Close the modal and clear the incoming call state
+			setShowIncomingCallModal(false);
+			setIncomingCall(null);
+			//toast.info("Call rejected");
+		}
 	};
 
 	// Dialer handlers
@@ -644,14 +703,15 @@ const Layout = ({ children }: LayoutProps) => {
 			<img src={CompanyLogo2.src} alt="logo" className="img-fluid header-logo" /></a>
           </div>
 
-
-
-
+          
+          
 
           
 
+          <GlobalFloatingCallBar />
 
 
+	    
 
           <div className="ms-auto d-flex align-items-center gap-5">
 
@@ -1042,8 +1102,11 @@ const Layout = ({ children }: LayoutProps) => {
 							{/* Bottom Row - Decline and Answer Buttons */}
 							<div className="d-flex align-items-center gap-2">
 								<button
-									onClick={handleRejectCall}
-									disabled={isDialing}
+									onClick={(e) => {
+										e.stopPropagation();
+										handleRejectCall();
+									}}
+									disabled={false}
 									className="btn rounded-pill d-flex align-items-center gap-2"
 									style={{
 										padding: "0.33rem 1em",

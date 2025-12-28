@@ -22,6 +22,8 @@ const floatingBarStyles = `
     animation: slideUp 0.3s ease-out;
     user-select: none;
     list-style: none;
+    top: 20px !important;
+    box-shadow: none !important;
   }
   
   .global-floating-call-bar * {
@@ -29,7 +31,7 @@ const floatingBarStyles = `
   }
   
   .global-floating-call-bar:hover {
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15) !important;
+    // box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15) !important;
   }
   
   .global-floating-call-bar.dragging {
@@ -124,7 +126,7 @@ const GlobalFloatingCallBar: React.FC = () => {
   const [incomingCallTimer, setIncomingCallTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Drag and position state
-  const [position, setPosition] = useState<CallBarPosition>("bottom");
+  const [position, setPosition] = useState<CallBarPosition>("top");
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
@@ -264,7 +266,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     ) {
       setDragPosition(null);
       setIsDragging(false);
-      setPosition("bottom");
+      setPosition("top");
       return;
     }
     
@@ -280,15 +282,20 @@ const GlobalFloatingCallBar: React.FC = () => {
     const minDist = Math.min(distToTop, distToBottom, distToLeft, distToRight);
     
     let newPosition: CallBarPosition = "bottom";
-    if (minDist === distToTop) {
-      newPosition = "top";
-    } else if (minDist === distToBottom) {
-      newPosition = "bottom";
-    } else if (minDist === distToLeft) {
-      newPosition = "left";
-    } else if (minDist === distToRight) {
-      newPosition = "right";
-    }
+      if (minDist === distToTop) {
+        newPosition = "top";
+      } else if (minDist === distToBottom) {
+        newPosition = "bottom";
+      } else if (minDist === distToLeft) {
+        newPosition = "left";
+      } else if (minDist === distToRight) {
+        newPosition = "right";
+      }
+      
+      // Default to top if dragged outside
+      if (newPosition === "bottom" && barRect.top < 0) {
+        newPosition = "top";
+      }
     
     // Clear drag position and update position state - React will handle the styling
     setDragPosition(null);
@@ -340,7 +347,7 @@ const GlobalFloatingCallBar: React.FC = () => {
   const getPositionStyles = useCallback((): React.CSSProperties => {
     const baseStyles: React.CSSProperties = {
       position: "fixed",
-      zIndex: 1050,
+      zIndex: 9999,
       backgroundColor: "#fff",
       boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
       display: "flex",
@@ -350,6 +357,10 @@ const GlobalFloatingCallBar: React.FC = () => {
       border: "none",
       visibility: "visible",
       opacity: 1,
+      
+      left: "0",
+      right: "0",
+      width: "100%",
     };
 
     // If dragging, use drag position but preserve original layout
@@ -367,14 +378,14 @@ const GlobalFloatingCallBar: React.FC = () => {
         baseStyles.flexDirection = "column";
         baseStyles.borderRadius = "1.5rem";
         baseStyles.padding = "1rem 0.75rem";
-        baseStyles.gap = "0.75rem";
+        baseStyles.gap = "0.5rem";
         baseStyles.minWidth = "70px";
         baseStyles.maxWidth = "85px";
       } else {
         baseStyles.flexDirection = "row";
         baseStyles.borderRadius = "1.5rem";
         baseStyles.padding = "0.5rem 1rem";
-        baseStyles.gap = "1rem";
+        baseStyles.gap = "0.5rem";
         baseStyles.minWidth = "320px";
         baseStyles.maxWidth = "625px";
         baseStyles.width = "auto";
@@ -387,9 +398,9 @@ const GlobalFloatingCallBar: React.FC = () => {
     const isVertical = position === "left" || position === "right";
     
     baseStyles.borderRadius = "1.5rem";
-    baseStyles.padding = isVertical ? "1rem 0.75rem" : "1rem";
-    baseStyles.gap = isVertical ? "0.75rem" : "1rem";
-
+    baseStyles.padding = "0.5rem 1rem";
+    baseStyles.gap = "1rem";
+    baseStyles.top = "0px !important";
     if (isVertical) {
       baseStyles.flexDirection = "column";
       baseStyles.minWidth = "70px";
@@ -400,30 +411,34 @@ const GlobalFloatingCallBar: React.FC = () => {
         baseStyles.transform = "translateY(-50%)";
         baseStyles.right = "auto";
         baseStyles.bottom = "auto";
+        baseStyles.top = "0px !important";
       } else {
         baseStyles.right = "20px";
         baseStyles.top = "50%";
         baseStyles.transform = "translateY(-50%)";
         baseStyles.left = "auto";
         baseStyles.bottom = "auto";
+        baseStyles.top = "0px !important";
       }
     } else {
       baseStyles.flexDirection = "row";
       baseStyles.minWidth = "320px";
+      baseStyles.top = "0px !important";
       //baseStyles.maxWidth = "450px";
       baseStyles.width = "auto";
       if (position === "bottom") {
         baseStyles.bottom = "20px";
         baseStyles.left = "50%";
-        baseStyles.transform = "translateX(-50%)";
+        //baseStyles.transform = "translateX(-50%)";
         baseStyles.top = "auto";
         baseStyles.right = "auto";
       } else {
-        baseStyles.top = "20px";
-        baseStyles.left = "50%";
-        baseStyles.transform = "translateX(-50%)";
+        baseStyles.top = "0";
+        baseStyles.left = "0";
+        baseStyles.right = "0";
+        baseStyles.width = "100%";
+        baseStyles.transform = "none";
         baseStyles.bottom = "auto";
-        baseStyles.right = "auto";
       }
     }
 
@@ -1183,8 +1198,8 @@ const GlobalFloatingCallBar: React.FC = () => {
           className={`global-floating-call-bar ${isDragging ? "dragging" : ""}`}
           style={getPositionStyles()}
         >
-          {/* Drag Handle - small area at edge */}
-          <div
+          {/* Drag Handle - disabled for now */}
+          {/* <div
             ref={dragHandleRef}
             className="call-bar-drag-handle"
             onMouseDown={handleDragStart}
@@ -1199,17 +1214,18 @@ const GlobalFloatingCallBar: React.FC = () => {
               zIndex: 10,
             }}
             title="Drag to reposition"
-          />
+          /> */}
 
           {/* Contact Info Section */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: isVertical ? "0.75rem" : "1rem",
+              gap: "0.5rem",
               flex: isVertical ? "none" : 1,
               flexDirection: isVertical ? "column" : "row",
               minWidth: 0,
+              top:"0",
               position: "relative",
               zIndex: 1,
             }}
@@ -1696,15 +1712,15 @@ const GlobalFloatingCallBar: React.FC = () => {
                 e.stopPropagation();
                 handleEndCall();
               }}
-              className="btn btn-danger rounded-1 d-flex align-items-center gap-1"
-              style={{
-                padding: "0.625rem 1rem",
-                fontWeight: 500,
-                color:"#fff",
-                fontSize: "1rem",
-                boxShadow: "0 4px 6px -1px rgba(239,68,68,0.3)",
-                marginLeft: "0.5rem",
-              }}
+              className="btn btn-danger btn-sm  rounded-1 d-flex align-items-center gap-1"
+              // style={{
+              //   padding: "0.625rem 1rem",
+              //   fontWeight: 500,
+              //   color:"#fff",
+              //   fontSize: "1rem",
+              //   boxShadow: "0 4px 6px -1px rgba(239,68,68,0.3)",
+              //   marginLeft: "0.5rem",
+              // }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.boxShadow = "0 6px 8px -1px rgba(239,68,68,0.4)";
               }}

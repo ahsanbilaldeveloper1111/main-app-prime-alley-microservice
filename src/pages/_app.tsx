@@ -9,7 +9,6 @@ import type { NextPage } from "next";
 import { appWithTranslation } from "next-i18next";
 import { ToastContainer } from 'react-toastify';
 import Providers from "@components/providers";
-import GlobalFloatingCallBar from "@components/GlobalFloatingCallBar";
 import favicon from "@assets/images/favicon.png";
 import Router from "next/router";
 import NProgress from "nprogress";
@@ -51,8 +50,6 @@ const MyApp: any = ({ Component, pageProps, ...rest }: AppPropsWithLayout) => {
       </Head>
       <Providers store={store}>
         {getLayout(<Component {...pageProps} />)}
-        {/* Global Floating Call Bar - appears on every page */}
-        <GlobalFloatingCallBar />
       </Providers>
       <ToastContainer />
     </>

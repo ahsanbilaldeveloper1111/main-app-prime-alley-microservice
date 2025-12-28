@@ -21,6 +21,9 @@ import {
   Wrench,
   Package,
   Ban,
+  PhoneMissed,
+  PhoneIncoming,
+  PhoneOff,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import TimezoneSearch from '@components/TimezoneSearch';
@@ -71,9 +74,9 @@ const Dashboard = () => {
 <Row className="mb-4">
   <Col xs={12} md={6}>
     <div className="d-flex gap-2 mb-3">
-      <Button variant="primary" size="sm">Today</Button>
+      {/* <Button variant="primary" size="sm">Today</Button>
       <Button variant="outline-secondary" size="sm">This Week</Button>
-      <Button variant="outline-secondary" size="sm">This Month</Button>
+      <Button variant="outline-secondary" size="sm">This Month</Button> */}
     </div>
   </Col>
   <Col xs={12} md={6}>
@@ -114,13 +117,13 @@ const Dashboard = () => {
                     <div className="d-flex align-items-center justify-content-between mb-1">
                       <div className="d-flex align-items-center gap-2">
                         <FileText className="text-success" size={18} />
-                        <span className="small fw-semibold">Prospects</span>
+                        <span className="small fw-semibold">Leads</span>
                       </div>
-                      <span className="fw-bold" style={{ fontSize: '0.85rem' }}>5/18</span>
+                      {/* <span className="fw-bold" style={{ fontSize: '0.85rem' }}>5/18</span> */}
                     </div>
                     <ProgressBar now={28} variant="success" style={{ height: '6px', borderRadius: '3px' }} />
                     <div className="d-flex justify-content-between mt-1">
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>5 New</small>
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>5 Converted</small>
                       <small className="text-muted" style={{ fontSize: '0.7rem' }}>28%</small>
                     </div>
                   </div>
@@ -130,13 +133,13 @@ const Dashboard = () => {
                     <div className="d-flex align-items-center justify-content-between mb-1">
                       <div className="d-flex align-items-center gap-2">
                         <Users className="text-info" size={18} />
-                        <span className="small fw-semibold">Leads</span>
+                        <span className="small fw-semibold">Deals</span>
                       </div>
-                      <span className="fw-bold" style={{ fontSize: '0.85rem' }}>4/13</span>
+                      {/* <span className="fw-bold" style={{ fontSize: '0.85rem' }}>4/13</span> */}
                     </div>
                     <ProgressBar now={31} variant="info" style={{ height: '6px', borderRadius: '3px' }} />
                     <div className="d-flex justify-content-between mt-1">
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>4 New</small>
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>4 Converted</small>
                       <small className="text-muted" style={{ fontSize: '0.7rem' }}>31%</small>
                     </div>
                   </div>
@@ -148,11 +151,11 @@ const Dashboard = () => {
                         <ShoppingCart className="text-warning" size={18} />
                         <span className="small fw-semibold">Orders</span>
                       </div>
-                      <span className="fw-bold" style={{ fontSize: '0.85rem' }}>4/10</span>
+                      {/* <span className="fw-bold" style={{ fontSize: '0.85rem' }}>4/10</span> */}
                     </div>
                     <ProgressBar now={40} variant="warning" style={{ height: '6px', borderRadius: '3px' }} />
                     <div className="d-flex justify-content-between mt-1">
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>4 Done</small>
+                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>4 Converted</small>
                       <small className="text-muted" style={{ fontSize: '0.7rem' }}>40%</small>
                     </div>
                   </div>
@@ -257,6 +260,14 @@ const Dashboard = () => {
                   <span className="text-muted">•••</span>
                 </div>
                 <div className="d-flex flex-column gap-2 mb-2 flex-grow-1">
+                <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center gap-2">
+                      <Clock className="text-info" size={18} />
+                      <span style={{ fontSize: '0.9rem' }}>Scheduled Calls</span>
+                    </div>
+                    <Badge bg="info" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>2</Badge>
+                  </div>
+                  
                   <div className="d-flex align-items-center justify-content-between">
                     <div className="d-flex align-items-center gap-2">
                       <AlertCircle className="text-danger" size={18} />
@@ -274,26 +285,21 @@ const Dashboard = () => {
                   <div className="d-flex align-items-center justify-content-between">
                     <div className="d-flex align-items-center gap-2">
                       <FileText className="text-warning" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Overdue Proposals</span>
+                      <span style={{ fontSize: '0.9rem' }}>Lost Deals</span>
                     </div>
                     <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>1</Badge>
                   </div>
                   <div className="d-flex align-items-center justify-content-between">
                     <div className="d-flex align-items-center gap-2">
                       <DollarSign className="text-warning" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Pending Quotes</span>
+                      <span style={{ fontSize: '0.9rem' }}>Cancelled Orders</span>
                     </div>
                     <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>1</Badge>
                   </div>
-                  <div className="d-flex align-items-center justify-content-between">
-                    <div className="d-flex align-items-center gap-2">
-                      <Clock className="text-info" size={18} />
-                      <span style={{ fontSize: '0.9rem' }}>Scheduled Calls</span>
-                    </div>
-                    <Badge bg="info" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>2</Badge>
-                  </div>
+                  
                 </div>
-                <Button variant="primary" className="mx-auto d-block mt-auto" style={{ width: '160px' }}>View Overdue</Button>
+                <Button variant="primary" className="mx-auto d-block mt-auto" style={{ width: '160px' }}>Visit Dashboard</Button>
+                {/* it will redirect to the crm/dashboard page */}
               </Card.Body>
             </Card>
           </Col>
@@ -330,12 +336,14 @@ const Dashboard = () => {
                   </div>
                   
                   <div className="col-6">
-                    <Button variant="primary" size="sm" className="w-100">AI Insights</Button>
+                    <Button variant="primary" size="sm" className="w-100">Dialer</Button>
                   </div>
                   <div className="col-6">
                     <Button variant="primary" size="sm" className="w-100">Live Wallboards</Button>
                   </div>
                   <div className="col-6">
+                    <Button variant="primary" size="sm" className="w-100">Billing</Button>
+                  </div>                  <div className="col-6">
                     <Button variant="primary" size="sm" className="w-100">Control Hub</Button>
                   </div>
                 </div>
@@ -392,31 +400,43 @@ const Dashboard = () => {
 
           {/* Missed & Callbacks */}
           <Col xs={12} md={6} lg={3}>
-            <Card className="h-100 shadow-sm">
+            <Card 
+              className="h-100 shadow-sm" 
+              style={{
+                opacity: 0.8,
+                pointerEvents: 'none',
+                cursor: 'not-allowed'
+              }}
+            >
               <Card.Body className="p-3 d-flex flex-column">
                 <div className="d-flex justify-content-between align-items-center mb-2">
-                  <h6 className="mb-0 fw-bold">Missed & Callbacks</h6>
+                  <h6 className="mb-0 fw-bold">AI Analysis</h6>
                   <span className="text-muted">•••</span>
                 </div>
                 <div className="d-flex gap-3 mb-2 flex-grow-1">
                   {/* Left Column - List */}
-                  <div className="d-flex flex-column gap-2" style={{ flex: 1 }}>
+                  <div className="d-flex flex-column gap-2" style={{ flex: 1.5 }}>
                     <div className="d-flex align-items-center gap-2">
-                      <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{missedCallsCount}</Badge>
-                      <span style={{ fontSize: '0.9rem' }}>Missed Calls</span>
+                      <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>100</Badge>
+                      <span style={{ fontSize: '0.9rem' }}>Analyzed Calls</span>
                     </div>
                     <div className="d-flex align-items-center gap-2">
-                      <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{callbacksDueCount}</Badge>
-                      <span style={{ fontSize: '0.9rem' }}>Callbacks Due</span>
+                      <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>40</Badge>
+                      <span style={{ fontSize: '0.9rem' }}>Qualified Calls</span>
                     </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>2</Badge>
+                      <span style={{ fontSize: '0.9rem' }}>Unqualified Calls</span>
+                    </div>
+                   
                     <div className="d-flex align-items-center gap-2">
                       <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{voicemailsCount}</Badge>
-                      <span style={{ fontSize: '0.9rem' }}>Voicemails</span>
+                      <span style={{ fontSize: '0.9rem' }}>Inquiries</span>
                     </div>
                   </div>
                   
                   {/* Right Column - Bar Chart */}
-                  <div style={{ flex: 1, minWidth: '80px' }}>
+                  <div style={{ flex: 0.5, minWidth: '80px' }}>
                     <ResponsiveContainer width="100%" height={80}>
                       <BarChart
                         data={[
@@ -443,11 +463,9 @@ const Dashboard = () => {
                     </ResponsiveContainer>
                   </div>
                 </div>
-                <div className="mb-2">
-                  <small className="text-muted" style={{ fontSize: '0.8rem' }}>Oldest: <span className="fw-semibold text-dark">1h 15m</span></small>
-                </div>
-                <Button variant="primary" className="mx-auto d-block mt-auto" style={{ width: '160px' }}>
-                  <Phone size={16} className="me-2" /> Start
+                
+                <Button disabled={true} variant="primary" className="mx-auto d-block mt-auto" style={{  }}>
+                  <Phone size={16} className="me-2" /> Go to AI Insights
                 </Button>
               </Card.Body>
             </Card>
@@ -498,30 +516,26 @@ const Dashboard = () => {
                         {/* Stats Summary */}
                         <div className="d-flex flex-column justify-content-center" style={{ flex: 1, gap: '3px' }}>
                           <div className="d-flex align-items-center gap-1">
-                            <CheckCircle className="text-success" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Answered</span>
+                            <Phone className="text-success" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Internal Calls</span>
                             <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>18</span>
                           </div>
                           <div className="d-flex align-items-center gap-1">
-                            <XCircle className="text-danger" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>No Answer</span>
+                            <Phone className="text-danger" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>External Calls</span>
                             <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>4</span>
                           </div>
                           <div className="d-flex align-items-center gap-1">
-                            <Clock className="text-warning" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Busy</span>
+                            <Phone className="text-warning" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>National</span>
                             <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>2</span>
                           </div>
                           <div className="d-flex align-items-center gap-1">
                             <Phone className="text-info" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Voicemail</span>
+                            <span style={{ fontSize: '0.75rem' }}>International</span>
                             <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>3</span>
                           </div>
-                          <div className="d-flex align-items-center gap-1">
-                            <XCircle className="text-secondary" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Failed</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>1</span>
-                          </div>
+                          
                         </div>
                       </div>
                       <Button variant="primary" className="mx-auto d-block mt-auto" size="sm" style={{ width: '160px' }}>Open Call Log</Button>
@@ -530,9 +544,11 @@ const Dashboard = () => {
 
                   {/* Vertical Divider */}
                   <Col xs={12} md={6} className="border-start border-md-1 border-0">
+                    
+                    
                     <div className="d-flex flex-column h-100">
                       <div className="d-flex justify-content-between align-items-center mb-2">
-                        <h6 className="mb-0 fw-bold">Top Call Reasons</h6>
+                        <h6 className="mb-0 fw-bold">Missed & Callbacks</h6>
                         <span className="text-muted">•••</span>
                       </div>
                       <div className="d-flex gap-2 flex-grow-1">
@@ -569,38 +585,49 @@ const Dashboard = () => {
                         {/* Stats Summary */}
                         <div className="d-flex flex-column justify-content-center" style={{ flex: 1, gap: '3px' }}>
                           <div className="d-flex align-items-center gap-1">
-                            <AlertCircle className="text-warning" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Billing Issue</span>
+                            <PhoneMissed className="text-warning" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Total Missed Calls</span>
                             <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>25</span>
                           </div>
                           <div className="d-flex align-items-center gap-1">
-                            <DollarSign className="text-warning" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Pricing</span>
+                            <PhoneIncoming className="text-success" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Total Answered Calls</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>10</span>
+                          </div>
+                          <div className="d-flex align-items-center gap-1">
+                            <PhoneOff className="text-warning" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Total Unanswered Calls</span>
                             <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>20</span>
                           </div>
                           <div className="d-flex align-items-center gap-1">
-                            <Wrench className="text-warning" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Tech Support</span>
+                            <Phone className="text-warning" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Total Callsback Due</span>
                             <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>18</span>
                           </div>
+                          {/* 
                           <div className="d-flex align-items-center gap-1">
-                            <Package className="text-success" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Order Status</span>
+                            <Phone className="text-success" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Total Voicemails</span>
                             <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>15</span>
                           </div>
                           <div className="d-flex align-items-center gap-1">
-                            <Ban className="text-success" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Cancellation</span>
+                            <Phone className="text-success" size={13} />
+                            <span style={{ fontSize: '0.75rem' }}>Total Failed Calls</span>
                             <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>12</span>
-                          </div>
-                          <div className="d-flex align-items-center gap-1">
-                            <Phone className="text-info" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>General</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>10</span>
-                          </div>
+                          </div> */}
+                          
                         </div>
                       </div>
                     </div>
+
+
+
+
+
+
+
+
+
                   </Col>
                 </Row>
               </Card.Body>
