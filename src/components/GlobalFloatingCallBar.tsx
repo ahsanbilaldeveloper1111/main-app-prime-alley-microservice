@@ -582,15 +582,35 @@ const GlobalFloatingCallBar: React.FC = () => {
       return call;
   }, [activeCalls, userAddress, callStateMap]);
 
-  // Get user extension data for the active call number
+  // Determine the other party's number (the person we're talking to, not ourselves)
+  const otherPartyNumber = React.useMemo(() => {
+    if (!activeCall || !userAddress) {
+      return activeCall?.number || null;
+    }
+    
+    // If user is the calling party, show the called party's number
+    if (activeCall.callingAddress === userAddress && activeCall.calledAddress) {
+      return activeCall.calledAddress;
+    }
+    
+    // If user is the called party, show the calling party's number
+    if (activeCall.calledAddress === userAddress && activeCall.callingAddress) {
+      return activeCall.callingAddress;
+    }
+    
+    // Fallback to number field
+    return activeCall.number || null;
+  }, [activeCall, userAddress]);
+
+  // Get user extension data for the other party's number
   const activeCallUserData = React.useMemo(() => {
-    if (!activeCall || !activeCall.number || !getUserDataExtensions) {
+    if (!activeCall || !otherPartyNumber || !getUserDataExtensions) {
       return null;
     }
     
     try {
       const userDataExtensions = getUserDataExtensions() || {};
-      const callNumber = activeCall.number;
+      const callNumber = otherPartyNumber;
       const dnString = String(callNumber);
       const dnNumber = Number(callNumber);
       
@@ -599,18 +619,18 @@ const GlobalFloatingCallBar: React.FC = () => {
       
       return data;
     } catch (error) {
-      console.error(`[GlobalFloatingCallBar] Error getting extension data for ${activeCall.number}:`, error);
+      console.error(`[GlobalFloatingCallBar] Error getting extension data for ${otherPartyNumber}:`, error);
       return null;
     }
-  }, [activeCall, getUserDataExtensions]);
+  }, [activeCall, otherPartyNumber, getUserDataExtensions]);
 
   // Get user name from extension data
   const activeCallUserName = React.useMemo(() => {
     if (!activeCallUserData) {
-      return activeCall?.number || "Unknown";
+      return otherPartyNumber || "Unknown";
     }
-    return activeCallUserData.name || activeCallUserData.user_name || activeCall?.number || "Unknown";
-  }, [activeCallUserData, activeCall]);
+    return activeCallUserData.name || activeCallUserData.user_name || otherPartyNumber || "Unknown";
+  }, [activeCallUserData, otherPartyNumber]);
 
   // Get user image URL
   const activeCallUserImageUrl = React.useMemo(() => {
@@ -1289,7 +1309,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                 >
                   {activeCallUserName}
                 </h3>
-                <div
+                {/* <div
                   style={{
                     fontSize: "0.7rem",
                     color: "#94a3b8",
@@ -1300,7 +1320,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                   }}
                 >
                   {displayNumber}
-                </div>
+                </div> */}
                 {/* Optional: Add contact label/group here if available */}
 
                 {/* Status Text */}
@@ -1371,7 +1391,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                   flexDirection: isVertical ? "column" : "row",
                 }}
               >
-                <span className="text-success" style={{ fontWeight: "500" }}>Incoming call</span>
+                <span className="text-success" style={{ fontWeight: "500" }}>Outgoing call</span>
                 <span className="bg-success rounded-circle" style={{ width: "0.375rem", height: "0.375rem" }}></span>
                 <span style={{ color: "#94a3b8" }}>Ringing...</span>
               </div>

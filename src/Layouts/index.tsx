@@ -1044,25 +1044,19 @@ const Layout = ({ children }: LayoutProps) => {
 								)}
 							</div>
 							<div>
-								<h3
-									style={{
-										fontSize: "1rem",
-										fontWeight: "600",
-										color: "#334155",
-										marginBottom: "0.25rem",
-									}}
-								>
-									{calledAddressUserName}
-								</h3>
-								{/* <div
-									style={{
-										fontSize: "0.875rem",
-										color: "#64748b",
-										marginBottom: "0.25rem",
-									}}
-								>
-									{formatPhoneNumber(incomingCall.calledAddress)}
-								</div> */}
+								{incomingCallUserData && (
+									<h3
+										style={{
+											fontSize: "1rem",
+											fontWeight: "600",
+											color: "#334155",
+											marginBottom: "0.25rem",
+										}}
+									>
+										{incomingCallUserName}
+									</h3>
+								)}
+								
 								<div
 									style={{
 										fontSize: "1rem",
@@ -1070,7 +1064,7 @@ const Layout = ({ children }: LayoutProps) => {
 										marginBottom: "0.25rem",
 									}}
 								>
-									{incomingCallUserName}
+									{incomingCall?.callingAddress ? formatPhoneNumber(incomingCall.callingAddress) : "Unknown"}
 								</div>
 								{/* <div
 									style={{
