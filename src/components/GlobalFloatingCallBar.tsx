@@ -23,6 +23,9 @@ const floatingBarStyles = `
     user-select: none;
     list-style: none;
     top: 20px !important;
+    left: auto !important;
+    right: 15rem !important;
+    
     box-shadow: none !important;
   }
   
@@ -1354,27 +1357,7 @@ const GlobalFloatingCallBar: React.FC = () => {
             )}
             
             
-            {activeCall.status === "onHold" && (
-              <div
-                style={{
-                  fontSize: isVertical ? "0.75rem" : "0.75rem",
-                  color: "#F4C22B",
-                  fontWeight: 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  flexDirection: isVertical ? "column" : "row",
-                }}
-              >
-                <i
-                  className="material-icons-two-tone"
-                  style={{ fontSize: isVertical ? "1rem" : "1rem" }}
-                >
-                  pause_circle
-                </i>
-                <span>{isVertical ? "Hold" : "On Hold"}</span>
-              </div>
-            )}
+            
             {activeCall.status === "ringing" && (
               <div
                 className="call-status-ringing"
@@ -1422,7 +1405,7 @@ const GlobalFloatingCallBar: React.FC = () => {
             }}
           >
             {/* Keypad Button */}
-            <button
+            {/* <button
               type="button"
               tabIndex={0}
               onClick={(e) => {
@@ -1459,11 +1442,35 @@ const GlobalFloatingCallBar: React.FC = () => {
               >
                 dialpad
               </i>
-            </button>
+            </button> */}
+
+{activeCall.status === "onHold" && (
+              <div
+                style={{
+                  fontSize: isVertical ? "0.75rem" : "0.75rem",
+                  color: "#F4C22B",
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  flexDirection: isVertical ? "column" : "row",
+                }}
+              >
+                {/* <i
+                  className="material-icons-two-tone"
+                  style={{ fontSize: isVertical ? "1rem" : "1rem" }}
+                >
+                  pause_circle
+                </i> */}
+                <span>{isVertical ? "Hold" : "On Hold"}</span>
+              </div>
+            )}
 
             {/* Additional Controls for Connected Calls */}
             {activeCall.status === "connected" && (
               <>
+
+              
                 <button
                   type="button"
                   role="button"

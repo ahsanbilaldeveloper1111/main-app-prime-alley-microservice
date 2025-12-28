@@ -708,7 +708,7 @@ const Layout = ({ children }: LayoutProps) => {
 
           
 
-          <GlobalFloatingCallBar />
+          {/* <GlobalFloatingCallBar /> */}
 
 
 	    
@@ -719,6 +719,7 @@ const Layout = ({ children }: LayoutProps) => {
 
 
             <div className="d-flex align-items-center justify-content-end">
+              <GlobalFloatingCallBar />
 
               {/* Call Button - Opens Dialer Modal */}
             {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
