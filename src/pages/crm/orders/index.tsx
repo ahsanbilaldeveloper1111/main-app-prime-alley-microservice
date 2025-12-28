@@ -39,7 +39,7 @@ import {
   Modal,
 } from "react-bootstrap";
 import Select from "react-select";
-import { ModuleSlug, formatDateForTable } from "@utils/Helper";
+import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper";
 import {
   Target,
   CheckCircle,
@@ -108,6 +108,7 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import FormModal from "../../partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
+import moment from "moment";
 
 // Phone Container Component (with Badge for tables)
 const ignoredKeys = ["order_stage_id"];
@@ -1335,7 +1336,8 @@ const CrmOrders = () => {
       approvalStatus: order.order_approval_status || null,
       fulfillmentStatus: order.fulfillment_status || null,
       paymentStatus: order.payment_status || null,
-      orderDate: formatDateForTable(order.order_date),
+      //orderDate: formatDateForTable(order.order_date),
+      orderDate: order.order_date ? moment(order.order_date).format(GlobalDateFormat) : '-',
       assignedUser:
         extensions.find(
           (ext: any) =>
@@ -2385,7 +2387,19 @@ const CrmOrders = () => {
                       ordersPagination.currentPage,
                       ordersPagination.rowsPerPage
                     ).map((order) => (
-                      <tr key={order.id}>
+                      <tr 
+                        key={order.id}
+                        onDoubleClick={() => {
+                          if (session?.user?.permissions?.includes("list-crm-orders")) {
+                            handleViewOrder(order.rawData?.id || order.id);
+                          }
+                        }}
+                        style={{
+                          cursor: session?.user?.permissions?.includes("list-crm-orders") 
+                            ? "pointer" 
+                            : "default"
+                        }}
+                      >
                         {selectedOrdersColumns.includes("orderNumber") && (
                           <td className="fw-semibold">{order.orderNumber}</td>
                         )}
@@ -2518,7 +2532,7 @@ const CrmOrders = () => {
                           <td>{order.assignedUser || "-"}</td>
                         )}
                         {selectedOrdersColumns.includes("orderDate") && (
-                          <td>{order.orderDate || "-"}</td>
+                          <td className="text-uppercase">{order.orderDate || "-"}</td>
                         )}
                         {selectedOrdersColumns.includes("owner") && (
                           <td>{order.owner || "-"}</td>

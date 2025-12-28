@@ -126,8 +126,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.CRM_SERVICES,
       icon: <Briefcase size={20} />,
       color: MENU_COLORS.CRM,
-      title: "CRM & Sales",
-      label: "CRM & Sales",
+      title: "CRM Workspace",
+      label: "CRM Workspace",
       url: '',
       subItems: [
         {

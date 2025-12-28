@@ -509,7 +509,7 @@ export const debugTimezoneConversion = (date: string, time: string) => {
 
 export const GlobalDateFormat = "D MMM YYYY";
 export const GlobalTimeFormat = "hh:mm:ss A";
-export const GlobalDateTimeFormat = "D MMM YYYY hh:mm:ss A";
+export const GlobalDateTimeFormat = "DD MMM YYYY hh:mm:ss A";
 
 /**
  * Format date for table display (e.g., "13 Dec, 2025")
