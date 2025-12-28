@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Card, Button, Badge } from 'react-bootstrap'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { CtiDevice } from '@components/live-calls/utils/types'
@@ -56,6 +56,7 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
   onToggle
 }) => {
   const hasContent = sectionDns.length > 0
+  const prevHasContentRef = useRef(hasContent)
 
   const sectionTitle = getSectionTitle(sectionKey)
   const sectionIcon = getSectionIcon(sectionKey)
@@ -67,10 +68,20 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
                     sectionKey === 'activeIdle' ? '#6b7280' : 
                     sectionKey === 'offline' ? '#ef4444' : '#ef4444'
 
-  // Auto-collapse section if no agents available
+  // Auto-collapse section if no agents available, and auto-expand when content appears
   useEffect(() => {
-    if (!hasContent && !isCollapsed) {
-      onToggle()
+    const prevHasContent = prevHasContentRef.current
+    prevHasContentRef.current = hasContent
+
+    // Only trigger when hasContent changes
+    if (prevHasContent !== hasContent) {
+      if (!hasContent && !isCollapsed) {
+        // Collapse if content is removed
+        onToggle()
+      } else if (hasContent && isCollapsed) {
+        // Auto-expand when content appears
+        onToggle()
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasContent, isCollapsed])
