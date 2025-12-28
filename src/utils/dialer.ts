@@ -86,7 +86,7 @@ export const validateResponse = (response: any) => {
       message: responseData?.responseData?.message
     }
   }else{
-    toast.error(responseData?.responseData?.message);
+   // toast.error(responseData?.responseData?.message);
     return {
       success: false,
       error: responseData?.responseData?.message,

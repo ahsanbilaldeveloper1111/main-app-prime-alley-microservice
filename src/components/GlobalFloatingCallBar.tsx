@@ -27,6 +27,10 @@ const floatingBarStyles = `
     right: 15rem !important;
     
     box-shadow: none !important;
+
+    @media (max-width: 480px) {
+      right: 0rem !important;
+    }
   }
   
   .global-floating-call-bar * {
@@ -1309,7 +1313,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                 >
                   {activeCallUserName}
                 </h3>
-                {/* <div
+                <div
                   style={{
                     fontSize: "0.7rem",
                     color: "#94a3b8",
@@ -1319,8 +1323,8 @@ const GlobalFloatingCallBar: React.FC = () => {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {displayNumber}
-                </div> */}
+                  {otherPartyNumber}
+                </div>
                 {/* Optional: Add contact label/group here if available */}
 
                 {/* Status Text */}
