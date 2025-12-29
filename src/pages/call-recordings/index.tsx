@@ -137,6 +137,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   // Use hierarchy data hook
   const { 
     hierarchyDataExtensions,
+    hierarchyDataDepartments,
+    hierarchyDataUsers,
     loading: hierarchyLoading
   } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
   const [callDurationBarChartModal, setCallDurationBarChartModal] = useState(false);
@@ -299,6 +301,21 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       name: 'Extension',
       selector: (row: any) => row.AgentExtension,
       sortable: true
+    },
+    {
+      key: 'Username',
+      name: 'Username',
+      selector: (row: any) => row.Username,
+      sortable: true
+    },
+    {
+      key: 'Department',
+      name: 'Department',
+      selector: (row: any) => row.Department,
+      sortable: true,
+      cell: (props: any) => {
+        return props.Department || '---';
+      }
     },
     {
       key: 'RemotePartyNumber',
@@ -1224,6 +1241,47 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                       label: ext.name
                     })) || []}
                     placeholder="Select extensions"
+                  />
+                </Form.Group>
+              </Col>
+
+              {/* Departments */}
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label>Departments</Form.Label>
+                  <SelectBox
+                    isMulti
+                    isSearchable={true}
+                    isDisabled={hierarchyLoading}
+                    value={(currentFilters as any)?.department?.length > 0 ? (currentFilters as any)?.department : null}
+                    onChange={(value) => {
+                      setCurrentFilters({ ...currentFilters, department: value ? (value as string[]) : [] });
+                    }}
+                    options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
+                      value: dept.id,
+                      label: dept.name
+                    })) || []}
+                    placeholder="Select departments"
+                  />
+                </Form.Group>
+              </Col>
+
+              {/* Users */}
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label>Username</Form.Label>
+                  <SelectBox
+                    isSearchable={true}
+                    isDisabled={hierarchyLoading}
+                    value={(currentFilters as any)?.username || null}
+                    onChange={(value) => {
+                      setCurrentFilters({ ...currentFilters, username: value as string || '' });
+                    }}
+                    options={(hierarchyDataUsers as any)?.map((user: any) => ({
+                      value: user.id,
+                      label: user.name
+                    })) || []}
+                    placeholder="Select username"
                   />
                 </Form.Group>
               </Col>
