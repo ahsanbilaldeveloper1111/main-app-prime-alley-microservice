@@ -63,7 +63,7 @@ const ProductDetails = () => {
          { key: 'billing_cycle', name: 'Billing Cycle', selector: (row: any) => row.product?.billing_cycle, sortable: true,
           cell: (row: any) => {
             return <div>
-              {row?.product?.billing_cycle || 'Yearly'}
+              {row?.product?.billing_cycle || ''}
             </div>
           }
          },
@@ -72,7 +72,7 @@ const ProductDetails = () => {
          { key: 'renewal_start_date', name: 'Renewal Start Date', selector: (row: any) => row.product?.renewal_start_date, sortable: true,
           cell: (row: any) => {
             return <div>
-              <span>{moment(row?.product?.renewal_start_date).format('DD-MMM-YYYY')}</span>
+              {row?.product?.renewal_start_date ? moment(row?.product?.renewal_start_date).format('DD-MMM-YYYY') : ''}
             </div>
           }
          },
@@ -81,7 +81,7 @@ const ProductDetails = () => {
          { key: 'renewal_end_date', name: 'Renewal End Date', selector: (row: any) => row.product?.renewal_end_date, sortable: true,
           cell: (row: any) => {
             return <div>
-               <span>{moment(row?.product?.renewal_end_date).format('DD-MMM-YYYY')}</span>
+               {row?.product?.renewal_end_date ? moment(row?.product?.renewal_end_date).format('DD-MMM-YYYY') : ''}
             </div>
           }
          },
