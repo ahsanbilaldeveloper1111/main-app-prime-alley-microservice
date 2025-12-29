@@ -773,7 +773,7 @@ const GlobalFloatingCallBar: React.FC = () => {
   // Don't show floating bar if CTI is not initialized or user doesn't have permission
   // Also check if we're on the dialer or live-calls page itself (to avoid duplicate UI)
   // Only show if there's an active call (dialer button is now in topbar)
-  const hideOnPages = ["/cti/dialer", "/cti/live-calls"];
+  const hideOnPages: string[] = [];
   const shouldShowFloatingBar = isInitialized && 
     hasPermission("dial-call-cti") && 
     !hideOnPages.includes(router.pathname);
