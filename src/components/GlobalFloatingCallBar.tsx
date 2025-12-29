@@ -22,9 +22,10 @@ const floatingBarStyles = `
     animation: slideUp 0.3s ease-out;
     user-select: none;
     list-style: none;
-    top: 20px !important;
+    top: 15px !important;
     left: auto !important;
     right: 15rem !important;
+    width:auto !important;
     
     box-shadow: none !important;
 

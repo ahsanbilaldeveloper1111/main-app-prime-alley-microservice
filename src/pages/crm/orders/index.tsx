@@ -10,6 +10,25 @@ import React, {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
+  FiUpload,
+  FiDatabase,
+  FiSearch,
+  FiFilter,
+  FiTrash2,
+  FiEye,
+  FiUser,
+  FiUsers,
+  FiPhone,
+  FiMessageCircle,
+  FiPlay,
+  FiClock,
+  FiX,
+  FiAlertCircle,
+  FiCalendar,
+  FiTarget,
+  FiMoreVertical,
+} from "react-icons/fi";
+import {
   getOrders,
   getOrder,
   getStages,
@@ -399,41 +418,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
             })}
           </div>
 
-          <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
-            <InputGroup
-              style={{ width: "300px", minWidth: "200px" }}
-              className="flex-shrink-0"
-            >
-              <Form.Control
-                style={{ height: "41px" }}
-                type="text"
-                placeholder={searchPlaceholder}
-                value={searchValue}
-                onChange={(e) => onSearchChange(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    onSearch();
-                  }
-                }}
-              />
-              <Button variant="outline-secondary" onClick={onSearch}>
-                <Search size={16} />
-              </Button>
-            </InputGroup>
-            <Button
-              variant={showAdvancedFilters ? "primary" : "outline-secondary"}
-              onClick={onToggleAdvancedFilters}
-              className="d-flex align-items-center flex-shrink-0"
-            >
-              <Filter size={16} className="me-2" />
-              Filters
-              {advancedFilterCount > 0 && (
-                <Badge bg="light" text="dark" className="ms-2">
-                  {advancedFilterCount}
-                </Badge>
-              )}
-            </Button>
-          </div>
+         
         </div>
       </Card.Body>
     </Card>
@@ -1551,6 +1536,13 @@ const CrmOrders = () => {
               <BarChart3 size={16} className="me-2" />
               {showOrdersAnalytics ? "Hide Analytics" : "Show Analytics"}
             </Button>
+            <Button
+            variant={showAdvancedFilters ? "secondary" : "outline-secondary"}
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          >
+            <FiFilter size={16} className="me-2" />
+            {showAdvancedFilters ? "Hide Filters" : "Show Filters"}
+          </Button>
           </div>
         </div>
 
@@ -1700,41 +1692,42 @@ const CrmOrders = () => {
               icon: <Trash2 size={16} />,
             },
           ]}
-          activeFilter={activeFilter}
-          onFilterChange={(filterId) => {
-            setActiveFilter(filterId);
-            setOrdersPagination({ ...ordersPagination, currentPage: 1 });
-          }}
-          searchValue={ordersSearch}
-          onSearchChange={(value) => setOrdersSearch(value)}
-          onSearch={() => {
-            if (ordersSearch.trim()) {
-              handleFiltersChange({ search: ordersSearch.trim() });
-            } else {
-              handleFiltersChange({ search: null });
-            }
-            setOrdersPagination({ ...ordersPagination, currentPage: 1 });
-          }}
-          searchPlaceholder="Search orders by number, customer, deal..."
-          showAdvancedFilters={showAdvancedFilters}
-          onToggleAdvancedFilters={() =>
-            setShowAdvancedFilters(!showAdvancedFilters)
-          }
-          advancedFilterCount={
-            (ordersFilters.assignedTo !== null ? 1 : 0) +
-            (ordersFilters.stage !== null ? 1 : 0) +
-            (ordersFilters.industry !== null ? 1 : 0) +
-            (ordersFilters.orderValueMin !== null ||
-            ordersFilters.orderValueMax !== null
-              ? 1
-              : 0) +
-            (ordersFilters.orderApprovalStatus !== null ? 1 : 0) +
-            (ordersFilters.fulfillmentStatus !== null ? 1 : 0) +
-            (ordersFilters.paymentStatus !== null ? 1 : 0) +
-            (ordersFilters.dateFrom !== null || ordersFilters.dateTo !== null
-              ? 1
-              : 0)
-          }
+          // activeFilter={activeFilter}
+          // onFilterChange={(filterId) => {
+          //   setActiveFilter(filterId);
+          //   setOrdersPagination({ ...ordersPagination, currentPage: 1 });
+          // }}
+          // searchValue={ordersSearch}
+          
+          // onSearch={() => {
+          //   if (ordersSearch.trim()) {
+          //     handleFiltersChange({ search: ordersSearch.trim() });
+          //   } else {
+          //     handleFiltersChange({ search: null });
+          //   }
+          //   setOrdersPagination({ ...ordersPagination, currentPage: 1 });
+          // }}
+          // searchPlaceholder="Search orders by number, customer, deal..."
+          // onSearchChange={(value) => setOrdersSearch(value)}
+          // showAdvancedFilters={showAdvancedFilters}
+          // onToggleAdvancedFilters={() =>
+          //   setShowAdvancedFilters(!showAdvancedFilters)
+          // }
+          // advancedFilterCount={
+          //   (ordersFilters.assignedTo !== null ? 1 : 0) +
+          //   (ordersFilters.stage !== null ? 1 : 0) +
+          //   (ordersFilters.industry !== null ? 1 : 0) +
+          //   (ordersFilters.orderValueMin !== null ||
+          //   ordersFilters.orderValueMax !== null
+          //     ? 1
+          //     : 0) +
+          //   (ordersFilters.orderApprovalStatus !== null ? 1 : 0) +
+          //   (ordersFilters.fulfillmentStatus !== null ? 1 : 0) +
+          //   (ordersFilters.paymentStatus !== null ? 1 : 0) +
+          //   (ordersFilters.dateFrom !== null || ordersFilters.dateTo !== null
+          //     ? 1
+          //     : 0)
+          // }
         />
 
         {/* Advanced Filters */}
@@ -1742,6 +1735,17 @@ const CrmOrders = () => {
           <Card className="border-0 shadow-sm mb-4">
             <Card.Body>
               <Row className="g-3 align-items-end">
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">
+                    Search
+                  </Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={ordersSearch}
+                    onChange={(e) => setOrdersSearch(e.target.value)}
+                    placeholder="Search orders by number, customer, deal..."
+                  />
+                </Col>
                 <Col md={4}>
                   <Form.Label className="small fw-bold mb-2">
                     Assigned To
@@ -1777,10 +1781,6 @@ const CrmOrders = () => {
                         ...prev,
                         assignedTo: assignedToValue,
                       }));
-                      // Update currentFilters for API call
-                      handleFiltersChange({
-                        assigned_to: assignedToValue || null,
-                      });
                       // Reset to all when assigned filter changes
                       setActiveFilter("all");
                     }}
@@ -1817,10 +1817,6 @@ const CrmOrders = () => {
                         ...prev,
                         stage: stageValue,
                       }));
-                      // Update currentFilters for API call
-                      handleFiltersChange({
-                        order_stage_id: stageValue || null,
-                      });
                       // Update activeFilter to match selected stage
                       if (stageValue) {
                         setActiveFilter(stageValue);
@@ -1845,9 +1841,6 @@ const CrmOrders = () => {
                         ...prev,
                         industry: value,
                       }));
-                      handleFiltersChange({
-                        industry: value || null,
-                      });
                     }}
                   >
                     <option value="">Select Industry</option>
@@ -1883,9 +1876,6 @@ const CrmOrders = () => {
                         ...prev,
                         orderValueMin: value,
                       }));
-                      handleFiltersChange({
-                        order_value_min: value || null,
-                      });
                     }}
                     placeholder="0.00"
                   />
@@ -1905,9 +1895,6 @@ const CrmOrders = () => {
                         ...prev,
                         orderValueMax: value,
                       }));
-                      handleFiltersChange({
-                        order_value_max: value || null,
-                      });
                     }}
                     placeholder="0.00"
                   />
@@ -1924,9 +1911,6 @@ const CrmOrders = () => {
                         ...prev,
                         orderApprovalStatus: value,
                       }));
-                      handleFiltersChange({
-                        order_approval_status: value || null,
-                      });
                     }}
                   >
                     <option value="">Select Status</option>
@@ -1947,9 +1931,6 @@ const CrmOrders = () => {
                         ...prev,
                         fulfillmentStatus: value,
                       }));
-                      handleFiltersChange({
-                        fulfillment_status: value || null,
-                      });
                     }}
                   >
                     <option value="">Select Status</option>
@@ -1972,9 +1953,6 @@ const CrmOrders = () => {
                         ...prev,
                         paymentStatus: value,
                       }));
-                      handleFiltersChange({
-                        payment_status: value || null,
-                      });
                     }}
                   >
                     <option value="">Select Status</option>
@@ -1997,9 +1975,6 @@ const CrmOrders = () => {
                         ...prev,
                         dateFrom: dateValue,
                       }));
-                      handleFiltersChange({
-                        date_from: dateValue || null,
-                      });
                     }}
                   />
                 </Col>
@@ -2016,9 +1991,6 @@ const CrmOrders = () => {
                         ...prev,
                         dateTo: dateValue,
                       }));
-                      handleFiltersChange({
-                        date_to: dateValue || null,
-                      });
                     }}
                   />
                 </Col>
@@ -2028,6 +2000,55 @@ const CrmOrders = () => {
                       variant="outline-secondary"
                       className="d-flex align-items-center justify-content-center"
                       onClick={() => {
+                        // Map ordersFilters to the format expected by handleFiltersChange
+                        const filtersToApply: Record<string, any> = {};
+                        
+                        if (ordersSearch) {
+                          filtersToApply.search = ordersSearch;
+                        }
+                        if (ordersFilters.assignedTo) {
+                          filtersToApply.assigned_to = ordersFilters.assignedTo;
+                        }
+                        if (ordersFilters.stage) {
+                          filtersToApply.order_stage_id = ordersFilters.stage;
+                        }
+                        if (ordersFilters.industry) {
+                          filtersToApply.industry = ordersFilters.industry;
+                        }
+                        if (ordersFilters.orderValueMin) {
+                          filtersToApply.order_value_min = ordersFilters.orderValueMin;
+                        }
+                        if (ordersFilters.orderValueMax) {
+                          filtersToApply.order_value_max = ordersFilters.orderValueMax;
+                        }
+                        if (ordersFilters.orderApprovalStatus) {
+                          filtersToApply.order_approval_status = ordersFilters.orderApprovalStatus;
+                        }
+                        if (ordersFilters.fulfillmentStatus) {
+                          filtersToApply.fulfillment_status = ordersFilters.fulfillmentStatus;
+                        }
+                        if (ordersFilters.paymentStatus) {
+                          filtersToApply.payment_status = ordersFilters.paymentStatus;
+                        }
+                        if (ordersFilters.dateFrom) {
+                          filtersToApply.date_from = ordersFilters.dateFrom;
+                        }
+                        if (ordersFilters.dateTo) {
+                          filtersToApply.date_to = ordersFilters.dateTo;
+                        }
+                        
+                        handleFiltersChange(filtersToApply);
+                        setOrdersPagination({ ...ordersPagination, currentPage: 1 });
+                        setRefreshKey((prev) => prev + 1);
+                      }}
+                    >
+                      Submit Filters
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      className="d-flex align-items-center justify-content-center"
+                      onClick={() => {
+                        setOrdersSearch("");
                         setOrdersFilters({
                           assignedTo: null,
                           stage: null,
@@ -2040,6 +2061,7 @@ const CrmOrders = () => {
                           dateFrom: null,
                           dateTo: null,
                         });
+                        handleFiltersChange({});
                         setCurrentFilters({});
                         setActiveFilter("all");
                         setOrdersPagination({

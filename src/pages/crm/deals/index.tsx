@@ -10,6 +10,25 @@ import React, {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
+  FiUpload,
+  FiDatabase,
+  FiSearch,
+  FiFilter,
+  FiTrash2,
+  FiEye,
+  FiUser,
+  FiUsers,
+  FiPhone,
+  FiMessageCircle,
+  FiPlay,
+  FiClock,
+  FiX,
+  FiAlertCircle,
+  FiCalendar,
+  FiTarget,
+  FiMoreVertical,
+} from "react-icons/fi";
+import {
   getDeals,
   getStages,
   deleteDeal,
@@ -371,7 +390,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
             })}
           </div>
 
-          <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
+          {/* <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
             <InputGroup style={{ width: '300px', minWidth: '200px' }} className="flex-shrink-0">
               <Form.Control
                 style={{ height: '41px' }}
@@ -405,7 +424,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 </Badge>
               )}
             </Button>
-          </div>
+          </div> */}
         </div>
       </Card.Body>
     </Card>
@@ -580,7 +599,7 @@ const CrmDeals = () => {
         setLoading(false);
       }
     },
-    [currentFilters, dealsSearch]
+    [currentFilters]
   );
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
@@ -1507,6 +1526,14 @@ const CrmDeals = () => {
                 </Button>
               </Link>
             )} */}
+
+<Button
+            variant={showAdvancedFilters ? "secondary" : "outline-secondary"}
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          >
+            <FiFilter size={16} className="me-2" />
+            {showAdvancedFilters ? "Hide Filters" : "Show Filters"}
+          </Button>
           </div>
         </div>
 
@@ -1632,33 +1659,33 @@ const CrmDeals = () => {
               icon: <Trash2 size={16} />
             }
           ]}
-          activeFilter={activeFilter}
-          onFilterChange={(filterId) => {
-            setActiveFilter(filterId);
-            setDealsPagination({ ...dealsPagination, currentPage: 1 });
-          }}
-          searchValue={dealsSearch}
-          onSearchChange={(value) => setDealsSearch(value)}
-          onSearch={() => {
-            if (dealsSearch.trim()) {
-              handleFiltersChange({ search: dealsSearch.trim() });
-            } else {
-              handleFiltersChange({ search: null });
-            }
-            setDealsPagination({ ...dealsPagination, currentPage: 1 });
-          }}
-          searchPlaceholder="Search deals by name, company..."
-          showAdvancedFilters={showAdvancedFilters}
-          onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
-          advancedFilterCount={
-            (dealsFilters.assignedTo !== null ? 1 : 0) +
-            (dealsFilters.stage !== null ? 1 : 0) +
-            (dealsFilters.followUpDateFrom !== null || dealsFilters.followUpDateTo !== null ? 1 : 0) +
-            (dealsFilters.probabilityMin !== null || dealsFilters.probabilityMax !== null ? 1 : 0) +
-            (dealsFilters.dealType !== null ? 1 : 0) +
-            (dealsFilters.industry !== null ? 1 : 0) +
-            (dealsFilters.expectedCloseDateFrom !== null || dealsFilters.expectedCloseDateTo !== null ? 1 : 0)
-          }
+          // activeFilter={activeFilter}
+          // onFilterChange={(filterId) => {
+          //   setActiveFilter(filterId);
+          //   setDealsPagination({ ...dealsPagination, currentPage: 1 });
+          // }}
+          // searchValue={dealsSearch}
+          // onSearchChange={(value) => setDealsSearch(value)}
+          // onSearch={() => {
+          //   if (dealsSearch.trim()) {
+          //     handleFiltersChange({ search: dealsSearch.trim() });
+          //   } else {
+          //     handleFiltersChange({ search: null });
+          //   }
+          //   setDealsPagination({ ...dealsPagination, currentPage: 1 });
+          // }}
+          // searchPlaceholder="Search deals by name, company..."
+          // showAdvancedFilters={showAdvancedFilters}
+          // onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          // advancedFilterCount={
+          //   (dealsFilters.assignedTo !== null ? 1 : 0) +
+          //   (dealsFilters.stage !== null ? 1 : 0) +
+          //   (dealsFilters.followUpDateFrom !== null || dealsFilters.followUpDateTo !== null ? 1 : 0) +
+          //   (dealsFilters.probabilityMin !== null || dealsFilters.probabilityMax !== null ? 1 : 0) +
+          //   (dealsFilters.dealType !== null ? 1 : 0) +
+          //   (dealsFilters.industry !== null ? 1 : 0) +
+          //   (dealsFilters.expectedCloseDateFrom !== null || dealsFilters.expectedCloseDateTo !== null ? 1 : 0)
+          // }
         />
 
         {/* Advanced Filters */}
@@ -1666,6 +1693,17 @@ const CrmDeals = () => {
           <Card className="border-0 shadow-sm mb-4">
             <Card.Body>
               <Row className="g-3 align-items-end">
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">
+                    Search
+                  </Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="Search deals by name, company, value..."
+                    value={dealsSearch}
+                    onChange={(e) => setDealsSearch(e.target.value)}
+                  />
+                </Col>
                 <Col md={4}>
                   <Form.Label className="small fw-bold mb-2">Assigned To</Form.Label>
                   <Select
@@ -1687,10 +1725,6 @@ const CrmDeals = () => {
                         ...prev,
                         assignedTo: assignedToValue
                       }));
-                      // Update currentFilters for API call
-                      handleFiltersChange({ 
-                        assigned_to: assignedToValue || null 
-                      });
                       // Reset to all when assigned filter changes
                       setActiveFilter('all');
                     }}
@@ -1714,10 +1748,6 @@ const CrmDeals = () => {
                         ...prev,
                         stage: stageValue
                       }));
-                      // Update currentFilters for API call
-                      handleFiltersChange({ 
-                        stage_id: stageValue || null 
-                      });
                       // Update activeFilter to match selected stage
                       if (stageValue) {
                         setActiveFilter(stageValue);
@@ -1741,9 +1771,6 @@ const CrmDeals = () => {
                         ...prev,
                         followUpDateFrom: dateValue
                       }));
-                      handleFiltersChange({
-                        follow_up_date_from: dateValue || null
-                      });
                     }}
                   />
                 </Col>
@@ -1758,9 +1785,6 @@ const CrmDeals = () => {
                         ...prev,
                         followUpDateTo: dateValue
                       }));
-                      handleFiltersChange({
-                        follow_up_date_to: dateValue || null
-                      });
                     }}
                   />
                 </Col>
@@ -1777,9 +1801,6 @@ const CrmDeals = () => {
                         ...prev,
                         probabilityMin: value
                       }));
-                      handleFiltersChange({
-                        probability_min: value || null
-                      });
                     }}
                     placeholder="0"
                   />
@@ -1797,9 +1818,6 @@ const CrmDeals = () => {
                         ...prev,
                         probabilityMax: value
                       }));
-                      handleFiltersChange({
-                        probability_max: value || null
-                      });
                     }}
                     placeholder="100"
                   />
@@ -1814,9 +1832,6 @@ const CrmDeals = () => {
                         ...prev,
                         dealType: value
                       }));
-                      handleFiltersChange({
-                        deal_type: value || null
-                      });
                     }}
                   >
                     <option value="">Select Deal Type</option>
@@ -1836,9 +1851,6 @@ const CrmDeals = () => {
                         ...prev,
                         industry: value
                       }));
-                      handleFiltersChange({
-                        industry: value || null
-                      });
                     }}
                   >
                     <option value="">Select Industry</option>
@@ -1866,9 +1878,6 @@ const CrmDeals = () => {
                         ...prev,
                         expectedCloseDateFrom: dateValue
                       }));
-                      handleFiltersChange({
-                        expected_close_date_from: dateValue || null
-                      });
                     }}
                   />
                 </Col>
@@ -1883,9 +1892,6 @@ const CrmDeals = () => {
                         ...prev,
                         expectedCloseDateTo: dateValue
                       }));
-                      handleFiltersChange({
-                        expected_close_date_to: dateValue || null
-                      });
                     }}
                   />
                 </Col>
@@ -1895,6 +1901,55 @@ const CrmDeals = () => {
                       variant="outline-secondary"
                       className="d-flex align-items-center justify-content-center"
                       onClick={() => {
+                        // Map dealsFilters to the format expected by handleFiltersChange
+                        const filtersToApply: Record<string, any> = {};
+                        
+                        if (dealsSearch) {
+                          filtersToApply.search = dealsSearch;
+                        }
+                        if (dealsFilters.assignedTo) {
+                          filtersToApply.assigned_to = dealsFilters.assignedTo;
+                        }
+                        if (dealsFilters.stage) {
+                          filtersToApply.stage_id = dealsFilters.stage;
+                        }
+                        if (dealsFilters.followUpDateFrom) {
+                          filtersToApply.follow_up_date_from = dealsFilters.followUpDateFrom;
+                        }
+                        if (dealsFilters.followUpDateTo) {
+                          filtersToApply.follow_up_date_to = dealsFilters.followUpDateTo;
+                        }
+                        if (dealsFilters.probabilityMin) {
+                          filtersToApply.probability_min = dealsFilters.probabilityMin;
+                        }
+                        if (dealsFilters.probabilityMax) {
+                          filtersToApply.probability_max = dealsFilters.probabilityMax;
+                        }
+                        if (dealsFilters.dealType) {
+                          filtersToApply.deal_type = dealsFilters.dealType;
+                        }
+                        if (dealsFilters.industry) {
+                          filtersToApply.industry = dealsFilters.industry;
+                        }
+                        if (dealsFilters.expectedCloseDateFrom) {
+                          filtersToApply.expected_close_date_from = dealsFilters.expectedCloseDateFrom;
+                        }
+                        if (dealsFilters.expectedCloseDateTo) {
+                          filtersToApply.expected_close_date_to = dealsFilters.expectedCloseDateTo;
+                        }
+                        
+                        handleFiltersChange(filtersToApply);
+                        setDealsPagination({ ...dealsPagination, currentPage: 1 });
+                        setRefreshKey(prev => prev + 1);
+                      }}
+                    >
+                      Submit Filters
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      className="d-flex align-items-center justify-content-center"
+                      onClick={() => {
+                        setDealsSearch("");
                         setDealsFilters({
                           assignedTo: null,
                           stage: null,
@@ -1907,6 +1962,7 @@ const CrmDeals = () => {
                           expectedCloseDateFrom: null,
                           expectedCloseDateTo: null,
                         });
+                        handleFiltersChange({});
                         setCurrentFilters({});
                         setActiveFilter('all');
                         setDealsPagination({ ...dealsPagination, currentPage: 1 });

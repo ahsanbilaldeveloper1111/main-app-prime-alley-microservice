@@ -95,6 +95,25 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
+import {
+  FiUpload,
+  FiDatabase,
+  FiSearch,
+  FiFilter,
+  FiTrash2,
+  FiEye,
+  FiUser,
+  FiUsers,
+  FiPhone,
+  FiMessageCircle,
+  FiPlay,
+  FiClock,
+  FiX,
+  FiAlertCircle,
+  FiCalendar,
+  FiTarget,
+  FiMoreVertical,
+} from "react-icons/fi";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import moment from "moment";
@@ -478,7 +497,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
             })}
           </div>
 
-          <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
+          {/* <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
             <InputGroup
               style={{ width: "300px", minWidth: "200px" }}
               className="flex-shrink-0"
@@ -499,20 +518,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 <Search size={16} />
               </Button>
             </InputGroup>
-            <Button
-              variant={showAdvancedFilters ? "primary" : "outline-secondary"}
-              onClick={onToggleAdvancedFilters}
-              className="d-flex align-items-center flex-shrink-0"
-            >
-              <Filter size={16} className="me-2" />
-              Filters
-              {advancedFilterCount > 0 && (
-                <Badge bg="light" text="dark" className="ms-2">
-                  {advancedFilterCount}
-                </Badge>
-              )}
-            </Button>
-          </div>
+            
+          </div> */}
         </div>
       </Card.Body>
     </Card>
@@ -2128,6 +2135,10 @@ const CrmLeads = () => {
                 </Button>
               </Link>
             )}
+            <Button variant={`${showAdvancedFilters ? "secondary" : "outline-secondary"}`} onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}>
+              <Filter size={16} className="me-2" />
+              {showAdvancedFilters ? "Hide Filters" : "Show Filters"}
+            </Button>
           </div>
         </div>
 
@@ -2282,41 +2293,41 @@ const CrmLeads = () => {
               icon: <Trash2 size={16} />,
             },
           ]}
-          activeFilter={activeFilter}
-          onFilterChange={(filterId) => {
-            setActiveFilter(filterId);
-            setLeadsPagination({ ...leadsPagination, currentPage: 1 });
-          }}
-          searchValue={leadsSearch}
-          onSearchChange={(value) => setLeadsSearch(value)}
-          onSearch={() => {
-            if (leadsSearch.trim()) {
-              handleFiltersChange({ search: leadsSearch.trim() });
-            } else {
-              handleFiltersChange({ search: null });
-            }
-            setLeadsPagination({ ...leadsPagination, currentPage: 1 });
-          }}
-          searchPlaceholder="Search leads by name, company, email..."
-          showAdvancedFilters={showAdvancedFilters}
-          onToggleAdvancedFilters={() =>
-            setShowAdvancedFilters(!showAdvancedFilters)
-          }
-          advancedFilterCount={
-            (leadsFilters.assignedTo !== null ? 1 : 0) +
-            (leadsFilters.stage !== null ? 1 : 0) +
-            (leadsFilters.industry !== null ? 1 : 0) +
-            (leadsFilters.source !== null ? 1 : 0) +
-            (leadsFilters.leadPotential !== null ? 1 : 0) +
-            (leadsFilters.campaign !== null ? 1 : 0) +
-            (leadsFilters.leadScoreMin !== null ||
-            leadsFilters.leadScoreMax !== null
-              ? 1
-              : 0) +
-            (leadsFilters.dateFrom !== null || leadsFilters.dateTo !== null
-              ? 1
-              : 0)
-          }
+          // activeFilter={activeFilter}
+          // onFilterChange={(filterId) => {
+          //   setActiveFilter(filterId);
+          //   setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+          // }}
+          // searchValue={leadsSearch}
+          // onSearchChange={(value) => setLeadsSearch(value)}
+          // onSearch={() => {
+          //   if (leadsSearch.trim()) {
+          //     handleFiltersChange({ search: leadsSearch.trim() });
+          //   } else {
+          //     handleFiltersChange({ search: null });
+          //   }
+          //   setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+          // }}
+          // searchPlaceholder="Search leads by name, company, email..."
+          // showAdvancedFilters={showAdvancedFilters}
+          // onToggleAdvancedFilters={() =>
+          //   setShowAdvancedFilters(!showAdvancedFilters)
+          // }
+          // advancedFilterCount={
+          //   (leadsFilters.assignedTo !== null ? 1 : 0) +
+          //   (leadsFilters.stage !== null ? 1 : 0) +
+          //   (leadsFilters.industry !== null ? 1 : 0) +
+          //   (leadsFilters.source !== null ? 1 : 0) +
+          //   (leadsFilters.leadPotential !== null ? 1 : 0) +
+          //   (leadsFilters.campaign !== null ? 1 : 0) +
+          //   (leadsFilters.leadScoreMin !== null ||
+          //   leadsFilters.leadScoreMax !== null
+          //     ? 1
+          //     : 0) +
+          //   (leadsFilters.dateFrom !== null || leadsFilters.dateTo !== null
+          //     ? 1
+          //     : 0)
+          // }
         />
 
         {/* Advanced Filters */}
@@ -2324,6 +2335,17 @@ const CrmLeads = () => {
           <Card className="border-0 shadow-sm mb-4">
             <Card.Body>
               <Row className="g-3 align-items-end">
+                <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">
+                    Search
+                  </Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="Search leads by name, company, email..."
+                    value={leadsSearch}
+                    onChange={(e) => setLeadsSearch(e.target.value)}
+                  />
+                </Col>
                 <Col md={4}>
                   <Form.Label className="small fw-bold mb-2">
                     Assigned To
@@ -2359,10 +2381,6 @@ const CrmLeads = () => {
                         ...prev,
                         assignedTo: assignedToValue,
                       }));
-                      // Update currentFilters for API call
-                      handleFiltersChange({
-                        assigned_to: assignedToValue || null,
-                      });
                       // Reset to all when assigned filter changes
                       setActiveFilter("all");
                     }}
@@ -2397,10 +2415,6 @@ const CrmLeads = () => {
                         ...prev,
                         stage: stageValue,
                       }));
-                      // Update currentFilters for API call
-                      handleFiltersChange({
-                        stage_id: stageValue || null,
-                      });
                       // Update activeFilter to match selected stage
                       if (stageValue) {
                         setActiveFilter(stageValue);
@@ -2451,9 +2465,6 @@ const CrmLeads = () => {
                         ...prev,
                         industry: industryValue,
                       }));
-                      handleFiltersChange({
-                        industry: industryValue || null,
-                      });
                     }}
                     placeholder="Select industry..."
                     styles={customSelectStyles}
@@ -2478,9 +2489,6 @@ const CrmLeads = () => {
                         ...prev,
                         source: sourceValue,
                       }));
-                      handleFiltersChange({
-                        source: sourceValue || null,
-                      });
                     }}
                     placeholder="Select or create source..."
                     styles={customSelectStyles}
@@ -2514,9 +2522,6 @@ const CrmLeads = () => {
                         ...prev,
                         leadPotential: leadPotentialValue,
                       }));
-                      handleFiltersChange({
-                        lead_potential: leadPotentialValue || null,
-                      });
                     }}
                     placeholder="Select lead potential..."
                     styles={customSelectStyles}
@@ -2551,9 +2556,6 @@ const CrmLeads = () => {
                         ...prev,
                         campaign: campaignValue,
                       }));
-                      handleFiltersChange({
-                        campaign_id: campaignValue || null,
-                      });
                     }}
                     placeholder="Select campaign..."
                     styles={customSelectStyles}
@@ -2575,9 +2577,6 @@ const CrmLeads = () => {
                           ...prev,
                           leadScoreMin: minValue,
                         }));
-                        handleFiltersChange({
-                          lead_score_min: minValue || null,
-                        });
                       }}
                       placeholder="Min"
                       style={{ flex: 1 }}
@@ -2593,9 +2592,6 @@ const CrmLeads = () => {
                           ...prev,
                           leadScoreMax: maxValue,
                         }));
-                        handleFiltersChange({
-                          lead_score_max: maxValue || null,
-                        });
                       }}
                       placeholder="Max"
                       style={{ flex: 1 }}
@@ -2616,9 +2612,6 @@ const CrmLeads = () => {
                           ...prev,
                           dateFrom: dateFromValue,
                         }));
-                        handleFiltersChange({
-                          date_from: dateFromValue || null,
-                        });
                       }}
                       placeholder="From"
                       style={{ flex: 1 }}
@@ -2633,21 +2626,67 @@ const CrmLeads = () => {
                           ...prev,
                           dateTo: dateToValue,
                         }));
-                        handleFiltersChange({
-                          date_to: dateToValue || null,
-                        });
                       }}
                       placeholder="To"
                       style={{ flex: 1 }}
                     />
                   </div>
                 </Col>
-                <Col md={12}>
+                <Col md={4}>
                   <div className="d-flex gap-2">
                     <Button
                       variant="outline-secondary"
                       className="d-flex align-items-center justify-content-center"
                       onClick={() => {
+                        // Map leadsFilters to the format expected by handleFiltersChange
+                        const filtersToApply: Record<string, any> = {};
+                        
+                        if (leadsSearch) {
+                          filtersToApply.search = leadsSearch;
+                        }
+                        if (leadsFilters.assignedTo) {
+                          filtersToApply.assigned_to = leadsFilters.assignedTo;
+                        }
+                        if (leadsFilters.stage) {
+                          filtersToApply.stage_id = leadsFilters.stage;
+                        }
+                        if (leadsFilters.industry) {
+                          filtersToApply.industry = leadsFilters.industry;
+                        }
+                        if (leadsFilters.source) {
+                          filtersToApply.source = leadsFilters.source;
+                        }
+                        if (leadsFilters.leadPotential) {
+                          filtersToApply.lead_potential = leadsFilters.leadPotential;
+                        }
+                        if (leadsFilters.campaign) {
+                          filtersToApply.campaign_id = leadsFilters.campaign;
+                        }
+                        if (leadsFilters.leadScoreMin) {
+                          filtersToApply.lead_score_min = leadsFilters.leadScoreMin;
+                        }
+                        if (leadsFilters.leadScoreMax) {
+                          filtersToApply.lead_score_max = leadsFilters.leadScoreMax;
+                        }
+                        if (leadsFilters.dateFrom) {
+                          filtersToApply.date_from = leadsFilters.dateFrom;
+                        }
+                        if (leadsFilters.dateTo) {
+                          filtersToApply.date_to = leadsFilters.dateTo;
+                        }
+                        
+                        handleFiltersChange(filtersToApply);
+                        setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+                        setRefreshKey((prev) => prev + 1);
+                      }}
+                    >
+                      Submit Filters
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      className="d-flex align-items-center justify-content-center"
+                      onClick={() => {
+                        setLeadsSearch("");
                         setLeadsFilters({
                           assignedTo: null,
                           stage: null,
@@ -2660,6 +2699,7 @@ const CrmLeads = () => {
                           dateFrom: null,
                           dateTo: null,
                         });
+                        handleFiltersChange({});
                         setCurrentFilters({});
                         setActiveFilter("all");
                         setLeadsPagination({

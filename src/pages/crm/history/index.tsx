@@ -40,14 +40,14 @@ import moment from "moment";
 // Filter Bar Component
 interface FilterBarProps {
   quickFilters: { id: string; label: string; count?: number; variant?: string; color?: string; icon?: React.ReactNode }[];
-  activeFilter: string;
-  onFilterChange: (filterId: string) => void;
-  searchValue: string;
-  onSearchChange: (value: string) => void;
-  onSearch: () => void;
+  activeFilter?: string;
+  onFilterChange?: (filterId: string) => void;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  onSearch?: () => void;
   searchPlaceholder?: string;
-  showAdvancedFilters: boolean;
-  onToggleAdvancedFilters: () => void;
+  showAdvancedFilters?: boolean;
+  onToggleAdvancedFilters?: () => void;
   advancedFilterCount?: number;
 }
 
@@ -95,7 +95,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                 <Button
                   key={filter.id}
                   variant={hasCustomColor ? undefined : (isActive ? (filter.variant || 'primary') : 'outline-secondary')}
-                  onClick={() => onFilterChange(filter.id)}
+                  onClick={() => onFilterChange && onFilterChange(filter.id)}
                   className="d-flex align-items-center gap-2"
                   style={hasCustomColor ? buttonStyle : undefined}
                 >
@@ -106,54 +106,62 @@ const FilterBar: React.FC<FilterBarProps> = ({
                   {filter.label}
 
                   {/* Badge */}
-                  <Badge
-                    bg={isActive ? 'light' : 'light'}
-                    text={isActive ? 'dark' : 'dark'}
-                    className="ms-2"
-                  >
-                    {filter.count}
-                  </Badge>
+                  {filter.count !== undefined && (
+                    <Badge
+                      bg={isActive ? 'light' : 'light'}
+                      text={isActive ? 'dark' : 'dark'}
+                      className="ms-2"
+                    >
+                      {filter.count}
+                    </Badge>
+                  )}
                 </Button>
               );
             })}
           </div>
 
           {/* Right Side: Search and Filters */}
-          <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
-            {/* <InputGroup style={{ width: '300px', minWidth: '200px' }} className="flex-shrink-0">
-              <Form.Control
-                style={{ height: '41px' }}
-                type="text"
-                placeholder={searchPlaceholder}
-                value={searchValue}
-                onChange={(e) => onSearchChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    onSearch();
-                  }
-                }}
-              />
-              <Button 
-                variant="outline-secondary"
-                onClick={onSearch}
-              >
-                <Search size={16} />
-              </Button>
-            </InputGroup> */}
-            <Button 
-              variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
-              onClick={onToggleAdvancedFilters}
-              className="d-flex align-items-center flex-shrink-0"
-            >
-              <Filter size={16} className="me-2" />
-              Filters
-              {advancedFilterCount > 0 && (
-                <Badge bg="light" text="dark" className="ms-2">
-                  {advancedFilterCount}
-                </Badge>
+          {(onSearchChange || onToggleAdvancedFilters) && (
+            <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
+              {onSearchChange && onSearch && (
+                <InputGroup style={{ width: '300px', minWidth: '200px' }} className="flex-shrink-0">
+                  <Form.Control
+                    style={{ height: '41px' }}
+                    type="text"
+                    placeholder={searchPlaceholder}
+                    value={searchValue || ""}
+                    onChange={(e) => onSearchChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && onSearch) {
+                        onSearch();
+                      }
+                    }}
+                  />
+                  <Button 
+                    variant="outline-secondary"
+                    onClick={() => onSearch?.()}
+                  >
+                    <Search size={16} />
+                  </Button>
+                </InputGroup>
               )}
-            </Button>
-          </div>
+              {onToggleAdvancedFilters && (
+                <Button 
+                  variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
+                  onClick={onToggleAdvancedFilters}
+                  className="d-flex align-items-center flex-shrink-0"
+                >
+                  <Filter size={16} className="me-2" />
+                  Filters
+                  {(advancedFilterCount ?? 0) > 0 && (
+                    <Badge bg="light" text="dark" className="ms-2">
+                      {advancedFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </Card.Body>
     </Card>
@@ -970,10 +978,14 @@ const HistoryPage = () => {
           <p className="text-muted mb-0">Track and manage all customer activities across the pipeline</p>
         </div>
         <div className="d-flex flex-wrap gap-2">
-          <Button variant="outline-secondary" size="sm">
+          <Button variant="outline-secondary" >
             <Download size={16} className="me-2" />
             Export
           </Button>
+          <Button variant={`${showActivityAdvancedFilters ? "secondary" : "outline-secondary"}`} onClick={() => setShowActivityAdvancedFilters(!showActivityAdvancedFilters)}>
+              <Filter size={16} className="me-2" />
+              {showActivityAdvancedFilters ? "Hide Filters" : "Show Filters"}
+            </Button>
         </div>
       </div>
 
@@ -1005,22 +1017,22 @@ const HistoryPage = () => {
             icon: <ShoppingBag size={16} />
           }
         ]}
-        activeFilter={activityTypeFilter}
-        onFilterChange={(filterId) => setActivityTypeFilter(filterId)}
-        searchValue={activitySearch}
-        onSearchChange={(value) => setActivitySearch(value)}
-        onSearch={() => {
-          setPagination(prev => ({ ...prev, current_page: 1 }));
-          fetchHistoryData(1);
-        }}
-        searchPlaceholder="Search by customer or agent..."
-        showAdvancedFilters={showActivityAdvancedFilters}
-        onToggleAdvancedFilters={() => setShowActivityAdvancedFilters(!showActivityAdvancedFilters)}
-        advancedFilterCount={
-          activityFilters.agents.length +
-          (activityFilters.dateRange.start ? 1 : 0) +
-          (activityFilters.dateRange.end ? 1 : 0)
-        }
+        // activeFilter={activityTypeFilter}
+        // onFilterChange={(filterId) => setActivityTypeFilter(filterId)}
+        // searchValue={activitySearch}
+        // onSearchChange={(value) => setActivitySearch(value)}
+        // onSearch={() => {
+        //   setPagination(prev => ({ ...prev, current_page: 1 }));
+        //   fetchHistoryData(1);
+        // }}
+        // searchPlaceholder="Search by customer or agent..."
+        // showAdvancedFilters={showActivityAdvancedFilters}
+        // onToggleAdvancedFilters={() => setShowActivityAdvancedFilters(!showActivityAdvancedFilters)}
+        // advancedFilterCount={
+        //   activityFilters.agents.length +
+        //   (activityFilters.dateRange.start ? 1 : 0) +
+        //   (activityFilters.dateRange.end ? 1 : 0)
+        // }
       />
 
       {/* Advanced Filters Panel */}

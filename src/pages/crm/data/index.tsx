@@ -317,14 +317,14 @@ interface FilterBarProps {
     color?: string;
     icon?: React.ReactNode;
   }[];
-  activeFilter: string;
-  onFilterChange: (filterId: string) => void;
-  searchValue: string;
-  onSearchChange: (value: string) => void;
-  onSearch: () => void;
+  activeFilter?: string;
+  onFilterChange?: (filterId: string) => void;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  onSearch?: () => void;
   searchPlaceholder?: string;
-  showAdvancedFilters: boolean;
-  onToggleAdvancedFilters: () => void;
+  showAdvancedFilters?: boolean;
+  onToggleAdvancedFilters?: () => void;
   advancedFilterCount?: number;
 }
 
@@ -375,7 +375,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                       ? filter.variant || "primary"
                       : "outline-secondary"
                   }
-                  onClick={() => onFilterChange(filter.id)}
+                  onClick={() => onFilterChange && onFilterChange(filter.id)}
                   className="d-flex align-items-center gap-2"
                   style={hasCustomColor ? buttonStyle : undefined}
                 >
@@ -391,41 +391,47 @@ const FilterBar: React.FC<FilterBarProps> = ({
           </div>
 
           {/* Right Side: Search and Filters */}
-          <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
-            <InputGroup
-              style={{ width: "300px", minWidth: "200px" }}
-              className="flex-shrink-0"
-            >
-              <Form.Control
-                style={{ height: "41px" }}
-                type="text"
-                placeholder={searchPlaceholder}
-                value={searchValue}
-                onChange={(e) => onSearchChange(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    onSearch();
-                  }
-                }}
-              />
-              <Button variant="outline-secondary" onClick={onSearch}>
-                <FiSearch size={16} />
-              </Button>
-            </InputGroup>
-            <Button
-              variant={showAdvancedFilters ? "primary" : "outline-secondary"}
-              onClick={onToggleAdvancedFilters}
-              className="d-flex align-items-center flex-shrink-0"
-            >
-              <FiFilter size={16} className="me-2" />
-              Filters
-              {advancedFilterCount > 0 && (
-                <Badge bg="light" text="dark" className="ms-2">
-                  {advancedFilterCount}
-                </Badge>
+          {(onSearchChange || onToggleAdvancedFilters) && (
+            <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
+              {onSearchChange && onSearch && (
+                <InputGroup
+                  style={{ width: "300px", minWidth: "200px" }}
+                  className="flex-shrink-0"
+                >
+                  <Form.Control
+                    style={{ height: "41px" }}
+                    type="text"
+                    placeholder={searchPlaceholder}
+                    value={searchValue || ""}
+                    onChange={(e) => onSearchChange?.(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter" && onSearch) {
+                        onSearch();
+                      }
+                    }}
+                  />
+                  <Button variant="outline-secondary" onClick={() => onSearch?.()}>
+                    <FiSearch size={16} />
+                  </Button>
+                </InputGroup>
               )}
-            </Button>
-          </div>
+              {onToggleAdvancedFilters && (
+                <Button
+                  variant={showAdvancedFilters ? "primary" : "outline-secondary"}
+                  onClick={onToggleAdvancedFilters}
+                  className="d-flex align-items-center flex-shrink-0"
+                >
+                  <FiFilter size={16} className="me-2" />
+                  Filters
+                  {(advancedFilterCount ?? 0) > 0 && (
+                    <Badge bg="light" text="dark" className="ms-2">
+                      {advancedFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </Card.Body>
     </Card>
@@ -2493,6 +2499,13 @@ const CrmProspectsManagement = () => {
               Import Contacts
             </Button>
           )}
+          <Button
+            variant={showAdvancedFilters ? "secondary" : "outline-secondary"}
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          >
+            <FiFilter size={16} className="me-2" />
+            {showAdvancedFilters ? "Hide Filters" : "Show Filters"}
+          </Button>
         </div>
       </div>
 
@@ -2610,39 +2623,39 @@ const CrmProspectsManagement = () => {
                 icon: <FiTarget size={16} />,
               },
             ]}
-            activeFilter={activeFilter}
-            onFilterChange={(filterId) => {
-              setActiveFilter(filterId);
-              setPagination((prev) => ({ ...prev, currentPage: 1 }));
-            }}
-            searchValue={prospectsSearch}
-            onSearchChange={(value) => {
-              setProspectsSearch(value);
-            }}
-            onSearch={() =>
-              handleFiltersChange({
-                ...currentFilters,
-                search: prospectsSearch,
-              })
-            }
-            searchPlaceholder="Search by name or phone..."
-            showAdvancedFilters={showAdvancedFilters}
-            onToggleAdvancedFilters={() =>
-              setShowAdvancedFilters(!showAdvancedFilters)
-            }
-            advancedFilterCount={
-              (prospectsFilters.assignedTo !== null ? 1 : 0) +
-              (prospectsFilters.campaigns !== null &&
-              prospectsFilters.campaigns.length > 0
-                ? 1
-                : 0) +
-              (prospectsFilters.nextCallScheduled !== null ? 1 : 0) +
-              (prospectsFilters.sourceFile !== null ? 1 : 0) +
-              (prospectsFilters.tags !== null &&
-              prospectsFilters.tags.length > 0
-                ? 1
-                : 0)
-            }
+            // activeFilter={activeFilter}
+            // onFilterChange={(filterId) => {
+            //   setActiveFilter(filterId);
+            //   setPagination((prev) => ({ ...prev, currentPage: 1 }));
+            // }}
+            // searchValue={prospectsSearch}
+            // onSearchChange={(value) => {
+            //   setProspectsSearch(value);
+            // }}
+            // onSearch={() =>
+            //   handleFiltersChange({
+            //     ...currentFilters,
+            //     search: prospectsSearch,
+            //   })
+            // }
+            // searchPlaceholder="Search by name or phone..."
+            // showAdvancedFilters={showAdvancedFilters}
+            // onToggleAdvancedFilters={() =>
+            //   setShowAdvancedFilters(!showAdvancedFilters)
+            // }
+            // advancedFilterCount={
+            //   (prospectsFilters.assignedTo !== null ? 1 : 0) +
+            //   (prospectsFilters.campaigns !== null &&
+            //   prospectsFilters.campaigns.length > 0
+            //     ? 1
+            //     : 0) +
+            //   (prospectsFilters.nextCallScheduled !== null ? 1 : 0) +
+            //   (prospectsFilters.sourceFile !== null ? 1 : 0) +
+            //   (prospectsFilters.tags !== null &&
+            //   prospectsFilters.tags.length > 0
+            //     ? 1
+            //     : 0)
+            // }
           />
         )}
 
@@ -2652,6 +2665,17 @@ const CrmProspectsManagement = () => {
             <Card className="border-0 shadow-sm mb-4">
               <Card.Body>
                 <Row className="g-3 align-items-end">
+                  <Col md={4}>
+                    <Form.Label className="small fw-bold mb-2">
+                      Search
+                    </Form.Label>
+                    <Form.Control
+                      type="text"
+                      placeholder="Search by name or phone..."
+                      value={prospectsSearch}
+                      onChange={(e) => setProspectsSearch(e.target.value)}
+                    />
+                  </Col>
                   <Col md={4}>
                     <Form.Label className="small fw-bold mb-2">
                       Assigned To
@@ -2693,14 +2717,6 @@ const CrmProspectsManagement = () => {
                           ...prev,
                           assignedTo: assignedToValue,
                         }));
-                        // Update currentFilters for API call
-                        const newFilters = { ...currentFilters };
-                        if (assignedToValue) {
-                          newFilters.user_extension = [assignedToValue];
-                        } else {
-                          delete newFilters.user_extension;
-                        }
-                        handleFiltersChange(newFilters);
                         // Reset to all when assigned filter changes
                         setActiveFilter("all");
                       }}
@@ -2741,14 +2757,6 @@ const CrmProspectsManagement = () => {
                           ...prev,
                           campaigns: campaignValues,
                         }));
-                        // Update currentFilters for API call
-                        const newFilters = { ...currentFilters };
-                        if (campaignValues && campaignValues.length > 0) {
-                          newFilters.campaign_id = campaignValues;
-                        } else {
-                          delete newFilters.campaign_id;
-                        }
-                        handleFiltersChange(newFilters);
                         // Reset to all when campaign filter changes
                         setActiveFilter("all");
                       }}
@@ -2771,47 +2779,6 @@ const CrmProspectsManagement = () => {
                           nextCallDateFrom: null,
                           nextCallDateTo: null,
                         }));
-                        
-                        const now = moment();
-                        let newFilters: any = { ...currentFilters };
-                        
-                        if (value === 'today') {
-                          const today = now.format('YYYY-MM-DD');
-                          newFilters.scheduled_call_from = today;
-                          newFilters.scheduled_call_to = today;
-                          delete newFilters.scheduled_call_status;
-                        } else if (value === 'tomorrow') {
-                          const tomorrow = moment().add(1, 'day').format('YYYY-MM-DD');
-                          newFilters.scheduled_call_from = tomorrow;
-                          newFilters.scheduled_call_to = tomorrow;
-                          delete newFilters.scheduled_call_status;
-                        } else if (value === 'this_week') {
-                          const startOfWeek = moment().startOf('week').format('YYYY-MM-DD');
-                          const endOfWeek = moment().endOf('week').format('YYYY-MM-DD');
-                          newFilters.scheduled_call_from = startOfWeek;
-                          newFilters.scheduled_call_to = endOfWeek;
-                          delete newFilters.scheduled_call_status;
-                        } else if (value === 'next_week') {
-                          const nextWeekStart = moment().add(1, 'week').startOf('week').format('YYYY-MM-DD');
-                          const nextWeekEnd = moment().add(1, 'week').endOf('week').format('YYYY-MM-DD');
-                          newFilters.scheduled_call_from = nextWeekStart;
-                          newFilters.scheduled_call_to = nextWeekEnd;
-                          delete newFilters.scheduled_call_status;
-                        } else if (value === 'overdue') {
-                          newFilters.scheduled_call_status = 'overdue';
-                          delete newFilters.scheduled_call_from;
-                          delete newFilters.scheduled_call_to;
-                        } else if (value === 'custom') {
-                          // Custom date range - dates will be set separately
-                          // Keep existing scheduled_call_from and scheduled_call_to if they exist
-                        } else {
-                          // Clear scheduled call filters
-                          delete newFilters.scheduled_call_from;
-                          delete newFilters.scheduled_call_to;
-                          delete newFilters.scheduled_call_status;
-                        }
-                        
-                        handleFiltersChange(newFilters);
                         setActiveFilter("all");
                       }}
                     >
@@ -2839,13 +2806,6 @@ const CrmProspectsManagement = () => {
                               ...prev,
                               nextCallDateFrom: dateValue,
                             }));
-                            const newFilters = { ...currentFilters };
-                            if (dateValue) {
-                              newFilters.scheduled_call_from = dateValue;
-                            } else {
-                              delete newFilters.scheduled_call_from;
-                            }
-                            handleFiltersChange(newFilters);
                           }}
                         />
                       </Col>
@@ -2862,13 +2822,6 @@ const CrmProspectsManagement = () => {
                               ...prev,
                               nextCallDateTo: dateValue,
                             }));
-                            const newFilters = { ...currentFilters };
-                            if (dateValue) {
-                              newFilters.scheduled_call_to = dateValue;
-                            } else {
-                              delete newFilters.scheduled_call_to;
-                            }
-                            handleFiltersChange(newFilters);
                           }}
                         />
                       </Col>
@@ -2891,13 +2844,6 @@ const CrmProspectsManagement = () => {
                           ...prev,
                           sourceFile: sourceValue,
                         }));
-                        const newFilters = { ...currentFilters };
-                        if (sourceValue) {
-                          newFilters.source_file = sourceValue;
-                        } else {
-                          delete newFilters.source_file;
-                        }
-                        handleFiltersChange(newFilters);
                         setActiveFilter("all");
                       }}
                       placeholder="Select or create source..."
@@ -2933,13 +2879,6 @@ const CrmProspectsManagement = () => {
                           ...prev,
                           tags: tagValues,
                         }));
-                        const newFilters = { ...currentFilters };
-                        if (tagValues && tagValues.length > 0) {
-                          newFilters.tags = tagValues;
-                        } else {
-                          delete newFilters.tags;
-                        }
-                        handleFiltersChange(newFilters);
                         setActiveFilter("all");
                       }}
                       placeholder="Select tags..."
@@ -2953,6 +2892,71 @@ const CrmProspectsManagement = () => {
                         variant="outline-secondary"
                         className="d-flex align-items-center justify-content-center"
                         onClick={() => {
+                          // Map prospectsFilters to the format expected by handleFiltersChange
+                          const filtersToApply: Record<string, any> = {};
+                          
+                          if (prospectsSearch) {
+                            filtersToApply.search = prospectsSearch;
+                          }
+                          if (prospectsFilters.assignedTo) {
+                            filtersToApply.user_extension = [prospectsFilters.assignedTo];
+                          }
+                          if (prospectsFilters.campaigns && prospectsFilters.campaigns.length > 0) {
+                            filtersToApply.campaign_id = prospectsFilters.campaigns;
+                          }
+                          if (prospectsFilters.sourceFile) {
+                            filtersToApply.source_file = prospectsFilters.sourceFile;
+                          }
+                          if (prospectsFilters.tags && prospectsFilters.tags.length > 0) {
+                            filtersToApply.tags = prospectsFilters.tags;
+                          }
+                          
+                          // Handle next call scheduled filters
+                          const now = moment();
+                          if (prospectsFilters.nextCallScheduled === 'today') {
+                            const today = now.format('YYYY-MM-DD');
+                            filtersToApply.scheduled_call_from = today;
+                            filtersToApply.scheduled_call_to = today;
+                          } else if (prospectsFilters.nextCallScheduled === 'tomorrow') {
+                            const tomorrow = moment().add(1, 'day').format('YYYY-MM-DD');
+                            filtersToApply.scheduled_call_from = tomorrow;
+                            filtersToApply.scheduled_call_to = tomorrow;
+                          } else if (prospectsFilters.nextCallScheduled === 'this_week') {
+                            const startOfWeek = moment().startOf('week').format('YYYY-MM-DD');
+                            const endOfWeek = moment().endOf('week').format('YYYY-MM-DD');
+                            filtersToApply.scheduled_call_from = startOfWeek;
+                            filtersToApply.scheduled_call_to = endOfWeek;
+                          } else if (prospectsFilters.nextCallScheduled === 'next_week') {
+                            const nextWeekStart = moment().add(1, 'week').startOf('week').format('YYYY-MM-DD');
+                            const nextWeekEnd = moment().add(1, 'week').endOf('week').format('YYYY-MM-DD');
+                            filtersToApply.scheduled_call_from = nextWeekStart;
+                            filtersToApply.scheduled_call_to = nextWeekEnd;
+                          } else if (prospectsFilters.nextCallScheduled === 'overdue') {
+                            filtersToApply.scheduled_call_status = 'overdue';
+                          } else if (prospectsFilters.nextCallScheduled === 'custom') {
+                            if (prospectsFilters.nextCallDateFrom) {
+                              filtersToApply.scheduled_call_from = prospectsFilters.nextCallDateFrom;
+                            }
+                            if (prospectsFilters.nextCallDateTo) {
+                              filtersToApply.scheduled_call_to = prospectsFilters.nextCallDateTo;
+                            }
+                          }
+                          
+                          handleFiltersChange(filtersToApply);
+                          setPagination((prev) => ({
+                            ...prev,
+                            currentPage: 1,
+                          }));
+                          setRefreshKey((prev) => prev + 1);
+                        }}
+                      >
+                        Submit Filters
+                      </Button>
+                      <Button
+                        variant="outline-secondary"
+                        className="d-flex align-items-center justify-content-center"
+                        onClick={() => {
+                          setProspectsSearch("");
                           setProspectsFilters({
                             assignedTo: null,
                             campaigns: null,
@@ -2962,6 +2966,7 @@ const CrmProspectsManagement = () => {
                             sourceFile: null,
                             tags: null,
                           });
+                          handleFiltersChange({});
                           setCurrentFilters({});
                           setActiveFilter("all");
                           setPagination((prev) => ({
@@ -2971,7 +2976,7 @@ const CrmProspectsManagement = () => {
                           setRefreshKey((prev) => prev + 1);
                         }}
                       >
-                        Reset
+                         Reset Filters
                       </Button>
                     </div>
                   </Col>
@@ -5666,3 +5671,4 @@ CrmProspectsManagement.getLayout = (page: ReactElement) => {
 };
 
 export default CrmProspectsManagement;
+
