@@ -60,28 +60,28 @@ const ProductDetails = () => {
           }
          },
 
-         { key: 'billing_cycle', name: 'Billing Cycle', selector: (row: any) => row.product?.billing_cycle, sortable: true,
+         { key: 'billing_cycle', name: 'Billing Cycle', selector: (row: any) => row?.billing_cycle, sortable: true,
           cell: (row: any) => {
             return <div>
-              {row?.product?.billing_cycle || ''}
+              {row?.billing_cycle || ''}
             </div>
           }
          },
 
 
-         { key: 'renewal_start_date', name: 'Renewal Start Date', selector: (row: any) => row.product?.renewal_start_date, sortable: true,
+         { key: 'renewal_start_date', name: 'Renewal Start Date', selector: (row: any) => row?.renewal_start_date, sortable: true,
           cell: (row: any) => {
             return <div>
-              {row?.product?.renewal_start_date ? moment(row?.product?.renewal_start_date).format('DD-MMM-YYYY') : ''}
+              {row?.renewal_start_date ? moment(row?.renewal_start_date).format('DD-MMM-YYYY') : ''}
             </div>
           }
          },
 
 
-         { key: 'renewal_end_date', name: 'Renewal End Date', selector: (row: any) => row.product?.renewal_end_date, sortable: true,
+         { key: 'renewal_end_date', name: 'Renewal End Date', selector: (row: any) => row?.renewal_end_date, sortable: true,
           cell: (row: any) => {
             return <div>
-               {row?.product?.renewal_end_date ? moment(row?.product?.renewal_end_date).format('DD-MMM-YYYY') : ''}
+               {row?.renewal_end_date ? moment(row?.renewal_end_date).format('DD-MMM-YYYY') : ''}
             </div>
           }
          },
