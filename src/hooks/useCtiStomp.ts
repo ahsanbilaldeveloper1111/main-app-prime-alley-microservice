@@ -1322,11 +1322,14 @@ export default function useCtiStomp(
       };
 
       eventSource.onmessage = (event) => {
-        // Update last message time for health check
-        lastMessageTimeRef.current = Date.now();
-
         try {
           const data = JSON.parse(event.data);
+
+          // Update last message time for health check - but only for real messages, not pings
+          // This ensures health check can detect when CTI events stop even if SSE pings continue
+          if (data.type !== "ping" && data.type !== "test") {
+            lastMessageTimeRef.current = Date.now();
+          }
 
           switch (data.type) {
             case "complete_state":
@@ -1448,11 +1451,11 @@ export default function useCtiStomp(
               break;
 
             case "ping":
-              // Ignore ping messages
+              // Ignore ping messages (don't update health check timer)
               break;
 
             case "test":
-              // Ignore test messages
+              // Ignore test messages (don't update health check timer)
               break;
 
             default:
@@ -2146,11 +2149,14 @@ export default function useCtiStomp(
           };
 
           eventSource.onmessage = (event) => {
-            // Update last message time for health check
-            lastMessageTimeRef.current = Date.now();
-
             try {
               const data = JSON.parse(event.data);
+
+              // Update last message time for health check - but only for real messages, not pings
+              // This ensures health check can detect when CTI events stop even if SSE pings continue
+              if (data.type !== "ping" && data.type !== "test") {
+                lastMessageTimeRef.current = Date.now();
+              }
 
               switch (data.type) {
                 case "complete_state":
