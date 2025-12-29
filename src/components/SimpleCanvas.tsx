@@ -137,10 +137,10 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
                           <h5><b>{rowData.department?.name || 'N/A'}</b></h5>
                         </div>
 
-                        <div className="sbox">
+                        {/* <div className="sbox">
                           <p className="text-muted mb-0 small">Last Login</p>
                           <h5><b>{rowData.last_login_at ? formatDateTimeToLocal(rowData.last_login_at, GlobalDateTimeFormat) : 'N/A'}</b></h5>
-                        </div>
+                        </div> */}
 
 
 
@@ -157,15 +157,15 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
                         <Button size="sm" variant="primary" className="w-100" onClick={() => handleResetPassword(rowData.username)}>Reset Password</Button>  
                         )}
 
-                        {session?.user?.permissions?.includes('disable-user-users')  && (
+                        {/* {session?.user?.permissions?.includes('disable-user-users')  && (
                             <Button size="sm" variant="danger" className="w-100" onClick={() => handleDisableUser(rowData.encId)}>Disable User</Button>
-                        )}
+                        )} */}
 
 
                         </div>
 
 
-                        <div className="userActvityHistory">
+                        {/* <div className="userActvityHistory">
                           <h5>User Activity History</h5>
                           
                           <div className="timeline">
@@ -196,7 +196,7 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
                               </div>
                             </div>
                           </div>
-                        </div>
+                        </div> */}
 
 
 

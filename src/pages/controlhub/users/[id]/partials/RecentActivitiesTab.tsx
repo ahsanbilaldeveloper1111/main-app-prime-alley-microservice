@@ -26,7 +26,7 @@ const RecentActivitiesTab: React.FC<RecentActivitiesTabProps> = ({
 }) => {
     return (
         <Row>
-            <Col md={12}>
+            {/* <Col md={12}>
                 <Card>
                     <Card.Header>
                         <h5>Recent Activities</h5>
@@ -69,7 +69,7 @@ const RecentActivitiesTab: React.FC<RecentActivitiesTabProps> = ({
                         ))}
                     </Card.Body>
                 </Card>
-            </Col>
+            </Col> */}
         </Row>
     );
 };

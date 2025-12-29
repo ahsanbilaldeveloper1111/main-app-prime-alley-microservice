@@ -567,11 +567,10 @@ const CallStatsCountry = () => {
                     },
                     {
                       id: 'total-cost',
-                      title: 'Cost',
-                      value: summary.total_cost,
-                      description: 'Total cost of calls',
-                      valueType: 'cost',
-                      prefix: '$',
+                      title: 'Total Duration',
+                      value: summary.total_duration,
+                      description: 'Total duration of calls',
+                      valueType: 'seconds',
                       delay: 0.9
                     }
                   ]}

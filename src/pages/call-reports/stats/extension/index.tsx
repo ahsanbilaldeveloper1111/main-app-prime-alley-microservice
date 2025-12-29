@@ -656,7 +656,7 @@ const CallStatsExtension = () => {
                                     </div>
                                 </Col>
                             </>
-                        ) : dataLoaded && summary.total_calls === 0 && summary.total_cost === 0 && summary.answered_calls === 0 && summary.unanswered_calls === 0 ? (
+                        ) : dataLoaded && summary.total_calls === 0 && summary.total_duration === 0 && summary.answered_calls === 0 && summary.unanswered_calls === 0 ? (
                             // Empty state when no data is available
                             <Col md={12}>
                                 <div className="card report-shadow">
@@ -700,12 +700,11 @@ const CallStatsExtension = () => {
                                         },
                                         {
                                             id: "total-cost",
-                                            title: "Cost",
-                                            value: summary.total_cost,
-                                            valueType: "cost",
-                                            description: "Total cost of calls",
+                                            title: "Total Duration",
+                                            value: summary.total_duration,
+                                            valueType: "seconds",
+                                            description: "Total duration of calls",
                                             delay: 0.9,
-                                            prefix: "$"
                                         }
                                     ]}
                                     

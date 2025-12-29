@@ -571,13 +571,12 @@ const CallStatsDepartment = () => {
                   },
                   {
                     id: 'total-cost',
-                    title: 'Cost',
-                    value: summary.total_cost,
-                    description: 'Total cost of calls',
+                    title: 'Total Duration',
+                    value: summary.total_duration,
+                    description: 'Total duration of calls',
                     delay: 0.9,
-                    valueType: 'cost',
+                    valueType: 'seconds',
                     showAnimatedNumber: true,
-                    prefix: '$',
                   }
                 ]}
               
