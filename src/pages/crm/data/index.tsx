@@ -2623,11 +2623,11 @@ const CrmProspectsManagement = () => {
                 icon: <FiTarget size={16} />,
               },
             ]}
-            // activeFilter={activeFilter}
-            // onFilterChange={(filterId) => {
-            //   setActiveFilter(filterId);
-            //   setPagination((prev) => ({ ...prev, currentPage: 1 }));
-            // }}
+            activeFilter={activeFilter}
+            onFilterChange={(filterId) => {
+              setActiveFilter(filterId);
+              setPagination((prev) => ({ ...prev, currentPage: 1 }));
+            }}
             // searchValue={prospectsSearch}
             // onSearchChange={(value) => {
             //   setProspectsSearch(value);

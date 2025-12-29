@@ -98,7 +98,7 @@ const Dashboard = () => {
 </Row>
 
         {/* Title */}
-        <h4 className="mb-4 fw-bold">My CRM & Sales</h4>
+        <h4 className="mb-4 fw-bold">My CRM Workspace</h4>
 
         {/* Top Row - Main Cards */}
         <Row className="g-3 mb-3">

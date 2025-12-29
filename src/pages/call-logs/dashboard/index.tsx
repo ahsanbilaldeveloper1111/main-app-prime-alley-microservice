@@ -92,8 +92,8 @@ const CallDashboard = () => {
     
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters, setCurrentFilters] = useState({
-      start_datetime: moment().subtract(6, 'days').format('YYYY-MM-DD hh:mm:ss A'),
-      end_datetime: moment().format('YYYY-MM-DD hh:mm:ss A'),
+      start_datetime: moment().utc().startOf('day').format('YYYY-MM-DDTHH:mm:ss') + 'Z',
+      end_datetime: moment().utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z',
     });
     const [generalStats, setGeneralStats] = useState<GeneralStats>({
         totalCalls: 0,
@@ -583,7 +583,56 @@ const [ExtensionChart, setExtensionChart] = React.useState({
    
 
     const handleFiltersChange = (filters: any) => {
-        setCurrentFilters(filters);
+        // Format datetime values to UTC format before sending to API
+        const formattedFilters: any = { ...filters };
+        
+        if (formattedFilters.start_datetime) {
+            // Handle different date formats
+            let startMoment = moment(formattedFilters.start_datetime);
+            
+            if (formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+                // Format is YYYY-MM-DDTHH:mm, add :00 seconds
+                startMoment = moment(formattedFilters.start_datetime + ':00');
+            } else if (formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [AP]M$/)) {
+                // Format is YYYY-MM-DD hh:mm:ss A (local format from dashboard)
+                startMoment = moment(formattedFilters.start_datetime, 'YYYY-MM-DD hh:mm:ss A');
+            } else if (!formattedFilters.start_datetime.includes('T') && !formattedFilters.start_datetime.includes(' ')) {
+                // If only date, set to 00:00:00
+                startMoment = moment(formattedFilters.start_datetime).startOf('day');
+            }
+            
+            // Convert to UTC
+            formattedFilters.start_datetime = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+        }
+        
+        if (formattedFilters.end_datetime) {
+            // Handle different date formats
+            let endMoment = moment(formattedFilters.end_datetime);
+            
+            if (formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+                // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
+                const timePart = formattedFilters.end_datetime.split('T')[1];
+                if (timePart === '23:59') {
+                    endMoment = moment(formattedFilters.end_datetime + ':59');
+                } else {
+                    endMoment = moment(formattedFilters.end_datetime + ':00');
+                }
+            } else if (formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [AP]M$/)) {
+                // Format is YYYY-MM-DD hh:mm:ss A (local format from dashboard)
+                endMoment = moment(formattedFilters.end_datetime, 'YYYY-MM-DD hh:mm:ss A');
+            } else if (!formattedFilters.end_datetime.includes('T') && !formattedFilters.end_datetime.includes(' ')) {
+                // If only date, set to 23:59:59
+                endMoment = moment(formattedFilters.end_datetime).endOf('day');
+            }
+            
+            // Convert to UTC
+            formattedFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+        }
+        
+        // Remove timezone key from payload if present
+        delete formattedFilters.timezone;
+        
+        setCurrentFilters(formattedFilters);
     };
 
     const handleExport = async (exportType: string, filters: Record<string, any>) => {

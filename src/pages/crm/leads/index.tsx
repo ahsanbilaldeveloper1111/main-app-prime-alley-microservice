@@ -2293,11 +2293,11 @@ const CrmLeads = () => {
               icon: <Trash2 size={16} />,
             },
           ]}
-          // activeFilter={activeFilter}
-          // onFilterChange={(filterId) => {
-          //   setActiveFilter(filterId);
-          //   setLeadsPagination({ ...leadsPagination, currentPage: 1 });
-          // }}
+          activeFilter={activeFilter}
+          onFilterChange={(filterId) => {
+            setActiveFilter(filterId);
+            setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+          }}
           // searchValue={leadsSearch}
           // onSearchChange={(value) => setLeadsSearch(value)}
           // onSearch={() => {

@@ -1659,11 +1659,11 @@ const CrmDeals = () => {
               icon: <Trash2 size={16} />
             }
           ]}
-          // activeFilter={activeFilter}
-          // onFilterChange={(filterId) => {
-          //   setActiveFilter(filterId);
-          //   setDealsPagination({ ...dealsPagination, currentPage: 1 });
-          // }}
+          activeFilter={activeFilter}
+          onFilterChange={(filterId) => {
+            setActiveFilter(filterId);
+            setDealsPagination({ ...dealsPagination, currentPage: 1 });
+          }}
           // searchValue={dealsSearch}
           // onSearchChange={(value) => setDealsSearch(value)}
           // onSearch={() => {
