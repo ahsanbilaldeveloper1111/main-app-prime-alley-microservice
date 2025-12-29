@@ -3,9 +3,14 @@ import { Column } from '@components/CustomDataTable';
 import { FiEdit } from 'react-icons/fi';
 import DatatableActionButton from '@components/DatatableActionButton';
 import { Button } from 'react-bootstrap';
-import { Edit, Eye, Key } from 'lucide-react';
+import { Eye, Key } from 'lucide-react';
 
-export const useUserColumns = (session: any, customFieldColumns: Column[]) => {
+interface UseUserColumnsOptions {
+    onResetPassword?: (username: string) => void;
+}
+
+export const useUserColumns = (session: any, customFieldColumns: Column[], options?: UseUserColumnsOptions) => {
+    const { onResetPassword } = options || {};
     // Memoize base columns to prevent recreation on every render
     const baseColumns: Column[] = useMemo(() => [
         { key: 'name', name: 'Display Name', selector: (row: any) => row.name, sortable: true },
@@ -62,20 +67,25 @@ export const useUserColumns = (session: any, customFieldColumns: Column[]) => {
                 <Button 
                 variant="light" size="sm" 
                 className="btn-action-style-2 p-1 text-primary" 
-                title="Update Password (coming soon)"
+                title="Reset Password"
+                onClick={() => onResetPassword && onResetPassword(props.username)}
               >
                 <Key className="text-primary" size={16} />
               </Button>
               )}
 
                 {session?.user?.permissions?.includes('edit-users') && (
-                    <Button variant="light"  className="btn-action-style-2 p-1 text-primary" title="View" onClick={() => window.location.href = `/controlhub/users/${props.encId}`}>
+                    <Button variant="light"  className="btn-action-style-2 p-1 text-primary" title="View" onClick={() => {
+                        if (typeof globalThis !== 'undefined' && globalThis.window) {
+                            globalThis.window.location.href = `/controlhub/users/${props.encId}`;
+                        }
+                    }}>
                         <Eye size={16} />
                     </Button>
                 )}
             </div>
         ),
-    }), [session?.user?.permissions]);
+    }), [session?.user?.permissions, onResetPassword]);
 
     // Memoize the columns array to prevent unnecessary re-renders
     const columns: Column[] = useMemo(() => {

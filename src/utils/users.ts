@@ -746,3 +746,22 @@ export const getUserAccessLevelSummary = async (userId?: string, encFlag?: boole
     throw error;
   }
 }
+
+/**
+ * Reset user password
+ * @param data - Object containing username, password, and password_confirmation
+ * @param endpoint - Optional API endpoint (defaults to 'users/reset-password')
+ * @returns Promise with API response
+ */
+export const resetUserPassword = async (
+  data: { username: string; password: string; password_confirmation: string },
+  endpoint: string = 'users/reset-password'
+) => {
+  try {
+    const response = await axiosInstance.post(endpoint, data);
+    return response?.data;
+  } catch (error: any) {
+    console.error('API Error:', error);
+    throw error;
+  }
+}

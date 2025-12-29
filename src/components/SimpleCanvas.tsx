@@ -1,10 +1,11 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Offcanvas, Button, Row, Col } from 'react-bootstrap';
 import '@assets/scss/offcanvas.scss';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import moment from 'moment';
 import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
+import ResetPasswordModal from './ResetPasswordModal';
 
 interface SimpleCanvasProps {
   show: boolean;
@@ -22,21 +23,35 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
   const { data:session, status } = useSession();
   
   const [currentPage, setCurrentPage] = useState<string>('');
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [selectedUsername, setSelectedUsername] = useState<string>('');
 
   useEffect(() => {
     // Get current page information
-    const pathname = window.location.pathname;
-    const pageName = pathname.split('/').pop() || 'home';
-    setCurrentPage(pageName);
+    if (typeof globalThis !== 'undefined' && globalThis.window) {
+      const pathname = globalThis.window.location.pathname;
+      // Handle both '/controlhub/users' and '/controlhub/users/' cases
+      const pathParts = pathname.split('/').filter(Boolean);
+      const pageName = pathParts.at(-1) || 'home';
+      // Also check if pathname includes 'users' for more robust detection
+      const isUsersPage = pathname.includes('/users') || pageName === 'users';
+      setCurrentPage(isUsersPage ? 'users' : pageName);
+    }
   }, []);
 
   const handleDisableUser = (encId: string) => {
     console.log(encId);
   }
 
-  const handleResetPassword = (encId: string) => {
-    console.log(encId);
-  }
+  const handleResetPassword = useCallback((username: string) => {
+    setSelectedUsername(username);
+    setShowResetPasswordModal(true);
+  }, []);
+
+  const handleCloseResetPasswordModal = useCallback(() => {
+    setShowResetPasswordModal(false);
+    setSelectedUsername('');
+  }, []);
 
   return (
     <Offcanvas 
@@ -49,25 +64,28 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
         <Offcanvas.Title>User Details</Offcanvas.Title>
       </Offcanvas.Header> */}
       <Offcanvas.Body>
-        
-        
+        {!rowData && (
+          <div className="text-center p-4">
+            <p className="text-muted">No data available</p>
+          </div>
+        )}
         {rowData && (
           <Row className="mb-3">
             <Col md={12}>
               <div className="mt-2">
                 {/* Conditional rendering based on page */}
-                {currentPage === 'users' && (
+                {(currentPage === 'settings' || (typeof globalThis !== 'undefined' && globalThis.window?.location.pathname.includes('/settings'))) ? (
                   <div className="canvasDisplay">
-                     {rowData  && (
+                     {rowData && (
                       <div className="data-item">
 
                         <div className="sbox">
                           <div className="uAvatar">
                             <div className="iBox">
-                              {rowData?.name.charAt(0).toUpperCase()}
+                              {rowData?.name?.charAt(0)?.toUpperCase() || 'U'}
                             </div>
                             <div className="dContent">
-                              <h5 className="dName">{rowData?.name}</h5>
+                              <h5 className="dName">{rowData?.name || 'N/A'}</h5>
                               <p className="dRole badge bg-primary small">{rowData?.role || ''}</p>
                             </div>
                           </div>
@@ -81,7 +99,7 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
 
                         <div className="sbox">
                           <p className="text-muted mb-0 small">User Name</p>
-                          <h5><b style={{textTransform: 'none'}}>{rowData.username}</b></h5>
+                          <h5><b style={{textTransform: 'none'}}>{rowData?.username || 'N/A'}</b></h5>
                         </div>
 
                         {/* <div className="sbox">
@@ -135,8 +153,8 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
                             </Link> 
                         )}
                         
-                        {session?.user?.permissions?.includes('reset-password-users')  && (
-                        <Button size="sm" variant="primary" className="w-100" onClick={() => handleResetPassword(rowData.encId)}>Reset Password</Button>  
+                        {session?.user?.permissions?.includes('reset-password-users')  && rowData?.username && (
+                        <Button size="sm" variant="primary" className="w-100" onClick={() => handleResetPassword(rowData.username)}>Reset Password</Button>  
                         )}
 
                         {session?.user?.permissions?.includes('disable-user-users')  && (
@@ -187,6 +205,12 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
                       </div>
                      )}
                   </div>
+                ) : (
+                  <div className="text-center p-4">
+                    <p className="text-muted small">Page: {currentPage}</p>
+                    <p className="text-muted small">Pathname: {typeof globalThis !== 'undefined' && globalThis.window ? globalThis.window.location.pathname : 'N/A'}</p>
+                    <p className="text-muted small">RowData available: {rowData ? 'Yes' : 'No'}</p>
+                  </div>
                 )}
                 
                 
@@ -199,6 +223,12 @@ const SimpleCanvas: React.FC<SimpleCanvasProps> = ({
         
         
       </Offcanvas.Body>
+      
+      <ResetPasswordModal
+        show={showResetPasswordModal}
+        onHide={handleCloseResetPasswordModal}
+        username={selectedUsername}
+      />
     </Offcanvas>
   );
 };

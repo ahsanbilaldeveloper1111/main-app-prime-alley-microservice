@@ -29,6 +29,7 @@ import SelectBox from '@components/SelectBox';
 
 
 interface Summary {
+    totalCalls: number;
     users: number;
     extensions: number;
     inbound: number;
@@ -61,6 +62,11 @@ const CallLogs = () => {
         { key: 'username', name: 'Username', selector: (row: any) => row.username, sortable: true },
         { key: 'department_name', name: 'Department', selector: (row: any) => row.department_name, sortable: true },
         { key: 'call_type', name: 'Call Type', selector: (row: any) => row.call_type, sortable: true },
+        { key: 'is_answered', name: 'Call Result', selector: (row: any) => row.is_answered, sortable: true,
+            cell: (props: any) => {
+                return props.is_answered ==='Yes' ? <span className="status-badge success">Answered</span> : <span className="status-badge danger">Not Answered</span>;
+            }
+         },
         {
             key: 'Duration',
             name: 'Duration',
@@ -113,6 +119,7 @@ const CallLogs = () => {
     
     const [summary, setSummary] = useState<Summary>({
         users: 0,
+        totalCalls: 0,
         extensions: 0,
         inbound: 0,
         outbound: 0
@@ -121,6 +128,7 @@ const CallLogs = () => {
     const {
         hierarchyDataUsers,
         hierarchyDataExtensions,
+        hierarchyDataDepartments,
         loading: hierarchyLoading
     } = useHierarchyData(ModuleSlug.CALL_LOGS);
     const [totalUsers, setTotalUsers] = useState(0);
@@ -128,13 +136,14 @@ const CallLogs = () => {
         setTotalUsers(hierarchyDataUsers.length);
     }, [hierarchyDataUsers]);
 
+    const [totalCalls, setTotalCalls] = useState(0);
     // Create cards data for PageSummaryGrid
     const summaryCards: SummaryCard[] = [
         {
             id: 'total-users',
-            title: 'Total Users',
-            value: totalUsers || 0,
-            description: 'Show Registered users in the system',
+            title: 'Total Calls',
+            value: totalCalls || 0,
+            description: 'Show total calls in the system',
             delay: 0.1,
             showAnimatedNumber: true,
             animationDuration: 1000,
@@ -172,6 +181,7 @@ const CallLogs = () => {
         }
     ];
     
+   
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
         // Prevent duplicate calls
         const now = Date.now();
@@ -200,6 +210,7 @@ const CallLogs = () => {
                 filters: currentFiltersRef.current, 
                 moduleSlug: ModuleSlug.CALL_LOGS 
             }, 'call-logs/list');
+            setTotalCalls(response?.recordsTotal || 0);
             
             if(response?.summary){
                 setShowDateRange(true);
@@ -501,13 +512,19 @@ const CallLogs = () => {
                         <Col md={4}>
                             <Form.Group>
                                 <Form.Label>Departments</Form.Label>
-                                <Form.Control
-                                    type="text"
-                                    placeholder="Enter department"
-                                    value={(pendingFilters as any)?.department || ''}
-                                    onChange={(e) => {
-                                        setPendingFilters({ ...pendingFilters, department: e.target.value });
+                                <SelectBox
+                                    isMulti
+                                    isSearchable={true}
+                                    isDisabled={hierarchyLoading}
+                                    value={(pendingFilters as any)?.department?.length > 0 ? (pendingFilters as any)?.department : null}
+                                    onChange={(value) => {
+                                        setPendingFilters({ ...pendingFilters, department: value ? (value as string[]) : [] });
                                     }}
+                                    options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
+                                        value: dept.id,
+                                        label: dept.name
+                                    })) || []}
+                                    placeholder="Select departments"
                                 />
                             </Form.Group>
                         </Col>

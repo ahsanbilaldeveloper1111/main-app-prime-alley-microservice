@@ -1,5 +1,5 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState } from 'react';
+import React, { ReactElement, useState, useCallback } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { useSession } from 'next-auth/react';
@@ -15,6 +15,7 @@ import OverviewTab from './partials/OverviewTab';
 import InsightTab from './partials/InsightTab';
 import UserDetailsModal from './partials/UserDetailsModal';
 import SyncLdapUsersModal from './partials/SyncLdapUsersModal';
+import ResetPasswordModal from '@components/ResetPasswordModal';
 
 // Import hooks and utilities
 import { useUserColumns } from '@hooks/controlhub/users/userColumns';
@@ -31,8 +32,24 @@ const Users = () => {
     const [activeTab, setActiveTab] = useState('overview');
     const roleId = router.query.role_id as string | undefined;
 
+    // Reset password modal state
+    const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+    const [selectedUsername, setSelectedUsername] = useState<string>('');
+
+    // Handle reset password button click
+    const handleResetPasswordClick = useCallback((username: string) => {
+        setSelectedUsername(username);
+        setShowResetPasswordModal(true);
+    }, []);
+
+    // Handle reset password modal close
+    const handleCloseResetPasswordModal = useCallback(() => {
+        setShowResetPasswordModal(false);
+        setSelectedUsername('');
+    }, []);
+
     // Use custom hooks
-    const { baseColumns } = useUserColumns(session, []);
+    const { baseColumns } = useUserColumns(session, [], { onResetPassword: handleResetPasswordClick });
     
     const {
         customFieldColumns,
@@ -43,7 +60,7 @@ const Users = () => {
     } = useUsersData(session, baseColumns, roleId);
     
     // Get columns with custom fields
-    const { columns } = useUserColumns(session, customFieldColumns);
+    const { columns } = useUserColumns(session, customFieldColumns, { onResetPassword: handleResetPasswordClick });
     
     const {
         growthChart,
@@ -137,6 +154,12 @@ const Users = () => {
                     onHide={handleCloseSyncLdapUsersModal}
                     loading={loadingLdapUsers}
                     responseData={responseDataLdapUsers}
+                />
+
+                <ResetPasswordModal
+                    show={showResetPasswordModal}
+                    onHide={handleCloseResetPasswordModal}
+                    username={selectedUsername}
                 />
             </React.Fragment>
         </ProtectedRoute>

@@ -168,12 +168,12 @@ const CallIncomingCountry = () => {
       cell: (row: any) => formatMinutesAndSeconds(row.AvgDuration)
      },
 
-    { key: 'Cost', name: 'Total Cost', selector: (row: any) => row.Cost, sortable: true,
-      cell: (row: any) => formatCurrency(row.Cost)
-     },
-    { key: 'AvgCost', name: 'Avg Cost', selector: (row: any) => row['Avg Cost'], sortable: true,
-      cell: (row: any) => formatCurrency(Number(row['Avg Cost']))
-     },
+    // { key: 'Cost', name: 'Total Cost', selector: (row: any) => row.Cost, sortable: true,
+    //   cell: (row: any) => formatCurrency(row.Cost)
+    //  },
+    // { key: 'AvgCost', name: 'Avg Cost', selector: (row: any) => row['Avg Cost'], sortable: true,
+    //   cell: (row: any) => formatCurrency(Number(row['Avg Cost']))
+    //  },
         
     ];
 
