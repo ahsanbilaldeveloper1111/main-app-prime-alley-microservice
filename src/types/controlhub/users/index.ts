@@ -22,6 +22,9 @@ export interface User {
     extended_permissions: string[];
     blocked_permissions: string[];
     role_excluded_permissions: string[];
+    profile: {
+        profile_picture: string;
+    };
 }
 
 export interface Permission {

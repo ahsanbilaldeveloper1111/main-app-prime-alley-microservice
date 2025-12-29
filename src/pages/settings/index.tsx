@@ -271,7 +271,7 @@ const Settings = () => {
           gap: 8px;
           padding: 10px 20px;
           border-radius: 8px;
-          border: 2px solid;
+          border: 1px solid;
           font-weight: 500;
           font-size: 14px;
           cursor: pointer;
@@ -286,9 +286,7 @@ const Settings = () => {
         }
 
         .settings-filter-button.active {
-          background: #198754;
           color: white;
-          border-color: #198754;
         }
 
         .settings-filter-button.active .filter-icon {
@@ -316,7 +314,7 @@ const Settings = () => {
           gap: 8px;
           padding: 8px 16px;
           border-radius: 8px;
-          border: 2px solid;
+          border: 1px solid;
           font-weight: 500;
           font-size: 13px;
           cursor: pointer;
@@ -331,9 +329,7 @@ const Settings = () => {
         }
 
         .settings-sub-filter-button.active {
-          background: #198754;
           color: white;
-          border-color: #198754;
         }
 
         .settings-sub-filter-button.active .filter-icon {
@@ -374,7 +370,8 @@ const Settings = () => {
                       className={`settings-filter-button ${isActive ? 'active' : ''}`}
                       onClick={() => handleMainTabChange(tab.key)}
                       style={{
-                        borderColor: isActive ? '#198754' : tab.color,
+                        backgroundColor: isActive ? tab.color : 'white',
+                        borderColor: isActive ? tab.color : tab.color,
                         color: isActive ? 'white' : tab.color
                       }}
                     >
@@ -400,7 +397,8 @@ const Settings = () => {
                         className={`settings-sub-filter-button ${isActive ? 'active' : ''}`}
                         onClick={() => handleSubTabClick(activeTab, subTab.key)}
                         style={{
-                          borderColor: isActive ? '#198754' : subTab.color,
+                          backgroundColor: isActive ? subTab.color : 'white',
+                          borderColor: isActive ? subTab.color : subTab.color,
                           color: isActive ? 'white' : subTab.color
                         }}
                       >

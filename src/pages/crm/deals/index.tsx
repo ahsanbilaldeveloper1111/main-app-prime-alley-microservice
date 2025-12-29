@@ -39,7 +39,7 @@ import {
   Modal,
 } from "react-bootstrap";
 import Select from 'react-select';
-import { ModuleSlug, formatDateForTable } from "@utils/Helper";
+import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper";
 import {
   Target,
   CheckCircle,
@@ -1335,8 +1335,15 @@ const CrmDeals = () => {
       value: deal.net_value || deal.grand_total || '0',
       currency: deal.currency || 'USD',
       probability: deal?.stage?.probability || 0,
-      closeDate: formatDateForTable(deal.expected_close_date),
-      followUpDate: formatDateForTable(deal.follow_up_date),
+
+
+      // closeDate: formatDateForTable(deal.expected_close_date),
+      // followUpDate: formatDateForTable(deal.follow_up_date),
+
+      closeDate: deal.expected_close_date ? moment(deal.expected_close_date).format(GlobalDateFormat) : '-',
+      followUpDate: deal.follow_up_date ? moment(deal.follow_up_date).format(GlobalDateFormat) : '-',
+
+
       owner: extensions.find((ext: any) => ext?.id == deal?.created_by || ext?.extension == deal?.created_by)?.display_name || 
               extensions.find((ext: any) => ext?.id == deal?.created_by || ext?.extension == deal?.created_by)?.name || 
               deal.created_by || '',
@@ -2082,7 +2089,19 @@ const CrmDeals = () => {
                       dealsPagination.currentPage,
                       dealsPagination.rowsPerPage
                     ).map((deal) => (
-                      <tr key={deal.id}>
+                      <tr 
+                        key={deal.id}
+                        onDoubleClick={() => {
+                          if (session?.user?.permissions?.includes('list-crm-deals')) {
+                            handleViewDeal(deal.rawData?.id || deal.id);
+                          }
+                        }}
+                        style={{
+                          cursor: session?.user?.permissions?.includes('list-crm-deals') 
+                            ? "pointer" 
+                            : "default"
+                        }}
+                      >
                         {selectedDealsColumns.includes('name') && (
                           <td className="fw-semibold">
                             <div className="d-flex align-items-center gap-2">
@@ -2152,10 +2171,10 @@ const CrmDeals = () => {
                           <td className="fw-semibold">{deal.currency} {parseFloat(String(deal.value)).toLocaleString()}</td>
                         )}
                         {selectedDealsColumns.includes('closeDate') && (
-                          <td>{deal.closeDate || '-'}</td>
+                          <td className="text-uppercase">{deal.closeDate || '-'}</td>
                         )}
                         {selectedDealsColumns.includes('followUpDate') && (
-                          <td>{deal.followUpDate || '-'}</td>
+                          <td className="text-uppercase">{deal.followUpDate || '-'}</td>
                         )}
                         {selectedDealsColumns.includes('owner') && (
                           <td>{deal.owner || '-'}</td>

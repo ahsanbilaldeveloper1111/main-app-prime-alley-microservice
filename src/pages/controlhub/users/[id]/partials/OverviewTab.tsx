@@ -7,6 +7,7 @@ import { assignRoleToUser, assignGroupToUser, MarkAsCompanyAdmin } from '@utils/
 import RecentActivitiesTab from './RecentActivitiesTab';
 import UserProfileTab from './UserProfileTab';
 import OrganizationalHierarchyTab from './OrganizationalHierarchyTab';
+import { getStorageImageUrl } from '@utils/imageUtils';
 
 interface OverviewTabProps {
     currentUser: User | null;
@@ -71,11 +72,13 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
         }
     };
 
+    const [profilePicture, setProfilePicture] = useState<string>('');
     React.useEffect(() => {
         if (currentUser) {
             setUpdatedGroup(currentUser.group_id || '');
             setUpdatedRole(currentUser.role_id || '');
             setIsCompanyAdmin(currentUser.is_company_admin === "1");
+            setProfilePicture(currentUser.profile?.profile_picture || '');
         }
     }, [currentUser]);
 
@@ -89,9 +92,12 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                             <Row className="align-items-center">
                                 <Col xs={3}>
                                     <div className="user-avatar">
+                                        {profilePicture ? 
+                                        <img src={getStorageImageUrl(profilePicture) || ''} alt="Profile" className="img-fluid rounded-circle" /> : 
                                         <div className="text">
                                             <i className="material-icons-two-tone">person</i>
                                         </div>
+}
                                     </div>
                                 </Col>
                                 <Col xs={9}>

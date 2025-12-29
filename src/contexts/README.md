@@ -222,7 +222,7 @@ function MyComponent() {
     if (result.success) {
       toast.success(`Calling ${phoneNumber}...`);
     } else {
-      toast.error(result.error || 'Failed to make call');
+      toast.error( 'Failed to make call');
     }
   };
   

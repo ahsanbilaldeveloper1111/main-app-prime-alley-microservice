@@ -1,6 +1,6 @@
 import React from 'react'
 import { Button, Col, Row } from 'react-bootstrap'
-import { ChevronDown, ChevronUp, DiscAlbum, PhoneCall } from 'lucide-react'
+import { ChevronDown, ChevronUp, DiscAlbum, PhoneCall, Filter } from 'lucide-react'
 import Link from 'next/link'
 
 interface PageHeaderProps {
@@ -10,6 +10,8 @@ interface PageHeaderProps {
   collapsedSections: { [key: string]: boolean }
   expandAll: () => void
   collapseAll: () => void
+  showFilterBar: boolean
+  toggleFilterBar: () => void
 }
 
 const PageHeader: React.FC<PageHeaderProps> = ({
@@ -18,17 +20,19 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   toggleFullscreen,
   collapsedSections,
   expandAll,
-  collapseAll
+  collapseAll,
+  showFilterBar,
+  toggleFilterBar
 }) => {
   const allCollapsed = Object.values(collapsedSections).every(val => val === true)
   
   return (
     <Row className={`mb-3 ${isFullscreen ? 'd-none' : ''}`}>
       <Col md={12}>
-        <div className="page-header-title style-2">
+        <div className="page-header-title style-2 mt-0 mb-0">
           <Row className="d-flex justify-content-between align-items-center">
             <Col md={5}>
-              <h2 className="mb-0">Live View</h2>
+              <h2 className="mb-0">Live Calls</h2>
             </Col>
 
             <Col md={7} className="d-flex justify-content-end">
@@ -118,6 +122,24 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                       </svg>
                   <span className="ms-2">{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
                 </Button>
+
+                <Button
+                  variant={showFilterBar ? "primary" : "outline-secondary"}
+                  size="sm"
+                  onClick={toggleFilterBar}
+                  className="d-flex align-items-center"
+                  style={{ 
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    whiteSpace: 'nowrap',
+                    padding: '0.5rem 1rem'
+                  }}
+                >
+                  <Filter size={16} className="me-1" />
+                  <span>{showFilterBar ? 'Hide Filter' : 'Show Filter'}</span>
+                </Button>
+
+                
               </div>
             </Col>
           </Row>

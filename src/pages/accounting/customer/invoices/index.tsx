@@ -17,6 +17,7 @@ const STATUS_PARTIALLY_PAID = 'partially_paid';
 const STATUS_FAILED = 'failed';
 const STATUS_REFUNDED = 'refunded';
 const STATUS_PENDING = 'pending';
+
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
@@ -498,6 +499,43 @@ const InvoiceList = () => {
           </div>
         ),
       },
+      {
+        key: "status",
+        name: "Status",
+        selector: (row: InvoiceData) => row.status,
+        sortable: true,
+        cell: (props: InvoiceData) => {
+          const getStatusBadge = (status: string) => {
+            switch (status) {
+              case STATUS_DRAFT:
+                return <span className="badge bg-secondary">Draft</span>;
+              case STATUS_SENT:
+                return <span className="badge bg-info">Sent</span>;
+              case STATUS_PAID:
+                return <span className="badge bg-success">Paid</span>;
+              case STATUS_OVERDUE:
+                return <span className="badge bg-danger">Overdue</span>;
+              case STATUS_CANCELLED:
+                return <span className="badge bg-dark">Cancelled</span>;
+
+              case STATUS_PARTIALLY_PAID:
+                return <span className="badge bg-warning">Partially Paid</span>;
+              case STATUS_FAILED:
+                return <span className="badge bg-danger">Failed</span>;
+              case STATUS_REFUNDED:
+                return <span className="badge bg-danger">Refunded</span>;
+              case STATUS_PENDING:
+                return <span className="badge bg-warning">Pending</span>;
+              case STATUS_DRAFT:
+                return <span className="badge bg-secondary">Draft</span>;
+              default:
+                return <span className="badge bg-light text-dark">{status}</span>;
+            }
+          };
+          
+          return getStatusBadge(props.status || STATUS_DRAFT);
+        },
+      },
      
       {
         key: "subtotal",
@@ -557,43 +595,7 @@ const InvoiceList = () => {
           </span>
         ),
       },
-      {
-        key: "status",
-        name: "Status",
-        selector: (row: InvoiceData) => row.status,
-        sortable: true,
-        cell: (props: InvoiceData) => {
-          const getStatusBadge = (status: string) => {
-            switch (status) {
-              case STATUS_DRAFT:
-                return <span className="badge bg-secondary">Draft</span>;
-              case STATUS_SENT:
-                return <span className="badge bg-info">Sent</span>;
-              case STATUS_PAID:
-                return <span className="badge bg-success">Paid</span>;
-              case STATUS_OVERDUE:
-                return <span className="badge bg-danger">Overdue</span>;
-              case STATUS_CANCELLED:
-                return <span className="badge bg-dark">Cancelled</span>;
-
-              case STATUS_PARTIALLY_PAID:
-                return <span className="badge bg-warning">Partially Paid</span>;
-              case STATUS_FAILED:
-                return <span className="badge bg-danger">Failed</span>;
-              case STATUS_REFUNDED:
-                return <span className="badge bg-danger">Refunded</span>;
-              case STATUS_PENDING:
-                return <span className="badge bg-warning">Pending</span>;
-              case STATUS_DRAFT:
-                return <span className="badge bg-secondary">Draft</span>;
-              default:
-                return <span className="badge bg-light text-dark">{status}</span>;
-            }
-          };
-          
-          return getStatusBadge(props.status || STATUS_DRAFT);
-        },
-      },
+      
       {
         key: "Action",
         name: "ACTION",
@@ -606,15 +608,13 @@ const InvoiceList = () => {
           
           <div className="d-flex gap-2"> 
             
-              {props.status === STATUS_PENDING && session?.user?.permissions?.includes('pay-invoices-billing') && (
-                       
+              {(props.status === STATUS_PENDING || props.status === STATUS_OVERDUE || props.status === STATUS_PARTIALLY_PAID) && session?.user?.permissions?.includes('pay-invoices-billing') && (
 
               <Button 
-              variant="info" 
+              variant="danger" 
               size="sm"
               style={{ 
-                backgroundColor: '#5bc0de', 
-                borderColor: '#5bc0de', 
+               
                 color: 'white',
                 fontSize: '0.85rem',
                 padding: '0.375rem 0.75rem'
@@ -628,26 +628,39 @@ const InvoiceList = () => {
               )}
              
                        
-
-                        <Button 
-                          variant="light" 
-                          size="sm"
-                          style={{ 
-                            backgroundColor: '#e9ecef',
-                            borderColor: '#dee2e6',
-                            color: '#212529',
-                            fontSize: '0.85rem',
-                            padding: '0.375rem 0.75rem',
-                            fontWeight: '500'
-                          }}
-                          onClick={() => { 
-                            handleDownloadPDF(props)
-                          }}
-                        >
-                          Download
-                        </Button>
+             {props.status === STATUS_PAID 
+             && (
+              // <Button 
+              // variant="info" 
+              // size="sm"
+              // style={{ 
+              //   backgroundColor: '#5bc0de', 
+              //   borderColor: '#5bc0de', 
+              //   color: 'white',
+              //   fontSize: '0.85rem', 
+              //   padding: '0.375rem 0.75rem'
+              // }}
+              // onClick={() => handlePayInvoice(props)}
+              // >
+              // Pay Now
+              // </Button>
+              <Button 
+              variant="success" 
+              size="sm"
+              style={{ 
+               
+                fontSize: '0.85rem',
+                padding: '0.375rem 0.75rem',
+                fontWeight: '500'
+              }}
+              
+            >
+              Paid
+            </Button> 
+             )}
                       
                         </div>
+                       
             </>
           );
         },

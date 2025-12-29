@@ -9,7 +9,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import { useState } from 'react';
 import { Card, Row, Col, Button, Badge, Form, Modal } from 'react-bootstrap';
-import { ChevronRight, Clock, DollarSign, Edit, FileText, Wallet, Users, Mail, Phone, User, Package, Check, TrendingUp } from 'lucide-react';
+import { ChevronRight, Clock, DollarSign, Edit, FileText, Wallet, Users, Mail, Phone, User, Package, Check, TrendingUp, X, Eye, Send } from 'lucide-react';
 import { formatNumber } from "@utils/Helper";
 
 import "@assets/scss/billing.scss";
@@ -19,10 +19,12 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import countries from "world-countries";
 
-import { GetCompanyDetails,GetPaymentMethods,UpdateCompanyDetails,GetDashboardCounters } from "@utils/accounting";
+import { GetCompanyDetails,GetPaymentMethods,UpdateCompanyDetails,GetDashboardCounters,GetPayments } from "@utils/accounting";
+import { getInvoices } from "@utils/accountingOld";
 import ThemeSelect from "@components/ThemeSelect";
 import { toast } from "react-toastify";
 import router from "next/router";
+import moment from "moment";
 
 const AccountOverview = () => {
 
@@ -137,6 +139,34 @@ const AccountOverview = () => {
   const getPaymentMethods = async () => {
     const response = await GetPaymentMethods() as any;
     setPaymentMethods(response?.payment_methods || []);
+  };
+
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
+  useEffect(() => {
+    getPaymentHistory();
+  }, []);
+  const getPaymentHistory = async () => {
+    try {
+      const response = await GetPayments({ page: 1, per_page: 3,limit: 3 }) as any;
+     // console.log('response payment history', response);
+      setPaymentHistory(response?.dataList || []);
+    } catch (error) {
+      console.error('Error fetching payment history:', error);
+    }
+  };
+
+  const [recentInvoices, setRecentInvoices] = useState<any[]>([]);
+  useEffect(() => {
+    getRecentInvoices();
+  }, []);
+  const getRecentInvoices = async () => {
+    try {
+      const response = await getInvoices({ page: 1, per_page: 3,limit:3 }) as any;
+      console.log('response recent invoices', response);
+      setRecentInvoices(response?.data || []);
+    } catch (error) {
+      console.error('Error fetching recent invoices:', error);
+    }
   };
 
   const [showBillingEditModal, setShowBillingEditModal] = useState(false);
@@ -286,7 +316,7 @@ const AccountOverview = () => {
               </div> */}
               
               <div className="d-flex justify-content-between align-items-center py-2">
-                <small className="text-muted" style={{ fontSize: '0.8rem' }}>Pending</small>
+                <small className="text-muted" style={{ fontSize: '0.8rem' }}>Pending Amount</small>
                 <span className="fw-semibold" style={{ fontSize: '0.9rem' }}>{companyDetails?.profile?.currency} {formatNumber(companyDetails?.profile?.outstanding_invoices)}</span>
 
                  
@@ -459,35 +489,62 @@ const AccountOverview = () => {
                 <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Payment Method</h6>
               </div>
 
-              {paymentMethods?.map((method: any) => (
-                    <div key={method.id}>
-                      {method.is_default ===true && (
-                        <>
-                        
+              {paymentMethods && paymentMethods.some((method: any) => method.is_default === true) ? (
+                paymentMethods.map((method: any) => (
+                  <div key={method.id}>
+                    {method.is_default === true && (
+                      <>
+                        <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                          <small className="text-muted" style={{ fontSize: '0.75rem' }}>Card</small>
+                          <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>•••• {method.card?.last4}</span>
+                        </div>
 
                         <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                <small className="text-muted" style={{ fontSize: '0.75rem' }}>Card</small>
-                <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>•••• {method.card?.last4}</span>
-              </div>
-
-                        
-                        <div className="d-flex justify-content-between align-items-center py-1border-bottom">
-                <small className="text-muted" style={{ fontSize: '0.75rem' }}>Card Type</small>
-                <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
-                {method.card?.brand}
-                </span>
-              </div>
+                          <small className="text-muted" style={{ fontSize: '0.75rem' }}>Card Type</small>
+                          <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
+                            {method.card?.brand}
+                          </span>
+                        </div>
 
                         <div className="d-flex justify-content-between align-items-center py-1">
-                <small className="text-muted" style={{ fontSize: '0.75rem' }}>Expiry</small>
-                <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
-                {method.card?.exp_month}/{method.card?.exp_year}
-                </span>
-              </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                          <small className="text-muted" style={{ fontSize: '0.75rem' }}>Expiry</small>
+                          <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
+                            {method.card?.exp_month}/{method.card?.exp_year}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              ) : paymentMethods && paymentMethods.length > 0 ? (
+                <div className="text-center py-3">
+                  <p className="text-muted mb-2" style={{ fontSize: '0.75rem' }}>
+                    No default payment method set
+                  </p>
+                  <Button 
+                    variant="primary" 
+                    size="sm"
+                    onClick={() => router.push('/accounting/customer/payment-methods')}
+                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.7rem' }}
+                  >
+                    Manage Payment Methods
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-3">
+                  <p className="text-muted mb-2" style={{ fontSize: '0.75rem' }}>
+                    No payment method added
+                  </p>
+                  <Button 
+                    variant="primary" 
+                    size="sm"
+                    onClick={() => router.push('/accounting/customer/payment-methods')}
+                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.7rem' }}
+                  >
+                    Add Card
+                  </Button>
+                </div>
+              )}
               
               
 
@@ -507,36 +564,125 @@ const AccountOverview = () => {
         <Col md={6} lg={4} className="mb-3">
           <Card className='billing-details-cards' style={{ height: '100%' }}>
             <Card.Body className="p-2">
-              <div className="d-flex align-items-center gap-2 mb-2">
-                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
-                  width: '28px', 
-                  height: '28px', 
-                  backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                  flexShrink: 0 
-                }}>
-                  <Clock size={14} style={{ color: '#fbbf24' }} />
-                </div>
-                <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Upcoming Renewals</h6>
-              </div>
-              
-              {subscriptions
-                .filter(sub => sub.status === 'Active' || sub.status === 'Trial')
-                .slice(0, 3)
-                .map((sub, index) => (
-                  <div key={sub.id} className={`py-1 ${index < 2 ? 'border-bottom' : ''}`}>
-                    <div className="d-flex justify-content-between align-items-center">
-                      <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                        <small className="d-block text-truncate" style={{ fontSize: '0.75rem', fontWeight: '500' }}>
-                          {sub.name}
-                        </small>
-                        <small className="text-muted" style={{ fontSize: '0.7rem' }}>{sub.renewalEnd}</small>
-                      </div>
-                      <small className="fw-semibold ms-2" style={{ fontSize: '0.75rem', flexShrink: 0 }}>
-                        {sub.price}
-                      </small>
-                    </div>
+              <div className="d-flex align-items-center justify-content-between gap-2 mb-2">
+                <div className="d-flex align-items-center gap-2">
+                  <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
+                    width: '28px', 
+                    height: '28px', 
+                    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                    flexShrink: 0 
+                  }}>
+                    <Clock size={14} style={{ color: '#fbbf24' }} />
                   </div>
-                ))}
+                  <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Recent Invoices</h6>
+                </div>
+                <Button 
+                  variant="outline-primary" 
+                  size="sm" 
+                  className="d-flex align-items-center"
+                  onClick={() => router.push('/accounting/customer/invoices')}
+                  style={{ textDecoration: 'none', fontSize: '0.75rem' }}
+                >
+                  <Eye size={12} className="me-1" /> View All
+                </Button>
+              </div>
+
+              
+              {recentInvoices.length > 0 ? (
+                recentInvoices.map((invoice: any, index: number) => {
+                  const getStatusIcon = (iconColor: string) => {
+                    const status = invoice.status?.toLowerCase();
+                    if (status === 'paid') {
+                      return <Check size={10} style={{ color: iconColor }} />;
+                    } else if (status === 'overdue' || status === 'failed' || status === 'refunded') {
+                      return <X size={10} style={{ color: iconColor }} />;
+                    } else if (status === 'partially_paid' || status === 'pending') {
+                      return <Clock size={10} style={{ color: iconColor }} />;
+                    } else if (status === 'sent') {
+                      return <Send size={10} style={{ color: iconColor }} />;
+                    } else if (status === 'draft') {
+                      return <Edit size={10} style={{ color: iconColor }} />;
+                    } else if (status === 'cancelled') {
+                      return <X size={10} style={{ color: iconColor }} />;
+                    } else {
+                      return <FileText size={10} style={{ color: iconColor }} />;
+                    }
+                  };
+
+                  const getStatusBgColor = () => {
+                    const status = invoice.status?.toLowerCase();
+                    if (status === 'paid') {
+                      return '#22c55e'; // solid green background
+                    } else if (status === 'overdue' || status === 'failed' || status === 'refunded') {
+                      return 'rgba(239, 68, 68, 0.2)'; // red
+                    } else if (status === 'partially_paid' || status === 'pending') {
+                      return 'rgba(251, 191, 36, 0.2)'; // yellow/orange
+                    } else if (status === 'sent') {
+                      return 'rgba(59, 130, 246, 0.2)'; // blue
+                    } else if (status === 'draft') {
+                      return 'rgba(107, 114, 128, 0.2)'; // gray
+                    } else if (status === 'cancelled') {
+                      return 'rgba(55, 65, 81, 0.2)'; // dark gray
+                    } else {
+                      return 'rgba(156, 163, 175, 0.2)'; // light gray
+                    }
+                  };
+
+                  const getStatusIconColor = () => {
+                    const status = invoice.status?.toLowerCase();
+                    if (status === 'paid') {
+                      return '#ffffff'; // white icon on green background
+                    } else if (status === 'overdue' || status === 'failed' || status === 'refunded') {
+                      return '#ef4444'; // red
+                    } else if (status === 'partially_paid' || status === 'pending') {
+                      return '#fbbf24'; // yellow
+                    } else if (status === 'sent') {
+                      return '#3b82f6'; // blue
+                    } else if (status === 'draft') {
+                      return '#6b7280'; // gray
+                    } else if (status === 'cancelled') {
+                      return '#374151'; // dark gray
+                    } else {
+                      return '#9ca3af'; // light gray
+                    }
+                  };
+
+                  return (
+                    <div key={invoice.id} className={`py-1 ${index < recentInvoices.length - 1 ? 'border-bottom' : ''}`}>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <div className="flex-grow-1 d-flex align-items-center gap-2" style={{ minWidth: 0 }}>
+                          <div 
+                            className="rounded-circle d-flex align-items-center justify-content-center" 
+                            style={{ 
+                              width: '20px', 
+                              height: '20px', 
+                              backgroundColor: getStatusBgColor(),
+                              flexShrink: 0 
+                            }}
+                          >
+                            {getStatusIcon(getStatusIconColor())}
+                          </div>
+                          <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                            <small className="d-block text-truncate" style={{ fontSize: '0.75rem', fontWeight: '500' }}>
+                              #{invoice.invoice_number}
+                            </small>
+                            <small className="text-muted" style={{ fontSize: '0.7rem' }}>
+                              {invoice.invoice_date ? moment(invoice.invoice_date).format('DD-MMM-YYYY') : ''}
+                            </small>
+                          </div>
+                        </div>
+                        <small className="fw-semibold ms-2" style={{ fontSize: '0.75rem', flexShrink: 0 }}>
+                          {invoice.currency_code || 'AED'} {formatNumber(invoice.total_amount || 0)}
+                        </small>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-3">
+                  <small className="text-muted" style={{ fontSize: '0.75rem' }}>No invoices available</small>
+                </div>
+              )}
             </Card.Body>
           </Card>
         </Col>
@@ -545,41 +691,72 @@ const AccountOverview = () => {
         <Col md={6} lg={4} className="mb-3">
           <Card className='billing-details-cards' style={{ height: '100%' }}>
             <Card.Body className="p-2">
-              <div className="d-flex align-items-center gap-2 mb-2">
-                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
-                  width: '28px', 
-                  height: '28px', 
-                  backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                  flexShrink: 0 
-                }}>
-                  <TrendingUp size={14} style={{ color: '#22c55e' }} />
+              <div className="d-flex align-items-center justify-content-between gap-2 mb-2">
+                <div className="d-flex align-items-center gap-2">
+                  <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
+                    width: '28px', 
+                    height: '28px', 
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    flexShrink: 0 
+                  }}>
+                    <TrendingUp size={14} style={{ color: '#22c55e' }} />
+                  </div>
+                  <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Payment History</h6>
                 </div>
-                <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Recent Activity</h6>
+                <Button 
+                  variant="outline-primary" 
+                  size="sm" 
+                  className="d-flex align-items-center"
+                  onClick={() => router.push('/accounting/customer/billing-history')}
+                  style={{ textDecoration: 'none', fontSize: '0.75rem' }}
+                >
+                  <Eye size={12} className="me-1" /> View All
+                </Button>
               </div>
               
-              <div className="d-flex gap-2 py-1 border-bottom">
-                <Check size={12} className="mt-1 text-success" style={{ flexShrink: 0 }} />
-                <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                  <small className="d-block" style={{ fontSize: '0.75rem', fontWeight: '500' }}>Payment completed</small>
-                  <small className="text-muted" style={{ fontSize: '0.7rem' }}>2 hours ago</small>
-                </div>
-              </div>
-              
-              <div className="d-flex gap-2 py-1 border-bottom">
-                <FileText size={12} className="mt-1 text-info" style={{ flexShrink: 0 }} />
-                <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                  <small className="d-block" style={{ fontSize: '0.75rem', fontWeight: '500' }}>Invoice #INV-003 generated</small>
-                  <small className="text-muted" style={{ fontSize: '0.7rem' }}>Yesterday</small>
-                </div>
-              </div>
+              {paymentHistory.length > 0 ? (
+                paymentHistory.map((payment: any, index: number) => {
+                  const getIcon = () => {
+                    if (payment.status === 'completed') {
+                      return <Check size={12} className="mt-1 text-success" style={{ flexShrink: 0 }} />;
+                    } else if (payment.status === 'failed' || payment.status === 'cancelled') {
+                      return <X size={12} className="mt-1 text-danger" style={{ flexShrink: 0 }} />;
+                    } else {
+                      return <FileText size={12} className="mt-1 text-info" style={{ flexShrink: 0 }} />;
+                    }
+                  };
 
-              <div className="d-flex gap-2 py-1">
-                <Package size={12} className="mt-1 text-primary" style={{ flexShrink: 0 }} />
-                <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                  <small className="d-block" style={{ fontSize: '0.75rem', fontWeight: '500' }}>Subscription activated</small>
-                  <small className="text-muted" style={{ fontSize: '0.7rem' }}>3 days ago</small>
+                  const getStatusText = () => {
+                    if (payment.status === 'completed') {
+                      return `Payment completed${payment.invoice?.invoice_number ? ` - ${payment.invoice.invoice_number}` : ''}`;
+                    } else if (payment.status === 'failed') {
+                      return `Payment failed${payment.invoice?.invoice_number ? ` - ${payment.invoice.invoice_number}` : ''}`;
+                    } else if (payment.status === 'cancelled') {
+                      return `Payment cancelled${payment.invoice?.invoice_number ? ` - ${payment.invoice.invoice_number}` : ''}`;
+                    } else {
+                      return `Payment ${payment.status}${payment.invoice?.invoice_number ? ` - ${payment.invoice.invoice_number}` : ''}`;
+                    }
+                  };
+
+                  return (
+                    <div key={payment.id} className={`d-flex gap-2 py-1 ${index < paymentHistory.length - 1 ? 'border-bottom' : ''}`}>
+                      {getIcon()}
+                      <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                        <small className="d-block" style={{ fontSize: '0.75rem', fontWeight: '500' }}>
+                          {getStatusText()}
+                        </small>
+                        <small className="text-muted" style={{ fontSize: '0.7rem' }}>
+                          {moment(payment.payment_date).fromNow()}
+                        </small>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-3">
+                  <small className="text-muted" style={{ fontSize: '0.75rem' }}>No payment history available</small>
                 </div>
-              </div>
+              )}
             </Card.Body>
           </Card>
         </Col>
@@ -609,6 +786,7 @@ const AccountOverview = () => {
                     cursor: 'pointer',
                     transition: 'all 0.2s'
                   }}
+                  onClick={() => router.push('/accounting/customer/invoices')}
                 >
                   <div className="rounded d-flex align-items-center justify-content-center" style={{ 
                     width: '24px', 
@@ -618,7 +796,7 @@ const AccountOverview = () => {
                   }}>
                     <FileText size={12} style={{ color: '#3b82f6' }} />
                   </div>
-                  <small style={{ fontSize: '0.75rem', fontWeight: '500' }}>Download Invoices</small>
+                  <small style={{ fontSize: '0.75rem', fontWeight: '500' }}>Invoices status</small>
                 </div>
 
                 <div 
@@ -631,12 +809,15 @@ const AccountOverview = () => {
                   }}
                  
                 >
-                  <div className="rounded d-flex align-items-center justify-content-center" style={{ 
+                  <div className="rounded d-flex align-items-center justify-content-center" 
+                  onClick={() => router.push('/accounting/customer/payment-methods')}
+                  style={{ 
                     width: '24px', 
                     height: '24px', 
                     backgroundColor: 'rgba(34, 197, 94, 0.1)',
                     flexShrink: 0 
                   }}>
+                    
                     <Wallet size={12} style={{ color: '#22c55e' }} />
                   </div>
                   <small style={{ fontSize: '0.75rem', fontWeight: '500' }}>Update Payment Method</small>
@@ -644,6 +825,7 @@ const AccountOverview = () => {
 
                 <div 
                   className="d-flex align-items-center gap-2 py-2 px-2" 
+                  onClick={() => router.push('/accounting/customer/product-details')}
                   style={{ 
                     border: '1px solid #dee2e6', 
                     borderRadius: '4px',

@@ -34,7 +34,8 @@ import {
   ChevronsRight,
 } from "lucide-react";
 import "@assets/scss/ticketsnew.scss";
-import { ModuleSlug } from "@utils/Helper";
+import { GlobalDateFormat, GlobalTimeFormat, ModuleSlug } from "@utils/Helper";
+import moment from "moment";
 
 // Filter Bar Component
 interface FilterBarProps {
@@ -169,6 +170,7 @@ interface ActivityRecord {
   lastActivity: string;
   stage: string;
   tags: string[];
+  dateTime: string;
 }
 
 const HistoryPage = () => {
@@ -331,6 +333,7 @@ const HistoryPage = () => {
           type: typeCapitalized,
           agent: agentName,
           lastActivity: formattedDate,
+          dateTime: record.updated_at,
           stage: record.stage_name || 'N/A',
           tags: [] // Tags not available in API response
         };
@@ -1137,7 +1140,16 @@ const HistoryPage = () => {
                   </tr>
                 ) : (
                   filteredActivityRecords.map((activity) => (
-                    <tr key={activity.id}>
+                    <tr 
+                      key={activity.id}
+                      onDoubleClick={() => {
+                        setSelectedActivityRecord(activity);
+                        setShowActivityTimelineModal(true);
+                      }}
+                      style={{
+                        cursor: "pointer"
+                      }}
+                    >
                       <td>
                         <div>
                           <div className="fw-semibold text-dark">{activity.customer}</div>
@@ -1174,14 +1186,17 @@ const HistoryPage = () => {
                               const splittedArray = alphabeticChars.split(' ');
                               return [splittedArray[0][0], splittedArray?.[1]?.[0] || ''].join('').toUpperCase();
                             })()}
+                           
                           </div>
                           <div className="small">{activity.agent}</div>
                         </div>
                       </td>
                       <td>
-                        <div className="small">
-                          <div className="text-dark">{activity.lastActivity.split(' ')[0]}</div>
-                          <div className="text-muted">{activity.lastActivity.split(' ')[1]}</div>
+                        <div className="small text-uppercase">
+                          {/* <div className="text-dark">{activity.lastActivity.split(' ')[0]}</div>
+                          <div className="text-muted">{activity.lastActivity.split(' ')[1]}</div> */}
+                          {activity.dateTime ? moment(activity.dateTime).format(GlobalDateFormat) : '-'}
+                          <div className="text-muted">{activity.dateTime ? moment(activity.dateTime).format(GlobalTimeFormat) : ''}</div>
                         </div>
                       </td>
                       <td>

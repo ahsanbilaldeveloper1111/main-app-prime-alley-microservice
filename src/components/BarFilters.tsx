@@ -29,8 +29,15 @@ const BarFilters: React.FC<BarFiltersProps> = ({
   onReset,
   onSubmit
 }) => {
-  // Calculate advanced filter count (excluding 'search' key)
-  const advancedFilterCount = Object.keys(filters).filter(key => key !== 'search').length;
+  // Calculate advanced filter count (excluding 'search' key and empty values)
+  const advancedFilterCount = Object.keys(filters).filter(key => {
+    if (key === 'search') return false;
+    const value = filters[key];
+    // Don't count empty values
+    if (value === null || value === undefined || value === '') return false;
+    if (Array.isArray(value) && value.length === 0) return false;
+    return true;
+  }).length;
   
   // State for toggling filter content visibility
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);

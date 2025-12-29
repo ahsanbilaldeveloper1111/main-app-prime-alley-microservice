@@ -14,7 +14,7 @@ export const config = {
   
   // Application configuration
   app: {
-    name: 'Business Contact Center',
+    name: 'Business Workspace AI-Powered',
     baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
   },
   

@@ -3,6 +3,7 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
 import { io, Socket } from "socket.io-client";
 import { Col, Button, Card, Modal, Row, Form } from 'react-bootstrap';
+import { BarChart3 } from 'lucide-react';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import type { NextPage } from 'next';
@@ -33,7 +34,6 @@ import '@assets/scss/common.scss';
 // Utils
 import { ListCallLogs, ExportCallLogs, DownloadCallRecording, DownloadStreamingExport } from '@utils/calls';
 import { GetHierarchyData } from '@utils/users';
-import { formatDateTimeToLocal } from '@utils/Helper';
 
 // Assets
 import imgStatus1 from '@assets/images/widget/img-status-1.svg';
@@ -43,7 +43,7 @@ import imgStatus4 from '@assets/images/widget/img-status-4.svg';
 import router from 'next/router';
 import axiosInstance from '@utils/axios';
 import { toast } from 'react-toastify';
-import { convertUTCToUserTimezone, convertUTCTimeToUserTimezone, convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, convertUTCDateToUserTimezone, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat, encodeAnalysisData, getAutoTimezone, convertDateTimeWithOffsetToLocal } from '@utils/Helper';
+import { formatDuration, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat, encodeAnalysisData, convertDateTimeWithOffsetToLocal, formatDateTimeToLocal } from '@utils/Helper';
 import PageLoader from '@components/PageLoader';
 import CircularProgressLoader from '@components/CircularProgressLoader';
 import CircularProgressCircle from '@components/CircularProgressCircle';
@@ -100,12 +100,39 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const [startDateTime, setStartDateTime] = useState<string>('');
   const [endDateTime, setEndDateTime] = useState<string>('');
 
+  // Initialize filters with default values immediately to prevent first API call without dates
+  const getDefaultFilters = () => {
+    const now = moment();
+    const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
+    const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
+    const startDateApi = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+    const endDateApi = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+    return {
+      current: {
+        start_date: startDateInput,
+        end_date: endDateInput
+      },
+      applied: {
+        start_date: startDateApi,
+        end_date: endDateApi
+      }
+    };
+  };
+  
+  const defaultFilters = getDefaultFilters();
+  
   // State declarations
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({});
-  const [appliedFilters, setAppliedFilters] = useState({}); // Filters that trigger API calls
+  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(defaultFilters.current);
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>(defaultFilters.applied); // Filters that trigger API calls
   const [searchValue, setSearchValue] = useState<string>('');
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
+  const [showAnalytics, setShowAnalytics] = useState<boolean>(false);
+  
+  // Refs to prevent duplicate API calls
+  const appliedFiltersRef = useRef<Record<string, any>>(defaultFilters.applied);
+  const isFetchingRef = useRef(false);
+  const lastFetchTimeRef = useRef(0);
+  const lastFetchParamsRef = useRef<string>('');
   
   // Use hierarchy data hook
   const { 
@@ -137,7 +164,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     perPage: 15,
   });
   const [socketExtensions, setSocketExtensions] = useState<number[]>([]);
-  const [currentTimezone, setCurrentTimezone] = useState<string>('');
 
   const [summary, setSummary] = useState<Summary>({
     numbers: 0,
@@ -292,18 +318,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       selector: (row: any) => row.Duration,
       sortable: true,
       cell: (props: any) => {
-        // const formatDuration = (seconds: number) => {
-        //   const minutes = Math.floor(seconds / 60);
-        //   let secs = seconds % 60;
-        //   secs = parseFloat(secs.toFixed(2));
-          
-        //   if (minutes > 0) {
-        //     return `${minutes} Min ${secs} Sec`;
-        //   } else {
-        //     return `${secs} Sec`;
-        //   }
-        // };
-        
         const duration = parseInt(props.Duration.toString())/10000000 || 0;
         return (
           <div>
@@ -413,13 +427,30 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   };
 
   const fetchCallLogsOriginal = useCallback(async (page = 1, perPage = 15, search = "") => {
+    // Prevent duplicate calls
+    const now = Date.now();
+    const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(appliedFiltersRef.current)}`;
+    
+    // Skip if already fetching with same params within 500ms
+    if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
+      return;
+    }
+    
+    // Skip if same params were fetched recently (within 100ms)
+    if (lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 100) {
+      return;
+    }
+    
+    isFetchingRef.current = true;
+    lastFetchTimeRef.current = now;
+    lastFetchParamsRef.current = paramsKey;
+    
     setShowPageLoader(true);
-    const response = await ListCallLogs(
-      { page, perPage, search, filters: appliedFilters, reportType: 'recordings', moduleSlug: ModuleSlug.CALL_RECORDINGS },
-      'call-logs/recordings'
-    ).finally(() => {
-      setShowPageLoader(false);
-    });
+    try {
+      const response = await ListCallLogs(
+        { page, perPage, search, filters: appliedFiltersRef.current, reportType: 'recordings', moduleSlug: ModuleSlug.CALL_RECORDINGS },
+        'call-logs/recordings'
+      );
     
 
     if (response?.summary) {
@@ -459,13 +490,13 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           newChartData.label.push(item.label);
           // Parse string values to numbers before division
           const longestCall = typeof item.longest_call === 'string' 
-            ? parseFloat(item.longest_call) 
+            ? Number.parseFloat(item.longest_call) 
             : Number(item.longest_call) || 0;
           const shortestCall = typeof item.shortest_call === 'string' 
-            ? parseFloat(item.shortest_call) 
+            ? Number.parseFloat(item.shortest_call) 
             : Number(item.shortest_call) || 0;
           const averageCall = typeof item.average_call === 'string' 
-            ? parseFloat(item.average_call) 
+            ? Number.parseFloat(item.average_call) 
             : Number(item.average_call) || 0;
           
           newChartData.longest_call.push(longestCall / ms);
@@ -473,20 +504,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           newChartData.average_call.push(averageCall / ms);
         });
 
-        console.log("Chart data (raw)", dataExtension);
-        console.log("Chart data (processed)", newChartData);
-        console.log("Chart data (values check)", {
-          extension_101: {
-            shortest: newChartData.shortest_call[0],
-            average: newChartData.average_call[0],
-            longest: newChartData.longest_call[0]
-          },
-          extension_107: {
-            shortest: newChartData.shortest_call[1],
-            average: newChartData.average_call[1],
-            longest: newChartData.longest_call[1]
-          }
-        });
         setChartLoading(true);
 
         const dataLength = newChartData.label.length;
@@ -585,8 +602,12 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       }
     }
 
-    return response;
-  }, [appliedFilters]);
+      return response;
+    } finally {
+      setShowPageLoader(false);
+      isFetchingRef.current = false;
+    }
+  }, []);
 
   // Wrapper function that handles modified data
   const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
@@ -625,7 +646,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const handleFiltersChange = (filters: any) => {
     // Format datetime values to include seconds and timezone offset (remove timezone key)
     const formattedFilters: any = { ...filters };
-    const timezone = currentTimezone || getAutoTimezone();
     
     if (formattedFilters.start_date) {
       // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
@@ -667,8 +687,11 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     // Remove timezone key from payload (timezone is now included in datetime values)
     delete formattedFilters.timezone;
     
+    // Update both state and ref immediately
     setCurrentFilters(filters); // Keep input format for display
     setAppliedFilters(formattedFilters); // Use formatted filters for API (with timezone in datetime)
+    appliedFiltersRef.current = formattedFilters;
+    
     // Trigger refresh for GenericListPage to fetch new data
     setRefreshKey((prev) => prev + 1);
     
@@ -739,7 +762,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         });
       }
     } catch (error) {
-      console.error('Export error:', error);
       toast.error('Export failed');
     }
   };
@@ -786,7 +808,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       }, 1000);
       
     } catch (error) {
-      console.error('Download error:', error);
       toast.error('Download failed');
       
       // Remove from downloading set on error
@@ -829,8 +850,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       window.open(tempUrl, '_blank');
       
 
-    } catch (error) {
-      console.error('Error navigating to analysis:', error);
+    } catch {
+      // Error handling for navigation
     }
   };
 
@@ -856,12 +877,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     setAudioError(null);
     setMediaPlayerShow(false);
     
-    console.log('=== AUDIO LOADING DEBUG ===');
-    console.log('trackId:', audioTrackId);
-
-    
     try {
-      console.log('Attempting to load audio via axiosInstance...');
       const response = await axiosInstance.get(`call-logs/recordings/download/${audioTrackId}`, {
         responseType: 'blob',
         params: {
@@ -874,47 +890,31 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       });
       setShowPageLoader(false);
       
-      console.log('AxiosInstance response received:', response.status, response.headers);
-      
       if (response.status === 200) {
         setMediaPlayerModal(true);
         const blob = new Blob([response.data], { type: 'audio/mpeg' });
         const audioUrl = window.URL.createObjectURL(blob);
         setAudioUrl(audioUrl);
-
-        console.log('Audio loaded successfully via axiosInstance');
       } else if (response.status === 204) {
         toast.error('Audio file not found');
       } else {
         setAudioError(`Unexpected response status: ${response.status}`);
-        console.log('Unexpected response status:', response.status);
       }
       
     } catch (error: any) {
-      console.error('=== AXIOSINSTANCE ERROR ===');
-      console.error('Error loading audio file via axiosInstance:', error);
-      
       if (error.response) {
-        console.error('Error response status:', error.response.status);
-        console.error('Error response data:', error.response.data);
-        console.error('Error response headers:', error.response.headers);
-        
         if (error.response.status === 204) {
           toast.error('Audio file not found');
         } else {
-         
           setAudioError(`Error loading audio: ${error.response.status}`);
         }
       } else if (error.request) {
-        
         setAudioError('No response received from server');
       } else {
-       
         setAudioError(`Request error: ${error.message}`);
       }
     } finally {
       setAudioLoading(false);
-      console.log('=== AUDIO LOADING COMPLETE ===');
     }
   };
 
@@ -932,36 +932,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   // Initial data load is handled by GenericListPage component automatically
   // No need for manual useEffect here to avoid double API calls
 
-  // Get current timezone on component mount and set default date values
-  useEffect(() => {
-    const timezone = getAutoTimezone();
-    setCurrentTimezone(timezone);
-    
-    // Set default start_date (today 00:00) and end_date (today 23:59)
-    // Format for datetime-local input (YYYY-MM-DDTHH:mm)
-    const now = moment();
-    const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
-    const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
-    
-    // Format for API (UTC format)
-    const startDateApi = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-    const endDateApi = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-    
-    // Set default filters for input (without timezone key)
-    const defaultFilters = {
-      start_date: startDateInput,
-      end_date: endDateInput
-    };
-    
-    // Set applied filters with API format (with timezone offset in datetime, no timezone key)
-    const defaultAppliedFilters = {
-      start_date: startDateApi,
-      end_date: endDateApi
-    };
-    
-    setCurrentFilters(defaultFilters);
-    setAppliedFilters(defaultAppliedFilters);
-  }, []);
 
 
 
@@ -1060,18 +1030,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
 
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Recordings" showPageLoader={showPageLoader} />
-
-      {/* {currentTimezone && (
-        <Row className="mb-2">
-          <Col md={12}>
-            <div className="d-flex justify-content-end align-items-center">
-              <small className="text-muted">
-                <strong>Current Timezone:</strong> {currentTimezone}
-              </small>
-            </div>
-          </Col>
-        </Row>
-      )} */}
       
       <Row className="mb-3">
             <Col md={12}>
@@ -1086,16 +1044,21 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                     <Col md={8} className="d-flex justify-content-end">
                       
                     <div className="action-buttons">
-
-                    {showDateRange && startDateTime && endDateTime && moment(startDateTime).isValid() && moment(endDateTime).isValid() && (
-                            <>
-                            <p className="mb-0">
-                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
-                            </p>
-                          
-                            </>
-                          )}
-                    
+                      <Button
+                        variant={showAnalytics ? "primary" : "outline-secondary"}
+                        size="sm"
+                        onClick={() => setShowAnalytics(!showAnalytics)}
+                        className="d-flex align-items-center"
+                        style={{ 
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap',
+                          padding: '0.5rem 1rem'
+                        }}
+                      >
+                        <BarChart3 size={16} className="me-1" />
+                        <span>{showAnalytics ? 'Hide Analytics' : 'Show Analytics'}</span>
+                      </Button>
                     </div>
 
 
@@ -1113,6 +1076,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       <PageSummaryGrid cards={summaryCards} />
 
       {/* Charts */}
+      {showAnalytics && (
       <Row className="mb-3">
         <Col md={6}>
           <Card>
@@ -1175,6 +1139,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           </Card>
         </Col>
       </Row>
+      )}
 
       
 
@@ -1206,9 +1171,19 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           handleFiltersChange(currentFilters);
         }}
         onReset={() => {
-          setCurrentFilters({});
-          setAppliedFilters({});
-          handleFiltersChange({});
+          // Preserve current date filters, clear all other filters
+          const resetCurrentFilters: Record<string, any> = {
+            start_date: (currentFilters as any)?.start_date || defaultFilters.current.start_date,
+            end_date: (currentFilters as any)?.end_date || defaultFilters.current.end_date,
+          };
+          const resetAppliedFilters: Record<string, any> = {
+            start_date: (appliedFilters as any)?.start_date || defaultFilters.applied.start_date,
+            end_date: (appliedFilters as any)?.end_date || defaultFilters.applied.end_date,
+          };
+          setCurrentFilters(resetCurrentFilters);
+          setAppliedFilters(resetAppliedFilters);
+          appliedFiltersRef.current = resetAppliedFilters;
+          handleFiltersChange(resetCurrentFilters);
         }}
         filterContent={
           <>
@@ -1262,7 +1237,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                     placeholder="Enter remote party numbers (comma separated)"
                     value={((currentFilters as any)?.remote_party_number || []).join(', ')}
                     onChange={(e) => {
-                      const values = e.target.value.split(',').map(v => v.trim()).filter(v => v);
+                      const values = e.target.value.split(',').map(v => v.trim()).filter(Boolean);
                       setCurrentFilters({ ...currentFilters, remote_party_number: values });
                     }}
                   />

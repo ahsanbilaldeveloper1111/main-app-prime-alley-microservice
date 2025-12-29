@@ -1,90 +1,44 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useRef, useCallback } from 'react';
+import React, { ReactElement, useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { ListCallLogs, DownloadCallRecording } from '@utils/calls';
-import { GetHierarchyData } from '@utils/users';
-import { Column } from '@components/CustomDataTable';
-import { Button, Modal, Row, Tab, Tabs, Form } from 'react-bootstrap';
+import { DownloadCallRecording, GetTranscriptionOverview } from '@utils/calls';
+import { GetImagicalTranscriptions } from '@utils/aiml';
+import { Button, Modal, Row, Form, Badge } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
-import { ModuleSlug } from '@utils/Helper';
-import AnimatedNumber from '@components/AnimatedNumber';
-import EmptyState from '@components/EmptyState';
-import { formatDateTimeToLocal, GlobalDateTimeFormat ,formatDuration, encodeAnalysisData} from '@utils/Helper';
+import { ModuleSlug, formatDateTimeToLocal, GlobalDateTimeFormat, formatDuration } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
-import CreatableSelect from 'react-select/creatable';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
+import BarFilters from '@components/BarFilters';
+import SelectBox from '@components/SelectBox';
 import axiosInstance from '@utils/axios';
 import '@assets/scss/common.scss';
-
-import imgStatus1 from '@assets/images/widget/img-status-1.svg'
-import imgStatus2 from '@assets/images/widget/img-status-2.svg'
-import imgStatus3 from '@assets/images/widget/img-status-3.svg'
-import imgStatus4 from '@assets/images/widget/img-status-4.svg'
 import '@assets/scss/report-style.scss';
 import '@assets/scss/tabs.scss';
 import moment from 'moment';
-import Link from 'next/link';
-import NProgress from "nprogress";
-import "nprogress/nprogress.css";
-
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import { motion } from 'framer-motion';
 import CircularProgressCircle from '@components/CircularProgressCircle';
 
-import dynamic from 'next/dynamic';
-import { ApexOptions } from 'apexcharts';
-const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
-interface GeneralStats {
-    totalCalls: number;
-    totalInbound: number;
-    totalOutbound: number;
-    totalMissedIncoming: number;
-    totalMissedOutgoing: number;
-    totalAvgRingTime: number;
-    totalAvgDuration: number;
-    totalAvgCost: number;
+interface TranscriptionSummary {
+    total_transcriptions: number;
+    inbound_transcriptions: number;
+    outbound_transcriptions: number;
+    pending_transcriptions: number;
+    processing_transcriptions: number;
+    completed_transcriptions: number;
+    failed_transcriptions: number;
+    with_transcription: number;
+    with_analysis: number;
 }
 
-interface TrendByCountry {
-  CallDate: string;
-  StartHour: string;
-  Country: string;
-  IsCountryTotal: string;
-  Calls: string;
-  Unanswered: string;
-  Answered: string;
-  AvgRingTime: string;
-  MaxRingTime: string;
-  TotalDuration: string;
-  AvgDuration: string;
-  Duration: string;
-  Cost: string;
-  AvgCost: string;
-}
-
-// Helper function to format seconds to HH:MM:SS
-const formatSecondsToTime = (seconds: number): string => {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-};
 
 const AnalyzeRecordings = () => {
     const { data:session, status } = useSession();
-    const [showCountryChartModal, setShowCountryChartModal] = useState(false);
-    const [showDepartmentChartModal, setShowDepartmentChartModal] = useState(false);
-    const [showExtensionChartModal, setShowExtensionChartModal] = useState(false);
-    const [loading, setLoading] = useState(false);
     const [filterLoading, setFilterLoading] = useState(false);
-    const [showDateRange, setShowDateRange] = useState(false);
     
     // Audio player state
     const [mediaPlayerModal, setMediaPlayerModal] = useState(false);
@@ -97,129 +51,129 @@ const AnalyzeRecordings = () => {
     const audioPlayerRef = useRef<AudioPlayerRef>(null);
     
     const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [currentFilters, setCurrentFilters] = useState({
-      start_date: moment().subtract(1, 'day').startOf('day').format('YYYY-MM-DD hh:mm:ss A'),
-      end_date: moment().endOf('day').format('YYYY-MM-DD hh:mm:ss A'),
+    const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({
+      start_datetime: moment().subtract(1, 'day').startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z',
+      end_datetime: moment().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z',
     });
-    const [generalStats, setGeneralStats] = useState<GeneralStats>({
-        totalCalls: 0,
-        totalInbound: 0,
-        totalOutbound: 0,
-        totalMissedIncoming: 0,
-        totalMissedOutgoing: 0,
-        totalAvgRingTime: 0,
-        totalAvgDuration: 0,
-        totalAvgCost: 0,
+    
+    // Ref to track if fetch is in progress to prevent concurrent calls
+    const isFetchingRef = useRef<boolean>(false);
+    // Ref to store latest filters to avoid dependency issues
+    const currentFiltersRef = useRef<Record<string, any>>(currentFilters);
+    // Ref to track last fetch time to prevent rapid duplicate calls
+    const lastFetchTimeRef = useRef<number>(0);
+    // Ref to track last fetch params to detect duplicate calls
+    const lastFetchParamsRef = useRef<string>('');
+    
+    // Update ref when currentFilters changes
+    useEffect(() => {
+        currentFiltersRef.current = currentFilters;
+    }, [currentFilters]);
+
+    const [transcriptionOverview, setTranscriptionOverview] = useState<any>(null);
+
+    useEffect(() => {
+      handleGetTranscriptionOverview();
+    }, []);
+
+    const handleGetTranscriptionOverview = async () => {
+      const response = await GetTranscriptionOverview();
+      setTranscriptionOverview(response);
+    };
+
+    // Removed duplicate call - fetchTableData handles all API calls
+
+    const [transcriptionSummary, setTranscriptionSummary] = useState<TranscriptionSummary>({
+        total_transcriptions: 0,
+        inbound_transcriptions: 0,
+        outbound_transcriptions: 0,
+        pending_transcriptions: 0,
+        processing_transcriptions: 0,
+        completed_transcriptions: 0,
+        failed_transcriptions: 0,
+        with_transcription: 0,
+        with_analysis: 0,
     });
 
-    // Create cards data for PageSummaryGrid
-    const summaryCards: SummaryCard[] = [
+    // Base card configuration to avoid duplication
+    const baseCardConfig = {
+        showAnimatedNumber: true,
+        animationDuration: 1000,
+        fontStyle: 'style-2' as const
+    };
+
+    // Create cards data for PageSummaryGrid using transcription summary
+    const summaryCards: SummaryCard[] = useMemo(() => [
         {
-            id: 'total-calls',
-            title: 'Total Calls',
-            value: generalStats.totalCalls,
-            description: 'Total calls in the system',
+            id: 'total-transcriptions',
+            title: 'Total Transcriptions',
+            value: transcriptionSummary.total_transcriptions,
+            description: 'Total transcriptions in the system',
             delay: 0.1,
-            showAnimatedNumber: true,
-            animationDuration: 1000,
-            fontStyle: 'style-2'
+            ...baseCardConfig
         },
         {
-            id: 'inbound-calls',
+            id: 'inbound-transcriptions',
             title: 'Inbound',
-            value: generalStats.totalInbound,
-            description: 'Inbound calls in the system',
-            delay: 0.3,
-            showAnimatedNumber: true,
-            animationDuration: 1000,
-            fontStyle: 'style-2'
+            value: transcriptionSummary.inbound_transcriptions,
+            description: 'Inbound transcriptions',
+            delay: 0.2,
+            ...baseCardConfig
         },
         {
-            id: 'outbound-calls',
+            id: 'outbound-transcriptions',
             title: 'Outbound',
-            value: generalStats.totalOutbound,
-            description: 'Outbound calls in the system',
+            value: transcriptionSummary.outbound_transcriptions,
+            description: 'Outbound transcriptions',
+            delay: 0.3,
+            ...baseCardConfig
+        },
+        {
+            id: 'completed-transcriptions',
+            title: 'Completed',
+            value: transcriptionSummary.completed_transcriptions,
+            description: 'Completed transcriptions',
+            delay: 0.4,
+            ...baseCardConfig
+        },
+        {
+            id: 'pending-transcriptions',
+            title: 'Pending',
+            value: transcriptionSummary.pending_transcriptions,
+            description: 'Pending transcriptions',
             delay: 0.5,
-            showAnimatedNumber: true,
-            animationDuration: 1000,
-            fontStyle: 'style-2'
+            ...baseCardConfig
         },
         {
-            id: 'missed-incoming',
-            title: 'Missed Incoming',
-            value: generalStats.totalMissedIncoming,
-            description: 'Missed incoming calls in the system',
+            id: 'processing-transcriptions',
+            title: 'Processing',
+            value: transcriptionSummary.processing_transcriptions,
+            description: 'Processing transcriptions',
+            delay: 0.6,
+            ...baseCardConfig
+        },
+        {
+            id: 'with-analysis',
+            title: 'With Analysis',
+            value: transcriptionSummary.with_analysis,
+            description: 'Transcriptions with analysis',
             delay: 0.7,
-            showAnimatedNumber: true,
-            animationDuration: 1000,
-            fontStyle: 'style-2'
+            ...baseCardConfig
         },
         {
-            id: 'missed-outgoing',
-            title: 'Missed Outgoing',
-            value: generalStats.totalMissedOutgoing,
-            description: 'Missed outgoing calls in the system',
-            delay: 0.9,
-            showAnimatedNumber: true,
-            animationDuration: 1000,
-            fontStyle: 'style-2'
+            id: 'with-transcription',
+            title: 'With Transcription',
+            value: transcriptionSummary.with_transcription,
+            description: 'Transcriptions available',
+            delay: 0.8,
+            ...baseCardConfig
         },
-        {
-            id: 'avg-ring-time',
-            title: 'Avg Ring Time',
-            value: generalStats.totalAvgRingTime,
-            description: 'Avg ring time in the system',
-            delay: 1.1,
-            showAnimatedNumber: true,
-            animationDuration: 1000,
-            fontStyle: 'style-2',
-            valueType: 'seconds',
-        },
-        {
-            id: 'avg-duration',
-            title: 'Avg Duration',
-            value: generalStats.totalAvgDuration,
-            description: 'Avg duration in the system',
-            delay: 1.3,
-            showAnimatedNumber: true,
-            animationDuration: 1000,
-            fontStyle: 'style-2',
-            valueType: 'seconds',
-        },
-        {
-            id: 'avg-cost',
-            title: 'Avg Cost',
-            value: generalStats.totalAvgCost,
-            description: 'Avg cost in the system',
-            delay: 1.5,
-            showAnimatedNumber: true,
-            animationDuration: 1000,
-            fontStyle: 'style-2',
-            prefix: '$',
-        }
-    ];
+    ], [transcriptionSummary]);
 
-    const [perPage, setPerPage] = useState(5);
-    const [page, setPage] = useState(1);
-
-    const [showExtensionChart, setShowExtensionChart] = useState(true);
-    const [showDepartmentChart, setShowDepartmentChart] = useState(true);
-    const [showCountryChart, setShowCountryChart] = useState(true);
-
-    const [countryChartData, setCountryChartData] = useState<any[]>([]);
-    const [departmentChartData, setDepartmentChartData] = useState<any[]>([]);
-    const [extensionChartData, setExtensionChartData] = useState<any[]>([]);
-
-    const [startDateTime, setStartDateTime] = useState<string>('');
-    const [endDateTime, setEndDateTime] = useState<string>('');
-
-    // Direct filter states
-    const [selectedExtensions, setSelectedExtensions] = useState<string[]>([]);
-    const [selectedDirection, setSelectedDirection] = useState<string>('');
-    const [selectedStatus, setSelectedStatus] = useState<string>('');
-    const [dateRange, setDateRange] = useState({
-        start: moment().subtract(1, 'day').format('YYYY-MM-DD'),
-        end: moment().format('YYYY-MM-DD')
+    const [searchValue, setSearchValue] = useState<string>('');
+    const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>({
+        start_datetime: moment().subtract(1, 'day').startOf('day').format('YYYY-MM-DDTHH:mm'),
+        end_datetime: moment().endOf('day').format('YYYY-MM-DDTHH:mm'),
     });
 
     // Get hierarchy data for extensions
@@ -269,21 +223,28 @@ const AnalyzeRecordings = () => {
             key: 'AgentExtension',
             name: 'Extension',
             selector: (row: any) => row.AgentExtension,
-            sortable: true
-        },
-        {
-            key: 'RemotePartyNumber',
-            name: 'Remote Number',
-            selector: (row: any) => row.RemotePartyNumber,
-            sortable: true
-        },
-        {
-            key: 'Direction',
-            name: 'Direction',
-            selector: (row: any) => row.Direction,
             sortable: true,
             cell: (props: any) => {
-                const direction = props.Direction;
+                return (
+                    <div>
+                        {props?.local_party_model?.localParty || ''}
+                    </div>
+                )
+            }
+        },
+        {
+            key: 'remoteParty',
+            name: 'Remote Number',
+            selector: (row: any) => row.remoteParty,
+            sortable: true
+        },
+        {
+            key: 'direction',
+            name: 'Direction',
+            selector: (row: any) => row?.direction,
+            sortable: true,
+            cell: (props: any) => {
+                const direction = props?.direction;
                 const badgeClass = direction === 'INCOMING' ? 'badge bg-success' : 'badge bg-primary';
                 return (
                     <span className={badgeClass}>
@@ -293,29 +254,51 @@ const AnalyzeRecordings = () => {
             }
         },
         {
-            key: 'Duration',
+            key: 'duration',
             name: 'Duration',
-            selector: (row: any) => row.Duration,
+            selector: (row: any) => row.duration,
             sortable: true,
             cell: (props: any) => {
-                // const formatDuration = (seconds: number) => {
-                //     const minutes = Math.floor(seconds / 60);
-                //     let secs = seconds % 60;
-                //     secs = parseFloat(secs.toFixed(2));
-                    
-                //     if (minutes > 0) {
-                //         return `${minutes} Min ${secs} Sec`;
-                //     } else {
-                //         return `${secs} Sec`;
-                //     }
-                // };
-                
-                const duration = parseInt(props.Duration.toString())/10000000 || 0;
+                const duration = parseInt(props?.duration?.toString())/10000000 || 0;
                 return (
                     <div>
                         {formatDuration(duration)}
                     </div>
                 );
+            }
+        },
+        {
+            key:'status',
+            name: 'Qualified',
+            selector: (row: any) => row.status,
+            sortable: true,
+            cell: (props: any) => {
+                return (
+                    <div>
+                        {props?.status === 'completed' ?
+                        <Badge bg={props?.analysis?.qualified === true ? 'success' : 'warning'}>
+                            {props?.analysis?.qualified === true ? 'Qualified' : 'Unqualified'}
+                        </Badge>
+                        :
+                            <span className='text-muted'>N/A</span>
+                        }
+                    </div>
+                )
+            }
+        },
+        {
+            key:'status',
+            name: 'Status',
+            selector: (row: any) => row.status,
+            sortable: true,
+            cell: (props: any) => {
+                return (
+                    <div>
+                        <Badge bg={props?.status === 'completed' ? 'success' : 'warning'}>
+                            {props?.status === 'completed' ? 'Completed' : 'Pending'}
+                        </Badge>
+                    </div>
+                )
             }
         },
         {
@@ -371,433 +354,133 @@ const AnalyzeRecordings = () => {
         }
     ];
 
-    useEffect(() => {
-        fetchGeneralStats();
-    }, []);
 
     const [showPageLoader, setShowPageLoader] = useState(false);
-    const fetchGeneralStats = async () => {
-        setShowPageLoader(true);
-        const response = await ListCallLogs({ page: page, perPage: perPage, search: "", filters: currentFilters, reportType: 'statsDashboard', moduleSlug: ModuleSlug.CALL_RECORDINGS }, 'call-logs/generalStats').finally(() => {
-            setShowPageLoader(false);
-        });
 
-        if(response.success){
-            const responseData = response.data;
-            const dataFilters = response?.filters;
-            setShowDateRange(true);
+    // Helper function to get dates with fallback (same logic used in API calls)
+    const getDatesFromFilters = (filters: Record<string, any>) => {
+        // Default dates in UTC format
+        const defaultStartDate = moment().subtract(1, 'day').startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+        const defaultEndDate = moment().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
         
-            setGeneralStats({
-                totalCalls: responseData.total_calls,
-                totalInbound: responseData.inbound_calls,
-                totalOutbound: responseData.outbound_calls,
-                totalMissedIncoming: responseData.missed_incoming_calls,
-                totalMissedOutgoing: responseData.missed_outgoing_calls,
-                totalAvgRingTime: responseData.avg_ring_time,
-                totalAvgDuration: responseData.avg_duration,
-                totalAvgCost: responseData.avg_cost,
-            });
-
-            setStartDateTime(dataFilters?.start_datetime);
-            setEndDateTime(dataFilters?.end_datetime);
-
-            // Extract and map chart data
-            const chartExtension = responseData?.chart_data?.extension;
-            if(chartExtension){
-                setShowExtensionChart(true);
-                setExtensionChartData(chartExtension);
-                
-                // Map extension data to chart format
-                const extensionLabels = chartExtension.map((item: any) => item.label || 'Unknown');
-                const shortestData = chartExtension.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
-                const longestData = chartExtension.map((item: any) => item.longest ? parseInt(item.longest) : 0);
-                
-                setExtensionChart({
-                    series: [{
-                        name: 'Shortest',
-                        data: shortestData
-                    }, {
-                        name: 'Longest', 
-                        data: longestData
-                    }],
-                    options: {
-                        ...ExtensionChart.options,
-                        xaxis: {
-                            ...ExtensionChart.options.xaxis,
-                            categories: extensionLabels,
-                            labels: {
-                                show: true,
-                                formatter: function(value: string) {
-                                    const numValue = parseFloat(value);
-                                    return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                                },
-                                style: {
-                                    fontSize: '11px',
-                                    colors: '#666'
-                                }
-                            }
-                        },
-                        tooltip: {
-                            ...ExtensionChart.options.tooltip,
-                            y: {
-                                formatter: function(value: number) {
-                                    return formatSecondsToTime(value);
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-            
-            const chartDepartment = responseData?.chart_data?.department;
-            if(chartDepartment){
-                setShowDepartmentChart(true);
-                setDepartmentChartData(chartDepartment);
-                
-                // Map department data to chart format
-                const departmentLabels = chartDepartment.map((item: any) => item.label || 'Unknown');
-                const shortestData = chartDepartment.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
-                const longestData = chartDepartment.map((item: any) => item.longest ? parseInt(item.longest) : 0);
-                const averageData = chartDepartment.map((item: any) => item.average ? parseInt(item.average) : 0);
-                
-                setDepartmentChart({
-                    series: [{
-                        name: 'Shortest',
-                        data: shortestData
-                    }, {
-                        name: 'Average',
-                        data: averageData
-                    }, {
-                        name: 'Longest',
-                        data: longestData
-                    }],
-                    options: {
-                        ...DepartmentChart.options,
-                        xaxis: {
-                            ...DepartmentChart.options.xaxis,
-                            categories: departmentLabels as string[],
-                            labels: {
-                                show: true,
-                                formatter: function(value: string) {
-                                    const numValue = parseFloat(value);
-                                    return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                                },
-                                style: {
-                                    fontSize: '11px',
-                                    colors: '#666'
-                                }
-                            }
-                        },
-                        yaxis: {
-                            ...DepartmentChart.options.yaxis,
-                            show: true,
-                            labels: {
-                                show: true,
-                                style: {
-                                    fontSize: '11px',
-                                    colors: '#666'
-                                }
-                            }
-                        },
-                        chart: {
-                            ...DepartmentChart.options.chart
-                        },
-                        plotOptions: {
-                            bar: {
-                                borderRadius: 4,
-                                borderRadiusApplication: 'end',
-                                horizontal: true,
-                                columnHeight: '2px',
-                            }
-                        },
-                        dataLabels: {
-                            enabled: false,
-                        },
-                        tooltip: {
-                            y: {
-                                formatter: function(value: number) {
-                                    return formatSecondsToTime(value);
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-            
-            const chartCountry = responseData?.chart_data?.country;
-            if(chartCountry){
-                setShowCountryChart(true);
-                setCountryChartData(chartCountry);
-                
-                // Map country data to chart format
-                const countryLabels = chartCountry.map((item: any) => item.label || 'Unknown');
-                const shortestData = chartCountry.map((item: any) => item.shortest ? parseInt(item.shortest) : 0);
-                const longestData = chartCountry.map((item: any) => item.longest ? parseInt(item.longest) : 0);
-                const averageData = chartCountry.map((item: any) => item.average ? parseInt(item.average) : 0);
-                
-                setCountryChart({
-                    series: [
-                        {
-                            name: 'Shortest',
-                            data: shortestData
-                        },
-                        {
-                            name: 'Average',
-                            data: averageData
-                        },
-                        {
-                            name: 'Longest',
-                            data: longestData
-                        }
-                    ],
-                    options: {
-                        ...CountryChart.options,
-                        xaxis: {
-                            ...CountryChart.options.xaxis,
-                            categories: countryLabels,
-                            labels: {
-                                show: true,
-                                formatter: function(value: string) {
-                                    const numValue = parseFloat(value);
-                                    return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                                },
-                                style: {
-                                    fontSize: '11px',
-                                    colors: '#666'
-                                }
-                            }
-                        },
-                        tooltip: {
-                            y: {
-                                formatter: function(value: number) {
-                                    return formatSecondsToTime(value);
-                                }
-                            }
-                        }
-                    }
-                });
+        // If filters already have UTC format dates, use them; otherwise use defaults
+        let startDate = defaultStartDate;
+        let endDate = defaultEndDate;
+        
+        if (filters.start_datetime && filters.start_datetime.trim()) {
+            // If it's already in UTC format (ends with Z), use it as is
+            if (filters.start_datetime.endsWith('Z') || filters.start_datetime.includes('T')) {
+                startDate = filters.start_datetime;
+            } else {
+                // Convert to UTC if it's in local format
+                const startMoment = moment(filters.start_datetime);
+                startDate = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
             }
         }
+        
+        if (filters.end_datetime && filters.end_datetime.trim()) {
+            // If it's already in UTC format (ends with Z), use it as is
+            if (filters.end_datetime.endsWith('Z') || filters.end_datetime.includes('T')) {
+                endDate = filters.end_datetime;
+            } else {
+                // Convert to UTC if it's in local format
+                const endMoment = moment(filters.end_datetime);
+                endDate = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+            }
+        }
+        
+        return { startDate, endDate };
     };
-
-    const [CountryChart, setCountryChart] = React.useState({
-        series: [{
-            name: '',
-            data: [] as number[]
-        }],
-        options: {
-            chart: {
-                type: 'bar' as const,
-                toolbar: {
-                    show: false
-                },
-            },
-            plotOptions: {
-                bar: {
-                    borderRadius: 4,
-                    borderRadiusApplication: 'end',
-                    horizontal: true,
-                    columnHeight: '2px',
-                }
-            },
-            legend: {
-                show: true,
-                position: 'bottom'
-            },
-            dataLabels: {
-                enabled: false
-            },
-            tooltip: {
-                y: {
-                    formatter: function(value: number) {
-                        return formatSecondsToTime(value);
-                    }
-                }
-            },
-            xaxis: {
-                categories: [] as string[],
-                labels: {
-                    show: true,
-                    formatter: function(value: string) {
-                        const numValue = parseFloat(value);
-                        return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                    },
-                    style: {
-                        fontSize: '11px',
-                        colors: '#666'
-                    }
-                }
-            },
-            yaxis: {
-                title: {
-                    text: '',
-                    style: {
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        color: '#263238',
-                        marginRight: '10px'
-                    }
-                }
-            }
-        },
-    }); 
-
-    const [DepartmentChart, setDepartmentChart] = React.useState({
-        series: [] as any[],
-        options: {
-            chart: {
-                type: 'bar',
-                toolbar: {
-                    show: false
-                }
-            },
-            plotOptions: {
-                bar: {
-                    borderRadius: 4,
-                    borderRadiusApplication: 'end',
-                    horizontal: true,
-                    columnHeight: '2px',
-                }
-            },
-            legend: {
-                show: true,
-                position: 'bottom'
-            },
-            dataLabels: {
-                enabled: false
-            },
-            tooltip: {
-                y: {
-                    formatter: function(value: number) {
-                        return formatSecondsToTime(value);
-                    }
-                }
-            },
-            xaxis: {
-                categories: [] as string[],
-                labels: {
-                    show: true,
-                    formatter: function(value: string) {
-                        const numValue = parseFloat(value);
-                        return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                    },
-                    style: {
-                        fontSize: '11px',
-                        colors: '#666'
-                    }
-                }
-            },
-            yaxis: {
-                show: true,
-                title: {
-                    text: 'Duration',
-                    style: {
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        color: '#263238',
-                        marginRight: '10px'
-                    }
-                },
-                labels: {
-                    show: true,
-                    style: {
-                        fontSize: '11px',
-                        colors: '#666'
-                    }
-                }
-            },
-            fill: {
-                opacity: 1
-            },
-        },
-    });  
-
-    const [ExtensionChart, setExtensionChart] = React.useState({
-        series: [] as any[],
-        options: {
-            chart: {
-                type: 'bar' as const,
-                toolbar: {
-                    show: false
-                }
-            },
-            plotOptions: {
-                bar: {
-                    horizontal: true,
-                    dataLabels: {
-                        show: true,
-                        position: 'top',
-                    },
-                }
-            },
-            dataLabels: {
-                enabled: false,
-            },
-            stroke: {
-                show: true,
-                width: 1,
-                colors: ['#fff']
-            },
-            tooltip: {
-                shared: false,
-                intersect: false,
-                y: {
-                    formatter: function(value: number) {
-                        return formatSecondsToTime(value);
-                    }
-                }
-            },
-            xaxis: {
-                categories: [] as string[],
-                labels: {
-                    show: true,
-                    formatter: function(value: string) {
-                        const numValue = parseFloat(value);
-                        return isNaN(numValue) ? value : formatSecondsToTime(numValue);
-                    },
-                    style: {
-                        fontSize: '11px',
-                        colors: '#666'
-                    }
-                }
-            },
-            yaxis: {
-                title: {
-                    text: '',
-                },
-            },
-            legend: {
-                position: 'bottom' as const,
-                horizontalAlign: 'center' as const,
-                offsetX: 40
-            }
-        },
-    });
 
     // Fetch table data function for call recordings
     const fetchTableData = useCallback(async (page = 1, perPage = 15, search = "") => {
+        // Get latest filters from ref to ensure we always have the most recent values
+        const filters = currentFiltersRef.current || {};
+        
+        // Ensure dates always have fallback values - never send empty strings
+        const { startDate, endDate } = getDatesFromFilters(filters);
+        
+        // Create a unique key for this request to detect duplicates
+        const requestKey = `${page}-${perPage}-${search}-${startDate}-${endDate}`;
+        const now = Date.now();
+        
+        // Prevent concurrent calls
+        if (isFetchingRef.current) {
+            return { dataList: [], total: 0, last_page: 0, current_page: 1, per_page: 15 };
+        }
+        
+        // Prevent duplicate calls within 1000ms (React StrictMode or rapid re-renders)
+        if (requestKey === lastFetchParamsRef.current && (now - lastFetchTimeRef.current) < 1000) {
+            return { dataList: [], total: 0, last_page: 0, current_page: 1, per_page: 15 };
+        }
+        
         try {
+            isFetchingRef.current = true;
+            lastFetchTimeRef.current = now;
+            lastFetchParamsRef.current = requestKey;
             setShowPageLoader(true);
-            const response = await ListCallLogs(
-                { page, perPage, search, filters: currentFilters, reportType: 'recordings', moduleSlug: ModuleSlug.CALL_RECORDINGS },
-                'call-logs/recordings'
-            ).finally(() => {
-                setShowPageLoader(false);
+            
+            // Extract start_datetime and end_datetime from filters for separate parameters
+            // Use the dates from getDatesFromFilters which has fallback logic - always returns a value
+            const start_datetime = filters.start_datetime || startDate;
+            const end_datetime = filters.end_datetime || endDate;
+            
+            // Create a copy of filters without start_datetime and end_datetime to avoid duplication
+            const filterParams: any = {};
+            Object.keys(filters).forEach(key => {
+                if (key !== 'start_datetime' && key !== 'end_datetime') {
+                    filterParams[key] = filters[key];
+                }
             });
             
-            if (response?.dataList) {
-                setTableData(response.dataList);
+            const response = await GetImagicalTranscriptions(
+                { 
+                    page, 
+                    perPage, 
+                    search, 
+                    start_datetime: start_datetime,
+                    end_datetime: end_datetime,
+                    filters: filterParams
+                }
+                
+            ).finally(() => {
+                setShowPageLoader(false);
+                isFetchingRef.current = false;
+            });
+
+            if(response &&  response?.success === true){
+                setTableData(response?.data);
                 setPaginationInfo({
-                    totalRows: response.total || 0,
-                    totalPages: response.last_page || 0,
-                    currentPage: response.current_page || 1,
-                    perPage: response.per_page || 15,
+                    totalRows: response?.pagination?.total || 0,
+                    totalPages: response?.pagination?.last_page || 0,
+                    currentPage: response?.pagination?.page || 1,
+                    perPage: response?.pagination?.limit || 15,
                 });
+
+                // Update transcription summary from API response
+                if (response?.summary) {
+                    setTranscriptionSummary({
+                        total_transcriptions: response.summary.total_transcriptions || 0,
+                        inbound_transcriptions: response.summary.inbound_transcriptions || 0,
+                        outbound_transcriptions: response.summary.outbound_transcriptions || 0,
+                        pending_transcriptions: response.summary.pending_transcriptions || 0,
+                        processing_transcriptions: response.summary.processing_transcriptions || 0,
+                        completed_transcriptions: response.summary.completed_transcriptions || 0,
+                        failed_transcriptions: response.summary.failed_transcriptions || 0,
+                        with_transcription: response.summary.with_transcription || 0,
+                        with_analysis: response.summary.with_analysis || 0,
+                    });
+                }
+            }else{
+                toast.error('Failed to get transcriptions');
             }
+
             
+
             return response;
+
+
         } catch (error) {
-            console.error('Error fetching table data:', error);
             setTableData([]);
             setPaginationInfo({
                 totalRows: 0,
@@ -807,160 +490,152 @@ const AnalyzeRecordings = () => {
             });
             return { dataList: [], total: 0, last_page: 0, current_page: 1, per_page: 15 };
         }
-    }, [currentFilters]);
+    }, []); // Empty dependency array - using refs to access latest values
 
-    const handleFiltersChange = (filters: any) => {
-        setCurrentFilters(filters);
-        // Only refresh table data if filters actually changed
-        if (Object.keys(filters).length > 0) {
-        fetchTableData(1, 15, '');
-        }
-    };
-
-    // Handle direct filter changes
-    const handleDirectFilterChange = async () => {
+    const handleFiltersChange = async (filters: any) => {
         setFilterLoading(true);
         
         try {
-            const filters: any = {
-                start_date: `${dateRange.start} 00:00:00`,
-                end_date: `${dateRange.end} 23:59:59`
-            };
+            // Convert datetime-local format to UTC format for API
+            const apiFilters: any = {};
+            
+            if (filters.start_datetime) {
+                // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
+                // Convert to UTC ISO format
+                let startMoment = moment(filters.start_datetime);
+                
+                if (filters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+                    // Format is YYYY-MM-DDTHH:mm, add :00 seconds
+                    startMoment = moment(filters.start_datetime + ':00');
+                } else if (!filters.start_datetime.includes('T')) {
+                    // If only date, set to 00:00:00
+                    startMoment = moment(filters.start_datetime).startOf('day');
+                }
+                
+                // Convert to UTC
+                apiFilters.start_datetime = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+            }
+            
+            if (filters.end_datetime) {
+                // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
+                // Convert to UTC ISO format
+                let endMoment = moment(filters.end_datetime);
+                
+                if (filters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+                    // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
+                    const timePart = filters.end_datetime.split('T')[1];
+                    if (timePart === '23:59') {
+                        endMoment = moment(filters.end_datetime + ':59');
+                    } else {
+                        endMoment = moment(filters.end_datetime + ':00');
+                    }
+                } else if (!filters.end_datetime.includes('T')) {
+                    // If only date, set to 23:59:59
+                    endMoment = moment(filters.end_datetime).endOf('day');
+                }
+                
+                // Convert to UTC
+                apiFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+            }
+            
+            // Always include local_parties and direction if they exist, even if empty
+            // This ensures they're sent to the API when explicitly set
+            if (filters.local_parties !== undefined) {
+                if (filters.local_parties && filters.local_parties.length > 0) {
+                    // Ensure extension_number is an array of strings
+                    apiFilters.local_parties = Array.isArray(filters.local_parties) 
+                        ? filters.local_parties.map((ext: any) => String(ext))
+                        : [String(filters.local_parties)];
+                } else {
+                    // Set to empty array to clear the filter
+                    apiFilters.local_parties = [];
+                }
+            }
+            if (filters.direction !== undefined) {
+                apiFilters.direction = filters.direction || '';
+            }
 
-            // Add optional filters only if they have values
-            if (selectedExtensions.length > 0) {
-                filters.extension_number = selectedExtensions;
-            }
-            if (selectedDirection) {
-                filters.call_direction = selectedDirection;
-            }
-            if (selectedStatus) {
-                filters.is_answered = selectedStatus;
-            }
-
-            setCurrentFilters(filters);
-            await fetchTableData(1, 15, '');
+            setCurrentFilters(apiFilters);
+            // Update the ref immediately so fetchTableData can use the latest values
+            currentFiltersRef.current = apiFilters;
+            setAppliedFilters(filters);
+            // Don't call fetchTableData directly here - GenericListPage will handle it when filters prop changes
         } catch (error) {
-            console.error('Error applying filters:', error);
             toast.error('Failed to apply filters. Please try again.');
         } finally {
             setFilterLoading(false);
         }
     };
 
-    // Handle individual filter changes
-    const handleExtensionChange = (extensions: string[]) => {
-        setSelectedExtensions(extensions);
-    };
 
-    const handleDirectionChange = (direction: string) => {
-        setSelectedDirection(direction);
-    };
-
-    const handleStatusChange = (status: string) => {
-        setSelectedStatus(status);
-    };
-
-    const handleDateRangeChange = (field: 'start' | 'end', value: string) => {
-        setDateRange(prev => ({
-            ...prev,
-            [field]: value
-        }));
-    };
-
+    // Helper function to clear download state
+    const clearDownloadState = useCallback((recordingId: string) => {
+        setDownloadingRecordings(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(recordingId);
+            return newSet;
+        });
+        setDownloadProgress(prev => {
+            const newProgress = { ...prev };
+            delete newProgress[recordingId];
+            return newProgress;
+        });
+    }, []);
 
     const handleDownload = async (props: any) => {
-        const { Id, AgentExtension } = props;
+        const { uuid, local_party_model, imagicle } = props;
         
         // Add to downloading set and initialize progress
-        setDownloadingRecordings(prev => new Set(prev).add(Id));
-        setDownloadProgress(prev => ({ ...prev, [Id]: 0 }));
+        setDownloadingRecordings(prev => new Set(prev).add(uuid));
+        setDownloadProgress(prev => ({ ...prev, [uuid]: 0 }));
         
         try {
             // Simulate progress updates
             const progressInterval = setInterval(() => {
                 setDownloadProgress(prev => {
-                    const currentProgress = prev[Id] || 0;
+                    const currentProgress = prev[uuid] || 0;
                     if (currentProgress < 90) {
-                        return { ...prev, [Id]: currentProgress + Math.random() * 15 };
+                        return { ...prev, [uuid]: currentProgress + Math.random() * 15 };
                     }
                     return prev;
                 });
             }, 200);
 
             await DownloadCallRecording(
-                Id, AgentExtension, 'call-logs/recordings/download', props.imagicle
+                uuid, local_party_model, 'call-logs/recordings/download', imagicle
             );
             
             // Complete the progress
             clearInterval(progressInterval);
-            setDownloadProgress(prev => ({ ...prev, [Id]: 100 }));
+            setDownloadProgress(prev => ({ ...prev, [uuid]: 100 }));
             
             // Show completion briefly before hiding
             setTimeout(() => {
-                setDownloadingRecordings(prev => {
-                    const newSet = new Set(prev);
-                    newSet.delete(Id);
-                    return newSet;
-                });
-                setDownloadProgress(prev => {
-                    const newProgress = { ...prev };
-                    delete newProgress[Id];
-                    return newProgress;
-                });
+                clearDownloadState(uuid);
             }, 1000);
             
         } catch (error) {
-            console.error('Download error:', error);
             toast.error('Download failed');
-            
-            // Remove from downloading set on error
-            setDownloadingRecordings(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(Id);
-                return newSet;
-            });
-            setDownloadProgress(prev => {
-                const newProgress = { ...prev };
-                delete newProgress[Id];
-                return newProgress;
-            });
+            clearDownloadState(uuid);
         }
     };
 
     const handleAnalysis = async (props: any) => {
-        try {
-            const { Id, AudioTrack } = props;
-
-            // Create data object with all parameters
-            const dataObject = {
-                id: Id || '',
-                file: AudioTrack || '',
-                direction: props.Direction || '',
-                phone: props.RemotePartyNumber || '',
-                imagicle: props.imagicle || '',
-                duration: props.Duration || '',
-                dateTime: props.DateTime || '',
-            };
-
-            // Encode data to base64 (unreadable format) using helper function
-            const encodedData = encodeAnalysisData(dataObject);
-            
-            // Pass as single encoded parameter
-            const tempUrl = `/ai-ml/analysis/new?data=${encodeURIComponent(encodedData)}`;
-
-            window.open(tempUrl, '_blank');
-
-        } catch (error) {
-            console.error('Error navigating to analysis:', error);
-        }
+        // Analysis functionality disabled
+        return;
     };
 
     const handlePlayRecording = (recording: any) => {
-        const trackId = recording.Id;
-        const agentExtension = recording.AgentExtension;
 
-        loadAuthenticatedAudio(trackId, agentExtension, recording.imagicle);
+        if(!recording?.uuid || !recording?.local_party_model?.localParty || !recording?.imagicle){
+            toast.error('Recording data is not complete. Please try again later.');
+            return;
+        }
+
+        const trackId = recording?.uuid;
+        const agentExtension = recording?.local_party_model?.localParty;
+
+        loadAuthenticatedAudio(trackId, agentExtension, recording?.imagicle);
 
         setSelectedRecording(recording);
         setAudioLoading(false);
@@ -972,12 +647,8 @@ const AnalyzeRecordings = () => {
         
         setAudioLoading(true);
         setAudioError(null);
-        
-        console.log('=== AUDIO LOADING DEBUG ===');
-        console.log('trackId:', audioTrackId);
 
         try {
-            console.log('Attempting to load audio via axiosInstance...');
             const response = await axiosInstance.get(`call-logs/recordings/download/${audioTrackId}`, {
                 responseType: 'blob',
                 params: {
@@ -989,31 +660,19 @@ const AnalyzeRecordings = () => {
                 }
             });
             
-            console.log('AxiosInstance response received:', response.status, response.headers);
-            
             if (response.status === 200) {
                 setMediaPlayerModal(true);
                 const blob = new Blob([response.data], { type: 'audio/mpeg' });
                 const audioUrl = window.URL.createObjectURL(blob);
                 setAudioUrl(audioUrl);
-
-                console.log('Audio loaded successfully via axiosInstance');
             } else if (response.status === 204) {
                 toast.error('Audio file not found');
             } else {
                 setAudioError(`Unexpected response status: ${response.status}`);
-                console.log('Unexpected response status:', response.status);
             }
             
         } catch (error: any) {
-            console.error('=== AXIOSINSTANCE ERROR ===');
-            console.error('Error loading audio file via axiosInstance:', error);
-            
             if (error.response) {
-                console.error('Error response status:', error.response.status);
-                console.error('Error response data:', error.response.data);
-                console.error('Error response headers:', error.response.headers);
-                
                 if (error.response.status === 204) {
                     toast.error('Audio file not found');
                 } else {
@@ -1026,7 +685,6 @@ const AnalyzeRecordings = () => {
             }
         } finally {
             setAudioLoading(false);
-            console.log('=== AUDIO LOADING COMPLETE ===');
         }
     };
 
@@ -1041,14 +699,6 @@ const AnalyzeRecordings = () => {
         }
     };
 
-    const refreshData = async () => {
-        setLoading(true);
-        NProgress.start();
-        await fetchGeneralStats();
-        await fetchTableData(1, 15, '');
-        setLoading(false);  
-        NProgress.done();
-    }
 
     return (
         <React.Fragment>
@@ -1065,14 +715,7 @@ const AnalyzeRecordings = () => {
                             <Col md={8} className="d-flex justify-content-end">
                                 <div className="action-buttons">
                                     <div className="d-flex align-items-center gap-2">
-                                        {showDateRange && (
-                                            <>
-                                                <p className="mb-0">
-                                                    Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
-                                                </p>
-                                                <i className="material-icons-two-tone" style={{cursor: 'pointer'}} onClick={() => refreshData()}>refresh</i>
-                                            </>
-                                        )}
+                                       
                                     </div>
                                 </div>
                             </Col>
@@ -1083,279 +726,148 @@ const AnalyzeRecordings = () => {
 
             <PageSummaryGrid cards={summaryCards} />
 
-            <Row>
-                {showCountryChart && (
-                    <Col md={4}>
-                        <div className="card">
-                            <div className="card-body">
-                                {countryChartData.length === 0 ? (
-                                    <EmptyState
-                                        title="No Calls by Country Data"
-                                        description="Chart data will appear here when available."
-                                        className="table-empty-state"
-                                    />
-                                ) : (
-                                    <>
-                                        <div className="d-flex justify-content-between align-items-center mb-3">
-                                            <h5 className="mb-0 app-title-heading">Calls by Country</h5>
-                                            <button 
-                                                className="btn btn-sm btn-light"
-                                                onClick={() => setShowCountryChartModal(true)}
-                                            >
-                                                <i className="material-icons-two-tone">open_in_full</i>
-                                            </button>
-                                        </div>
-                                        <ReactApexChart 
-                                            options={CountryChart.options as ApexOptions} 
-                                            series={CountryChart.series} 
-                                            type="bar" 
-                                            height={200} 
-                                        />
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </Col>
-                )}
+            <BarFilters
+                searchValue={searchValue}
+                onSearchChange={(value) => setSearchValue(value)}
+                onSearch={() => {
+                    handleFiltersChange({ ...appliedFilters, search: searchValue });
+                }}
+                leftContent={
+                    <>
+                        {(() => {
+                            // Use same logic as API call to get dates
+                            const { startDate, endDate } = getDatesFromFilters(currentFilters);
+                            return (
+                                <p className="mb-0">
+                                    Date Range : <span className="status-badge primary">
+                                        {formatDateTimeToLocal(startDate, GlobalDateTimeFormat)}
+                                    </span> to <span className="status-badge primary">
+                                        {formatDateTimeToLocal(endDate, GlobalDateTimeFormat)}
+                                    </span>
+                                </p>
+                            );
+                        })()}
+                    </>
+                }
+                searchPlaceholder="Search call recordings..."
+                showSearch={false}
+                filters={appliedFilters}
+                onSubmit={() => {
+                    handleFiltersChange(appliedFilters);
+                }}
+                onReset={() => {
+                    // Preserve current date filters, clear all other filters
+                    // Only include date filters to avoid counting empty filters
+                    const resetFilters: Record<string, any> = {
+                        start_datetime: (appliedFilters as any)?.start_datetime || moment().subtract(1, 'day').startOf('day').format('YYYY-MM-DDTHH:mm'),
+                        end_datetime: (appliedFilters as any)?.end_datetime || moment().endOf('day').format('YYYY-MM-DDTHH:mm'),
+                    };
+                    setAppliedFilters(resetFilters);
+                    handleFiltersChange(resetFilters);
+                }}
+                filterContent={
+                    <>
+                        {/* Date Range */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Start Date & Time</Form.Label>
+                                <Form.Control
+                                    type="datetime-local"
+                                    value={(appliedFilters as any)?.start_datetime || ''}
+                                    max={moment().format('YYYY-MM-DDTHH:mm')}
+                                    onChange={(e) => {
+                                        const datetimeValue = e.target.value;
+                                        const endDatetime = (appliedFilters as any)?.end_datetime || '';
+                                        
+                                        let updatedFilters: any = {
+                                            ...appliedFilters,
+                                            start_datetime: datetimeValue
+                                        };
+                                        
+                                        if (datetimeValue && endDatetime && moment(datetimeValue).isAfter(moment(endDatetime))) {
+                                            updatedFilters.end_date = datetimeValue;
+                                        }
+                                        
+                                        setAppliedFilters(updatedFilters);
+                                    }}
+                                />
+                            </Form.Group>
+                        </Col>
 
-                {showDepartmentChart && (
-                    <Col md={4}>
-                        <div className="card">
-                            <div className="card-body">
-                                {departmentChartData.length === 0 ? (
-                                    <EmptyState
-                                        title="No Calls by Department Data"
-                                        description="Chart data will appear here when available."
-                                        className="table-empty-state"
-                                    />
-                                ) : (
-                                    <>
-                                        <div className="d-flex justify-content-between align-items-center mb-3">
-                                            <h5 className="mb-0 app-title-heading">Call by Department</h5>
-                                            <button 
-                                                className="btn btn-sm btn-light"
-                                                onClick={() => setShowDepartmentChartModal(true)}
-                                            >
-                                                <i className="material-icons-two-tone">open_in_full</i>
-                                            </button>
-                                        </div>
-                                        <ReactApexChart 
-                                            options={DepartmentChart.options as ApexOptions} 
-                                            series={DepartmentChart.series} 
-                                            type="bar" 
-                                            height={200} 
-                                        />
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </Col>
-                )}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>End Date & Time</Form.Label>
+                                <Form.Control
+                                    type="datetime-local"
+                                    value={(appliedFilters as any)?.end_datetime || ''}
+                                    min={(appliedFilters as any)?.start_datetime || ''}
+                                    max={moment().format('YYYY-MM-DDTHH:mm')}
+                                    onChange={(e) => {
+                                        const datetimeValue = e.target.value;
+                                        const startDatetime = (appliedFilters as any)?.start_datetime || '';
+                                        
+                                        let updatedFilters: any = {
+                                            ...appliedFilters,
+                                            end_datetime: datetimeValue
+                                        };
+                                        
+                                        if (datetimeValue && startDatetime && moment(datetimeValue).isBefore(moment(startDatetime))) {
+                                            updatedFilters.start_datetime = datetimeValue;
+                                        }
+                                        
+                                        setAppliedFilters(updatedFilters);
+                                    }}
+                                />
+                            </Form.Group>
+                        </Col>
 
-                {showExtensionChart && (
-                    <Col md={4}>
-                        <div className="card">
-                            <div className="card-body">
-                                {extensionChartData.length === 0 ? (
-                                    <EmptyState
-                                        title="No Calls by Extension Data"
-                                        description="Chart data will appear here when available."
-                                        className="table-empty-state"
-                                    />
-                                ) : (
-                                    <>
-                                        <div className="d-flex justify-content-between align-items-center mb-3">
-                                            <h5 className="mb-0 app-title-heading">Call by Extension</h5>
-                                            <button 
-                                                className="btn btn-sm btn-light"
-                                                onClick={() => setShowExtensionChartModal(true)}
-                                            >
-                                                <i className="material-icons-two-tone">open_in_full</i>
-                                            </button>
-                                        </div>
-                                        <ReactApexChart 
-                                            options={ExtensionChart.options} 
-                                            series={ExtensionChart.series} 
-                                            type="bar" 
-                                            height={200} 
-                                        />
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </Col>
-                )}
-            </Row>
+                        {/* Extension */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Extension</Form.Label>
+                                <SelectBox
+                                    isMulti
+                                    isSearchable={true}
+                                    isDisabled={hierarchyLoading}
+                                    value={(appliedFilters as any)?.local_parties?.length > 0 ? (appliedFilters as any)?.local_parties : null}
+                                    onChange={(value) => {
+                                        // Ensure extension_number is always an array of strings
+                                        const extensionArray = value 
+                                            ? (Array.isArray(value) ? value : [value]).map((ext: any) => String(ext))
+                                            : [];
+                                        setAppliedFilters({ ...appliedFilters, local_parties: extensionArray });
+                                    }}
+                                    options={(hierarchyDataExtensions as any)?.map((ext: any) => ({
+                                        value: String(ext.id), // Ensure value is always a string
+                                        label: ext.name
+                                    })) || []}
+                                    placeholder="Select extensions"
+                                />
+                            </Form.Group>
+                        </Col>
 
-            {/* Direct Filters Section */}
-            <Row className="mb-3">
-                <Col md={12}>
-                    <div className="card">
-                        <div className="card-body">
-                            <h5 className="mb-3 app-title-heading">Filters</h5>
-                            <Row className="g-3">
-                                {/* Date Range */}
-                                <Col md={3}>
-                                    <Form.Group>
-                                        <Form.Label>Start Date</Form.Label>
-                                        <Form.Control
-                                            type="date"
-                                            value={dateRange.start}
-                                            onChange={(e) => handleDateRangeChange('start', e.target.value)}
-                                        />
-                                    </Form.Group>
-                                </Col>
-                                <Col md={3}>
-                                    <Form.Group>
-                                        <Form.Label>End Date</Form.Label>
-                                        <Form.Control
-                                            type="date"
-                                            value={dateRange.end}
-                                            onChange={(e) => handleDateRangeChange('end', e.target.value)}
-                                        />
-                                    </Form.Group>
-                                </Col>
+                        {/* Call Direction */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Call Direction</Form.Label>
+                                <SelectBox
+                                    isSearchable={false}
+                                    value={(appliedFilters as any)?.direction || null}
+                                    onChange={(value) => {
+                                        setAppliedFilters({ ...appliedFilters, direction: value as string || '' });
+                                    }}
+                                    options={[
+                                        { value: 'CALL_OUTGOING', label: 'Outgoing' },
+                                        { value: 'CALL_INCOMING', label: 'Incoming' }
+                                    ]}
+                                    placeholder="Select call direction"
+                                />
+                            </Form.Group>
+                        </Col>
 
-                                {/* Extensions */}
-                                <Col md={3}>
-                                    <Form.Group>
-                                        <Form.Label>Extensions</Form.Label>
-                                        <CreatableSelect
-                                            isMulti
-                                            onChange={(selected) => {
-                                                const values = (selected || []).map((opt: any) => opt.value);
-                                                handleExtensionChange(values);
-                                            }}
-                                            value={selectedExtensions.map(ext => ({ value: ext, label: ext }))}
-                                            placeholder="Select extensions..."
-                                            options={hierarchyDataExtensions?.map((ext: any) => ({
-                                                value: ext.id,
-                                                label: ext.name
-                                            })) || []}
-                                            styles={{
-                                                control: (base, state) => ({
-                                                    ...base,
-                                                    borderColor: state.isFocused ? '#80bdff' : '#ced4da',
-                                                    boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(0, 123, 255, 0.25)' : 'none',
-                                                    fontSize: '14px',
-                                                    fontWeight: 'normal',
-                                                    minHeight: '38px',
-                                                    height: '48px',
-                                                    border: '1px solid #ced4da',
-                                                    borderRadius: '0.375rem',
-                                                    '&:hover': {
-                                                        borderColor: '#ced4da'
-                                                    }
-                                                }),
-                                                valueContainer: (base) => ({
-                                                    ...base,
-                                                    padding: '2px 8px',
-                                                    height: '34px',
-                                                    alignItems: 'center'
-                                                }),
-                                                input: (base) => ({
-                                                    ...base,
-                                                    margin: '0px',
-                                                    padding: '0px',
-                                                    height: '30px'
-                                                }),
-                                                multiValue: (base) => ({
-                                                    ...base,
-                                                    fontSize: '12px',
-                                                    backgroundColor: '#e9ecef',
-                                                    borderRadius: '0.25rem',
-                                                    margin: '1px'
-                                                }),
-                                                multiValueLabel: (base) => ({
-                                                    ...base,
-                                                    fontSize: '12px',
-                                                    padding: '2px 6px'
-                                                }),
-                                                multiValueRemove: (base) => ({
-                                                    ...base,
-                                                    fontSize: '12px',
-                                                    padding: '2px 4px'
-                                                }),
-                                                placeholder: (base) => ({
-                                                    ...base,
-                                                    fontSize: '14px',
-                                                    color: '#6c757d'
-                                                }),
-                                                dropdownIndicator: (base) => ({
-                                                    ...base,
-                                                    padding: '8px'
-                                                }),
-                                                clearIndicator: (base) => ({
-                                                    ...base,
-                                                    padding: '8px'
-                                                }),
-                                                menu: (base) => ({
-                                                    ...base,
-                                                    fontSize: '14px'
-                                                }),
-                                                option: (base) => ({
-                                                    ...base,
-                                                    fontSize: '14px',
-                                                    padding: '8px 12px'
-                                                })
-                                            }}
-                                        />
-                                    </Form.Group>
-                                </Col>
-
-                                {/* Call Direction */}
-                                <Col md={3}>
-                                    <Form.Group>
-                                        <Form.Label>Call Direction</Form.Label>
-                                        <Form.Select
-                                            value={selectedDirection}
-                                            onChange={(e) => handleDirectionChange(e.target.value)}
-                                        >
-                                            <option value="">All</option>
-                                            <option value="INCOMING">Incoming</option>
-                                            <option value="OUTGOING">Outgoing</option>
-                                        </Form.Select>
-                                    </Form.Group>
-                                </Col>
-
-                                {/* Call Status */}
-                                <Col md={3}>
-                                    <Form.Group>
-                                        <Form.Label>Call Status</Form.Label>
-                                        <Form.Select
-                                            value={selectedStatus}
-                                            onChange={(e) => handleStatusChange(e.target.value)}
-                                        >
-                                            <option value="">All</option>
-                                            <option value="true">Answered</option>
-                                            <option value="false">Not Answered</option>
-                                        </Form.Select>
-                                    </Form.Group>
-                                </Col>
-
-                                {/* Apply Button */}
-                                <Col md={3} className="d-flex align-items-end">
-                                    <Button 
-                                        variant="primary" 
-                                        onClick={handleDirectFilterChange}
-                                        className="w-100"
-                                        disabled={filterLoading}
-                                    >
-                                        {filterLoading ? (
-                                            <>
-                                                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                                Loading...
-                                            </>
-                                        ) : (
-                                            'Apply Filters'
-                                        )}
-                                    </Button>
-                                </Col>
-                            </Row>
-                        </div>
-                    </div>
-                </Col>
-            </Row>
+                    </>
+                }
+            />
 
             {/* Data Table */}
             {session?.user?.permissions?.includes('transcriptions-analysis-aiml') && (
@@ -1367,106 +879,10 @@ const AnalyzeRecordings = () => {
                                     defaultPageSize={15}
                                     filters={currentFilters}
                                     refreshKey={refreshKey}
-                                    search={true}
+                                    search={false}
                                     tableStyle='table-style-2'
                                 />
                             )}
-
-            {/* Country Chart Modal */}
-            <Modal 
-                show={showCountryChartModal} 
-                onHide={() => setShowCountryChartModal(false)}
-                size="xl"
-                centered
-                className="chart-modal"
-            >
-                <Modal.Header closeButton>
-                    <Modal.Title>Calls by Country</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <div className="chart-container" style={{ minHeight: '500px' }}>
-                        <ReactApexChart 
-                            options={{
-                                ...CountryChart.options as ApexOptions,
-                                chart: {
-                                    ...CountryChart.options.chart,
-                                    height: 500,
-                                    toolbar: {
-                                        show: true
-                                    }
-                                }
-                            }} 
-                            series={CountryChart.series} 
-                            type="bar" 
-                            height={500} 
-                        />
-                    </div>
-                </Modal.Body>
-            </Modal>
-
-            {/* Department Chart Modal */}
-            <Modal 
-                show={showDepartmentChartModal} 
-                onHide={() => setShowDepartmentChartModal(false)}
-                size="xl"
-                centered
-                className="chart-modal"
-            >
-                <Modal.Header closeButton>
-                    <Modal.Title>Calls by Department</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <div className="chart-container" style={{ minHeight: '500px' }}>
-                        <ReactApexChart 
-                            options={{
-                                ...DepartmentChart.options as ApexOptions,
-                                chart: {
-                                    ...DepartmentChart.options.chart as ApexChart,
-                                    height: 500,
-                                    toolbar: {
-                                        show: true
-                                    }
-                                }
-                            }} 
-                            series={DepartmentChart.series} 
-                            type="bar" 
-                            height={500} 
-                        />
-                    </div>
-                </Modal.Body>
-            </Modal>
-
-            {/* Extension Chart Modal */}
-            <Modal 
-                show={showExtensionChartModal} 
-                onHide={() => setShowExtensionChartModal(false)}
-                size="xl"
-                centered
-                className="chart-modal"
-            >
-                <Modal.Header closeButton>
-                    <Modal.Title>Calls by Extension</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <div className="chart-container" style={{ minHeight: '500px' }}>
-                        <ReactApexChart 
-                            options={{
-                                ...ExtensionChart.options,
-                                chart: {
-                                    ...ExtensionChart.options.chart as ApexChart,
-                                    height: 500,
-                                    toolbar: {
-                                        show: true
-                                    }
-                                }
-                            }} 
-                            series={ExtensionChart.series} 
-                            type="bar" 
-                            height={500} 
-                        />
-                    </div>
-                </Modal.Body>
-            </Modal>
 
             {/* Media Player Modal */}
             <Modal

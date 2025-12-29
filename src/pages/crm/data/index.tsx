@@ -25,6 +25,8 @@ import {
   InputGroup,
   Dropdown,
   Table,
+  Popover,
+  OverlayTrigger,
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
@@ -71,6 +73,7 @@ import {
   Trash2,
   MoreVertical,
   Phone as PhoneIcon,
+  Phone,
   Mail,
   X,
   User,
@@ -104,7 +107,7 @@ import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import FormModal from "../../partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import { ModuleSlug, formatDuration, formatDateTimeToLocal, GlobalDateFormat, GlobalTimeFormat } from "@utils/Helper";
+import { ModuleSlug, formatDuration, formatDateTimeToLocal, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
@@ -123,7 +126,9 @@ interface KPICardData {
   onClick?: () => void;
 }
 
-const PhoneContainer = ({ phone }: { phone: string }) => {
+const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => void }) => {
+  const [showPopover, setShowPopover] = useState(false);
+
   const parsePhone = useCallback((phone: string) => {
     if (!phone)
       return {
@@ -154,19 +159,99 @@ const PhoneContainer = ({ phone }: { phone: string }) => {
           phone: "N/A",
           countryCode: "",
         };
-  }, [phone]);
+  }, [phone, parsePhone]);
 
   const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
+
+  const phoneBadge = (
+    <Badge 
+      bg="info" 
+      className="bg-opacity-10 text-dark"
+      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      onMouseEnter={() => setShowPopover(true)}
+      onMouseLeave={() => setShowPopover(false)}
+    >
+      <div className="d-flex align-items-center gap-2">
+        {phoneNumber?.countryCode && (
+          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
+        )}
+        {phoneNumber.phone}
+      </div>
+    </Badge>
+  );
+
+  if (!onClick) {
+    return phoneBadge;
+  }
+
+  const popover = (
+    <Popover 
+      id={`phone-popover-${phone}`} 
+      style={{ 
+        maxWidth: '160px', 
+        pointerEvents: 'auto',
+        border: 'none',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+        borderRadius: '8px'
+      }}
+      onMouseEnter={() => setShowPopover(true)}
+      onMouseLeave={() => setShowPopover(false)}
+    >
+      <Popover.Body 
+        className="p-0"
+        style={{ 
+          padding: '8px',
+          borderRadius: '8px'
+        }}
+      >
+        <Button
+          variant="default"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+            setShowPopover(false);
+          }}
+          className="d-flex align-items-center justify-content-center gap-2 w-100"
+          style={{ 
+            fontSize: '13px', 
+            fontWeight: '600',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: '1px solid #dee2e6',
+            backgroundColor: 'transparent',
+            color: '#212529',
+            boxShadow: 'none',
+            transition: 'all 0.2s ease',
+            minHeight: '36px'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.backgroundColor = '#f8f9fa';
+            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+        >
+          <Phone size={18} style={{ strokeWidth: 2.5 }} />
+          <span>Call</span>
+        </Button>
+      </Popover.Body>
+    </Popover>
+  );
+
   return (
-      <Badge bg="info" className="bg-opacity-10 text-dark">
-        <div className="d-flex align-items-center gap-2">
-          {phoneNumber?.countryCode && <img
-            src={flagImgSrc}
-            alt={phoneNumber.countryCode}
-          />}
-          {phoneNumber.phone}
-        </div>
-      </Badge>
+    <OverlayTrigger
+      show={showPopover}
+      placement="top"
+      overlay={popover}
+      trigger={[]}
+    >
+      <span style={{ display: 'inline-block' }}>{phoneBadge}</span>
+    </OverlayTrigger>
   );
 };
 
@@ -2077,8 +2162,8 @@ const CrmProspectsManagement = () => {
 
           return (
             <div className="d-flex align-items-center">
-              <span className="">
-                {moment(lastCalled).format("MMM DD, HH:mm")}
+              <span className="text-uppercase">
+                {lastCalled ? moment(lastCalled).format(GlobalDateTimeFormat) : '-'}
               </span>
             </div>
           );
@@ -2156,11 +2241,11 @@ const CrmProspectsManagement = () => {
           return (
             <div className="d-flex align-items-center">
               <span
-                className={`status-badge ${
+                className={`status-badge text-uppercase ${
                   isOverdue ? "danger" : isNextHour ? "warning" : ""
                 }`}
               >
-                {moment(props.scheduled_call_at).format("MMM DD, HH:mm")}
+                {props.scheduled_call_at ? moment(props.scheduled_call_at).format(GlobalDateTimeFormat) : '-'}
                 {isOverdue && <span className="ms-1 fw-bold">(Overdue)</span>}
                 {isNextHour && !isOverdue && (
                   <span className="ms-1 fw-bold">(Soon)</span>
@@ -3209,7 +3294,19 @@ const CrmProspectsManagement = () => {
                               ];
 
                             return (
-                              <tr key={item.id}>
+                              <tr 
+                                key={item.id}
+                                onDoubleClick={() => {
+                                  if (session?.user?.permissions?.includes("view-crm-data-management")) {
+                                    handleViewData(item);
+                                  }
+                                }}
+                                style={{
+                                  cursor: session?.user?.permissions?.includes("view-crm-data-management") 
+                                    ? "pointer" 
+                                    : "default"
+                                }}
+                              >
                                 {session?.user?.permissions?.includes(
                                   "delete-crm-data-management"
                                 ) && (
@@ -3274,7 +3371,10 @@ const CrmProspectsManagement = () => {
                                 )}
                                 {selectedColumns.includes("phone") && (
                                   <td>
-                                    <PhoneContainer phone={item?.phone} />
+                                    <PhoneContainer 
+                                      phone={item?.phone} 
+                                      onClick={() => handleCallClick(item)}
+                                    />
                                   </td>
                                 )}
                                 {selectedColumns.includes("source") && (

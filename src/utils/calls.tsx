@@ -217,3 +217,22 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
     throw error;
   }
 };
+
+export const GetTranscriptionOverview = async () => {
+  try {
+      
+    const response = await axiosInstance.get(`call-logs/analytics/dashboard-overview`,{
+      params: {
+        reportType: 'analyticsDashboardOverview',
+      }
+    });
+    if(response && response?.data && response?.data?.success === true){
+      return response?.data?.data;
+    } else {
+    //  toast.error("Failed to fetch transcription overview");
+    }
+  } catch (error) {
+   // toast.error("Failed to fetch transcription overview");
+    throw error;
+  }
+};

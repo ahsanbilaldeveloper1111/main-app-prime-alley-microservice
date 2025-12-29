@@ -664,7 +664,7 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
                             </div>
                         ) : profileData ? (
                             <Row>
-                                <Col md={3} className="text-center mb-3">
+                                {/* <Col md={3} className="text-center mb-3">
                                     {profileData?.profile_picture ? (() => {
                                         const imageUrl = getStorageImageUrl(profileData.profile_picture);
                                         
@@ -693,67 +693,101 @@ const UserProfileTab: React.FC<UserProfileTabProps> = ({
                                             <i className="material-icons-two-tone" style={{ fontSize: '80px' }}>person</i>
                                         </div>
                                     )}
-                                </Col>
-                                <Col md={9}>
-                                    <Row>
+                                </Col> */}
+                                <Col md={12}>
+                                    <Row className="g-1">
                                         <Col md={6}>
-                                            <p className="mb-1 small text-primary"><b>Title</b></p>
-                                            <p className="mb-3">{profileData.title || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">Title</div>
+                                                <div className="profile-field-value">{profileData.title || 'N/A'}</div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>First Name</b></p>
-                                            <p className="mb-3">{profileData.first_name || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">First Name</div>
+                                                <div className="profile-field-value">{profileData.first_name || 'N/A'}</div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>Last Name</b></p>
-                                            <p className="mb-3">{profileData.last_name || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">Last Name</div>
+                                                <div className="profile-field-value">{profileData.last_name || 'N/A'}</div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>Email</b></p>
-                                            <p className="mb-3">{profileData.email || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">Email</div>
+                                                <div className="profile-field-value">{profileData.email || 'N/A'}</div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>Phone Number</b></p>
-                                            <p className="mb-3">
-                                                {profileData.phone_number ? (
-                                                    <PhoneContainer phone={profileData.phone_number} showBadge={false} />
-                                                ) : (
-                                                    'N/A'
-                                                )}
-                                            </p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">Phone Number</div>
+                                                <div className="profile-field-value">
+                                                    {profileData.phone_number ? (
+                                                        <PhoneContainer phone={profileData.phone_number} showBadge={false} />
+                                                    ) : (
+                                                        'N/A'
+                                                    )}
+                                                </div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>Gender</b></p>
-                                            <p className="mb-3">{profileData.gender || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">Gender</div>
+                                                <div className="profile-field-value">{profileData.gender || 'N/A'}</div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>Job Title</b></p>
-                                            <p className="mb-3">{profileData.job_title || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">Job Title</div>
+                                                <div className="profile-field-value">{profileData.job_title || 'N/A'}</div>
+                                            </div>
 
-                                            <p className="mb-1 small text-primary"><b>Languages</b></p>
-                                            <p className="mb-3">{formatLanguageForDisplay(profileData.language)}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">Languages</div>
+                                                <div className="profile-field-value">{formatLanguageForDisplay(profileData.language)}</div>
+                                            </div>
                                         </Col>
                                         <Col md={6}>
-                                            <p className="mb-1 small text-primary"><b>Department</b></p>
-                                            <p className="mb-3">{profileData.department || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">Department</div>
+                                                <div className="profile-field-value">{profileData.department || 'N/A'}</div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>Country</b></p>
-                                            <p className="mb-3">{profileData.country || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">Country</div>
+                                                <div className="profile-field-value">{profileData.country || 'N/A'}</div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>State</b></p>
-                                            <p className="mb-3">{profileData.state || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">State</div>
+                                                <div className="profile-field-value">{profileData.state || 'N/A'}</div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>City</b></p>
-                                            <p className="mb-3">{profileData.city || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">City</div>
+                                                <div className="profile-field-value">{profileData.city || 'N/A'}</div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>Postal Code</b></p>
-                                            <p className="mb-3">{profileData.postal_code || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">Postal Code</div>
+                                                <div className="profile-field-value">{profileData.postal_code || 'N/A'}</div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>Address</b></p>
-                                            <p className="mb-3">{profileData.address || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">Address</div>
+                                                <div className="profile-field-value">{profileData.address || 'N/A'}</div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>Timezone</b></p>
-                                            <p className="mb-3">{profileData.timezone || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">Timezone</div>
+                                                <div className="profile-field-value">{profileData.timezone || 'N/A'}</div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>Service Type</b></p>
-                                            <p className="mb-3">{profileData.service_type || 'N/A'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">Service Type</div>
+                                                <div className="profile-field-value">{profileData.service_type || 'N/A'}</div>
+                                            </div>
                                             
-                                            <p className="mb-1 small text-primary"><b>User Consent</b></p>
-                                            <p className="mb-3">{profileData.user_consent ? 'Yes' : 'No'}</p>
+                                            <div className="profile-field-item">
+                                                <div className="profile-field-label">User Consent</div>
+                                                <div className="profile-field-value">{profileData.user_consent ? 'Yes' : 'No'}</div>
+                                            </div>
                                         </Col>
                                     </Row>
                                 </Col>

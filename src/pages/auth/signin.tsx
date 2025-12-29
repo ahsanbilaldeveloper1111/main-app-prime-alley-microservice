@@ -26,6 +26,8 @@ const Signin = () => {
   const statusRef = useRef<string>("loading");
   const emailInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
+  const autofillHandledRef = useRef<boolean>(false);
+  const isEmailFocusedRef = useRef<boolean>(false);
 
   // Use NextAuth's useSession hook for frontend session management
   const { data: session, status } = useSession();
@@ -59,14 +61,22 @@ const Signin = () => {
             setCredentials(prev => ({ ...prev, password: passwordValue }));
           }
           
-          // If both fields are filled, focus on password field so user can press Enter
-          if (emailValue && passwordValue && !loading) {
+          // Don't auto-focus password field when both fields are already filled
+          // This allows user to press Enter directly to submit without extra focus step
+          // Only focus password if email is filled but password is not (user needs to enter password)
+          if (emailValue && !passwordValue && !autofillHandledRef.current && !isEmailFocusedRef.current && !loading) {
+            autofillHandledRef.current = true;
             // Small delay to ensure autofill is complete
             setTimeout(() => {
-              if (passwordInputRef.current) {
+              // Double-check that email field is still not focused before focusing password
+              if (passwordInputRef.current && document.activeElement !== emailInputRef.current) {
                 passwordInputRef.current.focus();
               }
             }, 100);
+          } else if (emailValue && passwordValue) {
+            // Both fields are filled, mark as handled but don't focus anything
+            // User can press Enter directly to submit
+            autofillHandledRef.current = true;
           }
         }
       };
@@ -213,6 +223,58 @@ const Signin = () => {
     }
   };
 
+  // Handle global Enter key press when both fields are auto-filled
+  useEffect(() => {
+    if (sessionLoading || loading) return;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Only handle Enter key
+      if (e.key !== 'Enter' || loading) return;
+
+      const emailInput = emailInputRef.current;
+      const passwordInput = passwordInputRef.current;
+
+      if (!emailInput || !passwordInput) return;
+
+      // Check if both fields have values
+      const emailValue = emailInput.value;
+      const passwordValue = passwordInput.value;
+
+      // If both fields are filled and user hasn't focused on any input, submit the form
+      if (emailValue && passwordValue && document.activeElement !== emailInput && document.activeElement !== passwordInput) {
+        // Sync state from input refs
+        const atIndex = emailValue.indexOf("@");
+        const cleanEmail = atIndex === -1 ? emailValue.replace(/@/g, "") : emailValue.slice(0, atIndex);
+        
+        if (cleanEmail !== credentials.email || passwordValue !== credentials.password) {
+          setCredentials({
+            email: cleanEmail,
+            password: passwordValue
+          });
+          // Submit after state is synced
+          setTimeout(() => {
+            const form = emailInput.closest('form');
+            if (form) {
+              form.requestSubmit();
+            }
+          }, 0);
+        } else {
+          // State is already synced, submit directly
+          const form = emailInput.closest('form');
+          if (form) {
+            form.requestSubmit();
+          }
+        }
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+    };
+  }, [sessionLoading, loading, credentials.email, credentials.password]);
+
   // Handle session loading and redirects
   useEffect(() => {
     // Clear any existing timeout
@@ -321,7 +383,7 @@ const Signin = () => {
               <div className="card my-5 mx-3">
                 <div className="card-body">
                    <Image  
-                   src={logodark} className="img-brand img-fluid mb-3" alt="Business Contact Center"
+                   src={logodark} className="img-brand img-fluid mb-3" alt="Business Workspace AI-Powered"
                    width={200}
                     />
                   <h4 className="f-w-500 mb-1">Welcome Back</h4>
@@ -341,6 +403,39 @@ const Signin = () => {
                         onChange={handleChange}
                         onInput={handleInput}
                         autoComplete="username"
+                        onFocus={() => {
+                          isEmailFocusedRef.current = true;
+                        }}
+                        onBlur={() => {
+                          isEmailFocusedRef.current = false;
+                        }}
+                        onKeyDown={(e) => {
+                          // If Enter is pressed and both fields are filled, submit the form
+                          if (e.key === 'Enter' && !loading) {
+                            const emailVal = emailInputRef.current?.value;
+                            const passwordVal = passwordInputRef.current?.value;
+                            
+                            if (emailVal && passwordVal) {
+                              // Sync state from input refs before form submission
+                              if (emailVal !== credentials.email || passwordVal !== credentials.password) {
+                                const atIndex = emailVal.indexOf("@");
+                                const cleanEmail = atIndex === -1 ? emailVal.replace(/@/g, "") : emailVal.slice(0, atIndex);
+                                setCredentials({
+                                  email: cleanEmail,
+                                  password: passwordVal
+                                });
+                                // Submit after state is synced
+                                setTimeout(() => {
+                                  const form = emailInputRef.current?.closest('form');
+                                  if (form) {
+                                    form.requestSubmit();
+                                  }
+                                }, 0);
+                                e.preventDefault();
+                              }
+                            }
+                          }
+                        }}
                       />
                     </div>
                     <div className="form-group mb-3 position-relative">

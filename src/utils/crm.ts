@@ -173,7 +173,7 @@ export interface DashboardData {
 
 // Helper function to extract data from controlhub response
 function extractData<T>(response: any): T {
-  console.log("Extracting data from response:", response);
+  //console.log("Extracting data from response:", response);
 
   // Handle successful response with nested data structure
   if (response?.code === 200 && response?.data?.success) {
@@ -201,6 +201,18 @@ export const getCrmDashboard = async () => {
     return extractData(response);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch dashboard data");
+    throw error;
+  }
+};
+
+export const getCrmDashboardOverview = async () => {
+  try {
+    const response = await axiosInstance.get("/crm/dashboard/overview");
+    if(response && response?.data && response?.data?.code === 200 && response?.data?.data?.success === true){
+      return response?.data?.data?.data;
+    } 
+    
+  } catch (error: any) {
     throw error;
   }
 };

@@ -56,6 +56,7 @@ const LiveCallDashboard = () => {
   const [selectedTeam, setSelectedTeam] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [sortBy, setSortBy] = useState('none');
+  const [showFilterBar, setShowFilterBar] = useState(false);
 
   // Default filter functions (implement these based on your needs)
   const applyFilters = () => {
@@ -521,6 +522,8 @@ const LiveCallDashboard = () => {
         collapsedSections={collapsedSections}
         expandAll={expandAll}
         collapseAll={collapseAll}
+        showFilterBar={showFilterBar}
+        toggleFilterBar={() => setShowFilterBar(!showFilterBar)}
       />
 
           {/* Summary Dashboard */}
@@ -534,19 +537,21 @@ const LiveCallDashboard = () => {
           />
 
           {/* Sticky Filter Bar */}
-          <FilterBar
-            searchQuery={searchQuery}
-            selectedTeam={selectedTeam}
-            selectedStatus={selectedStatus}
-            sortBy={sortBy}
-            setSearchQuery={setSearchQuery}
-            setSelectedTeam={setSelectedTeam}
-            setSelectedStatus={setSelectedStatus}
-            setSortBy={setSortBy}
-            applyFilters={applyFilters}
-            clearFilters={clearFilters}
-            getUserTeams={getUserTeams}
-          />
+          {showFilterBar && (
+            <FilterBar
+              searchQuery={searchQuery}
+              selectedTeam={selectedTeam}
+              selectedStatus={selectedStatus}
+              sortBy={sortBy}
+              setSearchQuery={setSearchQuery}
+              setSelectedTeam={setSelectedTeam}
+              setSelectedStatus={setSelectedStatus}
+              setSortBy={setSortBy}
+              applyFilters={applyFilters}
+              clearFilters={clearFilters}
+              getUserTeams={getUserTeams}
+            />
+          )}
 
             
 

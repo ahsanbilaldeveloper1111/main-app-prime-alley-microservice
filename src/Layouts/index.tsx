@@ -17,7 +17,9 @@ import {
   Link,
   Phone,
   Search,
-  X
+  X,
+  PhoneCall,
+  User
     } from 'lucide-react';
 import { Badge, Button, Dropdown } from 'react-bootstrap';
 import { useCti } from '@hooks/useCti';
@@ -27,6 +29,7 @@ import { toast } from 'react-toastify';
 import UserDummyImage from "@assets/images/user-dummy.jpg";
 import { getStorageImageUrl } from "@utils/imageUtils";
 import DeviceSelectionModal from '../components/DeviceSelectionModal';
+import GlobalFloatingCallBar from '../components/GlobalFloatingCallBar';
 
 interface LayoutProps {
 	children: ReactNode;
@@ -45,6 +48,7 @@ const Layout = ({ children }: LayoutProps) => {
 		userAddress, 
 		dnsMap, 
 		attendCall, 
+		endCall,
 		getUserDataExtensions,
 		activeCalls,
 		formatDuration,
@@ -393,24 +397,24 @@ const Layout = ({ children }: LayoutProps) => {
 	// Handle attend call
 	const handleAttendCall = async () => {
 		if (!hasPermission("dial-call-cti")) {
-			toast.error("You do not have permission to answer calls");
+			//toast.error("You do not have permission to answer calls");
 			return;
 		}
 
 		if (!incomingCall) {
-			toast.error("No incoming call to attend");
+			//toast.error("No incoming call to attend");
 			return;
 		}
 
 		const userDeviceInfo = dnsMap?.[userAddress || ''];
 		if (!userDeviceInfo || !userDeviceInfo.devices) {
-			toast.error("No device information available");
+			//toast.error("No device information available");
 			return;
 		}
 
 		const userDevices = Object.values(userDeviceInfo.devices);
 		if (userDevices.length === 0) {
-			toast.error("No devices available");
+			//toast.error("No devices available");
 			return;
 		}
 
@@ -441,20 +445,77 @@ const Layout = ({ children }: LayoutProps) => {
 				setIncomingCall(null);
 				//toast.success("Call attended successfully");
 			} else {
-				toast.error(result.error || "Failed to attend call");
+				//toast.error(result.error || "Failed to attend call");
 			}
 		} catch (error) {
-			toast.error("Failed to attend call");
+			//toast.error("Failed to attend call");
 		} finally {
 			setIsDialing(false);
 		}
 	};
 
 	// Handle reject call
-	const handleRejectCall = () => {
-		setShowIncomingCallModal(false);
-		setIncomingCall(null);
-		toast.info("Call rejected");
+	const handleRejectCall = async () => {
+		if (!incomingCall) {
+			setShowIncomingCallModal(false);
+			setIncomingCall(null);
+			return;
+		}
+
+		try {
+			// Check if there's an active call with matching callId (like GlobalFloatingCallBar does)
+			const matchingActiveCall = Array.from(activeCalls.values()).find((call: any) => 
+				call.callId === incomingCall.callId ||
+				(call.callingAddress === incomingCall.callingAddress && call.calledAddress === incomingCall.calledAddress)
+			);
+
+			// Get device information for rejecting the call
+			const userDeviceInfo = dnsMap?.[userAddress || ''];
+			if (userDeviceInfo && userDeviceInfo.devices) {
+				const userDevices = Object.values(userDeviceInfo.devices);
+				if (userDevices.length > 0) {
+					// Find controller device first
+					let controllerDevice: any = null;
+					if (incomingCall.controllerDeviceName) {
+						controllerDevice = userDevices.find((device: any) => 
+							device.deviceName === incomingCall.controllerDeviceName
+						);
+					}
+
+					if (!controllerDevice) {
+						controllerDevice = userDevices.find((device: any) => device.terminalState === 'REGISTERED') || userDevices[0];
+					}
+
+					// Get calling device info from active call (if available) or use default
+					// This matches GlobalFloatingCallBar which uses activeCall.callingDeviceName
+					const callingDeviceName = matchingActiveCall?.callingDeviceName || '';
+					const callingDeviceType = matchingActiveCall?.callingDeviceType || '';
+
+					// Reject the call through CTI - match GlobalFloatingCallBar format exactly
+					if (controllerDevice && incomingCall.callId) {
+						await endCall({
+							callId: incomingCall.callId,
+							callingAddress: incomingCall.callingAddress,
+							calledAddress: incomingCall.calledAddress,
+							callingDeviceType: callingDeviceType,
+							callingDeviceName: callingDeviceName,
+							controllerAddress: userAddress || '',
+							controllerDeviceName: controllerDevice.deviceName || '',
+							controllerDeviceType: controllerDevice.deviceType || ''
+						} as any).catch(() => {
+							// Silently fail if call already ended or rejected
+						});
+					}
+				}
+			}
+		} catch (error) {
+			console.error("Unable to reject call");
+		} finally {
+			// Close the modal and clear the incoming call state
+			setShowIncomingCallModal(false);
+			setIncomingCall(null);
+			//toast.info("Call rejected");
+		}
 	};
 
 	// Dialer handlers
@@ -464,14 +525,14 @@ const Layout = ({ children }: LayoutProps) => {
 
 	const handleDial = async (numberToDial: string = dialedNumber) => {
 		if (!numberToDial.trim()) {
-			toast.error("Please enter a number to dial");
+			//toast.error("Please enter a number to dial");
 			return;
 		}
 
 		// Check if user has multiple devices
 		const userDevices = getAllUserDevices();
 		if (!userDevices) {
-			toast.error("No calling device information available");
+			//toast.error("No calling device information available");
 			return;
 		}
 
@@ -497,10 +558,10 @@ const Layout = ({ children }: LayoutProps) => {
 				setDialedNumber("");
 				closeDialer();
 			} else {
-				toast.error(result.error || "Failed to make call");
+				//toast.error(result.error || "Failed to make call");
 			}
 		} catch (error) {
-			toast.error("Failed to make call");
+			//toast.error("Failed to make call");
 		} finally {
 			setIsDialing(false);
 		}
@@ -540,14 +601,14 @@ const Layout = ({ children }: LayoutProps) => {
 			});
 
 			if (result.success) {
-				toast.success(`Calling ${numberToDial}...`);
+				//toast.success(`Calling ${numberToDial}...`);
 				setDialedNumber("");
 				closeDialer();
 			} else {
-				toast.error(result.error || "Failed to make call");
+				//toast.error(result.error || "Failed to make call");
 			}
 		} catch (error) {
-			toast.error("Failed to make call");
+			//toast.error("Failed to make call");
 		} finally {
 			setIsDialing(false);
 		}
@@ -642,14 +703,15 @@ const Layout = ({ children }: LayoutProps) => {
 			<img src={CompanyLogo2.src} alt="logo" className="img-fluid header-logo" /></a>
           </div>
 
-
-
-
+          
+          
 
           
 
+          {/* <GlobalFloatingCallBar /> */}
 
 
+	    
 
           <div className="ms-auto d-flex align-items-center gap-5">
 
@@ -657,6 +719,7 @@ const Layout = ({ children }: LayoutProps) => {
 
 
             <div className="d-flex align-items-center justify-content-end">
+              <GlobalFloatingCallBar />
 
               {/* Call Button - Opens Dialer Modal */}
             {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
@@ -665,7 +728,7 @@ const Layout = ({ children }: LayoutProps) => {
                 variant="link" 
                 size="sm" 
                 className="text-dark position-relative pointer-cursor" 
-                style={{ cursor: 'pointer', padding: '0.5rem' }}
+                style={{ cursor: 'pointer', padding: '0.5rem',marginRight: '10px' }}
                 disabled={!isInitialized}
                 onClick={(e) => {
                   e.preventDefault();
@@ -679,7 +742,7 @@ const Layout = ({ children }: LayoutProps) => {
                 <i className="material-icons-two-tone" style={{ 
                   cursor: 'pointer', 
                   fontSize: '1.5rem', 
-                  backgroundColor: '#04a9f5', 
+                  backgroundColor: '#1976d2', 
                   pointerEvents: 'none',
                   
                 }}>dialpad</i>  
@@ -981,25 +1044,19 @@ const Layout = ({ children }: LayoutProps) => {
 								)}
 							</div>
 							<div>
-								<h3
-									style={{
-										fontSize: "1rem",
-										fontWeight: "600",
-										color: "#334155",
-										marginBottom: "0.25rem",
-									}}
-								>
-									{calledAddressUserName}
-								</h3>
-								{/* <div
-									style={{
-										fontSize: "0.875rem",
-										color: "#64748b",
-										marginBottom: "0.25rem",
-									}}
-								>
-									{formatPhoneNumber(incomingCall.calledAddress)}
-								</div> */}
+								{incomingCallUserData && (
+									<h3
+										style={{
+											fontSize: "1rem",
+											fontWeight: "600",
+											color: "#334155",
+											marginBottom: "0.25rem",
+										}}
+									>
+										{incomingCallUserName}
+									</h3>
+								)}
+								
 								<div
 									style={{
 										fontSize: "1rem",
@@ -1007,7 +1064,7 @@ const Layout = ({ children }: LayoutProps) => {
 										marginBottom: "0.25rem",
 									}}
 								>
-									{incomingCallUserName}
+									{incomingCall?.callingAddress ? formatPhoneNumber(incomingCall.callingAddress) : "Unknown"}
 								</div>
 								{/* <div
 									style={{
@@ -1040,8 +1097,11 @@ const Layout = ({ children }: LayoutProps) => {
 							{/* Bottom Row - Decline and Answer Buttons */}
 							<div className="d-flex align-items-center gap-2">
 								<button
-									onClick={handleRejectCall}
-									disabled={isDialing}
+									onClick={(e) => {
+										e.stopPropagation();
+										handleRejectCall();
+									}}
+									disabled={false}
 									className="btn rounded-pill d-flex align-items-center gap-2"
 									style={{
 										padding: "0.33rem 1em",
@@ -1143,6 +1203,16 @@ const Layout = ({ children }: LayoutProps) => {
 					>
 						{/* Header */}
 						<div className="d-flex align-items-center justify-content-between mb-3">
+							<div>
+								{/* <User 
+									size={20}
+									
+								/>
+								<span>
+									{loggedInName}
+								</span> */}
+							</div>
+							<div>
 							{isDeviceRegistered ? (
 								<span className="badge" style={{ 
 									padding: '0.375rem 1rem', 
@@ -1166,6 +1236,7 @@ const Layout = ({ children }: LayoutProps) => {
 									Offline
 								</span>
 							)}
+							</div>
 						</div>
 
 						{/* Active Call Info - Show at top if exists */}
@@ -1382,7 +1453,7 @@ const Layout = ({ children }: LayoutProps) => {
 								padding: "1rem",
 								fontSize: "1.125rem",
 								fontWeight: 600,
-								backgroundColor: isDeviceRegistered ? "#22c55e" : "#94a3b8",
+								background: "linear-gradient(135deg, #2374d4, #4facfe)",
 								border: "none",
 								color: "white",
 								cursor: (!dialedNumber.trim() || isDialing || !isDeviceRegistered) ? "not-allowed" : "pointer",
@@ -1390,12 +1461,12 @@ const Layout = ({ children }: LayoutProps) => {
 							}}
 							onMouseEnter={(e) => {
 								if (!e.currentTarget.disabled && isDeviceRegistered) {
-									e.currentTarget.style.backgroundColor = "#16a34a";
+									e.currentTarget.style.background = "linear-gradient(135deg, rgb(15 83 164), rgb(79, 172, 254))";
 								}
 							}}
 							onMouseLeave={(e) => {
 								if (!e.currentTarget.disabled && isDeviceRegistered) {
-									e.currentTarget.style.backgroundColor = "#22c55e";
+									e.currentTarget.style.background = "linear-gradient(135deg, #2374d4, #4facfe)";
 								}
 							}}
 							title={!isDeviceRegistered ? "Device is not registered. Please register your device to make calls." : ""}
@@ -1407,7 +1478,7 @@ const Layout = ({ children }: LayoutProps) => {
 								</>
 							) : (
 								<>
-									<i className="material-icons-two-tone" style={{ fontSize: "1.5rem", color: "#fff" }}>
+									<i className="material-icons-two-tone" style={{ fontSize: "1.5rem", color: "#fff" ,backgroundColor: '#fff'}}>
 										call
 									</i>
 									Call

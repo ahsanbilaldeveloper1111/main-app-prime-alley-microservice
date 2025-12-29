@@ -19,7 +19,7 @@ const BreadcrumbItem: React.FC<BreadcrumbItemProps> = ({ mainTitle,mainLink, sub
   return (
     <React.Fragment>
     <Head>
-      <title>{displayTitle} | Business Contact Center</title>
+      <title>{displayTitle} | Business Workspace AI-Powered</title>
     </Head>
     <PageLoader isLoading={showPageLoader} />
     {/* <div className="page-header">

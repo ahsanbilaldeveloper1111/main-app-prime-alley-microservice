@@ -1680,7 +1680,7 @@ const Header = ({ themeMode }: HeaderProps) => {
                     <div className="m-header" >
                     <Link href={`${BASE_URL}/dashboard`}  className="b-brand text-primary">
                         <img src={CompanyLogo2.src} alt="logo" className="img-fluid" />
-                        {/* <span className="sidebar-logo-text">Business Contact Center</span> */}
+                        {/* <span className="sidebar-logo-text">Business Workspace AI-Powered</span> */}
                     </Link>
                             </div>
 

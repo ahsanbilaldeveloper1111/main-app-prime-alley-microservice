@@ -1,5 +1,5 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useCallback } from 'react';
+import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
@@ -85,32 +85,6 @@ const CallIncomingExtension = () => {
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('calls_chart');
     
-    // Debug session state
-    useEffect(() => {
-        console.log('Session state:', { session, status });
-        if (status === 'authenticated' && session) {
-            console.log('Session authenticated successfully');
-        } else if (status === 'loading') {
-            console.log('Session still loading...');
-        } else if (status === 'unauthenticated') {
-            console.log('User not authenticated');
-        }
-    }, [session, status]);
-    
-    // Debug component mounting
-    useEffect(() => {
-        console.log('CallIncomingExtension component mounted');
-        console.log('Initial props and state:', { 
-            session, 
-            status, 
-            filtersReady, 
-            dataLoaded, 
-            loading 
-        });
-        return () => {
-            console.log('CallIncomingExtension component unmounting');
-        };
-    }, []);
 
     // Animation variants for tab transitions
     const tabVariants = {
@@ -167,58 +141,48 @@ const CallIncomingExtension = () => {
      },
     ];
 
-    const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [currentFilters, setCurrentFilters] = useState({
-      is_incoming_only: 'true'
-    });
-    const [pendingFilters, setPendingFilters] = useState({});
-    const [currentTimezone, setCurrentTimezone] = useState<string>('');
-    
-    // Get current timezone on component mount and set default date values
-    useEffect(() => {
-        const timezone = getAutoTimezone();
-        setCurrentTimezone(timezone);
-        
-        // Set default start_datetime (today 00:00) and end_datetime (today 23:59)
-        // Format for datetime-local input (YYYY-MM-DDTHH:mm) in local timezone
-        const now = moment();
-        const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
-        const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
-        
-        // Set default filters for input (local timezone)
-        const defaultPendingFilters = {
-            start_datetime: startDateInput,
-            end_datetime: endDateInput,
-            is_incoming_only: 'true'
-        };
-        
-        // Set applied filters with UTC format for API
-        const startDateUTC = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        const endDateUTC = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        
-        const defaultCurrentFilters = {
-            start_datetime: startDateUTC,
-            end_datetime: endDateUTC,
-            is_incoming_only: 'true'
-        };
-        
-        setPendingFilters(defaultPendingFilters);
-        setCurrentFilters(defaultCurrentFilters);
-    }, []);
+  // Initialize filters with default values immediately to prevent first API call without dates
+  const getDefaultFilters = () => {
+    const now = moment();
+    const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
+    const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
+    const startDateUTC = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+    const endDateUTC = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+    return {
+      pending: {
+        start_datetime: startDateInput,
+        end_datetime: endDateInput,
+        is_incoming_only: 'true'
+      },
+      current: {
+        start_datetime: startDateUTC,
+        end_datetime: endDateUTC,
+        is_incoming_only: 'true'
+      }
+    };
+  };
+  
+  const defaultFilters = getDefaultFilters();
+  
+    const [refreshKey, setRefreshKey] = useState<number>(1); // Start at 1 to ensure initial fetch
+    const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(defaultFilters.current);
+    const [pendingFilters, setPendingFilters] = useState<Record<string, any>>(defaultFilters.pending);
 
-    // Debug current filters state
-    useEffect(() => {
-        console.log('Current filters state changed:', currentFilters);
-    }, [currentFilters]);
     const [dataLoaded, setDataLoaded] = useState(false);
-    const [filtersReady, setFiltersReady] = useState(false);
+    const filtersReady = true; // Always ready since filters are initialized immediately
     
     // Use ref to track if initial fetch has been done
     const initialFetchDone = React.useRef(false);
+    // Use ref to track last filters used for charts to prevent unnecessary refetches
+    const lastChartFilters = React.useRef<string>('');
+    
+    // Refs to prevent duplicate API calls
+    const currentFiltersRef = useRef<Record<string, any>>(defaultFilters.current);
+    const isFetchingRef = useRef(false);
+    const lastFetchTimeRef = useRef(0);
+    const lastFetchParamsRef = useRef<string>('');
     
     const {
-      hierarchyDataUsers,
-      hierarchyDataDepartments,
       hierarchyDataExtensions,
       loading: hierarchyLoading
     } = useHierarchyData(ModuleSlug.CALL_REPORTS);
@@ -234,22 +198,36 @@ const CallIncomingExtension = () => {
 
     const [showPageLoader, setShowPageLoader] = useState(false);
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
+        // Prevent duplicate calls - but always allow the first call
+        const now = Date.now();
+        const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(currentFiltersRef.current)}`;
         
-        // Only fetch if filters are ready
-        if (!filtersReady) {
-            console.log('Filters not ready yet, skipping fetch');
+        // Skip if already fetching with same params within 500ms
+        if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
             return;
         }
         
-        console.log('Fetching call logs with filters:', currentFilters);
+        // Skip if same params were fetched recently (within 100ms) - but allow first call (when lastFetchParamsRef is empty string)
+        if (lastFetchParamsRef.current !== '' && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 100) {
+            return;
+        }
+        
+        isFetchingRef.current = true;
+        lastFetchTimeRef.current = now;
+        lastFetchParamsRef.current = paramsKey;
+        
         setLoading(true);
         setShowPageLoader(true);
         
         try {
-            const response = await ListCallLogs({ page, perPage, search, filters: currentFilters, reportType: 'incomingStatsExtension', 
-                moduleSlug: ModuleSlug.CALL_REPORTS }, 'call-logs/statsIncomingByExtension').finally(() => {
-                  setShowPageLoader(false);
-                });
+            const response = await ListCallLogs({ 
+                page, 
+                perPage, 
+                search, 
+                filters: currentFiltersRef.current, 
+                reportType: 'incomingStatsExtension', 
+                moduleSlug: ModuleSlug.CALL_REPORTS 
+            }, 'call-logs/statsIncomingByExtension');
               
             if (response?.summary) {
 
@@ -260,54 +238,32 @@ const CallIncomingExtension = () => {
 
                 setSummary(response.summary);
                 setDataLoaded(true);
-                console.log('Summary data set:', response.summary);
-                console.log('DataLoaded set to true');
-            } else if (response?.data) {
-                // Fallback: check if data exists but no summary
-                console.log('Response has data but no summary:', response.data);
-                setDataLoaded(true);
-                console.log('DataLoaded set to true (fallback 1)');
-            } else if (response && typeof response === 'object') {
-                // Check if response is an object but doesn't have expected properties
-                console.log('Response is object but missing expected properties:', response);
-                setDataLoaded(true);
-                console.log('DataLoaded set to true (fallback 2)');
             } else {
-                console.warn('No summary or data in response:', response);
-                setDataLoaded(true); // Mark as loaded even if no data
-                console.log('DataLoaded set to true (fallback 3)');
+                setDataLoaded(true);
             }
             
             setLoading(false);
             return response;
-        } catch (error: unknown) {
-            console.error('Error fetching call logs:', error);
-            if (error instanceof Error) {
-                console.error('Error details:', {
-                    message: error.message,
-                    stack: error.stack,
-                    name: error.name
-                });
-            }
+        } catch {
             setLoading(false);
-            setDataLoaded(true); // Mark as loaded even on error
-            console.log('DataLoaded set to true (error case)');
+            setDataLoaded(true);
             toast.error('Failed to fetch call data');
             return null;
+        } finally {
+            setShowPageLoader(false);
+            isFetchingRef.current = false;
         }
-    }, [currentFilters, filtersReady]);
+    }, []);
 
     const [simpleDonut, setSimpleDonut] = React.useState<{ series: number[]; labels: string[] } | null>(null);
 
     useEffect(() => {
         if(summary && dataLoaded) {
-        console.log('Summary data:', summary);
           const answeredCalls = Number(summary.answered_calls) || 0;
           const unansweredCalls = Number(summary.unanswered_calls) || 0;
           
           // Check if both values are 0, if so don't set chart data (will show empty state)
           if (answeredCalls === 0 && unansweredCalls === 0) {
-            console.log('Both answered and unanswered calls are 0, not setting chart data');
             setSimpleDonut(null);
           } else {
             // Set chart data only when there's actual data
@@ -320,63 +276,12 @@ const CallIncomingExtension = () => {
     }, [summary, dataLoaded]);
 
     // Trigger initial data fetch when filters become ready
+    // Ensure initial fetch happens when session is ready
     useEffect(() => {
-        if (filtersReady && status === 'authenticated' && session && !initialFetchDone.current) {
+        if (session && session.user?.permissions?.includes('list-call-logs')) {
             initialFetchDone.current = true;
-            fetchCallLogs(1, 15, "");
-        } else if (status === 'loading') {
-            console.log('Session still loading, waiting...');
-        } else if (status === 'unauthenticated') {
-            console.log('User not authenticated');
-        } else {
-            console.log('Not ready for data fetch:', { filtersReady, status, hasSession: !!session });
         }
-    }, [filtersReady, status, session]);
-    
-    // Fallback: if filters haven't been marked as ready after 1 second, mark them as ready
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (!filtersReady) {
-                console.log('Fallback: marking filters as ready');
-                setFiltersReady(true);
-            }
-        }, 1000);
-        
-        return () => clearTimeout(timer);
-    }, [filtersReady]);
-    
-    // Additional fallback: if session is authenticated but filters still not ready after 2 seconds
-    useEffect(() => {
-        if (status === 'authenticated' && session) {
-            const timer = setTimeout(() => {
-                if (!filtersReady) {
-                    console.log('Session-based fallback: marking filters as ready');
-                    setFiltersReady(true);
-                }
-            }, 2000);
-            
-            return () => clearTimeout(timer);
-        }
-    }, [status, session, filtersReady]);
-    
-    // Debug initial state
-    useEffect(() => {
-        console.log('Initial state:', { 
-            filtersReady, 
-            dataLoaded, 
-            loading, 
-            currentFilters, 
-            session: !!session, 
-            status 
-        });
-        
-        // Log the actual API functions to make sure they're available
-        console.log('API functions check:', {
-            ListCallLogs: typeof ListCallLogs,
-            ExportCallLogs: typeof ExportCallLogs,
-            DownloadStreamingExport: typeof DownloadStreamingExport
-        });
-    }, [filtersReady, dataLoaded, loading, currentFilters, session, status]);
+    }, [session]);
 
     
     const handleFiltersChange = (filters: any) => {
@@ -422,33 +327,22 @@ const CallIncomingExtension = () => {
             formattedFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
         }
         
-        console.log('Filters changed:', formattedFilters);
-        console.log('Previous filters:', currentFilters);
-        console.log('New filters:', formattedFilters);
-        
         // Check if filters actually changed
         const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(formattedFilters);
-        console.log('Filters actually changed:', filtersChanged);
         
         // Check if this is a complete clear (empty object or only has default values)
         const isCompletelyCleared = Object.keys(formattedFilters).length === 0 || 
             (Object.keys(formattedFilters).length === 1 && formattedFilters.hasOwnProperty('is_incoming_only'));
         
-        console.log('Is completely cleared:', isCompletelyCleared);
-        
+        // Update both state and ref immediately
         setCurrentFilters(formattedFilters);
-        
-        // Mark filters as ready when they are first set
-        if (!filtersReady) {
-            console.log('Marking filters as ready for the first time');
-            setFiltersReady(true);
-        }
+        currentFiltersRef.current = formattedFilters;
         
         // Reset data loaded state when filters actually change or when cleared
         if ((filtersChanged && filtersReady) || isCompletelyCleared) {
-            console.log('Resetting data loaded state due to filter change or clear');
             setDataLoaded(false);
-            console.log('DataLoaded set to false due to filter change');
+            // Reset chart filters ref to allow chart refetch
+            lastChartFilters.current = '';
             setSummary({
                 total_calls: 0,
                 answered_calls: 0,
@@ -461,9 +355,6 @@ const CallIncomingExtension = () => {
             
             // Trigger refresh
             setRefreshKey(prev => prev + 1);
-            console.log('Refresh key updated, new value:', refreshKey + 1);
-        } else if (!filtersChanged) {
-            console.log('Filters did not change, keeping dataLoaded state:', dataLoaded);
         }
     };
 
@@ -476,15 +367,7 @@ const CallIncomingExtension = () => {
             'incomingStatsExtension'
           );
         }
-      } catch (error: unknown) {
-        console.error('Export error:', error);
-        if (error instanceof Error) {
-            console.error('Export error details:', {
-                message: error.message,
-                stack: error.stack,
-                name: error.name
-            });
-        }
+      } catch {
         toast.error('Export failed');
       }
     };
@@ -501,9 +384,12 @@ const CallIncomingExtension = () => {
 
     useEffect(() => {
       // Only fetch charts when filters are ready and not empty
-      const areFiltersReady = filtersReady && currentFilters && Object.keys(currentFilters).length > 0;
+      // Check if filters have actually changed
+      const currentFiltersString = JSON.stringify(currentFilters);
+      const filtersChanged = lastChartFilters.current !== currentFiltersString;
       
-      if (areFiltersReady) {
+      if (session && filtersChanged && currentFilters && Object.keys(currentFilters).length > 0) {
+        lastChartFilters.current = currentFiltersString;
         const fetchCharts = async () => {
           setChartLoading(true);
           try {
@@ -638,7 +524,7 @@ const CallIncomingExtension = () => {
         setChartDuration(null);
         setChartLoading(false);
       }
-    }, [currentFilters, filtersReady]);
+    }, [currentFilters, session]);
 
 
     const [currentChartDataType, setCurrentChartDataType] = useState<'calls' | 'time' | 'cost' | 'custom'>('custom');
@@ -771,7 +657,7 @@ const CallIncomingExtension = () => {
                                     series={simpleDonut.series} 
                                     labels={simpleDonut.labels}
                                     dataType="calls"
-                                    height={250}
+                                    height={200}
                                     width={500}
                                     showDataLabels={true}
                                     dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
@@ -1012,10 +898,21 @@ const CallIncomingExtension = () => {
                 // Chart data will be triggered by useEffect watching currentFilters
               }}
               onReset={() => {
-                setPendingFilters({});
-                const resetFilters = { is_incoming_only: 'true' };
-                setCurrentFilters(resetFilters);
-                handleFiltersChange(resetFilters);
+                // Preserve current date filters, clear all other filters
+                const resetPendingFilters: Record<string, any> = {
+                  start_datetime: (pendingFilters as any)?.start_datetime || defaultFilters.pending.start_datetime,
+                  end_datetime: (pendingFilters as any)?.end_datetime || defaultFilters.pending.end_datetime,
+                  is_incoming_only: 'true'
+                };
+                const resetCurrentFilters: Record<string, any> = {
+                  start_datetime: (currentFilters as any)?.start_datetime || defaultFilters.current.start_datetime,
+                  end_datetime: (currentFilters as any)?.end_datetime || defaultFilters.current.end_datetime,
+                  is_incoming_only: 'true'
+                };
+                setPendingFilters(resetPendingFilters);
+                setCurrentFilters(resetCurrentFilters);
+                currentFiltersRef.current = resetCurrentFilters;
+                handleFiltersChange(resetPendingFilters);
               }}
               filterContent={
                 <>

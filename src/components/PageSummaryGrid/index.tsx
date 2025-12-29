@@ -7,7 +7,7 @@ export interface SummaryCard {
   id: string;
   title: string;
   value: number;
-  description: string;
+  description?: string;
   delay?: number;
   showAnimatedNumber?: boolean;
   animationDuration?: number;
@@ -28,6 +28,7 @@ export interface PageSummaryGridProps {
   gridColumns?: 2 | 3 | 4;
   cardHeading?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
   gridTextAlign?: 'left' | 'center' | 'right';
+  compact?: boolean;
 }
 
 const PageSummaryGrid: React.FC<PageSummaryGridProps> = ({
@@ -38,13 +39,18 @@ const PageSummaryGrid: React.FC<PageSummaryGridProps> = ({
   baseDelay = 0.1,
   gridColumns,
   cardHeading = 'h3',
-  gridTextAlign = 'left'
+  gridTextAlign = 'left',
+  compact = false
 }) => {
   const getGridClassName = () => {
+    let baseClass = className;
     if (gridColumns) {
-      return `${className} grid-${gridColumns}-columns`;
+      baseClass = `${baseClass} grid-${gridColumns}-columns`;
     }
-    return className;
+    if (compact) {
+      baseClass = `${baseClass} compact`;
+    }
+    return baseClass;
   };
 
   return (
@@ -64,7 +70,7 @@ const PageSummaryGrid: React.FC<PageSummaryGridProps> = ({
             damping: 15
           }}
           whileHover={{
-            scale: 1.05,
+            scale: compact ? 1.02 : 1.03,
             transition: { duration: 0.2 }
           }}
         >
@@ -85,7 +91,7 @@ const PageSummaryGrid: React.FC<PageSummaryGridProps> = ({
               <h2 className="mb-0 f-w-500 style-2">{card?.prefix ?? ''}{card.value ?? 0}{card?.suffix ?? ''}</h2>
             )}
           </div>
-          <p>{card.description}</p>
+          {card.description && <p>{card.description}</p>}
         </motion.div>
       ))}
     </div>

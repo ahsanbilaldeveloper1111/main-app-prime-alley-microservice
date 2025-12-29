@@ -21,7 +21,7 @@ const UsersTabs: React.FC<UsersTabsProps> = ({ activeTab, setActiveTab }) => {
                             Overview
                         </button>
                     </li>
-                    <li className="nav-item" role="presentation">
+                    {/* <li className="nav-item" role="presentation">
                         <button
                             className={`nav-link ${activeTab === 'insight' ? 'active' : ''}`}
                             onClick={() => setActiveTab('insight')}
@@ -30,7 +30,7 @@ const UsersTabs: React.FC<UsersTabsProps> = ({ activeTab, setActiveTab }) => {
                         >
                             Insight
                         </button>
-                    </li>
+                    </li> */}
                 </ul>
             </Col>
         </Row>

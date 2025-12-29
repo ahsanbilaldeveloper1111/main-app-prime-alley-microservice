@@ -22,6 +22,15 @@ const floatingBarStyles = `
     animation: slideUp 0.3s ease-out;
     user-select: none;
     list-style: none;
+    top: 20px !important;
+    left: auto !important;
+    right: 15rem !important;
+    
+    box-shadow: none !important;
+
+    @media (max-width: 480px) {
+      right: 0rem !important;
+    }
   }
   
   .global-floating-call-bar * {
@@ -29,7 +38,7 @@ const floatingBarStyles = `
   }
   
   .global-floating-call-bar:hover {
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15) !important;
+    // box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15) !important;
   }
   
   .global-floating-call-bar.dragging {
@@ -124,7 +133,7 @@ const GlobalFloatingCallBar: React.FC = () => {
   const [incomingCallTimer, setIncomingCallTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Drag and position state
-  const [position, setPosition] = useState<CallBarPosition>("bottom");
+  const [position, setPosition] = useState<CallBarPosition>("top");
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
@@ -264,7 +273,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     ) {
       setDragPosition(null);
       setIsDragging(false);
-      setPosition("bottom");
+      setPosition("top");
       return;
     }
     
@@ -280,15 +289,20 @@ const GlobalFloatingCallBar: React.FC = () => {
     const minDist = Math.min(distToTop, distToBottom, distToLeft, distToRight);
     
     let newPosition: CallBarPosition = "bottom";
-    if (minDist === distToTop) {
-      newPosition = "top";
-    } else if (minDist === distToBottom) {
-      newPosition = "bottom";
-    } else if (minDist === distToLeft) {
-      newPosition = "left";
-    } else if (minDist === distToRight) {
-      newPosition = "right";
-    }
+      if (minDist === distToTop) {
+        newPosition = "top";
+      } else if (minDist === distToBottom) {
+        newPosition = "bottom";
+      } else if (minDist === distToLeft) {
+        newPosition = "left";
+      } else if (minDist === distToRight) {
+        newPosition = "right";
+      }
+      
+      // Default to top if dragged outside
+      if (newPosition === "bottom" && barRect.top < 0) {
+        newPosition = "top";
+      }
     
     // Clear drag position and update position state - React will handle the styling
     setDragPosition(null);
@@ -340,7 +354,7 @@ const GlobalFloatingCallBar: React.FC = () => {
   const getPositionStyles = useCallback((): React.CSSProperties => {
     const baseStyles: React.CSSProperties = {
       position: "fixed",
-      zIndex: 1050,
+      zIndex: 9999,
       backgroundColor: "#fff",
       boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
       display: "flex",
@@ -350,6 +364,10 @@ const GlobalFloatingCallBar: React.FC = () => {
       border: "none",
       visibility: "visible",
       opacity: 1,
+      
+      left: "0",
+      right: "0",
+      width: "100%",
     };
 
     // If dragging, use drag position but preserve original layout
@@ -367,14 +385,14 @@ const GlobalFloatingCallBar: React.FC = () => {
         baseStyles.flexDirection = "column";
         baseStyles.borderRadius = "1.5rem";
         baseStyles.padding = "1rem 0.75rem";
-        baseStyles.gap = "0.75rem";
+        baseStyles.gap = "0.5rem";
         baseStyles.minWidth = "70px";
         baseStyles.maxWidth = "85px";
       } else {
         baseStyles.flexDirection = "row";
         baseStyles.borderRadius = "1.5rem";
-        baseStyles.padding = "1.25rem";
-        baseStyles.gap = "1rem";
+        baseStyles.padding = "0.5rem 1rem";
+        baseStyles.gap = "0.5rem";
         baseStyles.minWidth = "320px";
         baseStyles.maxWidth = "625px";
         baseStyles.width = "auto";
@@ -387,9 +405,9 @@ const GlobalFloatingCallBar: React.FC = () => {
     const isVertical = position === "left" || position === "right";
     
     baseStyles.borderRadius = "1.5rem";
-    baseStyles.padding = isVertical ? "1rem 0.75rem" : "1.25rem";
-    baseStyles.gap = isVertical ? "0.75rem" : "1rem";
-
+    baseStyles.padding = "0.5rem 1rem";
+    baseStyles.gap = "1rem";
+    baseStyles.top = "0px !important";
     if (isVertical) {
       baseStyles.flexDirection = "column";
       baseStyles.minWidth = "70px";
@@ -400,30 +418,34 @@ const GlobalFloatingCallBar: React.FC = () => {
         baseStyles.transform = "translateY(-50%)";
         baseStyles.right = "auto";
         baseStyles.bottom = "auto";
+        baseStyles.top = "0px !important";
       } else {
         baseStyles.right = "20px";
         baseStyles.top = "50%";
         baseStyles.transform = "translateY(-50%)";
         baseStyles.left = "auto";
         baseStyles.bottom = "auto";
+        baseStyles.top = "0px !important";
       }
     } else {
       baseStyles.flexDirection = "row";
       baseStyles.minWidth = "320px";
+      baseStyles.top = "0px !important";
       //baseStyles.maxWidth = "450px";
       baseStyles.width = "auto";
       if (position === "bottom") {
         baseStyles.bottom = "20px";
         baseStyles.left = "50%";
-        baseStyles.transform = "translateX(-50%)";
+        //baseStyles.transform = "translateX(-50%)";
         baseStyles.top = "auto";
         baseStyles.right = "auto";
       } else {
-        baseStyles.top = "20px";
-        baseStyles.left = "50%";
-        baseStyles.transform = "translateX(-50%)";
+        baseStyles.top = "0";
+        baseStyles.left = "0";
+        baseStyles.right = "0";
+        baseStyles.width = "100%";
+        baseStyles.transform = "none";
         baseStyles.bottom = "auto";
-        baseStyles.right = "auto";
       }
     }
 
@@ -564,15 +586,35 @@ const GlobalFloatingCallBar: React.FC = () => {
       return call;
   }, [activeCalls, userAddress, callStateMap]);
 
-  // Get user extension data for the active call number
+  // Determine the other party's number (the person we're talking to, not ourselves)
+  const otherPartyNumber = React.useMemo(() => {
+    if (!activeCall || !userAddress) {
+      return activeCall?.number || null;
+    }
+    
+    // If user is the calling party, show the called party's number
+    if (activeCall.callingAddress === userAddress && activeCall.calledAddress) {
+      return activeCall.calledAddress;
+    }
+    
+    // If user is the called party, show the calling party's number
+    if (activeCall.calledAddress === userAddress && activeCall.callingAddress) {
+      return activeCall.callingAddress;
+    }
+    
+    // Fallback to number field
+    return activeCall.number || null;
+  }, [activeCall, userAddress]);
+
+  // Get user extension data for the other party's number
   const activeCallUserData = React.useMemo(() => {
-    if (!activeCall || !activeCall.number || !getUserDataExtensions) {
+    if (!activeCall || !otherPartyNumber || !getUserDataExtensions) {
       return null;
     }
     
     try {
       const userDataExtensions = getUserDataExtensions() || {};
-      const callNumber = activeCall.number;
+      const callNumber = otherPartyNumber;
       const dnString = String(callNumber);
       const dnNumber = Number(callNumber);
       
@@ -581,18 +623,18 @@ const GlobalFloatingCallBar: React.FC = () => {
       
       return data;
     } catch (error) {
-      console.error(`[GlobalFloatingCallBar] Error getting extension data for ${activeCall.number}:`, error);
+      console.error(`[GlobalFloatingCallBar] Error getting extension data for ${otherPartyNumber}:`, error);
       return null;
     }
-  }, [activeCall, getUserDataExtensions]);
+  }, [activeCall, otherPartyNumber, getUserDataExtensions]);
 
   // Get user name from extension data
   const activeCallUserName = React.useMemo(() => {
     if (!activeCallUserData) {
-      return activeCall?.number || "Unknown";
+      return otherPartyNumber || "Unknown";
     }
-    return activeCallUserData.name || activeCallUserData.user_name || activeCall?.number || "Unknown";
-  }, [activeCallUserData, activeCall]);
+    return activeCallUserData.name || activeCallUserData.user_name || otherPartyNumber || "Unknown";
+  }, [activeCallUserData, otherPartyNumber]);
 
   // Get user image URL
   const activeCallUserImageUrl = React.useMemo(() => {
@@ -783,14 +825,14 @@ const GlobalFloatingCallBar: React.FC = () => {
 
   const handleDial = async (numberToDial: string = dialedNumber) => {
     if (!numberToDial.trim()) {
-      toast.error("Please enter a number to dial");
+      //toast.error("Please enter a number to dial");
       return;
     }
 
     // Check if user has multiple devices
     const userDevices = getAllUserDevices();
     if (!userDevices) {
-      toast.error("No calling device information available");
+      //toast.error("No calling device information available");
       return;
     }
 
@@ -812,14 +854,14 @@ const GlobalFloatingCallBar: React.FC = () => {
       const result = await dialNumber(numberToDial);
 
       if (result.success) {
-        toast.success(`Calling ${numberToDial}...`);
+        //toast.success(`Calling ${numberToDial}...`);
         setDialedNumber("");
         closeDialer();
       } else {
-        toast.error(result.error || "Failed to make call");
+        //toast.error(result.error || "Failed to make call");
       }
     } catch (error) {
-      toast.error("Failed to make call");
+      //toast.error("Failed to make call");
     } finally {
       setIsDialing(false);
     }
@@ -859,14 +901,14 @@ const GlobalFloatingCallBar: React.FC = () => {
       });
 
       if (result.success) {
-        toast.success(`Calling ${numberToDial}...`);
+        //toast.success(`Calling ${numberToDial}...`);
         setDialedNumber("");
         closeDialer();
       } else {
-        toast.error(result.error || "Failed to make call");
+        //toast.error(result.error || "Failed to make call");
       }
     } catch (error) {
-      toast.error("Failed to make call");
+      //toast.error("Failed to make call");
     } finally {
       setIsDialing(false);
     }
@@ -874,13 +916,13 @@ const GlobalFloatingCallBar: React.FC = () => {
 
   const handleEndCall = async () => {
     if (!activeCall || !activeCall.callId) {
-      toast.error("Call ID not available");
+      //toast.error("Call ID not available");
       return;
     }
 
     const controllerDevice = getControllerDeviceInfo(activeCall);
     if (!controllerDevice) {
-      toast.error("No calling device information available");
+      //toast.error("No calling device information available");
       return;
     }
 
@@ -900,22 +942,22 @@ const GlobalFloatingCallBar: React.FC = () => {
       if (result.success) {
        // toast.success("Call ended");
       } else {
-        toast.error(result.error || "Failed to end call");
+        //toast.error(result.error || "Failed to end call");
       }
     } catch (error) {
-      toast.error("Failed to end call");
+      //toast.error("Failed to end call");
     }
   };
 
   const handleHoldCall = async () => {
     if (!activeCall || !activeCall.callId) {
-      toast.error("Call ID not available");
+      //toast.error("Call ID not available");
       return;
     }
 
     const controllerDevice = getControllerDeviceInfo(activeCall);
     if (!controllerDevice) {
-      toast.error("No calling device information available");
+      //toast.error("No calling device information available");
       return;
     }
 
@@ -933,24 +975,24 @@ const GlobalFloatingCallBar: React.FC = () => {
       } as any);
 
       if (result.success) {
-        toast.success("Call put on hold");
+        //toast.success("Call put on hold");
       } else {
-        toast.error(result.error || "Failed to hold call");
+        //toast.error(result.error || "Failed to hold call");
       }
     } catch (error) {
-      toast.error("Failed to hold call");
+      //toast.error("Failed to hold call");
     }
   };
 
   const handleResumeCall = async () => {
     if (!activeCall || !activeCall.callId) {
-      toast.error("Call ID not available");
+     // toast.error("Call ID not available");
       return;
     }
 
     const controllerDevice = getControllerDeviceInfo(activeCall);
     if (!controllerDevice) {
-      toast.error("No calling device information available");
+      //toast.error("No calling device information available");
       return;
     }
 
@@ -968,29 +1010,29 @@ const GlobalFloatingCallBar: React.FC = () => {
       } as any);
 
       if (result.success) {
-        toast.success("Call resumed");
+        //toast.success("Call resumed");
       } else {
-        toast.error(result.error || "Failed to resume call");
+        //toast.error(result.error || "Failed to resume call");
       }
     } catch (error) {
-      toast.error("Failed to resume call");
+      //toast.error("Failed to resume call");
     }
   };
 
   const handleTransferCall = async () => {
     if (!activeCall || !activeCall.callId) {
-      toast.error("Call ID not available");
+      //toast.error("Call ID not available");
       return;
     }
 
     if (!transferTarget.trim()) {
-      toast.error("Please select a target extension");
+      //toast.error("Please select a target extension");
       return;
     }
 
     const controllerDevice = getControllerDeviceInfo(activeCall);
     if (!controllerDevice) {
-      toast.error("No calling device information available");
+      //toast.error("No calling device information available");
       return;
     }
 
@@ -1002,7 +1044,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     );
 
     if (targetCall) {
-      toast.error(`Extension ${transferTarget} is currently busy`);
+      //toast.error(`Extension ${transferTarget} is currently busy`);
       return;
     }
 
@@ -1018,15 +1060,15 @@ const GlobalFloatingCallBar: React.FC = () => {
       });
 
       if (result.success) {
-        toast.success(`Call transferred to ${transferTarget}`);
+        //toast.success(`Call transferred to ${transferTarget}`);
         setShowTransferModal(false);
         setTransferTarget("");
         setExtensionSearch("");
       } else {
-        toast.error(result.error || "Failed to transfer call");
+       // toast.error(result.error || "Failed to transfer call");
       }
     } catch (error) {
-      toast.error("Failed to transfer call");
+      //toast.error("Failed to transfer call");
     }
   };
 
@@ -1049,25 +1091,25 @@ const GlobalFloatingCallBar: React.FC = () => {
   const handleAttendCall = async () => {
     // Check permission for attending calls
     if (!hasPermission("dial-call-cti")) {
-      toast.error("You do not have permission to answer calls");
+     // toast.error("You do not have permission to answer calls");
       return;
     }
 
     if (!incomingCall) {
-      toast.error("No incoming call to attend");
+     // toast.error("No incoming call to attend");
       return;
     }
 
     // Get controller device info from dnsMap for the user
     const userDeviceInfo = dnsMap[userAddress];
     if (!userDeviceInfo || !userDeviceInfo.devices) {
-      toast.error("No device information available");
+      //toast.error("No device information available");
       return;
     }
 
     const userDevices = Object.values(userDeviceInfo.devices);
     if (userDevices.length === 0) {
-      toast.error("No devices available");
+     // toast.error("No devices available");
       return;
     }
 
@@ -1111,10 +1153,10 @@ const GlobalFloatingCallBar: React.FC = () => {
         
        // toast.success("Call attended successfully");
       } else {
-        toast.error(result.error || "Failed to attend call");
+       // toast.error(result.error || "Failed to attend call");
       }
     } catch (error) {
-      toast.error("Failed to attend call");
+      //toast.error("Failed to attend call");
     } finally {
       setIsDialing(false);
     }
@@ -1132,7 +1174,7 @@ const GlobalFloatingCallBar: React.FC = () => {
     setShowIncomingCallModalContext(false);
     setIncomingCall(null);
     setIncomingCallContext(null);
-    toast.info("Call rejected");
+    //toast.info("Call rejected");
   };
 
   const isVertical = position === "left" || position === "right";
@@ -1183,8 +1225,8 @@ const GlobalFloatingCallBar: React.FC = () => {
           className={`global-floating-call-bar ${isDragging ? "dragging" : ""}`}
           style={getPositionStyles()}
         >
-          {/* Drag Handle - small area at edge */}
-          <div
+          {/* Drag Handle - disabled for now */}
+          {/* <div
             ref={dragHandleRef}
             className="call-bar-drag-handle"
             onMouseDown={handleDragStart}
@@ -1199,17 +1241,18 @@ const GlobalFloatingCallBar: React.FC = () => {
               zIndex: 10,
             }}
             title="Drag to reposition"
-          />
+          /> */}
 
           {/* Contact Info Section */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: isVertical ? "0.75rem" : "1rem",
+              gap: "0.5rem",
               flex: isVertical ? "none" : 1,
               flexDirection: isVertical ? "column" : "row",
               minWidth: 0,
+              top:"0",
               position: "relative",
               zIndex: 1,
             }}
@@ -1218,9 +1261,9 @@ const GlobalFloatingCallBar: React.FC = () => {
             <div
               className="position-relative"
               style={{
-                width: isVertical ? "3rem" : "5rem",
-                height: isVertical ? "3rem" : "5rem",
-                minWidth: isVertical ? "3rem" : "5rem",
+                width: isVertical ? "3rem" : "3rem",
+                height: isVertical ? "3rem" : "3rem",
+                minWidth: isVertical ? "3rem" : "3rem",
                 flexShrink: 0,
               }}
             >
@@ -1259,7 +1302,7 @@ const GlobalFloatingCallBar: React.FC = () => {
               <div style={{ flex: 1 }}>
                 <h3
                   style={{
-                    fontSize: "1.5rem",
+                    fontSize: "1rem",
                     fontWeight: 600,
                     color: "#334155",
                     marginBottom: "0.25rem",
@@ -1272,7 +1315,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                 </h3>
                 <div
                   style={{
-                    fontSize: "1rem",
+                    fontSize: "0.7rem",
                     color: "#94a3b8",
                     marginBottom: "0.25rem",
                     overflow: "hidden",
@@ -1280,7 +1323,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {displayNumber}
+                  {otherPartyNumber}
                 </div>
                 {/* Optional: Add contact label/group here if available */}
 
@@ -1288,7 +1331,7 @@ const GlobalFloatingCallBar: React.FC = () => {
             {activeCall.status === "connected" && (
               <div
                 style={{
-                  fontSize: isVertical ? "0.875rem" : "0.875rem",
+                  fontSize: isVertical ? "0.75rem" : "0.75rem",
                   color: "#334155",
                   fontWeight: 500,
                   display: "flex",
@@ -1338,32 +1381,12 @@ const GlobalFloatingCallBar: React.FC = () => {
             )}
             
             
-            {activeCall.status === "onHold" && (
-              <div
-                style={{
-                  fontSize: isVertical ? "0.875rem" : "0.875rem",
-                  color: "#F4C22B",
-                  fontWeight: 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  flexDirection: isVertical ? "column" : "row",
-                }}
-              >
-                <i
-                  className="material-icons-two-tone"
-                  style={{ fontSize: isVertical ? "1rem" : "1rem" }}
-                >
-                  pause_circle
-                </i>
-                <span>{isVertical ? "Hold" : "On Hold"}</span>
-              </div>
-            )}
+            
             {activeCall.status === "ringing" && (
               <div
                 className="call-status-ringing"
                 style={{
-                  fontSize: isVertical ? "0.875rem" : "0.875rem",
+                  fontSize: isVertical ? "0.75rem" : "0.75rem",
                   color: "#334155",
                   fontWeight: 500,
                   display: "flex",
@@ -1372,7 +1395,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                   flexDirection: isVertical ? "column" : "row",
                 }}
               >
-                <span className="text-success" style={{ fontWeight: "500" }}>Incoming call</span>
+                <span className="text-success" style={{ fontWeight: "500" }}>Outgoing call</span>
                 <span className="bg-success rounded-circle" style={{ width: "0.375rem", height: "0.375rem" }}></span>
                 <span style={{ color: "#94a3b8" }}>Ringing...</span>
               </div>
@@ -1380,7 +1403,7 @@ const GlobalFloatingCallBar: React.FC = () => {
             {activeCall.status === "dialing" && (
               <div
                 style={{
-                  fontSize: isVertical ? "0.875rem" : "0.875rem",
+                  fontSize: isVertical ? "0.75rem" : "0.75rem",
                   color: "#334155",
                   fontWeight: 500,
                   display: "flex",
@@ -1406,7 +1429,7 @@ const GlobalFloatingCallBar: React.FC = () => {
             }}
           >
             {/* Keypad Button */}
-            <button
+            {/* <button
               type="button"
               tabIndex={0}
               onClick={(e) => {
@@ -1443,11 +1466,35 @@ const GlobalFloatingCallBar: React.FC = () => {
               >
                 dialpad
               </i>
-            </button>
+            </button> */}
+
+{activeCall.status === "onHold" && (
+              <div
+                style={{
+                  fontSize: isVertical ? "0.75rem" : "0.75rem",
+                  color: "#F4C22B",
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  flexDirection: isVertical ? "column" : "row",
+                }}
+              >
+                {/* <i
+                  className="material-icons-two-tone"
+                  style={{ fontSize: isVertical ? "1rem" : "1rem" }}
+                >
+                  pause_circle
+                </i> */}
+                <span>{isVertical ? "Hold" : "On Hold"}</span>
+              </div>
+            )}
 
             {/* Additional Controls for Connected Calls */}
             {activeCall.status === "connected" && (
               <>
+
+              
                 <button
                   type="button"
                   role="button"
@@ -1588,13 +1635,13 @@ const GlobalFloatingCallBar: React.FC = () => {
                         })
                           .then((result) => {
                             if (result.success) {
-                              toast.success("Call answered");
+                              //toast.success("Call answered");
                             } else {
-                              toast.error(result.error || "Failed to answer call");
+                             // toast.error(result.error || "Failed to answer call");
                             }
                           })
                           .catch(() => {
-                            toast.error("Failed to answer call");
+                            //toast.error("Failed to answer call");
                           })
                           .finally(() => {
                             setIsDialing(false);
@@ -1696,15 +1743,15 @@ const GlobalFloatingCallBar: React.FC = () => {
                 e.stopPropagation();
                 handleEndCall();
               }}
-              className="btn btn-danger rounded-1 d-flex align-items-center gap-1"
-              style={{
-                padding: "0.625rem 1rem",
-                fontWeight: 500,
-                color:"#fff",
-                fontSize: "1rem",
-                boxShadow: "0 4px 6px -1px rgba(239,68,68,0.3)",
-                marginLeft: "0.5rem",
-              }}
+              className="btn btn-danger btn-sm  rounded-1 d-flex align-items-center gap-1"
+              // style={{
+              //   padding: "0.625rem 1rem",
+              //   fontWeight: 500,
+              //   color:"#fff",
+              //   fontSize: "1rem",
+              //   boxShadow: "0 4px 6px -1px rgba(239,68,68,0.3)",
+              //   marginLeft: "0.5rem",
+              // }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.boxShadow = "0 6px 8px -1px rgba(239,68,68,0.4)";
               }}
