@@ -286,7 +286,7 @@ const AccountOverview = () => {
               </div> */}
               
               <div className="d-flex justify-content-between align-items-center py-2">
-                <small className="text-muted" style={{ fontSize: '0.8rem' }}>Pending</small>
+                <small className="text-muted" style={{ fontSize: '0.8rem' }}>Pending Amount</small>
                 <span className="fw-semibold" style={{ fontSize: '0.9rem' }}>{companyDetails?.profile?.currency} {formatNumber(companyDetails?.profile?.outstanding_invoices)}</span>
 
                  
@@ -459,35 +459,48 @@ const AccountOverview = () => {
                 <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Payment Method</h6>
               </div>
 
-              {paymentMethods?.map((method: any) => (
-                    <div key={method.id}>
-                      {method.is_default ===true && (
-                        <>
-                        
+              {paymentMethods && paymentMethods.some((method: any) => method.is_default === true) ? (
+                paymentMethods.map((method: any) => (
+                  <div key={method.id}>
+                    {method.is_default === true && (
+                      <>
+                        <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
+                          <small className="text-muted" style={{ fontSize: '0.75rem' }}>Card</small>
+                          <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>•••• {method.card?.last4}</span>
+                        </div>
 
                         <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
-                <small className="text-muted" style={{ fontSize: '0.75rem' }}>Card</small>
-                <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>•••• {method.card?.last4}</span>
-              </div>
-
-                        
-                        <div className="d-flex justify-content-between align-items-center py-1border-bottom">
-                <small className="text-muted" style={{ fontSize: '0.75rem' }}>Card Type</small>
-                <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
-                {method.card?.brand}
-                </span>
-              </div>
+                          <small className="text-muted" style={{ fontSize: '0.75rem' }}>Card Type</small>
+                          <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
+                            {method.card?.brand}
+                          </span>
+                        </div>
 
                         <div className="d-flex justify-content-between align-items-center py-1">
-                <small className="text-muted" style={{ fontSize: '0.75rem' }}>Expiry</small>
-                <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
-                {method.card?.exp_month}/{method.card?.exp_year}
-                </span>
-              </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                          <small className="text-muted" style={{ fontSize: '0.75rem' }}>Expiry</small>
+                          <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
+                            {method.card?.exp_month}/{method.card?.exp_year}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-3">
+                  <p className="text-muted mb-2" style={{ fontSize: '0.75rem' }}>
+                    No payment method added
+                  </p>
+                  <Button 
+                    variant="primary" 
+                    size="sm"
+                    onClick={() => router.push('/accounting/customer/payment-methods')}
+                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.7rem' }}
+                  >
+                    Add Card
+                  </Button>
+                </div>
+              )}
               
               
 
