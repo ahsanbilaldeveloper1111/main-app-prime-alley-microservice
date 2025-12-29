@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import axiosInstance from "@utils/axios";
 import { getCrossTabCtiManager } from "../utils/crossTabCtiManager";
 import { useAuth } from "./useAuth";
+import { useRouter } from "next/router";
 
 interface CtiDevice {
   dn: string;
@@ -102,6 +103,9 @@ export default function useCtiStomp(
   // Cross-tab manager for sharing connection across tabs
   const crossTabManagerRef = useRef(getCrossTabCtiManager());
   const [isMasterTab, setIsMasterTab] = useState(false);
+
+  // Router for checking current page
+  const router = useRouter();
 
   // Track authentication state to reinitialize connection after login
   const { isAuthenticated, isInitialized: authInitialized } = useAuth();
@@ -1580,6 +1584,19 @@ export default function useCtiStomp(
           console.log(
             `[${currentInstanceId}] Not master tab, waiting for state from master tab...`
           );
+          
+          // If on live-calls page, demand first subscription data
+          const isLiveCallsPage = router.pathname?.includes('live-calls') || 
+                                  (typeof globalThis !== 'undefined' && globalThis.window?.location.pathname?.includes('live-calls'));
+          
+          if (isLiveCallsPage && manager.isCrossTabSupported()) {
+            // Request initial state from master tab via cross-tab manager
+            manager.requestAction('requestInitialState', {}).catch((error) => {
+              console.log(`[${currentInstanceId}] Failed to request initial state from master:`, error);
+            });
+            console.log(`[${currentInstanceId}] Requested initial state for live-calls page from master tab`);
+          }
+          
           // Reset connecting flag since we're not initializing
           isConnectingRef.current = false;
           isGettingTokenRef.current = false; // Reset token flag
@@ -2381,9 +2398,30 @@ export default function useCtiStomp(
       setError(null);
     });
 
+    // Listen to action requests from non-master tabs (master tab only)
+    const unsubscribeActionRequests = manager.onActionRequest(async (event) => {
+      if (!manager.isMasterTab()) {
+        return; // Only master tab handles action requests
+      }
+
+      if (event.data?.actionType === 'requestInitialState') {
+        // Publish request for initial state
+        if (publishStompMessageRef.current) {
+          publishStompMessageRef.current(
+            "/app/request/initial-state",
+            ""
+          );
+          console.log(`[${instanceIdRef.current}] Master tab: Requested initial state for non-master tab`);
+        }
+        // Send success response
+        manager.sendActionResponse(event.actionId || '', { success: true });
+      }
+    });
+
     return () => {
       unsubscribeCtiEvents();
       unsubscribeStateUpdates();
+      unsubscribeActionRequests();
     };
   }, [handleCallEvent, saveCallStatesToStorage]);
 
