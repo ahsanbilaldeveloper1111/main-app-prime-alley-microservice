@@ -427,14 +427,14 @@ interface FilterBarProps {
     color?: string;
     icon?: React.ReactNode;
   }[];
-  activeFilter: string;
-  onFilterChange: (filterId: string) => void;
-  searchValue: string;
-  onSearchChange: (value: string) => void;
-  onSearch: () => void;
+  activeFilter?: string;
+  onFilterChange?: (filterId: string) => void;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  onSearch?: () => void;
   searchPlaceholder?: string;
-  showAdvancedFilters: boolean;
-  onToggleAdvancedFilters: () => void;
+  showAdvancedFilters?: boolean;
+  onToggleAdvancedFilters?: () => void;
   advancedFilterCount?: number;
 }
 
@@ -482,7 +482,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
                       ? filter.variant || "primary"
                       : "outline-secondary"
                   }
-                  onClick={() => onFilterChange(filter.id)}
+                  onClick={() => onFilterChange && onFilterChange(filter.id)}
                   className="d-flex align-items-center gap-2"
                   style={hasCustomColor ? buttonStyle : undefined}
                 >
