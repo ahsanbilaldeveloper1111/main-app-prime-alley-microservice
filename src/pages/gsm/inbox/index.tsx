@@ -5,7 +5,7 @@ import BreadcrumbItem from '@common/BreadcrumbItem';
 import { Row, Col } from 'react-bootstrap';
 import GenericListPage from '@components/GenericListPage';
 import { Column } from '@components/CustomDataTable';
-import { ListGsmInbox } from '@utils/GsmManagement';
+import { ListGsmInbox,MarkAsRead } from '@utils/GsmManagement';
 import GsmInboxFilter from '@components/filters/GsmInboxFilter';
 import moment from 'moment';
 import '@assets/scss/common.scss';
@@ -13,48 +13,53 @@ import { useSession } from 'next-auth/react';
 
 import '@assets/scss/gsm-inbox.scss';
 import { toast } from 'react-toastify';
+import { GlobalDateTimeFormat } from '@utils/Helper';
 
 const GsmInbox = () => {
   const { data: session, status } = useSession();
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState<{[key: string]: any}>({});
+  const [readItems, setReadItems] = useState<Set<number>>(new Set());
 
   const columns: Column[] = useMemo(
     () => [
-      {
-        key: "id",
-        name: "ID",
-        selector: (row: any) => row.id,
-        sortable: true,
-        cell: (props: any) => (
-          <span className="fw-bold text-primary">#{props.id}</span>
-        ),
-      },
-      {
-        key: "gsm_name",
-        name: "GSM Name",
-        selector: (row: any) => row.gsm?.name,
-        sortable: true,
-        cell: (props: any) => (
-          <span className="badge bg-info">
-            {props.gsm?.name || 'Unknown'}
-          </span>
-        ),
-      },
-      {
-        key: "port",
-        name: "Port",
-        selector: (row: any) => row.port?.port_number,
-        sortable: true,
-        cell: (props: any) => (
-          <span className="badge bg-secondary">
-            Port {props.port?.port_number || 'N/A'}
-          </span>
-        ),
-      },
+      ...(session?.user?.is_admin === "1" ? [
+        {
+          key: "id",
+          name: "ID",
+          selector: (row: any) => row.id,
+          sortable: true,
+          cell: (props: any) => (
+            <span className="fw-bold text-primary">#{props.id}</span>
+          ),
+        },
+        {
+          key: "gsm_name",
+          name: "GSM Name",
+          selector: (row: any) => row.gsm?.name,
+          sortable: true,
+          cell: (props: any) => (
+            <span className="badge bg-info">
+              {props.gsm?.name || 'Unknown'}
+            </span>
+          ),
+        },
+        {
+          key: "port",
+          name: "Port",
+          selector: (row: any) => row.port?.port_number,
+          sortable: true,
+          cell: (props: any) => (
+            <span className="badge bg-secondary">
+              Port {props.port?.port_number || 'N/A'}
+            </span>
+          ),
+        },
+      ] : []),
+      
       {
         key: "mobile_number",
-        name: "Mobile Number",
+        name: "Receiver Number",
         selector: (row: any) => row.port?.mobile_number,
         sortable: true,
         cell: (props: any) => (
@@ -74,31 +79,36 @@ const GsmInbox = () => {
           </span>
         ),
       },
-      {
-        key: "smsc",
-        name: "SMSC",
-        selector: (row: any) => row.smsc,
-        sortable: true,
-        cell: (props: any) => (
-          <span className="text-muted">
-            {props.smsc || 'N/A'}
-          </span>
-        ),
-      },
-      {
-        key: "imsi",
-        name: "IMSI",
-        selector: (row: any) => row.imsi,
-        sortable: true,
-        cell: (props: any) => (
-          <span className="text-info font-monospace">
-            {props.imsi || 'N/A'}
-          </span>
-        ),
-      },
+
+
+...(session?.user?.is_admin === "1" ? [
+  {
+    key: "smsc",
+  name: "SMSC",
+  selector: (row: any) => row.smsc,
+  sortable: true,
+  cell: (props: any) => (
+    <span className="text-muted">
+      {props.smsc || 'N/A'}
+    </span>
+  ),
+},
+{
+  key: "imsi",
+  name: "IMSI",
+  selector: (row: any) => row.imsi,
+  sortable: true,
+  cell: (props: any) => (
+    <span className="text-info font-monospace">
+      {props.imsi || 'N/A'}
+    </span>
+  ),
+},
+] : []),
+      
       {
         key: "text",
-        name: "Message",
+        name: "Message Body",
         selector: (row: any) => row.text,
         sortable: true,
         cell: (props: any) => {
@@ -200,9 +210,9 @@ const GsmInbox = () => {
     
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(() => {
-        toast.success('Message copied to clipboard');
+        //toast.success('Message copied to clipboard');
       }).catch(() => {
-        toast.error('Failed to copy message');
+        //toast.error('Failed to copy message');
       });
     } else {
       // Fallback for older browsers
@@ -216,9 +226,16 @@ const GsmInbox = () => {
     }
   }, []);
 
-  const handleMarkAsRead = useCallback((id: number) => {
+  const handleMarkAsRead = useCallback(async (id: number) => {
     console.log('Mark as read:', id);
-    toast.success('Message marked as read');
+    const ids = [id.toString()];
+    const response = await MarkAsRead(ids);
+    if(response){
+      setReadItems(prev => new Set(prev).add(id));
+      toast.success('Message marked as read');
+    }else{
+      toast.error('Failed to mark message as read');
+    }
   }, []);
 
   const handlePageChange = useCallback((page: number) => {
@@ -228,12 +245,14 @@ const GsmInbox = () => {
   const handlePrevPage = useCallback(() => {
     if (currentPage > 1) {
       setCurrentPage(currentPage - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [currentPage]);
 
   const handleNextPage = useCallback(() => {
     if (gsmInbox?.last_page && currentPage < gsmInbox.last_page) {
       setCurrentPage(currentPage + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [currentPage, gsmInbox?.last_page]);
 
@@ -252,7 +271,7 @@ const GsmInbox = () => {
         <Col md={4}>
           
             <h2 className="mb-0">
-              GSM Inbox
+              Carrier Messages
             </h2>
           
         </Col>
@@ -285,7 +304,7 @@ const GsmInbox = () => {
                 </div>
             </div>
             <div className="analytics-note">
-                Statistics shown are for the current page. Use the `Filters` option for specific data.
+                Total messages in the system.
             </div>
         </div>
         </Col>
@@ -296,10 +315,17 @@ const GsmInbox = () => {
       {gsmInbox?.data?.length > 0 ? (
         <Row>
           <Col md={12}>
-          <div className="inbox-list">
+          
+          {session?.user?.is_admin === "1" ? (
+            <div className="inbox-list">
             {gsmInbox?.data?.map((item: any) => (
               <div className="message-card new" data-sender={item.sender} data-receiver={item.receiver} data-smsc={item.smsc} data-imsi={item.imsi} data-full-message={item.full_message} data-timestamp={item.timestamp} data-status={item.status} style={{display: 'flex'}}>
-              <span className="new-indicator" onClick={() => handleMarkAsRead(item.id)}></span>
+              {!readItems.has(item.id) && (
+                <div className="new-indicator-wrapper" onClick={() => handleMarkAsRead(item.id)} style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', position: 'absolute', top: '15px', left: '15px', zIndex: 10}}>
+                  <span className="new-indicator" title="Mark as read" style={{position: 'relative', top: 'auto', right: 'auto', width: '10px', height: '10px', backgroundColor: '#0d6efd', borderRadius: '50%', boxShadow: '0 0 0 3px rgba(13, 110, 253, 0.2)'}}></span>
+                  <span className="new-indicator-text" style={{fontSize: '12px', color: '#0d6efd', fontWeight: '500'}}>Mark as read</span>
+                </div>
+              )}
               <div className="message-content" onClick={() => {
                 setSelectedMessage(item);
                 setShowDetailsModal(true);
@@ -307,7 +333,7 @@ const GsmInbox = () => {
                   
                   <div className="message-card-header">
                       <div className="sender-info">
-                          <span className="sender-name">SMS from {item?.number}</span>
+                          <span className="sender-name">Message from {item?.number}</span>
                           <span className="label-chip">
                               <span className="port-status-dot active"></span> Port {item?.port?.port_number}
                           </span>
@@ -338,6 +364,47 @@ const GsmInbox = () => {
           </div>
             ))}
           </div>
+          ) : (
+            <div className="inbox-list">
+            {gsmInbox?.data?.map((item: any) => (
+              <div className="message-card new" data-sender={item.sender} data-receiver={item.receiver} data-smsc={item.smsc} data-imsi={item.imsi} data-full-message={item.full_message} data-timestamp={item.timestamp} data-status={item.status} style={{display: 'flex'}}>
+              {!readItems.has(item.id) && (
+                <div className="new-indicator-wrapper" onClick={() => handleMarkAsRead(item.id)} style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', position: 'absolute', top: '10px', right: '15px', zIndex: 10}}>
+                  <span className="new-indicator" title="Mark as read" style={{position: 'relative', top: 'auto', right: 'auto', width: '10px', height: '10px', backgroundColor: '#0d6efd', borderRadius: '50%', boxShadow: '0 0 0 3px rgba(13, 110, 253, 0.2)'}}></span>
+                  <span className="new-indicator-text" style={{fontSize: '12px', color: '#0d6efd', fontWeight: '500'}}>Mark as read</span>
+                </div>
+              )}
+              <div className="message-content" onClick={() => {
+                setSelectedMessage(item);
+                setShowDetailsModal(true);
+              }}>
+                  
+                  <div className="message-card-header">
+                      <div className="sender-info">
+                          <span className="sender-name">Sender Number: {item?.number}</span>
+                          {/* <span className="label-chip">
+                              <span className="port-status-dot active"></span> Receiver Number: {item?.port?.mobile_number}
+                          </span> */}
+                      </div>
+                      <div className="meta-info">
+                          <span className="meta-item timestamp text-uppercase"><i className="fas fa-clock"></i> Date Time : {item?.received_at ? moment(item?.received_at).format(GlobalDateTimeFormat) : 'N/A'}</span>
+                      </div>
+                  </div>
+                  <p className="message-body">
+                      <span className="message-preview">{item?.text}</span>
+                  </p>
+                  <div className="details-grid">
+                      <div className="detail-item">
+                          <strong>Receiver Number</strong>
+                          <span>{item?.port?.mobile_number?.length > 0 ? item?.port?.mobile_number : 'N/A'}</span>
+                      </div>
+                      
+                  </div>
+              </div>
+          </div>
+            ))}
+          </div>
+          )}
           
           </Col>
         </Row>
@@ -359,11 +426,12 @@ const GsmInbox = () => {
         <div id="detail-modal" className="modal" style={{display: 'flex'}}>
         <div className="modal-content">
             <span className="close-btn" id="detail-close-btn" onClick={() => setShowDetailsModal(false)}><i className="fas fa-times"></i></span>
-            <h2 id="detail-sender">SMS from {selectedMessage?.number || 'N/A'}</h2>
+            <h2 id="detail-sender">Message from {selectedMessage?.number || 'N/A'}</h2>
             <div id="detail-meta" className="meta-info">
                     <span className="meta-item"><i className="fas fa-clock"></i> {selectedMessage?.received_at ? moment(selectedMessage.received_at).fromNow() : 'N/A'}</span>
-                    <span className="meta-item"><i className="fas fa-mobile-alt"></i> GSM: {selectedMessage?.gsm?.name || 'N/A'}</span>
-                    <span className="label-chip">Port {selectedMessage?.port?.port_number || 'N/A'}</span>
+
+                    {/* <span className="meta-item"><i className="fas fa-mobile-alt"></i> GSM: {selectedMessage?.gsm?.name || 'N/A'}</span>
+                    <span className="label-chip">Port {selectedMessage?.port?.port_number || 'N/A'}</span> */}
                 </div>
             <div id="detail-body" className="modal-message-body">{selectedMessage?.text || 'N/A'}</div>
             <button className="copy-message-btn" style={{marginTop: '20px', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', border: 'none', borderRadius: '8px', backgroundColor: 'var(--primary-accent)', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s'}} onClick={() => handleCopyMessage(selectedMessage?.text || '')}>
@@ -380,14 +448,14 @@ const GsmInbox = () => {
                         <span>{selectedMessage?.port?.mobile_number || 'N/A'}</span>
                         <button className="copy-btn" data-text-to-copy={selectedMessage?.port?.mobile_number || ''}><i className="fas fa-copy" onClick={() => handleCopyMessage(selectedMessage?.port?.mobile_number || '')}></i></button>
                     </div>
-                    <div className="detail-item">
+                    {/* <div className="detail-item">
                         <strong>SMSC</strong>
                         <span>{selectedMessage?.smsc || 'N/A'}</span>
-                    </div>
-                    <div className="detail-item">
+                    </div> */}
+                    {/* <div className="detail-item">
                         <strong>IMSI</strong>
                         <span>{selectedMessage?.imsi || 'N/A'}</span>
-                    </div>
+                    </div> */}
                 </div>
         </div>
     </div>

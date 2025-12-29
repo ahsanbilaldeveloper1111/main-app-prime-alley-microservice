@@ -287,3 +287,23 @@ export const updateGsm = async (id: string, name: string, ip_address: string, us
       throw error;
     }
   }
+
+
+  export const MarkAsRead = async (ids: string[]) => {
+    try {
+      const response = await axiosInstance.post(`gsm/inbox/markAsRead`, {
+        ids: ids
+      });
+      if(response){
+        const responseData = response.data;
+        if(responseData.code == 200){
+          return true;
+        }
+      }else{
+        toast.error('Failed to update port mobile number');
+        return false;
+      }
+    } catch (error) {
+      throw error;
+    }
+  }

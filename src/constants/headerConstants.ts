@@ -97,8 +97,8 @@ MENU_COLORS: {
     GSM_DASHBOARD: 'Dashboard',
     GSM_LIST: 'Telco Gateway List',
     COMPANY_ASSIGN: 'Assign',
-    PORTS: 'SIM Ports',
-    INBOX: 'Messages Inbox',
+    PORTS: 'Carrier Ports',
+    INBOX: 'Carrier Messages',
     SYNC_GSM: 'Sync GSM',
     COMPANY_PO: 'Company Profiling',
     

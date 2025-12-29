@@ -24,7 +24,7 @@ import { useSession } from 'next-auth/react';
 import { Column } from "@components/CustomDataTable";
 import moment from "moment";
 import FormModal from "@pages/partial/FormModal";
-import { formatNumber } from "@utils/Helper";
+import { formatNumber, GlobalDateFormat } from "@utils/Helper";
 import { Filter } from "lucide-react";
 
 interface Product {
@@ -62,32 +62,32 @@ const ProductDetails = () => {
 
          { key: 'billing_cycle', name: 'Billing Cycle', selector: (row: any) => row?.billing_cycle, sortable: true,
           cell: (row: any) => {
-            return <div>
+            return <div className="text-capitalize">
               {row?.billing_cycle || ''}
             </div>
           }
          },
 
 
-         { key: 'renewal_start_date', name: 'Renewal Start Date', selector: (row: any) => row?.renewal_start_date, sortable: true,
+         { key: 'renewal_start_date', name: 'Current Period Start', selector: (row: any) => row?.renewal_start_date, sortable: true,
           cell: (row: any) => {
-            return <div>
-              {row?.renewal_start_date ? moment(row?.renewal_start_date).format('DD-MMM-YYYY') : ''}
+            return <div className="text-uppercase">
+              {row?.renewal_start_date ? moment(row?.renewal_start_date).format(GlobalDateFormat) : ''}
             </div>
           }
          },
 
 
-         { key: 'renewal_end_date', name: 'Renewal End Date', selector: (row: any) => row?.renewal_end_date, sortable: true,
+         { key: 'renewal_end_date', name: 'Current Period End', selector: (row: any) => row?.renewal_end_date, sortable: true,
           cell: (row: any) => {
-            return <div>
-               {row?.renewal_end_date ? moment(row?.renewal_end_date).format('DD-MMM-YYYY') : ''}
+            return <div className="text-uppercase">
+               {row?.renewal_end_date ? moment(row?.renewal_end_date).format(GlobalDateFormat) : ''}
             </div>
           }
          },
 
 
-         { key: 'subscriptions', name: 'Subscriptions', selector: (row: any) => row?.subscriptions || 0, sortable: true,
+         { key: 'subscriptions', name: 'Quantity', selector: (row: any) => row?.subscriptions || 0, sortable: true,
           cell: (row: any) => {
             return <div>
               {row?.subscriptions || '0'}

@@ -32,31 +32,34 @@ const GsmPorts = () => {
   const { data: session, status } = useSession();
 
   const columns: Column[] = [
+    
+    ...(session?.user?.is_admin === "1" ? [
     {
-      key: "id",
+      key: "ip_address",
       name: "IP Address",
       selector: (row: any) => row.ip_address,
       sortable: true,
-      cell: (props: any) => (
-        <div style={{ minWidth: "120px" }}>{props?.gsm?.ip_address}</div>
-      ),
     },
+  
     {
       key: "port_number",
       name: "Port",
       selector: (row: any) => row.port_number,
       sortable: true,
     },
+  ] : []),
+
+
     {
       key: "mobile_number",
-      name: "Mobile Number",
+      name: "SIM Number",
       selector: (row: any) => row.mobile_number,
       sortable: true,
     },
 
     {
       key: "sim_status",
-      name: "Sim Status",
+      name: "SIM Status",
       selector: (row: any) => row.sim_status,
       sortable: true,
       cell: (props: any) => (
@@ -84,7 +87,7 @@ const GsmPorts = () => {
     },
     {
       key: "signal_status",
-      name: "Signal Status",
+      name: "Signal",
       selector: (row: any) => row.signal_status,
       sortable: true,
       cell: (props: any) => (
@@ -130,60 +133,71 @@ const GsmPorts = () => {
     },
     ] : []),
     
-    {
-      key: "status",
-      name: "Port Status",
-      selector: (row: any) => row.port_status,
-      sortable: true,
-      cell: (props: any) => (
-        <div>
-          {props?.status === "up" && (
-            <span className="status-badge success">Active</span>
-          )}
-          {props?.status === "down" && (
-            <span className="status-badge danger">Not Active</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "companyies",
-      name: "Company",
-      selector: (row: any) => row.companies,
-      sortable: true,
-      cell: (props: any) => <div>{props?.companies?.[0]?.name}</div>,
-    },
-    {
-      key: "Action",
-      name: "action",
-      selector: (row: any) => row.id,
-      sortable: false,
-      cell: (props: any) => (
-        <div className="d-flex gap-3">
-          {/* {session?.user?.permissions?.includes('update-mobile-number-gsm-ports') && 
-                    props?.unassigned_ports?.length > 0 && (
-                      <button className="btn btn-sm btn-outline-primary" onClick={() => handleUpdateMobileNumber(props.id)}>Update Mobile Number</button>
-                  )}     */}
+    ...(session?.user?.is_admin === "1" ? [
+      {
+        key: "status",
+        name: "Port Status",
+        selector: (row: any) => row.port_status,
+        sortable: true,
+        cell: (props: any) => (
+          <div>
+            {props?.status === "up" && (
+              <span className="status-badge success">Active</span>
+            )}
+            {props?.status === "down" && (
+              <span className="status-badge danger">Not Active</span>
+            )}
+          </div>
+        ),
+      },
 
-          <DatatableActionButton
-            actions={[
-              ...(session?.user?.permissions?.includes(
-                "update-mobile-number-gsm-ports"
-              )
-                ? [
-                    {
-                      label: "Update Mobile Number",
-                      icon: <FiEdit className="me-2" />,
-                      onClick: () => handleUpdateMobileNumber(props.id, props.mobile_number),
-                      className: "action-edit",
-                    },
-                  ]
-                : []),
-            ]}
-          />
-        </div>
-      ),
-    },
+      {
+        key: "companyies",
+        name: "Company",
+        selector: (row: any) => row.companies,
+        sortable: true,
+        cell: (props: any) => <div>{props?.companies?.[0]?.name}</div>,
+      },
+      {
+        key: "Action",
+        name: "action",
+        selector: (row: any) => row.id,
+        sortable: false,
+        cell: (props: any) => (
+          <div className="d-flex gap-3">
+            {/* {session?.user?.permissions?.includes('update-mobile-number-gsm-ports') && 
+                      props?.unassigned_ports?.length > 0 && (
+                        <button className="btn btn-sm btn-outline-primary" onClick={() => handleUpdateMobileNumber(props.id)}>Update Mobile Number</button>
+                    )}     */}
+  
+            <DatatableActionButton
+              actions={[
+                ...(session?.user?.permissions?.includes(
+                  "update-mobile-number-gsm-ports"
+                )
+                  ? [
+                      {
+                        label: "Update Mobile Number",
+                        icon: <FiEdit className="me-2" />,
+                        onClick: () => handleUpdateMobileNumber(props.id, props.mobile_number),
+                        className: "action-edit",
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </div>
+        ),
+      },
+
+
+    ] : []),
+    
+
+
+
+
+    
   ];
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -204,9 +218,9 @@ const GsmPorts = () => {
   const summaryCards: SummaryCard[] = [
     {
       id: "total-gsms-count",
-      title: "Total Ports",
+      title: "Total",
       value: portSummary?.total_port,
-      description: "Total ports in the system",
+      description: "Total Carrier Ports in the system",
       delay: 0.1,
       showAnimatedNumber: true,
       animationDuration: 1000,
@@ -214,9 +228,9 @@ const GsmPorts = () => {
     },
     {
       id: "assigned-gsms-count",
-      title: "Registered Ports",
+      title: "Registered",
       value: portSummary?.online_port,
-      description: "Registered ports in the system",
+      description: "Registered Carrier Ports in the system",
       delay: 0.3,
       showAnimatedNumber: true,
       animationDuration: 1000,
@@ -224,9 +238,9 @@ const GsmPorts = () => {
     },
     {
       id: "unassigned-gsms-count",
-      title: "Unregistered Ports",
+      title: "Unregistered",
       value: portSummary?.offline_port,
-      description: "Unregistered ports in the system",
+      description: "Unregistered Carrier Ports in the system",
       delay: 0.5,
       showAnimatedNumber: true,
       animationDuration: 1000,
@@ -234,9 +248,9 @@ const GsmPorts = () => {
     },
     {
       id: "total-ports-count",
-      title: "Active Ports",
+      title: "Active",
       value: portSummary?.active_port,
-      description: "Active ports in the system",
+      description: "Active Carrier Ports in the system",
       delay: 0.7,
       showAnimatedNumber: true,
       animationDuration: 1000,
@@ -336,13 +350,13 @@ const GsmPorts = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Carrier Ports" />
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="align-items-center">
               <Col md={3}>
-                <h2 className="mb-0 d-flex align-items-center">Ports</h2>
+                <h2 className="mb-0 d-flex align-items-center">Carrier Ports</h2>
               </Col>
               <Col md={9} className="d-flex justify-content-end">
                 <div className="action-buttons">
