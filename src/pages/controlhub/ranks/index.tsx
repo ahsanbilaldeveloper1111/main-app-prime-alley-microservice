@@ -448,7 +448,7 @@ const Ranks = () => {
             }
         } catch (error) {
             console.error('Error assigning ranks:', error);
-            toast.error('Failed to assign ranks');
+           // toast.error('Failed to assign ranks');
         } finally {
             setIsSubmittingBulkAssignment(false);
         }

@@ -260,25 +260,19 @@ export const assignRoleToUser = async (id: string, role_id: string) => {
 export const assignRankBulk = async (rank_id: string | number, user_ids: string[]) => {
   try {
     const response = await axiosInstance.post(
-      `users/assignRankbBulk`,
+      `users/assignRankBulk`,
       {
         rank_id: rank_id,
         user_ids: user_ids
-      },
-      {
-        responseType: 'json',
-        headers: {
-          'Accept': '*/*',
-          'Content-Type': 'application/json'
-        }
       }
+      
     );
    
     if(response.data){
       const responseData = response.data;
       
       if(responseData.code === 200){
-        toast.success('Ranks assigned successfully');
+        //toast.success('Ranks assigned successfully');
         return true;
       }else{
         toast.error(responseData.message);
