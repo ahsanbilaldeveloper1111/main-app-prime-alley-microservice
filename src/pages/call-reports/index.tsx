@@ -115,7 +115,7 @@ const PageReports = () => {
                                 <a href="/call-reports/stats/general" className="report-card" >
                                     <div className="report-header">
                                         <span className="material-icons-two-tone report-icon">call</span>
-                                        <h2 className="report-title">Call Stats By Overall</h2>
+                                        <h2 className="report-title">General Call Statistics</h2>
                                     </div>
                                     <p className="report-description">
                                     Visualize call volumes, durations, and trends across all calls with dynamic charts and detailed metrics.

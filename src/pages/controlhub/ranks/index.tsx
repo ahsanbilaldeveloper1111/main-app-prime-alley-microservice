@@ -174,7 +174,7 @@ const Ranks = () => {
                                 }] : []),
                                 ...(session?.user?.permissions?.includes('add-ranks') ? [{
                                     label: 'Clone Rank',
-                                    icon: <Copy className="me-2" />,
+                                    icon: <Copy className="me-2" size={16} />,
                                     onClick: () => {
                                         handleCloneRank(props);
                                     },

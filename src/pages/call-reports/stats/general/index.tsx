@@ -103,6 +103,7 @@ const CallStatsDepartment = () => {
   
   const {
     hierarchyDataExtensions,
+    hierarchyDataDepartments,
     loading: hierarchyLoading
   } = useHierarchyData(ModuleSlug.CALL_REPORTS);
   
@@ -297,14 +298,14 @@ const CallStatsDepartment = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Overall Call Stats" showPageLoader={showPageLoader} />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="General Call Statistics" showPageLoader={showPageLoader} />
       
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={5}>
-                <h2 className="mb-0">Overall Call Stats</h2>
+                <h2 className="mb-0">General Call Statistics</h2>
               </Col>
               <Col md={7} className="d-flex justify-content-end">
                 <div className="action-buttons">
@@ -479,14 +480,19 @@ const CallStatsDepartment = () => {
                   <Col md={4}>
                     <Form.Group>
                       <Form.Label>Departments</Form.Label>
-                      <Form.Control
-                        type="text"
-                        placeholder="Enter departments (comma separated)"
-                        value={((pendingFilters as any)?.department || []).join(', ')}
-                        onChange={(e) => {
-                          const values = e.target.value.split(',').map(v => v.trim()).filter(Boolean);
-                          setPendingFilters({ ...pendingFilters, department: values });
+                      <SelectBox
+                        isMulti
+                        isSearchable={true}
+                        isDisabled={hierarchyLoading}
+                        value={(pendingFilters as any)?.department?.length > 0 ? (pendingFilters as any)?.department : null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, department: value ? (value as string[]) : [] });
                         }}
+                        options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
+                          value: dept.id,
+                          label: dept.name
+                        })) || []}
+                        placeholder="Select departments"
                       />
                     </Form.Group>
                   </Col>

@@ -50,13 +50,11 @@ const CallStatsDepartment = () => {
     return {
       pending: {
         start_datetime: startDateInput,
-        end_datetime: endDateInput,
-        is_incoming_only: 'false'
+        end_datetime: endDateInput
       },
       current: {
         start_datetime: startDateUTC,
-        end_datetime: endDateUTC,
-        is_incoming_only: 'false'
+        end_datetime: endDateUTC
       }
     };
   };
@@ -72,6 +70,7 @@ const CallStatsDepartment = () => {
   
   const {
     hierarchyDataExtensions,
+    hierarchyDataDepartments,
     loading: hierarchyLoading
   } = useHierarchyData(ModuleSlug.CALL_REPORTS);
   
@@ -95,7 +94,7 @@ const CallStatsDepartment = () => {
   });
 
   const columns: Column[] = [
-    { key: 'DepartmentName', name: 'DepartmentName', selector: (row: any) => row.DepartmentName, sortable: true },
+    { key: 'DepartmentName', name: 'Department Name', selector: (row: any) => row.DepartmentName, sortable: true },
     { key: 'Extension', name: 'Extension', selector: (row: any) => row.Extension, sortable: true },
     { key: 'Username', name: 'User Name', selector: (row: any) => row.Username, sortable: true },
     { key: 'DepartmentExtension', name: 'Department Extension', selector: (row: any) => row.DepartmentExtension, sortable: true },
@@ -237,6 +236,11 @@ const CallStatsDepartment = () => {
       formattedFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
     }
     
+    // Remove is_incoming_only if it's empty, null, or undefined (don't send to API by default)
+    if (!formattedFilters.is_incoming_only || formattedFilters.is_incoming_only === '') {
+      delete formattedFilters.is_incoming_only;
+    }
+    
     const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(formattedFilters);
     const isCompletelyCleared = Object.keys(formattedFilters).length === 0 || 
       (Object.keys(formattedFilters).length === 1 && formattedFilters.hasOwnProperty('is_incoming_only'));
@@ -356,13 +360,11 @@ const CallStatsDepartment = () => {
                 // Preserve current date filters, clear all other filters
                 const resetPendingFilters: Record<string, any> = {
                   start_datetime: (pendingFilters as any)?.start_datetime || defaultFilters.pending.start_datetime,
-                  end_datetime: (pendingFilters as any)?.end_datetime || defaultFilters.pending.end_datetime,
-                  is_incoming_only: 'false'
+                  end_datetime: (pendingFilters as any)?.end_datetime || defaultFilters.pending.end_datetime
                 };
                 const resetCurrentFilters: Record<string, any> = {
                   start_datetime: (currentFilters as any)?.start_datetime || defaultFilters.current.start_datetime,
-                  end_datetime: (currentFilters as any)?.end_datetime || defaultFilters.current.end_datetime,
-                  is_incoming_only: 'false'
+                  end_datetime: (currentFilters as any)?.end_datetime || defaultFilters.current.end_datetime
                 };
                 setPendingFilters(resetPendingFilters);
                 setCurrentFilters(resetCurrentFilters);
@@ -372,6 +374,26 @@ const CallStatsDepartment = () => {
               filterContent={
                 <>
                   
+
+                  {/* Call Direction */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Call Direction</Form.Label>
+                      <SelectBox
+                        isSearchable={false}
+                        value={(pendingFilters as any)?.is_incoming_only || null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, is_incoming_only: value as string || '' });
+                        }}
+                        options={[
+                          { value: 'true', label: 'Incoming' },
+                          { value: 'false', label: 'Outgoing' },
+                          { value: '', label: 'Both' }
+                        ]}
+                        placeholder="Select call direction"
+                      />
+                    </Form.Group>
+                  </Col>
 
                   {/* Call Status */}
                   <Col md={4}>
@@ -405,6 +427,27 @@ const CallStatsDepartment = () => {
                           const values = e.target.value.split(',').map(v => v.trim()).filter(Boolean);
                           setPendingFilters({ ...pendingFilters, called_numbers: values });
                         }}
+                      />
+                    </Form.Group>
+                  </Col>
+
+                  {/* Department */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Department</Form.Label>
+                      <SelectBox
+                        isMulti
+                        isSearchable={true}
+                        isDisabled={hierarchyLoading}
+                        value={(pendingFilters as any)?.department?.length > 0 ? (pendingFilters as any)?.department : null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, department: value ? (value as string[]) : [] });
+                        }}
+                        options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
+                          value: dept.id,
+                          label: dept.name
+                        })) || []}
+                        placeholder="Select departments"
                       />
                     </Form.Group>
                   </Col>
@@ -471,21 +514,6 @@ const CallStatsDepartment = () => {
                     </Form.Group>
                   </Col>
 
-                  {/* Departments */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Departments</Form.Label>
-                      <Form.Control
-                        type="text"
-                        placeholder="Enter departments (comma separated)"
-                        value={((pendingFilters as any)?.department || []).join(', ')}
-                        onChange={(e) => {
-                          const values = e.target.value.split(',').map(v => v.trim()).filter(Boolean);
-                          setPendingFilters({ ...pendingFilters, department: values });
-                        }}
-                      />
-                    </Form.Group>
-                  </Col>
 
                   {/* Date Range - Start */}
                   <Col md={4}>

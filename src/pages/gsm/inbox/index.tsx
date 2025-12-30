@@ -179,7 +179,7 @@ const GsmInbox = () => {
 
   useEffect(() => {
     fetchGsmInbox(currentPage, perPage, "");
-  }, [memoizedFilters, currentPage, perPage]);
+  }, [memoizedFilters, currentPage, perPage, refreshKey]);
 
   const fetchGsmInbox = useCallback(
     async (page = 1, perPage = 15, search = "") => {
@@ -233,6 +233,7 @@ const GsmInbox = () => {
     if(response){
       setReadItems(prev => new Set(prev).add(id));
       toast.success('Message marked as read');
+      setRefreshKey(prev => prev + 1);
     }else{
       toast.error('Failed to mark message as read');
     }
@@ -320,8 +321,8 @@ const GsmInbox = () => {
             <div className="inbox-list">
             {gsmInbox?.data?.map((item: any) => (
               <div className="message-card new" data-sender={item.sender} data-receiver={item.receiver} data-smsc={item.smsc} data-imsi={item.imsi} data-full-message={item.full_message} data-timestamp={item.timestamp} data-status={item.status} style={{display: 'flex'}}>
-              {!readItems.has(item.id) && (
-                <div className="new-indicator-wrapper" onClick={() => handleMarkAsRead(item.id)} style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', position: 'absolute', top: '15px', left: '15px', zIndex: 10}}>
+              {item.is_read === "0" && !readItems.has(item.id) && (
+                <div className="new-indicator-wrapper" onClick={() => handleMarkAsRead(item.id)} style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', position: 'absolute', top: '10px', right: '15px', zIndex: 10}}>
                   <span className="new-indicator" title="Mark as read" style={{position: 'relative', top: 'auto', right: 'auto', width: '10px', height: '10px', backgroundColor: '#0d6efd', borderRadius: '50%', boxShadow: '0 0 0 3px rgba(13, 110, 253, 0.2)'}}></span>
                   <span className="new-indicator-text" style={{fontSize: '12px', color: '#0d6efd', fontWeight: '500'}}>Mark as read</span>
                 </div>
@@ -368,7 +369,7 @@ const GsmInbox = () => {
             <div className="inbox-list">
             {gsmInbox?.data?.map((item: any) => (
               <div className="message-card new" data-sender={item.sender} data-receiver={item.receiver} data-smsc={item.smsc} data-imsi={item.imsi} data-full-message={item.full_message} data-timestamp={item.timestamp} data-status={item.status} style={{display: 'flex'}}>
-              {!readItems.has(item.id) && (
+              {item.is_read === "0" && !readItems.has(item.id) && (
                 <div className="new-indicator-wrapper" onClick={() => handleMarkAsRead(item.id)} style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', position: 'absolute', top: '10px', right: '15px', zIndex: 10}}>
                   <span className="new-indicator" title="Mark as read" style={{position: 'relative', top: 'auto', right: 'auto', width: '10px', height: '10px', backgroundColor: '#0d6efd', borderRadius: '50%', boxShadow: '0 0 0 3px rgba(13, 110, 253, 0.2)'}}></span>
                   <span className="new-indicator-text" style={{fontSize: '12px', color: '#0d6efd', fontWeight: '500'}}>Mark as read</span>

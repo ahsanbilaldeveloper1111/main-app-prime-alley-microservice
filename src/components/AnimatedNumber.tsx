@@ -15,16 +15,24 @@ const AnimatedNumber = ({ value, duration = 1000, textColor = '', suffix = '', p
   const [displayValue, setDisplayValue] = useState(0);
 
   const formatSeconds = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     
-    //console.log('formatSeconds input:', seconds, 'minutes:', minutes, 'remainingSeconds:', remainingSeconds);
+    //console.log('formatSeconds input:', seconds, 'hours:', hours, 'minutes:', minutes, 'remainingSeconds:', remainingSeconds);
     
-    if (minutes > 0) {
-      return `${minutes}m ${remainingSeconds}s`;
-    } else {
-      return `${remainingSeconds}s`;
+    const parts = [];
+    if (hours > 0) {
+      parts.push(`${hours}h`);
     }
+    if (minutes > 0) {
+      parts.push(`${minutes}m`);
+    }
+    if (remainingSeconds > 0 || parts.length === 0) {
+      parts.push(`${remainingSeconds}s`);
+    }
+    
+    return parts.join(' ');
   };
 
   // Function to format seconds as "1m 23s"
