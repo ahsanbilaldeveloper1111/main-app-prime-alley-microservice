@@ -97,7 +97,7 @@ const CallStatsDepartment = () => {
     { key: 'DepartmentName', name: 'Department Name', selector: (row: any) => row.DepartmentName, sortable: true },
     { key: 'Extension', name: 'Extension', selector: (row: any) => row.Extension, sortable: true },
     { key: 'Username', name: 'User Name', selector: (row: any) => row.Username, sortable: true },
-    { key: 'DepartmentExtension', name: 'Department Extension', selector: (row: any) => row.DepartmentExtension, sortable: true },
+    // { key: 'DepartmentExtension', name: 'Department Extension', selector: (row: any) => row.DepartmentExtension, sortable: true },
 
     // Outgoing columns
     { key: 'Outgoing_AnsweredCalls', name: 'Outgoing Answered Calls', selector: (row: any) => row.Outgoing?.AnsweredCalls || 0, sortable: true },

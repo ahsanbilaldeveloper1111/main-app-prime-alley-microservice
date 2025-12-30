@@ -15,6 +15,7 @@ import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
 import "@assets/scss/reports.scss";
 import moment from 'moment';
 import { useSession } from 'next-auth/react';
+import router from 'next/router';
 
 
 const PageReports = () => {
@@ -40,7 +41,7 @@ const PageReports = () => {
                             <>
                             
                             <Col md={4}>
-                                <a href="/call-reports/stats/country" className="report-card" >
+                                <div  className="report-card" >
                                     <div className="report-header">
                                         <span className="material-icons-two-tone report-icon">call</span>
                                         <h2 className="report-title app-title-heading">Call Stats By Country</h2>
@@ -49,16 +50,18 @@ const PageReports = () => {
                                     Visualize call volumes, durations, and trends across countries with dynamic charts and detailed metrics.
                                     </p>
                                     <div className="report-meta">
-                                        <div className="meta-item">Type: <span>Call Outbound</span></div>
-                                        <div className="meta-item">Last Run: <span>{moment().format('MMM D, YYYY')}</span></div>
-                                        <div className="view-button app-button btn btn-primary">View</div>
+                                        <div className="meta-item">Type: <span>Inbound/Outbound</span></div>
+                                        
+                                        <div className="view-button app-button btn btn-primary"
+                                        onClick={() => router.push('/call-reports/stats/country')}
+                                        >View</div>
                                     </div>
-                                </a>
+                                </div>
                             </Col>
 
 
                             <Col md={4}>
-                                <a href="/call-reports/stats/department" className="report-card" >
+                                <div className="report-card" >
                                     <div className="report-header">
                                         <span className="material-icons-two-tone report-icon">call</span>
                                         <h2 className="report-title">Call Stats By Department</h2>
@@ -67,18 +70,20 @@ const PageReports = () => {
                                     Visualize call volumes, durations, and trends across departments with dynamic charts and detailed metrics.
                                     </p>
                                     <div className="report-meta">
-                                        <div className="meta-item">Type: <span>Call Outbound</span></div>
-                                        <div className="meta-item">Last Run: <span>{moment().format('MMM D, YYYY')}</span></div>
-                                        <div className="view-button app-button btn btn-primary">View</div>
+                                        <div className="meta-item">Type: <span>Inbound/Outbound</span></div>
+                                        
+                                        <div className="view-button app-button btn btn-primary"
+                                        onClick={() => router.push('/call-reports/stats/department')}
+                                        >View</div>
                                     </div>
-                                </a>
+                                </div>
                             </Col>
 
                             
 
 
                             <Col md={4}>
-                                <a href="/call-reports/stats/extension" className="report-card" >
+                                <div className="report-card" >
                                     <div className="report-header">
                                         <span className="material-icons-two-tone report-icon">call</span>
                                         <h2 className="report-title">Call Stats By Extension</h2>
@@ -87,15 +92,17 @@ const PageReports = () => {
                                     Visualize call volumes, durations, and trends across extensions with dynamic charts and detailed metrics.
                                     </p>
                                     <div className="report-meta">
-                                        <div className="meta-item">Type: <span>Call Outbound</span></div>
-                                        <div className="meta-item">Last Run: <span>{moment().format('MMM D, YYYY')}</span></div>
-                                        <div className="view-button app-button btn btn-primary">View</div>
+                                        <div className="meta-item">Type: <span>Inbound/Outbound</span></div>
+                                        
+                                        <div className="view-button app-button btn btn-primary"
+                                        onClick={() => router.push('/call-reports/stats/extension')}
+                                        >View</div>
                                     </div>
-                                </a>
+                                </div>
                             </Col>
 
                             <Col md={4}>
-                                <a href="/call-reports/stats/department/extension" className="report-card" >
+                                <div className="report-card" >
                                     <div className="report-header">
                                         <span className="material-icons-two-tone report-icon">call</span>
                                         <h2 className="report-title">Call Stats By Department Extension</h2>
@@ -104,15 +111,17 @@ const PageReports = () => {
                                     Visualize call volumes, durations, and trends across departments extensions with dynamic charts and detailed metrics.
                                     </p>
                                     <div className="report-meta">
-                                        <div className="meta-item">Type: <span>Call Outbound</span></div>
-                                        <div className="meta-item">Last Run: <span>{moment().format('MMM D, YYYY')}</span></div>
-                                        <div className="view-button app-button btn btn-primary">View</div>
+                                        <div className="meta-item">Type: <span>Inbound/Outbound</span></div>
+                                        
+                                        <div className="view-button app-button btn btn-primary"
+                                        onClick={() => router.push('/call-reports/stats/department/extension')}
+                                        >View</div>
                                     </div>
-                                </a>
+                                </div>
                             </Col>
 
                             <Col md={4}>
-                                <a href="/call-reports/stats/general" className="report-card" >
+                                <div className="report-card" >
                                     <div className="report-header">
                                         <span className="material-icons-two-tone report-icon">call</span>
                                         <h2 className="report-title">General Call Statistics</h2>
@@ -121,11 +130,13 @@ const PageReports = () => {
                                     Visualize call volumes, durations, and trends across all calls with dynamic charts and detailed metrics.
                                     </p>
                                     <div className="report-meta">
-                                        <div className="meta-item">Type: <span>Call Outbound</span></div>
-                                        <div className="meta-item">Last Run: <span>{moment().format('MMM D, YYYY')}</span></div>
-                                        <div className="view-button app-button btn btn-primary">View</div>
+                                        <div className="meta-item">Type: <span>Inbound/Outbound</span></div>
+                                        
+                                        <div className="view-button app-button btn btn-primary"
+                                        onClick={() => router.push('/call-reports/stats/general')}
+                                        >View</div>
                                     </div>
-                                </a>
+                                </div>
                             </Col>
                             
                             </>
@@ -137,56 +148,62 @@ const PageReports = () => {
 
                             <>
                                 <Col md={4}>
-                                    <a href="/call-reports/incoming/country" className="report-card" >
+                                    <div className="report-card" >
                                         <div className="report-header">
                                             <span className="material-icons-two-tone report-icon">call_received</span>
-                                            <h2 className="report-title">Call Incoming By Country</h2>
+                                            <h2 className="report-title">Call Inbound By Country</h2>
                                         </div>
                                         <p className="report-description">
                                         Visualize call volumes, durations, and trends across countries with dynamic charts and detailed metrics.
                                         </p>
                                         <div className="report-meta">
-                                            <div className="meta-item">Type: <span>Call Incoming</span></div>
-                                            <div className="meta-item">Last Run: <span>{moment().format('MMM D, YYYY')}</span></div>
-                                            <div className="view-button app-button btn btn-primary">View</div>
+                                            <div className="meta-item">Type: <span>Call Inbound</span></div>
+                                            
+                                            <div className="view-button app-button btn btn-primary"
+                                            onClick={() => router.push('/call-reports/incoming/country')}
+                                            >View</div>
                                         </div>
-                                    </a>
+                                    </div>
                                 </Col>
 
 
                                 <Col md={4}>
-                                    <a href="/call-reports/incoming/department" className="report-card" >
+                                    <div className="report-card" >
                                         <div className="report-header">
                                             <span className="material-icons-two-tone report-icon">call_received</span>
-                                            <h2 className="report-title">Call Incoming By Department</h2>
+                                            <h2 className="report-title">Call Inbound By Department</h2>
                                         </div>
                                         <p className="report-description">
                                         Visualize call volumes, durations, and trends across departments with dynamic charts and detailed metrics.
                                         </p>
                                         <div className="report-meta">
-                                            <div className="meta-item">Type: <span>Call Incoming</span></div>
-                                            <div className="meta-item">Last Run: <span>{moment().format('MMM D, YYYY')}</span></div>
-                                            <div className="view-button app-button btn btn-primary">View</div>
+                                            <div className="meta-item">Type: <span>Call Inbound</span></div>
+                                            
+                                            <div className="view-button app-button btn btn-primary"
+                                            onClick={() => router.push('/call-reports/incoming/department')}
+                                            >View</div>
                                         </div>
-                                    </a>
+                                    </div>
                                 </Col>
 
 
                                 <Col md={4}>
-                                    <a href="/call-reports/incoming/extension" className="report-card" >
+                                    <div className="report-card" >
                                         <div className="report-header">
                                             <span className="material-icons-two-tone report-icon">call_received</span>
-                                            <h2 className="report-title">Call Incoming By Extension</h2>
+                                            <h2 className="report-title">Call Inbound By Extension</h2>
                                         </div>
                                         <p className="report-description">
                                         Visualize call volumes, durations, and trends across extensions with dynamic charts and detailed metrics.
                                         </p>
                                         <div className="report-meta">
-                                            <div className="meta-item">Type: <span>Call Incoming</span></div>
-                                            <div className="meta-item">Last Run: <span>{moment().format('MMM D, YYYY')}</span></div>
-                                            <div className="view-button app-button btn btn-primary">View</div>
+                                            <div className="meta-item">Type: <span>Call Inbound</span></div>
+                                            
+                                            <div className="view-button app-button btn btn-primary"
+                                            onClick={() => router.push('/call-reports/incoming/extension')}
+                                            >View</div>
                                         </div>
-                                    </a>
+                                    </div>
                                 </Col>
                             </>
                             )}

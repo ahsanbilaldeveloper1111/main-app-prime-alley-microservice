@@ -675,7 +675,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     {
       id: 'reports',
       key: 'reports',
-      permission: '',//PERMISSIONS.REPORTS_SERVICES,
+      permission: PERMISSIONS.REPORTS_SERVICES,
       icon: <BarChart3 size={20} />,
       color: MENU_COLORS.REPORTS,
       title: MENU_LABELS.REPORTS,
