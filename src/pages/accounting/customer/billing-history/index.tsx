@@ -146,7 +146,7 @@ const BillingHistory = () => {
 
       <PageHeader
         title="Billing History"
-
+        description="View your billing history and manage your payments."
         showSearch={false}
         
       />

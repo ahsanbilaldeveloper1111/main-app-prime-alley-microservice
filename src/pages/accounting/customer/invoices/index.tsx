@@ -1891,11 +1891,11 @@ const InvoiceList = () => {
                   </div>
                   <div className="col-md-6">
                     <p><strong>Subtotal:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {formatNumber(parseFloat(selectedInvoiceForPayment.subtotal || '0'))}</p>
-                    <p><strong>VAT Amount:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {formatNumber(parseFloat(selectedInvoiceForPayment.tax_amount || '0'))}</p>
+                    <p><strong>TAX Amount:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {formatNumber(parseFloat(selectedInvoiceForPayment.tax_amount || '0'))}</p>
                     <p><strong className="text-primary">Total Amount:</strong> {selectedInvoiceForPayment.currency_code || 'USD'} {formatNumber(parseFloat(selectedInvoiceForPayment.total_amount || '0'))}</p>
                     
                     {/* Currency Conversion Display */}
-                    {exchangeRates.length > 0 && baseCurrency !== (selectedInvoiceForPayment.currency_code || 'USD') && (
+                    {/* {exchangeRates.length > 0 && baseCurrency !== (selectedInvoiceForPayment.currency_code || 'USD') && (
                       <div className="mt-3 p-2 bg-light rounded">
                         <small className="text-muted">Converted to {baseCurrency}:</small>
                         <div className="mt-1">
@@ -1907,7 +1907,7 @@ const InvoiceList = () => {
                           Exchange Rate: 1 {selectedInvoiceForPayment.currency_code || 'USD'} = {formatNumber(getExchangeRate(selectedInvoiceForPayment.currency_code || 'USD', baseCurrency))} {baseCurrency}
                         </small>
                       </div>
-                    )}
+                    )} */}
                   </div>
                 </div>
               </div>
@@ -2088,7 +2088,7 @@ const InvoiceList = () => {
                 {/* Invoice Header */}
                 <div className="row mb-4">
                   <div className="col-md-6">
-                    <h5 className="mb-3">Invoice Information</h5>
+                    <h5 className="mb-3 alert alert-info">Invoice Information</h5>
                     <table className="table table-borderless">
                       <tbody>
                         <tr>
@@ -2139,7 +2139,7 @@ const InvoiceList = () => {
                     </table>
                   </div>
                   <div className="col-md-6">
-                    <h5 className="mb-3">Company Information</h5>
+                    <h5 className="mb-3 alert alert-info">Company Information</h5>
                     {selectedInvoiceForView.company ? (
                       <table className="table table-borderless">
                         <tbody>
@@ -2162,7 +2162,7 @@ const InvoiceList = () => {
                           {selectedInvoiceForView.company.profile?.address && (
                             <tr>
                               <td className="fw-bold">Address:</td>
-                              <td>{selectedInvoiceForView.company.profile.address}</td>
+                              <td className="text-capitalize">{selectedInvoiceForView.company.profile.address}</td>
                             </tr>
                           )}
                         </tbody>
@@ -2212,7 +2212,7 @@ const InvoiceList = () => {
                               </td>
                               <td className="text-end">
                                 <strong>
-                                  {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.line_total || '0'))}
+                                  {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.total_amount || '0'))}
                                 </strong>
                               </td>
                             </tr>
