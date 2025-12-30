@@ -414,7 +414,7 @@ const CrmReports = () => {
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <h2 className="mb-0 fw-bold" style={{ fontSize: '20px', color: '#1f2937' }}>Reports</h2>
+        <h2 className="mb-0 fw-bold" style={{ fontSize: '20px', color: '#1f2937' }}>CRM Insights</h2>
         <div className="d-flex gap-3 align-items-center">
           <div style={{ position: 'relative' }}>
             <button

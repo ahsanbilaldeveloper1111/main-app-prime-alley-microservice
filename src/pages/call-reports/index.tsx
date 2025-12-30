@@ -21,7 +21,7 @@ const PageReports = () => {
     const { data: session } = useSession();
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="Reports" mainLink="/call-reports" subTitle="Call Reports" />
+            <BreadcrumbItem mainTitle="Call Analytics" mainLink="/call-reports" subTitle="Call Analytics" />
             {/* <PageHeader title="Reports" leftGrid={12} /> */}
 
 
@@ -30,7 +30,7 @@ const PageReports = () => {
             <div className="dashboard">
                 <div className="dashboard-section">
                     <div className="section-header app-title-heading"><span className="material-icons-two-tone">call</span>
-                    Call Reports
+                    Call Analytics
                     </div>
                     <div className="report-grid" id="reportGrid">
                         <Row className="">

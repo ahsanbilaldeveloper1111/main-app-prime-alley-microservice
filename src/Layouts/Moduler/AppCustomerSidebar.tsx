@@ -684,14 +684,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       subItems: [
         {
           id: 'crm-reports',
-          title: 'CRM Reports',
+          title: 'CRM Insights',
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.VIEW_CRM_REPORTS,
           url: '/crm/reports'
         },
         {
           id: 'call-reports',
-          title: 'Calls Reports',
+          title: 'Call Analytics',
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.VIEW_CALL_REPORTS,
           url: '/call-reports'
