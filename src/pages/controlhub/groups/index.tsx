@@ -17,6 +17,7 @@ import { getAllTeams } from '@utils/teams';
 import { toast } from 'react-toastify';
 import { useModuleSelection } from '@hooks/useModuleSelection';
 import { Module } from '@typings/controlhub/users';
+import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 
 
 
@@ -287,7 +288,7 @@ const Groups = () => {
         }
     };
 
-    const handleTeamSelectionChange = (selectedOptions: MultiValue<{ value: number; label: string }>) => {
+    const handleTeamSelectionChange = (selectedOptions: MultiValue<SelectCheckBoxOption>) => {
         const values = (selectedOptions || []).map((opt) => opt.value.toString());
         setSelectedTeamsToAssign(values);
     };
@@ -399,6 +400,15 @@ const Groups = () => {
         resetModules,
         isLoadingModules
     } = useModuleSelection(session, groupModules);
+
+    // Wrapper to convert SelectCheckBoxOption to ModuleOption for the hook
+    const handleModuleChangeWrapper = (selectedOptions: MultiValue<SelectCheckBoxOption>) => {
+        const convertedOptions = selectedOptions.map(opt => ({
+            value: String(opt.value),
+            label: opt.label
+        }));
+        handleModuleChange(convertedOptions);
+    };
 
     const handleAssignModules = async (props: any) => {
         setSelectedGroup(props.id);
@@ -638,8 +648,7 @@ const Groups = () => {
                                 <Info size={14} />
                             </span>
                         </label>
-                        <Select
-                            isMulti
+                        <SelectCheckBox
                             options={teamOptions}
                             value={selectedTeamsToAssign.map((idStr) => {
                                 const t = allTeams.find((t) => t.id.toString() === idStr);
@@ -648,10 +657,8 @@ const Groups = () => {
                                     label: t.name || `Team ${t.id}` 
                                 } : { value: Number.parseInt(idStr, 10), label: idStr };
                             })}
-                            onChange={(opts) => handleTeamSelectionChange(opts as MultiValue<{ value: number; label: string }>)}
+                            onChange={handleTeamSelectionChange}
                             placeholder="Select teams..."
-                            isClearable={true}
-                            isSearchable={true}
                             isLoading={isLoadingTeams}
                         />
                         <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
@@ -811,16 +818,11 @@ const Groups = () => {
                                 <Info size={14} />
                             </span>
                         </label>
-                        <Select
-                            className="basic-single"
-                            classNamePrefix="select"
-                            isMulti
+                        <SelectCheckBox
                             options={moduleOptions}
                             value={moduleValue}
-                            onChange={(opts) => handleModuleChange(opts as MultiValue<{ value: string; label: string }>)}
+                            onChange={handleModuleChangeWrapper}
                             placeholder="Select modules..."
-                            isClearable={true}
-                            isSearchable={true}
                             isLoading={isLoadingModules}
                         />
                         <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">

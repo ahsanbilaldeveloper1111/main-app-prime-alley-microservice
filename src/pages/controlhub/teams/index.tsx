@@ -18,6 +18,7 @@ import { getParentUsers } from '@utils/users';
 import { getModules } from '@utils/roles';
 import { toast } from 'react-toastify';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
+import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 
 
 
@@ -240,6 +241,8 @@ const Teams = () => {
     const [isLoadingTeamUsers, setIsLoadingTeamUsers] = useState<boolean>(false);
     const [isLoadingAssignUsers, setIsLoadingAssignUsers] = useState<boolean>(false);
     const [isLoadingRemoveUsers, setIsLoadingRemoveUsers] = useState<boolean>(false);
+    const [ownerSearchInput, setOwnerSearchInput] = useState<string>('');
+    const [userSearchInput, setUserSearchInput] = useState<string>('');
 
     const handleAssignUsers = async (props: any) => {
         setSelectedTeam(props.id);
@@ -247,6 +250,8 @@ const Teams = () => {
         setShowAssignUsersModal(true);
         setSelectedUsersToAssign([]);
         setSelectedOwnersToAssign([]);
+        setOwnerSearchInput('');
+        setUserSearchInput('');
         // Load all users when modal opens to ensure value mapping works
         await fetchAllUsers();
         await fetchTeamUsers(props.id);
@@ -340,11 +345,7 @@ const Teams = () => {
 
     const loadOwnerOptions = (inputValue: string): Promise<Array<{ value: number; label: string }>> => {
         const trimmed = (inputValue || '').trim();
-        if (trimmed.length < 2) {
-            return Promise.resolve([]);
-        }
         
-        // Ensure users are loaded
         // Ensure users are loaded
         const ensureData = allUsers.length === 0 && !isLoadingUsers
             ? fetchAllUsers()
@@ -358,21 +359,27 @@ const Teams = () => {
                 return [];
             }
             
-            const lower = trimmed.toLowerCase();
             const assignedUserIds = new Set([...teamUsers.map(u => u.id), ...teamOwners.map(u => u.id)]);
             const selectedUserIds = new Set(selectedUsersToAssign.map(id => Number.parseInt(id, 10)));
             const selectedOwnerIds = new Set(selectedOwnersToAssign.map(id => Number.parseInt(id, 10)));
             
-            const options = usersToSearch
+            let filteredUsers = usersToSearch
                 .filter((user) => !assignedUserIds.has(user.id))
                 .filter((user) => !selectedUserIds.has(user.id))
-                .filter((user) => !selectedOwnerIds.has(user.id))
-                .filter((user) => {
+                .filter((user) => !selectedOwnerIds.has(user.id));
+            
+            // If there's a search input, filter by it
+            if (trimmed.length > 0) {
+                const lower = trimmed.toLowerCase();
+                filteredUsers = filteredUsers.filter((user) => {
                     const nameMatch = user.name && user.name.toLowerCase().includes(lower);
                     const usernameMatch = user.username && user.username.toLowerCase().includes(lower);
                     const emailMatch = user.email && user.email.toLowerCase().includes(lower);
                     return nameMatch || usernameMatch || emailMatch;
-                })
+                });
+            }
+            
+            const options = filteredUsers
                 .slice(0, 200)
                 .map((user) => ({ 
                     value: user.id, 
@@ -382,12 +389,12 @@ const Teams = () => {
         });
     };
 
-    const handleUserSelectionChange = (selectedOptions: MultiValue<{ value: number; label: string }>) => {
+    const handleUserSelectionChange = (selectedOptions: MultiValue<SelectCheckBoxOption>) => {
         const values = (selectedOptions || []).map((opt) => opt.value.toString());
         setSelectedUsersToAssign(values);
     };
 
-    const handleOwnerSelectionChange = (selectedOptions: MultiValue<{ value: number; label: string }>) => {
+    const handleOwnerSelectionChange = (selectedOptions: MultiValue<SelectCheckBoxOption>) => {
         const values = (selectedOptions || []).map((opt) => opt.value.toString());
         setSelectedOwnersToAssign(values);
     };
@@ -528,6 +535,8 @@ const Teams = () => {
         setTeamOwners([]);
         setSelectedTeam(null);
         setSelectedTeamName(null);
+        setOwnerSearchInput('');
+        setUserSearchInput('');
     };
 
     // Module Assignment State
@@ -584,8 +593,8 @@ const Teams = () => {
         }
     };
 
-    const handleModuleSelectionChange = (selectedOptions: MultiValue<{ value: number; label: string }>) => {
-        const values = (selectedOptions || []).map((opt) => opt.value);
+    const handleModuleSelectionChange = (selectedOptions: MultiValue<SelectCheckBoxOption>) => {
+        const values = (selectedOptions || []).map((opt) => opt.value as number);
         setSelectedModulesToAssign(values);
     };
 
@@ -668,6 +677,40 @@ const Teams = () => {
             label: module.name || `Module ${module.id}`
         }));
     }, [allModules]);
+
+    // Prepare owner options for Select component - shows all available owners
+    const ownerOptions = useMemo(() => {
+        if (allUsers.length === 0) return [];
+        
+        const assignedUserIds = new Set([...teamUsers.map(u => u.id), ...teamOwners.map(u => u.id)]);
+        const selectedUserIds = new Set(selectedUsersToAssign.map(id => Number.parseInt(id, 10)));
+        
+        // Don't filter out selectedOwnerIds - keep them visible so user can see what's selected
+        return allUsers
+            .filter((user) => !assignedUserIds.has(user.id))
+            .filter((user) => !selectedUserIds.has(user.id)) // Only exclude if selected as regular user
+            .map((user) => ({ 
+                value: user.id, 
+                label: `${user.name || 'Unknown'} (${user.username || user.email || 'N/A'})` 
+            }));
+    }, [allUsers, teamUsers, teamOwners, selectedUsersToAssign]);
+
+    // Prepare user options for Select component - shows all available users
+    const userOptions = useMemo(() => {
+        if (allUsers.length === 0) return [];
+        
+        const assignedUserIds = new Set([...teamUsers.map(u => u.id), ...teamOwners.map(u => u.id)]);
+        const selectedOwnerIds = new Set(selectedOwnersToAssign.map(id => Number.parseInt(id, 10)));
+        
+        // Don't filter out selectedUserIds - keep them visible so user can see what's selected
+        return allUsers
+            .filter((user) => !assignedUserIds.has(user.id))
+            .filter((user) => !selectedOwnerIds.has(user.id)) // Only exclude if selected as owner
+            .map((user) => ({ 
+                value: user.id, 
+                label: `${user.name || 'Unknown'} (${user.username || user.email || 'N/A'})` 
+            }));
+    }, [allUsers, teamUsers, teamOwners, selectedOwnersToAssign]);
 
     return (
         <React.Fragment>
@@ -824,16 +867,9 @@ const Teams = () => {
                                 <Info size={14} />
                             </span>
                         </label>
-                        <AsyncSelect
-                            className="basic-single"
-                            classNamePrefix="select"
-                            cacheOptions
-                            defaultOptions={false}
-                            isClearable={true}
-                            isSearchable={true}
-                            isMulti={true}
-                            loadOptions={loadOwnerOptions as any}
-                            onChange={(opts) => handleOwnerSelectionChange(opts as MultiValue<{ value: number; label: string }>)}
+                        <SelectCheckBox
+                            options={ownerOptions}
+                            onChange={handleOwnerSelectionChange}
                             value={selectedOwnersToAssign.map((idStr) => {
                                 const u = allUsers.find((u) => u.id.toString() === idStr);
                                 return u ? { 
@@ -841,13 +877,20 @@ const Teams = () => {
                                     label: `${u.name || 'Unknown'} (${u.username || u.email || 'N/A'})` 
                                 } : { value: Number(idStr), label: idStr };
                             })}
-                            noOptionsMessage={() => 'Type at least 2 characters to search'}
-                            placeholder="Type at least 2 characters to search owners..."
+                            noOptionsMessage="No owners found"
+                            placeholder="Select owners to assign..."
+                            isLoading={isLoadingUsers}
+                            inputValue={ownerSearchInput}
+                            onInputChange={(newValue, action) => {
+                                if (action.action !== 'input-blur' && action.action !== 'menu-close') {
+                                    setOwnerSearchInput(newValue);
+                                }
+                            }}
                         />
                         <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
                             <Info size={12} />
                             <span style={{ fontSize: '0.813rem' }}>
-                                Type at least 2 characters to search for owners. Users already assigned to this team or selected as regular users will not appear in the list.
+                                Click the dropdown to see all available owners. You can search to filter the list. Users already assigned to this team or selected as regular users will not appear in the list.
                             </span>
                         </Form.Text>
                     </div>
@@ -935,16 +978,9 @@ const Teams = () => {
                                 <Info size={14} />
                             </span>
                         </label>
-                        <AsyncSelect
-                            className="basic-single"
-                            classNamePrefix="select"
-                            cacheOptions
-                            defaultOptions={false}
-                            isClearable={true}
-                            isSearchable={true}
-                            isMulti={true}
-                            loadOptions={loadUserOptions as any}
-                            onChange={(opts) => handleUserSelectionChange(opts as MultiValue<{ value: number; label: string }>)}
+                        <SelectCheckBox
+                            options={userOptions}
+                            onChange={handleUserSelectionChange}
                             value={selectedUsersToAssign.map((idStr) => {
                                 const u = allUsers.find((u) => u.id.toString() === idStr);
                                 return u ? { 
@@ -952,13 +988,20 @@ const Teams = () => {
                                     label: `${u.name || 'Unknown'} (${u.username || u.email || 'N/A'})` 
                                 } : { value: Number(idStr), label: idStr };
                             })}
-                            noOptionsMessage={() => 'Type at least 2 characters to search'}
-                            placeholder="Type at least 2 characters to search users..."
+                            noOptionsMessage="No users found"
+                            placeholder="Select users to assign..."
+                            isLoading={isLoadingUsers}
+                            inputValue={userSearchInput}
+                            onInputChange={(newValue, action) => {
+                                if (action.action !== 'input-blur' && action.action !== 'menu-close') {
+                                    setUserSearchInput(newValue);
+                                }
+                            }}
                         />
                         <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
                             <Info size={12} />
                             <span style={{ fontSize: '0.813rem' }}>
-                                Type at least 2 characters to search for users. Users already assigned to this team or selected as owners will not appear in the list.
+                                Click the dropdown to see all available users. You can search to filter the list. Users already assigned to this team or selected as owners will not appear in the list.
                             </span>
                         </Form.Text>
                     </div>
@@ -1094,17 +1137,14 @@ const Teams = () => {
                                 <Info size={14} />
                             </span>
                         </label>
-                        <Select
+                        <SelectCheckBox
                             options={moduleOptions}
                             value={selectedModulesToAssign.map((id) => {
                                 const option = moduleOptions.find(opt => opt.value === id);
                                 return option || { value: id, label: `Module ${id}` };
                             })}
-                            onChange={(opts) => handleModuleSelectionChange(opts as MultiValue<{ value: number; label: string }>)}
+                            onChange={handleModuleSelectionChange}
                             placeholder="Select modules..."
-                            isClearable={true}
-                            isSearchable={true}
-                            isMulti={true}
                             isLoading={isLoadingModules}
                         />
                         <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">

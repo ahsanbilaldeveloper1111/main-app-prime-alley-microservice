@@ -5,10 +5,14 @@ import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
 import { ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles, getUserTypes, getModules, getPermissionsByModule, updateSeverityLevel } from '@utils/roles';
 import { Column } from '@components/CustomDataTable';
-import { Button, Row, Col, Form, OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Button, Row, Col, Form, OverlayTrigger, Tooltip, Modal } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import Select, { SingleValue } from 'react-select';
+import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
+import { getParentUsers, assignRankBulk } from '@utils/users';
+import { Users } from 'lucide-react';
 
 import '@assets/scss/common.scss';
 import SuccessfulModal from '@pages/partial/SuccessfulModal'
@@ -358,6 +362,17 @@ const Ranks = () => {
 
     // Severity Level Modal State
     const [showSeverityLevelModal, setShowSeverityLevelModal] = useState<boolean>(false);
+
+    // Bulk Rank Assignment State
+    const [showBulkRankAssignmentModal, setShowBulkRankAssignmentModal] = useState<boolean>(false);
+    const [selectedUsersForBulk, setSelectedUsersForBulk] = useState<SelectCheckBoxOption[]>([]);
+    const [selectedRankForBulk, setSelectedRankForBulk] = useState<{ value: number | string; label: string } | null>(null);
+    const [allUsersForBulk, setAllUsersForBulk] = useState<any[]>([]);
+    const [allRanksForBulk, setAllRanksForBulk] = useState<any[]>([]);
+    const [isLoadingUsersForBulk, setIsLoadingUsersForBulk] = useState<boolean>(false);
+    const [isLoadingRanksForBulk, setIsLoadingRanksForBulk] = useState<boolean>(false);
+    const [isSubmittingBulkAssignment, setIsSubmittingBulkAssignment] = useState<boolean>(false);
+    const [userSearchInput, setUserSearchInput] = useState<string>('');
     const [modules, setModules] = useState<any[]>([]);
     const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
     const [permissions, setPermissions] = useState<any[]>([]);
@@ -365,6 +380,104 @@ const Ranks = () => {
     const [selectedSeverityLevel, setSelectedSeverityLevel] = useState<string>("");
     const [isLoadingModules, setIsLoadingModules] = useState<boolean>(false);
     const [isLoadingPermissions, setIsLoadingPermissions] = useState<boolean>(false);
+
+    const fetchAllRanksForBulk = async () => {
+        setIsLoadingRanksForBulk(true);
+        try {
+            const response = await ListRoles({ page: 1, perPage: 1000, search: "", filters: {} });
+            if (response && response.dataList && Array.isArray(response.dataList)) {
+                setAllRanksForBulk(response.dataList);
+            }
+        } catch (error) {
+            console.error('Error fetching ranks:', error);
+           // toast.error('Failed to load ranks');
+        } finally {
+            setIsLoadingRanksForBulk(false);
+        }
+    };
+
+    const fetchAllUsersForBulk = async () => {
+        setIsLoadingUsersForBulk(true);
+        try {
+            const response = await getParentUsers();
+            if (response && Array.isArray(response)) {
+                setAllUsersForBulk(response);
+            }
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            toast.error('Failed to load users');
+        } finally {
+            setIsLoadingUsersForBulk(false);
+        }
+    };
+
+    const handleBulkRankAssignment = async () => {
+        setShowBulkRankAssignmentModal(true);
+        setSelectedUsersForBulk([]);
+        setSelectedRankForBulk(null);
+        setUserSearchInput('');
+        await fetchAllUsersForBulk();
+        await fetchAllRanksForBulk();
+    };
+
+    const handleBulkRankAssignmentSubmit = async () => {
+        if (!selectedRankForBulk) {
+            toast.error('Please select a rank');
+            return;
+        }
+        if (selectedUsersForBulk.length === 0) {
+            toast.error('Please select at least one user');
+            return;
+        }
+
+        setIsSubmittingBulkAssignment(true);
+        try {
+            const userIds = selectedUsersForBulk.map(opt => String(opt.value));
+            const response = await assignRankBulk(selectedRankForBulk.value, userIds);
+            if (response) {
+                setShowBulkRankAssignmentModal(false);
+                setSelectedUsersForBulk([]);
+                setSelectedRankForBulk(null);
+                setUserSearchInput('');
+                setSuccessModalTitle('Ranks Assigned');
+                setSuccessModalDescription(`${selectedUsersForBulk.length} user(s) have been assigned the rank successfully`);
+                setTimeout(() => {
+                    setShowSuccessfulModal(true);
+                }, 100);
+                setRefreshKey(prev => prev + 1);
+            }
+        } catch (error) {
+            console.error('Error assigning ranks:', error);
+            toast.error('Failed to assign ranks');
+        } finally {
+            setIsSubmittingBulkAssignment(false);
+        }
+    };
+
+    const handleCloseBulkRankAssignmentModal = () => {
+        setShowBulkRankAssignmentModal(false);
+        setSelectedUsersForBulk([]);
+        setSelectedRankForBulk(null);
+        setUserSearchInput('');
+    };
+
+    // Prepare user options for SelectCheckBox
+    const userOptionsForBulk = useMemo(() => {
+        if (allUsersForBulk.length === 0) return [];
+        
+        return allUsersForBulk.map((user) => ({ 
+            value: user.id, 
+            label: `${user.name || 'Unknown'} (${user.username || user.email || 'N/A'})` 
+        }));
+    }, [allUsersForBulk]);
+
+    // Prepare rank options for Select
+    const rankOptionsForBulk = useMemo(() => {
+        return allRanksForBulk.map((rank) => ({
+            value: rank.id,
+            label: rank.name || `Rank ${rank.id}`
+        }));
+    }, [allRanksForBulk]);
 
     const handleOpenCreateRankModal = async () => {
         await fetchUserTypes();
@@ -465,7 +578,12 @@ const Ranks = () => {
                     
                     {/* <RolesFilters onFiltersChange={handleFiltersChange} onExport={handleExport} /> */}
                     {session?.user?.permissions?.includes('add-ranks') && (
+                        <>
                         <Button variant="primary"  onClick={handleOpenCreateRankModal}>Add Rank</Button>
+                        </>
+                    )}
+                    {session?.user?.permissions?.includes('assign-rank-users') && (
+                        <Button variant="danger"  onClick={handleBulkRankAssignment}>Bulk Rank Assignment</Button>
                     )}
                     {session?.user?.is_admin === "1" && (
                         <Button variant="outline-primary" className="ms-2" onClick={handleOpenSeverityLevelModal}>Severity Level</Button>
@@ -746,6 +864,86 @@ const Ranks = () => {
                     setPermissions([]);
                 }}
             />
+
+            {/* Bulk Rank Assignment Modal */}
+            <Modal
+                show={showBulkRankAssignmentModal}
+                onHide={handleCloseBulkRankAssignmentModal}
+                size="lg"
+            >
+                <Modal.Header closeButton>
+                    <Modal.Title className="d-flex align-items-center gap-2">
+                        <Users size={20} className="text-danger" />
+                        Bulk Rank Assignment
+                    </Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <div className="form-group mb-4">
+                        <label htmlFor="selectRank" className="fw-semibold d-flex align-items-center gap-2 form-label">
+                            Select Rank <span className="text-danger">*</span>
+                        </label>
+                        <Select
+                            options={rankOptionsForBulk}
+                            value={selectedRankForBulk}
+                            onChange={(opt) => setSelectedRankForBulk(opt as { value: number | string; label: string } | null)}
+                            placeholder="Select a rank..."
+                            isClearable={true}
+                            isSearchable={true}
+                            isLoading={isLoadingRanksForBulk}
+                        />
+                        <Form.Text className="text-muted d-flex align-items-center gap-1 form-text mt-2">
+                            <span style={{ fontSize: '0.813rem' }}>
+                                Select a single rank to assign to multiple users.
+                            </span>
+                        </Form.Text>
+                    </div>
+
+                    <div className="form-group mb-4">
+                        <label htmlFor="selectUsers" className="fw-semibold d-flex align-items-center gap-2 form-label">
+                            Select Users <span className="text-danger">*</span>
+                        </label>
+                        <SelectCheckBox
+                            options={userOptionsForBulk}
+                            value={selectedUsersForBulk}
+                            onChange={(opts) => setSelectedUsersForBulk(opts as SelectCheckBoxOption[])}
+                            placeholder="Select users to assign rank..."
+                            isLoading={isLoadingUsersForBulk}
+                            inputValue={userSearchInput}
+                            onInputChange={(newValue, action) => {
+                                if (action.action !== 'input-blur' && action.action !== 'menu-close') {
+                                    setUserSearchInput(newValue);
+                                }
+                            }}
+                        />
+                        <Form.Text className="text-muted d-flex align-items-center gap-1 form-text mt-2">
+                            <span style={{ fontSize: '0.813rem' }}>
+                                Select multiple users to assign the selected rank. You can search to filter the list.
+                            </span>
+                        </Form.Text>
+                    </div>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={handleCloseBulkRankAssignmentModal} disabled={isSubmittingBulkAssignment}>
+                        Cancel
+                    </Button>
+                    <Button 
+                        variant="danger" 
+                        onClick={handleBulkRankAssignmentSubmit}
+                        disabled={!selectedRankForBulk || selectedUsersForBulk.length === 0 || isSubmittingBulkAssignment}
+                    >
+                        {isSubmittingBulkAssignment ? (
+                            <>
+                                <div className="spinner-border spinner-border-sm me-1" role="status" />
+                                Assigning...
+                            </>
+                        ) : (
+                            <>
+                                Assign Rank to {selectedUsersForBulk.length} User(s)
+                            </>
+                        )}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </React.Fragment>
     );
 };

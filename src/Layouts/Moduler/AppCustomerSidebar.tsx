@@ -248,13 +248,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_CALL_RECORDINGS,
           url: '/call-recordings'
         },
-        {
-          id: 'call-ai-analysis',
-          title: 'Calls AI Analysis',
-          icon: <ChartNoAxesCombined size={16} />,
-          permission: PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML,
-          url: '/ai-ml/analyze-recordings'
-        }
+        
         // {
         //   id: 'call-reports',
         //   key: 'call-reports',
@@ -464,10 +458,11 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML,
           url: '/ai-ml/analysis'
         },
+        
         {
-          id: 'ai-ml-analyze-recordings',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.ANALYZE_RECORDINGS,
-          icon: <AudioLines size={16} />,
+          id: 'call-ai-analysis',
+          title: 'Calls AI Analysis',
+          icon: <ChartNoAxesCombined size={16} />,
           permission: PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML,
           url: '/ai-ml/analyze-recordings'
         },

@@ -83,8 +83,8 @@ const CustomerDashboard = () => {
       [
         { title: 'Subscriptions', value: response?.products?.total || 0, icon: <Package size={24} />, color: 'primary', iconBg: 'rgba(59, 130, 246, 0.1)', iconColor: '#3b82f6' },
         { title: 'Total Invoice Amount', value: currency + ' ' + formatNumber(response?.invoices?.total_amount), icon: <FileText size={24} />, color: 'primary', iconBg: 'rgba(59, 130, 246, 0.1)', iconColor: '#3b82f6' },
-        { title: 'Outstanding Amount', value: currency + ' ' + formatNumber(response?.invoices?.outstanding_amount), icon: <AlertCircle size={24} />, color: 'warning', iconBg: 'rgba(251, 191, 36, 0.1)', iconColor: '#fbbf24' },
-         { title: 'Est. Next Month', value: '0.00', icon: <Wallet size={24} />, color: 'info', iconBg: 'rgba(34, 211, 238, 0.1)', iconColor: '#22d3ee' },
+        // { title: 'Outstanding Amount', value: currency + ' ' + formatNumber(response?.invoices?.outstanding_amount), icon: <AlertCircle size={24} />, color: 'warning', iconBg: 'rgba(251, 191, 36, 0.1)', iconColor: '#fbbf24' },
+        //  { title: 'Est. Next Month', value: '0.00', icon: <Wallet size={24} />, color: 'info', iconBg: 'rgba(34, 211, 238, 0.1)', iconColor: '#22d3ee' },
         { title: 'Overdue Invoices', value: response?.invoices?.overdue_invoices_count, icon: <Clock size={24} />, color: 'danger', iconBg: 'rgba(239, 68, 68, 0.1)', iconColor: '#ef4444', payNow: false },
         { title: 'Overdue Amount', value: currency + ' ' + formatNumber(response?.invoices?.overdue_amount), icon: <AlertCircle size={24} />, color: 'warning', iconBg: 'rgba(251, 191, 36, 0.1)', iconColor: '#fbbf24', payNow: true }
       ]

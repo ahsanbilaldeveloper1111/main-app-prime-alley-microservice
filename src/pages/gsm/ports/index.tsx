@@ -52,14 +52,14 @@ const GsmPorts = () => {
 
     {
       key: "mobile_number",
-      name: "SIM Number",
+      name: "Port Number",
       selector: (row: any) => row.mobile_number,
       sortable: true,
     },
 
     {
       key: "sim_status",
-      name: "SIM Status",
+      name: "Port Status",
       selector: (row: any) => row.sim_status,
       sortable: true,
       cell: (props: any) => (
