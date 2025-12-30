@@ -260,7 +260,7 @@ export const assignRoleToUser = async (id: string, role_id: string) => {
 export const assignRankBulk = async (rank_id: string | number, user_ids: string[]) => {
   try {
     const response = await axiosInstance.post(
-      `users/assignRankBulk`,
+      `users/assignBulkRank`,
       {
         rank_id: rank_id,
         user_ids: user_ids
