@@ -473,6 +473,10 @@ const InvoiceList = () => {
   const [activePaymentTab, setActivePaymentTab] = useState<string>("saved-cards");
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   
+  // View invoice modal states
+  const [showViewInvoiceModal, setShowViewInvoiceModal] = useState<boolean>(false);
+  const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<any | null>(null);
+  
   // Exchange rate states
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
   const [isLoadingExchangeRates, setIsLoadingExchangeRates] = useState<boolean>(false);
@@ -620,6 +624,21 @@ const InvoiceList = () => {
             <>
           
           <div className="d-flex gap-2"> 
+
+          <Button 
+              variant="primary" 
+              size="sm"
+              style={{ 
+               
+                fontSize: '0.85rem',
+                padding: '0.375rem 0.75rem',
+                fontWeight: '500'
+              }}
+              onClick={() => handleViewInvoice(props)}
+              title="View Invoice"
+            >
+              View
+            </Button> 
             
               {(props.status === STATUS_PENDING || props.status === STATUS_OVERDUE || props.status === STATUS_PARTIALLY_PAID) && session?.user?.permissions?.includes('pay-invoices-billing') && (
 
@@ -799,10 +818,7 @@ const InvoiceList = () => {
     };
   }, [companyProducts]);
 
-  // Get products to display in dropdowns (always use company products)
-  const getProductsToDisplay = useCallback((companyId?: string): ProductData[] => {
-    return companyProducts;
-  }, [companyProducts]);
+ 
 
   // Load exchange rates directly from free API
   const loadExchangeRates = useCallback(async (invoiceCurrency: string) => {
@@ -1132,104 +1148,7 @@ const InvoiceList = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceFormData | null>(
     null
   );
-  const [showEditInvoiceModal, setShowEditInvoiceModal] =
-    useState<boolean>(false);
-  const [editingInvoice, setEditingInvoice] = useState<boolean>(false);
 
-
-  // Delete Invoice Modal
-  const [showDeleteInvoiceModal, setShowDeleteInvoiceModal] = useState<boolean>(false);
-  const [confirmDeleteInvoice, setConfirmDeleteInvoice] = useState<string>("");
-
-  const handleEditInvoice = useCallback((props: InvoiceData) => {
-    // Convert API response items to form format
-    const convertedItems: InvoiceItemCreateUpdatePayload[] = props.items.map(item => ({
-      product_id: item.product_id,
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-      tax_rate: item.tax_rate,
-      tax_amount: (item as any).tax_amount || "0.00", // Include tax_amount from API response
-    }));
-    
-    setSelectedInvoice({
-      ...props,
-      items: convertedItems,
-      status: props.status || STATUS_DRAFT
-    });
-    setShowEditInvoiceModal(true);
-    
-    // Load company products for the company when editing
-    if (props.company_id) {
-      console.log("Loading company products for edit invoice company:", props.company_id);
-      loadCompanyProducts(parseInt(props.company_id));
-    }
-  }, [loadCompanyProducts]);
-
-  const handleSubmitEditInvoice = useCallback(async () => {
-    if (!selectedInvoice) return;
-
-    if (!selectedInvoice.company_id) {
-      toast.error("Please select a company");
-      return;
-    }
-    if (!selectedInvoice.items || selectedInvoice.items.length === 0) {
-      toast.error("Please add at least one item to the invoice");
-      return;
-    }
-    
-    if (selectedInvoice.items.some(item => !item.product_id)) {
-      toast.error("Please select a product for all items");
-      return;
-    }
-    if (!selectedInvoice.due_date) {
-      toast.error("Please select a due date");
-      return;
-    }
-
-    setEditingInvoice(true);
-    try {
-      // Get company VAT rate and exemption status
-      const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice.company_id);
-      const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-      const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-      
-      const totals = calculateTotals(selectedInvoice.items, companyVatRate, isVatExempt, selectedInvoice.currency_code || 'USD', selectedInvoice.company_id);
-      const invoiceData: InvoiceCreateUpdatePayload = {
-        company_id: selectedInvoice.company_id,
-        invoice_date: selectedInvoice.invoice_date,
-        due_date: selectedInvoice.due_date,
-        payment_mode: selectedInvoice.payment_mode,
-        currency_code: selectedInvoice.currency_code || 'USD',
-        tax_amount: totals.tax_amount,
-        notes: selectedInvoice.notes || "",
-        terms_conditions: selectedInvoice.terms_conditions || "",
-        items: selectedInvoice.items,
-        subtotal: totals.subtotal,
-        total_amount: totals.total_amount,
-        status: selectedInvoice.status || STATUS_DRAFT,
-      };
-      // Transform for API (map tax_rate to vat_rate for items)
-      const apiPayload = transformInvoiceForAPI(invoiceData);
-      const response = await updateInvoice(selectedInvoice.id, apiPayload);
-
-      if (response) {
-        setSelectedInvoice(null);
-        setShowEditInvoiceModal(false);
-        setRefreshKey((prev) => prev + 1);
-        toast.success("Invoice updated successfully");
-      }
-    } catch (error) {
-      console.error("Error updating invoice:", error);
-      toast.error("Failed to update invoice");
-    } finally {
-      setEditingInvoice(false);
-    }
-  }, [selectedInvoice]);
-
-  // Create Invoice Modal
-  const [showCreateInvoiceModal, setShowCreateInvoiceModal] =
-    useState<boolean>(false);
-  const [creatingInvoice, setCreatingInvoice] = useState<boolean>(false);
   const [newInvoice, setNewInvoice] = useState<InvoiceCreateUpdatePayload>({
     company_id: "",
     invoice_date: moment().format("YYYY-MM-DD"),
@@ -1377,106 +1296,15 @@ const InvoiceList = () => {
     };
   };
 
-  const handleSubmitCreateInvoice = useCallback(async () => {
-    if (!newInvoice.company_id) {
-      toast.error("Please select a company");
-      return;
-    }
-    if (!newInvoice.items || newInvoice.items.length === 0) {
-      toast.error("Please add at least one item to the invoice");
-      return;
-    }
-    
-    if (newInvoice.items.some(item => !item.product_id)) {
-      toast.error("Please select a product for all items");
-      return;
-    }
-    if (!newInvoice.due_date) {
-      toast.error("Please select a due date");
-      return;
-    }
-
-    setCreatingInvoice(true);
-    try {
-      // Get company VAT rate and exemption status
-      const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
-      const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-      const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-      
-      const totals = calculateTotals(newInvoice.items, companyVatRate, isVatExempt, newInvoice.currency_code, newInvoice.company_id);
-      const invoiceData: InvoiceCreateUpdatePayload = {
-        ...newInvoice,
-        ...totals,
-        // Ensure VAT is calculated based on company settings or custom VAT rate
-        tax_amount: totals.tax_amount,
-        status: newInvoice.status,
-      };
-      // Transform for API (map tax_rate to vat_rate for items)
-      const apiPayload = transformInvoiceForAPI(invoiceData);
-      const response = await createInvoice(apiPayload);
-
-      if (response) {
-        setNewInvoice({
-          company_id: "",
-          invoice_date: moment().format("YYYY-MM-DD"),
-          due_date: "",
-          payment_mode: "one_time",
-          currency_code: "USD",
-          tax_amount: 0,
-          notes: "",
-          terms_conditions: "",
-          items: [],
-          subtotal: 0,
-          total_amount: 0,
-          status: STATUS_DRAFT,
-        });
-        setShowCreateInvoiceModal(false);
-        setRefreshKey((prev) => prev + 1);
-        toast.success("Invoice created successfully");
-      }
-    } catch (error) {
-      console.error("Error creating invoice:", error);
-      toast.error("Failed to create invoice");
-    } finally {
-      setCreatingInvoice(false);
-    }
-  }, [newInvoice]);
-
-  // Modal handlers
-  const openCreateInvoiceModal = useCallback(
-    () => setShowCreateInvoiceModal(true),
-    []
-  );
-  const closeCreateInvoiceModal = useCallback(() => {
-    setShowCreateInvoiceModal(false);
-    setNewInvoice({
-      company_id: "",
-      invoice_date: moment().format("YYYY-MM-DD"),
-      due_date: "",
-      payment_mode: "one_time",
-      currency_code: "USD",
-      tax_amount: 0,
-      notes: "",
-      terms_conditions: "",
-      items: [],
-      subtotal: 0,
-      total_amount: 0,
-      status: STATUS_DRAFT,
-    });
-    setShowCustomVatRate(false);
-    setProcessedInvoiceItems([]);
+  // View invoice handler
+  const handleViewInvoice = useCallback((invoice: InvoiceData) => {
+    setSelectedInvoiceForView(invoice);
+    setShowViewInvoiceModal(true);
   }, []);
 
-  const closeEditInvoiceModal = useCallback(() => {
-    setShowEditInvoiceModal(false);
-    setSelectedInvoice(null);
-    setShowEditCustomVatRate(false);
-  }, []);
-
-  // Delete Invoice Handlers
-  const handleDeleteInvoice = useCallback((props: InvoiceData) => {
-    setSelectedInvoice(props);
-    setShowDeleteInvoiceModal(true);
+  const closeViewInvoiceModal = useCallback(() => {
+    setShowViewInvoiceModal(false);
+    setSelectedInvoiceForView(null);
   }, []);
 
   // Payment handlers
@@ -1542,342 +1370,6 @@ const InvoiceList = () => {
       }
     });
   }, [selectedCardId, selectedInvoiceForPayment, createInvoicePayment, handleDirectPaymentSuccess, handleDirectPaymentError]);
-
-  const handleSubmitDeleteInvoice = useCallback(async () => {
-    if (!selectedInvoice) return;
-
-    const confirmDeleteValue = confirmDeleteInvoice.trim();
-    if (confirmDeleteValue === "DELETE") {
-      try {
-        await deleteInvoice(selectedInvoice.id);
-        setSelectedInvoice(null);
-        setShowDeleteInvoiceModal(false);
-        setConfirmDeleteInvoice("");
-        setRefreshKey((prev) => prev + 1);
-        toast.success("Invoice deleted successfully");
-      } catch (error) {
-        console.error("Error deleting invoice:", error);
-        toast.error("Failed to delete invoice");
-      }
-    } else {
-      toast.error("Please type the word DELETE to confirm");
-    }
-  }, [confirmDeleteInvoice, selectedInvoice]);
-
-  // Invoice item management functions
-  const addNewInvoiceItem = useCallback(() => {
-    // Get company VAT rate first
-    const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
-    const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-    
-    const newItem: InvoiceItemCreateUpdatePayload = {
-      product_id: "",
-      quantity: "1",
-      unit_price: "0.00",
-      tax_rate: companyVatRate.toString(), // Use company VAT rate
-      tax_amount: "0.00", // This will be automatically calculated
-    };
-    
-    const updatedItems = [...newInvoice.items, newItem];
-    // Get company VAT rate and exemption status
-    const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-    const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, newInvoice.currency_code, newInvoice.company_id);
-    
-    // Store processed items for table display
-    setProcessedInvoiceItems(totals.processedItems || []);
-    
-    setNewInvoice(prev => ({
-      ...prev,
-      items: updatedItems,
-      ...totals
-    }));
-  }, [newInvoice.items, newInvoice.company_id, companies]);
-
-  const updateNewInvoiceItem = useCallback((index: number, field: keyof InvoiceItemCreateUpdatePayload, value: string) => {
-    const updatedItems = [...newInvoice.items];
-    updatedItems[index] = {
-      ...updatedItems[index],
-      [field]: value,
-    };
-    
-    // Auto-populate unit price and tax rate when product is selected
-    if (field === 'product_id' && value) {
-      const productInfo = getEffectiveProductPrice(value, newInvoice.company_id);
-      const productCurrency = productInfo.currency;
-      const invoiceCurrency = newInvoice.currency_code || 'USD';
-      
-      // Convert the product price from its currency to invoice currency
-      const exchangeRate = getExchangeRate(productCurrency, invoiceCurrency);
-      const convertedPrice = (parseFloat(productInfo.price) * exchangeRate).toFixed(2);
-      
-      updatedItems[index].unit_price = convertedPrice;
-      
-      // Auto-populate tax rate based on company settings (company VAT takes priority)
-      const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
-      const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-      
-      // Use company VAT rate (company settings take priority over product settings)
-      updatedItems[index].tax_rate = companyVatRate.toString();
-    }
-    
-    // Get company VAT rate and exemption status
-    const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
-    const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-    const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-    const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, newInvoice.currency_code, newInvoice.company_id);
-    
-    // Store processed items for table display
-    setProcessedInvoiceItems(totals.processedItems || []);
-    
-    setNewInvoice(prev => ({
-      ...prev,
-      items: updatedItems,
-      ...totals
-    }));
-  }, [newInvoice.items, newInvoice.company_id, companies, getEffectiveProductPrice, getExchangeRate, newInvoice.currency_code, companyProducts]);
-
-  const removeNewInvoiceItem = useCallback((index: number) => {
-    const updatedItems = newInvoice.items.filter((_, i) => i !== index);
-    // Get company VAT rate and exemption status
-    const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
-    const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-    const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-    const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, newInvoice.currency_code, newInvoice.company_id);
-    
-    // Store processed items for table display
-    setProcessedInvoiceItems(totals.processedItems || []);
-    
-    setNewInvoice(prev => ({
-      ...prev,
-      items: updatedItems,
-      ...totals
-    }));
-  }, [newInvoice.items, newInvoice.company_id, companies]);
-
-  const addEditInvoiceItem = useCallback(() => {
-    if (!selectedInvoice) return;
-    
-    // Get company VAT rate first
-    const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice.company_id);
-    const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-    
-    const newItem: InvoiceItemCreateUpdatePayload = {
-      product_id: "",
-      quantity: "1",
-      unit_price: "0.00",
-      tax_rate: companyVatRate.toString(), // Use company VAT rate
-      tax_amount: "0.00", // This will be automatically calculated
-    };
-    
-    const updatedItems = [...selectedInvoice.items, newItem];
-    // Get company VAT rate and exemption status
-    const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-    const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, selectedInvoice.currency_code || 'USD', selectedInvoice.company_id);
-    
-    setSelectedInvoice(prev => ({
-      ...prev!,
-      items: updatedItems,
-      subtotal: totals.subtotal.toString(),
-      tax_amount: totals.tax_amount.toString(),
-      total_amount: totals.total_amount.toString(),
-    }));
-  }, [selectedInvoice, companies]);
-
-  const updateEditInvoiceItem = useCallback((index: number, field: keyof InvoiceItemCreateUpdatePayload, value: string) => {
-    if (!selectedInvoice) return;
-    
-    const updatedItems = [...selectedInvoice.items];
-    updatedItems[index] = {
-      ...updatedItems[index],
-      [field]: value,
-    };
-    
-    // Auto-populate unit price and tax rate when product is selected
-    if (field === 'product_id' && value) {
-      const productInfo = getEffectiveProductPrice(value, selectedInvoice.company_id);
-      const productCurrency = productInfo.currency;
-      const invoiceCurrency = selectedInvoice.currency_code || 'USD';
-      
-      // Convert the product price from its currency to invoice currency
-      const exchangeRate = getExchangeRate(productCurrency, invoiceCurrency);
-      const convertedPrice = (parseFloat(productInfo.price) * exchangeRate).toFixed(2);
-      
-      updatedItems[index].unit_price = convertedPrice;
-      
-      // Auto-populate tax rate based on company settings (company VAT takes priority)
-      const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice.company_id);
-      const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-      
-      // Use company VAT rate (company settings take priority over product settings)
-      updatedItems[index].tax_rate = companyVatRate.toString();
-    }
-    
-    // Get company VAT rate and exemption status
-    const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice.company_id);
-    const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-    const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-    const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, selectedInvoice.currency_code || 'USD', selectedInvoice.company_id);
-    
-    setSelectedInvoice(prev => ({
-      ...prev!,
-      items: updatedItems,
-      subtotal: totals.subtotal.toString(),
-      tax_amount: totals.tax_amount.toString(),
-      total_amount: totals.total_amount.toString(),
-    }));
-  }, [selectedInvoice, companies, getEffectiveProductPrice, getExchangeRate, companyProducts]);
-
-  const removeEditInvoiceItem = useCallback((index: number) => {
-    if (!selectedInvoice) return;
-    
-    const updatedItems = selectedInvoice.items.filter((_, i) => i !== index);
-    // Get company VAT rate and exemption status
-    const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice.company_id);
-    const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-    const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-    const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, selectedInvoice.currency_code || 'USD', selectedInvoice.company_id);
-    
-    setSelectedInvoice(prev => ({
-      ...prev!,
-      items: updatedItems,
-      subtotal: totals.subtotal.toString(),
-      tax_amount: totals.tax_amount.toString(),
-      total_amount: totals.total_amount.toString(),
-    }));
-  }, [selectedInvoice, companies]);
-
-  // Input handlers
-  const handleNewInvoiceChange = useCallback(
-    (field: keyof InvoiceCreateUpdatePayload, value: any) => {
-      setNewInvoice((prev: InvoiceCreateUpdatePayload) => {
-        const updatedInvoice = {
-          ...prev,
-          [field]: value,
-        };
-        
-        // Recalculate totals when company changes
-        if (field === 'company_id' && value) {
-          const selectedCompany = companies.find(c => c.id.toString() === value);
-          const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-          const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-          
-          // Update existing items' VAT rates to match the new company's VAT rate
-          const updatedItems = updatedInvoice.items.map(item => ({
-            ...item,
-            tax_rate: companyVatRate.toString(), // Update VAT rate for all existing items
-          }));
-          
-          const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, updatedInvoice.currency_code || 'USD', value.toString());
-          
-          // Store processed items for table display
-          setProcessedInvoiceItems(totals.processedItems || []);
-          
-          return {
-            ...updatedInvoice,
-            items: updatedItems, // Use updated items with new VAT rates
-            vat_rate: companyVatRate, // Auto-populate VAT rate from company
-            ...totals
-          };
-        }
-        
-        // Recalculate totals when currency changes
-        if (field === 'currency_code' && value) {
-          const selectedCompany = companies.find(c => c.id.toString() === updatedInvoice.company_id);
-          const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-          const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-          const totals = calculateTotals(updatedInvoice.items, companyVatRate, isVatExempt, value, updatedInvoice.company_id);
-          
-          // Store processed items for table display
-          setProcessedInvoiceItems(totals.processedItems || []);
-          
-          return {
-            ...updatedInvoice,
-            ...totals
-          };
-        }
-        
-        
-        return updatedInvoice;
-      });
-      
-      // Load company products when company is selected
-      if (field === 'company_id' && value) {
-        console.log("Company selected in create modal:", value.toString());
-        loadCompanyProducts(parseInt(value));
-      }
-      
-      // Load exchange rates when currency changes
-      if (field === 'currency_code' && value) {
-        console.log("Currency changed in create modal:", value.toString());
-        debouncedLoadExchangeRates(value);
-      }
-    },
-    [loadCompanyProducts, debouncedLoadExchangeRates, companies]
-  );
-
-  const handleEditInvoiceChange = useCallback(
-    (field: keyof InvoiceFormData, value: any) => {
-      setSelectedInvoice((prev: InvoiceFormData | null) => {
-        const updatedInvoice = {
-          ...prev!,
-          [field]: value,
-        };
-        
-        // Recalculate totals when company changes
-        if (field === 'company_id' && value) {
-          const selectedCompany = companies.find(c => c.id.toString() === value);
-          const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-          const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-          
-          // Update existing items' VAT rates to match the new company's VAT rate
-          const updatedItems = updatedInvoice.items.map(item => ({
-            ...item,
-            tax_rate: companyVatRate.toString(), // Update VAT rate for all existing items
-          }));
-          
-          const totals = calculateTotals(updatedItems, companyVatRate, isVatExempt, updatedInvoice.currency_code || 'USD', value.toString());
-          return {
-            ...updatedInvoice,
-            items: updatedItems, // Use updated items with new VAT rates
-            vat_rate: companyVatRate, // Auto-populate VAT rate from company
-            subtotal: totals.subtotal.toString(),
-            tax_amount: totals.tax_amount.toString(),
-            total_amount: totals.total_amount.toString(),
-          };
-        }
-        
-        // Recalculate totals when currency changes
-        if (field === 'currency_code' && value) {
-          const selectedCompany = companies.find(c => c.id.toString() === updatedInvoice.company_id);
-          const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-          const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-          const totals = calculateTotals(updatedInvoice.items, companyVatRate, isVatExempt, value, updatedInvoice.company_id);
-          return {
-            ...updatedInvoice,
-            subtotal: totals.subtotal.toString(),
-            tax_amount: totals.tax_amount.toString(),
-            total_amount: totals.total_amount.toString(),
-          };
-        }
-        
-        
-        return updatedInvoice;
-      });
-      
-      // Load company products when company is selected
-      if (field === 'company_id' && value) {
-        console.log("Company selected in edit modal:", value.toString());
-        loadCompanyProducts(parseInt(value));
-      }
-      
-      // Load exchange rates when currency changes
-      if (field === 'currency_code' && value) {
-        console.log("Currency changed in edit modal:", value.toString());
-        debouncedLoadExchangeRates(value);
-      }
-    },
-    [loadCompanyProducts, debouncedLoadExchangeRates, companies]
-  );
 
 
   const generateInvoiceHTML = useCallback((invoice: InvoiceData) => {
@@ -2370,985 +1862,6 @@ const InvoiceList = () => {
       />
       {/* )} */}
 
-      {/* Create Invoice Modal */}
-      {showCreateInvoiceModal && (
-        <Modal
-          show={showCreateInvoiceModal}
-          onHide={closeCreateInvoiceModal}
-          size="xl"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Create New Invoice</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newInvoiceCompany">Company</label>
-                  <select
-                    className="form-control"
-                    id="newInvoiceCompany"
-                    value={newInvoice.company_id}
-                    onChange={(e) =>
-                      handleNewInvoiceChange("company_id", e.target.value)
-                    }
-                  >
-                    <option value="">Select Company</option>
-                    {companies.map((company: CompanyData) => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newInvoiceDate">Invoice Date</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    id="newInvoiceDate"
-                    value={newInvoice.invoice_date}
-                    onChange={(e) =>
-                      handleNewInvoiceChange("invoice_date", e.target.value)
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newInvoiceDueDate">Due Date</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    id="newInvoiceDueDate"
-                    value={newInvoice.due_date}
-                    onChange={(e) =>
-                      handleNewInvoiceChange("due_date", e.target.value)
-                    }
-                    min={moment().format("YYYY-MM-DD")}
-                  />
-                </div>
-              </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newInvoicePaymentMode">Payment Mode</label>
-                  <select
-                    className="form-control"
-                    id="newInvoicePaymentMode"
-                    value={newInvoice.payment_mode}
-                    onChange={(e) =>
-                      handleNewInvoiceChange("payment_mode", e.target.value)
-                    }
-                  >
-                    <option value="one_time">One Time</option>
-                    {/* <option value="recurring">Recurring</option> */}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newInvoiceStatus">Status</label>
-                  <select
-                    className="form-control"
-                    id="newInvoiceStatus"
-                    value={newInvoice.status}
-                    onChange={(e) =>
-                      handleNewInvoiceChange("status", e.target.value)
-                    }
-                  >
-                    <option value={STATUS_DRAFT}>Draft</option>
-                    <option value={STATUS_SENT}>Sent</option>
-                    <option value={STATUS_PAID}>Paid</option>
-                    <option value={STATUS_OVERDUE}>Overdue</option>
-                    <option value={STATUS_CANCELLED}>Cancelled</option>
-                  </select>
-                </div>
-              </div>
-            </div> */}
-
-            {/* Invoice Items Section */}
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <label>Invoice Items</label>
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={addNewInvoiceItem}
-                    >
-                      Add Item
-                    </Button>
-                  </div>
-                  
-                  {newInvoice.items.length === 0 ? (
-                    <div className="text-muted text-center py-3">
-                      No items added yet. Click "Add Item" to start.
-                    </div>
-                  ) : (
-                    <div className="table-responsive">
-                      <table style={{tableLayout: "fixed"}} className="table table-bordered">
-                        <thead>
-                          <tr>
-                            <th colSpan={2}>Product</th>
-                            <th>Quantity</th>
-                            <th>Base Price</th>
-                            <th>Unit Price</th>
-                            <th>VAT %</th>
-                            <th>VAT Amount</th>
-                            <th>Line Total</th>
-                            <th>Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {newInvoice.items.map((item, index) => {
-                            const product = companyProducts.find(p => p.id.toString() === item.product_id);
-                            const quantity = parseFloat(item.quantity) || 0;
-                            const unitPrice = parseFloat(item.unit_price) || 0;
-                            
-                            // Get product currency and convert to invoice currency
-                            const productInfo = getEffectiveProductPrice(item.product_id, newInvoice.company_id);
-                            const productCurrency = productInfo.currency;
-                            const exchangeRate = getExchangeRate(productCurrency, newInvoice.currency_code);
-                            const convertedUnitPrice = unitPrice * exchangeRate;
-                            const lineSubtotal = quantity * convertedUnitPrice;
-                            
-                            // Use processed item data if available, otherwise calculate inline
-                            const processedItem = processedInvoiceItems[index];
-                            const lineVatAmount = processedItem ? processedItem.line_vat_amount : 0;
-                            const lineTotal = processedItem ? processedItem.line_total : lineSubtotal;
-                            
-                            // Get VAT exemption status for display
-                            const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
-                            const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-                            
-                            return (
-                              <tr key={index}>
-                                <td colSpan={2}>
-                                  <select
-                                    className="form-control form-control-sm"
-                                    value={item.product_id}
-                                    onChange={(e) => updateNewInvoiceItem(index, "product_id", e.target.value)}
-                                  >
-                                    <option value="">Select Product</option>
-                                    {getProductsToDisplay(newInvoice.company_id).map((product) => {
-                                      const productInfo = getEffectiveProductPrice(product.id.toString(), newInvoice.company_id);
-                                      return (
-                                        <option key={product.id} value={product.id.toString()}>
-                                          {product.name} - {productInfo.currency} {productInfo.price}
-                                          {product.pricing_type === "company_specific" && product.company_pricing ? " (Company Price)" : ""}
-                                          {productInfo.includesVat ? " (incl. VAT)" : " (excl. VAT)"}
-                                        </option>
-                                      );
-                                    })}
-                                  </select>
-                                </td>
-                                <td>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="form-control form-control-sm"
-                                    value={item.quantity}
-                                    onChange={(e) => updateNewInvoiceItem(index, "quantity", e.target.value)}
-                                    placeholder="0.00"
-                                  />
-                                </td>
-                                <td>
-                                  <div className="text-center">
-                                    <div className="fw-bold text-muted">
-                                      {productInfo.currency} {productInfo.price}
-                                    </div>
-                                    <small className="text-muted">
-                                      {isLoadingExchangeRates && productCurrency !== newInvoice.currency_code && (
-                                        <span>
-                                          <Spinner animation="border" size="sm" className="me-1" />
-                                          Converting...
-                                        </span>
-                                      )}
-                                    </small>
-                                  </div>
-                                </td>
-                                <td>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="form-control form-control-sm"
-                                    value={convertedUnitPrice.toFixed(2)}
-                                    onChange={(e) => {
-                                      // Convert back to original currency for storage
-                                      const convertedValue = parseFloat(e.target.value) || 0;
-                                      const originalValue = convertedValue / exchangeRate;
-                                      updateNewInvoiceItem(index, "unit_price", originalValue.toFixed(2));
-                                    }}
-                                    placeholder="0.00"
-                                  />
-                                  <small className="text-muted">
-                                    {newInvoice.currency_code}
-                                  </small>
-                                </td>
-                                <td>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="form-control form-control-sm"
-                                    value={item.tax_rate}
-                                    onChange={(e) => updateNewInvoiceItem(index, "tax_rate", e.target.value)}
-                                    placeholder="0.00"
-                                    disabled={isVatExempt}
-                                  />
-                                  {isVatExempt && (
-                                    <small className="text-muted">Exempt</small>
-                                  )}
-                                </td>
-                                <td>
-                                  <span className="fw-bold text-warning">
-                                    {isLoadingExchangeRates && productCurrency !== newInvoice.currency_code ? (
-                                      <span className="text-muted">
-                                        <Spinner animation="border" size="sm" className="me-1" />
-                                        Loading...
-                                      </span>
-                                    ) : (
-                                      `${newInvoice.currency_code} ${lineVatAmount.toFixed(2)}`
-                                    )}
-                                  </span>
-                                </td>
-                                <td>
-                                  <span className="fw-bold">
-                                    {isLoadingExchangeRates && productCurrency !== newInvoice.currency_code ? (
-                                      <span className="text-muted">
-                                        <Spinner animation="border" size="sm" className="me-1" />
-                                        Loading...
-                                      </span>
-                                    ) : (
-                                      `${newInvoice.currency_code} ${lineTotal.toFixed(2)}`
-                                    )}
-                                  </span>
-                                </td>
-                                <td>
-                                  <Button
-                                    variant="outline-danger"
-                                    size="sm"
-                                    onClick={() => removeNewInvoiceItem(index)}
-                                  >
-                                    Remove
-                                  </Button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-3">
-                <div className="form-group mb-3">
-                  <label htmlFor="newInvoiceSubtotal">Subtotal</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    id="newInvoiceSubtotal"
-                    value={isLoadingExchangeRates && newInvoice.currency_code !== 'USD' ? 'Loading...' : newInvoice.subtotal}
-                    readOnly
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-              <div className="col-md-3">
-                <div className="form-group mb-3">
-                  <label htmlFor="newInvoiceTaxAmount">
-                    VAT Amount 
-                    <small className="text-muted">(Auto-calculated)</small>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    id="newInvoiceTaxAmount"
-                    value={isLoadingExchangeRates && newInvoice.currency_code !== 'USD' ? 'Loading...' : newInvoice.tax_amount}
-                    readOnly
-                    placeholder="0.00"
-                  />
-                  <small className="text-muted">
-                    <i className="fas fa-info-circle me-1"></i>
-                    Calculated based on VAT rate above
-                  </small>
-                </div>
-              </div>
-              <div className="col-md-3">
-                <div className="form-group mb-3">
-                  <label htmlFor="newInvoiceTotalAmount">Total Amount</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    id="newInvoiceTotalAmount"
-                    value={isLoadingExchangeRates && newInvoice.currency_code !== 'USD' ? 'Loading...' : newInvoice.total_amount}
-                    readOnly
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="newInvoiceCurrency">Currency</label>
-                  <select
-                    className="form-control"
-                    id="newInvoiceCurrency"
-                    value={newInvoice.currency_code}
-                    onChange={(e) =>
-                      handleNewInvoiceChange("currency_code", e.target.value)
-                    }
-                  >
-                    <option value="USD">USD</option>
-                    <option value="AED">AED</option>
-                    <option value="PKR">PKR</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-
-            {/* Company VAT Information - Read Only */}
-            {newInvoice.company_id && (
-              <div className="row">
-                <div className="col-md-12">
-                  <div className="form-group mb-3">
-                    <label>VAT Information (Auto-Applied)</label>
-                    <div className="card">
-                      <div className="card-body">
-                        {(() => {
-                          const selectedCompany = companies.find(c => c.id.toString() === newInvoice.company_id);
-                          console.log("Selected company for VAT display:", selectedCompany);
-                          const vatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-                          const isVatExempt = selectedCompany?.profile?.vat_exemption;
-                          const paymentTerm = selectedCompany?.profile?.payment_terms;
-                          
-                          console.log("VAT Rate:", vatRate, "Is VAT Exempt:", isVatExempt, "Payment Term:", paymentTerm, selectedCompany);
-                          
-                          return (
-                            <div className="d-flex justify-content-between align-items-center">
-                              <div>
-                                <div className="d-flex align-items-center mb-2">
-                                  <i className="fas fa-info-circle text-info me-2"></i>
-                                  <strong>VAT Rate:</strong> 
-                                  <span className={`ms-2 badge ${isVatExempt ? 'bg-success' : 'bg-primary'}`}>
-                                    {isVatExempt ? 'VAT Exempt' : `${vatRate}%`}
-                                  </span>
-                                </div>
-                                {paymentTerm && (
-                                  <div className="d-flex align-items-center mb-2">
-                                    <i className="fas fa-calendar-alt text-warning me-2"></i>
-                                    <strong>Payment Term:</strong> 
-                                    <span className="ms-2 badge bg-warning text-dark">
-                                      {paymentTerm} days
-                                    </span>
-                                  </div>
-                                )}
-                                {selectedCompany?.profile?.tax_id && (
-                                  <div className="text-muted small">
-                                    <strong>Tax ID:</strong> {selectedCompany.profile.tax_id}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-muted small text-end">
-                                <div>VAT is automatically calculated</div>
-                                <div>based on company settings</div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-
-
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <label htmlFor="newInvoiceNotes">Notes</label>
-                  <textarea
-                    className="form-control"
-                    id="newInvoiceNotes"
-                    value={newInvoice.notes}
-                    onChange={(e) =>
-                      handleNewInvoiceChange("notes", e.target.value)
-                    }
-                    rows={3}
-                    placeholder="Additional notes..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <RichTextEditor
-                    id="newInvoiceTerms"
-                    value={newInvoice.terms_conditions}
-                    onChange={(value) => handleNewInvoiceChange("terms_conditions", value)}
-                    placeholder="Enter terms and conditions... Use bullet points (•), numbered lists (1.), and line breaks for formatting."
-                    rows={6}
-                  />
-                </div>
-              </div>
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeCreateInvoiceModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitCreateInvoice}
-              disabled={creatingInvoice}
-            >
-              {creatingInvoice ? "Creating..." : "Create Invoice"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
-
-      {/* Edit Invoice Modal */}
-      {showEditInvoiceModal && selectedInvoice && (
-        <Modal
-          show={showEditInvoiceModal}
-          onHide={closeEditInvoiceModal}
-          size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>
-              Edit Invoice #{selectedInvoice.invoice_number}
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceCompany">Company</label>
-                  <select
-                    className="form-control"
-                    id="editInvoiceCompany"
-                    value={selectedInvoice.company_id || ""}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("company_id", e.target.value)
-                    }
-                  >
-                    <option value="">Select Company</option>
-                    {companies.map((company: CompanyData) => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceDate">Invoice Date</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    id="editInvoiceDate"
-                    value={
-                      selectedInvoice.invoice_date
-                        ? moment(selectedInvoice.invoice_date).format(
-                            "YYYY-MM-DD"
-                          )
-                        : ""
-                    }
-                    onChange={(e) =>
-                      handleEditInvoiceChange("invoice_date", e.target.value)
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceDueDate">Due Date</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    id="editInvoiceDueDate"
-                    value={
-                      selectedInvoice.due_date
-                        ? moment(selectedInvoice.due_date).format("YYYY-MM-DD")
-                        : ""
-                    }
-                    onChange={(e) =>
-                      handleEditInvoiceChange("due_date", e.target.value)
-                    }
-                    min={moment().format("YYYY-MM-DD")}
-                  />
-                </div>
-              </div>
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoicePaymentMode">Payment Mode</label>
-                  <select
-                    className="form-control"
-                    id="editInvoicePaymentMode"
-                    value={selectedInvoice.payment_mode || "one_time"}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("payment_mode", e.target.value)
-                    }
-                  >
-                    <option value="one_time">One Time</option>
-                    {/* <option value="recurring">Recurring</option> */}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceStatus">Status</label>
-                  <select
-                    className="form-control"
-                    id="editInvoiceStatus"
-                    value={selectedInvoice.status || STATUS_DRAFT}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("status", e.target.value)
-                    }
-                  >
-                    <option value={STATUS_DRAFT}>Draft</option>
-                    <option value={STATUS_SENT}>Sent</option>
-                    <option value={STATUS_PAID}>Paid</option>
-                    <option value={STATUS_OVERDUE}>Overdue</option>
-                    <option value={STATUS_CANCELLED}>Cancelled</option>
-                  </select>
-                </div>
-              </div>
-            </div> */}
-
-            {/* Invoice Items Section */}
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <label>Invoice Items</label>
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={addEditInvoiceItem}
-                    >
-                      Add Item
-                    </Button>
-                  </div>
-                  
-                  {selectedInvoice.items.length === 0 ? (
-                    <div className="text-muted text-center py-3">
-                      No items added yet. Click "Add Item" to start.
-                    </div>
-                  ) : (
-                    <div className="table-responsive">
-                      <table style={{tableLayout: "fixed"}} className="table table-bordered">
-                        <thead>
-                          <tr>
-                            <th colSpan={2}>Product</th>
-                            <th>Quantity</th>
-                            <th>Base Price</th>
-                            <th>Unit Price</th>
-                            <th>VAT %</th>
-                            <th>VAT Amount</th>
-                            <th>Line Total</th>
-                            <th>Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedInvoice.items.map((item, index) => {
-                            const product = companyProducts.find(p => p.id.toString() === item.product_id);
-                            const quantity = parseFloat(item.quantity) || 0;
-                            const unitPrice = parseFloat(item.unit_price) || 0;
-                            
-                            // Get product currency and convert to invoice currency
-                            const productInfo = getEffectiveProductPrice(item.product_id, selectedInvoice?.company_id);
-                            const productCurrency = productInfo.currency;
-                            const exchangeRate = getExchangeRate(productCurrency, selectedInvoice?.currency_code || 'USD');
-                            const convertedUnitPrice = unitPrice * exchangeRate;
-                            const lineSubtotal = quantity * convertedUnitPrice;
-                            
-                            // Calculate VAT for this line item using the item's tax_rate and tax_amount
-                            const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice?.company_id);
-                            const companyVatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-                            const isVatExempt = selectedCompany?.profile?.vat_exemption || false;
-                            
-                            // Use the item's tax_rate and tax_amount if available
-                            const effectiveVatRate = parseFloat(item.tax_rate) || companyVatRate;
-                            const lineVatAmount = item.tax_amount ? parseFloat(item.tax_amount) : (isVatExempt ? 0 : lineSubtotal * (effectiveVatRate / 100));
-                            const lineTotal = lineSubtotal + lineVatAmount;
-                            
-                            return (
-                              <tr key={index}>
-                                <td colSpan={2}>
-                                  <select
-                                    className="form-control form-control-sm"
-                                    value={item.product_id}
-                                    onChange={(e) => updateEditInvoiceItem(index, "product_id", e.target.value)}
-                                  >
-                                    <option value="">Select Product</option>
-                                    {getProductsToDisplay(selectedInvoice?.company_id).map((product) => {
-                                      const productInfo = getEffectiveProductPrice(product.id.toString(), selectedInvoice?.company_id);
-                                      return (
-                                        <option key={product.id} value={product.id.toString()}>
-                                          {product.name} - {productInfo.currency} {productInfo.price}
-                                          {product.pricing_type === "company_specific" && product.company_pricing ? " (Company Price)" : ""}
-                                          {productInfo.includesVat ? " (incl. VAT)" : " (excl. VAT)"}
-                                        </option>
-                                      );
-                                    })}
-                                  </select>
-                                </td>
-                                <td>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="form-control form-control-sm"
-                                    value={item.quantity}
-                                    onChange={(e) => updateEditInvoiceItem(index, "quantity", e.target.value)}
-                                    placeholder="0.00"
-                                  />
-                                </td>
-                                <td>
-                                  <div className="text-center">
-                                    <div className="fw-bold text-muted">
-                                      {productInfo.currency} {productInfo.price}
-                                    </div>
-                                    <small className="text-muted">
-                                      {isLoadingExchangeRates && productCurrency !== selectedInvoice?.currency_code && (
-                                        <span>
-                                          <Spinner animation="border" size="sm" className="me-1" />
-                                          Converting...
-                                        </span>
-                                      )}
-                                    </small>
-                                  </div>
-                                </td>
-                                <td>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="form-control form-control-sm"
-                                    value={convertedUnitPrice.toFixed(2)}
-                                    onChange={(e) => {
-                                      // Convert back to original currency for storage
-                                      const convertedValue = parseFloat(e.target.value) || 0;
-                                      const originalValue = convertedValue / exchangeRate;
-                                      updateEditInvoiceItem(index, "unit_price", originalValue.toFixed(2));
-                                    }}
-                                    placeholder="0.00"
-                                  />
-                                  <small className="text-muted">
-                                    {selectedInvoice?.currency_code}
-                                  </small>
-                                </td>
-                                <td>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    className="form-control form-control-sm"
-                                    value={item.tax_rate}
-                                    onChange={(e) => updateEditInvoiceItem(index, "tax_rate", e.target.value)}
-                                    placeholder="0.00"
-                                    disabled={isVatExempt}
-                                  />
-                                  {isVatExempt && (
-                                    <small className="text-muted">Exempt</small>
-                                  )}
-                                </td>
-                                <td>
-                                  <span className="fw-bold text-warning">
-                                    {isLoadingExchangeRates && productCurrency !== selectedInvoice?.currency_code ? (
-                                      <span className="text-muted">
-                                        <Spinner animation="border" size="sm" className="me-1" />
-                                        Loading...
-                                      </span>
-                                    ) : (
-                                      `${selectedInvoice.currency_code} ${lineVatAmount.toFixed(2)}`
-                                    )}
-                                  </span>
-                                </td>
-                                <td>
-                                  <span className="fw-bold">
-                                    {isLoadingExchangeRates && productCurrency !== selectedInvoice?.currency_code ? (
-                                      <span className="text-muted">
-                                        <Spinner animation="border" size="sm" className="me-1" />
-                                        Loading...
-                                      </span>
-                                    ) : (
-                                      `${selectedInvoice.currency_code} ${lineTotal.toFixed(2)}`
-                                    )}
-                                  </span>
-                                </td>
-                                <td>
-                                  <Button
-                                    variant="outline-danger"
-                                    size="sm"
-                                    onClick={() => removeEditInvoiceItem(index)}
-                                  >
-                                    Remove
-                                  </Button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-3">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceSubtotal">Subtotal</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    id="editInvoiceSubtotal"
-                    value={isLoadingExchangeRates && selectedInvoice?.currency_code !== 'USD' ? 'Loading...' : (selectedInvoice.subtotal || "")}
-                    readOnly
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-              <div className="col-md-3">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceTaxAmount">
-                    VAT Amount 
-                    <small className="text-muted">(Auto-calculated)</small>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    id="editInvoiceTaxAmount"
-                    value={isLoadingExchangeRates && selectedInvoice?.currency_code !== 'USD' ? 'Loading...' : (selectedInvoice.tax_amount || "")}
-                    readOnly
-                    placeholder="0.00"
-                  />
-                  <small className="text-muted">
-                    <i className="fas fa-info-circle me-1"></i>
-                    Calculated based on VAT rate above
-                  </small>
-                </div>
-              </div>
-              <div className="col-md-3">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceTotalAmount">Total Amount</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    id="editInvoiceTotalAmount"
-                    value={isLoadingExchangeRates && selectedInvoice?.currency_code !== 'USD' ? 'Loading...' : (selectedInvoice.total_amount || "")}
-                    readOnly
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-6">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceCurrency">Currency</label>
-                  <select
-                    className="form-control"
-                    id="editInvoiceCurrency"
-                    value={selectedInvoice.currency_code || "USD"}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("currency_code", e.target.value)
-                    }
-                  >
-                    <option value="USD">USD</option>
-                    <option value="AED">AED</option>
-                    <option value="PKR">PKR</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-
-            {/* Company VAT Information - Read Only */}
-            {selectedInvoice.company_id && (
-              <div className="row">
-                <div className="col-md-12">
-                  <div className="form-group mb-3">
-                    <label>VAT Information (Auto-Applied)</label>
-                    <div className="card">
-                      <div className="card-body">
-                        {(() => {
-                          const selectedCompany = companies.find(c => c.id.toString() === selectedInvoice.company_id);
-                          console.log("Selected company for VAT display (edit):", selectedCompany);
-                          const vatRate = selectedCompany?.profile?.vat_rate ? parseFloat(selectedCompany.profile.vat_rate) : 0;
-                          const isVatExempt = selectedCompany?.profile?.vat_exemption;
-                          const paymentTerm = selectedCompany?.profile?.payment_terms;
-                          
-                          console.log("VAT Rate (edit):", vatRate, "Is VAT Exempt (edit):", isVatExempt, "Payment Term (edit):", paymentTerm);
-                          
-                          return (
-                            <div className="d-flex justify-content-between align-items-center">
-                              <div>
-                                <div className="d-flex align-items-center mb-2">
-                                  <i className="fas fa-info-circle text-info me-2"></i>
-                                  <strong>VAT Rate:</strong> 
-                                  <span className={`ms-2 badge ${isVatExempt ? 'bg-success' : 'bg-primary'}`}>
-                                    {isVatExempt ? 'VAT Exempt' : `${vatRate}%`}
-                                  </span>
-                                </div>
-                                {paymentTerm && (
-                                  <div className="d-flex align-items-center mb-2">
-                                    <i className="fas fa-calendar-alt text-warning me-2"></i>
-                                    <strong>Payment Term:</strong> 
-                                    <span className="ms-2 badge bg-warning text-dark">
-                                      {paymentTerm} days
-                                    </span>
-                                  </div>
-                                )}
-                                {selectedCompany?.profile?.tax_id && (
-                                  <div className="text-muted small">
-                                    <strong>Tax ID:</strong> {selectedCompany.profile.tax_id}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-muted small text-end">
-                                <div>VAT is automatically calculated</div>
-                                <div>based on company settings</div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-
-
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <label htmlFor="editInvoiceNotes">Notes</label>
-                  <textarea
-                    className="form-control"
-                    id="editInvoiceNotes"
-                    value={selectedInvoice.notes || ""}
-                    onChange={(e) =>
-                      handleEditInvoiceChange("notes", e.target.value)
-                    }
-                    rows={3}
-                    placeholder="Additional notes..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="row">
-              <div className="col-md-12">
-                <div className="form-group mb-3">
-                  <RichTextEditor
-                    id="editInvoiceTerms"
-                    value={selectedInvoice.terms_conditions || ""}
-                    onChange={(value) => handleEditInvoiceChange("terms_conditions", value)}
-                    placeholder="Enter terms and conditions... Use bullet points (•), numbered lists (1.), and line breaks for formatting."
-                    rows={6}
-                  />
-                </div>
-              </div>
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={closeEditInvoiceModal}>
-              Close
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSubmitEditInvoice}
-              disabled={editingInvoice}
-            >
-              {editingInvoice ? "Updating..." : "Update Invoice"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
-
-      {/* Delete Invoice Modal */}
-      {showDeleteInvoiceModal && selectedInvoice && (
-        <Modal
-          show={showDeleteInvoiceModal}
-          onHide={() => setShowDeleteInvoiceModal(false)}
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>Delete Invoice?</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p>
-              Are you sure you want to delete invoice{" "}
-              <b className="text-danger">#{selectedInvoice.invoice_number}</b>?
-            </p>
-            <p>
-              This action cannot be undone.
-            </p>
-            <p>
-              Type the word <b className="text-danger">DELETE</b> to confirm
-            </p>
-            <input
-              type="text"
-              className="form-control"
-              id="confirmDeleteInvoice"
-              value={confirmDeleteInvoice}
-              onChange={(e) => setConfirmDeleteInvoice(e.target.value)}
-              placeholder="Type the word DELETE to confirm"
-            />
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="secondary"
-              onClick={() => setShowDeleteInvoiceModal(false)}
-            >
-              Close
-            </Button>
-            <Button variant="danger" onClick={handleSubmitDeleteInvoice}>
-              Delete
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
 
       {/* Payment Modal */}
       {showPaymentModal && selectedInvoiceForPayment && (
@@ -3552,6 +2065,191 @@ const InvoiceList = () => {
             <Button variant="secondary" onClick={closePaymentModal}>
               Cancel
             </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* View Invoice Modal */}
+      {showViewInvoiceModal && (
+        <Modal
+          show={showViewInvoiceModal}
+          onHide={closeViewInvoiceModal}
+          size="xl"
+          centered
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>
+              Invoice Details
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {selectedInvoiceForView ? (
+              <div>
+                {/* Invoice Header */}
+                <div className="row mb-4">
+                  <div className="col-md-6">
+                    <h5 className="mb-3">Invoice Information</h5>
+                    <table className="table table-borderless">
+                      <tbody>
+                        <tr>
+                          <td className="fw-bold" style={{ width: '40%' }}>Invoice Number:</td>
+                          <td>{selectedInvoiceForView.invoice_number || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                          <td className="fw-bold">Invoice Date:</td>
+                          <td>
+                            {selectedInvoiceForView.invoice_date
+                              ? moment(selectedInvoiceForView.invoice_date).format('DD MMM YYYY')
+                              : 'N/A'}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="fw-bold">Due Date:</td>
+                          <td>
+                            {selectedInvoiceForView.due_date
+                              ? moment(selectedInvoiceForView.due_date).format('DD MMM YYYY')
+                              : 'N/A'}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="fw-bold">Status:</td>
+                          <td>
+                            <Badge
+                              bg={
+                                selectedInvoiceForView.status === STATUS_PAID
+                                  ? 'success'
+                                  : selectedInvoiceForView.status === STATUS_OVERDUE
+                                  ? 'danger'
+                                  : selectedInvoiceForView.status === STATUS_PARTIALLY_PAID
+                                  ? 'warning'
+                                  : selectedInvoiceForView.status === STATUS_PENDING
+                                  ? 'info'
+                                  : 'secondary'
+                              }
+                            >
+                              {selectedInvoiceForView.status?.toUpperCase() || 'N/A'}
+                            </Badge>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="fw-bold">Payment Mode:</td>
+                          <td>{selectedInvoiceForView.payment_mode || 'N/A'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="col-md-6">
+                    <h5 className="mb-3">Company Information</h5>
+                    {selectedInvoiceForView.company ? (
+                      <table className="table table-borderless">
+                        <tbody>
+                          <tr>
+                            <td className="fw-bold" style={{ width: '40%' }}>Company Name:</td>
+                            <td>{selectedInvoiceForView.company.name || 'N/A'}</td>
+                          </tr>
+                          <tr>
+                            <td className="fw-bold">Country:</td>
+                            <td>{selectedInvoiceForView.company.country || 'N/A'}</td>
+                          </tr>
+                          <tr>
+                            <td className="fw-bold">Phone:</td>
+                            <td>{selectedInvoiceForView.company.phone || 'N/A'}</td>
+                          </tr>
+                          <tr>
+                            <td className="fw-bold">Email:</td>
+                            <td className="text-lowercase">{selectedInvoiceForView.company.email || 'N/A'}</td>
+                          </tr>
+                          {selectedInvoiceForView.company.profile?.address && (
+                            <tr>
+                              <td className="fw-bold">Address:</td>
+                              <td>{selectedInvoiceForView.company.profile.address}</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="text-muted">No company information available</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Invoice Items */}
+                <div className="mb-4">
+                  <h5 className="mb-3">Invoice Items</h5>
+                  {selectedInvoiceForView.items && selectedInvoiceForView.items.length > 0 ? (
+                    <div className="">
+                      <table className="table table-bordered">
+                        <thead className="table-light">
+                          <tr>
+                            {/* <th>#</th> */}
+                            <th className="text-start">Product/Description</th>
+                            <th className="text-end">Quantity</th>
+                            <th className="text-end">Unit Price</th>
+                            <th className="text-end">Tax Rate (%)</th>
+                            <th className="text-end">Tax Amount</th>
+                            <th className="text-end">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedInvoiceForView.items.map((item: any, index: number) => (
+                            <tr key={item.id || index}>
+                              {/* <td>{index + 1}</td> */}
+                              <td className="text-start">
+                                <div>
+                                  <strong>{item.product?.name || item.description || 'N/A'}</strong>
+                                  {item.product?.description && item.product.description !== item.product.name && (
+                                    <div className="text-muted small">{item.product.description}</div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="text-end">{formatNumber(parseFloat(item.quantity || '0'))}</td>
+                              <td className="text-end">
+                                {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.unit_price || '0'))}
+                              </td>
+                              <td className="text-end">{formatNumber(parseFloat(item.tax_rate || '0'))}%</td>
+                              <td className="text-end">
+                                {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.tax_amount || '0'))}
+                              </td>
+                              <td className="text-end">
+                                <strong>
+                                  {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.line_total || '0'))}
+                                </strong>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <Alert variant="info">No items found for this invoice</Alert>
+                  )}
+                </div>
+
+               
+
+                {/* Notes */}
+                {selectedInvoiceForView.notes && (
+                  <div className="mb-3">
+                    <h6>Notes</h6>
+                    <Card>
+                      <Card.Body>
+                        <p className="mb-0" style={{ whiteSpace: 'pre-wrap' }}>
+                          {selectedInvoiceForView.notes}
+                        </p>
+                      </Card.Body>
+                    </Card>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Alert variant="warning">No invoice data available</Alert>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={closeViewInvoiceModal}>
+              Close
+            </Button>
+            
           </Modal.Footer>
         </Modal>
       )}

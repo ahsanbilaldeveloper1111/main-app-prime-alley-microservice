@@ -418,7 +418,7 @@ const TmsUserManagement = () => {
                                     variant="outline-secondary"
                                     size="sm"
                                     onClick={() => {
-                                        const randomPassword = generateComplexId(15);
+                                        const randomPassword = generateComplexId();
                                         setPassword(randomPassword);
                                         setPasswordConfirmation(randomPassword);
                                     }}

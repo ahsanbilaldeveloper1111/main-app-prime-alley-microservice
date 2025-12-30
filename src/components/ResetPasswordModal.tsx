@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Modal, Button, Form } from 'react-bootstrap';
+import { Modal, Button, Form, Card } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { generateComplexId } from '@utils/Helper';
 import { UpdatePassword } from '@utils/tms/tmsUserManagement';
+import { Check, X, Lock } from 'lucide-react';
 
 interface ResetPasswordModalProps {
   show: boolean;
@@ -77,7 +78,7 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
 
   // Handle password generation
   const handleGeneratePassword = useCallback(() => {
-    const randomPassword = generateComplexId(15);
+    const randomPassword = generateComplexId();
     // Set password and validation state
     setPassword(randomPassword);
     setPasswordErrors(validatePasswordComplexity(randomPassword));
@@ -173,11 +174,8 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
         <Modal.Title>Reset Password</Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        {/* <p className="mb-3 text-muted">
-          Reset password for user: <strong className="text-dark">{username}</strong>
-        </p> */}
-        <Form.Group className="mb-3">
-          <Form.Label className="fw-semibold">Password</Form.Label>
+        <Form.Group className="mb-4">
+          <Form.Label className="fw-semibold mb-2">Password</Form.Label>
           <div className="input-group">
             <Form.Control
               type="text"
@@ -189,58 +187,86 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
             />
             <Button
               variant="outline-secondary"
-              size="sm"
               onClick={handleGeneratePassword}
-              className="border"
+              style={{
+                padding: '0.375rem 1rem',
+                fontWeight: '500',
+                whiteSpace: 'nowrap'
+              }}
             >
               Generate
             </Button>
           </div>
           {password.length > 0 && isPasswordValid(password) && (
-            <Form.Text className="text-success">
-              ✓ Password meets all requirements
+            <Form.Text className="text-success d-flex align-items-center mt-2" style={{ fontSize: '0.875rem' }}>
+              <Check size={16} className="me-1" />
+              Password meets all requirements
             </Form.Text>
           )}
-          {password.length > 0 && (
-            <div className="mt-3 p-3 bg-light rounded" style={{ fontSize: '0.875rem' }}>
-              <small className="text-muted fw-semibold d-block mb-2">Password Requirements:</small>
-              <div className="d-flex flex-column gap-2">
-                <div className={`d-flex align-items-center ${passwordErrors.minLength ? 'text-success' : 'text-danger'}`}>
-                  <span className="me-2" style={{ fontSize: '1rem', fontWeight: 'bold' }}>
-                    {passwordErrors.minLength ? '✓' : '✗'}
-                  </span>
+        </Form.Group>
+
+        {/* Password Requirements Card */}
+        {password.length > 0 && (
+          <Card className="mb-4" style={{ 
+            border: '1px solid #e9ecef',
+            borderRadius: '8px',
+            backgroundColor: '#f8f9fa'
+          }}>
+            <Card.Body style={{ padding: '1rem' }}>
+              <div className="d-flex align-items-center mb-3">
+                <Lock size={18} className="me-2 text-muted" />
+                <h6 className="mb-0 fw-semibold" style={{ fontSize: '0.875rem', color: '#495057' }}>
+                  Password Requirements
+                </h6>
+              </div>
+              <div className="d-flex flex-column gap-2" style={{ fontSize: '0.875rem' }}>
+                <div className={`d-flex align-items-center ${passwordErrors.minLength ? 'text-success' : 'text-muted'}`}>
+                  {passwordErrors.minLength ? (
+                    <Check size={18} className="me-2 flex-shrink-0" style={{ color: '#28a745' }} />
+                  ) : (
+                    <X size={18} className="me-2 flex-shrink-0" style={{ color: '#6c757d' }} />
+                  )}
                   <span>At least 8 characters</span>
                 </div>
-                <div className={`d-flex align-items-center ${passwordErrors.hasUppercase ? 'text-success' : 'text-danger'}`}>
-                  <span className="me-2" style={{ fontSize: '1rem', fontWeight: 'bold' }}>
-                    {passwordErrors.hasUppercase ? '✓' : '✗'}
-                  </span>
+                <div className={`d-flex align-items-center ${passwordErrors.hasUppercase ? 'text-success' : 'text-muted'}`}>
+                  {passwordErrors.hasUppercase ? (
+                    <Check size={18} className="me-2 flex-shrink-0" style={{ color: '#28a745' }} />
+                  ) : (
+                    <X size={18} className="me-2 flex-shrink-0" style={{ color: '#6c757d' }} />
+                  )}
                   <span>At least one uppercase letter (A-Z)</span>
                 </div>
-                <div className={`d-flex align-items-center ${passwordErrors.hasLowercase ? 'text-success' : 'text-danger'}`}>
-                  <span className="me-2" style={{ fontSize: '1rem', fontWeight: 'bold' }}>
-                    {passwordErrors.hasLowercase ? '✓' : '✗'}
-                  </span>
+                <div className={`d-flex align-items-center ${passwordErrors.hasLowercase ? 'text-success' : 'text-muted'}`}>
+                  {passwordErrors.hasLowercase ? (
+                    <Check size={18} className="me-2 flex-shrink-0" style={{ color: '#28a745' }} />
+                  ) : (
+                    <X size={18} className="me-2 flex-shrink-0" style={{ color: '#6c757d' }} />
+                  )}
                   <span>At least one lowercase letter (a-z)</span>
                 </div>
-                <div className={`d-flex align-items-center ${passwordErrors.hasNumber ? 'text-success' : 'text-danger'}`}>
-                  <span className="me-2" style={{ fontSize: '1rem', fontWeight: 'bold' }}>
-                    {passwordErrors.hasNumber ? '✓' : '✗'}
-                  </span>
+                <div className={`d-flex align-items-center ${passwordErrors.hasNumber ? 'text-success' : 'text-muted'}`}>
+                  {passwordErrors.hasNumber ? (
+                    <Check size={18} className="me-2 flex-shrink-0" style={{ color: '#28a745' }} />
+                  ) : (
+                    <X size={18} className="me-2 flex-shrink-0" style={{ color: '#6c757d' }} />
+                  )}
                   <span>At least one number (0-9)</span>
                 </div>
-                <div className={`d-flex align-items-center ${passwordErrors.hasSpecialChar ? 'text-success' : 'text-danger'}`}>
-                  <span className="me-2" style={{ fontSize: '1rem', fontWeight: 'bold' }}>
-                    {passwordErrors.hasSpecialChar ? '✓' : '✗'}
-                  </span>
+                <div className={`d-flex align-items-center ${passwordErrors.hasSpecialChar ? 'text-success' : 'text-muted'}`}>
+                  {passwordErrors.hasSpecialChar ? (
+                    <Check size={18} className="me-2 flex-shrink-0" style={{ color: '#28a745' }} />
+                  ) : (
+                    <X size={18} className="me-2 flex-shrink-0" style={{ color: '#6c757d' }} />
+                  )}
                   <span>At least one special character (!@#$%^&*...)</span>
                 </div>
               </div>
-            </div>
-          )}
-        </Form.Group>
+            </Card.Body>
+          </Card>
+        )}
+
         <Form.Group className="mb-3">
-          <Form.Label className="fw-semibold">Confirm Password</Form.Label>
+          <Form.Label className="fw-semibold mb-2">Confirm Password</Form.Label>
           <Form.Control
             type="text"
             value={passwordConfirmation}
@@ -255,8 +281,9 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
             </Form.Control.Feedback>
           )}
           {passwordConfirmation.length > 0 && !confirmPasswordError && password === passwordConfirmation && (
-            <Form.Text className="text-success">
-              ✓ Passwords match
+            <Form.Text className="text-success d-flex align-items-center mt-2" style={{ fontSize: '0.875rem' }}>
+              <Check size={16} className="me-1" />
+              Passwords match
             </Form.Text>
           )}
         </Form.Group>

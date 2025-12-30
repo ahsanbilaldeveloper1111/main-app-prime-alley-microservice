@@ -84,13 +84,11 @@ const CallStatsCountry = () => {
     return {
       pending: {
         start_datetime: startDateInput,
-        end_datetime: endDateInput,
-        is_incoming_only: 'false'
+        end_datetime: endDateInput
       },
       current: {
         start_datetime: startDateUTC,
-        end_datetime: endDateUTC,
-        is_incoming_only: 'false'
+        end_datetime: endDateUTC
       }
     };
   };
@@ -275,6 +273,11 @@ const CallStatsCountry = () => {
       
       // Convert to UTC
       formattedFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+    }
+    
+    // Remove is_incoming_only if it's empty, null, or undefined (don't send to API by default)
+    if (!formattedFilters.is_incoming_only || formattedFilters.is_incoming_only === '') {
+      delete formattedFilters.is_incoming_only;
     }
     
     const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(formattedFilters);
@@ -857,13 +860,11 @@ const CallStatsCountry = () => {
                 // Preserve current date filters, clear all other filters
                 const resetPendingFilters: Record<string, any> = {
                   start_datetime: (pendingFilters as any)?.start_datetime || defaultFilters.pending.start_datetime,
-                  end_datetime: (pendingFilters as any)?.end_datetime || defaultFilters.pending.end_datetime,
-                  is_incoming_only: 'false'
+                  end_datetime: (pendingFilters as any)?.end_datetime || defaultFilters.pending.end_datetime
                 };
                 const resetCurrentFilters: Record<string, any> = {
                   start_datetime: (currentFilters as any)?.start_datetime || defaultFilters.current.start_datetime,
-                  end_datetime: (currentFilters as any)?.end_datetime || defaultFilters.current.end_datetime,
-                  is_incoming_only: 'false'
+                  end_datetime: (currentFilters as any)?.end_datetime || defaultFilters.current.end_datetime
                 };
                 setPendingFilters(resetPendingFilters);
                 setCurrentFilters(resetCurrentFilters);
@@ -873,6 +874,26 @@ const CallStatsCountry = () => {
               filterContent={
                 <>
                   
+
+                  {/* Call Direction */}
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Call Direction</Form.Label>
+                      <SelectBox
+                        isSearchable={false}
+                        value={(pendingFilters as any)?.is_incoming_only || null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, is_incoming_only: value as string || '' });
+                        }}
+                        options={[
+                          { value: 'true', label: 'Incoming' },
+                          { value: 'false', label: 'Outgoing' },
+                          { value: '', label: 'Both' }
+                        ]}
+                        placeholder="Select call direction"
+                      />
+                    </Form.Group>
+                  </Col>
 
                   {/* Call Status */}
                   <Col md={4}>

@@ -15,7 +15,7 @@ export const generateCustomId = (prefix = "", length = 12) => {
   return prefix + id.substring(0, length);
 };
 
-export const generateComplexId = (length = 12) => {
+export const generateComplexId = (length = 8) => {
   const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const lower = 'abcdefghijklmnopqrstuvwxyz';
   const digits = '0123456789';

@@ -308,7 +308,7 @@ const CreateLdapUserForm: React.FC<CreateLdapUserFormProps> = ({
                                             variant="outline-secondary"
                                             size="sm"
                                             onClick={() => {
-                                                const randomPassword = generateComplexId(12);
+                                                const randomPassword = generateComplexId();
                                                 handleCreateFormChange(
                                                     "password",
                                                     randomPassword,
