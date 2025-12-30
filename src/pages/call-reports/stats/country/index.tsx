@@ -779,7 +779,7 @@ const CallStatsCountry = () => {
               </AnimatePresence>
             </Tab>
 
-            <Tab eventKey="cost_chart" title="Cost by Country">
+            {/* <Tab eventKey="cost_chart" title="Cost by Country">
               <AnimatePresence mode="wait">
                 {activeTab === 'cost_chart' && (
                   <motion.div
@@ -824,7 +824,7 @@ const CallStatsCountry = () => {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </Tab>
+            </Tab> */}
           </Tabs>
         </Col>
       </Row>

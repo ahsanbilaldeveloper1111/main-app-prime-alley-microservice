@@ -823,7 +823,7 @@ const CallIncomingExtension = () => {
                            </AnimatePresence>
                         </Tab>
 
-                        <Tab eventKey="cost_chart" title="Cost by Extension">
+                        {/* <Tab eventKey="cost_chart" title="Cost by Extension">
                            <AnimatePresence mode="wait">
                              {activeTab === 'cost_chart' && (
                                <motion.div
@@ -866,7 +866,7 @@ const CallIncomingExtension = () => {
                                </motion.div>
                              )}
                            </AnimatePresence>
-                        </Tab>
+                        </Tab> */}
 
                     </Tabs>
                 </Col>

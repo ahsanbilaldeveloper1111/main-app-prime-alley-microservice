@@ -74,6 +74,8 @@ const PageReports = () => {
                                 </a>
                             </Col>
 
+                            
+
 
                             <Col md={4}>
                                 <a href="/call-reports/stats/extension" className="report-card" >
@@ -83,6 +85,40 @@ const PageReports = () => {
                                     </div>
                                     <p className="report-description">
                                     Visualize call volumes, durations, and trends across extensions with dynamic charts and detailed metrics.
+                                    </p>
+                                    <div className="report-meta">
+                                        <div className="meta-item">Type: <span>Call Outbound</span></div>
+                                        <div className="meta-item">Last Run: <span>{moment().format('MMM D, YYYY')}</span></div>
+                                        <div className="view-button app-button btn btn-primary">View</div>
+                                    </div>
+                                </a>
+                            </Col>
+
+                            <Col md={4}>
+                                <a href="/call-reports/stats/department/extension" className="report-card" >
+                                    <div className="report-header">
+                                        <span className="material-icons-two-tone report-icon">call</span>
+                                        <h2 className="report-title">Call Stats By Department Extension</h2>
+                                    </div>
+                                    <p className="report-description">
+                                    Visualize call volumes, durations, and trends across departments extensions with dynamic charts and detailed metrics.
+                                    </p>
+                                    <div className="report-meta">
+                                        <div className="meta-item">Type: <span>Call Outbound</span></div>
+                                        <div className="meta-item">Last Run: <span>{moment().format('MMM D, YYYY')}</span></div>
+                                        <div className="view-button app-button btn btn-primary">View</div>
+                                    </div>
+                                </a>
+                            </Col>
+
+                            <Col md={4}>
+                                <a href="/call-reports/stats/general" className="report-card" >
+                                    <div className="report-header">
+                                        <span className="material-icons-two-tone report-icon">call</span>
+                                        <h2 className="report-title">Call Stats By Overall</h2>
+                                    </div>
+                                    <p className="report-description">
+                                    Visualize call volumes, durations, and trends across all calls with dynamic charts and detailed metrics.
                                     </p>
                                     <div className="report-meta">
                                         <div className="meta-item">Type: <span>Call Outbound</span></div>

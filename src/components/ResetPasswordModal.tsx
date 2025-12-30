@@ -173,9 +173,9 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
         <Modal.Title>Reset Password</Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        <p className="mb-3 text-muted">
+        {/* <p className="mb-3 text-muted">
           Reset password for user: <strong className="text-dark">{username}</strong>
-        </p>
+        </p> */}
         <Form.Group className="mb-3">
           <Form.Label className="fw-semibold">Password</Form.Label>
           <div className="input-group">

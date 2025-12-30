@@ -276,6 +276,9 @@ MENU_COLORS: {
     VIEW_CALL_LOGS: 'view-call-logs',
     VIEW_CALL_RECORDINGS: 'view-call-recordings',
     VIEW_CALL_REPORTS: 'view-call-reports',
+    CALL_REPORTS_BY_STATISTICS_REPORTS: 'call-reports-by-statistics-reports',
+    CALL_REPORTS_BY_CALL_INCOMING_REPORTS: 'call-reports-by-call-incoming-reports',
+    CALL_REPORTS_BY_TREND_REPORTS: 'call-reports-by-trend-reports',
 
     REPORTS_SERVICES: 'reports-services',
 

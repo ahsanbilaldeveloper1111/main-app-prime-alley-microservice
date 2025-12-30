@@ -66,6 +66,7 @@ import { LineChart, Line,} from 'recharts';
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
+import { GlobalDateTimeFormat } from "@utils/Helper";
 
 // KPI Card Component
 interface KPICardData {
@@ -147,8 +148,14 @@ const CHART_COLORS = [
   "#aa96da", // Lavender
 ];
 
+// Helper function to format numbers with commas
+const formatNumber = (value: number | undefined | null): string => {
+  const num = value || 0;
+  return num.toLocaleString('en-US');
+};
+
 const CrmDashboard = () => {
-  const [dashboardData, setDashboardData] = useState<CrmDashboardData | null>(null);
+  const [dashboardData, setDashboardData] = useState<any>(null);
   const [recentLeads, setRecentLeads] = useState<LeadData[]>([]);
   const [recentDeals, setRecentDeals] = useState<DealData[]>([]);
   const [recentOrders, setRecentOrders] = useState<OrderData[]>([]);
@@ -206,13 +213,33 @@ const CrmDashboard = () => {
         getDeals({ per_page: 5 }),
         getOrders({ per_page: 5 }),
       ]);
-      console.log("ZEZEZE", dashboard);
-      setDashboardData(dashboard as CrmDashboardData);
+      console.log("dashboard data", dashboard);
+      setDashboardData(dashboard);
 
       // Set conversion percentages from API
-      const conversionStats = (dashboard as CrmDashboardData)?.conversion_stats?.last_30_days;
-      setLeadToDealPercent(conversionStats?.leads_to_deals_percentage || 0);
-      setDealToOrderPercent(conversionStats?.deals_to_orders_percentage || 0);
+      setLeadToDealPercent(dashboard?.conversion_ratios?.lead_to_deal || 0);
+      setDealToOrderPercent(dashboard?.conversion_ratios?.deal_to_order || 0);
+      
+      // Set campaign performance chart data
+      if (dashboard?.campaign_performance?.chart_data) {
+        const chartData = dashboard.campaign_performance.chart_data.map((item: any) => ({
+          name: item.month_label || item.month,
+          leads: Number(item.leads) || 0,
+          deals: Number(item.deals) || 0,
+          orders: Number(item.orders) || 0,
+        }));
+        setMonthlyData(chartData);
+      }
+      
+      // Set task statuses data
+      if (dashboard?.task_statuses) {
+        const taskData = [
+          { name: 'Completed', value: dashboard.task_statuses.completed || 0, color: '#20C997' },
+          { name: 'Pending', value: dashboard.task_statuses.pending || 0, color: '#FFC107' },
+          { name: 'Overdue', value: dashboard.task_statuses.overdue || 0, color: '#FD7E14' },
+        ];
+        // Update tasksData will be done in render
+      }
 
       // Get recent items
       console.log("ZEZEZE", leadsResponse);
@@ -331,35 +358,36 @@ const CrmDashboard = () => {
   // Calculate max count for progress bars
   const leadsByStage = dashboardData?.stage_distribution?.leads || [];
   const maxLeadCount = leadsByStage.reduce(
-    (max, stage) => Math.max(max, stage.count),
+    (max: number, stage: any) => Math.max(max, stage.count || 0),
     0
   ) || 1;
 
 
 
-  const campaignData = [
-    { name: 'Apr 1', Clicks: 5, Leads: 8, Deals: 6, Orders: 4 },
-    { name: 'Apr 1', Clicks: 15, Leads: 18, Deals: 12, Orders: 8 },
-    { name: 'Apr 22', Clicks: 25, Leads: 22, Deals: 18, Orders: 15 },
-    { name: 'Apr 16', Clicks: 35, Leads: 28, Deals: 22, Orders: 18 },
-    { name: 'Apr 13', Clicks: 30, Leads: 32, Deals: 28, Orders: 22 },
-    { name: 'Apr 24', Clicks: 45, Leads: 38, Deals: 35, Orders: 30 },
-  ];
+  // Campaign Performance data from API
+  const campaignData = dashboardData?.campaign_performance?.chart_data?.map((item: any) => ({
+    name: item.month_label || item.month,
+    Leads: Number(item.leads) || 0,
+    Deals: Number(item.deals) || 0,
+    Orders: Number(item.orders) || 0,
+  })) || [];
 
-  const tasksData = [
-    { name: 'Completed', value: 12, color: '#20C997' },
-    { name: 'In Progress', value: 8, color: '#FFC107' },
-    { name: 'Pending', value: 5, color: '#FD7E14' },
-  ];
+  // Tasks data from API
+  const tasksData = dashboardData?.task_statuses ? [
+    { name: 'Completed', value: dashboardData.task_statuses.completed || 0, color: '#20C997' },
+    { name: 'Pending', value: dashboardData.task_statuses.pending || 0, color: '#FFC107' },
+    { name: 'Overdue', value: dashboardData.task_statuses.overdue || 0, color: '#FD7E14' },
+  ] : [];
 
   const totalTasks = tasksData.reduce((sum, item) => sum + item.value, 0);
-  const completedPercentage = Math.round((tasksData[0].value / totalTasks) * 100);
+  const completedPercentage = totalTasks > 0 ? Math.round((tasksData[0]?.value / totalTasks) * 100) : 0;
 
   // Calculate funnel percentages (relative to Prospects as 100%)
-  const prospectsCount = dashboardOverview?.crm_data_count || 0;
-  const leadsCount = dashboardData?.stats?.leads?.active || 0;
-  const dealsCount = dashboardData?.stats?.deals?.active || 0;
-  const ordersCount = dashboardData?.stats?.orders?.total || 0;
+  const prospectsCount = dashboardData?.counts?.crm_data || 0;
+  const leadsCount = dashboardData?.counts?.leads || 0;
+  const dealsCount = dashboardData?.counts?.deals || 0;
+  const ordersCount = dashboardData?.counts?.orders || 0;
+  const orderConversionPercentage = dashboardData?.conversion_ratios?.order_conversion_percentage || 0;
   
   const prospectsPercentage = prospectsCount > 0 ? 100 : 0;
   const leadsPercentage = prospectsCount > 0 ? Math.round((leadsCount / prospectsCount) * 100) : 0;
@@ -380,7 +408,7 @@ const CrmDashboard = () => {
           <Col xs={12} md={7} className="mb-2 mb-md-0">
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <h4 style={{ margin: 0, fontWeight: 600, color: '#1E293B' }}>CRM Dashboard</h4>
-              <div style={{ flex: 1, maxWidth: '420px', position: 'relative' }}>
+              {/* <div style={{ flex: 1, maxWidth: '420px', position: 'relative' }}>
                 <Search className="position-absolute" style={{ left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6c757d', zIndex: 10 }} size={18} />
                 <Form.Control
                   type="text"
@@ -390,11 +418,11 @@ const CrmDashboard = () => {
                   onChange={(e) => setSearchText(e.target.value)}
                   style={{ height: '40px', borderRadius: '8px', border: '1px solid #E2E8F0' }}
                 />
-              </div>
+              </div> */}
             </div>
           </Col>
 
-          <Col xs={12} md={5} className="d-flex justify-content-md-end align-items-center">
+          {/* <Col xs={12} md={5} className="d-flex justify-content-md-end align-items-center">
             <div ref={datePickerRef} style={{ position: 'relative' }}>
               <div onClick={() => setShowDatePicker((s) => !s)} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px 12px', display: 'flex', gap: '8px', alignItems: 'center', cursor: 'pointer', minWidth: '160px' }}>
                 <Calendar size={16} color="#64748B" />
@@ -413,7 +441,7 @@ const CrmDashboard = () => {
                 </div>
               )}
             </div>
-          </Col>
+          </Col> */}
         </Row>
 
         {/* Top Stats */}
@@ -426,7 +454,7 @@ const CrmDashboard = () => {
                     <Users size={20} color="#0EA5E9" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{dashboardOverview?.crm_data_count || 0}</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.crm_data || 0)}</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Prospects</p>
                   </div>
                 </div>
@@ -441,7 +469,7 @@ const CrmDashboard = () => {
                     <UserPlus size={20} color="#3B82F6" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{dashboardData?.stats?.leads?.active || 0}</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.leads || 0)}</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Leads</p>
                   </div>
                 </div>
@@ -456,7 +484,7 @@ const CrmDashboard = () => {
                     <DollarSign size={20} color="#F59E0B" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{dashboardData?.stats?.deals?.active || 0}</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.deals || 0)}</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Deals</p>
                   </div>
                 </div>
@@ -471,7 +499,7 @@ const CrmDashboard = () => {
                     <ShoppingCart size={20} color="#F97316" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{dashboardData?.stats?.orders?.total || 0}</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.orders || 0)}</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Orders</p>
                   </div>
                 </div>
@@ -486,7 +514,7 @@ const CrmDashboard = () => {
                     <TrendingUp size={20} color="#0EA5E9" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{dashboardData?.conversion_stats?.last_30_days?.leads_to_deals_percentage || 0}%</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{dashboardData?.conversion_ratios?.lead_to_deal?.toFixed(2) || 0}%</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Leads to Deals Conversion</p>
                   </div>
                 </div>
@@ -501,7 +529,7 @@ const CrmDashboard = () => {
                     <TrendingUp size={20} color="#10B981" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{dashboardData?.conversion_stats?.last_30_days?.deals_to_orders_percentage || 0}</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{dashboardData?.conversion_ratios?.deal_to_order?.toFixed(2) || 0}%</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Deals to Orders Conversion</p>
                   </div>
                 </div>
@@ -524,7 +552,7 @@ const CrmDashboard = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>Prospects</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{dashboardOverview?.crm_data_count || 0}</span>
+                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(prospectsCount)}</span>
                     </div>
                     <div style={{ flex: 1, marginLeft: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                       <div style={{ width: '100%', maxWidth: '260px', height: '32px', backgroundColor: '#E6EEF9', borderRadius: '8px' }}>
@@ -538,7 +566,7 @@ const CrmDashboard = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>Leads</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{leadsCount}</span>
+                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(leadsCount)}</span>
                     </div>
                     <div style={{ flex: 1, marginLeft: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                       <div style={{ width: '100%', maxWidth: '260px', height: '32px', backgroundColor: '#ECFDF5', borderRadius: '8px' }}>
@@ -552,7 +580,7 @@ const CrmDashboard = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>Deals</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{dealsCount}</span>
+                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(dealsCount)}</span>
                     </div>
                     <div style={{ flex: 1, marginLeft: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                       <div style={{ width: '100%', maxWidth: '260px', height: '32px', backgroundColor: '#FFFAEB', borderRadius: '8px' }}>
@@ -566,7 +594,7 @@ const CrmDashboard = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>Orders</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{ordersCount}</span>
+                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(ordersCount)}</span>
                     </div>
                     <div style={{ flex: 1, marginLeft: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                       <div style={{ width: '100%', maxWidth: '260px', height: '32px', backgroundColor: '#FFF7ED', borderRadius: '8px' }}>
@@ -576,7 +604,7 @@ const CrmDashboard = () => {
                   </div>
                 </div>
 
-                <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>Prospects → Orders conversion: {ordersPercentage}%</p>
+                <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>Prospects → Orders conversion: {orderConversionPercentage.toFixed(2)}%</p>
               </Card.Body>
             </Card>
 
@@ -586,71 +614,61 @@ const CrmDashboard = () => {
                 <h5 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', color: '#1E293B' }}>Recent Activities</h5>
                 
                 <ListGroup variant="flush">
-                  <ListGroup.Item style={{ padding: '16px 0', border: 'none' }}>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Users size={16} color="#10B981" />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
-                          <div>
-                            <span style={{ fontSize: '13px', color: '#64748B' }}>24 Apr 2024</span>
-                            <span style={{ fontSize: '14px', color: '#1E293B', marginLeft: '8px', fontWeight: 500 }}>
-                              Followed with <span style={{ color: '#3B82F6' }}>ABC Corp.</span>
-                            </span>
+                  {(dashboardData?.recent_activities || []).slice(0, 5).map((activity: any, index: number) => {
+                    const getIcon = () => {
+                      if (activity.type === 'lead') return <UserPlus size={16} color="#3B82F6" />;
+                      if (activity.type === 'meeting') return <Calendar size={16} color="#10B981" />;
+                      if (activity.type === 'followup') return <CheckCircle size={16} color="#10B981" />;
+                      return <Users size={16} color="#10B981" />;
+                    };
+                    const getBgColor = () => {
+                      if (activity.type === 'lead') return '#DBEAFE';
+                      if (activity.type === 'meeting') return '#D1FAE5';
+                      if (activity.type === 'followup') return '#D1FAE5';
+                      return '#D1FAE5';
+                    };
+                    const getTypeLabel = () => {
+                      if (activity.type === 'lead') return 'Lead';
+                      if (activity.type === 'meeting') return 'Meeting';
+                      if (activity.type === 'followup') return 'Follow-up';
+                      return 'Activity';
+                    };
+                    return (
+                      <ListGroup.Item key={activity.id || index} style={{ padding: '16px 0', border: 'none', borderBottom: index < 4 ? '1px solid #F1F5F9' : 'none' }}>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: getBgColor(), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {getIcon()}
                           </div>
-                          <div style={{ padding: '4px 12px', backgroundColor: '#F1F5F9', borderRadius: '6px', fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Mail size={12} /> Email
-                          </div>
-                        </div>
-                        <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>Sent a .pptx via Eid permail.</p>
-                      </div>
-                    </div>
-                  </ListGroup.Item>
-
-                  <ListGroup.Item style={{ padding: '16px 0', border: 'none' }}>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <UserPlus size={16} color="#3B82F6" />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
-                          <div>
-                            <span style={{ fontSize: '13px', color: '#64748B' }}>26 Apr 2024</span>
-                            <span style={{ fontSize: '14px', color: '#1E293B', marginLeft: '8px', fontWeight: 500 }}>
-                              Scall with <span style={{ color: '#3B82F6' }}>John Smith</span>
-                            </span>
-                          </div>
-                          <div style={{ padding: '4px 12px', backgroundColor: '#F1F5F9', borderRadius: '6px', fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Mail size={12} /> Email
-                          </div>
-                        </div>
-                        <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>Sent a dad's win'ta paper onad ; (hair new offer.</p>
-                      </div>
-                    </div>
-                  </ListGroup.Item>
-
-                  <ListGroup.Item style={{ padding: '16px 0', border: 'none' }}>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <CheckCircle size={16} color="#10B981" />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
-                          <div>
-                            <span style={{ fontSize: '13px', color: '#64748B' }}>33 Apr 2024</span>
-                            <span style={{ fontSize: '14px', color: '#1E293B', marginLeft: '8px', fontWeight: 500 }}>
-                              Schoote presentation for Demo
-                            </span>
-                          </div>
-                          <div style={{ padding: '4px 12px', backgroundColor: '#F1F5F9', borderRadius: '6px', fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <CheckCircle size={12} /> Check In
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
+                              <div>
+                                <span style={{ fontSize: '13px', color: '#64748B' }}>
+                                  {(() => {
+                                    const formatted = moment.utc(activity.created_at).local().format('DD MMM YYYY,hh:mm:ss A');
+                                    return formatted.replace(/(\d{2} )(\w{3})( \d{4})/, (match, day, month, year) => `${day}${month.toUpperCase()}${year}`);
+                                  })()}
+                                </span>
+                                <span style={{ fontSize: '14px', color: '#1E293B', marginLeft: '8px', fontWeight: 500 }}>
+                                  {activity.description || 'Activity'}
+                                </span>
+                              </div>
+                              <div style={{ padding: '4px 12px', backgroundColor: '#F1F5F9', borderRadius: '6px', fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {getTypeLabel()}
+                              </div>
+                            </div>
+                            {activity.user_extension && (
+                              <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>Extension: {activity.user_extension}</p>
+                            )}
                           </div>
                         </div>
-                        <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>Beel s .anedio wini ff hone ufccuss nqgm eah.</p>
-                      </div>
-                    </div>
-                  </ListGroup.Item>
+                      </ListGroup.Item>
+                    );
+                  })}
+                  {(!dashboardData?.recent_activities || dashboardData.recent_activities.length === 0) && (
+                    <ListGroup.Item style={{ padding: '16px 0', border: 'none' }}>
+                      <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0, textAlign: 'center' }}>No recent activities</p>
+                    </ListGroup.Item>
+                  )}
                 </ListGroup>
               </Card.Body>
             </Card>
@@ -666,41 +684,37 @@ const CrmDashboard = () => {
                 </div>
 
                 <ListGroup variant="flush">
-                  <ListGroup.Item style={{ padding: '16px 0', border: 'none', borderBottom: '1px solid #F1F5F9' }}>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
-                        <img src="/api/placeholder/40/40" alt="User" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <h6 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>
-                          Product Demo – <span style={{ color: '#3B82F6' }}>ABC Corp</span>
-                        </h6>
-                        <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>18:00 – 16:30 GiMib</p>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Calendar size={14} color="#94A3B8" />
-                        <span style={{ fontSize: '13px', color: '#64748B' }}>Apr 26, 2024</span>
-                      </div>
-                    </div>
-                  </ListGroup.Item>
-
-                  <ListGroup.Item style={{ padding: '16px 0', border: 'none' }}>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '16px', fontWeight: 600, color: '#3B82F6' }}>
-                        S
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <h6 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>
-                          Quarterly Review – <span style={{ color: '#3B82F6' }}>Smith LLC</span>
-                        </h6>
-                        <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>14:00 – 16:30 GiMib</p>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Calendar size={14} color="#94A3B8" />
-                        <span style={{ fontSize: '13px', color: '#64748B' }}>Apr 26, 2024</span>
-                      </div>
-                    </div>
-                  </ListGroup.Item>
+                  {(dashboardData?.upcoming_meetings || []).slice(0, 5).map((meeting: any, index: number) => {
+                    const initials = meeting.name ? meeting.name.charAt(0).toUpperCase() : 'M';
+                    const companyName = meeting.lead?.company_name || meeting.deal?.company_name || '';
+                    const meetingTime = meeting.meeting_time ? moment(meeting.meeting_time).format('HH:mm') : '';
+                    return (
+                      <ListGroup.Item key={meeting.id || index} style={{ padding: '16px 0', border: 'none', borderBottom: index < (dashboardData?.upcoming_meetings?.length || 0) - 1 ? '1px solid #F1F5F9' : 'none' }}>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '16px', fontWeight: 600, color: '#3B82F6' }}>
+                            {initials}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <h6 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>
+                              {meeting.name} {companyName && <span style={{ color: '#3B82F6' }}>– {companyName}</span>}
+                            </h6>
+                            <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
+                              {meeting.meeting_type} {meetingTime && `– ${meetingTime}`}
+                            </p>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Calendar size={14} color="#94A3B8" />
+                            <span style={{ fontSize: '13px', color: '#64748B' }}>{moment(meeting.meeting_date).format('MMM DD, YYYY')}</span>
+                          </div>
+                        </div>
+                      </ListGroup.Item>
+                    );
+                  })}
+                  {(!dashboardData?.upcoming_meetings || dashboardData.upcoming_meetings.length === 0) && (
+                    <ListGroup.Item style={{ padding: '16px 0', border: 'none' }}>
+                      <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0, textAlign: 'center' }}>No upcoming meetings</p>
+                    </ListGroup.Item>
+                  )}
                 </ListGroup>
               </Card.Body>
             </Card>
@@ -715,7 +729,7 @@ const CrmDashboard = () => {
                 <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>Total Order Revenue</p>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                  <h2 style={{ fontSize: '32px', fontWeight: 700, margin: 0, color: '#1E293B' }}>AED 17,305</h2>
+                  <h2 style={{ fontSize: '32px', fontWeight: 700, margin: 0, color: '#1E293B' }}>AED {formatNumber(dashboardData?.order_revenue_aed || 0)}</h2>
                   <div style={{ height: '32px' }}>
                     <svg width="120" height="32" viewBox="0 0 120 32">
                       <path d="M0,16 L10,20 L20,12 L30,18 L40,8 L50,14 L60,10 L70,6 L80,4 L90,8 L100,6 L110,4 L120,2" 
@@ -729,7 +743,7 @@ const CrmDashboard = () => {
                 </div>
 
                 <div style={{ width: '100%', height: '40px', background: 'linear-gradient(90deg, #14B8A6 0%, #10B981 100%)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: '16px', marginBottom: '16px' }}>
-                  AED 17,305
+                  AED {formatNumber(dashboardData?.order_revenue_aed || 0)}
                 </div>
 
                 <p style={{ fontSize: '13px', color: '#64748B', margin: 0, lineHeight: '1.6' }}>
@@ -795,68 +809,36 @@ const CrmDashboard = () => {
                 </div>
 
                 <ListGroup variant="flush">
-                  <ListGroup.Item style={{ padding: '16px 0', border: 'none', borderBottom: '1px solid #F1F5F9' }}>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
-                        <img src="https://i.pravatar.cc/150?img=12" alt="User" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <h6 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>Call Amy Davis</h6>
-                        <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>Diqit Is sheduled for omprow</p>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', backgroundColor: '#D1FAE5', borderRadius: '6px' }}>
-                        <Calendar size={14} color="#10B981" />
-                        <span style={{ fontSize: '13px', color: '#10B981', fontWeight: 500 }}>Apr 26, 2024</span>
-                      </div>
-                    </div>
-                  </ListGroup.Item>
-
-                  <ListGroup.Item style={{ padding: '16px 0', border: 'none', borderBottom: '1px solid #F1F5F9' }}>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
-                        <img src="https://i.pravatar.cc/150?img=12" alt="User" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <h6 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>Send Proposal to XYZ Inc.</h6>
-                        <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>Diqit $acLaeeie princing options.</p>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', backgroundColor: '#D1FAE5', borderRadius: '6px' }}>
-                        <Calendar size={14} color="#10B981" />
-                        <span style={{ fontSize: '13px', color: '#10B981', fontWeight: 500 }}>Apr 27, 2024</span>
-                      </div>
-                    </div>
-                  </ListGroup.Item>
-                  <ListGroup.Item style={{ padding: '16px 0', border: 'none', borderBottom: '1px solid #F1F5F9' }}>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
-                        <img src="https://i.pravatar.cc/150?img=12" alt="User" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <h6 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>Create presentation for Demo</h6>
-                        <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>Discuss tentop iann preemta.</p>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', backgroundColor: '#F1F5F9', borderRadius: '6px' }}>
-                        <Calendar size={14} color="#64748B" />
-                        <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 500 }}>Apr 25, 2024</span>
-                      </div>
-                    </div>
-                  </ListGroup.Item>
-
-                  <ListGroup.Item style={{ padding: '16px 0', border: 'none' }}>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
-                        <img src="https://i.pravatar.cc/150?img=12" alt="User" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <h6 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>Send Quote to Smith LLC.</h6>
-                        <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>Pinal quote needed.</p>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', backgroundColor: '#F1F5F9', borderRadius: '6px' }}>
-                        <Calendar size={14} color="#64748B" />
-                        <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 500 }}>Apr 28, 2024</span>
-                      </div>
-                    </div>
-                  </ListGroup.Item>
+                  {(dashboardData?.upcoming_tasks || []).slice(0, 5).map((task: any, index: number) => {
+                    const initials = task.name ? task.name.charAt(0).toUpperCase() : 'T';
+                    const isOverdue = task.status === 'overdue';
+                    const bgColor = isOverdue ? '#F1F5F9' : '#D1FAE5';
+                    const textColor = isOverdue ? '#64748B' : '#10B981';
+                    return (
+                      <ListGroup.Item key={task.id || index} style={{ padding: '16px 0', border: 'none', borderBottom: index < (dashboardData?.upcoming_tasks?.length || 0) - 1 ? '1px solid #F1F5F9' : 'none' }}>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '14px', fontWeight: 600, color: '#3B82F6' }}>
+                            {initials}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <h6 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{task.name}</h6>
+                            {task.company_name && (
+                              <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>{task.company_name}</p>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', backgroundColor: bgColor, borderRadius: '6px',textTransform: 'uppercase' }}>
+                            <Calendar size={14} color={textColor} />
+                            <span style={{ fontSize: '13px', color: textColor, fontWeight: 500 }}>{moment(task.due_date).format(GlobalDateTimeFormat)}</span>
+                          </div>
+                        </div>
+                      </ListGroup.Item>
+                    );
+                  })}
+                  {(!dashboardData?.upcoming_tasks || dashboardData.upcoming_tasks.length === 0) && (
+                    <ListGroup.Item style={{ padding: '16px 0', border: 'none' }}>
+                      <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0, textAlign: 'center' }}>No upcoming tasks</p>
+                    </ListGroup.Item>
+                  )}
                 </ListGroup>
               </Card.Body>
             </Card>
@@ -876,7 +858,6 @@ const CrmDashboard = () => {
                     <YAxis tick={{ fontSize: 10, fill: '#94A3B8' }} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}%`} />
                     <Tooltip />
                     <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} iconType="circle" iconSize={8} />
-                    <Line type="monotone" dataKey="Clicks" stroke="#0EA5E9" strokeWidth={2} dot={{ r: 2 }} />
                     <Line type="monotone" dataKey="Leads" stroke="#14B8A6" strokeWidth={2} dot={{ r: 2 }} />
                     <Line type="monotone" dataKey="Deals" stroke="#F59E0B" strokeWidth={2} dot={{ r: 2 }} />
                     <Line type="monotone" dataKey="Orders" stroke="#F97316" strokeWidth={2} dot={{ r: 2 }} />
@@ -888,63 +869,46 @@ const CrmDashboard = () => {
             {/* Top Customers */}
             <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '16px' }}>
               <Card.Body style={{ padding: '20px' }}>
-                <h5 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px', color: '#1E293B' }}>Top Customers</h5>
+                <h5 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px', color: '#1E293B' }}>Recent Leads</h5>
                 
-                <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 500, marginBottom: '12px', display: 'grid', gridTemplateColumns: '36px 1fr 100px 60px 90px', gap: '8px', paddingLeft: '4px' }}>
+                <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 500, marginBottom: '12px', display: 'grid', gridTemplateColumns: '36px 1fr 120px 80px 140px', gap: '8px', paddingLeft: '4px' }}>
                   <span></span>
-                  <span>CUSTOMER</span>
-                  <span style={{ textAlign: 'right' }}>TOTAL REVENUE</span>
-                  <span style={{ textAlign: 'center' }}>ORDERS</span>
-                  <span style={{ textAlign: 'right' }}>LAST ORDER</span>
+                  <span>Lead Name</span>
+                  <span style={{ textAlign: 'right' }}>Campaign Name</span>
+                  <span style={{ textAlign: 'center' }}>Stage At</span>
+                  <span style={{ textAlign: 'right' }}>Created At</span>
                 </div>
 
                 <ListGroup variant="flush">
-                  <ListGroup.Item style={{ padding: '10px 0', border: 'none', borderBottom: '1px solid #F1F5F9' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 100px 60px 90px', gap: '8px', alignItems: 'center' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#3B82F6' }}>
-                        A
-                      </div>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>ABC Corp</span>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 600, textAlign: 'right' }}>AED 8,700</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', textAlign: 'center' }}>-</span>
-                      <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>Apr 23, 2024</span>
-                    </div>
-                  </ListGroup.Item>
-
-                  <ListGroup.Item style={{ padding: '10px 0', border: 'none', borderBottom: '1px solid #F1F5F9' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 100px 60px 90px', gap: '8px', alignItems: 'center' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#3B82F6' }}>
-                        A
-                      </div>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>XYZ Inc</span>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 600, textAlign: 'right' }}>AED 6,200</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', textAlign: 'center' }}>-</span>
-                      <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>Apr 17, 2024</span>
-                    </div>
-                  </ListGroup.Item>
-
-                  <ListGroup.Item style={{ padding: '10px 0', border: 'none' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 100px 60px 90px', gap: '8px', alignItems: 'center' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
-                        S
-                      </div>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>Smith LLC</span>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 600, textAlign: 'right' }}>AED 2,405</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', textAlign: 'center' }}>-</span>
-                      <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>Apr 15, 2024</span>
-                    </div>
-                  </ListGroup.Item>
-                  <ListGroup.Item style={{ padding: '10px 0', border: 'none' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 100px 60px 90px', gap: '8px', alignItems: 'center' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
-                        S
-                      </div>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>Smith LLC</span>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 600, textAlign: 'right' }}>AED 2,405</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', textAlign: 'center' }}>-</span>
-                      <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>Apr 15, 2024</span>
-                    </div>
-                  </ListGroup.Item>
+                  {(dashboardData?.recent_leads || []).slice(0, 5).map((lead: any, index: number) => {
+                    const initials = lead.name ? lead.name.charAt(0).toUpperCase() : 'L';
+                    const campaignName = lead.campaign?.name || '-';
+                    const stageName = lead.stage?.name || '-';
+                    const stageColor = lead.stage?.color || '#64748B';
+                    return (
+                      <ListGroup.Item key={lead.id || index} style={{ padding: '10px 0', border: 'none', borderBottom: index < (dashboardData?.recent_leads?.length || 0) - 1 ? '1px solid #F1F5F9' : 'none' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 120px 80px 140px', gap: '8px', alignItems: 'center' }}>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#3B82F6' }}>
+                            {initials}
+                          </div>
+                          <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>{lead.name || '-'}</span>
+                          <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500, textAlign: 'right' }}>{campaignName}</span>
+                          <span style={{ fontSize: '13px', color: stageColor, fontWeight: 500, textAlign: 'center' }}>{stageName}</span>
+                          <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>
+                            {(() => {
+                              const formatted = moment.utc(lead.created_at).local().format('DD MMM YYYY,hh:mm:ss A');
+                              return formatted.replace(/(\d{2} )(\w{3})( \d{4})/, (match, day, month, year) => `${day}${month.toUpperCase()}${year}`);
+                            })()}
+                          </span>
+                        </div>
+                      </ListGroup.Item>
+                    );
+                  })}
+                  {(!dashboardData?.recent_leads || dashboardData.recent_leads.length === 0) && (
+                    <ListGroup.Item style={{ padding: '10px 0', border: 'none' }}>
+                      <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0, textAlign: 'center' }}>No recent leads</p>
+                    </ListGroup.Item>
+                  )}
                 </ListGroup>
               </Card.Body>
             </Card>
@@ -962,49 +926,29 @@ const CrmDashboard = () => {
                 </div>
 
                 <ListGroup variant="flush">
-                  <ListGroup.Item style={{ padding: '10px 0', border: 'none', borderBottom: '1px solid #F1F5F9' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 100px 100px', gap: '8px', alignItems: 'center' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#3B82F6' }}>
-                        A
-                      </div>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>ABC Corp</span>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 600, textAlign: 'right' }}>AED 8,700</span>
-                      <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>Apr 23, 2024</span>
-                    </div>
-                  </ListGroup.Item>
-
-                  <ListGroup.Item style={{ padding: '10px 0', border: 'none', borderBottom: '1px solid #F1F5F9' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 100px 100px', gap: '8px', alignItems: 'center' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#3B82F6' }}>
-                        A
-                      </div>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>XYZ Inc</span>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 600, textAlign: 'right' }}>AED 6,200</span>
-                      <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>Apr 19, 2024</span>
-                    </div>
-                  </ListGroup.Item>
-
-                  <ListGroup.Item style={{ padding: '10px 0', border: 'none' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 100px 100px', gap: '8px', alignItems: 'center' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
-                        S
-                      </div>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>Smith LLC</span>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 600, textAlign: 'right' }}>AED 2,405</span>
-                      <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>Apr 19, 2024</span>
-                    </div>
-                  </ListGroup.Item>
-                  <ListGroup.Item style={{ padding: '10px 0', border: 'none' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 100px 100px', gap: '8px', alignItems: 'center' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
-                        S
-                      </div>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>Smith LLC</span>
-                      <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 600, textAlign: 'right' }}>AED 2,405</span>
-                      <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>Apr 19, 2024</span>
-                    </div>
-                  </ListGroup.Item>
-                  
+                  {(dashboardData?.recent_deals || []).slice(0, 5).map((deal: any, index: number) => {
+                    const initials = deal.name ? deal.name.charAt(0).toUpperCase() : 'D';
+                    const companyName = deal.company_name || deal.ticket?.company_name || 'N/A';
+                    const dealValue = deal.grand_total || deal.net_value || 0;
+                    const currency = deal.currency || 'AED';
+                    return (
+                      <ListGroup.Item key={deal.id || index} style={{ padding: '10px 0', border: 'none', borderBottom: index < (dashboardData?.recent_deals?.length || 0) - 1 ? '1px solid #F1F5F9' : 'none' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 100px 100px', gap: '8px', alignItems: 'center' }}>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#3B82F6' }}>
+                            {initials}
+                          </div>
+                          <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>{companyName}</span>
+                          <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 600, textAlign: 'right' }}>{currency} {formatNumber(Number(dealValue))}</span>
+                          <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>{moment(deal.created_at).format('MMM DD, YYYY')}</span>
+                        </div>
+                      </ListGroup.Item>
+                    );
+                  })}
+                  {(!dashboardData?.recent_deals || dashboardData.recent_deals.length === 0) && (
+                    <ListGroup.Item style={{ padding: '10px 0', border: 'none' }}>
+                      <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0, textAlign: 'center' }}>No recent deals</p>
+                    </ListGroup.Item>
+                  )}
                 </ListGroup>
               </Card.Body>
             </Card>

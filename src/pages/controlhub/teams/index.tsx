@@ -691,7 +691,7 @@ const Teams = () => {
             .filter((user) => !selectedUserIds.has(user.id)) // Only exclude if selected as regular user
             .map((user) => ({ 
                 value: user.id, 
-                label: `${user.name || 'Unknown'} (${user.username || user.email || 'N/A'})` 
+                label: `${user.name || 'Unknown'} (${user.phone || user.email || 'N/A'})` 
             }));
     }, [allUsers, teamUsers, teamOwners, selectedUsersToAssign]);
 
@@ -708,7 +708,7 @@ const Teams = () => {
             .filter((user) => !selectedOwnerIds.has(user.id)) // Only exclude if selected as owner
             .map((user) => ({ 
                 value: user.id, 
-                label: `${user.name || 'Unknown'} (${user.username || user.email || 'N/A'})` 
+                label: `${user.name || 'Unknown'} (${user.phone || user.email || 'N/A'})` 
             }));
     }, [allUsers, teamUsers, teamOwners, selectedOwnersToAssign]);
 
@@ -874,7 +874,7 @@ const Teams = () => {
                                 const u = allUsers.find((u) => u.id.toString() === idStr);
                                 return u ? { 
                                     value: u.id, 
-                                    label: `${u.name || 'Unknown'} (${u.username || u.email || 'N/A'})` 
+                                    label: `${u.name || 'Unknown'} (${u.phone || u.email || 'N/A'})` 
                                 } : { value: Number(idStr), label: idStr };
                             })}
                             noOptionsMessage="No owners found"
@@ -985,7 +985,7 @@ const Teams = () => {
                                 const u = allUsers.find((u) => u.id.toString() === idStr);
                                 return u ? { 
                                     value: u.id, 
-                                    label: `${u.name || 'Unknown'} (${u.username || u.email || 'N/A'})` 
+                                    label: `${u.name || 'Unknown'} (${u.phone || u.email || 'N/A'})` 
                                 } : { value: Number(idStr), label: idStr };
                             })}
                             noOptionsMessage="No users found"

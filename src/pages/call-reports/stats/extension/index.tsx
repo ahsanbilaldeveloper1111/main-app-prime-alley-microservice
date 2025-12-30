@@ -928,7 +928,7 @@ const CallStatsExtension = () => {
                            </AnimatePresence>
                         </Tab>
 
-                        <Tab eventKey="cost_chart" title="Cost by Extension">
+                        {/* <Tab eventKey="cost_chart" title="Cost by Extension">
                            <AnimatePresence mode="wait">
                              {activeTab === 'cost_chart' && (
                                <motion.div
@@ -975,7 +975,7 @@ const CallStatsExtension = () => {
                                </motion.div>
                              )}
                            </AnimatePresence>
-                        </Tab>
+                        </Tab> */}
 
                     </Tabs>
                 </Col>

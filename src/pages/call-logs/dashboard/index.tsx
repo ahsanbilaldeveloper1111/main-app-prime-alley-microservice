@@ -91,10 +91,17 @@ const CallDashboard = () => {
     const [showDateRange, setShowDateRange] = useState(false);
     
     const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [currentFilters, setCurrentFilters] = useState({
-      start_datetime: moment().utc().startOf('day').format('YYYY-MM-DDTHH:mm:ss') + 'Z',
-      end_datetime: moment().utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z',
-    });
+    // Initialize with local time, then convert to UTC for API
+    const getInitialFilters = () => {
+      const now = moment();
+      const startLocal = now.clone().startOf('day');
+      const endLocal = now.clone();
+      return {
+        start_datetime: startLocal.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z',
+        end_datetime: endLocal.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z',
+      };
+    };
+    const [currentFilters, setCurrentFilters] = useState(getInitialFilters());
     const [generalStats, setGeneralStats] = useState<GeneralStats>({
         totalCalls: 0,
         totalInbound: 0,
@@ -583,49 +590,65 @@ const [ExtensionChart, setExtensionChart] = React.useState({
    
 
     const handleFiltersChange = (filters: any) => {
-        // Format datetime values to UTC format before sending to API
+        // Convert datetime values from local timezone to UTC before sending to API
         const formattedFilters: any = { ...filters };
         
         if (formattedFilters.start_datetime) {
-            // Handle different date formats
-            let startMoment = moment(formattedFilters.start_datetime);
+            let startMoment;
             
             if (formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-                startMoment = moment(formattedFilters.start_datetime + ':00');
-            } else if (formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [AP]M$/)) {
-                // Format is YYYY-MM-DD hh:mm:ss A (local format from dashboard)
-                startMoment = moment(formattedFilters.start_datetime, 'YYYY-MM-DD hh:mm:ss A');
-            } else if (!formattedFilters.start_datetime.includes('T') && !formattedFilters.start_datetime.includes(' ')) {
-                // If only date, set to 00:00:00
+                // Format is YYYY-MM-DDTHH:mm from datetime-local input
+                // datetime-local always returns values in local timezone
+                // Parse the string and create moment in local time explicitly
+                const dateTimeStr = formattedFilters.start_datetime + ':00';
+                // Split the datetime string to extract components
+                const [datePart, timePart] = dateTimeStr.split('T');
+                const [year, month, day] = datePart.split('-').map(Number);
+                const [hour, minute, second] = timePart.split(':').map(Number);
+                // Create moment object explicitly in local timezone
+                startMoment = moment([year, month - 1, day, hour, minute, second]);
+            } else if (formattedFilters.start_datetime.endsWith('Z')) {
+                // Already in UTC format - convert to local first
+                startMoment = moment.utc(formattedFilters.start_datetime).local();
+            } else if (!formattedFilters.start_datetime.includes('T')) {
+                // If only date, set to 00:00:00 in local time
                 startMoment = moment(formattedFilters.start_datetime).startOf('day');
+            } else {
+                // Default: parse as local time
+                startMoment = moment(formattedFilters.start_datetime);
             }
             
-            // Convert to UTC
+            // Convert local time to UTC for API
             formattedFilters.start_datetime = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
         }
         
         if (formattedFilters.end_datetime) {
-            // Handle different date formats
-            let endMoment = moment(formattedFilters.end_datetime);
+            let endMoment;
             
             if (formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
+                // Format is YYYY-MM-DDTHH:mm from datetime-local input
+                // datetime-local always returns values in local timezone
                 const timePart = formattedFilters.end_datetime.split('T')[1];
-                if (timePart === '23:59') {
-                    endMoment = moment(formattedFilters.end_datetime + ':59');
-                } else {
-                    endMoment = moment(formattedFilters.end_datetime + ':00');
-                }
-            } else if (formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [AP]M$/)) {
-                // Format is YYYY-MM-DD hh:mm:ss A (local format from dashboard)
-                endMoment = moment(formattedFilters.end_datetime, 'YYYY-MM-DD hh:mm:ss A');
-            } else if (!formattedFilters.end_datetime.includes('T') && !formattedFilters.end_datetime.includes(' ')) {
-                // If only date, set to 23:59:59
+                const seconds = timePart === '23:59' ? '59' : '00';
+                const dateTimeStr = formattedFilters.end_datetime + ':' + seconds;
+                // Split the datetime string to extract components
+                const [datePart, timePartFull] = dateTimeStr.split('T');
+                const [year, month, day] = datePart.split('-').map(Number);
+                const [hour, minute, second] = timePartFull.split(':').map(Number);
+                // Create moment object explicitly in local timezone
+                endMoment = moment([year, month - 1, day, hour, minute, second]);
+            } else if (formattedFilters.end_datetime.endsWith('Z')) {
+                // Already in UTC format - convert to local first
+                endMoment = moment.utc(formattedFilters.end_datetime).local();
+            } else if (!formattedFilters.end_datetime.includes('T')) {
+                // If only date, set to 23:59:59 in local time
                 endMoment = moment(formattedFilters.end_datetime).endOf('day');
+            } else {
+                // Default: parse as local time
+                endMoment = moment(formattedFilters.end_datetime);
             }
             
-            // Convert to UTC
+            // Convert local time to UTC for API
             formattedFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
         }
         

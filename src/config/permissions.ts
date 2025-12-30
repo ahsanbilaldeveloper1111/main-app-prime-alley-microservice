@@ -149,40 +149,50 @@ export const routePermissions: RoutePermission[] = [
                 permissions: [PERMISSIONS.VIEW_CALL_REPORTS]
             },
             {
+                path: '/stats/general',
+                permissions: [PERMISSIONS.CALL_REPORTS_BY_STATISTICS_REPORTS]
+            },
+            {
                 path: '/stats/country',
-                permissions: ['call-reports-by-statistics-reports']
+                permissions: [PERMISSIONS.CALL_REPORTS_BY_STATISTICS_REPORTS]
             },
             {
                 path: '/stats/department',
-                permissions: ['call-reports-by-statistics-reports']
+                permissions: [PERMISSIONS.CALL_REPORTS_BY_STATISTICS_REPORTS],
+                children: [
+                    {
+                        path: '/extension',
+                        permissions: [PERMISSIONS.CALL_REPORTS_BY_STATISTICS_REPORTS]
+                    }
+                ]
             },
             {
                 path: '/stats/extension',
-                permissions: ['call-reports-by-statistics-reports']
+                permissions: [PERMISSIONS.CALL_REPORTS_BY_STATISTICS_REPORTS]
             },
             {
                 path: '/incoming/country',
-                permissions: ['call-reports-by-call-incoming-reports']
+                permissions: [PERMISSIONS.CALL_REPORTS_BY_CALL_INCOMING_REPORTS]
             },
             {
                 path: '/incoming/department',
-                permissions: ['call-reports-by-call-incoming-reports']
+                permissions: [PERMISSIONS.CALL_REPORTS_BY_CALL_INCOMING_REPORTS]
             },
             {
                 path: '/incoming/extension',
-                permissions: ['call-reports-by-call-incoming-reports']
+                permissions: [PERMISSIONS.CALL_REPORTS_BY_CALL_INCOMING_REPORTS]
             },
             {
                 path: '/trend/country',
-                permissions: ['call-reports-by-trend-reports']
+                permissions: [PERMISSIONS.CALL_REPORTS_BY_TREND_REPORTS]
             },
             {
                 path: '/trend/department',
-                permissions: ['call-reports-by-trend-reports']
+                permissions: [PERMISSIONS.CALL_REPORTS_BY_TREND_REPORTS]
             },
             {
                 path: '/trend/extension',
-                permissions: ['call-reports-by-trend-reports']
+                permissions: [PERMISSIONS.CALL_REPORTS_BY_TREND_REPORTS]
             },
         ]
     },

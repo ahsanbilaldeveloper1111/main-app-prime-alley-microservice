@@ -1,6 +1,7 @@
 import React,{ReactElement, useEffect, useState} from 'react'
 import Layout from '@layout/index'
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import "@assets/scss/dashboard.scss";
 import "@assets/scss/common.scss";
 import {  Row, Col, Card, Button, ProgressBar, Badge, Form } from 'react-bootstrap';
@@ -28,17 +29,65 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import TimezoneSearch from '@components/TimezoneSearch';
 import { GetTranscriptionOverview } from '@utils/calls';
+import { getCrmDashboardOverview } from '@utils/crm';
 import { toast } from 'react-toastify';
 
+// Helper function to format numbers with commas
+const formatNumber = (value: number | undefined | null): string => {
+  const num = value || 0;
+  return num.toLocaleString('en-US');
+};
+
+// Custom Tooltip for PieChart to avoid hiding center text
+const CustomPieTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0];
+    return (
+      <div
+        style={{
+          backgroundColor: '#fff',
+          border: '1px solid #ddd',
+          borderRadius: '4px',
+          fontSize: '0.75rem',
+          padding: '6px 10px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          pointerEvents: 'none',
+          zIndex: 1000,
+          position: 'relative'
+        }}
+      >
+        <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>{data.name}</div>
+        <div style={{ color: '#666' }}>{formatNumber(data.value)}</div>
+      </div>
+    );
+  }
+  return null;
+};
+
 const Dashboard = () => {
+  const router = useRouter();
+  const { data: session } = useSession();
     
   const [transcriptionOverview, setTranscriptionOverview] = useState<any>(null);
+  const [crmDashboardData, setCrmDashboardData] = useState<any>(null);
   const [meetingCount, setMeetingCount] = useState<number>(0);
   const [followUpCount, setFollowUpCount] = useState<number>(0);
   const [tasksCount, setTasksCount] = useState<number>(0);
   const [missedCallsCount, setMissedCallsCount] = useState<number>(4);
   const [callbacksDueCount, setCallbacksDueCount] = useState<number>(2);
   const [voicemailsCount, setVoicemailsCount] = useState<number>(3);
+
+
+  useEffect(() => {
+    getCrmDashboardOverview().then((data) => {
+      console.log("CRM Dashboard Overview", data);
+      if (data) {
+        setCrmDashboardData(data);
+      }
+    });
+  }, []);
+
+
 
   useEffect(() => {
     GetTranscriptionOverview().then((data) => {
@@ -112,53 +161,86 @@ const Dashboard = () => {
                   <span className="text-muted">•••</span>
                 </div>
                 <div className="d-flex flex-column gap-3">
-                  {/* Prospects */}
-                  <div>
-                    <div className="d-flex align-items-center justify-content-between mb-1">
-                      <div className="d-flex align-items-center gap-2">
-                        <FileText className="text-success" size={18} />
-                        <span className="small fw-semibold">Leads</span>
-                      </div>
-                      {/* <span className="fw-bold" style={{ fontSize: '0.85rem' }}>5/18</span> */}
-                    </div>
-                    <ProgressBar now={28} variant="success" style={{ height: '6px', borderRadius: '3px' }} />
-                    <div className="d-flex justify-content-between mt-1">
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>5 Converted</small>
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>28%</small>
-                    </div>
-                  </div>
-                  
                   {/* Leads */}
-                  <div>
-                    <div className="d-flex align-items-center justify-content-between mb-1">
-                      <div className="d-flex align-items-center gap-2">
-                        <Users className="text-info" size={18} />
-                        <span className="small fw-semibold">Deals</span>
+                  {(() => {
+                    const totalCount = crmDashboardData?.crm_data_count || 0;
+                    const convertedCount = crmDashboardData?.converted_to_tickets || 0;
+                    const percentage = totalCount > 0 ? Math.round((convertedCount / totalCount) * 100) : 0;
+                    return (
+                      <div>
+                        <div className="d-flex align-items-center justify-content-between mb-1">
+                          <div className="d-flex align-items-center gap-2">
+                            <FileText className="text-success" size={18} />
+                            <span className="small fw-semibold">Leads</span>
+                          </div>
+                          {/* <span className="fw-bold" style={{ fontSize: '0.85rem' }}>{formatNumber(totalCount)}</span> */}
+                        </div>
+                        <ProgressBar 
+                          now={percentage} 
+                          variant="success" 
+                          style={{ height: '6px', borderRadius: '3px' }} 
+                        />
+                        <div className="d-flex justify-content-between mt-1">
+                          <small className="text-muted" style={{ fontSize: '0.7rem' }}>{formatNumber(convertedCount)} Converted</small>
+                          <small className="text-muted" style={{ fontSize: '0.7rem' }}>{percentage}%</small>
+                        </div>
                       </div>
-                      {/* <span className="fw-bold" style={{ fontSize: '0.85rem' }}>4/13</span> */}
-                    </div>
-                    <ProgressBar now={31} variant="info" style={{ height: '6px', borderRadius: '3px' }} />
-                    <div className="d-flex justify-content-between mt-1">
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>4 Converted</small>
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>31%</small>
-                    </div>
-                  </div>
+                    );
+                  })()}
+                  
+                  {/* Deals */}
+                  {(() => {
+                    const totalCount = crmDashboardData?.crm_data_count || 0;
+                    const convertedCount = crmDashboardData?.leads_converted_to_deals || 0;
+                    const percentage = totalCount > 0 ? Math.round((convertedCount / totalCount) * 100) : 0;
+                    return (
+                      <div>
+                        <div className="d-flex align-items-center justify-content-between mb-1">
+                          <div className="d-flex align-items-center gap-2">
+                            <Users className="text-info" size={18} />
+                            <span className="small fw-semibold">Deals</span>
+                          </div>
+                          {/* <span className="fw-bold" style={{ fontSize: '0.85rem' }}>s{formatNumber(totalCount)}</span> */}
+                        </div>
+                        <ProgressBar 
+                          now={percentage} 
+                          variant="info" 
+                          style={{ height: '6px', borderRadius: '3px' }} 
+                        />
+                        <div className="d-flex justify-content-between mt-1">
+                          <small className="text-muted" style={{ fontSize: '0.7rem' }}>{formatNumber(convertedCount)} Converted</small>
+                          <small className="text-muted" style={{ fontSize: '0.7rem' }}>{percentage}%</small>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   
                   {/* Orders */}
-                  <div>
-                    <div className="d-flex align-items-center justify-content-between mb-1">
-                      <div className="d-flex align-items-center gap-2">
-                        <ShoppingCart className="text-warning" size={18} />
-                        <span className="small fw-semibold">Orders</span>
+                  {(() => {
+                    const totalCount = crmDashboardData?.crm_data_count || 0;
+                    const convertedCount = crmDashboardData?.deals_converted_to_orders || 0;
+                    const percentage = totalCount > 0 ? Math.round((convertedCount / totalCount) * 100) : 0;
+                    return (
+                      <div>
+                        <div className="d-flex align-items-center justify-content-between mb-1">
+                          <div className="d-flex align-items-center gap-2">
+                            <ShoppingCart className="text-warning" size={18} />
+                            <span className="small fw-semibold">Orders</span>
+                          </div>
+                          {/* <span className="fw-bold" style={{ fontSize: '0.85rem' }}>{formatNumber(totalCount)}</span> */}
+                        </div>
+                        <ProgressBar 
+                          now={percentage} 
+                          variant="warning" 
+                          style={{ height: '6px', borderRadius: '3px' }} 
+                        />
+                        <div className="d-flex justify-content-between mt-1">
+                          <small className="text-muted" style={{ fontSize: '0.7rem' }}>{formatNumber(convertedCount)} Converted</small>
+                          <small className="text-muted" style={{ fontSize: '0.7rem' }}>{percentage}%</small>
+                        </div>
                       </div>
-                      {/* <span className="fw-bold" style={{ fontSize: '0.85rem' }}>4/10</span> */}
-                    </div>
-                    <ProgressBar now={40} variant="warning" style={{ height: '6px', borderRadius: '3px' }} />
-                    <div className="d-flex justify-content-between mt-1">
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>4 Converted</small>
-                      <small className="text-muted" style={{ fontSize: '0.7rem' }}>40%</small>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
               </Card.Body>
             </Card>
@@ -183,12 +265,19 @@ const Dashboard = () => {
                       style={{ width: '120px', height: '120px' }}
                     >
                       <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
+                        <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                          <Tooltip 
+                            content={<CustomPieTooltip />}
+                            allowEscapeViewBox={{ x: true, y: true }}
+                            cursor={false}
+                            offset={15}
+                            wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
+                          />
                           <Pie
                             data={[
-                              { name: 'Meetings', value: meetingCount, color: '#0d6efd' },
-                              { name: 'Follow Ups', value: followUpCount, color: '#198754' },
-                              { name: 'Tasks', value: tasksCount, color: '#ffc107' }
+                              { name: 'Meetings', value: crmDashboardData?.total_meetings || 0, color: '#0d6efd' },
+                              { name: 'Follow Ups', value: crmDashboardData?.total_followups || 0, color: '#198754' },
+                              { name: 'Tasks', value: crmDashboardData?.total_tasks || 0, color: '#ffc107' }
                             ]}
                             cx="50%"
                             cy="50%"
@@ -212,7 +301,7 @@ const Dashboard = () => {
                           className="fw-bold text-dark"
                           style={{ fontSize: '2rem', lineHeight: 1 }}
                         >
-                          {meetingCount + followUpCount + tasksCount}
+                          {formatNumber((crmDashboardData?.total_meetings || 0) + (crmDashboardData?.total_followups || 0) + (crmDashboardData?.total_tasks || 0))}
                         </span>
                       </div>
                     </div>
@@ -228,21 +317,21 @@ const Dashboard = () => {
                       <div className="text-muted small mb-1">
                         Meetings
                       </div>
-                      <div className="h4 mb-0 fw-bold text-dark">{meetingCount}</div>
+                      <div className="h4 mb-0 fw-bold text-dark">{formatNumber(crmDashboardData?.total_meetings || 0)}</div>
                     </div>
 
                     <div>
                       <div className="text-muted small mb-1">
                         Follow Ups
                       </div>
-                      <div className="h4 mb-0 fw-bold text-dark">{followUpCount}</div>
+                      <div className="h4 mb-0 fw-bold text-dark">{formatNumber(crmDashboardData?.total_followups || 0)}</div>
                     </div>
 
                     <div>
                       <div className="text-muted small mb-1">
                         Tasks
                       </div>
-                      <div className="h4 mb-0 fw-bold text-dark">{tasksCount}</div>
+                      <div className="h4 mb-0 fw-bold text-dark">{formatNumber(crmDashboardData?.total_tasks || 0)}</div>
                     </div>
                   </div>
                 </div>
@@ -265,7 +354,7 @@ const Dashboard = () => {
                       <Clock className="text-info" size={18} />
                       <span style={{ fontSize: '0.9rem' }}>Scheduled Calls</span>
                     </div>
-                    <Badge bg="info" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>2</Badge>
+                    <Badge bg="info" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{formatNumber(crmDashboardData?.scheduled_calls || 0)}</Badge>
                   </div>
                   
                   <div className="d-flex align-items-center justify-content-between">
@@ -273,33 +362,48 @@ const Dashboard = () => {
                       <AlertCircle className="text-danger" size={18} />
                       <span style={{ fontSize: '0.9rem' }}>Overdue Tasks</span>
                     </div>
-                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>3</Badge>
+                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{formatNumber(crmDashboardData?.overdue_tasks || 0)}</Badge>
                   </div>
                   <div className="d-flex align-items-center justify-content-between">
                     <div className="d-flex align-items-center gap-2">
                       <Phone className="text-danger" size={18} />
                       <span style={{ fontSize: '0.9rem' }}>Overdue Follow-Ups</span>
                     </div>
-                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>2</Badge>
+                    <Badge bg="danger" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{formatNumber(crmDashboardData?.overdue_followups || 0)}</Badge>
+                  </div>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center gap-2">
+                      <FileText className="text-warning" size={18} />
+                      <span style={{ fontSize: '0.9rem' }}>Lost Leads</span>
+                    </div>
+                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{formatNumber(crmDashboardData?.lost_leads || 0)}</Badge>
                   </div>
                   <div className="d-flex align-items-center justify-content-between">
                     <div className="d-flex align-items-center gap-2">
                       <FileText className="text-warning" size={18} />
                       <span style={{ fontSize: '0.9rem' }}>Lost Deals</span>
                     </div>
-                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>1</Badge>
+                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{formatNumber(crmDashboardData?.lost_deals || 0)}</Badge>
                   </div>
                   <div className="d-flex align-items-center justify-content-between">
                     <div className="d-flex align-items-center gap-2">
                       <DollarSign className="text-warning" size={18} />
                       <span style={{ fontSize: '0.9rem' }}>Cancelled Orders</span>
                     </div>
-                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>1</Badge>
+                    <Badge bg="warning" pill className="d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '0.75rem' }}>{formatNumber(crmDashboardData?.cancelled_orders || 0)}</Badge>
                   </div>
                   
                 </div>
-                <Button variant="primary" className="mx-auto d-block mt-auto" style={{ width: '160px' }}>Visit Dashboard</Button>
-                {/* it will redirect to the crm/dashboard page */}
+                {session?.user?.permissions?.includes('dashboard-crm') && (
+                  <Button 
+                    variant="primary" 
+                    className="mx-auto d-block mt-auto" 
+                    
+                    onClick={() => router.push('/crm/dashboard')}
+                  >
+                    Visit Dashboard
+                  </Button>
+                )}
               </Card.Body>
             </Card>
           </Col>
@@ -367,30 +471,30 @@ const Dashboard = () => {
                 </div>
                 <div className="d-flex justify-content-around align-items-center  mb-3">
                   <div className="text-center">
-                    <div className="h3 fw-bold text-primary mb-0">{transcriptionOverview?.calls?.total || 0}</div>
+                    <div className="h3 fw-bold text-primary mb-0">{formatNumber(transcriptionOverview?.calls?.total)}</div>
                     <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Total Calls</small>
                   </div>
                   <div className="text-center">
-                    <div className="h3 fw-bold text-dark mb-0">{transcriptionOverview?.calls?.outbound || 0}</div>
+                    <div className="h3 fw-bold text-dark mb-0">{formatNumber(transcriptionOverview?.calls?.outbound)}</div>
                     <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Outbound</small>
                   </div>
                   <div className="text-center">
-                    <div className="h3 fw-bold text-dark mb-0">{transcriptionOverview?.calls?.inbound || 0}</div>
+                    <div className="h3 fw-bold text-dark mb-0">{formatNumber(transcriptionOverview?.calls?.inbound)}</div>
                     <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Inbound</small>
                   </div>
                 </div>
 
                 <div className="d-flex justify-content-around align-items-center">
                   <div className="text-center">
-                    <div className="h3 fw-bold text-primary mb-0">{transcriptionOverview?.missed_callbacks?.answered || 0}</div>
+                    <div className="h3 fw-bold text-primary mb-0">{formatNumber(transcriptionOverview?.missed_callbacks?.answered)}</div>
                     <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Answered</small>
                   </div>
                   <div className="text-center">
-                    <div className="h3 fw-bold text-dark mb-0">{transcriptionOverview?.missed_callbacks?.unanswered || 0}</div>
+                    <div className="h3 fw-bold text-dark mb-0">{formatNumber(transcriptionOverview?.missed_callbacks?.unanswered)}</div>
                     <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Unanswered</small>
                   </div>
                   <div className="text-center">
-                    <div className="h3 fw-bold text-dark mb-0">{transcriptionOverview?.missed_callbacks?.missed_calls || 0}</div>
+                    <div className="h3 fw-bold text-dark mb-0">{formatNumber(transcriptionOverview?.missed_callbacks?.missed_calls)}</div>
                     <small className="text-muted d-block" style={{ fontSize: '0.75rem' }}>Missed Calls</small>
                   </div>
                 </div>
@@ -486,31 +590,49 @@ const Dashboard = () => {
                       <div className="d-flex gap-2 mb-2 flex-grow-1">
                         {/* Donut Chart */}
                         <div className="d-flex align-items-center justify-content-center" style={{ flex: 1 }}>
-                          <div style={{ width: '110px', height: '110px' }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
-                                <Pie
-                                  data={[
-                                    { name: 'Answered', value: 18, color: '#28a745' },
-                                    { name: 'No Answer', value: 4, color: '#dc3545' },
-                                    { name: 'Busy', value: 2, color: '#ffc107' },
-                                    { name: 'Voicemail', value: 3, color: '#17a2b8' },
-                                    { name: 'Failed', value: 1, color: '#6c757d' }
-                                  ]}
-                                  cx="50%"
-                                  cy="50%"
-                                  innerRadius={28}
-                                  outerRadius={48}
-                                  paddingAngle={2}
-                                  dataKey="value"
-                                >
-                                  {['#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6c757d'].map((color, index) => (
-                                    <Cell key={index} fill={color} />
-                                  ))}
-                                </Pie>
-                              </PieChart>
-                            </ResponsiveContainer>
-                          </div>
+                          {(() => {
+                            const internalCalls = transcriptionOverview?.call_outcomes?.internal_calls || 0;
+                            const externalCalls = transcriptionOverview?.call_outcomes?.external_calls || 0;
+                            const national = transcriptionOverview?.call_outcomes?.national || 0;
+                            const international = transcriptionOverview?.call_outcomes?.international || 0;
+                            const total = internalCalls + externalCalls + national + international;
+                            
+                            if (total === 0) {
+                              return (
+                                <div style={{ width: '110px', height: '110px' }} className="d-flex flex-column align-items-center justify-content-center">
+                                  <Phone className="text-muted" size={18} style={{ opacity: 0.5 }} />
+                                  <small className="text-muted mt-2" style={{ fontSize: '0.7rem' }}>No Data</small>
+                                </div>
+                              );
+                            }
+                            
+                            return (
+                              <div style={{ width: '110px', height: '110px' }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <PieChart>
+                                    <Pie
+                                      data={[
+                                        { name: 'Internal Calls', value: internalCalls, color: '#28a745' },
+                                        { name: 'External Calls', value: externalCalls, color: '#dc3545' },
+                                        { name: 'National', value: national, color: '#ffc107' },
+                                        { name: 'International', value: international, color: '#17a2b8' }
+                                      ]}
+                                      cx="50%"
+                                      cy="50%"
+                                      innerRadius={28}
+                                      outerRadius={48}
+                                      paddingAngle={2}
+                                      dataKey="value"
+                                    >
+                                      {['#28a745', '#dc3545', '#ffc107', '#17a2b8'].map((color, index) => (
+                                        <Cell key={index} fill={color} />
+                                      ))}
+                                    </Pie>
+                                  </PieChart>
+                                </ResponsiveContainer>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Stats Summary */}
@@ -518,27 +640,39 @@ const Dashboard = () => {
                           <div className="d-flex align-items-center gap-1">
                             <Phone className="text-success" size={13} />
                             <span style={{ fontSize: '0.75rem' }}>Internal Calls</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>18</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.call_outcomes?.internal_calls)}</span>
                           </div>
                           <div className="d-flex align-items-center gap-1">
                             <Phone className="text-danger" size={13} />
                             <span style={{ fontSize: '0.75rem' }}>External Calls</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>4</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.call_outcomes?.external_calls)}</span>
                           </div>
                           <div className="d-flex align-items-center gap-1">
                             <Phone className="text-warning" size={13} />
                             <span style={{ fontSize: '0.75rem' }}>National</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>2</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.call_outcomes?.national)}</span>
                           </div>
                           <div className="d-flex align-items-center gap-1">
                             <Phone className="text-info" size={13} />
                             <span style={{ fontSize: '0.75rem' }}>International</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>3</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.call_outcomes?.international)}</span>
                           </div>
                           
                         </div>
                       </div>
-                      <Button variant="primary" className="mx-auto d-block mt-auto" size="sm" style={{ width: '160px' }}>Open Call Log</Button>
+                      <Button 
+                        variant="primary" 
+                        className="mx-auto d-block mt-auto" 
+                       
+                        onClick={() => {
+                          if (session?.user?.permissions?.includes('dashboard-call-logs')) {
+                            router.push('/call-logs/dashboard');
+                          }
+                        }}
+                        disabled={!session?.user?.permissions?.includes('dashboard-call-logs') && !session?.user?.permissions?.includes('view-call-logs')}
+                      >
+                        Visit Dashboard
+                      </Button>
                     </div>
                   </Col>
 
@@ -554,32 +688,53 @@ const Dashboard = () => {
                       <div className="d-flex gap-2 flex-grow-1">
                         {/* Donut Chart */}
                         <div className="d-flex align-items-center justify-content-center" style={{ flex: 1 }}>
-                          <div style={{ width: '110px', height: '110px' }}>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
-                                <Pie
-                                  data={[
-                                    { name: 'Billing Issue', value: 25, color: '#ffc107' },
-                                    { name: 'Pricing', value: 20, color: '#fd7e14' },
-                                    { name: 'Tech Support', value: 18, color: '#dc3545' },
-                                    { name: 'Order Status', value: 15, color: '#28a745' },
-                                    { name: 'Cancellation', value: 12, color: '#20c997' },
-                                    { name: 'General', value: 10, color: '#17a2b8' }
-                                  ]}
-                                  cx="50%"
-                                  cy="50%"
-                                  innerRadius={28}
-                                  outerRadius={48}
-                                  paddingAngle={2}
-                                  dataKey="value"
-                                >
-                                  {['#ffc107', '#fd7e14', '#dc3545', '#28a745', '#20c997', '#17a2b8'].map((color, index) => (
-                                    <Cell key={index} fill={color} />
-                                  ))}
-                                </Pie>
-                              </PieChart>
-                            </ResponsiveContainer>
-                          </div>
+                          {(() => {
+                            const missedCalls = transcriptionOverview?.missed_callbacks?.missed_calls || 0;
+                            const answered = transcriptionOverview?.missed_callbacks?.answered || 0;
+                            const unanswered = transcriptionOverview?.missed_callbacks?.unanswered || 0;
+                            const total = missedCalls + answered + unanswered;
+                            
+                            if (total === 0) {
+                              return (
+                                <div style={{ width: '110px', height: '110px' }} className="d-flex flex-column align-items-center justify-content-center">
+                                  <Phone className="text-muted" size={18} style={{ opacity: 0.5 }} />
+                                  <small className="text-muted mt-2" style={{ fontSize: '0.7rem' }}>No Data</small>
+                                </div>
+                              );
+                            }
+                            
+                            return (
+                              <div style={{ width: '110px', height: '110px' }}>
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <PieChart>
+                                    <Tooltip 
+                                      content={<CustomPieTooltip />}
+                                      allowEscapeViewBox={{ x: true, y: true }}
+                                      cursor={false}
+                                      offset={70}
+                                    />
+                                    <Pie
+                                      data={[
+                                        { name: 'Missed Calls', value: missedCalls, color: '#ffc107' },
+                                        { name: 'Answered', value: answered, color: '#28a745' },
+                                        { name: 'Unanswered', value: unanswered, color: '#dc3545' }
+                                      ]}
+                                      cx="50%"
+                                      cy="50%"
+                                      innerRadius={28}
+                                      outerRadius={48}
+                                      paddingAngle={2}
+                                      dataKey="value"
+                                    >
+                                      {['#ffc107', '#28a745', '#dc3545'].map((color, index) => (
+                                        <Cell key={index} fill={color} />
+                                      ))}
+                                    </Pie>
+                                  </PieChart>
+                                </ResponsiveContainer>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Stats Summary */}
@@ -587,22 +742,17 @@ const Dashboard = () => {
                           <div className="d-flex align-items-center gap-1">
                             <PhoneMissed className="text-warning" size={13} />
                             <span style={{ fontSize: '0.75rem' }}>Total Missed Calls</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>25</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.missed_callbacks?.missed_calls || 0)}</span>
                           </div>
                           <div className="d-flex align-items-center gap-1">
                             <PhoneIncoming className="text-success" size={13} />
                             <span style={{ fontSize: '0.75rem' }}>Total Answered Calls</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>10</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.missed_callbacks?.answered || 0)}</span>
                           </div>
                           <div className="d-flex align-items-center gap-1">
                             <PhoneOff className="text-warning" size={13} />
                             <span style={{ fontSize: '0.75rem' }}>Total Unanswered Calls</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>20</span>
-                          </div>
-                          <div className="d-flex align-items-center gap-1">
-                            <Phone className="text-warning" size={13} />
-                            <span style={{ fontSize: '0.75rem' }}>Total Callsback Due</span>
-                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>18</span>
+                            <span className="fw-bold ms-auto" style={{ fontSize: '0.75rem' }}>{formatNumber(transcriptionOverview?.missed_callbacks?.unanswered || 0)}</span>
                           </div>
                           {/* 
                           <div className="d-flex align-items-center gap-1">

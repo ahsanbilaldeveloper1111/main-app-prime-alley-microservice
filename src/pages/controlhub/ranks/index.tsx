@@ -3,7 +3,7 @@ import React, { ReactElement, useState, useCallback, useMemo, useEffect } from '
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles, getUserTypes, getModules, getPermissionsByModule, updateSeverityLevel } from '@utils/roles';
+import { ListRoles, updateRole,deleteRole,addRole,BulkDeleteRoles, getUserTypes, getModules, getPermissionsByModule, updateSeverityLevel, cloneRank } from '@utils/roles';
 import { Column } from '@components/CustomDataTable';
 import { Button, Row, Col, Form, OverlayTrigger, Tooltip, Modal } from 'react-bootstrap';
 import { toast } from 'react-toastify';
@@ -12,7 +12,7 @@ import { useRouter } from 'next/router';
 import Select, { SingleValue } from 'react-select';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 import { getParentUsers, assignRankBulk } from '@utils/users';
-import { Users } from 'lucide-react';
+import { Copy, Users } from 'lucide-react';
 
 import '@assets/scss/common.scss';
 import SuccessfulModal from '@pages/partial/SuccessfulModal'
@@ -172,6 +172,14 @@ const Ranks = () => {
                                     onClick: () => handleEditRank(props),
                                     className: 'action-edit'
                                 }] : []),
+                                ...(session?.user?.permissions?.includes('add-ranks') ? [{
+                                    label: 'Clone Rank',
+                                    icon: <Copy className="me-2" />,
+                                    onClick: () => {
+                                        handleCloneRank(props);
+                                    },
+                                    className: 'action-clone'
+                                }] : []),
                                 ...(session?.user?.permissions?.includes('view-permissions-ranks') ? [{
                                     label: 'View Permissions',
                                     icon: <FiEye className="me-2" />,
@@ -244,6 +252,11 @@ const Ranks = () => {
     const [showEditRankModal, setShowEditRankModal] = useState<boolean>(false);
     const [userTypes, setUserTypes] = useState<any[]>([]);
     const [isLoadingUserTypes, setIsLoadingUserTypes] = useState<boolean>(false);
+    
+    // Clone Rank Modal State
+    const [showCloneRankModal, setShowCloneRankModal] = useState<boolean>(false);
+    const [cloneRankId, setCloneRankId] = useState<string | null>(null);
+    const [cloneRankName, setCloneRankName] = useState<string>('');
 
     // Fetch user types
     const fetchUserTypes = useCallback(async () => {
@@ -295,6 +308,36 @@ const Ranks = () => {
         setSelectedRank(props.id);
         setSelectedRankName(props.name);
         setShowDeleteRankModal(true);
+    };
+
+    const handleCloneRank = (props: any) => {
+        setCloneRankId(props.id);
+        setCloneRankName(`${props.name} (Copy)`);
+        setShowCloneRankModal(true);
+    };
+
+    const handleSubmitCloneRank = async () => {
+        if (!cloneRankName.trim()) {
+            toast.error('Please enter a rank name');
+            return;
+        }
+        if (!cloneRankId) {
+            toast.error('Invalid rank ID');
+            return;
+        }
+        const response = await cloneRank(cloneRankId, cloneRankName.trim());
+        if(response){
+            setCloneRankId(null);
+            setCloneRankName('');
+            setShowCloneRankModal(false);
+            setSuccessModalTitle('Rank Cloned');
+            setSuccessModalDescription('The rank has been cloned successfully');
+            setTimeout(() => {
+              setShowSuccessfulModal(true);
+              console.log('Modal state updated:', true);
+            }, 100);
+            setRefreshKey(prev => prev + 1); // Trigger refresh
+        }
     };
 
     const handleSubmitDeleteRank = async (confirmationText: string) => {
@@ -675,6 +718,41 @@ const Ranks = () => {
                 onCancel={() => {
                     setShowEditRankModal(false);
                     setSelectedRankUserTypeId(null);
+                }}
+            />
+
+            <FormModal
+                show={showCloneRankModal}
+                onHide={() => {
+                    setShowCloneRankModal(false);
+                    setCloneRankName('');
+                    setCloneRankId(null);
+                }}
+                title="Clone Rank"
+                desc="Please enter a name for the cloned rank."
+                formHtml={
+                    <>
+                        <div className="form-group mb-3">
+                            <label htmlFor="cloneRankName" className="form-label">New Rank Name</label>
+                            <input 
+                                className="form-control" 
+                                type="text" 
+                                id="cloneRankName"
+                                value={cloneRankName} 
+                                onChange={(e) => setCloneRankName(e.target.value)}
+                                placeholder="Enter rank name"
+                            />
+                            <p className="text-muted mt-2 small">Enter a name for the cloned rank. The new rank will have the same permissions and settings as the original.</p>
+                        </div>
+                    </>
+                }
+                submitButtonText="Clone Rank"
+                cancelButtonText="Cancel"
+                onSubmit={handleSubmitCloneRank}
+                onCancel={() => {
+                    setShowCloneRankModal(false);
+                    setCloneRankName('');
+                    setCloneRankId(null);
                 }}
             />
 

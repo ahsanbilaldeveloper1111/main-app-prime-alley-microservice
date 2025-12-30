@@ -121,6 +121,7 @@ export interface InvoiceData {
   invoice_number: string;
   invoice_date: string;
   due_date: string;
+  amount_due: string;
   subtotal: string;
   tax_amount: string;
   total_amount: string;

@@ -23,6 +23,7 @@ import {
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from 'next/router';
 import { getStorageImageUrl } from '@utils/imageUtils';
+import ResetPasswordModal from '@components/ResetPasswordModal';
 
 interface ProfileSidebarProps {
   isOpen?: boolean;
@@ -35,6 +36,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 }) => {
   const [darkMode, setDarkMode] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('English');
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
 
   const router = useRouter();
 	const { data: session, status } = useSession();
@@ -426,8 +428,16 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             
             <div className="profile-menu-section">
               
+            {session?.user?.permissions?.includes('reset-password-users') && (
               <li className="profile-menu-item">
-                <button className="profile-menu-button">
+                <button 
+                  className="profile-menu-button"
+                  onClick={() => {
+                    if (loggedInUserUsername) {
+                      setShowResetPasswordModal(true);
+                    }
+                  }}
+                >
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
                       <Key size={20} />
@@ -436,7 +446,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                   </div>
                 </button>
               </li>
-
+              )}
               <li className="profile-menu-item">
                 <button className="profile-menu-button">
                   <div className="profile-menu-content">
@@ -576,6 +586,12 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
           </ul>
         </div>
       </div>
+      
+      <ResetPasswordModal
+        show={showResetPasswordModal}
+        onHide={() => setShowResetPasswordModal(false)}
+        username={loggedInUserUsername}
+      />
     </>
   );
 };

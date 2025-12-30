@@ -537,29 +537,29 @@ const InvoiceList = () => {
         },
       },
      
-      {
-        key: "subtotal",
-        name: "Subtotal",
-        selector: (row: InvoiceData) => row.subtotal,
-        sortable: true,
-        cell: (props: InvoiceData) => (
-          <span >
-            {props?.currency_code || "USD"} {" "} {formatNumber(parseFloat(props?.subtotal || "0"))}
-          </span>
-        ),
-      },
-      {
-        key: "tax_amount",
-        name: "VAT Amount",
-        selector: (row: InvoiceData) => row.tax_amount,
-        sortable: true,
-        cell: (props: InvoiceData) => (
-          <span >
-            {props?.currency_code || "AED"}{" "}
-            {formatNumber(parseFloat(props?.tax_amount || "0"))}
-          </span>
-        ),
-      },
+      // {
+      //   key: "subtotal",
+      //   name: "Subtotal",
+      //   selector: (row: InvoiceData) => row.subtotal,
+      //   sortable: true,
+      //   cell: (props: InvoiceData) => (
+      //     <span >
+      //       {props?.currency_code || "USD"} {" "} {formatNumber(parseFloat(props?.subtotal || "0"))}
+      //     </span>
+      //   ),
+      // },
+      // {
+      //   key: "tax_amount",
+      //   name: "VAT Amount",
+      //   selector: (row: InvoiceData) => row.tax_amount,
+      //   sortable: true,
+      //   cell: (props: InvoiceData) => (
+      //     <span >
+      //       {props?.currency_code || "AED"}{" "}
+      //       {formatNumber(parseFloat(props?.tax_amount || "0"))}
+      //     </span>
+      //   ),
+      // },
       {
         key: "total_amount",
         name: "Total Amount",
@@ -568,6 +568,30 @@ const InvoiceList = () => {
         cell: (props: InvoiceData) => (
           <span >
             {props.currency_code || "AED"} {" "} {formatNumber(parseFloat(props?.total_amount || "0"))}
+          </span>
+        ),
+      },
+
+      {
+        key: "amount_due",
+        name: "Amount Due",
+        selector: (row: InvoiceData) => row?.amount_due,
+        sortable: true,
+        cell: (props: InvoiceData) => (
+          <span >
+            {props.currency_code || "AED"} {" "} {formatNumber(parseFloat(props?.amount_due || "0"))}
+          </span>
+        ),
+      },
+      
+      {
+        key: "invoice_date",
+        name: "Invoice Date",
+        selector: (row: InvoiceData) => row.invoice_date,
+        sortable: true,
+        cell: (props: InvoiceData) => (
+          <span >
+            {moment(props.invoice_date).format("DD-MMM-YYYY")}
           </span>
         ),
       },
@@ -581,17 +605,6 @@ const InvoiceList = () => {
             {props.due_date
               ? moment(props.due_date).format("DD-MMM-YYYY")
               : "No due date"}
-          </span>
-        ),
-      },
-      {
-        key: "invoice_date",
-        name: "Invoice Date",
-        selector: (row: InvoiceData) => row.invoice_date,
-        sortable: true,
-        cell: (props: InvoiceData) => (
-          <span >
-            {moment(props.invoice_date).format("DD-MMM-YYYY")}
           </span>
         ),
       },

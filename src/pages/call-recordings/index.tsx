@@ -384,7 +384,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                 />
               )}
             </div>
-            <i
+            {/* <i
               data-tooltip-id="my-tooltip"
               data-tooltip-content="Call Analysis"
               className='ph-duotone ph-chart-bar text-info'
@@ -392,7 +392,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
               onClick={() => {
                 handleAnalysis(props);
               }}
-            />
+            /> */}
           </div>
         )
       }

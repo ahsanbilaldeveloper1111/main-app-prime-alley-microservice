@@ -784,7 +784,7 @@ const CallStatsDepartment = () => {
               </AnimatePresence>
             </Tab>
 
-            <Tab eventKey="cost_chart" title="Cost by Department">
+            {/* <Tab eventKey="cost_chart" title="Cost by Department">
               <AnimatePresence mode="wait">
                 {activeTab === 'cost_chart' && (
                   <motion.div
@@ -829,7 +829,7 @@ const CallStatsDepartment = () => {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </Tab>
+            </Tab> */}
           </Tabs>
         </Col>
       </Row>

@@ -361,4 +361,31 @@ export const updateRole = async (id: string, name: string, user_type_id?: number
     }
   };
 
+  // Clone rank
+  export const cloneRank = async (id: string, name: string): Promise<boolean> => {
+    try {
+      const response = await axiosInstance.post(
+        `ranks/clone/${id}`,
+        { name: name }
+      );
+      if(response.data){
+        const responseData = response.data;
+        if(responseData.status === "success" || responseData.code === 200){
+          toast.success('Rank cloned successfully');
+          return true;
+        }else{
+          toast.error(responseData.message || 'Failed to clone rank');
+          return false;
+        }
+      }else{
+        toast.error('Failed to clone rank');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error cloning rank:', error);
+      toast.error('Failed to clone rank');
+      return false;
+    }
+  };
+
   
