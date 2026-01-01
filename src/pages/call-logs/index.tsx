@@ -3,7 +3,7 @@ import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'r
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { ListCallLogs, ExportCallLogs, DownloadStreamingExport } from '@utils/calls';
+import { ListCallLogs, ExportCallLogs, DownloadStreamingExport, DownloadCallsExport } from '@utils/calls';
 import { GetHierarchyData } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
 import { Row, Col, Form } from 'react-bootstrap';
@@ -39,6 +39,7 @@ interface Summary {
 const CallLogs = () => {
     const { data:session, status } = useSession();
     const [showPageLoader, setShowPageLoader] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
 
     const [showDateRange, setShowDateRange] = useState(false);
     const [startDateTime, setStartDateTime] = useState<string>('');
@@ -279,24 +280,17 @@ const CallLogs = () => {
         setRefreshKey((prev) => prev + 1);
     };
 
-    const handleExport = async (exportType: string, filters: Record<string, any>) => {
-     
-        setShowPageLoader(true);
-      try {
-            if (exportType === 'excel') {
-             
-              await DownloadStreamingExport(
-                { filters: currentFilters, isExport: true, exportType, moduleSlug: ModuleSlug.CALL_LOGS },
-                'call-logs/list',
-                'downlaodCallLogs'
-              ).finally(() => {
-                setShowPageLoader(false);
-              });
-            }
-          } catch (error) {
+    const handleExport = async () => {
+        setIsExporting(true);
+        try {
+            await DownloadCallsExport( currentFilters,'call-logs/analytics/download')
+        } catch (error) {
             console.error('Export error:', error);
             toast.error('Export failed');
-          }
+        }
+        finally {
+            setIsExporting(false);
+        }
     };
 
     
@@ -320,20 +314,27 @@ const CallLogs = () => {
 
                     
 
-                    {/* <div className="action-buttons">
-
-                    {showDateRange && startDateTime && endDateTime && moment.utc(startDateTime).isValid() && moment.utc(endDateTime).isValid() && (
-                            <>
-                            <p className="mb-0">
-                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
-                            </p>
-                          
-                            </>
-                          )}
+                    <div className="action-buttons">
+                        {session?.user?.permissions?.includes('export-call-logs') && (
+                            <div className="d-flex align-items-center gap-2">
+                                <button 
+                                    className="btn btn-outline-secondary" 
+                                    onClick={() => handleExport()}
+                                    disabled={isExporting}
+                                >
+                                    {isExporting ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                            Exporting...
+                                        </>
+                                    ) : (
+                                        'Export'
+                                    )}
+                                </button>
+                            </div>
+                        )}
                     
-                        <CallLogsFilters onFiltersChange={handleFiltersChange} onExport={handleExport} moduleSlug={ModuleSlug.CALL_LOGS} />
-                    
-                    </div> */}
+                    </div>
 
 
 

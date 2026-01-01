@@ -3,7 +3,7 @@ import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'r
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { ListCallLogs, ExportCallLogs, DownloadStreamingExport } from '@utils/calls';
+import { ListCallLogs, ExportCallLogs, DownloadStreamingExport, DownloadCallsExport } from '@utils/calls';
 import { GetHierarchyData } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
 import { Button, Modal, Row, Tab, Tabs, Form } from 'react-bootstrap';
@@ -78,6 +78,7 @@ const CallStatsDepartment = () => {
   const [showDateRange, setShowDateRange] = useState(false);
   const [startDateTime, setStartDateTime] = useState<string>('');
   const [endDateTime, setEndDateTime] = useState<string>('');
+  const [isExporting, setIsExporting] = useState(false);
 
   // Initialize filters with default values immediately to prevent first API call without dates
   const getDefaultFilters = () => {
@@ -221,18 +222,15 @@ const CallStatsDepartment = () => {
     }
   }, []);
 
-  const handleExport = async (exportType: string, filters: Record<string, any>) => {
+  const handleExport = async () => {
+    setIsExporting(true);
     try {
-      if (exportType === 'excel') {
-        await DownloadStreamingExport(
-          { filters: currentFilters, isExport: true, exportType, reportType: 'statsDepartment' }, 
-          'call-logs/statsByDepartment',
-          'statsDepartment'
-        );
-      }
+      await DownloadCallsExport(currentFilters, 'call-logs/report/department/export');
     } catch (error: unknown) {
       console.error('Export error:', error);
       toast.error('Export failed');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -500,12 +498,24 @@ const CallStatsDepartment = () => {
                           
                             </>
                           )}
-                  {/* <CallLogsFilters
-                    onFiltersChange={handleFiltersChange} 
-                    onExport={handleExport} 
-                    isVisibleCallDirection={false} 
-                    moduleSlug={ModuleSlug.CALL_REPORTS} 
-                  /> */}
+                  {/* {session?.user?.permissions?.includes('') && ( */}
+                    <div className="d-flex align-items-center gap-2">
+                      <button 
+                        className="btn btn-outline-secondary" 
+                        onClick={() => handleExport()}
+                        disabled={isExporting}
+                      >
+                        {isExporting ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Exporting...
+                          </>
+                        ) : (
+                          'Export'
+                        )}
+                      </button>
+                    </div>
+                  {/* )} */}
                 </div>
               </Col>
             </Row>

@@ -236,3 +236,72 @@ export const GetTranscriptionOverview = async () => {
     throw error;
   }
 };
+
+
+export const DownloadCallsExport = async (params:any, endpoint: string) => {  
+  try {
+    // Create base query parameters using URLSearchParams (matching ListCallLogs approach)
+    const queryParams = new URLSearchParams();
+    
+    // Flatten filters and add each key-value pair as separate query parameters
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        // Handle arrays by converting them to JSON strings for proper format (matching ListCallLogs)
+        if (Array.isArray(value)) {
+          const jsonString = JSON.stringify(value);
+          queryParams.append(key, jsonString);
+        }
+        // Handle objects by converting them to JSON strings
+        else if (typeof value === 'object') {
+          const jsonString = JSON.stringify(value);
+          queryParams.append(key, jsonString);
+        } else {
+          queryParams.append(key, value.toString());
+        }
+      }
+    });
+
+    const queryString = queryParams.toString();
+    // Set appropriate headers based on export type
+    const headers = {
+      'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*'
+        
+    };
+
+    const response = await axiosInstance.get(`${endpoint}?${queryString}`, {
+      responseType: 'blob',
+      headers
+    });
+
+
+
+    if (response.status === 204) {
+      toast.error('No data found for export');
+      return;
+    }
+
+    // Create blob with appropriate type based on export format
+    const blobType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    const blob = new Blob([response.data], { type: blobType });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // Generate filename with timestamp and appropriate extension
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const fileExtension ='csv';
+    link.setAttribute('download', `calls_export_${timestamp}.${fileExtension}`);
+    
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    
+    toast.success(`Calls export file downloaded successfully`);
+    return url;
+  } catch (error) {
+    console.error(`Calls export Download Error:`, error);
+    toast.error(`Calls export download failed`);
+    throw error;
+  }
+};

@@ -263,7 +263,7 @@ const CustomerDashboard = () => {
                 {/* Summary Cards - 6 boxes in one row */}
       <Row className="mb-4">
         {summaryCards.map((card, index) => (
-          <Col xl={3} lg={4} md={4} key={index} className="mb-3">
+          <Col  key={index} className="mb-3">
             <Card style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', position: 'relative' }}>
               <Card.Body>
                 <div className="d-flex align-items-center gap-3">
