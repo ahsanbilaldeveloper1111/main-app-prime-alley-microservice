@@ -803,6 +803,7 @@ export default function useCtiStomp(
     publishStompMessage,
   ]);
 
+
   // Shared getBearerToken function - defined outside useEffect so it can be reused
   // Uses isGettingTokenRef to prevent duplicate calls
   const getBearerToken = useCallback(async (): Promise<{
@@ -846,6 +847,9 @@ export default function useCtiStomp(
     isGettingTokenRef.current = true;
 
     try {
+      if(!isAuthenticated) {
+        throw new Error("User not authenticated");
+      }
       const response = await axiosInstance.get("/cti/connect", {
         headers: {
           "Content-Type": "application/json",
