@@ -3,7 +3,7 @@ import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'r
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import { ListCallLogs, ExportCallLogs, DownloadStreamingExport } from '@utils/calls';
+import { ListCallLogs, ExportCallLogs, DownloadStreamingExport, DownloadCallsExport } from '@utils/calls';
 
 import { GetHierarchyData } from '@utils/users';
 import { Column } from '@components/CustomDataTable';
@@ -81,6 +81,7 @@ const CallStatsExtension = () => {
     const [showDateRange, setShowDateRange] = useState(false);
     const [startDateTime, setStartDateTime] = useState<string>('');
     const [endDateTime, setEndDateTime] = useState<string>('');
+    const [isExporting, setIsExporting] = useState(false);
 
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('calls_chart');
@@ -361,17 +362,14 @@ const CallStatsExtension = () => {
         }
     };
 
-    const handleExport = async (exportType: string, filters: Record<string, any>) => {
+    const handleExport = async () => {
+      setIsExporting(true);
       try {
-        if (exportType === 'excel') {
-         
-          await DownloadStreamingExport(
-            { filters: currentFilters, isExport: true, exportType ,reportType:'statsExtension' }, 'call-logs/statsByExtension',
-            'statsExtension'
-          );
-        }
+        await DownloadCallsExport(currentFilters, 'call-logs/report/extension/export');
       } catch {
         toast.error('Export failed');
+      } finally {
+        setIsExporting(false);
       }
     };
 
@@ -600,8 +598,24 @@ const CallStatsExtension = () => {
                           
                             </>
                           )}
-                    {/* <CallLogsFilters
-                       onFiltersChange={handleFiltersChange} onExport={handleExport} isVisibleCallDirection={false} moduleSlug={ModuleSlug.CALL_REPORTS} /> */}
+                    {/* {session?.user?.permissions?.includes('') && ( */}
+                      <div className="d-flex align-items-center gap-2">
+                        <button 
+                          className="btn btn-outline-secondary" 
+                          onClick={() => handleExport()}
+                          disabled={isExporting}
+                        >
+                          {isExporting ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                              Exporting...
+                            </>
+                          ) : (
+                            'Export'
+                          )}
+                        </button>
+                      </div>
+                    {/* )} */}
                     </div>
                     </Col>
                   </Row>

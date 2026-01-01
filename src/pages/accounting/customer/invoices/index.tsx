@@ -459,6 +459,7 @@ const InvoiceList = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState<{search?: string; status?: string}>({});
   const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string | number>>(new Set());
 
   const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [companyProducts, setCompanyProducts] = useState<ProductData[]>([]);
@@ -2092,11 +2093,11 @@ const InvoiceList = () => {
                     <table className="table table-borderless">
                       <tbody>
                         <tr>
-                          <td className="fw-bold" style={{ width: '40%' }}>Invoice Number:</td>
+                          <td className="fw-bold" style={{ verticalAlign: 'top', width: '40%' }}>Invoice Number:</td>
                           <td>{selectedInvoiceForView.invoice_number || 'N/A'}</td>
                         </tr>
                         <tr>
-                          <td className="fw-bold">Invoice Date:</td>
+                          <td className="fw-bold" style={{ verticalAlign: 'top' }}>Invoice Date:</td>
                           <td>
                             {selectedInvoiceForView.invoice_date
                               ? moment(selectedInvoiceForView.invoice_date).format('DD MMM YYYY')
@@ -2104,7 +2105,7 @@ const InvoiceList = () => {
                           </td>
                         </tr>
                         <tr>
-                          <td className="fw-bold">Due Date:</td>
+                          <td className="fw-bold" style={{ verticalAlign: 'top' }}>Due Date:</td>
                           <td>
                             {selectedInvoiceForView.due_date
                               ? moment(selectedInvoiceForView.due_date).format('DD MMM YYYY')
@@ -2112,7 +2113,7 @@ const InvoiceList = () => {
                           </td>
                         </tr>
                         <tr>
-                          <td className="fw-bold">Status:</td>
+                          <td className="fw-bold" style={{ verticalAlign: 'top' }}>Status:</td>
                           <td>
                             <Badge
                               bg={
@@ -2132,8 +2133,8 @@ const InvoiceList = () => {
                           </td>
                         </tr>
                         <tr>
-                          <td className="fw-bold">Payment Mode:</td>
-                          <td>{selectedInvoiceForView.payment_mode || 'N/A'}</td>
+                          <td className="fw-bold" style={{ verticalAlign: 'top' }}>Payment Mode:</td>
+                          <td style={{ textTransform: 'uppercase' }}>{selectedInvoiceForView.payment_mode || 'N/A'}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -2144,24 +2145,24 @@ const InvoiceList = () => {
                       <table className="table table-borderless">
                         <tbody>
                           <tr>
-                            <td className="fw-bold" style={{ width: '40%' }}>Company Name:</td>
+                            <td style={{ verticalAlign: 'top', width: '40%' }} className="fw-bold" >Company Name:</td>
                             <td>{selectedInvoiceForView.company.name || 'N/A'}</td>
                           </tr>
                           <tr>
-                            <td className="fw-bold">Country:</td>
+                            <td style={{ verticalAlign: 'top' }} className="fw-bold">Country:</td>  
                             <td>{selectedInvoiceForView.company.country || 'N/A'}</td>
                           </tr>
                           <tr>
-                            <td className="fw-bold">Phone:</td>
+                            <td style={{ verticalAlign: 'top' }} className="fw-bold">Phone:</td>
                             <td>{selectedInvoiceForView.company.phone || 'N/A'}</td>
                           </tr>
                           <tr>
-                            <td className="fw-bold">Email:</td>
+                            <td style={{ verticalAlign: 'top' }} className="fw-bold">Email:</td>
                             <td className="text-lowercase">{selectedInvoiceForView.company.email || 'N/A'}</td>
                           </tr>
                           {selectedInvoiceForView.company.profile?.address && (
                             <tr>
-                              <td className="fw-bold">Address:</td>
+                              <td style={{ verticalAlign: 'top' }} className="fw-bold">Address:</td>
                               <td className="text-capitalize">{selectedInvoiceForView.company.profile.address}</td>
                             </tr>
                           )}
@@ -2198,7 +2199,33 @@ const InvoiceList = () => {
                                 <div>
                                   <strong>{item.product?.name || item.description || 'N/A'}</strong>
                                   {item.product?.description && item.product.description !== item.product.name && (
-                                    <div className="text-muted small">{item.product.description}</div>
+                                    <div className="text-muted small">
+                                      {item.product.description && item.product.description.length > 100 ? (
+                                        <>
+                                          {expandedDescriptions.has(item.id || index) 
+                                            ? item.product.description 
+                                            : `${item.product.description.substring(0, 100)}...`}
+                                          <button
+                                            className="btn btn-link p-0 ms-1 text-decoration-none"
+                                            style={{ fontSize: '0.875rem' }}
+                                            onClick={() => {
+                                              const newExpanded = new Set(expandedDescriptions);
+                                              const key = item.id || index;
+                                              if (newExpanded.has(key)) {
+                                                newExpanded.delete(key);
+                                              } else {
+                                                newExpanded.add(key);
+                                              }
+                                              setExpandedDescriptions(newExpanded);
+                                            }}
+                                          >
+                                            {expandedDescriptions.has(item.id || index) ? 'Show less' : 'Show more'}
+                                          </button>
+                                        </>
+                                      ) : (
+                                        item.product.description
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               </td>
@@ -2212,7 +2239,7 @@ const InvoiceList = () => {
                               </td>
                               <td className="text-end">
                                 <strong>
-                                  {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.total_amount || '0'))}
+                                  {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.line_total || '0'))}
                                 </strong>
                               </td>
                             </tr>
