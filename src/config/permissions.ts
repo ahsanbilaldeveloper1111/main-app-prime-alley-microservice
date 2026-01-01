@@ -32,6 +32,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/billing',permissions: ['']},
     {path:'/dialpad-use',permissions: ['']},
     {path:'/crm-new-dashboard',permissions: ['']},
+    {path:'/help-center-new',permissions: ['']},
 
     {
         path: '/dashboards',

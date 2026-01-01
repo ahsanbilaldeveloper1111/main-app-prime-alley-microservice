@@ -222,7 +222,7 @@ const CallStatsCountry = () => {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      await DownloadCallsExport(currentFilters, 'call-logs/report/country/export');
+      await DownloadCallsExport(currentFilters, 'call-logs/report/country/download');
     } catch (error: unknown) {
       console.error('Export error:', error);
       toast.error('Export failed');

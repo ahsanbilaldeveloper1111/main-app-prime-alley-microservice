@@ -383,7 +383,7 @@ const CallIncomingCountry = () => {
     const handleExport = async () => {
       setIsExporting(true);
       try {
-        await DownloadCallsExport(currentFilters, 'call-logs/report/country/export');
+        await DownloadCallsExport(currentFilters, 'call-logs/report/country/download');
       } catch {
         toast.error('Export failed');
       } finally {

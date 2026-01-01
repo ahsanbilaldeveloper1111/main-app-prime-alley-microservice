@@ -383,7 +383,7 @@ const CallIncomingDepartment = () => {
     const handleExport = async () => {
       setIsExporting(true);
       try {
-        await DownloadCallsExport(currentFilters, 'call-logs/report/department/export');
+        await DownloadCallsExport(currentFilters, 'call-logs/report/department/download');
       } catch {
         toast.error('Export failed');
       } finally {

@@ -365,7 +365,7 @@ const CallStatsExtension = () => {
     const handleExport = async () => {
       setIsExporting(true);
       try {
-        await DownloadCallsExport(currentFilters, 'call-logs/report/extension/export');
+        await DownloadCallsExport(currentFilters, 'call-logs/report/extension/download');
       } catch {
         toast.error('Export failed');
       } finally {

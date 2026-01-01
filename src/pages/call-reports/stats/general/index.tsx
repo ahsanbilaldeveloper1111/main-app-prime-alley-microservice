@@ -292,7 +292,7 @@ const CallStatsDepartment = () => {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      await DownloadCallsExport(currentFilters, 'call-logs/report/general/export');
+      await DownloadCallsExport(currentFilters, 'call-logs/report/general/download');
     } catch (error: unknown) {
       console.error('Export error:', error);
       toast.error('Export failed');
