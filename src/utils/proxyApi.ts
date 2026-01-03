@@ -3,7 +3,7 @@ import axios from 'axios';
 // Create a proxy axios instance that routes through Next.js API routes
 const proxyAxios = axios.create({
   baseURL: '/api', // This will route through our proxy API route (removed "proxy" word)
-  timeout: 30000,
+  timeout: 3000000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

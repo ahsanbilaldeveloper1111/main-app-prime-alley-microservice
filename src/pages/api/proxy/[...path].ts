@@ -113,7 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       headers,
       data: requestData,
       params: req.query,
-      timeout: 30000, // 30 second timeout
+      timeout: 6000000, // 30 second timeout
       validateStatus: () => true, // Don't throw on HTTP error status
       responseType: req.headers['accept']?.includes('blob') ? 'blob' : 'json',
     });

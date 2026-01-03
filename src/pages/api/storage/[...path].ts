@@ -34,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       method: 'GET',
       url: targetUrl,
       responseType: 'arraybuffer', // Handle binary data (images)
-      timeout: 30000, // 30 second timeout
+      timeout: 3000000, // 30 second timeout
       validateStatus: () => true, // Don't throw on HTTP error status
     });
 

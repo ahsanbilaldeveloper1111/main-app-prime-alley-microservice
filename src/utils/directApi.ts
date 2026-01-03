@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const directApi = axios.create({
   baseURL: 'http://crmstaging.sipzon.com:7480/api',
-  timeout: 10000,
+  timeout: 1000000,
   headers: {
     'Content-Type': 'application/x-www-form-urlencoded'
   },
