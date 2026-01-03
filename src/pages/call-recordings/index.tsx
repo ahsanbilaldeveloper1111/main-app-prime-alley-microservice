@@ -847,18 +847,21 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const handleAnalysis = async (props: any) => {
     try {
       const { Id, AudioTrack } = props;
-
+      
       // Create data object with all parameters
       const dataObject = {
-        id: Id || '',
-        file: AudioTrack || '',
-        direction: props.Direction || '',
-        phone: props.RemotePartyNumber || '',
-        imagicle: props.imagicle || '',
-        duration: props.Duration || '',
-        dateTime: props.DateTime || '',
-
+        uuid: Id || '',
+        direction: props?.Direction || '',
+        phone: props?.AgentExtension || '',
+        imagicle: props?.imagicle || '',
+        duration: props?.Duration || '',
+        dateTime: props?.DateTime || '',
+        dateOnly: props?.DateOnly || '',
+        remotePartyNumber:props?.RemotePartyNumber || '',
+        ownerUsername:props?.Username || '',
+        localPartyNumber:props?.AgentExtension || '',
       };
+      console.log('dataObject before analysis', dataObject);
 
       // Encode data to base64 (unreadable format) using helper function
       const encodedData = encodeAnalysisData(dataObject);

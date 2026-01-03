@@ -9,7 +9,7 @@ import { Button, Modal, Row, Form, Badge } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
-import { ModuleSlug, formatDateTimeToLocal, GlobalDateTimeFormat, formatDuration } from '@utils/Helper';
+import { ModuleSlug, formatDateTimeToLocal, GlobalDateTimeFormat, formatDuration, encodeAnalysisData, GlobalDateFormat } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 import BarFilters from '@components/BarFilters';
@@ -56,14 +56,12 @@ const AnalyzeRecordings = () => {
       end_datetime: moment().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z',
     });
     
-    // Ref to track if fetch is in progress to prevent concurrent calls
-    const isFetchingRef = useRef<boolean>(false);
     // Ref to store latest filters to avoid dependency issues
     const currentFiltersRef = useRef<Record<string, any>>(currentFilters);
-    // Ref to track last fetch time to prevent rapid duplicate calls
-    const lastFetchTimeRef = useRef<number>(0);
-    // Ref to track last fetch params to detect duplicate calls
-    const lastFetchParamsRef = useRef<string>('');
+    // Ref to track the current request key being processed
+    const currentRequestKeyRef = useRef<string>('');
+    // Ref to track pending requests by requestKey to prevent duplicate API calls
+    const pendingRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
     
     // Update ref when currentFilters changes
     useEffect(() => {
@@ -200,8 +198,8 @@ const AnalyzeRecordings = () => {
             sortable: true,
             cell: (props: any) => {
                 return (
-                    <div>
-                        {formatDateTimeToLocal(props.DateTime, 'YYYY-MM-DD')}
+                    <div style={{textTransform: 'uppercase'}}>
+                        {formatDateTimeToLocal(props.DateTime, GlobalDateFormat as string)}
                     </div>
                 )
             }
@@ -245,10 +243,10 @@ const AnalyzeRecordings = () => {
             sortable: true,
             cell: (props: any) => {
                 const direction = props?.direction;
-                const badgeClass = direction === 'INCOMING' ? 'badge bg-success' : 'badge bg-primary';
+                const badgeClass = direction === 'CALL_INCOMING' ? 'badge bg-success' : 'badge bg-primary';
                 return (
-                    <span className={badgeClass}>
-                        {direction === 'INCOMING' ? 'Incoming' : 'Outgoing'}
+                    <span className={badgeClass} style={{textTransform: 'uppercase'}}>
+                        {direction === 'CALL_INCOMING' ? 'Incoming' : 'Outgoing'}
                     </span>
                 );
             }
@@ -402,94 +400,117 @@ const AnalyzeRecordings = () => {
         
         // Create a unique key for this request to detect duplicates
         const requestKey = `${page}-${perPage}-${search}-${startDate}-${endDate}`;
-        const now = Date.now();
         
-        // Prevent concurrent calls
-        if (isFetchingRef.current) {
-            return { dataList: [], total: 0, last_page: 0, current_page: 1, per_page: 15 };
+        // CRITICAL: Check if the same request is already pending - return the same promise
+        // This must be the FIRST check to prevent duplicate API calls
+        // This check happens synchronously before any async operations
+        const pendingRequest = pendingRequestsRef.current.get(requestKey);
+        if (pendingRequest) {
+            return pendingRequest;
         }
         
-        // Prevent duplicate calls within 1000ms (React StrictMode or rapid re-renders)
-        if (requestKey === lastFetchParamsRef.current && (now - lastFetchTimeRef.current) < 1000) {
-            return { dataList: [], total: 0, last_page: 0, current_page: 1, per_page: 15 };
-        }
+        // Set the current request key immediately (synchronously) to prevent duplicates
+        currentRequestKeyRef.current = requestKey;
         
-        try {
-            isFetchingRef.current = true;
-            lastFetchTimeRef.current = now;
-            lastFetchParamsRef.current = requestKey;
-            setShowPageLoader(true);
+        // Create the async function and get its promise
+        const requestPromise = (async () => {
+            try {
+                setShowPageLoader(true);
             
-            // Extract start_datetime and end_datetime from filters for separate parameters
-            // Use the dates from getDatesFromFilters which has fallback logic - always returns a value
-            const start_datetime = filters.start_datetime || startDate;
-            const end_datetime = filters.end_datetime || endDate;
-            
-            // Create a copy of filters without start_datetime and end_datetime to avoid duplication
-            const filterParams: any = {};
-            Object.keys(filters).forEach(key => {
-                if (key !== 'start_datetime' && key !== 'end_datetime') {
-                    filterParams[key] = filters[key];
-                }
-            });
-            
-            const response = await GetImagicalTranscriptions(
-                { 
-                    page, 
-                    perPage, 
-                    search, 
-                    start_datetime: start_datetime,
-                    end_datetime: end_datetime,
-                    filters: filterParams
-                }
+                // Extract start_datetime and end_datetime from filters for separate parameters
+                // Use the dates from getDatesFromFilters which has fallback logic - always returns a value
+                const start_datetime = filters.start_datetime || startDate;
+                const end_datetime = filters.end_datetime || endDate;
                 
-            ).finally(() => {
-                setShowPageLoader(false);
-                isFetchingRef.current = false;
-            });
-
-            if(response &&  response?.success === true){
-                setTableData(response?.data);
-                setPaginationInfo({
-                    totalRows: response?.pagination?.total || 0,
-                    totalPages: response?.pagination?.last_page || 0,
-                    currentPage: response?.pagination?.page || 1,
-                    perPage: response?.pagination?.limit || 15,
+                // Create a copy of filters without start_datetime and end_datetime to avoid duplication
+                const filterParams: any = {};
+                Object.keys(filters).forEach(key => {
+                    if (key !== 'start_datetime' && key !== 'end_datetime') {
+                        filterParams[key] = filters[key];
+                    }
                 });
+                
+                const response = await GetImagicalTranscriptions(
+                    { 
+                        page, 
+                        perPage, 
+                        search, 
+                        start_datetime: start_datetime,
+                        end_datetime: end_datetime,
+                        filters: filterParams
+                    }
+                );
 
-                // Update transcription summary from API response
-                if (response?.summary) {
-                    setTranscriptionSummary({
-                        total_transcriptions: response.summary.total_transcriptions || 0,
-                        inbound_transcriptions: response.summary.inbound_transcriptions || 0,
-                        outbound_transcriptions: response.summary.outbound_transcriptions || 0,
-                        pending_transcriptions: response.summary.pending_transcriptions || 0,
-                        processing_transcriptions: response.summary.processing_transcriptions || 0,
-                        completed_transcriptions: response.summary.completed_transcriptions || 0,
-                        failed_transcriptions: response.summary.failed_transcriptions || 0,
-                        with_transcription: response.summary.with_transcription || 0,
-                        with_analysis: response.summary.with_analysis || 0,
-                    });
+                setShowPageLoader(false);
+                
+                // Clear current request key and remove from pending requests once completed
+                if (currentRequestKeyRef.current === requestKey) {
+                    currentRequestKeyRef.current = '';
                 }
-            }else{
-                toast.error('Failed to get transcriptions');
+                pendingRequestsRef.current.delete(requestKey);
+
+                if(response &&  response?.success === true){
+                    console.log(response?.data);
+                    setTableData(response?.data);
+                    setPaginationInfo({
+                        totalRows: response?.pagination?.total || 0,
+                        totalPages: response?.pagination?.last_page || 0,
+                        currentPage: response?.pagination?.page || 1,
+                        perPage: perPage, // Use the requested perPage value
+                    });
+
+                    // Update transcription summary from API response
+                    if (response?.summary) {
+                        setTranscriptionSummary({
+                            total_transcriptions: response.summary.total_transcriptions || 0,
+                            inbound_transcriptions: response.summary.inbound_transcriptions || 0,
+                            outbound_transcriptions: response.summary.outbound_transcriptions || 0,
+                            pending_transcriptions: response.summary.pending_transcriptions || 0,
+                            processing_transcriptions: response.summary.processing_transcriptions || 0,
+                            completed_transcriptions: response.summary.completed_transcriptions || 0,
+                            failed_transcriptions: response.summary.failed_transcriptions || 0,
+                            with_transcription: response.summary.with_transcription || 0,
+                            with_analysis: response.summary.with_analysis || 0,
+                        });
+                    }
+
+                    // Return data in the format expected by GenericListPage
+                    // Use the perPage parameter that was requested, not the response limit
+                    return {
+                        data: response?.data || [],
+                        total: response?.pagination?.total || 0,
+                        last_page: response?.pagination?.last_page || 0,
+                        current_page: response?.pagination?.page || 1,
+                        per_page: perPage, // Use the requested perPage value
+                    };
+                }else{
+                    toast.error('Failed to get transcriptions');
+                    return { data: [], total: 0, last_page: 0, current_page: 1, per_page: perPage };
+                }
+
+            } catch (error) {
+                setShowPageLoader(false);
+                setTableData([]);
+                setPaginationInfo({
+                    totalRows: 0,
+                    totalPages: 0,
+                    currentPage: 1,
+                    perPage: perPage,
+                });
+                // Clear current request key and remove from pending requests on error
+                if (currentRequestKeyRef.current === requestKey) {
+                    currentRequestKeyRef.current = '';
+                }
+                pendingRequestsRef.current.delete(requestKey);
+                return { data: [], total: 0, last_page: 0, current_page: 1, per_page: perPage };
             }
-
-            
-
-            return response;
-
-
-        } catch (error) {
-            setTableData([]);
-            setPaginationInfo({
-                totalRows: 0,
-                totalPages: 0,
-                currentPage: 1,
-                perPage: 15,
-            });
-            return { dataList: [], total: 0, last_page: 0, current_page: 1, per_page: 15 };
-        }
+        })();
+        
+        // CRITICAL: Store the promise IMMEDIATELY (synchronously) before any async operations
+        // This must happen right after creating the promise to prevent race conditions
+        pendingRequestsRef.current.set(requestKey, requestPromise);
+        
+        return requestPromise;
     }, []); // Empty dependency array - using refs to access latest values
 
     const handleFiltersChange = async (filters: any) => {
@@ -554,6 +575,9 @@ const AnalyzeRecordings = () => {
             if (filters.direction !== undefined) {
                 apiFilters.direction = filters.direction || '';
             }
+            if (filters.status !== undefined) {
+                apiFilters.status = filters.status || '';
+            }
 
             setCurrentFilters(apiFilters);
             // Update the ref immediately so fetchTableData can use the latest values
@@ -585,6 +609,14 @@ const AnalyzeRecordings = () => {
     const handleDownload = async (props: any) => {
         const { uuid, local_party_model, imagicle } = props;
         
+        // Extract the extension number from local_party_model
+        const agentExtension = local_party_model?.localParty;
+        
+        if (!agentExtension) {
+            toast.error('Extension number is missing. Please try again later.');
+            return;
+        }
+        
         // Add to downloading set and initialize progress
         setDownloadingRecordings(prev => new Set(prev).add(uuid));
         setDownloadProgress(prev => ({ ...prev, [uuid]: 0 }));
@@ -602,7 +634,7 @@ const AnalyzeRecordings = () => {
             }, 200);
 
             await DownloadCallRecording(
-                uuid, local_party_model, 'call-logs/recordings/download', imagicle
+                uuid, agentExtension, 'call-logs/recordings/download', imagicle
             );
             
             // Complete the progress
@@ -621,8 +653,35 @@ const AnalyzeRecordings = () => {
     };
 
     const handleAnalysis = async (props: any) => {
-        // Analysis functionality disabled
-        return;
+        try {
+            console.log('props before analysis', props);
+            // Create data object with all parameters
+            const dataObject = {
+              uuid: props?.uuid || '',
+              direction: props?.direction || '',
+              phone: props?.local_party_model?.localParty || '',
+              imagicle: props?.imagicle || '',
+              duration: props?.duration || '',
+              dateTime: props?.datetime || '',
+              dateOnly: props?.datetime ? moment(props?.datetime).format('YYYY-MM-DD') : '',
+              remotePartyNumber: props?.remoteParty || '',
+              ownerUsername: props?.local_party_model?.ownerUser || '',
+              localPartyNumber: props?.local_party_model?.localParty || '',
+            };
+            console.log('dataObject before analysis', dataObject);
+      
+            // Encode data to base64 (unreadable format) using helper function
+            const encodedData = encodeAnalysisData(dataObject);
+            
+            // Pass as single encoded parameter
+            const tempUrl = `/ai-ml/analysis/new?data=${encodeURIComponent(encodedData)}`;
+      
+            window.open(tempUrl, '_blank');
+            
+      
+          } catch {
+            // Error handling for navigation
+          }
     };
 
     const handlePlayRecording = (recording: any) => {
@@ -861,6 +920,29 @@ const AnalyzeRecordings = () => {
                                         { value: 'CALL_INCOMING', label: 'Incoming' }
                                     ]}
                                     placeholder="Select call direction"
+                                />
+                            </Form.Group>
+                        </Col>
+
+                        {/* Call status */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Analysis Status</Form.Label>
+                                <SelectBox
+                                    isSearchable={false}
+                                    value={(appliedFilters as any)?.status || null}
+                                    onChange={(value) => {
+                                        setAppliedFilters({ ...appliedFilters, status: value as string || '' });
+                                    }}
+                                    options={[
+                                        { value: '', label: 'All' },
+                                        { value: 'in_progress', label: 'IN_PROGRESS' },
+                                        { value: 'queued', label: 'QUEUED' },
+                                        { value: 'completed', label: 'COMPLETED' },
+                                        { value: 'in_complete', label: 'IN_COMPLETE' },
+                                        
+                                    ]}
+                                    placeholder="Select analysis status"
                                 />
                             </Form.Group>
                         </Col>

@@ -556,7 +556,7 @@ const LiveCallDashboard = () => {
             
 
       {/* Notification */}
-      {notification && (
+      {/* {notification && (
         <div className="notification-container">
           <div
             className={`alert alert-${notification.type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`}
@@ -569,7 +569,7 @@ const LiveCallDashboard = () => {
             />
           </div>
         </div>
-      )}
+      )} */}
 
       {/* CTI Table */}
       <SectionsRenderer

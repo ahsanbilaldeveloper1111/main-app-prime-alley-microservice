@@ -132,7 +132,7 @@ const UserCard: React.FC<UserCardProps> = ({
         setShowPopup({ dn: dn, deviceName })
       } else {
         console.log('User does not have monitoring permissions')
-        setNotification({ type: 'warning', message: 'You do not have permission to monitor calls' })
+        // setNotification({ type: 'warning', message: 'You do not have permission to monitor calls' })
       }
     } else if (terminalState === 'STALE') {
       console.log('Device is STALE, popup disabled')

@@ -36,8 +36,8 @@ const GsmPorts = () => {
     ...(session?.user?.is_admin === "1" ? [
     {
       key: "ip_address",
-      name: "IP Address",
-      selector: (row: any) => row.ip_address,
+      name: "Device Name ",
+      selector: (row: any) => row?.gsm?.name,
       sortable: true,
     },
   

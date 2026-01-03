@@ -615,41 +615,39 @@ const CallAnalysis = () => {
       let decodedImagicle = '';
       let decodedDuration = '';
       let decodedDateTime = '';
-
+      let decodedDateOnly = '';
+      let decodedRemotePartyNumber = '';
+      let decodedOwnerUsername = '';
+      let decodedLocalPartyNumber = '';
       // If encoded data exists, decode it
       if (data) {
         try {
           // Decode using helper function
           const dataObject = decodeAnalysisData(data as string);
-          
-          decodedId = dataObject.id;
-          decodedFile = dataObject.file;
+
+          console.log('dataObject', dataObject);
+          decodedId = dataObject.uuid;
           decodedDirection = dataObject.direction;
           decodedPhone = dataObject.phone;
           decodedImagicle = dataObject.imagicle;
-          decodedDuration = dataObject.duration;
+          decodedDuration = dataObject.duration; 
           decodedDateTime = dataObject.dateTime;
+          decodedDateOnly = dataObject.dateOnly;
+          decodedRemotePartyNumber = dataObject.remotePartyNumber;
+          
+          // decodedOwnerUsername = dataObject.ownerUsername;
+          // decodedLocalPartyNumber = dataObject.localPartyNumber;
+
+          decodedOwnerUsername = dataObject.localPartyNumber;
+          decodedLocalPartyNumber = dataObject.ownerUsername;
 
         } catch (decodeError) {
           console.error('Error decoding encoded data:', decodeError);
-          // Fallback to old format if decoding fails
-          decodedId = id ? decodeURIComponent(id as string) : '';
-          decodedFile = file ? decodeURIComponent(file as string) : '';
-          decodedDirection = direction ? decodeURIComponent(direction as string) : '';
-          decodedPhone = phone ? decodeURIComponent(phone as string) : '';
-          decodedImagicle = imagicle ? decodeURIComponent(imagicle as string) : '';
-          decodedDuration = duration ? decodeURIComponent(duration as string) : '';
-          decodedDateTime = dateTime ? decodeURIComponent(dateTime as string) : '';
+          
         }
       } else {
         // Fallback to old format for backward compatibility
-        decodedId = id ? decodeURIComponent(id as string) : '';
-        decodedFile = file ? decodeURIComponent(file as string) : '';
-        decodedDirection = direction ? decodeURIComponent(direction as string) : '';
-        decodedPhone = phone ? decodeURIComponent(phone as string) : '';
-        decodedImagicle = imagicle ? decodeURIComponent(imagicle as string) : '';
-        decodedDuration = duration ? decodeURIComponent(duration as string) : '';
-        decodedDateTime = dateTime ? decodeURIComponent(dateTime as string) : '';
+        
       }
       
       // Set basic parameters
@@ -679,39 +677,20 @@ const CallAnalysis = () => {
       }
       
       // Parse file path for additional parameters
-      if (decodedFile) {
-        const filePath = decodedFile;
-        const filename = filePath.split('\\').pop();
+     
         
-        if (filename) {
-          const cleanName = filename.replace('Record_', '').replace('_OUT', '');
-          const parts = cleanName.split('_');
-          
-          if (parts.length >= 4) {
-            const timestamp = parts[0];
-            const extension = parts[1];
-            const user = parts[2];
-            
-            // Format date from timestamp
-            const year = timestamp.substring(0, 4);
-            const month = timestamp.substring(4, 6);
-            const day = timestamp.substring(6, 8);
-            const formattedDate = `${year}-${month}-${day}`;
-            
-            // Set extracted parameters
-            setLocalPartyNumber(extension);
-            setOwnerUsername(user);
-            setDate(formattedDate);
-            
-            // Trigger analysis
-            handleGetCallAnalysisWithData(formattedDate, extension, user, decodedId, decodedImagicle,decodedDateTime,decodedDuration,decodedDirection,decodedPhone);
-          }
-        }
-      }
+        // Set extracted parameters
+        setLocalPartyNumber(decodedLocalPartyNumber);
+        setOwnerUsername(decodedOwnerUsername);
+        setDate(decodedDateOnly);
+        
+        // Trigger analysis
+        handleGetCallAnalysisWithData(decodedDateOnly, decodedLocalPartyNumber, decodedOwnerUsername, decodedId, decodedImagicle,decodedDateTime,decodedDuration,decodedDirection,decodedPhone);
+      
     } catch (error) {
       console.error('Error parsing URL data:', error);
     }
-  }, [router.isReady, router.query.data, router.query.id, router.query.file]);
+  }, [router.isReady, router.query.data]);
 
   // Load audio when uuid changes
   useEffect(() => {

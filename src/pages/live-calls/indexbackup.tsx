@@ -1423,12 +1423,12 @@ const LiveCallDashboard = () => {
         setMonitoringStartTime(prev => ({ ...prev, [dn]: new Date() }))
 
         const message = `Started ${monitorType.toLowerCase().replace('_', ' ')} monitoring for ${dn} with ${toneType} tone`
-        setNotification({ type: 'success', message })
+        // setNotification({ type: 'success', message })
         return true
       } else {
         setShowPageLoader(false);
        // console.error('Failed to start monitoring:', response.error)
-        setNotification({ type: 'danger', message: response.error || 'Failed to start monitoring' })
+        // setNotification({ type: 'danger', message: response.error || 'Failed to start monitoring' })
         return false
       }
     } catch (error) {
@@ -1878,7 +1878,7 @@ const LiveCallDashboard = () => {
             </Row>
 
       {/* Notification */}
-      {notification && (
+      {/* {notification && (
         <div className="notification-container">
           <div
             className={`alert alert-${notification.type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`}
@@ -1891,7 +1891,7 @@ const LiveCallDashboard = () => {
             />
           </div>
         </div>
-      )}
+      )} */}
 
       {/* CTI Table */}
       <Row className="mt-3">
