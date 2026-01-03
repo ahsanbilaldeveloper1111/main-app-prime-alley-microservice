@@ -865,13 +865,16 @@ const applyMultiLayerDecoding = (
  * const encoded = encodeAnalysisData(data);
  */
 export const encodeAnalysisData = (dataObject: {
-  id?: string;
-  file?: string;
+  uuid?: string;
   direction?: string;
   phone?: string;
   imagicle?: string;
   duration?: string;
   dateTime?: string;
+  dateOnly?: string;
+  remotePartyNumber?: string;
+  ownerUsername?: string;
+  localPartyNumber?: string;
 }): string => {
   try {
     // Get secret key from environment variable
@@ -905,13 +908,16 @@ export const encodeAnalysisData = (dataObject: {
 export const decodeAnalysisData = (
   encodedData: string
 ): {
-  id: string;
-  file: string;
+  uuid: string;
   direction: string;
   phone: string;
   imagicle: string;
   duration: string;
   dateTime: string;
+  dateOnly: string;
+  remotePartyNumber: string;
+  ownerUsername: string;
+  localPartyNumber: string;
 } => {
   try {
     // Get secret key from environment variable (must match encoding key)
@@ -927,13 +933,16 @@ export const decodeAnalysisData = (
     const dataObject = JSON.parse(decodedString);
 
     return {
-      id: dataObject.id || "",
-      file: dataObject.file || "",
+      uuid: dataObject.uuid || "",
       direction: dataObject.direction || "",
       phone: dataObject.phone || "",
       imagicle: dataObject.imagicle || "",
       duration: dataObject.duration || "",
       dateTime: dataObject.dateTime || "",
+      dateOnly: dataObject.dateOnly || "",
+      remotePartyNumber: dataObject.remotePartyNumber || "",
+      ownerUsername: dataObject.ownerUsername || "",
+      localPartyNumber: dataObject.localPartyNumber || "",
     };
   } catch (error) {
     console.error("Error decoding analysis data:", error);
