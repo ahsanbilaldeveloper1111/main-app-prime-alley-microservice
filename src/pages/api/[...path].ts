@@ -103,7 +103,7 @@ export default async function handler(
   const targetUrl = `${BACKEND_URL}${targetPath}`;
 
   // Special handling for audio downloads
-  const isAudioDownload = targetPath.includes("recordings/download");
+  const isAudioDownload = true;
 
   try {
     // Prepare headers for the backend request
@@ -197,7 +197,7 @@ export default async function handler(
       headers,
       data: requestData,
       params: req.query,
-      timeout: isAudioDownload ? 60000 : 30000, // 60 second timeout for audio files, 30 for others
+      timeout: isAudioDownload ? 600000 : 30000, // 60 second timeout for audio files, 30 for others
       validateStatus: () => true, // Don't throw on HTTP error status
       responseType: isAudioDownload
         ? "arraybuffer"
