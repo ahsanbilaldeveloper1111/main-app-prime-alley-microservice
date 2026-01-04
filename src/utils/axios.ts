@@ -6,7 +6,7 @@ import tokenService from "./tokenService";
 const axiosInstance: import('axios').AxiosInstance = axios.create({
   //baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
   baseURL: '/api',
-  timeout: 100000,
+  timeout: 1000000,
   // headers: {
   //   'Content-Type': 'application/json',
   //   'Accept': 'application/json',

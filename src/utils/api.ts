@@ -6,7 +6,7 @@ import { signOut } from 'next-auth/react';
 // Create axios instance with default configuration
 const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_BACKEND_URL || '',
-  timeout: 10000,
+  timeout: 1000000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -211,7 +211,7 @@ export const authAPI = {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
           },
-          timeout: 30000
+          timeout: 3000000
         });
         if (response.data.code === 200 && response.data.data?.access_token) {
           // Update sessionStorage with new tokens
@@ -264,7 +264,7 @@ export const authAPI = {
             // For now, we'll trigger a session update which will cause the JWT callback to run
             await axios.get('/api/auth/session', {
               withCredentials: true,
-              timeout: 10000
+              timeout: 1000000
             });
           } catch (sessionError) {
             // Log but don't fail - session update is best effort

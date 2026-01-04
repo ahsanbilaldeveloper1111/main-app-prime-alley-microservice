@@ -255,7 +255,7 @@ class TokenService {
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded'
             },
-            timeout: 30000 // 30 seconds timeout
+            timeout: 3000000 // 30 seconds timeout
           });
           // console.log('📥 Raw response:', response);
         } catch (error: any) {
