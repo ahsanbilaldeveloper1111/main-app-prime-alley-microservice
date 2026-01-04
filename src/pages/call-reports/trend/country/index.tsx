@@ -24,7 +24,7 @@ import '@assets/scss/report-style.scss';
 import '@assets/scss/tabs.scss';
 import { motion, AnimatePresence } from "framer-motion";
 import { easeInOut, easeOut, easeIn } from "framer-motion";
-import { ModuleSlug } from '@utils/Helper';
+import { ModuleSlug, getAutoTimezone } from '@utils/Helper';
 import moment from 'moment';
 
 interface Summary {
@@ -352,9 +352,12 @@ const CallTrendCountry = () => {
     const handleExport = async (exportType: string, filters: Record<string, any>) => {
       try {
         if (exportType === 'excel') {
-         
+          const exportFilters = {
+            ...currentFilters,
+            timezone: getAutoTimezone()
+          };
           await DownloadStreamingExport(
-            { filters: currentFilters, isExport: true, exportType ,reportType:'trendStatsCountry' }, 'call-logs/statsTrendByCountry',
+            { filters: exportFilters, isExport: true, exportType ,reportType:'trendStatsCountry' }, 'call-logs/statsTrendByCountry',
             'trendStatsCountry'
           );
         }

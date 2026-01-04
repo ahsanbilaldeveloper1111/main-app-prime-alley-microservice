@@ -15,7 +15,7 @@ import { useHierarchyData } from '@components/filters/useHierarchyData';
 import PageSummaryGrid from '@components/PageSummaryGrid';
 import '@assets/scss/report-style.scss';
 import moment from 'moment';
-import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal } from '@utils/Helper';
+import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
 import "@assets/scss/common.scss";
 
 
@@ -258,7 +258,11 @@ const CallStatsDepartment = () => {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      await DownloadCallsExport(currentFilters, 'call-logs/report/department-extension/download');
+      const exportPayload = {
+        ...currentFilters,
+        timezone: getAutoTimezone()
+      };
+      await DownloadCallsExport(exportPayload, 'call-logs/report/department-extension/download');
     } catch (error: unknown) {
       console.error('Export error:', error);
       toast.error('Export failed');

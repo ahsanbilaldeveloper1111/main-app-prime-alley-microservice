@@ -170,6 +170,7 @@ const CallStatsExtension = () => {
     
     const {
       hierarchyDataExtensions,
+      hierarchyDataDepartments,
       loading: hierarchyLoading
     } = useHierarchyData(ModuleSlug.CALL_REPORTS);
     
@@ -365,7 +366,11 @@ const CallStatsExtension = () => {
     const handleExport = async () => {
       setIsExporting(true);
       try {
-        await DownloadCallsExport(currentFilters, 'call-logs/report/extension/download');
+        const exportPayload = {
+          ...currentFilters,
+          timezone: getAutoTimezone()
+        };
+        await DownloadCallsExport(exportPayload, 'call-logs/report/extension/download');
       } catch {
         toast.error('Export failed');
       } finally {
@@ -1163,13 +1168,19 @@ const CallStatsExtension = () => {
                               <Col md={4}>
                                 <Form.Group>
                                   <Form.Label>Departments</Form.Label>
-                                  <Form.Control
-                                    type="text"
-                                    placeholder="Enter department"
-                                    value={(pendingFilters as any)?.department || ''}
-                                    onChange={(e) => {
-                                      setPendingFilters({ ...pendingFilters, department: e.target.value });
+                                  <SelectBox
+                                    isMulti
+                                    isSearchable={true}
+                                    isDisabled={hierarchyLoading}
+                                    value={(pendingFilters as any)?.department?.length > 0 ? (pendingFilters as any)?.department : null}
+                                    onChange={(value) => {
+                                      setPendingFilters({ ...pendingFilters, department: value ? (value as string[]) : [] });
                                     }}
+                                    options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
+                                      value: dept.id,
+                                      label: dept.name
+                                    })) || []}
+                                    placeholder="Select departments"
                                   />
                                 </Form.Group>
                               </Col>

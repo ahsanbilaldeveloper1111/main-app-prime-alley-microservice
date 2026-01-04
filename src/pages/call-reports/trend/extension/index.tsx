@@ -59,7 +59,7 @@ interface ChartData {
 
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
-import { ModuleSlug } from '@utils/Helper';
+import { ModuleSlug, getAutoTimezone } from '@utils/Helper';
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 const CallTrendExtension = () => {
@@ -355,9 +355,12 @@ const CallTrendExtension = () => {
     const handleExport = async (exportType: string, filters: Record<string, any>) => {
       try {
         if (exportType === 'excel') {
-         
+          const exportFilters = {
+            ...currentFilters,
+            timezone: getAutoTimezone()
+          };
           await DownloadStreamingExport(
-            { filters: currentFilters, isExport: true, exportType ,reportType:'trendStatsExtension' }, 'call-logs/statsTrendByExtension',
+            { filters: exportFilters, isExport: true, exportType ,reportType:'trendStatsExtension' }, 'call-logs/statsTrendByExtension',
             'trendStatsExtension'
           );
         }

@@ -15,7 +15,7 @@ import { useHierarchyData } from '@components/filters/useHierarchyData';
 import PageSummaryGrid from '@components/PageSummaryGrid';
 import '@assets/scss/report-style.scss';
 import moment from 'moment';
-import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal } from '@utils/Helper';
+import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
 
 // Helper function to convert HH:MM:SS to seconds
 const timeStringToSeconds = (timeStr: string): number => {
@@ -52,6 +52,8 @@ interface Summary {
     ComparisonCost: string;
     Saving: string;
     SavingPerc: string;
+    AnsweredCalls: string;
+    MissedCalls: string;
   };
   incoming?: {
     TotalCalls: string;
@@ -292,7 +294,11 @@ const CallStatsDepartment = () => {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      await DownloadCallsExport(currentFilters, 'call-logs/report/general/download');
+      const exportPayload = {
+        ...currentFilters,
+        timezone: getAutoTimezone()
+      };
+      await DownloadCallsExport(exportPayload, 'call-logs/report/general/download');
     } catch (error: unknown) {
       console.error('Export error:', error);
       toast.error('Export failed');
@@ -631,52 +637,24 @@ const CallStatsDepartment = () => {
                 valueType: 'seconds',
                 showAnimatedNumber: true
               },
-            //   {
-            //     id: 'outgoing-total-cost',
-            //     title: 'Total Cost',
-            //     value: Number(summary.outgoing?.TotalCost || 0),
-            //     description: 'Total cost of outgoing calls',
-            //     delay: 0.3,
-            //     valueType: 'cost',
-            //     showAnimatedNumber: true
-            //   },
-            //   {
-            //     id: 'outgoing-avg-cost',
-            //     title: 'Avg Cost',
-            //     value: Number(summary.outgoing?.AvgCost || 0),
-            //     description: 'Average cost per outgoing call',
-            //     delay: 0.4,
-            //     valueType: 'cost',
-            //     showAnimatedNumber: true
-            //   },
-            //   {
-            //     id: 'outgoing-comparison-cost',
-            //     title: 'Comparison Cost',
-            //     value: Number(summary.outgoing?.ComparisonCost || 0),
-            //     description: 'Comparison cost',
-            //     delay: 0.5,
-            //     valueType: 'cost',
-            //     showAnimatedNumber: true
-            //   },
-            //   {
-            //     id: 'outgoing-saving',
-            //     title: 'Saving',
-            //     value: Number(summary.outgoing?.Saving || 0),
-            //     description: 'Total savings',
-            //     delay: 0.6,
-            //     valueType: 'cost',
-            //     showAnimatedNumber: true
-            //   },
-            //   {
-            //     id: 'outgoing-saving-perc',
-            //     title: 'Saving %',
-            //     value: Number.parseFloat(summary.outgoing?.SavingPerc?.replace('%', '') || '0'),
-            //     description: 'Percentage of savings',
-            //     delay: 0.7,
-            //     valueType: 'number',
-            //     suffix: '%',
-            //     showAnimatedNumber: true
-            //   }
+              {
+                id: 'outgoing-answered-calls',
+                title: 'Answered Calls',
+                value: Number(summary.outgoing?.AnsweredCalls || 0),
+                description: 'Total answered outgoing calls',
+                delay: 0.3,
+                valueType: 'number',
+                showAnimatedNumber: true
+              },
+              {
+                id: 'outgoing-missed-calls',
+                title: 'Missed Calls',
+                value: Number(summary.outgoing?.MissedCalls || 0),
+                description: 'Total missed outgoing calls',
+                delay: 0.4,
+                valueType: 'number',
+                showAnimatedNumber: true
+              },
             ]}
           />
         </Col>

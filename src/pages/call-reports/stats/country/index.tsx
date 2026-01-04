@@ -26,7 +26,7 @@ import '@assets/scss/tabs.scss';
 import { motion, AnimatePresence } from "framer-motion";
 import { easeInOut, easeOut, easeIn } from "framer-motion";
 import moment from 'moment';
-import { formatCurrency, GlobalDateTimeFormat, formatDateTimeToLocal, ModuleSlug } from '@utils/Helper';
+import { formatCurrency, GlobalDateTimeFormat, formatDateTimeToLocal, ModuleSlug, getAutoTimezone } from '@utils/Helper';
 import { formatMinutesAndSeconds } from '@utils/Helper';
 
 import "@assets/scss/common.scss";
@@ -112,6 +112,7 @@ const CallStatsCountry = () => {
   
   const {
     hierarchyDataExtensions,
+    hierarchyDataDepartments,
     loading: hierarchyLoading
   } = useHierarchyData(ModuleSlug.CALL_REPORTS);
   
@@ -222,7 +223,11 @@ const CallStatsCountry = () => {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      await DownloadCallsExport(currentFilters, 'call-logs/report/country/download');
+      const exportPayload = {
+        ...currentFilters,
+        timezone: getAutoTimezone()
+      };
+      await DownloadCallsExport(exportPayload, 'call-logs/report/country/download');
     } catch (error: unknown) {
       console.error('Export error:', error);
       toast.error('Export failed');
@@ -1008,13 +1013,19 @@ const CallStatsCountry = () => {
                   <Col md={4}>
                     <Form.Group>
                       <Form.Label>Departments</Form.Label>
-                      <Form.Control
-                        type="text"
-                        placeholder="Enter department"
-                        value={(pendingFilters as any)?.department || ''}
-                        onChange={(e) => {
-                          setPendingFilters({ ...pendingFilters, department: e.target.value });
+                      <SelectBox
+                        isMulti
+                        isSearchable={true}
+                        isDisabled={hierarchyLoading}
+                        value={(pendingFilters as any)?.department?.length > 0 ? (pendingFilters as any)?.department : null}
+                        onChange={(value) => {
+                          setPendingFilters({ ...pendingFilters, department: value ? (value as string[]) : [] });
                         }}
+                        options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
+                          value: dept.id,
+                          label: dept.name
+                        })) || []}
+                        placeholder="Select departments"
                       />
                     </Form.Group>
                   </Col>

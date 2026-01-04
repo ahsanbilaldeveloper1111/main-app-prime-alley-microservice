@@ -22,7 +22,7 @@ import PageLoader from '@components/PageLoader';
 
 import '@assets/scss/common.scss';
 
-import { convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat, formatDateTimeToLocal, GlobalDateTimeFormat, ModuleSlug } from '@utils/Helper';
+import { convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat, formatDateTimeToLocal, GlobalDateTimeFormat, ModuleSlug, getAutoTimezone } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import BarFilters from '@components/BarFilters';
 import SelectBox from '@components/SelectBox';
@@ -283,7 +283,11 @@ const CallLogs = () => {
     const handleExport = async () => {
         setIsExporting(true);
         try {
-            await DownloadCallsExport( currentFilters,'call-logs/analytics/download')
+            const exportPayload = {
+                ...currentFilters,
+                timezone: getAutoTimezone()
+            };
+            await DownloadCallsExport( exportPayload,'call-logs/analytics/download')
         } catch (error) {
             console.error('Export error:', error);
             toast.error('Export failed');
