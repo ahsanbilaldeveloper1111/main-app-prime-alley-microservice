@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Button, Form, Badge } from 'react-bootstrap';
 import {
   ChevronLeft,
@@ -21,63 +21,286 @@ import {
 
   
 } from 'lucide-react';
+import { ListFAQTopics, ListFAQItems, getMostViewedFAQs } from '@utils/faqs';
 
 interface KnowledgeBaseProps {
   onBack: () => void;
   searchQuery?: string;
-  onArticleClick?: (articleId: string) => void;
+  onArticleClick?: (article: any) => void;
 }
 
 const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2FA', onArticleClick }) => {
-  const [selectedCategory, setSelectedCategory] = useState<string>('Getting Started');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('all');
   const [sortBy, setSortBy] = useState('most-relevant');
+  const [faqTopics, setFaqTopics] = useState<any[]>([]);
+  const [loadingTopics, setLoadingTopics] = useState<boolean>(false);
+  const [faqItems, setFaqItems] = useState<any[]>([]);
+  const [loadingItems, setLoadingItems] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [hasMore, setHasMore] = useState<boolean>(false);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [popularArticles, setPopularArticles] = useState<any[]>([]);
+  const [loadingPopularArticles, setLoadingPopularArticles] = useState<boolean>(false);
+  const [recentFAQs, setRecentFAQs] = useState<any[]>([]);
+  const [loadingRecentFAQs, setLoadingRecentFAQs] = useState<boolean>(false);
 
-  const categories = [
-    { name: 'Getting Started', count: 8, icon: BookOpen },
-    { name: 'Admin & Security', count: 12, icon: Shield },
-    { name: 'Billing', count: 6, icon: DollarSign },
-    { name: 'Integrations', count: 9, icon: Link2 },
-    { name: 'Calling & Web Dialer', count: 7, icon: Phone },
-    { name: 'AI & Automation', count: 5, icon: Bot },
-    { name: 'Reports & Analytics', count: 4, icon: BarChart3 }
-  ];
+  // Fetch FAQ topics on component mount
+  useEffect(() => {
+    const fetchTopics = async () => {
+      setLoadingTopics(true);
+      try {
+        const response = await ListFAQTopics({ page: 1, perPage: 100 });
+        if (response && response.data) {
+          setFaqTopics(response.data);
+          // Set first topic as selected if available
+          if (response.data.length > 0) {
+            setSelectedCategory(response.data[0].name);
+            setSelectedTopicId(response.data[0].id);
+          }
+        } else if (Array.isArray(response)) {
+          setFaqTopics(response);
+          if (response.length > 0) {
+            setSelectedCategory(response[0].name);
+            setSelectedTopicId(response[0].id);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching FAQ topics:', error);
+      } finally {
+        setLoadingTopics(false);
+      }
+    };
 
+    fetchTopics();
+  }, []);
+
+  // Fetch FAQ items when topic is selected
+  useEffect(() => {
+    const fetchFAQItems = async () => {
+      if (!selectedTopicId) return;
+      
+      setLoadingItems(true);
+      setCurrentPage(1);
+      try {
+        const response = await ListFAQItems({ 
+          page: 1, 
+          perPage: 5,
+          filters: { topic_id: selectedTopicId }
+        });
+        
+        let items: any[] = [];
+        if (response && response.data) {
+          items = Array.isArray(response.data) ? response.data : [];
+        } else if (Array.isArray(response)) {
+          items = response;
+        }
+        
+        setFaqItems(items);
+        
+        // Check if there are more items to load
+        // Assuming response has pagination info like total, last_page, etc.
+        if (response && typeof response === 'object' && 'last_page' in response) {
+          setHasMore(response.current_page < response.last_page);
+        } else if (response && typeof response === 'object' && 'total' in response) {
+          // Alternative pagination structure
+          const total = response.total || 0;
+          const perPage = 5;
+          setHasMore(items.length < total);
+        } else {
+          // If no pagination info, check if we got a full page
+          setHasMore(items.length === 5);
+        }
+      } catch (error) {
+        console.error('Error fetching FAQ items:', error);
+        setFaqItems([]);
+        setHasMore(false);
+      } finally {
+        setLoadingItems(false);
+      }
+    };
+
+    fetchFAQItems();
+  }, [selectedTopicId]);
+
+  // Fetch most viewed FAQs when topic is selected
+  useEffect(() => {
+    const fetchMostViewed = async () => {
+      setLoadingPopularArticles(true);
+      try {
+        const response = await getMostViewedFAQs(undefined, selectedTopicId || undefined);
+        if (response && Array.isArray(response)) {
+          setPopularArticles(response);
+        } else if (response && response.data && Array.isArray(response.data)) {
+          setPopularArticles(response.data);
+        } else {
+          setPopularArticles([]);
+        }
+      } catch (error) {
+        console.error('Error fetching most viewed FAQs:', error);
+        setPopularArticles([]);
+      } finally {
+        setLoadingPopularArticles(false);
+      }
+    };
+
+    fetchMostViewed();
+  }, [selectedTopicId]);
+
+  // Fetch recent FAQ items based on selected topic
+  useEffect(() => {
+    const fetchRecentFAQs = async () => {
+      if (!selectedTopicId) {
+        setRecentFAQs([]);
+        return;
+      }
+
+      setLoadingRecentFAQs(true);
+      try {
+        const response = await ListFAQItems({ 
+          page: 1, 
+          perPage: 5,
+          filters: { topic_id: selectedTopicId }
+        });
+        
+        let items: any[] = [];
+        if (response && response.data) {
+          items = Array.isArray(response.data) ? response.data : [];
+        } else if (Array.isArray(response)) {
+          items = response;
+        }
+        
+        // Sort by created_at descending (most recent first) if not already sorted
+        items.sort((a, b) => {
+          const dateA = new Date(a.created_at || a.updated_at || 0).getTime();
+          const dateB = new Date(b.created_at || b.updated_at || 0).getTime();
+          return dateB - dateA;
+        });
+        
+        // Take only the first 5
+        setRecentFAQs(items.slice(0, 5));
+      } catch (error) {
+        console.error('Error fetching recent FAQs:', error);
+        setRecentFAQs([]);
+      } finally {
+        setLoadingRecentFAQs(false);
+      }
+    };
+
+    fetchRecentFAQs();
+  }, [selectedTopicId]);
+
+  // Load more FAQ items
+  const handleLoadMore = async () => {
+    if (!selectedTopicId || loadingMore || !hasMore) return;
+    
+    setLoadingMore(true);
+    try {
+      const nextPage = currentPage + 1;
+      const response = await ListFAQItems({ 
+        page: nextPage, 
+        perPage: 5,
+        filters: { topic_id: selectedTopicId }
+      });
+      
+      let newItems: any[] = [];
+      if (response && response.data) {
+        newItems = Array.isArray(response.data) ? response.data : [];
+      } else if (Array.isArray(response)) {
+        newItems = response;
+      }
+      
+      // Append new items to existing ones
+      setFaqItems(prev => [...prev, ...newItems]);
+      setCurrentPage(nextPage);
+      
+      // Check if there are more items
+      if (response && typeof response === 'object' && 'last_page' in response) {
+        setHasMore(response.current_page < response.last_page);
+      } else if (response && typeof response === 'object' && 'total' in response) {
+        const total = response.total || 0;
+        setHasMore(faqItems.length + newItems.length < total);
+      } else {
+        setHasMore(newItems.length === 5);
+      }
+    } catch (error) {
+      console.error('Error loading more FAQ items:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Transform FAQ topics to categories format
+  const categories = faqTopics.map((topic) => ({
+    id: topic.id,
+    name: topic.name,
+    count: Number.parseInt(topic.faqs_count || '0', 10),
+    icon: topic.faq_module?.icon || 'help_outline'
+  }));
+
+  // Extract unique FAQ types from fetched items
+  const getUniqueTypes = () => {
+    const types = new Set<string>();
+    faqItems.forEach((item) => {
+      if (item.type && item.type.trim()) {
+        types.add(item.type.trim());
+      }
+    });
+    return Array.from(types).sort((a, b) => a.localeCompare(b));
+  };
+
+  const uniqueTypes = getUniqueTypes();
+  
+  // Create dynamic tabs with "All" as first tab
   const tabs = [
     { id: 'all', label: 'All' },
-    { id: 'setup', label: 'Setup Guides' },
-    { id: 'security', label: 'Security' }
+    ...uniqueTypes.map((type) => ({ id: type.toLowerCase().replaceAll(/\s+/g, '-'), label: type }))
   ];
 
-  const articles = [
-    {
-      icon: Shield,
-      title: 'Setting Up Two-Factor Authentication',
-      description: 'Learn how to enable 2FA for your account',
-      updated: '5 days ago',
-      views: 850
-    },
-    {
-      icon: Shield,
-      title: 'Resetting Your 2FA Device',
-      description: 'Steps to reset your 2FA device',
-      updated: '2 weeks ago',
-      views: 620
-    },
-    {
-      icon: Shield,
-      title: 'Troubleshooting 2FA Issues',
-      description: 'Common problems and solutions for 2FA',
-      updated: '1 week ago',
-      views: 540
-    }
-  ];
+  // Transform FAQ items to articles format
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'Recently';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+    return `${Math.floor(diffDays / 365)} years ago`;
+  };
 
-  const popularArticles = [
-    'Managing User Permissions',
-    'Setting Up Voicemail',
-    'Understanding API Keys'
-  ];
+  // Filter FAQ items by selected tab (type)
+  const filteredFAQItems = activeTab === 'all' 
+    ? faqItems 
+    : faqItems.filter((item) => {
+        const itemType = item.type?.trim().toLowerCase().replaceAll(/\s+/g, '-');
+        return itemType === activeTab;
+      });
+  console.log(filteredFAQItems);
+  const articles = filteredFAQItems.map((item) => ({
+    id: item.id,
+    icon: item.topic?.faq_module?.icon,
+    title: item.title ,
+    description: item.description || item.answer ? item.answer.replaceAll(/<[^>]*>/g, '').substring(0, 150) + '...' : 'No description available',
+    updated: formatDate(item.updated_at || item.created_at),
+    views: item.view_count || 0,
+    answer: item.answer,
+    topic: item.topic,
+    type: item.type
+  }));
+
+  // Transform most viewed FAQs to popular articles format
+  console.log(popularArticles);
+  const transformedPopularArticles = popularArticles.map((article) => ({
+    id: article.id,
+    title: article.question ,
+    viewCount: article.view_count || 0
+  }));
 
   const resources = [
     { icon: BookOpen, name: 'User Guides', color: '#4680ff' },
@@ -85,10 +308,13 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
     { icon: Users, name: 'Community Forum', color: '#1de9b6' }
   ];
 
-  const faqs = [
-    'How do I change my password?',
-    'What should I do if my account?'
-  ];
+  // Transform recent FAQs to the format needed for rendering
+  console.log(recentFAQs);
+  const transformedFAQs = recentFAQs.map((faq) => ({
+    id: faq.id,
+    title: faq.question ,
+    viewCount: faq.view_count || 0
+  }));
 
   return (
     <div style={{ background: '#f4f7fa', minHeight: '100vh', paddingBottom: '40px' }}>
@@ -126,53 +352,73 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
             overflow: 'hidden'
           }}>
             <div style={{ padding: '0' }}>
-              {categories.map((category, index) => {
-                const Icon = category.icon;
-                return (
-                  <div
-                    key={index}
-                    onClick={() => setSelectedCategory(category.name)}
-                    style={{
-                      padding: '10px 14px',
-                      cursor: 'pointer',
-                      background: selectedCategory === category.name ? '#f8f9fa' : '#fff',
-                      fontSize: '13px',
-                      fontWeight: selectedCategory === category.name ? '500' : '400',
-                      color: selectedCategory === category.name ? '#2c3e50' : '#495057',
-                      transition: 'all 0.15s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      borderBottom: index < categories.length - 1 ? '1px solid #f5f5f5' : 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (selectedCategory !== category.name) {
-                        e.currentTarget.style.background = '#f8f9fa';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (selectedCategory !== category.name) {
-                        e.currentTarget.style.background = '#fff';
-                      }
-                    }}
-                  >
-                    <Icon size={16} color={selectedCategory === category.name ? '#4680ff' : '#6c757d'} />
-                    <span style={{ flex: 1 }}>{category.name}</span>
-                    <Badge
-                      bg="light"
+              {loadingTopics ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+                  Loading categories...
+                </div>
+              ) : categories.length > 0 ? (
+                categories.map((category, index) => {
+                  return (
+                    <div
+                      key={category.id || index}
+                      onClick={() => {
+                        setSelectedCategory(category.name);
+                        setSelectedTopicId(category.id);
+                      }}
                       style={{
-                        fontSize: '11px',
-                        fontWeight: '500',
-                        color: '#6c757d',
-                        background: selectedCategory === category.name ? '#e3f2fd' : '#f0f0f0',
-                        padding: '2px 6px'
+                        padding: '10px 14px',
+                        cursor: 'pointer',
+                        background: selectedCategory === category.name ? '#f8f9fa' : '#fff',
+                        fontSize: '13px',
+                        fontWeight: selectedCategory === category.name ? '500' : '400',
+                        color: selectedCategory === category.name ? '#2c3e50' : '#495057',
+                        transition: 'all 0.15s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        borderBottom: index < categories.length - 1 ? '1px solid #f5f5f5' : 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedCategory !== category.name) {
+                          e.currentTarget.style.background = '#f8f9fa';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedCategory !== category.name) {
+                          e.currentTarget.style.background = '#fff';
+                        }
                       }}
                     >
-                      {category.count}
-                    </Badge>
-                  </div>
-                );
-              })}
+                      <i 
+                        className="material-icons-two-tone" 
+                        style={{ 
+                          fontSize: '18px',
+                          color: selectedCategory === category.name ? '#4680ff' : '#6c757d'
+                        }}
+                      >
+                        {category.icon}
+                      </i>
+                      <span style={{ flex: 1 }}>{category.name}</span>
+                      <Badge
+                        bg="light"
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          color: '#6c757d',
+                          background: selectedCategory === category.name ? '#e3f2fd' : '#f0f0f0',
+                          padding: '2px 6px'
+                        }}
+                      >
+                        {category.count}
+                      </Badge>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+                  No categories available
+                </div>
+              )}
             </div>
           </Card>
         </Col>
@@ -223,7 +469,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
             }}>"{searchQuery}"</span>
           </p>
         </div>
-        <div style={{ 
+        {/* <div style={{ 
           display: 'flex', 
           alignItems: 'center', 
           gap: '10px',
@@ -256,7 +502,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
             <option value="most-recent">Most Recent</option>
             <option value="most-viewed">Most Viewed</option>
           </Form.Select>
-        </div>
+        </div> */}
       </div>
 
       {/* Tabs */}
@@ -310,12 +556,16 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
     <Card.Body style={{ padding: '24px' }}>
       {/* Articles List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {articles.map((article, index) => {
-          const Icon = article.icon;
-          return (
-            <div
-              key={index}
-              onClick={() => onArticleClick?.(article.title)}
+        {loadingItems ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#6c757d' }}>
+            Loading articles...
+          </div>
+        ) : articles.length > 0 ? (
+          articles.map((article, index) => {
+            return (
+              <div
+                key={article.id || index}
+                onClick={() => onArticleClick?.(article)}
               style={{
                 background: 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)',
                 border: '1px solid #e5e7eb',
@@ -383,7 +633,15 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
                       
                     }}
                   >
-                    <Icon size={28} color="#667eea" strokeWidth={2} />
+                    <i 
+                      className="material-icons-two-tone" 
+                      style={{ 
+                        fontSize: '28px',
+                        color: '#667eea'
+                      }}
+                    >
+                      {article.icon}
+                    </i>
                   </div>
                 </Col>
                 <Col>
@@ -461,39 +719,54 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
               </Row>
             </div>
           );
-        })}
+        })
+        ) : (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#6c757d' }}>
+            No articles available for this category
+          </div>
+        )}
       </div>
 
       {/* Pagination or Load More */}
-      <div style={{
-        marginTop: '28px',
-        paddingTop: '24px',
-        borderTop: '1px solid #f3f4f6',
-        textAlign: 'center'
-      }}>
-        <Button
-          style={{
-            background: '#fff',
-            border: '2px solid #667eea',
-            borderRadius: '8px',
-            padding: '10px 24px',
-            fontSize: '14px',
-            fontWeight: '600',
-            color: '#667eea',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#667eea';
-            e.currentTarget.style.color = '#fff';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#fff';
-            e.currentTarget.style.color = '#667eea';
-          }}
-        >
-          Load More Results
-        </Button>
-      </div>
+      {hasMore && (
+        <div style={{
+          marginTop: '28px',
+          paddingTop: '24px',
+          borderTop: '1px solid #f3f4f6',
+          textAlign: 'center'
+        }}>
+          <Button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            style={{
+              background: '#fff',
+              border: '2px solid #667eea',
+              borderRadius: '8px',
+              padding: '10px 24px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#667eea',
+              transition: 'all 0.2s',
+              opacity: loadingMore ? 0.6 : 1,
+              cursor: loadingMore ? 'not-allowed' : 'pointer'
+            }}
+            onMouseEnter={(e) => {
+              if (!loadingMore) {
+                e.currentTarget.style.background = '#667eea';
+                e.currentTarget.style.color = '#fff';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!loadingMore) {
+                e.currentTarget.style.background = '#fff';
+                e.currentTarget.style.color = '#667eea';
+              }
+            }}
+          >
+            {loadingMore ? 'Loading...' : 'Load More Results'}
+          </Button>
+        </div>
+      )}
     </Card.Body>
   </Card>
 </Col>
@@ -552,55 +825,70 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
         flexDirection: 'column',
         gap: '0'
       }}>
-        {popularArticles.map((article, index) => (
-          <div
-            key={index}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '14px 20px',
-              cursor: 'pointer',
-              borderBottom: index < popularArticles.length - 1 ? '1px solid #f3f4f6' : 'none',
-              transition: 'all 0.2s',
-              background: '#fff'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f9fafb';
-              e.currentTarget.style.paddingLeft = '24px';
-              const chevron = e.currentTarget.querySelector('.chevron-icon');
-              if (chevron) (chevron as HTMLElement).style.color = '#667eea';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#fff';
-              e.currentTarget.style.paddingLeft = '20px';
-              const chevron = e.currentTarget.querySelector('.chevron-icon');
-              if (chevron) (chevron as HTMLElement).style.color = '#9ca3af';
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <span style={{
-                fontSize: '14px',
-                color: '#374151',
-                lineHeight: '1.5',
-                fontWeight: '500',
-                display: 'block',
-                marginBottom: '2px'
-              }}>
-                {article}
-              </span>
-            </div>
-            <ChevronRight 
-              size={16} 
-              className="chevron-icon"
-              style={{ 
-                flexShrink: 0, 
-                transition: 'color 0.2s',
-                color: '#9ca3af'
-              }} 
-            />
+        {loadingPopularArticles ? (
+          <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+            Loading popular articles...
           </div>
-        ))}
+        ) : transformedPopularArticles.length > 0 ? (
+          transformedPopularArticles.map((article, index) => (
+            <div
+              key={article.id || index}
+              onClick={() => {
+                // Find the full article from popularArticles
+                const fullArticle = popularArticles.find(item => item.id === article.id);
+                onArticleClick?.(fullArticle || article);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 20px',
+                cursor: 'pointer',
+                borderBottom: index < transformedPopularArticles.length - 1 ? '1px solid #f3f4f6' : 'none',
+                transition: 'all 0.2s',
+                background: '#fff'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#f9fafb';
+                e.currentTarget.style.paddingLeft = '24px';
+                const chevron = e.currentTarget.querySelector('.chevron-icon');
+                if (chevron) (chevron as HTMLElement).style.color = '#667eea';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#fff';
+                e.currentTarget.style.paddingLeft = '20px';
+                const chevron = e.currentTarget.querySelector('.chevron-icon');
+                if (chevron) (chevron as HTMLElement).style.color = '#9ca3af';
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <span style={{
+                  fontSize: '14px',
+                  color: '#374151',
+                  lineHeight: '1.5',
+                  fontWeight: '500',
+                  display: 'block',
+                  marginBottom: '2px'
+                }}>
+                  {article.title}
+                </span>
+              </div>
+              <ChevronRight 
+                size={16} 
+                className="chevron-icon"
+                style={{ 
+                  flexShrink: 0, 
+                  transition: 'color 0.2s',
+                  color: '#9ca3af'
+                }} 
+              />
+            </div>
+          ))
+        ) : (
+          <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+            No popular articles available
+          </div>
+        )}
       </div>
     </Card.Body>
   </Card>
@@ -779,66 +1067,81 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
         flexDirection: 'column',
         gap: '0'
       }}>
-        {faqs.map((faq, index) => (
-          <div
-            key={index}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '14px 20px',
-              cursor: 'pointer',
-              borderBottom: index < faqs.length - 1 ? '1px solid #f3f4f6' : 'none',
-              transition: 'all 0.2s',
-              background: '#fff'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f9fafb';
-              e.currentTarget.style.paddingLeft = '24px';
-              const icon = e.currentTarget.querySelector('.faq-icon');
-              if (icon) (icon as HTMLElement).style.color = '#667eea';
-              const chevron = e.currentTarget.querySelector('.chevron-icon');
-              if (chevron) (chevron as HTMLElement).style.color = '#667eea';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#fff';
-              e.currentTarget.style.paddingLeft = '20px';
-              const icon = e.currentTarget.querySelector('.faq-icon');
-              if (icon) (icon as HTMLElement).style.color = '#9ca3af';
-              const chevron = e.currentTarget.querySelector('.chevron-icon');
-              if (chevron) (chevron as HTMLElement).style.color = '#9ca3af';
-            }}
-          >
-            <FileQuestion 
-              size={18} 
-              className="faq-icon"
-              style={{ 
-                flexShrink: 0, 
-                transition: 'color 0.2s',
-                color: '#9ca3af'
-              }} 
-              strokeWidth={2}
-            />
-            <span style={{
-              fontSize: '14px',
-              color: '#374151',
-              flex: 1,
-              lineHeight: '1.5',
-              fontWeight: '500'
-            }}>
-              {faq}
-            </span>
-            <ChevronRight 
-              size={16} 
-              className="chevron-icon"
-              style={{ 
-                flexShrink: 0,
-                transition: 'color 0.2s',
-                color: '#9ca3af'
-              }} 
-            />
+        {loadingRecentFAQs ? (
+          <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+            Loading FAQs...
           </div>
-        ))}
+        ) : transformedFAQs.length > 0 ? (
+          transformedFAQs.map((faq, index) => (
+            <div
+              key={faq.id || index}
+              onClick={() => {
+                // Find the full FAQ item from recentFAQs
+                const fullFaq = recentFAQs.find(item => item.id === faq.id);
+                onArticleClick?.(fullFaq || faq);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '14px 20px',
+                cursor: 'pointer',
+                borderBottom: index < transformedFAQs.length - 1 ? '1px solid #f3f4f6' : 'none',
+                transition: 'all 0.2s',
+                background: '#fff'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#f9fafb';
+                e.currentTarget.style.paddingLeft = '24px';
+                const icon = e.currentTarget.querySelector('.faq-icon');
+                if (icon) (icon as HTMLElement).style.color = '#667eea';
+                const chevron = e.currentTarget.querySelector('.chevron-icon');
+                if (chevron) (chevron as HTMLElement).style.color = '#667eea';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#fff';
+                e.currentTarget.style.paddingLeft = '20px';
+                const icon = e.currentTarget.querySelector('.faq-icon');
+                if (icon) (icon as HTMLElement).style.color = '#9ca3af';
+                const chevron = e.currentTarget.querySelector('.chevron-icon');
+                if (chevron) (chevron as HTMLElement).style.color = '#9ca3af';
+              }}
+            >
+              <FileQuestion 
+                size={18} 
+                className="faq-icon"
+                style={{ 
+                  flexShrink: 0, 
+                  transition: 'color 0.2s',
+                  color: '#9ca3af'
+                }} 
+                strokeWidth={2}
+              />
+              <span style={{
+                fontSize: '14px',
+                color: '#374151',
+                flex: 1,
+                lineHeight: '1.5',
+                fontWeight: '500'
+              }}>
+                {faq.title}
+              </span>
+              <ChevronRight 
+                size={16} 
+                className="chevron-icon"
+                style={{ 
+                  flexShrink: 0,
+                  transition: 'color 0.2s',
+                  color: '#9ca3af'
+                }} 
+              />
+            </div>
+          ))
+        ) : (
+          <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+            No FAQs available
+          </div>
+        )}
       </div>
     </Card.Body>
   </Card>

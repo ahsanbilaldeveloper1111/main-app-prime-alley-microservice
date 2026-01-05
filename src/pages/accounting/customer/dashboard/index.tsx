@@ -47,6 +47,7 @@ const CustomerDashboard = () => {
     paid_amount: number;
     outstanding_amount: number;
   }>>([]);
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('Last 3 months');
   const [summaryCards, setSummaryCards] = useState<Array<{
     title: string;
     value: any;
@@ -69,7 +70,7 @@ const CustomerDashboard = () => {
     getTopProducts();
     getRecentActivity();
     getAnalyticsByMonth();
-  }, [currency]);
+  }, [currency, selectedPeriod]);
 
   const getCompanyDetails = async () => {
     const response = await GetCompanyDetails() as any;
@@ -167,8 +168,44 @@ const CustomerDashboard = () => {
     setRecentActivity(response);
   };
 
+  // Helper function to format date as DD-MM-YYYY
+  const formatDate = (date: Date): string => {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+
+  // Calculate date range based on selected period
+  const getDateRange = (period: string): { start_date: string; end_date: string } => {
+    const today = new Date();
+    const endDate = new Date(today);
+    let startDate = new Date(today);
+
+    switch (period) {
+      case 'Last 3 months':
+        startDate.setMonth(today.getMonth() - 3);
+        break;
+      case 'Last 6 months':
+        startDate.setMonth(today.getMonth() - 6);
+        break;
+      case 'This year':
+        startDate = new Date(today.getFullYear(), 0, 1); // January 1st of current year
+        break;
+      default:
+        startDate.setMonth(today.getMonth() - 3);
+    }
+
+    return {
+      start_date: formatDate(startDate),
+      end_date: formatDate(endDate)
+    };
+  };
+
   const getAnalyticsByMonth = async () => {
-    const response = await GetAnalyticsByMonth() as any;
+    const dateRange = getDateRange(selectedPeriod);
+    console.log('Date Range:', dateRange); // Debug log
+    const response = await GetAnalyticsByMonth(dateRange.start_date, dateRange.end_date) as any;
 
     // Transform the response data for the chart
     // Use response if available, otherwise use sampleResponse
@@ -305,10 +342,17 @@ const CustomerDashboard = () => {
                       <Card.Body>
                       <div className="d-flex justify-content-between align-items-center mb-4">
                         <h5 className="mb-0" style={{ fontWeight: '600' }}>Spending Overview</h5>
-                        <Form.Select size="sm" style={{ width: '150px' }}>
-                          <option>Last 6 months</option>
-                          <option>Last 12 months</option>
-                          <option>This year</option>
+                        <Form.Select 
+                          size="sm" 
+                          style={{ width: '150px' }}
+                          value={selectedPeriod}
+                          onChange={(e) => {
+                            setSelectedPeriod(e.target.value);
+                          }}
+                        >
+                          <option value="Last 3 months">Last 3 months</option>
+                          <option value="Last 6 months">Last 6 months</option>
+                          <option value="This year">This year</option>
                         </Form.Select>
                       </div>
                       <SpendingChart />

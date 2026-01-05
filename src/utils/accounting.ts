@@ -233,9 +233,16 @@ export const GetRecentActivity = async () => {
     throw error;
   }
 };
-export const GetAnalyticsByMonth = async () => {
+export const GetAnalyticsByMonth = async (start_date?: string, end_date?: string) => {
   try {
-    const response = await axiosInstance.get('accounting/get-analytics-by-month');
+    const params: any = {};
+    if (start_date) {
+      params.start_date = start_date;
+    }
+    if (end_date) {
+      params.end_date = end_date;
+    }
+    const response = await axiosInstance.get('accounting/get-analytics-by-month', { params });
     return extractData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch analytics by month");

@@ -2,11 +2,13 @@ import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
   useState,
+  useEffect,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
+import { ListFAQModules, getMostViewedFAQs } from "@utils/faqs";
 
 
 import "@assets/scss/common.scss";
@@ -53,8 +55,60 @@ const HelpCenter = () => {
   const [selectedTab, setSelectedTab] = useState('all');
   const [selectedSidebar, setSelectedSidebar] = useState('all');
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
-  const [selectedArticle, setSelectedArticle] = useState<string | null>(null);
+  const [selectedArticle, setSelectedArticle] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState('2FA');
+  const [faqModules, setFaqModules] = useState<any[]>([]);
+  const [loadingModules, setLoadingModules] = useState<boolean>(false);
+  const [trendingSearches, setTrendingSearches] = useState<any[]>([]);
+  const [loadingTrendingSearches, setLoadingTrendingSearches] = useState<boolean>(false);
+
+  // Color palette for modules
+  const moduleColors = ['#4680ff', '#04a9f5', '#1de9b6', '#f4c22b', '#ff6b6b', '#4ecdc4', '#95a5a6', '#e74c3c'];
+
+  // Fetch FAQ modules on component mount
+  useEffect(() => {
+    const fetchModules = async () => {
+      setLoadingModules(true);
+      try {
+        const response = await ListFAQModules({ page: 1, perPage: 100 });
+        if (response && response.data) {
+          setFaqModules(response.data);
+        } else if (Array.isArray(response)) {
+          setFaqModules(response);
+        }
+      } catch (error) {
+        console.error('Error fetching FAQ modules:', error);
+      } finally {
+        setLoadingModules(false);
+      }
+    };
+
+    fetchModules();
+  }, []);
+
+  // Fetch most viewed FAQs for trending searches
+  useEffect(() => {
+    const fetchTrendingSearches = async () => {
+      setLoadingTrendingSearches(true);
+      try {
+        const response = await getMostViewedFAQs();
+        if (response && Array.isArray(response)) {
+          setTrendingSearches(response);
+        } else if (response && response.data && Array.isArray(response.data)) {
+          setTrendingSearches(response.data);
+        } else {
+          setTrendingSearches([]);
+        }
+      } catch (error) {
+        console.error('Error fetching trending searches:', error);
+        setTrendingSearches([]);
+      } finally {
+        setLoadingTrendingSearches(false);
+      }
+    };
+
+    fetchTrendingSearches();
+  }, []);
 
   const mainCategories = [
     {
@@ -87,38 +141,22 @@ const HelpCenter = () => {
     }
   ];
 
-  const featuredTopics = [
-    {
-      icon: MapPin,
-      title: 'Getting Started',
-      description: 'Begin with 2-step verification',
-      color: '#4680ff'
-    },
-    {
-      icon: Receipt,
-      title: 'Billing',
-      description: 'Handling invoices',
-      color: '#04a9f5'
-    },
-    {
-      icon: Link,
-      title: 'Integrations',
-      description: 'API & Passwords',
-      color: '#1de9b6'
-    },
-    {
-      icon: WrenchIcon,
-      title: 'Troubleshooting',
-      description: 'Resolving issues',
-      color: '#f4c22b'
-    }
-  ];
+  // Transform FAQ modules to featured topics format
+  const featuredTopics = faqModules.map((module, index) => ({
+    id: module.id,
+    title: module.name,
+    description: module.description || `${module.faqs_count || 0} FAQs available`,
+    color: moduleColors[index % moduleColors.length],
+    icon: module.icon || 'help_outline'
+  }));
 
-  const trendingSearches = [
-    'API Integration Guide',
-    'Unable to access billing page',
-    'Two-Factor Authentication'
-  ];
+  // Transform most viewed FAQs to trending searches format
+  console.log(trendingSearches);
+  const transformedTrendingSearches = trendingSearches.map((faq) => ({
+    id: faq.id,
+    title: faq.question ,
+    viewCount: faq.view_count || 0
+  }));
 
   const tickets = [
     { id: '#107423', subject: 'Question about recent charge', category: 'Low', priority: 'low', status: 'Open', updated: '3 mins ago' },
@@ -348,53 +386,74 @@ const HelpCenter = () => {
                       marginBottom: '16px'
                     }}>Featured Topics</h4>
                     <Row className="g-3">
-                      {featuredTopics.map((topic, index) => {
-                        const Icon = topic.icon;
-                        return (
-                          <Col xs={12} sm={3} key={index}>
-                            <div style={{
-                              background: '#fafbfc',
-                              border: '1px solid #e9ecef',
-                              borderRadius: '6px',
-                              padding: '16px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              height: '100%',
-                              textAlign: 'center'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = '#f0f4f8';
-                              e.currentTarget.style.borderColor = '#4680ff';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = '#fafbfc';
-                              e.currentTarget.style.borderColor = '#e9ecef';
-                            }}>
+                      {loadingModules ? (
+                        <Col xs={12}>
+                          <div style={{ textAlign: 'center', padding: '20px' }}>
+                            <p style={{ color: '#6c757d' }}>Loading topics...</p>
+                          </div>
+                        </Col>
+                      ) : featuredTopics.length > 0 ? (
+                        featuredTopics.map((topic, index) => {
+                          return (
+                            <Col xs={12} sm={6} md={4} lg={3} key={topic.id || index}>
                               <div style={{
-                                width: '44px',
-                                height: '44px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                margin: '0 auto 10px auto'
+                                background: '#fafbfc',
+                                border: '1px solid #e9ecef',
+                                borderRadius: '6px',
+                                padding: '16px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                height: '100%',
+                                textAlign: 'center'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#f0f4f8';
+                                e.currentTarget.style.borderColor = topic.color;
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#fafbfc';
+                                e.currentTarget.style.borderColor = '#e9ecef';
+                              }}
+                              onClick={() => {
+                                // Navigate to knowledge base with module filter
+                                setCurrentView('knowledge-base');
+                                // You can add module filtering logic here
                               }}>
-                                <Icon size={24} color={topic.color} strokeWidth={2} />
+                                <div style={{
+                                  width: '44px',
+                                  height: '44px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  margin: '0 auto 10px auto',
+                                  color: topic.color
+                                }}>
+                                  <i className="material-icons-two-tone" style={{ fontSize: '28px' }}>
+                                    {topic.icon}
+                                  </i>
+                                </div>
+                                <h6 style={{
+                                  fontSize: '15px',
+                                  fontWeight: '600',
+                                  color: '#2c3e50',
+                                  marginBottom: '4px'
+                                }}>{topic.title}</h6>
+                                <p style={{
+                                  fontSize: '12px',
+                                  color: '#6c757d',
+                                  marginBottom: 0
+                                }}>{topic.description}</p>
                               </div>
-                              <h6 style={{
-                                fontSize: '15px',
-                                fontWeight: '600',
-                                color: '#2c3e50',
-                                marginBottom: '4px'
-                              }}>{topic.title}</h6>
-                              <p style={{
-                                fontSize: '12px',
-                                color: '#6c757d',
-                                marginBottom: 0
-                              }}>{topic.description}</p>
-                            </div>
-                          </Col>
-                        );
-                      })}
+                            </Col>
+                          );
+                        })
+                      ) : (
+                        <Col xs={12}>
+                          <div style={{ textAlign: 'center', padding: '20px' }}>
+                            <p style={{ color: '#6c757d' }}>No topics available</p>
+                          </div>
+                        </Col>
+                      )}
                     </Row>
                   </Card>
                 </Card>
@@ -421,28 +480,54 @@ const HelpCenter = () => {
                       marginBottom: '16px'
                     }}>Trending Searches</h4>
                     <div>
-                      {trendingSearches.map((search, index) => (
-                        <div key={index} style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px',
-                          padding: '10px 0',
-                          cursor: 'pointer'
-                        }}>
-                          <div style={{
-                            width: '6px',
-                            height: '6px',
-                            background: '#4680ff',
-                            borderRadius: '50%',
-                            flexShrink: 0
-                          }} />
-                          <p style={{
-                            fontSize: '13px',
-                            color: '#495057',
-                            margin: 0
-                          }}>{search}</p>
+                      {loadingTrendingSearches ? (
+                        <div style={{ textAlign: 'center', padding: '20px' }}>
+                          <p style={{ color: '#6c757d', fontSize: '13px' }}>Loading...</p>
                         </div>
-                      ))}
+                      ) : transformedTrendingSearches.length > 0 ? (
+                        transformedTrendingSearches.map((search, index) => (
+                          <div 
+                            key={search.id || index} 
+                            onClick={() => {
+                              setSearchQuery(search.title);
+                              setCurrentView('knowledge-base');
+                              setSelectedArticle(search);
+                              setCurrentView('article-detail');
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                              padding: '10px 0',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.paddingLeft = '5px';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.paddingLeft = '0';
+                            }}
+                          >
+                            <div style={{
+                              width: '6px',
+                              height: '6px',
+                              background: '#4680ff',
+                              borderRadius: '50%',
+                              flexShrink: 0
+                            }} />
+                            <p style={{
+                              fontSize: '13px',
+                              color: '#495057',
+                              margin: 0
+                            }}>{search.title}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '20px' }}>
+                          <p style={{ color: '#6c757d', fontSize: '13px' }}>No trending searches available</p>
+                        </div>
+                      )}
                     </div>
                   </Card>
                 </Card>
@@ -1049,8 +1134,8 @@ const HelpCenter = () => {
             <KnowledgeBase 
               onBack={() => setCurrentView('home')}
               searchQuery={searchQuery}
-              onArticleClick={(articleId) => {
-                setSelectedArticle(articleId);
+              onArticleClick={(article) => {
+                setSelectedArticle(article);
                 setCurrentView('article-detail');
               }}
             />
@@ -1060,7 +1145,12 @@ const HelpCenter = () => {
                 setCurrentView('knowledge-base');
                 setSelectedArticle(null);
               }}
-              articleId={selectedArticle}
+              articleData={selectedArticle}
+              articleId={selectedArticle?.id?.toString() || selectedArticle?.id || null}
+              onArticleClick={(article) => {
+                setSelectedArticle(article);
+                // Stay on article-detail view, just update the article
+              }}
             />
           ) : null}
 

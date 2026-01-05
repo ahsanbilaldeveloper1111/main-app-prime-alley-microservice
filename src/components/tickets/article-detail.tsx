@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getFAQItem, ListFAQItems, ListFAQTopics } from '@utils/faqs';
 import { Row, Col, Card, Button, Badge, Form } from 'react-bootstrap';
 import {
   ChevronLeft,
@@ -29,15 +30,158 @@ import {
 
 interface ArticleDetailProps {
   onBack: () => void;
-  articleId?: string;
+  articleId?: string | null;
+  articleData?: any;
+  onArticleClick?: (article: any) => void;
 }
 
-const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
+const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articleData, onArticleClick }) => {
   const [commentText, setCommentText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  // Sample article data
-  const article = {
-    title: 'Setting Up Two-Factor Authentication',
+  const [faqItem, setFaqItem] = useState<any>(articleData || null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [relatedArticles, setRelatedArticles] = useState<any[]>([]);
+  const [loadingRelated, setLoadingRelated] = useState<boolean>(false);
+  const [faqTopics, setFaqTopics] = useState<any[]>([]);
+  const [loadingTopics, setLoadingTopics] = useState<boolean>(false);
+
+  // Format date helper
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'Recently';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+    return `${Math.floor(diffDays / 365)} years ago`;
+  };
+
+  // Fetch FAQ item if only ID is provided
+  useEffect(() => {
+    const fetchFAQItem = async () => {
+      if (articleData) {
+        setFaqItem(articleData);
+        return;
+      }
+
+      if (!articleId) return;
+
+      setLoading(true);
+      try {
+        const id = Number.parseInt(articleId, 10);
+        if (!isNaN(id)) {
+          const item = await getFAQItem(id);
+          if (item) {
+            setFaqItem(item);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching FAQ item:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFAQItem();
+  }, [articleId, articleData]);
+
+  // Fetch related FAQ items based on topic and module
+  useEffect(() => {
+    const fetchRelatedArticles = async () => {
+      if (!faqItem) {
+        setRelatedArticles([]);
+        return;
+      }
+
+      setLoadingRelated(true);
+      try {
+        const filters: any = {};
+        
+        // Filter by topic if available
+        if (faqItem.topic_id) {
+          filters.topic_id = faqItem.topic_id;
+        } else if (faqItem.topic?.id) {
+          filters.topic_id = faqItem.topic.id;
+        }
+        
+        // Filter by module if available
+        if (faqItem.topic?.faq_module_id) {
+          filters.faq_module_id = faqItem.topic.faq_module_id;
+        } else if (faqItem.topic?.faq_module?.id) {
+          filters.faq_module_id = faqItem.topic.faq_module.id;
+        }
+
+        const response = await ListFAQItems({
+          page: 1,
+          perPage: 5,
+          filters: filters
+        });
+
+        let items: any[] = [];
+        if (response && response.data) {
+          items = Array.isArray(response.data) ? response.data : [];
+        } else if (Array.isArray(response)) {
+          items = response;
+        }
+
+        // Exclude the current article and limit to 5
+        const currentId = faqItem.id;
+        const related = items
+          .filter((item: any) => item.id !== currentId)
+          .slice(0, 5);
+
+        setRelatedArticles(related);
+      } catch (error) {
+        console.error('Error fetching related articles:', error);
+        setRelatedArticles([]);
+      } finally {
+        setLoadingRelated(false);
+      }
+    };
+
+    fetchRelatedArticles();
+  }, [faqItem]);
+
+  // Fetch FAQ topics on component mount
+  useEffect(() => {
+    const fetchTopics = async () => {
+      setLoadingTopics(true);
+      try {
+        const response = await ListFAQTopics({ page: 1, perPage: 100 });
+        if (response && response.data) {
+          setFaqTopics(response.data);
+        } else if (Array.isArray(response)) {
+          setFaqTopics(response);
+        }
+      } catch (error) {
+        console.error('Error fetching FAQ topics:', error);
+      } finally {
+        setLoadingTopics(false);
+      }
+    };
+
+    fetchTopics();
+  }, []);
+
+  // Transform FAQ item to article format
+  console.log(faqItem);
+  const article = faqItem ? {
+    title: faqItem.title || '',
+    updated: formatDate(faqItem.updated_at || faqItem.created_at),
+    views: faqItem.view_count || 0,
+    content: {
+      intro: faqItem.description || '',
+      answer: faqItem.answer || '',
+      type: faqItem.type || '',
+      topic: faqItem.topic || null
+    }
+  } : {
+    title: faqItem.title || '',
     updated: '5 days ago',
     views: 850,
     content: {
@@ -71,15 +215,14 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
     }
   };
 
-  const categories = [
-    { name: 'Getting Started', count: 8, icon: BookOpen },
-    { name: 'Admin & Security', count: 12, icon: Shield },
-    { name: 'Billing', count: 6, icon: DollarSign },
-    { name: 'Integrations', count: 9, icon: Link2 },
-    { name: 'Calling & Web Dialer', count: 7, icon: Phone },
-    { name: 'AI & Automation', count: 5, icon: Bot },
-    { name: 'Reports & Analytics', count: 4, icon: BarChart3 }
-  ];
+  // Transform FAQ topics to categories format
+  const categories = faqTopics.map((topic) => ({
+    id: topic.id,
+    name: topic.name,
+    count: Number.parseInt(topic.faqs_count || '0', 10),
+    icon: topic.faq_module?.icon || 'help_outline',
+    topic: topic
+  }));
 
   const contents = [
     'Steps to Enable Two-Factor Authentication',
@@ -88,11 +231,13 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
     'Additional Help for 2FA'
   ];
 
-  const relatedArticles = [
-    'Resetting Your 2FA Device',
-    'Troubleshooting 2FA Issues',
-    'Managing User Permissions'
-  ];
+  // Transform related articles for rendering
+  console.log(relatedArticles);
+  const transformedRelatedArticles = relatedArticles.map((item) => ({
+    id: item.id,
+    title: item.title ,
+    viewCount: item.view_count || 0
+  }));
 
   const comments = [
     {
@@ -137,7 +282,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
         </span>
         <span style={{ color: '#6c757d', margin: '0 8px' }}>›</span>
         <span style={{ color: '#2c3e50', fontWeight: '600', fontSize: '14px' }}>
-          Setting Up Two-Factor Authentication
+          {faqItem.title}
         </span>
       </div>
 
@@ -152,53 +297,79 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
             overflow: 'hidden'
           }}>
             <div style={{ padding: '0' }}>
-              {categories.map((category, index) => {
-                const Icon = category.icon;
-                return (
-                  <div
-                    key={index}
-                    onClick={() => setSelectedCategory(category.name)}
-                    style={{
-                      padding: '10px 14px',
-                      cursor: 'pointer',
-                      background: selectedCategory === category.name ? '#f8f9fa' : '#fff',
-                      fontSize: '13px',
-                      fontWeight: selectedCategory === category.name ? '500' : '400',
-                      color: selectedCategory === category.name ? '#2c3e50' : '#495057',
-                      transition: 'all 0.15s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      borderBottom: index < categories.length - 1 ? '1px solid #f5f5f5' : 'none'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (selectedCategory !== category.name) {
-                        e.currentTarget.style.background = '#f8f9fa';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (selectedCategory !== category.name) {
-                        e.currentTarget.style.background = '#fff';
-                      }
-                    }}
-                  >
-                    <Icon size={16} color={selectedCategory === category.name ? '#4680ff' : '#6c757d'} />
-                    <span style={{ flex: 1 }}>{category.name}</span>
-                    <Badge
-                      bg="light"
+              {loadingTopics ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+                  Loading categories...
+                </div>
+              ) : categories.length > 0 ? (
+                categories.map((category, index) => {
+                  const isSelected = selectedCategory === category.name || 
+                    (faqItem?.topic?.id === category.id || faqItem?.topic_id === category.id);
+                  return (
+                    <div
+                      key={category.id || index}
+                      onClick={() => {
+                        setSelectedCategory(category.name);
+                        // Navigate to knowledge base with this topic
+                        if (onArticleClick && category.topic) {
+                          // This will be handled by the parent component
+                          // For now, just update the selected category
+                        }
+                      }}
                       style={{
-                        fontSize: '11px',
-                        fontWeight: '500',
-                        color: '#6c757d',
-                        background: selectedCategory === category.name ? '#e3f2fd' : '#f0f0f0',
-                        padding: '2px 6px'
+                        padding: '10px 14px',
+                        cursor: 'pointer',
+                        background: isSelected ? '#f8f9fa' : '#fff',
+                        fontSize: '13px',
+                        fontWeight: isSelected ? '500' : '400',
+                        color: isSelected ? '#2c3e50' : '#495057',
+                        transition: 'all 0.15s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        borderBottom: index < categories.length - 1 ? '1px solid #f5f5f5' : 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.background = '#f8f9fa';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.background = '#fff';
+                        }
                       }}
                     >
-                      {category.count}
-                    </Badge>
-                  </div>
-                );
-              })}
+                      <i 
+                        className="material-icons-two-tone" 
+                        style={{ 
+                          fontSize: '18px',
+                          color: isSelected ? '#4680ff' : '#6c757d'
+                        }}
+                      >
+                        {category.icon}
+                      </i>
+                      <span style={{ flex: 1 }}>{category.name}</span>
+                      <Badge
+                        bg="light"
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: '500',
+                          color: '#6c757d',
+                          background: isSelected ? '#e3f2fd' : '#f0f0f0',
+                          padding: '2px 6px'
+                        }}
+                      >
+                        {category.count}
+                      </Badge>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+                  No categories available
+                </div>
+              )}
             </div>
           </Card>
         </Col>
@@ -212,7 +383,19 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
       boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
     }}>
       <Card.Body style={{ padding: '40px' }}>
-        {/* Article Header */}
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#6c757d' }}>
+            Loading article...
+          </div>
+        )}
+        {!loading && !faqItem && (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#6c757d' }}>
+            Article not found
+          </div>
+        )}
+        {!loading && faqItem ? (
+          <React.Fragment>
+            {/* Article Header */}
         <div style={{
           marginBottom: '32px',
           paddingBottom: '24px',
@@ -260,47 +443,83 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
           </div>
         </div>
 
-        {/* Introduction */}
-        <div style={{
-          background: '#f9fafb',
-          border: '1px solid #e5e7eb',
-          borderLeft: '4px solid #4680ff',
-          borderRadius: '8px',
-          padding: '20px',
-          marginBottom: '36px'
-        }}>
-          <p style={{
-            fontSize: '15px',
-            color: '#374151',
-            lineHeight: '1.8',
-            marginBottom: 0
-          }}>
-            {article.content.intro}
-          </p>
-        </div>
-
-        {/* Steps Section */}
-        <h2 style={{
-          fontSize: '24px',
-          fontWeight: '700',
-          color: '#1f2937',
-          marginBottom: '28px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px'
-        }}>
+        {/* Description/Introduction */}
+            {(article.content.intro || (article.content as any).description) && (
           <div style={{
-            width: '4px',
-            height: '24px',
-            background: '#4680ff',
-            borderRadius: '2px'
-          }} />
-          Steps to Enable Two-Factor Authentication
-        </h2>
+            background: '#f9fafb',
+            border: '1px solid #e5e7eb',
+            borderLeft: '4px solid #4680ff',
+            borderRadius: '8px',
+            padding: '20px',
+            marginBottom: '36px'
+          }}>
+            <p style={{
+              fontSize: '15px',
+              color: '#374151',
+              lineHeight: '1.8',
+              marginBottom: 0
+            }}>
+              {article.content.intro || (article.content as any).description}
+            </p>
+          </div>
+        )}
 
-        {/* Steps */}
-        <div style={{ marginBottom: '40px' }}>
-          {article.content.steps.map((step, index) => (
+        {/* Answer Section */}
+        {article.content.answer && (
+          <div style={{ marginBottom: '36px' }}>
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '700',
+              color: '#1f2937',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <div style={{
+                width: '4px',
+                height: '24px',
+                background: '#4680ff',
+                borderRadius: '2px'
+              }} />
+              Answer
+            </h2>
+            <div 
+              style={{
+                fontSize: '15px',
+                color: '#374151',
+                lineHeight: '1.8',
+                marginBottom: 0
+              }}
+              dangerouslySetInnerHTML={{ __html: article.content.answer }}
+            />
+          </div>
+        )}
+
+        {/* Steps Section - Only show if steps exist (for sample data) */}
+        {article.content.steps && article.content.steps.length > 0 && (
+          <>
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '700',
+              color: '#1f2937',
+              marginBottom: '28px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <div style={{
+                width: '4px',
+                height: '24px',
+                background: '#4680ff',
+                borderRadius: '2px'
+              }} />
+              Steps to Enable Two-Factor Authentication
+            </h2>
+
+            {/* Steps */}
+            <div style={{ marginBottom: '40px' }}>
+              {article.content.steps.map((step, index) => (
             <div key={index} style={{ 
               marginBottom: '28px',
               position: 'relative',
@@ -339,6 +558,8 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
             </div>
           ))}
         </div>
+          </>
+        )}
 
         {/* Was this helpful */}
         <div style={{
@@ -427,7 +648,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
 
         {/* Comments Section */}
         <div>
-          <div style={{
+          {/* <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -461,10 +682,10 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
               <Plus size={16} style={{ marginRight: '4px' }} />
               Add comment
             </Button>
-          </div>
+          </div> */}
 
           {/* Comment List */}
-          <div style={{ marginBottom: '24px' }}>
+          {/* <div style={{ marginBottom: '24px' }}>
             {comments.map((comment, index) => (
               <div
                 key={index}
@@ -523,8 +744,10 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
                 </div>
               </div>
             ))}
-          </div>
+          </div> */}
         </div>
+          </React.Fragment>
+        ) : null}
       </Card.Body>
     </Card>
   </Col>
@@ -532,7 +755,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
   {/* Right Sidebar */}
   <Col xs={12} lg={3}>
     {/* Contents */}
-    <Card style={{
+    {/* <Card style={{
       background: '#fff',
       border: '1px solid #e5e7eb',
       borderRadius: '12px',
@@ -609,7 +832,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
           ))}
         </div>
       </Card.Body>
-    </Card>
+    </Card> */}
 
     {/* Related Articles */}
     <Card style={{
@@ -635,7 +858,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
           gap: '8px'
         }}>
           <BookOpen size={18} color="#4680ff" />
-          Related Articles
+          Most Viewed Articles
         </h5>
       </div>
       <Card.Body style={{ padding: '0' }}>
@@ -644,49 +867,60 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
           flexDirection: 'column',
           gap: '0'
         }}>
-          {relatedArticles.map((article, index) => (
-            <div
-              key={index}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '14px 20px',
-                cursor: 'pointer',
-                borderBottom: index < relatedArticles.length - 1 ? '1px solid #f3f4f6' : 'none',
-                transition: 'all 0.2s',
-                background: '#fff'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f9fafb';
-                e.currentTarget.style.paddingLeft = '24px';
-                const chevron = e.currentTarget.querySelector('.chevron');
-                if (chevron) (chevron as HTMLElement).style.color = '#4680ff';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#fff';
-                e.currentTarget.style.paddingLeft = '20px';
-                const chevron = e.currentTarget.querySelector('.chevron');
-                if (chevron) (chevron as HTMLElement).style.color = '#9ca3af';
-              }}
-            >
-              <span style={{
-                fontSize: '14px',
-                color: '#374151',
-                fontWeight: '500'
-              }}>
-                {article}
-              </span>
-              <ChevronRight 
-                size={16} 
-                className="chevron"
-                style={{ 
-                  color: '#9ca3af',
-                  transition: 'color 0.2s'
-                }} 
-              />
+          {loadingRelated ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+              Loading related articles...
             </div>
-          ))}
+          ) : transformedRelatedArticles.length > 0 ? (
+            transformedRelatedArticles.map((article, index) => (
+              <div
+                key={article.id || index}
+                onClick={() => onArticleClick?.(relatedArticles.find(item => item.id === article.id) || article)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '14px 20px',
+                  cursor: 'pointer',
+                  borderBottom: index < transformedRelatedArticles.length - 1 ? '1px solid #f3f4f6' : 'none',
+                  transition: 'all 0.2s',
+                  background: '#fff'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f9fafb';
+                  e.currentTarget.style.paddingLeft = '24px';
+                  const chevron = e.currentTarget.querySelector('.chevron');
+                  if (chevron) (chevron as HTMLElement).style.color = '#4680ff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#fff';
+                  e.currentTarget.style.paddingLeft = '20px';
+                  const chevron = e.currentTarget.querySelector('.chevron');
+                  if (chevron) (chevron as HTMLElement).style.color = '#9ca3af';
+                }}
+              >
+                <span style={{
+                  fontSize: '14px',
+                  color: '#374151',
+                  fontWeight: '500'
+                }}>
+                  {article.title}
+                </span>
+                <ChevronRight 
+                  size={16} 
+                  className="chevron"
+                  style={{ 
+                    color: '#9ca3af',
+                    transition: 'color 0.2s'
+                  }} 
+                />
+              </div>
+            ))
+          ) : (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+              No related articles available
+            </div>
+          )}
         </div>
       </Card.Body>
     </Card>
@@ -762,9 +996,10 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
       border: '1px solid #e5e7eb',
       borderRadius: '12px',
       boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      display: 'none'
     }}>
-      <div style={{
+      {/* <div style={{
         padding: '18px 20px',
         background: 'linear-gradient(to right, #f9fafb, #fff)',
         borderBottom: '1px solid #f3f4f6'
@@ -781,10 +1016,10 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
           <MessageCircle size={18} color="#4680ff" />
           Recent Comments
         </h5>
-      </div>
+      </div> */}
       <Card.Body style={{ padding: '16px' }}>
         {/* Recent Comments */}
-        <div style={{ marginBottom: '16px' }}>
+        {/* <div style={{ marginBottom: '16px' }}>
           {comments.slice(0, 3).map((comment, index) => (
             <div
               key={index}
@@ -852,9 +1087,9 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
               </div>
             </div>
           ))}
-        </div>
+        </div> */}
 
-        <Button
+        {/* <Button
           variant="link"
           style={{
             fontSize: '13px',
@@ -874,7 +1109,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId }) => {
         >
           <Plus size={14} />
           Add your comment
-        </Button>
+        </Button> */}
       </Card.Body>
     </Card>
   </Col>
