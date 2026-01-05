@@ -453,7 +453,7 @@ class TokenService {
 
     // Only logout on actual authentication errors (401, 403) or invalid token errors
     // Don't logout on network errors or timeouts
-    if (error?.response?.status === 401 || error?.response?.status === 403) {
+    // if (error?.response?.status === 401 || error?.response?.status === 403) {
       // console.log('Token refresh failed with auth error, clearing session...');
       if (typeof window !== 'undefined' && window.sessionStorage) {
         sessionStorage.clear();
@@ -462,9 +462,9 @@ class TokenService {
         window.location.href = '/auth/signin';
         toast.error('Session expired - Please login again');
       }
-    } else {
+    // } else {
       // console.log('Token refresh failed but not an auth error, keeping session active:', error?.response?.status);
-    }
+    // }
   }
 
   // Check token status and refresh if needed
