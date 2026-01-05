@@ -9,11 +9,10 @@ import {
   createFAQItem,
   updateFAQItem,
   deleteFAQItem,
-  getAllFAQModules
+  getAllFAQTopics
 } from '@utils/faqs';
 import { Column } from '@components/CustomDataTable';
 import { Button, Form, Row, Col } from 'react-bootstrap';
-import { useSession } from 'next-auth/react';
 import '@assets/scss/common.scss';
 import FormModal from "@pages/partial/FormModal";
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
@@ -35,23 +34,26 @@ const CKEditorWrapper = dynamic(
 );
 
 const FAQItems = () => {
-  const { data: session } = useSession();
-  
   const columns: Column[] = [
     { key: 'question', name: 'Question', selector: (row: any) => row.question, sortable: true },
     { 
-      key: 'faq_module', 
-      name: 'Module', 
-      selector: (row: any) => row.faq_module?.name || 'N/A', 
+      key: 'topic', 
+      name: 'Topic', 
+      selector: (row: any) => row.topic?.name || 'N/A', 
       sortable: false,
       cell: (props: any) => (
         <div>
-          {props.faq_module ? (
-            <span className="status-badge primary" title={props.faq_module.description || ''}>
-              {props.faq_module.name}
+          {props.topic ? (
+            <span className="status-badge primary" title={props.topic.description || ''}>
+              {props.topic.name}
+              {props.topic.faq_module && (
+                <span className="text-muted ms-1" style={{ fontSize: '0.85em' }}>
+                  ({props.topic.faq_module.name})
+                </span>
+              )}
             </span>
           ) : (
-            <span className="text-muted">No module</span>
+            <span className="text-muted">No topic</span>
           )}
         </div>
       )
@@ -149,43 +151,55 @@ const FAQItems = () => {
   const [successModalDescription, setSuccessModalDescription] = useState('');
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [itemFormData, setItemFormData] = useState({
-    faq_module_id: '',
-    icon: '',
+    topic_id: '',
     question: '',
     answer: '',
     description: '',
     type: ''
   });
-  const [moduleOptions, setModuleOptions] = useState<any[]>([]);
-  const [isLoadingModules, setIsLoadingModules] = useState<boolean>(false);
+  const [topicOptions, setTopicOptions] = useState<any[]>([]);
+  const [isLoadingTopics, setIsLoadingTopics] = useState<boolean>(false);
+  const [isCreateModalEntered, setIsCreateModalEntered] = useState<boolean>(false);
+  const [isEditModalEntered, setIsEditModalEntered] = useState<boolean>(false);
 
   useEffect(() => {
     if (showCreateItemModal || showEditItemModal) {
-      fetchModuleOptions();
+      fetchTopicOptions();
     }
   }, [showCreateItemModal, showEditItemModal]);
 
-  const fetchModuleOptions = async () => {
-    if (moduleOptions.length > 0) return;
-    setIsLoadingModules(true);
+  useEffect(() => {
+    if (!showCreateItemModal) {
+      setIsCreateModalEntered(false);
+    }
+  }, [showCreateItemModal]);
+
+  useEffect(() => {
+    if (!showEditItemModal) {
+      setIsEditModalEntered(false);
+    }
+  }, [showEditItemModal]);
+
+  const fetchTopicOptions = async () => {
+    if (topicOptions.length > 0) return;
+    setIsLoadingTopics(true);
     try {
-      const modules = await getAllFAQModules();
-      setModuleOptions(modules.map((m: any) => ({
-        value: m.id,
-        label: m.name
+      const topics = await getAllFAQTopics();
+      setTopicOptions(topics.map((t: any) => ({
+        value: t.id,
+        label: `${t.name}${t.faq_module ? ` (${t.faq_module.name})` : ''}`
       })));
     } catch (error) {
-      console.error('Error fetching modules:', error);
+      console.error('Error fetching topics:', error);
     } finally {
-      setIsLoadingModules(false);
+      setIsLoadingTopics(false);
     }
   };
 
   const handleEditItem = (props: any) => {
     setSelectedItem(props.id);
     setItemFormData({
-      faq_module_id: props.faq_module_id?.toString() || '',
-      icon: props.icon || '',
+      topic_id: props.topic_id?.toString() || '',
       question: props.question || '',
       answer: props.answer || '',
       description: props.description || '',
@@ -195,12 +209,11 @@ const FAQItems = () => {
   };
 
   const handleSubmitEditItem = async () => {
-    if (!itemFormData.faq_module_id || !itemFormData.question || !itemFormData.answer) {
+    if (!itemFormData.topic_id || !itemFormData.question || !itemFormData.answer) {
       return;
     }
     const response = await updateFAQItem(selectedItem, {
-      faq_module_id: Number.parseInt(itemFormData.faq_module_id, 10),
-      icon: itemFormData.icon,
+      topic_id: Number.parseInt(itemFormData.topic_id, 10),
       question: itemFormData.question,
       answer: itemFormData.answer,
       description: itemFormData.description,
@@ -209,8 +222,7 @@ const FAQItems = () => {
     if (response) {
       setSelectedItem(null);
       setItemFormData({
-        faq_module_id: '',
-        icon: '',
+        topic_id: '',
         question: '',
         answer: '',
         description: '',
@@ -241,12 +253,11 @@ const FAQItems = () => {
   };
 
   const handleSubmitCreateItem = async () => {
-    if (!itemFormData.faq_module_id || !itemFormData.question || !itemFormData.answer) {
+    if (!itemFormData.topic_id || !itemFormData.question || !itemFormData.answer) {
       return;
     }
     const response = await createFAQItem({
-      faq_module_id: Number.parseInt(itemFormData.faq_module_id, 10),
-      icon: itemFormData.icon,
+      topic_id: Number.parseInt(itemFormData.topic_id, 10),
       question: itemFormData.question,
       answer: itemFormData.answer,
       description: itemFormData.description,
@@ -254,8 +265,7 @@ const FAQItems = () => {
     });
     if (response) {
       setItemFormData({
-        faq_module_id: '',
-        icon: '',
+        topic_id: '',
         question: '',
         answer: '',
         description: '',
@@ -311,13 +321,18 @@ const FAQItems = () => {
           setShowEditItemModal(false);
           setSelectedItem(null);
           setItemFormData({
-            faq_module_id: '',
-            icon: '',
+            topic_id: '',
             question: '',
             answer: '',
             description: '',
             type: ''
           });
+        }}
+        onEntered={() => {
+          setIsEditModalEntered(true);
+        }}
+        onExited={() => {
+          setIsEditModalEntered(false);
         }}
         title="Edit FAQ"
         titleIcon={<HelpCircle size={20} className="text-primary" />}
@@ -325,24 +340,24 @@ const FAQItems = () => {
         formHtml={
           <>
             <div className="form-group mb-3">
-              <label htmlFor="editItemModule" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                FAQ Module <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Select the FAQ module">
+              <label htmlFor="editItemTopic" className="fw-semibold d-flex align-items-center gap-2 form-label">
+                FAQ Topic <span className="text-danger">*</span>
+                <span className="text-muted ms-2" title="Select the FAQ topic">
                   <Info size={14} />
                 </span>
               </label>
               <Select
-                options={moduleOptions}
-                value={moduleOptions.find(opt => opt.value.toString() === itemFormData.faq_module_id)}
-                onChange={(option: any) => setItemFormData({ ...itemFormData, faq_module_id: option?.value?.toString() || '' })}
-                placeholder="Select module..."
-                isLoading={isLoadingModules}
+                options={topicOptions}
+                value={topicOptions.find(opt => opt.value.toString() === itemFormData.topic_id)}
+                onChange={(option: any) => setItemFormData({ ...itemFormData, topic_id: option?.value?.toString() || '' })}
+                placeholder="Select topic..."
+                isLoading={isLoadingTopics}
                 isClearable={false}
               />
               <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
                 <Info size={12} />
                 <span style={{ fontSize: '0.813rem' }}>
-                  Select the FAQ module this item belongs to
+                  Select the FAQ topic this item belongs to
                 </span>
               </Form.Text>
             </div>
@@ -369,22 +384,23 @@ const FAQItems = () => {
                 </span>
               </label>
               <div style={{ border: '1px solid #ced4da', borderRadius: '0.375rem' }}>
-                <CKEditorWrapper
-                  data={itemFormData.answer}
-                  onChange={(_event: any, editor: any) => {
-                    const data = editor.getData();
-                    setItemFormData({ ...itemFormData, answer: data });
-                  }}
-                  config={{
-                    toolbar: [
-                      'heading', '|',
-                      'bold', 'italic', 'link', '|',
-                      'bulletedList', 'numberedList', '|',
-                      'blockQuote', 'insertTable', '|',
-                      'undo', 'redo'
-                    ]
-                  }}
-                />
+                {isEditModalEntered && (
+                  <CKEditorWrapper
+                    key={`edit-${selectedItem}-${showEditItemModal}`}
+                    data={itemFormData.answer}
+                    onChange={(_event: any, editor: any) => {
+                      try {
+                        const data = editor.getData();
+                        setItemFormData({ ...itemFormData, answer: data });
+                      } catch (error) {
+                        console.error('Error getting editor data:', error);
+                      }
+                    }}
+                    config={{
+                      toolbar: 'undo redo | formatselect | bold italic | alignleft aligncenter alignright | bullist numlist | link | removeformat | help'
+                    }}
+                  />
+                )}
               </div>
               <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
                 <Info size={12} />
@@ -424,34 +440,17 @@ const FAQItems = () => {
                 placeholder="e.g., general, technical, billing"
               />
             </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editItemIcon" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Icon
-                <span className="text-muted ms-2" title="Enter icon identifier">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input 
-                className="form-control" 
-                type="text" 
-                id="editItemIcon"
-                value={itemFormData.icon} 
-                onChange={(e) => setItemFormData({ ...itemFormData, icon: e.target.value })} 
-                placeholder="e.g., question-circle"
-              />
-            </div>
           </>
         }
         submitButtonText="Update FAQ"
-        isSubmitDisabled={!itemFormData.faq_module_id || !itemFormData.question || !itemFormData.answer}
+        isSubmitDisabled={!itemFormData.topic_id || !itemFormData.question || !itemFormData.answer}
         cancelButtonText="Cancel"
         onSubmit={handleSubmitEditItem}
         onCancel={() => {
           setShowEditItemModal(false);
           setSelectedItem(null);
           setItemFormData({
-            faq_module_id: '',
-            icon: '',
+            topic_id: '',
             question: '',
             answer: '',
             description: '',
@@ -467,13 +466,18 @@ const FAQItems = () => {
         onHide={() => {
           setShowCreateItemModal(false);
           setItemFormData({
-            faq_module_id: '',
-            icon: '',
+            topic_id: '',
             question: '',
             answer: '',
             description: '',
             type: ''
           });
+        }}
+        onEntered={() => {
+          setIsCreateModalEntered(true);
+        }}
+        onExited={() => {
+          setIsCreateModalEntered(false);
         }}
         title="New FAQ"
         titleIcon={<HelpCircle size={20} className="text-primary" />}
@@ -481,24 +485,24 @@ const FAQItems = () => {
         formHtml={
           <>
             <div className="form-group mb-3">
-              <label htmlFor="newItemModule" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                FAQ Module <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Select the FAQ module">
+              <label htmlFor="newItemTopic" className="fw-semibold d-flex align-items-center gap-2 form-label">
+                FAQ Topic <span className="text-danger">*</span>
+                <span className="text-muted ms-2" title="Select the FAQ topic">
                   <Info size={14} />
                 </span>
               </label>
               <Select
-                options={moduleOptions}
-                value={moduleOptions.find(opt => opt.value.toString() === itemFormData.faq_module_id)}
-                onChange={(option: any) => setItemFormData({ ...itemFormData, faq_module_id: option?.value?.toString() || '' })}
-                placeholder="Select module..."
-                isLoading={isLoadingModules}
+                options={topicOptions}
+                value={topicOptions.find(opt => opt.value.toString() === itemFormData.topic_id)}
+                onChange={(option: any) => setItemFormData({ ...itemFormData, topic_id: option?.value?.toString() || '' })}
+                placeholder="Select topic..."
+                isLoading={isLoadingTopics}
                 isClearable={false}
               />
               <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
                 <Info size={12} />
                 <span style={{ fontSize: '0.813rem' }}>
-                  Select the FAQ module this item belongs to
+                  Select the FAQ topic this item belongs to
                 </span>
               </Form.Text>
             </div>
@@ -526,22 +530,23 @@ const FAQItems = () => {
                 </span>
               </label>
               <div style={{ border: '1px solid #ced4da', borderRadius: '0.375rem' }}>
-                <CKEditorWrapper
-                  data={itemFormData.answer}
-                  onChange={(_event: any, editor: any) => {
-                    const data = editor.getData();
-                    setItemFormData({ ...itemFormData, answer: data });
-                  }}
-                  config={{
-                    toolbar: [
-                      'heading', '|',
-                      'bold', 'italic', 'link', '|',
-                      'bulletedList', 'numberedList', '|',
-                      'blockQuote', 'insertTable', '|',
-                      'undo', 'redo'
-                    ]
-                  }}
-                />
+                {isCreateModalEntered && (
+                  <CKEditorWrapper
+                    key={`create-${showCreateItemModal}`}
+                    data={itemFormData.answer}
+                    onChange={(_event: any, editor: any) => {
+                      try {
+                        const data = editor.getData();
+                        setItemFormData({ ...itemFormData, answer: data });
+                      } catch (error) {
+                        console.error('Error getting editor data:', error);
+                      }
+                    }}
+                    config={{
+                      toolbar: 'undo redo | formatselect | bold italic | alignleft aligncenter alignright | bullist numlist | link | removeformat | help'
+                    }}
+                  />
+                )}
               </div>
               <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
                 <Info size={12} />
@@ -582,33 +587,16 @@ const FAQItems = () => {
                 placeholder="e.g., general, technical, billing"
               />
             </div>
-            <div className="form-group mb-3">
-              <label htmlFor="newItemIcon" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Icon
-                <span className="text-muted ms-2" title="Enter icon identifier">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input 
-                className="form-control" 
-                type="text" 
-                id="newItemIcon"
-                value={itemFormData.icon} 
-                onChange={(e) => setItemFormData({ ...itemFormData, icon: e.target.value })} 
-                placeholder="e.g., question-circle"
-              />
-            </div>
           </>
         }
         submitButtonText="Add FAQ"
-        isSubmitDisabled={!itemFormData.faq_module_id || !itemFormData.question || !itemFormData.answer}
+        isSubmitDisabled={!itemFormData.topic_id || !itemFormData.question || !itemFormData.answer}
         cancelButtonText="Cancel"
         onSubmit={handleSubmitCreateItem}
         onCancel={() => {
           setShowCreateItemModal(false);
           setItemFormData({
-            faq_module_id: '',
-            icon: '',
+            topic_id: '',
             question: '',
             answer: '',
             description: '',

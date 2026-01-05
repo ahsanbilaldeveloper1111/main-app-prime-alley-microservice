@@ -143,13 +143,14 @@ export const getFAQModule = async (id: number) => {
   }
 };
 
-export const createFAQModule = async (name: string, description?: string) => {
+export const createFAQModule = async (name: string, description?: string, icon?: string) => {
   try {
     const response = await axiosInstance.post(
       `faqs/modules`,
       {
         name,
-        description: description || null
+        description: description || null,
+        icon: icon || null
       }
     );
     return handleAPIResponse(response, 'Failed to create FAQ module', true);
@@ -159,13 +160,14 @@ export const createFAQModule = async (name: string, description?: string) => {
   }
 };
 
-export const updateFAQModule = async (id: number, name: string, description?: string) => {
+export const updateFAQModule = async (id: number, name: string, description?: string, icon?: string) => {
   try {
     const response = await axiosInstance.put(
       `faqs/modules/${id}`,
       {
         name,
-        description: description || null
+        description: description || null,
+        icon: icon || null
       }
     );
     return handleAPIResponse(response, 'Failed to update FAQ module', true);
@@ -182,6 +184,97 @@ export const deleteFAQModule = async (id: number) => {
     return result !== null;
   } catch (error: any) {
     handleAPIError(error, 'Failed to delete FAQ module');
+    return false;
+  }
+};
+
+// ==================== FAQ TOPICS ====================
+
+export const ListFAQTopics = async (params: PaginationParams = {}) => {
+  try {
+    const { page = 1, perPage = 15, search = "", filters = {} } = params;
+    
+    const response = await axiosInstance.get(
+      `faqs/topics`,
+      {
+        params: {
+          page,
+          per_page: perPage,
+          search,
+          ...filters,
+        }
+      }
+    );
+    
+    return handleAPIResponse(response, 'Failed to fetch FAQ topics');
+  } catch (error: any) {
+    handleAPIError(error, 'Failed to fetch FAQ topics');
+    throw error;
+  }
+};
+
+export const getAllFAQTopics = async () => {
+  try {
+    const response = await axiosInstance.get(`faqs/topics/all`);
+    const result = handleAPIResponse(response, 'Failed to fetch FAQ topics');
+    return result || [];
+  } catch (error: any) {
+    handleAPIError(error, 'Failed to fetch FAQ topics');
+    return [];
+  }
+};
+
+export const getFAQTopic = async (id: number) => {
+  try {
+    const response = await axiosInstance.get(`faqs/topics/${id}`);
+    return handleAPIResponse(response, 'Failed to fetch FAQ topic');
+  } catch (error: any) {
+    handleAPIError(error, 'Failed to fetch FAQ topic');
+    return null;
+  }
+};
+
+export const createFAQTopic = async (faq_module_id: number, name: string, description?: string) => {
+  try {
+    const response = await axiosInstance.post(
+      `faqs/topics`,
+      {
+        faq_module_id,
+        name,
+        description: description || null
+      }
+    );
+    return handleAPIResponse(response, 'Failed to create FAQ topic', true);
+  } catch (error: any) {
+    handleAPIError(error, 'Failed to create FAQ topic');
+    return null;
+  }
+};
+
+export const updateFAQTopic = async (id: number, faq_module_id: number, name: string, description?: string) => {
+  try {
+    const response = await axiosInstance.put(
+      `faqs/topics/${id}`,
+      {
+        faq_module_id,
+        name,
+        description: description || null
+      }
+    );
+    return handleAPIResponse(response, 'Failed to update FAQ topic', true);
+  } catch (error: any) {
+    handleAPIError(error, 'Failed to update FAQ topic');
+    return null;
+  }
+};
+
+export const deleteFAQTopic = async (id: number) => {
+  try {
+    const response = await axiosInstance.delete(`faqs/topics/${id}`);
+    const result = handleAPIResponse(response, 'Failed to delete FAQ topic', true);
+    return result !== null;
+  } catch (error: any) {
+    handleAPIError(error, 'Failed to delete FAQ topic');
     return false;
   }
 };
@@ -233,8 +326,7 @@ export const getFAQItem = async (id: number) => {
 };
 
 export const createFAQItem = async (data: {
-  faq_module_id: number;
-  icon?: string;
+  topic_id: number;
   question: string;
   answer: string;
   description?: string;
@@ -245,8 +337,7 @@ export const createFAQItem = async (data: {
     const response = await axiosInstance.post(
       `faqs/items`,
       {
-        faq_module_id: data.faq_module_id,
-        icon: data.icon || null,
+        topic_id: data.topic_id,
         question: data.question,
         answer: data.answer,
         description: data.description || null,
@@ -262,8 +353,7 @@ export const createFAQItem = async (data: {
 };
 
 export const updateFAQItem = async (id: number, data: {
-  faq_module_id: number;
-  icon?: string;
+  topic_id: number;
   question: string;
   answer: string;
   description?: string;
@@ -274,8 +364,7 @@ export const updateFAQItem = async (id: number, data: {
     const response = await axiosInstance.put(
       `faqs/items/${id}`,
       {
-        faq_module_id: data.faq_module_id,
-        icon: data.icon || null,
+        topic_id: data.topic_id,
         question: data.question,
         answer: data.answer,
         description: data.description || null,
@@ -311,9 +400,23 @@ export const incrementFAQViewCount = async (id: number) => {
   }
 };
 
-export const getFAQTypes = async (faq_module_id?: number) => {
+export const getMostViewedFAQs = async (faq_module_id?: number, topic_id?: number) => {
   try {
-    const params = faq_module_id ? { faq_module_id } : {};
+    const params: any = {};
+    if (faq_module_id) params.faq_module_id = faq_module_id;
+    if (topic_id) params.topic_id = topic_id;
+    const response = await axiosInstance.get(`faqs/items/most-viewed`, { params });
+    const result = handleAPIResponse(response, 'Failed to fetch most viewed FAQs');
+    return result || [];
+  } catch (error: any) {
+    handleAPIError(error, 'Failed to fetch most viewed FAQs');
+    return [];
+  }
+};
+
+export const getFAQTypes = async (topic_id?: number) => {
+  try {
+    const params = topic_id ? { topic_id } : {};
     const response = await axiosInstance.get(`faqs/items/types/list`, { params });
     const result = handleAPIResponse(response, 'Failed to fetch FAQ types');
     return result || [];

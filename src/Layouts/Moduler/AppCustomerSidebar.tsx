@@ -45,7 +45,10 @@ import {
   Wifi,
   ClipboardCheck,
   ClipboardList,
-  MonitorCheck
+  MonitorCheck,
+  User,
+  VoicemailIcon,
+  Bot
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -279,7 +282,37 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       color: MENU_COLORS.AUTOMATION,
       title: "AI Virtual Agent",
       label: "AI Virtual Agent",
-      url: '/ai-ml/outbound-calls'
+      url: '',
+      subItems: [
+        {
+          id: 'ai-bot-profile',
+          title: 'Voice Bot Profiles',
+          icon: <Bot size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/ai-ml/profiles'
+        },
+        {
+          id: 'ai-bot-campaigns',
+          title: 'Campaigns',
+          icon: <User size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/ai-ml/campaigns'
+        },
+        {
+          id: 'ai-bot-live-monitoring',
+          title: 'Live Monitoring',
+          icon: <MonitorCheck size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/ai-ml/live-monitoring'
+        },
+        {
+          id: 'ai-bot-campaign-reports',
+          title: 'Campaign Reports',
+          icon: <BarChart3 size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/ai-ml/campaign-reports'
+        }
+      ]
     },
 
     {

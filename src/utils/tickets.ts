@@ -126,7 +126,8 @@ export const UpdateTicketDetails = async (
   priority?: string,
   due_date?: string,
   images?: (string | File)[],
-  tags?: string[]
+  tags?: string[],
+  is_approved?: boolean
 ) => {
   try {
 
@@ -161,6 +162,9 @@ export const UpdateTicketDetails = async (
       tags.forEach((tag) => {
         formData.append('tags[]', tag);
       });
+    }
+    if (is_approved !== undefined) {
+      formData.append('is_approved', String(is_approved));
     }
     
     // Append images if provided - handle both strings (existing) and Files (new)

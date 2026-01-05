@@ -9,6 +9,7 @@ import {
   updateFAQModule,
   deleteFAQModule
 } from '@utils/faqs';
+import { useRouter } from 'next/router';
 import { Column } from '@components/CustomDataTable';
 import { Button, Form, Row, Col } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
@@ -16,11 +17,11 @@ import '@assets/scss/common.scss';
 import FormModal from "@pages/partial/FormModal";
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
-import { Edit, Info, Trash2, Layers, Plus } from 'lucide-react';
+import { Edit, Info, Trash2, Layers, Plus, ArrowLeft } from 'lucide-react';
 
 const FAQModules = () => {
   const { data: session } = useSession();
-  
+  const router = useRouter();
   const columns: Column[] = [
     { key: 'name', name: 'Name', selector: (row: any) => row.name, sortable: true },
     { 
@@ -98,25 +99,29 @@ const FAQModules = () => {
   const [selectedModule, setSelectedModule] = useState<any>(null);
   const [selectedModuleName, setSelectedModuleName] = useState<string>('');
   const [selectedModuleDescription, setSelectedModuleDescription] = useState<string>('');
+  const [selectedModuleIcon, setSelectedModuleIcon] = useState<string>('');
   const [showEditModuleModal, setShowEditModuleModal] = useState<boolean>(false);
   const [showCreateModuleModal, setShowCreateModuleModal] = useState<boolean>(false);
   const [newModuleName, setNewModuleName] = useState<string>('');
   const [newModuleDescription, setNewModuleDescription] = useState<string>('');
+  const [newModuleIcon, setNewModuleIcon] = useState<string>('');
   const [showDeleteModuleModal, setShowDeleteModuleModal] = useState<boolean>(false);
 
   const handleEditModule = (props: any) => {
     setSelectedModule(props.id);
     setSelectedModuleName(props.name);
     setSelectedModuleDescription(props.description || '');
+    setSelectedModuleIcon(props.icon || '');
     setShowEditModuleModal(true);
   };
 
   const handleSubmitEditModule = async () => {
-    const response = await updateFAQModule(selectedModule, selectedModuleName, selectedModuleDescription);
+    const response = await updateFAQModule(selectedModule, selectedModuleName, selectedModuleDescription, selectedModuleIcon);
     if (response) {
       setSelectedModule(null);
       setSelectedModuleName('');
       setSelectedModuleDescription('');
+      setSelectedModuleIcon('');
       setShowEditModuleModal(false);
       setRefreshKey(prev => prev + 1);
     }
@@ -144,10 +149,11 @@ const FAQModules = () => {
   };
 
   const handleSubmitCreateModule = async () => {
-    const response = await createFAQModule(newModuleName, newModuleDescription);
+    const response = await createFAQModule(newModuleName, newModuleDescription, newModuleIcon);
     if (response) {
       setNewModuleName('');
       setNewModuleDescription('');
+      setNewModuleIcon('');
       setShowCreateModuleModal(false);
       setRefreshKey(prev => prev + 1);
     }
@@ -166,6 +172,9 @@ const FAQModules = () => {
               </Col>
               <Col md={8} className="d-flex justify-content-end">
                 <div className="action-buttons">
+
+                
+
                   {/* {session?.user?.permissions?.includes('add-faq-modules') && ( */}
                     <Button variant="primary" onClick={() => setShowCreateModuleModal(true)}>
                       <Plus size={16} className="me-1" />
@@ -199,6 +208,7 @@ const FAQModules = () => {
           setSelectedModule(null);
           setSelectedModuleName('');
           setSelectedModuleDescription('');
+          setSelectedModuleIcon('');
         }}
         title="Edit FAQ Module"
         titleIcon={<Layers size={20} className="text-primary" />}
@@ -247,6 +257,28 @@ const FAQModules = () => {
                 </span>
               </Form.Text>
             </div>
+            <div className="form-group mb-3">
+              <label htmlFor="editModuleIcon" className="fw-semibold d-flex align-items-center gap-2 form-label">
+                Icon
+                <span className="text-muted ms-2" title="Enter icon identifier">
+                  <Info size={14} />
+                </span>
+              </label>
+              <input 
+                className="form-control" 
+                type="text" 
+                id="editModuleIcon"
+                value={selectedModuleIcon} 
+                onChange={(e) => setSelectedModuleIcon(e.target.value)} 
+                placeholder="e.g., question-circle"
+              />
+              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
+                <Info size={12} />
+                <span style={{ fontSize: '0.813rem' }}>
+                  Optional icon identifier for the FAQ module
+                </span>
+              </Form.Text>
+            </div>
           </>
         }
         submitButtonText="Update Module"
@@ -258,6 +290,7 @@ const FAQModules = () => {
           setSelectedModule(null);
           setSelectedModuleName('');
           setSelectedModuleDescription('');
+          setSelectedModuleIcon('');
         }}
       />
 
@@ -268,6 +301,7 @@ const FAQModules = () => {
           setShowCreateModuleModal(false);
           setNewModuleName('');
           setNewModuleDescription('');
+          setNewModuleIcon('');
         }}
         title="New FAQ Module"
         titleIcon={<Layers size={20} className="text-primary" />}
@@ -318,6 +352,28 @@ const FAQModules = () => {
                 </span>
               </Form.Text>
             </div>
+            <div className="form-group mb-3">
+              <label htmlFor="newModuleIcon" className="fw-semibold d-flex align-items-center gap-2 form-label">
+                Icon
+                <span className="text-muted ms-2" title="Enter icon identifier">
+                  <Info size={14} />
+                </span>
+              </label>
+              <input 
+                className="form-control" 
+                type="text" 
+                id="newModuleIcon"
+                value={newModuleIcon} 
+                onChange={(e) => setNewModuleIcon(e.target.value)} 
+                placeholder="e.g., question-circle"
+              />
+              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
+                <Info size={12} />
+                <span style={{ fontSize: '0.813rem' }}>
+                  Optional icon identifier for the FAQ module
+                </span>
+              </Form.Text>
+            </div>
           </>
         }
         submitButtonText="Add Module"
@@ -328,6 +384,7 @@ const FAQModules = () => {
           setShowCreateModuleModal(false);
           setNewModuleName('');
           setNewModuleDescription('');
+          setNewModuleIcon('');
         }}
       />
 

@@ -6,47 +6,47 @@ import { Row, Col, Card, Badge, Spinner } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
 import '@assets/scss/common.scss';
 import { Tag, Info } from 'lucide-react';
-import { getFAQTypes, getAllFAQModules } from '@utils/faqs';
+import { getFAQTypes, getAllFAQTopics } from '@utils/faqs';
 import Select from 'react-select';
 
 const FAQTypes = () => {
   const { data: session } = useSession();
   const [types, setTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [selectedModule, setSelectedModule] = useState<number | null>(null);
-  const [moduleOptions, setModuleOptions] = useState<any[]>([]);
-  const [isLoadingModules, setIsLoadingModules] = useState<boolean>(false);
+  const [selectedTopic, setSelectedTopic] = useState<number | null>(null);
+  const [topicOptions, setTopicOptions] = useState<any[]>([]);
+  const [isLoadingTopics, setIsLoadingTopics] = useState<boolean>(false);
 
   useEffect(() => {
-    fetchModuleOptions();
+    fetchTopicOptions();
   }, []);
 
   useEffect(() => {
     fetchTypes();
-  }, [selectedModule]);
+  }, [selectedTopic]);
 
-  const fetchModuleOptions = async () => {
-    setIsLoadingModules(true);
+  const fetchTopicOptions = async () => {
+    setIsLoadingTopics(true);
     try {
-      const modules = await getAllFAQModules();
-      setModuleOptions([
-        { value: null, label: 'All Modules' },
-        ...modules.map((m: any) => ({
-          value: m.id,
-          label: m.name
+      const topics = await getAllFAQTopics();
+      setTopicOptions([
+        { value: null, label: 'All Topics' },
+        ...topics.map((t: any) => ({
+          value: t.id,
+          label: `${t.name}${t.faq_module ? ` (${t.faq_module.name})` : ''}`
         }))
       ]);
     } catch (error) {
-      console.error('Error fetching modules:', error);
+      console.error('Error fetching topics:', error);
     } finally {
-      setIsLoadingModules(false);
+      setIsLoadingTopics(false);
     }
   };
 
   const fetchTypes = async () => {
     setLoading(true);
     try {
-      const response = await getFAQTypes(selectedModule || undefined);
+      const response = await getFAQTypes(selectedTopic || undefined);
       setTypes(response || []);
     } catch (error) {
       console.error('Error fetching FAQ types:', error);
@@ -71,11 +71,11 @@ const FAQTypes = () => {
               <Col md={6} className="d-flex justify-content-end align-items-center">
                 <div style={{ minWidth: '250px' }}>
                   <Select
-                    options={moduleOptions}
-                    value={moduleOptions.find(opt => opt.value === selectedModule)}
-                    onChange={(option: any) => setSelectedModule(option?.value || null)}
-                    placeholder="Filter by module..."
-                    isLoading={isLoadingModules}
+                    options={topicOptions}
+                    value={topicOptions.find(opt => opt.value === selectedTopic)}
+                    onChange={(option: any) => setSelectedTopic(option?.value || null)}
+                    placeholder="Filter by topic..."
+                    isLoading={isLoadingTopics}
                     isClearable={true}
                   />
                 </div>
@@ -102,7 +102,7 @@ const FAQTypes = () => {
                     <p className="text-muted mb-0">
                       <Info size={14} className="me-1" />
                       Found {types.length} unique type{types.length !== 1 ? 's' : ''}
-                      {selectedModule && ` for selected module`}
+                      {selectedTopic && ` for selected topic`}
                     </p>
                   </div>
                   <div className="d-flex flex-wrap gap-2">
@@ -118,8 +118,8 @@ const FAQTypes = () => {
                 <div className="text-center py-5">
                   <Tag size={48} className="text-muted mb-3" />
                   <p className="text-muted">
-                    {selectedModule 
-                      ? 'No types found for the selected module' 
+                    {selectedTopic 
+                      ? 'No types found for the selected topic' 
                       : 'No FAQ types found. Types are automatically created when FAQ items are assigned a type.'}
                   </p>
                 </div>

@@ -44,7 +44,7 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
-import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircle, X, Paperclip, FileText, Tag, Calendar, Clock, Download, MessageCircle, Send } from "lucide-react";
+import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircle, X, Paperclip, FileText, Tag, Calendar, Clock, Download, MessageCircle, Send, CircleCheckBig } from "lucide-react";
 
 import ThemeSelect from "@components/ThemeSelect";
 import Select from "react-select";
@@ -54,6 +54,15 @@ interface SelectOption {
   value: number;
   label: string;
 }
+
+const ticketCategories = { //ticket_category
+  INTERNAL: 'internal',
+  USER: 'user',
+};
+const TICKET_APPROVED_STATUS = {
+  APPROVED:true,
+  NOT_APPROVED: false,
+};
 
 const getPriorityBadgeColor = (priority: string | number) => {
   if (!priority && priority !== 0) return 'secondary';
@@ -85,7 +94,7 @@ const TicketList = () => {
   const [activeTab, setActiveTab] = useState<'public' | 'internal' | 'activity'>('public');
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState({ search: "", module_id: "", status_id: "", priority: "", type_id: "" });
+  const [currentFilters, setCurrentFilters] = useState<{ search: string; module_id: string; status_id: string; priority: string; type_id: string; ticket_category: string; is_approved: boolean | null }>({ search: "", module_id: "", status_id: "", priority: "", type_id: "", ticket_category: "", is_approved: null });
 
   const [statuses, setStatuses] = useState<any>([]);
   const [modules, setModules] = useState<any>([]);
@@ -132,6 +141,36 @@ const TicketList = () => {
           </div>
         ),
       },
+
+      ...(session?.user?.permissions?.includes('view-internal-tickets-tickets') && session?.user?.permissions?.includes('view-ticket-tickets') ? [
+        {
+          key: "ticket_category",
+          name: "Ticket Category",
+          selector: (row: any) => row.ticket_category,
+          sortable: true,
+          cell: (props: any) => {
+            return <span className="text-capitalize">
+              {props.ticket_category}
+              </span>
+          },
+        }
+      ] : []),
+
+      ...(session?.user?.permissions?.includes('view-unapproved-tickets-tickets') && session?.user?.permissions?.includes('view-ticket-tickets') ? [
+        {
+          key: "is_approved",
+          name: "Is Approved",
+          selector: (row: any) => row.is_approved,
+          sortable: true,
+          cell: (props: any) => {
+            return <span className="text-capitalize">
+              {props.is_approved ? "Approved" : "Not Approved"}
+            </span>
+          },
+        }
+        ] : []),
+
+
       {
         key: "type",
         name: "Type",
@@ -292,11 +331,25 @@ const TicketList = () => {
                 <Eye size={16}  onClick={() => handleViewTicket(props.id)} />
               </Button>
             )}
+
+{session?.user?.permissions?.includes('approve-internal-tickets-tickets') && props?.ticket_category==='internal' && (
+              <Button variant="light"  className="btn-action-style-2 p-1 text-primary" title="Make Approved / Not Approved">
+                <CircleCheckBig size={16}  onClick={() => handleApproveTicket(props)} />
+              </Button>
+            )}
+
             {session?.user?.permissions?.includes('edit-ticket-tickets') && (
               <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-primary" title="Edit">
                 <Edit size={16}  onClick={() => handleEditTicket(props)} />
               </Button>
             )}
+           
+            {session?.user?.permissions?.includes('edit-ticket-tickets') && (
+              <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-primary" title="Edit">
+                <Edit size={16}  onClick={() => handleEditTicket(props)} />
+              </Button>
+            )}
+
             
             {session?.user?.permissions?.includes('delete-ticket-tickets') && (Array.isArray(props.user_extension) ? props.user_extension.length > 0 : props.user_extension) ? (
             
@@ -795,6 +848,10 @@ const TicketList = () => {
     useState<boolean>(false);
   const [showDeleteTicketModal, setShowDeleteTicketModal] =
     useState<boolean>(false);
+  const [showApproveTicketModal, setShowApproveTicketModal] =
+    useState<boolean>(false);
+  const [selectedTicketForApprove, setSelectedTicketForApprove] = useState<any>(null);
+  const [selectedApprovalStatus, setSelectedApprovalStatus] = useState<boolean | null>(null);
 
   const handleSubmitEditTicket = useCallback(async () => {
     //console.log('Submit edit group:', selectedGroup, selectedGroupName);
@@ -927,6 +984,68 @@ const TicketList = () => {
       setRefreshKey((prev) => prev + 1); // Trigger refresh
     }
   }, [selectedTicket]);
+
+  const handleApproveTicket = useCallback((props: any) => {
+    setSelectedTicketForApprove(props);
+    setSelectedApprovalStatus(props.is_approved !== undefined ? Boolean(props.is_approved) : null);
+    setShowApproveTicketModal(true);
+  }, []);
+
+  const closeApproveTicketModal = useCallback(() => {
+    setShowApproveTicketModal(false);
+    setSelectedTicketForApprove(null);
+    setSelectedApprovalStatus(null);
+  }, []);
+
+  const handleSubmitApproveTicket = useCallback(async () => {
+    if (selectedApprovalStatus === null || !selectedTicketForApprove) {
+      toast.error("Please select an approval status");
+      return;
+    }
+
+    setCreatingTicket(true);
+    let response = null;
+    try {
+      // Only include user_extension if user has assign-user permission
+      let userExtensionArray = undefined;
+      if (session?.user?.permissions?.includes("assign-user-tickets")) {
+        userExtensionArray = Array.isArray(selectedTicketForApprove.user_extension)
+          ? selectedTicketForApprove.user_extension
+          : selectedTicketForApprove.user_extension
+          ? [selectedTicketForApprove.user_extension]
+          : [];
+        userExtensionArray = userExtensionArray.length > 0 ? userExtensionArray : undefined;
+      }
+      
+      response = await UpdateTicketDetails(
+        selectedTicketForApprove.id,
+        selectedTicketForApprove.title || selectedTicketForApprove.name,
+        selectedTicketForApprove.description || "",
+        selectedTicketForApprove.ticket_type_id || selectedTicketForApprove.type,
+        selectedTicketForApprove.ticket_status_id,
+        selectedTicketForApprove.module_id,
+        selectedTicketForApprove.submodule_id,
+        selectedTicketForApprove.submodule_child_id,
+        userExtensionArray,
+        selectedTicketForApprove.priority,
+        selectedTicketForApprove.due_date,
+        undefined,
+        undefined,
+        selectedApprovalStatus
+      );
+    } catch (error) {
+      console.error("Error updating ticket approval status:", error);
+      return;
+    } finally {
+      setCreatingTicket(false);
+    }
+    if (response) {
+      setSelectedTicketForApprove(null);
+      setSelectedApprovalStatus(null);
+      setShowApproveTicketModal(false);
+      setRefreshKey((prev) => prev + 1); // Trigger refresh
+    }
+  }, [selectedTicketForApprove, selectedApprovalStatus, session?.user?.permissions]);
 
   const [showCreateTicketModal, setShowCreateTicketModal] =
     useState<boolean>(false);
@@ -1555,8 +1674,10 @@ const TicketList = () => {
                   />
                 </InputGroup>
               </Col>
-              <Col md={2}>
 
+
+
+              <Col md={3}>
                 <ThemeSelect
                   placeholder="Select Module"
                   value={(() => {
@@ -1566,10 +1687,56 @@ const TicketList = () => {
                   onChange={(option: any) => handleFiltersChange({...currentFilters, module_id: option?.value})}
                   options={modules.map((m: any) => ({value: m.id, label: m.name}))}
                 />
+                </Col>
 
+{session?.user?.permissions?.includes('view-internal-tickets-tickets') && session?.user?.permissions?.includes('view-ticket-tickets') && (
+              <Col md={3}>
+                <ThemeSelect
+                  placeholder="Select Category"
+                  value={(() => {
+                    if (!currentFilters.ticket_category) return null;
+                    const categoryKey = Object.keys(ticketCategories).find(
+                      (key) => ticketCategories[key as keyof typeof ticketCategories] === currentFilters.ticket_category
+                    );
+                    return categoryKey ? {
+                      value: ticketCategories[categoryKey as keyof typeof ticketCategories],
+                      label: categoryKey.charAt(0) + categoryKey.slice(1).toLowerCase()
+                    } : null;
+                  })()}
+                  onChange={(option: any) => handleFiltersChange({...currentFilters, ticket_category: option?.value})}
+                  options={Object.keys(ticketCategories).map((key) => ({
+                    value: ticketCategories[key as keyof typeof ticketCategories],
+                    label: key.charAt(0) + key.slice(1).toLowerCase()
+                  }))}
+                />
               </Col>
+              )}
 
-              <Col md={2}>
+{session?.user?.permissions?.includes('view-unapproved-tickets-tickets') && session?.user?.permissions?.includes('view-ticket-tickets') && (
+              <Col md={3}>
+                <ThemeSelect
+                  placeholder="Select Approval Status"
+                  value={(() => {
+                    if (currentFilters.is_approved === null || currentFilters.is_approved === undefined) return null;
+                    const isApproved = currentFilters.is_approved === true;
+                    return {
+                      value: isApproved,
+                      label: isApproved ? "Approved" : "Not Approved"
+                    };
+                  })()}
+                  onChange={(option: any) => handleFiltersChange({...currentFilters, is_approved: option?.value})}
+                  options={[
+                    {value: TICKET_APPROVED_STATUS.APPROVED, label: "Approved"},
+                    {value: TICKET_APPROVED_STATUS.NOT_APPROVED, label: "Not Approved"}
+                  ]}
+                />
+              </Col>
+              )}
+             
+
+
+
+              <Col md={3}>
                 <ThemeSelect
                   placeholder="Select Status"
                   value={(() => {
@@ -1581,7 +1748,7 @@ const TicketList = () => {
                   options={statuses.map((s: any) => ({value: s.id, label: s.name}))}
                 />
               </Col>
-              <Col md={2}>
+              <Col md={3}>
                 <ThemeSelect
                   placeholder="Select Priority"
                   value={(() => {
@@ -1592,7 +1759,7 @@ const TicketList = () => {
                   options={[{value: "", label: "All"}, {value: "critical", label: "Critical"}, {value: "high", label: "High"}, {value: "medium", label: "Medium"}, {value: "low", label: "Low"}]}
                 />
               </Col>
-              <Col md={2}>
+              <Col md={3}>
                 <ThemeSelect
                 placeholder="Select Type"
                   value={(() => {
@@ -2063,6 +2230,39 @@ const TicketList = () => {
         cancelButtonText="Cancel"
         onConfirm={handleSubmitDeleteTicket}
         onCancel={closeDeleteTicketModal}
+      />
+
+      <FormModal
+        show={showApproveTicketModal}
+        onHide={closeApproveTicketModal}
+        title="Update Approval Status"
+        desc="Select the approval status for this ticket"
+        size="md"
+        formHtml={
+          <>
+            <Form.Group className="mb-3">
+              <Form.Label>Approval Status</Form.Label>
+              <ThemeSelect
+                placeholder="Select Approval Status"
+                value={selectedApprovalStatus !== null ? {
+                  value: selectedApprovalStatus,
+                  label: selectedApprovalStatus ? "Approved" : "Not Approved"
+                } : null}
+                onChange={(option: any) => setSelectedApprovalStatus(option?.value)}
+                options={[
+                  {value: TICKET_APPROVED_STATUS.APPROVED, label: "Approved"},
+                  {value: TICKET_APPROVED_STATUS.NOT_APPROVED, label: "Not Approved"}
+                ]}
+              />
+            </Form.Group>
+          </>
+        }
+        submitButtonText="Update Status"
+        cancelButtonText="Cancel"
+        onSubmit={handleSubmitApproveTicket}
+        onCancel={closeApproveTicketModal}
+        submitButtonVariant="primary"
+        cancelButtonVariant="secondary"
       />
 
       <FormModal

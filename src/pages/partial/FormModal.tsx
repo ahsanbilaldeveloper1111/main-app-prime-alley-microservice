@@ -21,6 +21,8 @@ interface FormModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   guidelines?: React.ReactNode;
   showGuidelines?: boolean;
+  onEntered?: () => void;
+  onExited?: () => void;
 }
 
 const FormModal: React.FC<FormModalProps> = ({
@@ -41,7 +43,9 @@ const FormModal: React.FC<FormModalProps> = ({
   isSubmitDisabled = false,
   size = 'md',
   guidelines,
-  showGuidelines = false
+  showGuidelines = false,
+  onEntered,
+  onExited
 }) => {
   const [isGuidelinesExpanded, setIsGuidelinesExpanded] = useState(false);
 
@@ -103,7 +107,14 @@ const FormModal: React.FC<FormModalProps> = ({
     //     </div>
     //   </div>
     // </div>
-    <Modal show={show} onHide={onHide} centered size={size as 'sm' | 'lg' | 'xl'}>
+    <Modal 
+      show={show} 
+      onHide={onHide} 
+      centered 
+      size={size as 'sm' | 'lg' | 'xl'}
+      onEntered={onEntered}
+      onExited={onExited}
+    >
       <Modal.Header closeButton className="bg-light">
         <div className="d-flex align-items-center justify-content-between w-100">
         <Modal.Title>

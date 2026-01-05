@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
+import { Editor } from '@tinymce/tinymce-react';
 
 interface CKEditorWrapperProps {
   data: string;
@@ -9,39 +10,59 @@ interface CKEditorWrapperProps {
 }
 
 const CKEditorWrapper: React.FC<CKEditorWrapperProps> = ({ data, onChange, config }) => {
-  const [isClient, setIsClient] = useState(false);
-  const [Editor, setEditor] = useState<any>(null);
-  const [ClassicEditor, setClassicEditor] = useState<any>(null);
+  const editorRef = useRef<any>(null);
+  const isInitializedRef = useRef(false);
 
+  // Default TinyMCE configuration - completely free, no license required
+  const defaultConfig = {
+    height: 400,
+    menubar: false,
+    readonly: false, // Explicitly set to false to ensure editor is editable
+    plugins: [
+      'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+      'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+      'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount'
+    ],
+    toolbar: 'undo redo | formatselect | bold italic forecolor | alignleft aligncenter ' +
+      'alignright alignjustify | bullist numlist outdent indent | ' +
+      'blockquote link | removeformat | help',
+    content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
+    branding: false, // Remove "Powered by TinyMCE" branding (optional)
+    ...config
+  };
+
+  const handleEditorChange = (content: string, editor: any) => {
+    // TinyMCE onChange provides content directly
+    if (onChange) {
+      // Simulate the CKEditor-style callback format for compatibility
+      const mockEvent = { target: { value: content } };
+      onChange(mockEvent, { getData: () => content });
+    }
+  };
+
+  // Update editor content when data prop changes (for edit mode)
   useEffect(() => {
-    setIsClient(true);
-    // Dynamically import only on client side
-    Promise.all([
-      import('@ckeditor/ckeditor5-react'),
-      import('@ckeditor/ckeditor5-build-classic')
-    ]).then(([CKEditorModule, ClassicEditorModule]) => {
-      setEditor(() => CKEditorModule.CKEditor);
-      setClassicEditor(() => ClassicEditorModule.default);
-    });
-  }, []);
-
-  if (!isClient || !Editor || !ClassicEditor) {
-    return (
-      <div className="p-3 text-center text-muted" style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        Loading editor...
-      </div>
-    );
-  }
+    if (editorRef.current && isInitializedRef.current && data !== editorRef.current.getContent()) {
+      editorRef.current.setContent(data || '');
+    }
+  }, [data]);
 
   return (
     <Editor
-      editor={ClassicEditor}
-      data={data}
-      onChange={onChange}
-      config={config}
+      apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY || '5vxmk5g4wbq5iluyh2onewg50bjb4yrjuvw7903d59b7for5'}
+      onInit={(_evt, editor) => {
+        editorRef.current = editor;
+        isInitializedRef.current = true;
+        // Set initial content
+        if (data) {
+          editor.setContent(data);
+        }
+      }}
+      initialValue={data || ''}
+      onEditorChange={handleEditorChange}
+      init={defaultConfig}
     />
   );
 };
 
 export default CKEditorWrapper;
-

@@ -36,6 +36,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/faqs',permissions: ['']},
     {path:'/faqs/modules',permissions: ['']},
     {path:'/faqs/items',permissions: ['']},
+    {path:'/faqs/topics',permissions: ['']},
     {path:'/faqs/types',permissions: ['']},
 
     {
@@ -287,6 +288,22 @@ export const routePermissions: RoutePermission[] = [
             },
             {
                 path: '/outbound-calls',
+                permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]
+            },
+            {
+                path: '/profiles',
+                permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]
+            },
+            {
+                path: '/campaigns',
+                permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]
+            },
+            {
+                path: '/live-monitoring',
+                permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]
+            },
+            {
+                path: '/campaign-reports',
                 permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]
             }
         ]
