@@ -23,7 +23,9 @@ import {
   Settings as SettingsIcon,
   AlertCircle,
   CheckCircle,
-  ArrowUp
+  ArrowUp,
+  HelpCircle,
+  Tag
 } from 'lucide-react';
 
 import "@assets/scss/common.scss";
@@ -60,6 +62,13 @@ import TicketModules from "@pages/tickets/modules";
 import ModuleCategories from "@pages/tickets/modules/categories";
 import ModuleSubCategories from "@pages/tickets/modules/sub-categories";
 import TicketTypes from "@pages/tickets/types";
+
+// Import FAQ components
+import FAQModules from "@pages/faqs/modules";
+import FAQTopics from "@pages/faqs/topics";
+import FAQItems from "@pages/faqs/items";
+import FAQTypes from "@pages/faqs/types";
+
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 
 // Destructure constants for easier use
@@ -74,6 +83,7 @@ const Settings = () => {
   const [activeTicketsTab, setActiveTicketsTab] = useState<string>("statuses");
   const [activeTelcoTab, setActiveTelcoTab] = useState<string>("assign-devices");
   const [activeNetopsTab, setActiveNetopsTab] = useState<string>("devices-list");
+  const [activeHelpCenterTab, setActiveHelpCenterTab] = useState<string>("modules");
   
   // Track which tabs have been visited to prevent re-mounting
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["user-management"]));
@@ -83,6 +93,7 @@ const Settings = () => {
   const [visitedTelcoTabs, setVisitedTelcoTabs] = useState<Set<string>>(new Set(["assign-devices"]));
   const [visitedNetopsTabs, setVisitedNetopsTabs] = useState<Set<string>>(new Set(["devices-list"]));
   const [visitedBillingTab, setVisitedBillingTab] = useState<boolean>(false);
+  const [visitedHelpCenterTabs, setVisitedHelpCenterTabs] = useState<Set<string>>(new Set(["modules"]));
 
   // Handle main tab change
   const handleMainTabChange = (key: string | null) => {
@@ -126,6 +137,12 @@ const Settings = () => {
     setVisitedNetopsTabs(prev => new Set(prev).add(tabKey));
   };
 
+  const handleHelpCenterTabChange = (key: string | null) => {
+    const tabKey = key || "modules";
+    setActiveHelpCenterTab(tabKey);
+    setVisitedHelpCenterTabs(prev => new Set(prev).add(tabKey));
+  };
+
   // Check if a tab should render
   const shouldRenderTab = (mainTab: string, subTab?: string) => {
     if (!visitedTabs.has(mainTab)) return false;
@@ -145,6 +162,8 @@ const Settings = () => {
           return visitedNetopsTabs.has(subTab) && activeNetopsTab === subTab;
         case "billing":
           return visitedBillingTab;
+        case "help-center":
+          return visitedHelpCenterTabs.has(subTab) && activeHelpCenterTab === subTab;
         default:
           return false;
       }
@@ -195,7 +214,16 @@ const Settings = () => {
       icon: Ticket,
       color: "#2196f3",
       permission: PERMISSIONS.TICKETS_SERVICES
+    },
+
+    {
+      key: "help-center",
+      title: "Help Center",
+      icon: HelpCircle,
+      color: "#17a2b8",
+      permission: PERMISSIONS.TICKETS_SERVICES // Using tickets permission for now, adjust if needed
     }
+    
   ];
 
   // Define sub-tabs for each main tab
@@ -227,6 +255,12 @@ const Settings = () => {
       { key: "categories", title: "Categories", icon: Package, color: "#ff9800", permission: PERMISSIONS.VIEW_TICKETS_CATEGORIES },
       { key: "sub-categories", title: "Sub Categories", icon: Layers, color: "#9c27b0", permission: PERMISSIONS.VIEW_TICKETS_SUBCATEGORIES },
       { key: "types", title: "Types", icon: Ticket, color: "#2196f3", permission: PERMISSIONS.VIEW_TICKETS_TYPES }
+    ],
+    "help-center": [
+      { key: "modules", title: "FAQ Modules", icon: Layers, color: "#0d6efd", permission: PERMISSIONS.TICKETS_SERVICES },
+      { key: "topics", title: "FAQ Topics", icon: Tag, color: "#ff9800", permission: PERMISSIONS.TICKETS_SERVICES },
+      { key: "items", title: "FAQ Items", icon: HelpCircle, color: "#198754", permission: PERMISSIONS.TICKETS_SERVICES },
+      { key: "types", title: "FAQ Types", icon: Tag, color: "#17a2b8", permission: PERMISSIONS.TICKETS_SERVICES }
     ]
   };
 
@@ -237,6 +271,7 @@ const Settings = () => {
       case "tickets": return activeTicketsTab;
       case "telco-gateway": return activeTelcoTab;
       case "devices-management": return activeNetopsTab;
+      case "help-center": return activeHelpCenterTab;
       default: return "";
     }
   };
@@ -248,6 +283,7 @@ const Settings = () => {
       case "tickets": handleTicketsTabChange(subTabKey); break;
       case "telco-gateway": handleTelcoTabChange(subTabKey); break;
       case "devices-management": handleNetopsTabChange(subTabKey); break;
+      case "help-center": handleHelpCenterTabChange(subTabKey); break;
     }
   };
 
@@ -362,6 +398,8 @@ const Settings = () => {
                 <div className="settings-filter-buttons shadow px-3 py-3">
                 {mainTabs.map((tab) => {
                   if (!session?.user?.permissions?.includes(tab.permission)) return null;
+                  // Show Help Center tab only if user is admin
+                  if (tab.key === "help-center" && Number(session?.user?.is_admin) !== 1) return null;
                   const IconComponent = tab.icon;
                   const isActive = activeTab === tab.key;
                   return (
@@ -466,6 +504,16 @@ const Settings = () => {
                     {activeTicketsTab === "categories" && <ModuleCategories />}
                     {activeTicketsTab === "sub-categories" && <ModuleSubCategories />}
                     {activeTicketsTab === "types" && <TicketTypes />}
+                  </div>
+                )}
+
+                {/* Help Center Content */}
+                {activeTab === "help-center" && shouldRenderTab("help-center", activeHelpCenterTab) && (
+                  <div>
+                    {activeHelpCenterTab === "modules" && <FAQModules />}
+                    {activeHelpCenterTab === "topics" && <FAQTopics />}
+                    {activeHelpCenterTab === "items" && <FAQItems />}
+                    {activeHelpCenterTab === "types" && <FAQTypes />}
                   </div>
                 )}
               </div>

@@ -482,7 +482,7 @@ export const ListCallLogs = async (params: PaginationParams = {}, endpoint: stri
 
 export const GetImagicalTranscriptions = async (params: any = {}) => {
   try {
-    const { page = 1, perPage = 15, search = "", start_datetime = '', end_datetime = '', filters = {} } = params;
+    const { page = 1, limit = 15, search = "", start_datetime = '', end_datetime = '', filters = {} } = params;
 
     // Build query parameters manually to handle arrays correctly
     // Use a Map to ensure each key appears only once
@@ -490,7 +490,7 @@ export const GetImagicalTranscriptions = async (params: any = {}) => {
     
     // Add base parameters
     paramsMap.set('page', page.toString());
-    paramsMap.set('perPage', perPage.toString());
+    paramsMap.set('limit', limit.toString());
     if (search) paramsMap.set('search', search);
     // Always include datetime parameters (they have fallback values in the calling function)
     if (start_datetime) paramsMap.set('start_datetime', start_datetime);

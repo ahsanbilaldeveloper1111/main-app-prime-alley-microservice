@@ -169,9 +169,9 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
   }, []);
 
   // Transform FAQ item to article format
-  console.log(faqItem);
+  console.log("faqItem", faqItem);
   const article = faqItem ? {
-    title: faqItem.title || '',
+    title: faqItem.title || faqItem.question || '',
     updated: formatDate(faqItem.updated_at || faqItem.created_at),
     views: faqItem.view_count || 0,
     content: {
@@ -181,7 +181,7 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
       topic: faqItem.topic || null
     }
   } : {
-    title: faqItem.title || '',
+    title: faqItem.title || faqItem.question || '',
     updated: '5 days ago',
     views: 850,
     content: {
@@ -232,10 +232,10 @@ const ArticleDetail: React.FC<ArticleDetailProps> = ({ onBack, articleId, articl
   ];
 
   // Transform related articles for rendering
-  console.log(relatedArticles);
+  console.log("relatedArticles", relatedArticles);
   const transformedRelatedArticles = relatedArticles.map((item) => ({
     id: item.id,
-    title: item.title ,
+    title: item.title || item.question ,
     viewCount: item.view_count || 0
   }));
 

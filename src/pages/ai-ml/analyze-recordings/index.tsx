@@ -391,7 +391,7 @@ const AnalyzeRecordings = () => {
     };
 
     // Fetch table data function for call recordings
-    const fetchTableData = useCallback(async (page = 1, perPage = 15, search = "") => {
+    const fetchTableData = useCallback(async (page = 1, limit = 15, search = "") => {
         // Get latest filters from ref to ensure we always have the most recent values
         const filters = currentFiltersRef.current || {};
         
@@ -399,7 +399,7 @@ const AnalyzeRecordings = () => {
         const { startDate, endDate } = getDatesFromFilters(filters);
         
         // Create a unique key for this request to detect duplicates
-        const requestKey = `${page}-${perPage}-${search}-${startDate}-${endDate}`;
+        const requestKey = `${page}-${limit}-${search}-${startDate}-${endDate}`;
         
         // CRITICAL: Check if the same request is already pending - return the same promise
         // This must be the FIRST check to prevent duplicate API calls
@@ -432,8 +432,8 @@ const AnalyzeRecordings = () => {
                 
                 const response = await GetImagicalTranscriptions(
                     { 
-                        page, 
-                        perPage, 
+                        page: 1, 
+                        limit: limit, 
                         search, 
                         start_datetime: start_datetime,
                         end_datetime: end_datetime,
@@ -456,7 +456,7 @@ const AnalyzeRecordings = () => {
                         totalRows: response?.pagination?.total || 0,
                         totalPages: response?.pagination?.last_page || 0,
                         currentPage: response?.pagination?.page || 1,
-                        perPage: perPage, // Use the requested perPage value
+                        perPage: limit, // Use the requested perPage value
                     });
 
                     // Update transcription summary from API response
@@ -475,17 +475,17 @@ const AnalyzeRecordings = () => {
                     }
 
                     // Return data in the format expected by GenericListPage
-                    // Use the perPage parameter that was requested, not the response limit
+                    // Use the limit parameter that was requested, not the response limit
                     return {
                         data: response?.data || [],
                         total: response?.pagination?.total || 0,
                         last_page: response?.pagination?.last_page || 0,
                         current_page: response?.pagination?.page || 1,
-                        per_page: perPage, // Use the requested perPage value
+                        per_page: limit, // Use the requested perPage value
                     };
                 }else{
                     toast.error('Failed to get transcriptions');
-                    return { data: [], total: 0, last_page: 0, current_page: 1, per_page: perPage };
+                    return { data: [], total: 0, last_page: 0, current_page: 1, per_page: limit };
                 }
 
             } catch (error) {
@@ -495,14 +495,14 @@ const AnalyzeRecordings = () => {
                     totalRows: 0,
                     totalPages: 0,
                     currentPage: 1,
-                    perPage: perPage,
+                    perPage: limit,
                 });
                 // Clear current request key and remove from pending requests on error
                 if (currentRequestKeyRef.current === requestKey) {
                     currentRequestKeyRef.current = '';
                 }
                 pendingRequestsRef.current.delete(requestKey);
-                return { data: [], total: 0, last_page: 0, current_page: 1, per_page: perPage };
+                return { data: [], total: 0, last_page: 0, current_page: 1, per_page: limit };
             }
         })();
         

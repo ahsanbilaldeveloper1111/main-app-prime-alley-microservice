@@ -285,7 +285,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
   const articles = filteredFAQItems.map((item) => ({
     id: item.id,
     icon: item.topic?.faq_module?.icon,
-    title: item.title ,
+    title: item.title || item.question || '',
     description: item.description || item.answer ? item.answer.replaceAll(/<[^>]*>/g, '').substring(0, 150) + '...' : 'No description available',
     updated: formatDate(item.updated_at || item.created_at),
     views: item.view_count || 0,
@@ -298,7 +298,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
   console.log(popularArticles);
   const transformedPopularArticles = popularArticles.map((article) => ({
     id: article.id,
-    title: article.question ,
+    title: article.title || article.question || '',
     viewCount: article.view_count || 0
   }));
 
@@ -312,7 +312,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
   console.log(recentFAQs);
   const transformedFAQs = recentFAQs.map((faq) => ({
     id: faq.id,
-    title: faq.question ,
+    title: faq.title || faq.question || '',
     viewCount: faq.view_count || 0
   }));
 
