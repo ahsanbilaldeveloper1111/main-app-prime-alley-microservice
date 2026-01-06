@@ -189,7 +189,7 @@ const Settings = () => {
     },
     {
       key: "telco-gateway",
-      title: "Telco Gateway",
+      title: "Carrier Gateway",
       icon: Phone,
       color: "#ff9800",
       permission: PERMISSIONS.GSM_SERVICES
@@ -469,7 +469,7 @@ const Settings = () => {
                   </div>
                 )}
 
-                {/* Telco Gateway Content */}
+                Telco G{/* ateway Content */}
                 {activeTab === "telco-gateway" && shouldRenderTab("telco-gateway", activeTelcoTab) && (
                   <div>
                     {activeTelcoTab === "assign-devices" && <GsmAssign />}

@@ -26,7 +26,6 @@ export const routePermissions: RoutePermission[] = [
     {path: '/resources/contact-support',permissions: ['']},
     {path:'/manager-dashboard',permissions: ['']},
     {path:'/unified-workspace',permissions: [PERMISSIONS.VIEW_UNIFIED_WORKSPACE]},
-    {path:'/help-center',permissions: ['']},
     {path:'/live-call-updated',permissions: ['']},
     {path:'/test-image-storage',permissions: ['']},
     {path:'/billing',permissions: ['']},
@@ -38,6 +37,21 @@ export const routePermissions: RoutePermission[] = [
     {path:'/faqs/items',permissions: ['']},
     {path:'/faqs/topics',permissions: ['']},
     {path:'/faqs/types',permissions: ['']},
+    {
+        path: '/help-center',
+        permissions: [''],
+        children: [
+            { path: '/knowledge-base', permissions: [''] },
+            { path: '/knowledge-base/[id]', permissions: [''] },
+            { path: '/my-tickets', permissions: [''] },
+            { path: '/my-tickets/new', permissions: [''] },
+            { path: '/my-tickets/[id]', permissions: [''] },
+            { path: '/contact-support', permissions: [''] },
+            { path: '/system-status', permissions: [''] },
+        ]
+    },
+
+    
 
     {
         path: '/dashboards',
@@ -291,6 +305,10 @@ export const routePermissions: RoutePermission[] = [
                 permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]
             },
             {
+                path: '/trunk-profiles',
+                permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]
+            },
+            {
                 path: '/profiles',
                 permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]
             },
@@ -446,7 +464,9 @@ export const routePermissions: RoutePermission[] = [
         path: '/dncr',
         permissions: [PERMISSIONS.DNCR_SERVICES],
         children: [
-            { path: '/check-number',permissions: ['check-numbers-dncr']}
+            { path: '/check-number',permissions: ['check-numbers-dncr']},
+            { path: '/api-number-check',permissions: ['check-numbers-dncr']},
+            { path: '/cdr-records',permissions: ['check-numbers-dncr']},
         ]
     },
 

@@ -285,12 +285,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       url: '',
       subItems: [
         {
+          id: 'ai-bot-trunk-profiles',
+          title: 'Trunk Profiles',
+          icon: <Bot size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/ai-ml/trunk-profiles'
+        },
+        {
           id: 'ai-bot-profile',
           title: 'Voice Bot Profiles',
           icon: <Bot size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
           url: '/ai-ml/profiles'
         },
+        
         {
           id: 'ai-bot-campaigns',
           title: 'Campaigns',
@@ -525,12 +533,26 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: MENU_LABELS.COMPLIANCES,
       url: '',
       subItems: [
+        // {
+        //   id: 'dncr-check-number',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.DNCR,
+        //   icon: <PhoneCall size={16} />,
+        //   permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
+        //   url: '/dncr/check-number'
+        // },
         {
-          id: 'dncr-check-number',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.DNCR,
+          id: 'dncr-api-number-check',
+          title: "API Number Check",
           icon: <PhoneCall size={16} />,
           permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
-          url: '/dncr/check-number'
+          url: '/dncr/api-number-check'
+        },
+        {
+          id: 'dncr-cdr-records',
+          title: "CDR Records",
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
+          url: '/dncr/cdr-records'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
@@ -577,7 +599,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             },
             { 
               id: 'billing-history', 
-              title: 'Billing History', 
+              title: 'Payment History', 
               icon: <FileText size={16} />, 
               url: '/accounting/customer/billing-history', permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING },
             

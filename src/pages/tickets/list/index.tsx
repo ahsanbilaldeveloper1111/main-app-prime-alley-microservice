@@ -332,17 +332,13 @@ const TicketList = () => {
               </Button>
             )}
 
-{session?.user?.permissions?.includes('approve-internal-tickets-tickets') && props?.ticket_category==='internal' && (
+{session?.user?.permissions?.includes('approve-internal-tickets-tickets') && props?.ticket_category==='internal' && props?.is_approved===false && (
               <Button variant="light"  className="btn-action-style-2 p-1 text-primary" title="Make Approved / Not Approved">
                 <CircleCheckBig size={16}  onClick={() => handleApproveTicket(props)} />
               </Button>
             )}
 
-            {session?.user?.permissions?.includes('edit-ticket-tickets') && (
-              <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-primary" title="Edit">
-                <Edit size={16}  onClick={() => handleEditTicket(props)} />
-              </Button>
-            )}
+           
            
             {session?.user?.permissions?.includes('edit-ticket-tickets') && (
               <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-primary" title="Edit">
@@ -848,10 +844,6 @@ const TicketList = () => {
     useState<boolean>(false);
   const [showDeleteTicketModal, setShowDeleteTicketModal] =
     useState<boolean>(false);
-  const [showApproveTicketModal, setShowApproveTicketModal] =
-    useState<boolean>(false);
-  const [selectedTicketForApprove, setSelectedTicketForApprove] = useState<any>(null);
-  const [selectedApprovalStatus, setSelectedApprovalStatus] = useState<boolean | null>(null);
 
   const handleSubmitEditTicket = useCallback(async () => {
     //console.log('Submit edit group:', selectedGroup, selectedGroupName);
@@ -985,23 +977,9 @@ const TicketList = () => {
     }
   }, [selectedTicket]);
 
-  const handleApproveTicket = useCallback((props: any) => {
-    setSelectedTicketForApprove(props);
-    setSelectedApprovalStatus(props.is_approved !== undefined ? Boolean(props.is_approved) : null);
-    setShowApproveTicketModal(true);
-  }, []);
-
-  const closeApproveTicketModal = useCallback(() => {
-    setShowApproveTicketModal(false);
-    setSelectedTicketForApprove(null);
-    setSelectedApprovalStatus(null);
-  }, []);
-
-  const handleSubmitApproveTicket = useCallback(async () => {
-    if (selectedApprovalStatus === null || !selectedTicketForApprove) {
-      toast.error("Please select an approval status");
-      return;
-    }
+  const handleApproveTicket = useCallback(async (props: any) => {
+    // Toggle approval status: if false, make it true; if true, make it false
+    const newApprovalStatus = !props.is_approved;
 
     setCreatingTicket(true);
     let response = null;
@@ -1009,43 +987,40 @@ const TicketList = () => {
       // Only include user_extension if user has assign-user permission
       let userExtensionArray = undefined;
       if (session?.user?.permissions?.includes("assign-user-tickets")) {
-        userExtensionArray = Array.isArray(selectedTicketForApprove.user_extension)
-          ? selectedTicketForApprove.user_extension
-          : selectedTicketForApprove.user_extension
-          ? [selectedTicketForApprove.user_extension]
+        userExtensionArray = Array.isArray(props.user_extension)
+          ? props.user_extension
+          : props.user_extension
+          ? [props.user_extension]
           : [];
         userExtensionArray = userExtensionArray.length > 0 ? userExtensionArray : undefined;
       }
       
       response = await UpdateTicketDetails(
-        selectedTicketForApprove.id,
-        selectedTicketForApprove.title || selectedTicketForApprove.name,
-        selectedTicketForApprove.description || "",
-        selectedTicketForApprove.ticket_type_id || selectedTicketForApprove.type,
-        selectedTicketForApprove.ticket_status_id,
-        selectedTicketForApprove.module_id,
-        selectedTicketForApprove.submodule_id,
-        selectedTicketForApprove.submodule_child_id,
+        props.id,
+        props.title || props.name,
+        props.description || "",
+        props.ticket_type_id || props.type,
+        props.ticket_status_id,
+        props.module_id,
+        props.submodule_id,
+        props.submodule_child_id,
         userExtensionArray,
-        selectedTicketForApprove.priority,
-        selectedTicketForApprove.due_date,
+        props.priority,
+        props.due_date,
         undefined,
         undefined,
-        selectedApprovalStatus
+        newApprovalStatus
       );
     } catch (error) {
       console.error("Error updating ticket approval status:", error);
-      return;
+      toast.error("Failed to update approval status");
     } finally {
       setCreatingTicket(false);
     }
     if (response) {
-      setSelectedTicketForApprove(null);
-      setSelectedApprovalStatus(null);
-      setShowApproveTicketModal(false);
       setRefreshKey((prev) => prev + 1); // Trigger refresh
     }
-  }, [selectedTicketForApprove, selectedApprovalStatus, session?.user?.permissions]);
+  }, [session?.user?.permissions]);
 
   const [showCreateTicketModal, setShowCreateTicketModal] =
     useState<boolean>(false);
@@ -2232,38 +2207,6 @@ const TicketList = () => {
         onCancel={closeDeleteTicketModal}
       />
 
-      <FormModal
-        show={showApproveTicketModal}
-        onHide={closeApproveTicketModal}
-        title="Update Approval Status"
-        desc="Select the approval status for this ticket"
-        size="md"
-        formHtml={
-          <>
-            <Form.Group className="mb-3">
-              <Form.Label>Approval Status</Form.Label>
-              <ThemeSelect
-                placeholder="Select Approval Status"
-                value={selectedApprovalStatus !== null ? {
-                  value: selectedApprovalStatus,
-                  label: selectedApprovalStatus ? "Approved" : "Not Approved"
-                } : null}
-                onChange={(option: any) => setSelectedApprovalStatus(option?.value)}
-                options={[
-                  {value: TICKET_APPROVED_STATUS.APPROVED, label: "Approved"},
-                  {value: TICKET_APPROVED_STATUS.NOT_APPROVED, label: "Not Approved"}
-                ]}
-              />
-            </Form.Group>
-          </>
-        }
-        submitButtonText="Update Status"
-        cancelButtonText="Cancel"
-        onSubmit={handleSubmitApproveTicket}
-        onCancel={closeApproveTicketModal}
-        submitButtonVariant="primary"
-        cancelButtonVariant="secondary"
-      />
 
       <FormModal
         show={showCreateTicketModal}

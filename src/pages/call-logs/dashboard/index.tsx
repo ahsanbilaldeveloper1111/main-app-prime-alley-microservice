@@ -880,7 +880,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                           <th>Answered</th>
                                           <th>Un Answered</th>
                                           <th>Duration</th>
-                                          <th>Cost</th>
+                                          {/* <th>Cost</th> */}
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -891,7 +891,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                                   <td>{item.Answered}</td>
                                                   <td>{item.Unanswered}</td>
                                                   <td>{formatDuration(Number(item.TotalDuration))}</td>
-                                                  <td>{parseFloat(item.Cost).toFixed(2)}</td>
+                                                  {/* <td>{parseFloat(item.Cost).toFixed(2)}</td> */}
                                                 </tr>
                                                 ))
                                           }
@@ -935,7 +935,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                     <th>Answered</th>
                                     <th>Un Answered</th>
                                     <th>Duration</th>
-                                    <th>Cost</th>
+                                    {/* <th>Cost</th> */}
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -946,7 +946,7 @@ const [ExtensionChart, setExtensionChart] = React.useState({
                                             <td>{item.Answered}</td>
                                             <td>{item.Unanswered}</td>
                                             <td>{formatDuration(Number(item.TotalDuration))}</td>
-                                            <td>{parseFloat(item.Cost).toFixed(2)}</td>
+                                            {/* <td>{parseFloat(item.Cost).toFixed(2)}</td> */}
                                           </tr>
                                         ))
                                     }

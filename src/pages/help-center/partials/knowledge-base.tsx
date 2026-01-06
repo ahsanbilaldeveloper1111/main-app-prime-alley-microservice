@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { Row, Col, Card, Button, Form, Badge } from 'react-bootstrap';
 import {
   ChevronLeft,

@@ -1,5 +1,5 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo, useRef } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
@@ -9,28 +9,33 @@ import {
   updateFAQModule,
   deleteFAQModule
 } from '@utils/faqs';
-import { useRouter } from 'next/router';
 import { Column } from '@components/CustomDataTable';
-import { Button, Form, Row, Col } from 'react-bootstrap';
-import { useSession } from 'next-auth/react';
+import { Button, Form, Row, Col, InputGroup, Modal } from 'react-bootstrap';
 import '@assets/scss/common.scss';
 import FormModal from "@pages/partial/FormModal";
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
-import { Edit, Info, Trash2, Layers, Plus, ArrowLeft } from 'lucide-react';
+import { Edit, Info, Trash2, Layers, Plus, Search } from 'lucide-react';
 
 const FAQModules = () => {
-  const { data: session } = useSession();
-  const router = useRouter();
   const columns: Column[] = [
     { key: 'name', name: 'Name', selector: (row: any) => row.name, sortable: true },
+    { key: 'icon', name: 'Icon', selector: (row: any) => row.icon, sortable: true,
+      cell: (props: any) => (
+        <div>
+          <i className="material-icons-two-tone" style={{ fontSize: '24px' }}>
+            {props.icon}
+          </i>
+        </div>
+      )
+     },
     { 
       key: 'description', 
       name: 'Description', 
       selector: (row: any) => row.description || 'N/A', 
       sortable: false,
       cell: (props: any) => (
-        <div>
+        <div style={{ maxWidth: '200px',  whiteSpace: 'normal' }}>
           <span className={props.description ? '' : 'text-muted'}>
             {props.description || 'No description'}
           </span>
@@ -106,6 +111,9 @@ const FAQModules = () => {
   const [newModuleDescription, setNewModuleDescription] = useState<string>('');
   const [newModuleIcon, setNewModuleIcon] = useState<string>('');
   const [showDeleteModuleModal, setShowDeleteModuleModal] = useState<boolean>(false);
+  const [showIconPicker, setShowIconPicker] = useState<boolean>(false);
+  const [iconPickerMode, setIconPickerMode] = useState<'create' | 'edit'>('create');
+  const [iconSearchQuery, setIconSearchQuery] = useState<string>('');
 
   const handleEditModule = (props: any) => {
     setSelectedModule(props.id);
@@ -157,6 +165,52 @@ const FAQModules = () => {
       setShowCreateModuleModal(false);
       setRefreshKey(prev => prev + 1);
     }
+  };
+
+  // Get icons list - load from JSON file
+  const [allIcons, setAllIcons] = useState<string[]>([]);
+  
+  useEffect(() => {
+    const loadIcons = async () => {
+      try {
+        // Import icons from JSON file
+        const iconData = await import('./icon-list.json');
+        const iconList = iconData.default || iconData;
+        if (Array.isArray(iconList) && iconList.length > 0) {
+          setAllIcons(iconList);
+        } else {
+          throw new Error('Invalid icon data format');
+        }
+      } catch (e) {
+        console.error('Error loading icons from JSON file:', e);
+        // Minimal fallback
+        setAllIcons(['help_outline', 'info', 'book', 'settings', 'person']);
+      }
+    };
+    loadIcons();
+  }, []);
+
+  // Filter icons based on search query
+  const filteredIcons = useMemo(() => {
+    if (!iconSearchQuery) return allIcons;
+    return allIcons.filter(icon => 
+      icon.toLowerCase().includes(iconSearchQuery.toLowerCase())
+    );
+  }, [allIcons, iconSearchQuery]);
+
+  const handleIconSelect = (iconName: string) => {
+    if (iconPickerMode === 'create') {
+      setNewModuleIcon(iconName);
+    } else {
+      setSelectedModuleIcon(iconName);
+    }
+    setShowIconPicker(false);
+    setIconSearchQuery('');
+  };
+
+  const openIconPicker = (mode: 'create' | 'edit') => {
+    setIconPickerMode(mode);
+    setShowIconPicker(true);
   };
 
   return (
@@ -264,14 +318,31 @@ const FAQModules = () => {
                   <Info size={14} />
                 </span>
               </label>
-              <input 
-                className="form-control" 
-                type="text" 
-                id="editModuleIcon"
-                value={selectedModuleIcon} 
-                onChange={(e) => setSelectedModuleIcon(e.target.value)} 
-                placeholder="e.g., question-circle"
-              />
+              <div className="d-flex gap-2">
+                <input 
+                  className="form-control" 
+                  type="text" 
+                  id="editModuleIcon"
+                  value={selectedModuleIcon} 
+                  onChange={(e) => setSelectedModuleIcon(e.target.value)} 
+                  placeholder="e.g., question-circle"
+                />
+                <Button 
+                  variant="outline-secondary" 
+                  onClick={() => openIconPicker('edit')}
+                  title="Choose Icon"
+                >
+                  <Layers size={16} />
+                </Button>
+              </div>
+              {selectedModuleIcon && (
+                <div className="mt-2 d-flex align-items-center gap-2">
+                  <span className="text-muted small">Preview:</span>
+                  <i className="material-icons-two-tone" style={{ fontSize: '24px' }}>
+                    {selectedModuleIcon}
+                  </i>
+                </div>
+              )}
               <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
                 <Info size={12} />
                 <span style={{ fontSize: '0.813rem' }}>
@@ -359,14 +430,31 @@ const FAQModules = () => {
                   <Info size={14} />
                 </span>
               </label>
-              <input 
-                className="form-control" 
-                type="text" 
-                id="newModuleIcon"
-                value={newModuleIcon} 
-                onChange={(e) => setNewModuleIcon(e.target.value)} 
-                placeholder="e.g., question-circle"
-              />
+              <div className="d-flex gap-2">
+                <input 
+                  className="form-control" 
+                  type="text" 
+                  id="newModuleIcon"
+                  value={newModuleIcon} 
+                  onChange={(e) => setNewModuleIcon(e.target.value)} 
+                  placeholder="e.g., question-circle"
+                />
+                <Button 
+                  variant="outline-secondary" 
+                  onClick={() => openIconPicker('create')}
+                  title="Choose Icon"
+                >
+                  <Layers size={16} />
+                </Button>
+              </div>
+              {newModuleIcon && (
+                <div className="mt-2 d-flex align-items-center gap-2">
+                  <span className="text-muted small">Preview:</span>
+                  <i className="material-icons-two-tone" style={{ fontSize: '24px' }}>
+                    {newModuleIcon}
+                  </i>
+                </div>
+              )}
               <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
                 <Info size={12} />
                 <span style={{ fontSize: '0.813rem' }}>
@@ -413,6 +501,120 @@ const FAQModules = () => {
         title={successModalTitle}
         description={successModalDescription}
       />
+
+      {/* Icon Picker Modal */}
+      <Modal
+        show={showIconPicker}
+        onHide={() => {
+          setShowIconPicker(false);
+          setIconSearchQuery('');
+        }}
+        size="lg"
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title className="d-flex align-items-center gap-2">
+            <Layers size={20} />
+            Choose Icon
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {/* Search Bar */}
+          <div className="mb-3">
+            <InputGroup>
+              <InputGroup.Text>
+                <Search size={16} />
+              </InputGroup.Text>
+              <Form.Control
+                type="text"
+                placeholder="Search icons..."
+                value={iconSearchQuery}
+                onChange={(e) => setIconSearchQuery(e.target.value)}
+              />
+            </InputGroup>
+          </div>
+
+          {/* Icons Grid */}
+          <div 
+            style={{ 
+              maxHeight: '400px', 
+              overflowY: 'auto',
+              border: '1px solid #dee2e6',
+              borderRadius: '4px',
+              padding: '10px'
+            }}
+          >
+            {filteredIcons.length === 0 ? (
+              <div className="text-center text-muted py-4">
+                {allIcons.length === 0 ? 'Loading icons...' : 'No icons found'}
+              </div>
+            ) : (
+              <div className="d-flex flex-wrap gap-2">
+                {filteredIcons.map((iconName) => (
+                  <div
+                    key={iconName}
+                    onClick={() => handleIconSelect(iconName)}
+                    style={{
+                      width: '60px',
+                      height: '60px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      background: '#fff'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.borderColor = '#4680ff';
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#fff';
+                      e.currentTarget.style.borderColor = '#dee2e6';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                    title={iconName}
+                  >
+                    <i className="material-icons-two-tone" style={{ fontSize: '24px' }}>
+                      {iconName}
+                    </i>
+                    <span 
+                      style={{ 
+                        fontSize: '10px', 
+                        color: '#6c757d',
+                        marginTop: '4px',
+                        textAlign: 'center',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        width: '100%',
+                        padding: '0 2px'
+                      }}
+                    >
+                      {iconName.length > 10 ? iconName.substring(0, 8) + '...' : iconName}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="mt-2 text-muted small">
+            Showing {filteredIcons.length} of {allIcons.length} icons
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => {
+            setShowIconPicker(false);
+            setIconSearchQuery('');
+          }}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </React.Fragment>
   );
 };

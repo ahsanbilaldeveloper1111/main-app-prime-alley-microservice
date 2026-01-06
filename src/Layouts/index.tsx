@@ -723,7 +723,27 @@ const Layout = ({ children }: LayoutProps) => {
 
               {/* Call Button - Opens Dialer Modal */}
             {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
-              <Button 
+              <>
+              {/* User Online/Offline Status */}
+              {/* <div className="d-flex align-items-center" style={{ marginRight: '10px' }}>
+                <div style={{
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  backgroundColor: isDeviceRegistered ? '#22c55e' : '#ef4444',
+                  marginRight: '6px',
+                  flexShrink: 0
+                }} />
+                <span style={{
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: isDeviceRegistered ? '#22c55e' : '#ef4444'
+                }}>
+                  {isDeviceRegistered ? 'Device Online' : 'Device Offline'}
+                </span>
+              </div> */}
+		  
+		  <Button
                 ref={dialerButtonRef}
                 variant="link" 
                 size="sm" 
@@ -746,7 +766,9 @@ const Layout = ({ children }: LayoutProps) => {
                   pointerEvents: 'none',
                   
                 }}>dialpad</i>  
+		   
               </Button>
+		  </>
             )}
 
 
