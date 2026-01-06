@@ -48,6 +48,8 @@ import {
   AlertCircle,
   CheckCircle,
   X,
+  ArrowRight,
+  ArrowLeft,
   Paperclip,
   FileText,
   Tag,
@@ -520,9 +522,268 @@ const TicketDetail = () => {
 
   const closeImageModal = useCallback(() => setShowImageModal(false), []);
 
-  const renderCommentThread = (comments: any[], tabType: string) => (
+  // Component to display change images with proper loading
+  const ChangeImageDisplay = ({ 
+    imagePath, 
+    isOld, 
+    fallbackText,
+    onClick 
+  }: { 
+    imagePath: string; 
+    isOld: boolean;
+    fallbackText: string;
+    onClick?: () => void;
+  }) => {
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+
+    useEffect(() => {
+      if (imagePath) {
+        setLoading(true);
+        setError(false);
+        loadImage(imagePath)
+          .then((url) => {
+            setImageUrl(url);
+            setLoading(false);
+          })
+          .catch((err) => {
+            console.error("Error loading change image:", err);
+            setError(true);
+            setLoading(false);
+          });
+      } else {
+        setError(true);
+        setLoading(false);
+      }
+    }, [imagePath]);
+
+    if (loading) {
+      return (
+        <small className="text-muted" style={{ fontSize: "0.75rem" }}>
+          Loading...
+        </small>
+      );
+    }
+
+    if (error || !imageUrl) {
+      return (
+        <small 
+          className={isOld ? "text-muted fw-medium" : "text-dark fw-bold"} 
+          style={{ 
+            fontSize: "0.813rem", 
+            textDecoration: isOld ? "line-through" : "none",
+            color: isOld ? undefined : "#28a745"
+          }}
+        >
+          {fallbackText}
+        </small>
+      );
+    }
+
+    const imageElement = (
+      <img
+        src={imageUrl}
+        alt={isOld ? "Previous value" : "Updated value"}
+        className="img-fluid rounded"
+        style={{
+          maxWidth: "60px",
+          maxHeight: "60px",
+          objectFit: "cover",
+          border: `1px solid ${isOld ? "#dc3545" : "#28a745"}`,
+        }}
+      />
+    );
+
+    if (onClick) {
+      return (
+        <button
+          type="button"
+          onClick={onClick}
+          className="border-0 bg-transparent p-0"
+          style={{ cursor: "pointer" }}
+          aria-label="View image"
+        >
+          {imageElement}
+        </button>
+      );
+    }
+
+    return imageElement;
+  };
+
+  const formatChangeValue = (value: any, fieldName?: string): string => {
+    if (value === null || value === undefined) return "None";
+    
+    // Handle priority field - map numeric values to labels
+    if (fieldName === "priority" || fieldName === "Priority") {
+      const priorityNum = Number(value);
+      if (!Number.isNaN(priorityNum) && priorityNum >= 0 && priorityNum < priorityLabels.length) {
+        return priorityLabels[priorityNum];
+      }
+    }
+    
+    // Handle is_approved field - convert boolean/string to "Approved"/"Not Approved"
+    if (fieldName === "is_approved" || fieldName === "Is Approved") {
+      if (value === true || value === "true" || value === "True") {
+        return "Approved";
+      }
+      if (value === false || value === "false" || value === "False") {
+        return "Not Approved";
+      }
+    }
+    
+    if (Array.isArray(value)) return value.join(", ");
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  };
+
+  const renderChanges = (changes: any, userExtension: any) => {
+    if (!changes || typeof changes !== "object") return null;
+
+    const updatedBy = extensions.find(
+      (e: any) => e?.id?.toString() === userExtension?.toString()
+    )?.display_name || userExtension;
+
+    const changeEntries = Object.entries(changes).filter(([_, change]: [string, any]) => 
+      change && typeof change === "object"
+    );
+
+    return (
+      <div
+        role="alert"
+        className="fade mb-0 alert alert-white show"
+        style={{ 
+          borderRadius: "8px",
+          border: "none",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          padding: 0,
+          overflow: "hidden"
+        }}
+      >
+        {/* Header Section */}
+        <div 
+          className="d-flex align-items-center gap-2 px-3 py-2"
+          style={{ 
+            backgroundColor: "rgba(255, 193, 7, 0.15)",
+            borderBottom: "1px solid rgba(0,0,0,0.08)"
+          }}
+        >
+          <CheckCircle size={18} className="text-warning" style={{ color: "#ff9800" }} />
+          <small className="fw-semibold" style={{ fontSize: "0.875rem", color: "#856404" }}>
+            Ticket updated by {updatedBy}
+          </small>
+        </div>
+
+        {/* Changes Section */}
+        <div className="px-3 py-3">
+          <small className="fw-bold d-block mb-3" style={{ fontSize: "0.813rem", color: "#856404", letterSpacing: "0.3px" }}>
+            Changes made:
+          </small>
+          <div className="d-flex flex-column gap-2">
+            {changeEntries.map(([field, change]: [string, any], index: number) => {
+              // Format field name (convert snake_case to Title Case)
+              const fieldName = field
+                .split("_")
+                .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(" ");
+              
+              const oldValue = formatChangeValue(change.old, field);
+              const newValue = formatChangeValue(change.new, field);
+              
+              // Check if this is an image field
+              const isImageField = field === "image" || field === "Image";
+              const oldImageValue = isImageField ? (Array.isArray(change.old) ? change.old[0] : change.old) : null;
+              const newImageValue = isImageField ? (Array.isArray(change.new) ? change.new[0] : change.new) : null;
+
+              return (
+                <div key={field}>
+                  <div 
+                    className="d-flex flex-column gap-2 p-2 rounded"
+                    style={{ 
+                      backgroundColor: index % 2 === 0 ? "rgba(255, 255, 255, 0.5)" : "transparent",
+                      transition: "background-color 0.2s"
+                    }}
+                  >
+                    <div className="flex-shrink-0">
+                      <small className="fw-bold text-dark" style={{ fontSize: "0.813rem" }}>
+                        {fieldName}:
+                      </small>
+                    </div>
+                    <div className="d-flex align-items-center gap-2 flex-wrap">
+                      {/* Old Value */}
+                      <div className="d-flex align-items-center gap-1 px-2 py-1 rounded" style={{ backgroundColor: "rgba(220, 53, 69, 0.1)" }}>
+                        <ArrowLeft size={16} style={{ color: "#dc3545" }} />
+                        {isImageField && oldImageValue && oldImageValue !== "None" && oldImageValue !== null ? (
+                          <ChangeImageDisplay
+                            imagePath={oldImageValue}
+                            isOld={true}
+                            fallbackText={oldValue}
+                          />
+                        ) : (
+                          <small 
+                            className="text-muted fw-medium" 
+                            style={{ fontSize: "0.813rem", textDecoration: "line-through" }}
+                          >
+                            {oldValue}
+                          </small>
+                        )}
+                      </div>
+                      
+                      <ArrowRight size={18} style={{ color: "#28a745", fontWeight: "bold" }} />
+                      
+                      {/* New Value */}
+                      <div className="d-flex align-items-center gap-1 px-2 py-1 rounded" style={{ backgroundColor: "rgba(40, 167, 69, 0.1)" }}>
+                        {isImageField && newImageValue && newImageValue !== "None" && newImageValue !== null ? (
+                          <ChangeImageDisplay
+                            imagePath={newImageValue}
+                            isOld={false}
+                            fallbackText={newValue}
+                            onClick={async () => {
+                              try {
+                                const fullUrl = await loadImage(newImageValue);
+                                handleImageClick(fullUrl);
+                              } catch (error) {
+                                console.error("Error loading image for modal:", error);
+                                handleImageClick(newImageValue);
+                              }
+                            }}
+                          />
+                        ) : (
+                          <small 
+                            className="text-dark fw-bold" 
+                            style={{ fontSize: "0.813rem", color: "#28a745" }}
+                          >
+                            {newValue}
+                          </small>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {index < changeEntries.length - 1 && (
+                    <div className="my-1" style={{ borderBottom: "1px solid rgba(0,0,0,0.08)" }}></div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCommentThread = (comments: any[], tabType: string) => {
+    // Get the appropriate image map based on tab type
+    const imageMap = tabType === "internal" 
+      ? assigneeCommentAttachmentImages 
+      : commentAttachmentImages;
+
+    return (
     <div className="position-relative" style={{ paddingLeft: "30px" }}>
-      {comments.map((item, index) => (
+        {comments.map((item, index) => {
+          const commentImageUrl = imageMap[item?.id];
+          
+          return (
         <div key={item?.id || index} className="mb-4 position-relative">
           {/* Timeline line */}
           {index !== comments.length - 1 && (
@@ -576,7 +837,7 @@ const TicketDetail = () => {
                     <div className="fw-semibold d-flex align-items-center gap-2">
                       {extensions.find(
                         (e: any) =>
-                          e.id.toString() === item?.user_extension.toString()
+                              e?.id?.toString() === item?.user_extension?.toString()
                       )?.display_name || item?.user_extension}
                     </div>
                     {tabType === "activity" && (
@@ -600,6 +861,32 @@ const TicketDetail = () => {
 
               <p className="mb-2 text-muted" style={{ fontSize: "0.9rem" }}>
                 {item?.content}
+                  </p>
+
+                  {/* Display comment attachment image */}
+                  {commentImageUrl && (
+                    <div className="mb-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => handleImageClick(commentImageUrl)}
+                        className="border-0 bg-transparent p-0"
+                        style={{ cursor: "pointer" }}
+                        aria-label="View comment attachment"
+                      >
+                        <img
+                          src={commentImageUrl}
+                          alt="Comment attachment"
+                          className="img-fluid rounded"
+                          style={{
+                            maxWidth: "100px",
+                            maxHeight: "100px",
+                            objectFit: "cover",
+                            border: "2px solid #dee2e6",
+                          }}
+                        />
+                      </button>
+                    </div>
+                  )}
 
                 {tabType === "activity" && (
                   <>
@@ -614,8 +901,8 @@ const TicketDetail = () => {
                             Ticket created by{" "}
                             {extensions.find(
                               (e: any) =>
-                                e.id.toString() ===
-                                item?.user_extension.toString()
+                                  e?.id?.toString() ===
+                                  item?.user_extension?.toString()
                             )?.display_name || item?.user_extension}
                           </small>
                         </div>
@@ -623,32 +910,18 @@ const TicketDetail = () => {
                     </p>
 
                     <p className="">
-                      {item?.action === "updated" && (
-                        <div
-                          role="alert"
-                          className="fade mb-0 py-2 px-3 alert alert-warning show d-flex align-items-center gap-2"
-                        >
-                          <CheckCircle size={16} className="" />
-                          <small className="fw-semibold">
-                            Ticket updated by{" "}
-                            {extensions.find(
-                              (e: any) =>
-                                e.id.toString() ===
-                                item?.user_extension.toString()
-                            )?.display_name || item?.user_extension}
-                          </small>
-                        </div>
-                      )}
+                        {item?.action === "updated" && item?.changes && renderChanges(item.changes, item?.user_extension)}
                     </p>
                   </>
                 )}
-              </p>
             </Card.Body>
           </Card>
         </div>
-      ))}
+          );
+        })}
     </div>
   );
+  };
 
   if (loading) {
     return (
@@ -865,20 +1138,40 @@ const TicketDetail = () => {
             >
               Assigned To
             </small>
-            <InputGroup>
-              <Form.Select
-                value={ticketData?.user_extension}
-                className="form-control"
-                disabled={true}
-                style={{ fontSize: "0.875rem" }}
-              >
-                {extensions.map((extension: any, index: number) => (
-                  <option key={index} value={extension.id}>
-                    {extension.display_name}
-                  </option>
-                ))}
-              </Form.Select>
-            </InputGroup>
+            <div className="d-flex flex-wrap gap-2 align-items-center">
+              {(() => {
+                const userExtensions = Array.isArray(ticketData?.user_extension)
+                  ? ticketData.user_extension
+                  : ticketData?.user_extension
+                  ? [ticketData.user_extension]
+                  : [];
+                
+                if (userExtensions.length === 0) {
+                  return (
+                    <span className="text-muted" style={{ fontSize: "0.875rem" }}>
+                      Not assigned
+                    </span>
+                  );
+                }
+                
+                return userExtensions.map((extId: any) => {
+                  const extension = extensions.find(
+                    (e: any) => e?.id?.toString() === extId?.toString()
+                  );
+                  return (
+                    <Badge
+                      key={extId?.toString() || `ext-${extId}`}
+                      bg="info"
+                      className="d-flex align-items-center gap-1"
+                      style={{ fontSize: "0.875rem", padding: "0.375rem 0.75rem" }}
+                    >
+                      <User size={14} />
+                      {extension?.display_name || extId}
+                    </Badge>
+                  );
+                });
+              })()}
+            </div>
           </div>
 
           <hr className="my-4" />
@@ -887,7 +1180,7 @@ const TicketDetail = () => {
             <h6 className="fw-bold mb-3">Description</h6>
             <p
               className="text-muted mb-0"
-              style={{ fontSize: "0.938rem", lineHeight: "1.6" }}
+              style={{ fontSize: "0.938rem", lineHeight: "1.6",wordBreak: "break-word" }}
             >
               {ticketData?.description}
             </p>
