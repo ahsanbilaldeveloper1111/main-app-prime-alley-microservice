@@ -854,8 +854,15 @@ const ApplicationMonitoring = () => {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="time" stroke="#94a3b8" style={{ fontSize: '0.75rem' }} />
-                    <YAxis stroke="#94a3b8" style={{ fontSize: '0.75rem' }} />
+                    <XAxis 
+                      dataKey="time" 
+                      stroke="#94a3b8" 
+                      tick={{ fontSize: '0.75rem', fill: '#94a3b8' }}
+                    />
+                    <YAxis 
+                      stroke="#94a3b8" 
+                      tick={{ fontSize: '0.75rem', fill: '#94a3b8' }}
+                    />
                     <Tooltip />
                     <Area type="monotone" dataKey="cpu" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorCpu)" />
                     <Area type="monotone" dataKey="memory" stroke="#f43f5e" strokeWidth={2} fillOpacity={1} fill="url(#colorMemory)" />
