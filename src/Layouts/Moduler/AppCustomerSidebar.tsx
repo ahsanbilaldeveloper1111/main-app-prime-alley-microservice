@@ -470,6 +470,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <Monitor size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_UPTIME_SLA,
           url: '/netops/uptime-sla'
+        },
+        {
+          id: 'netops-select-server',
+          title: 'Select Server',
+          icon: <Server size={16} />,
+          permission: PERMISSIONS.NETOPS_SERVICES,
+          url: '/netops/select-server'
+        },
+        {
+          id: 'netops-application-monitoring',
+          title: 'Application Monitoring',
+          icon: <Monitor size={16} />,
+          permission: PERMISSIONS.NETOPS_SERVICES,
+          url: '/netops/application-monitoring'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },

@@ -66,7 +66,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
   const [creatingTicket, setCreatingTicket] = useState<boolean>(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submittedTicketId, setSubmittedTicketId] = useState('');
-  
+
   // Default tags suggestions
   const defaultTags = [
     "urgent",
@@ -281,7 +281,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
       // Generate a ticket ID for display
       const ticketId = '#' + Math.floor(100000 + Math.random() * 900000);
       setSubmittedTicketId(ticketId);
-      setIsSubmitted(true);
+    setIsSubmitted(true);
       
       // Reset form
       setNewTicketTitle("");
@@ -561,7 +561,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                   <Form.Text style={{ fontSize: '12px', color: '#6c757d' }}>
                     Minimum 5 characters required
                   </Form.Text>
-                </div>
+                        </div>
 
                 {/* Type and Priority Row */}
                 <Row className="g-3" style={{ marginBottom: '24px' }}>
@@ -623,34 +623,34 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                 {/* Module and Status Row */}
                 <Row className="g-3" style={{ marginBottom: '24px' }}>
                   <Col md={6}>
-                    <Form.Label style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#2c3e50',
-                      marginBottom: '8px'
-                    }}>
+                  <Form.Label style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    marginBottom: '8px'
+                  }}>
                       Module <span style={{ color: '#dc3545' }}>*</span>
-                    </Form.Label>
-                    <Form.Select
+                  </Form.Label>
+                  <Form.Select
                       value={newTicketModule}
                       onChange={(e) => {
                         setNewTicketModule(e.target.value);
                         fetchSubmodules(e.target.value);
                       }}
-                      style={{
-                        fontSize: '14px',
-                        padding: '10px 14px',
-                        border: '1px solid #dee2e6',
+                    style={{
+                      fontSize: '14px',
+                      padding: '10px 14px',
+                      border: '1px solid #dee2e6',
                         borderRadius: '6px'
-                      }}
-                    >
+                    }}
+                  >
                       <option value="">Select Module</option>
                       {modules.map((module: any) => (
                         <option key={module.id} value={module.id}>
                           {module.name}
                         </option>
                       ))}
-                    </Form.Select>
+                  </Form.Select>
                   </Col>
                   <Col md={6}>
                     <Form.Label style={{
@@ -1003,9 +1003,9 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                       resize: 'none'
                     }}
                   />
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
                     marginTop: '8px',
                     padding: '0 4px'
                   }}>
@@ -1029,8 +1029,8 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                     fontSize: '14px',
                     fontWeight: '600',
                     color: '#2c3e50',
-                    marginBottom: '8px'
-                  }}>
+                  marginBottom: '8px'
+                }}>
                     Attachments (Optional)
                   </Form.Label>
                   <input
@@ -1066,29 +1066,29 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                   
                   {newTicketImages.length > 0 && (
                     <div style={{ marginTop: '12px' }}>
-                      <div style={{ 
-                        display: 'flex', 
+                  <div style={{
+                    display: 'flex',
                         flexWrap: 'wrap', 
                         gap: '8px' 
-                      }}>
+                  }}>
                         {newTicketImages.map((file, index) => (
                           <Badge 
                             key={index}
                             bg="light" 
                             text="dark" 
-                            style={{ 
+                      style={{
                               padding: '8px 12px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
                               fontSize: '12px'
-                            }}
-                          >
+                      }}
+                    >
                             <Paperclip size={14} />
                             <span>{file.name}</span>
                             <span style={{ color: '#6c757d' }}>
                               ({(file.size / 1024).toFixed(1)} KB)
-                            </span>
+                    </span>
                             <Button
                               variant="link"
                               size="sm"
@@ -1111,7 +1111,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                             </Button>
                           </Badge>
                         ))}
-                      </div>
+                  </div>
                     </div>
                   )}
                 </div>

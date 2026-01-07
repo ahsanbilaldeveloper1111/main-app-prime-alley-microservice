@@ -743,18 +743,18 @@ const APINumberCheck = () => {
                       </div>
                     ) : (
                       <>
-                        <Upload size={32} color="#6c757d" style={{ marginBottom: '12px' }} />
-                        <p style={styles.dropzoneText}>Drag and drop or browse to upload CSV</p>
-                        <input
-                          type="file"
-                          accept=".csv"
-                          onChange={handleFileUpload}
-                          style={styles.fileInput}
-                          id="csvUpload"
-                        />
-                        <label htmlFor="csvUpload" style={styles.browseLabel}>
-                          Browse
-                        </label>
+                    <Upload size={32} color="#6c757d" style={{ marginBottom: '12px' }} />
+                    <p style={styles.dropzoneText}>Drag and drop or browse to upload CSV</p>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileUpload}
+                      style={styles.fileInput}
+                      id="csvUpload"
+                    />
+                    <label htmlFor="csvUpload" style={styles.browseLabel}>
+                      Browse
+                    </label>
                       </>
                     )}
                   </div>
@@ -806,13 +806,13 @@ const APINumberCheck = () => {
                     disabled={!csvFile || isUploading}
                   >
                     {isUploading ? 'Uploading...' : 'Upload & Check Numbers'}
-                  </button>
+                </button>
                 )}
                 {(results.length > 0 || bulkResults) && (
-                  <button style={styles.btnOutline} onClick={handleDownloadResults}>
+                <button style={styles.btnOutline} onClick={handleDownloadResults}>
                     <Download size={16} style={{ marginRight: '6px', display: 'inline' }} />
-                    Download Results
-                  </button>
+                  Download Results
+                </button>
                 )}
               </div>
             </div>
@@ -841,19 +841,19 @@ const APINumberCheck = () => {
                 No results yet. Enter phone numbers and click "Check Numbers" to see results.
               </div>
             ) : (
-              <div style={styles.tableWrapper}>
-                <table style={styles.table}>
-                  <thead style={styles.thead}>
-                    <tr>
+            <div style={styles.tableWrapper}>
+              <table style={styles.table}>
+                <thead style={styles.thead}>
+                  <tr>
                       <th style={styles.th}>Phone Number</th>
-                      <th style={styles.th}>Status</th>
+                    <th style={styles.th}>Status</th>
                       <th style={styles.th}>Account Number</th>
                       <th style={styles.th}>DNCR Status</th>
                       <th style={styles.th}>Transaction Status</th>
-                      <th style={styles.th}>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                    <th style={styles.th}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
                     {bulkResults ? (
                       // Display bulk results
                       Object.entries(bulkResults).map(([phoneNumber, data]: [string, any]) => (
@@ -889,7 +889,7 @@ const APINumberCheck = () => {
                       results.map((result: PhoneResult, idx: number) => (
                         <tr key={`${result.input}-${idx}`} style={styles.tr}>
                           <td style={styles.td}><strong>{result.input}</strong></td>
-                          <td style={styles.td}>
+                      <td style={styles.td}>
                             <span style={{
                               ...styles.badgeValid,
                               backgroundColor: result.status === "Valid" ? '#d4edda' : '#f8d7da',
@@ -898,9 +898,9 @@ const APINumberCheck = () => {
                             }}>
                               {result.status || "N/A"}
                             </span>
-                          </td>
+                      </td>
                           <td style={styles.td}>{result.accountNumber || "N/A"}</td>
-                          <td style={styles.td}>
+                      <td style={styles.td}>
                             {result.dncrStatus ? (
                               <span style={{
                                 ...styles.badgeValid,
@@ -911,15 +911,15 @@ const APINumberCheck = () => {
                                 {result.dncrStatus}
                               </span>
                             ) : "N/A"}
-                          </td>
+                      </td>
                           <td style={styles.td}>{result.transactionStatus || "N/A"}</td>
                           <td style={styles.td}>{result.notes || "N/A"}</td>
-                        </tr>
+                    </tr>
                       ))
                     )}
-                  </tbody>
-                </table>
-              </div>
+                </tbody>
+              </table>
+            </div>
             )}
           </div>
         </div>

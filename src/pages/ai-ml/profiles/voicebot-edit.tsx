@@ -8,7 +8,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import axiosInstance from "@utils/axios";
-import { CreateVoiceBot } from "@utils/aiml";
+import { UpdateVoiceBot, GetVoiceBotById } from "@utils/aiml";
 import { toast } from "react-toastify";
 import { useRouter } from 'next/router';
 
@@ -19,9 +19,11 @@ interface Trunk {
   numbers: string[];
 }
 
-const VoiceBotCreate = () => {
+const VoiceBotEdit = () => {
   const router = useRouter();
+  const { id } = router.query;
   const [activeTab, setActiveTab] = useState('basics');
+  const [isLoadingBot, setIsLoadingBot] = useState<boolean>(false);
   const [botName, setBotName] = useState('');
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState('Description');
@@ -51,6 +53,7 @@ const VoiceBotCreate = () => {
   const [isLoadingTrunks, setIsLoadingTrunks] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTrunkData, setSelectedTrunkData] = useState<Trunk | null>(null);
+  const [originalBotData, setOriginalBotData] = useState<any>(null);
 
   // Fetch trunks from API
   const fetchTrunks = useCallback(async () => {
@@ -62,8 +65,8 @@ const VoiceBotCreate = () => {
         numbers: Array.isArray(trunk.numbers) ? trunk.numbers : [],
       }));
       setTrunks(received);
-      // Set default trunk if available and no trunk is selected
-      if (received.length > 0) {
+      // Only set default trunk if we're in create mode (no id) and no trunk is selected
+      if (received.length > 0 && !id) {
         setTrunk(prevTrunk => {
           if (!prevTrunk && received.length > 0) {
             const firstTrunk = received[0];
@@ -85,10 +88,99 @@ const VoiceBotCreate = () => {
     }
   }, []);
 
-  // Load trunks on mount
+  // Convert business hours object to string format for display
+  const formatBusinessHours = (businessHoursObj: any): string => {
+    if (!businessHoursObj || typeof businessHoursObj !== 'object') {
+      return '0 Selected';
+    }
+
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const enabledDays = days.filter(day => businessHoursObj[day]?.enabled);
+    
+    if (enabledDays.length === 0) {
+      return '0 Selected';
+    }
+
+    // Check if it's 24/7 (all days, 00:00-23:59)
+    const is247 = enabledDays.length === 7 && 
+      days.every(day => {
+        const dayHours = businessHoursObj[day];
+        return dayHours?.enabled && dayHours.start === '00:00' && dayHours.end === '23:59';
+      });
+    if (is247) return '24/7';
+
+    // Check for common patterns
+    const firstDay = businessHoursObj[enabledDays[0]];
+    const allSame = enabledDays.every(day => {
+      const dayHours = businessHoursObj[day];
+      return dayHours?.start === firstDay.start && dayHours?.end === firstDay.end;
+    });
+
+    if (allSame) {
+      if (enabledDays.length === 5 && !enabledDays.includes('saturday') && !enabledDays.includes('sunday')) {
+        if (firstDay.start === '09:00' && firstDay.end === '17:00') return 'Business Hours';
+        if (firstDay.start === '08:00' && firstDay.end === '20:00') return 'Extended Hours';
+      }
+      if (enabledDays.length === 7 && firstDay.start === '09:00' && firstDay.end === '18:00') {
+        return 'Weekend Included';
+      }
+    }
+
+    return 'Custom Schedule';
+  };
+
+  // Load bot data
+  const fetchBotData = useCallback(async () => {
+    if (!id) return;
+
+    // Handle query parameter type (can be string or string[])
+    const botId = Array.isArray(id) ? id[0] : id;
+    if (!botId) return;
+
+    setIsLoadingBot(true);
+    try {
+      const botData = await GetVoiceBotById(botId);
+      if (botData) {
+        // Store original data for comparison
+        setOriginalBotData(botData);
+        
+        setBotName(botData.bot_name || '');
+        setDescription(botData.description || '');
+        setTags(botData.tags || 'Description');
+        setCategory(botData.category || 'Acquisition');
+        setOwner(botData.owner || 'Tiffany Reid');
+        setStatus(botData.status || 'active');
+        setTrunk(botData.trunk || '');
+        setCallerId(botData.caller_id || '');
+        setRegion(botData.region || 'United States');
+        setTtsProvider(botData.tts_provider || 'Google Cloud TTS');
+        setLanguageCode(botData.voice_model || 'en-US-Wavenet-G');
+        setVoice(botData.voice_type || 'en-US-Wavenet-G (Male)');
+        setGreetingPrompt(botData.greeting_prompt || '');
+        setSystemPrompt(botData.system_prompt || '');
+        setConcurrency(`Max ${botData.concurrency_limit || 10} Calls`);
+        setTimezone(botData.timezone || 'Pacific Time');
+        setBusinessHours(formatBusinessHours(botData.business_hours));
+        setCompleteContext(botData.complete_context ?? true);
+        setRecordingConsent(botData.recording_consent ?? false);
+        setDncrCheck(botData.dnc_registry_check ?? false);
+        setCallbackWaiting(botData.callback_waiting ?? false);
+      }
+    } catch (error) {
+      console.error('Error fetching bot data:', error);
+      toast.error('Failed to load bot data');
+    } finally {
+      setIsLoadingBot(false);
+    }
+  }, [id]);
+
+  // Load trunks and bot data on mount
   useEffect(() => {
     fetchTrunks();
-  }, []);
+    if (id) {
+      fetchBotData();
+    }
+  }, [fetchTrunks, fetchBotData, id]);
 
   // Update selected trunk data when trunk changes
   useEffect(() => {
@@ -165,6 +257,117 @@ const VoiceBotCreate = () => {
     return match ? Number.parseInt(match[0], 10) : 10;
   };
 
+  // Compare current values with original values and return only changed fields
+  const getChangedFields = (saveAsDraft: boolean = false): any => {
+    if (!originalBotData) {
+      // If no original data, return all fields (shouldn't happen in edit mode)
+      return {};
+    }
+
+    const payload: any = {};
+    const cleanCategory = category ? category.replace(/📁/g, '').trim() : undefined;
+    const currentConcurrency = getConcurrencyLimit(concurrency);
+    const businessHoursObj = parseBusinessHours(businessHours);
+    const originalBusinessHours = originalBotData.business_hours || null;
+
+    // Compare each field
+    if (botName.trim() !== (originalBotData.bot_name || '')) {
+      payload.bot_name = botName.trim();
+    }
+
+    if (description.trim() !== (originalBotData.description || '')) {
+      payload.description = description.trim();
+    }
+
+    if (cleanCategory !== (originalBotData.category || '')) {
+      payload.category = cleanCategory;
+    }
+
+    if (tags !== (originalBotData.tags || '')) {
+      payload.tags = tags;
+    }
+
+    if (owner !== (originalBotData.owner || '')) {
+      payload.owner = owner;
+    }
+
+    const newStatus = saveAsDraft ? 'draft' : status.toLowerCase();
+    if (newStatus !== (originalBotData.status || '')) {
+      payload.status = newStatus;
+    }
+
+    if (trunk !== (originalBotData.trunk || '')) {
+      payload.trunk = trunk;
+    }
+
+    if (callerId !== (originalBotData.caller_id || '')) {
+      payload.caller_id = callerId;
+    }
+
+    if (region !== (originalBotData.region || '')) {
+      payload.region = region;
+    }
+
+    if (ttsProvider !== (originalBotData.tts_provider || '')) {
+      payload.tts_provider = ttsProvider;
+    }
+
+    if (languageCode !== (originalBotData.voice_model || '')) {
+      payload.voice_model = languageCode;
+    }
+
+    if (voice !== (originalBotData.voice_type || '')) {
+      payload.voice_type = voice;
+    }
+
+    if (greetingPrompt !== (originalBotData.greeting_prompt || '')) {
+      payload.greeting_prompt = greetingPrompt;
+    }
+
+    if (systemPrompt !== (originalBotData.system_prompt || '')) {
+      payload.system_prompt = systemPrompt;
+    }
+
+    if (currentConcurrency !== (originalBotData.concurrency_limit || 10)) {
+      payload.concurrency_limit = currentConcurrency;
+    }
+
+    if (timezone !== (originalBotData.timezone || '')) {
+      payload.timezone = timezone;
+    }
+
+    if (completeContext !== (originalBotData.complete_context ?? true)) {
+      payload.complete_context = completeContext;
+    }
+
+    if (recordingConsent !== (originalBotData.recording_consent ?? false)) {
+      payload.recording_consent = recordingConsent;
+    }
+
+    if (dncrCheck !== (originalBotData.dnc_registry_check ?? false)) {
+      payload.dnc_registry_check = dncrCheck;
+    }
+
+    if (callbackWaiting !== (originalBotData.callback_waiting ?? false)) {
+      payload.callback_waiting = callbackWaiting;
+    }
+
+    // Compare business hours (deep comparison)
+    const originalBHStr = originalBusinessHours ? JSON.stringify(originalBusinessHours) : 'null';
+    const currentBHStr = businessHoursObj ? JSON.stringify(businessHoursObj) : 'null';
+    
+    if (currentBHStr !== originalBHStr) {
+      if (businessHoursObj) {
+        payload.business_hours = businessHoursObj;
+      } else {
+        // If business hours was removed, send null
+        payload.business_hours = null;
+      }
+    }
+
+    return payload;
+  };
+
   // Handle form submission
   const handleSubmit = async (saveAsDraft: boolean = false) => {
     // Validation
@@ -183,51 +386,35 @@ const VoiceBotCreate = () => {
       return;
     }
 
-    setIsSubmitting(true);
-
-    try {
-      const businessHoursObj = parseBusinessHours(businessHours);
-      
-      // Clean category value to remove any emojis or extra characters
-      const cleanCategory = category ? category.replace(/📁/g, '').trim() : undefined;
-      
-      const payload: any = {
-        bot_name: botName.trim(),
-        description: description.trim() || undefined,
-        category: cleanCategory || undefined,
-        tags: tags || undefined,
-        owner: owner || undefined,
-        status: saveAsDraft ? 'draft' : status.toLowerCase(),
-        trunk: trunk,
-        caller_id: callerId,
-        region: region || undefined,
-        tts_provider: ttsProvider || undefined,
-        voice_model: languageCode || undefined,
-        voice_type: voice || undefined,
-        greeting_prompt: greetingPrompt || undefined,
-        system_prompt: systemPrompt || undefined,
-        concurrency_limit: getConcurrencyLimit(concurrency),
-        timezone: timezone || undefined,
-        complete_context: completeContext,
-        recording_consent: recordingConsent,
-        dnc_registry_check: dncrCheck,
-        callback_waiting: callbackWaiting,
-      };
-
-      // Only include business_hours if it's configured
-      if (businessHoursObj) {
-        payload.business_hours = businessHoursObj;
+      // Handle query parameter type (can be string or string[])
+      const botId = Array.isArray(id) ? id[0] : id;
+      if (!botId) {
+        toast.error('Bot ID is missing');
+        return;
       }
 
-      const response = await CreateVoiceBot(payload);
+      setIsSubmitting(true);
+
+      try {
+        // Get only changed fields
+        const payload = getChangedFields(saveAsDraft);
+
+        // If no fields changed, show message and return
+        if (Object.keys(payload).length === 0) {
+          toast.info('No changes detected');
+          setIsSubmitting(false);
+          return;
+        }
+
+        const response = await UpdateVoiceBot(botId, payload);
 
       if (response && response.status) {
         // Navigate back to profiles list
         router.push('/ai-ml/profiles');
       }
     } catch (error: any) {
-      console.error('Error creating voice bot:', error);
-      // Error handling is done in CreateVoiceBot function
+      console.error('Error updating voice bot:', error);
+      // Error handling is done in UpdateVoiceBot function
     } finally {
       setIsSubmitting(false);
     }
@@ -297,10 +484,10 @@ const VoiceBotCreate = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Create Voice Bot" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Edit Voice Bot" />
 
       <PageHeader
-        title="Create Voice Bot"
+        title="Edit Voice Bot"
         showSearch={false}
       />
 
@@ -1183,7 +1370,7 @@ const VoiceBotCreate = () => {
             }
           }}
         >
-          {isSubmitting ? 'Saving...' : 'Save & Continue'}
+          {isSubmitting ? 'Updating...' : 'Update & Continue'}
         </button>
       </div>
     </div>
@@ -1256,8 +1443,8 @@ const VoiceBotCreate = () => {
   );
 };
 
-VoiceBotCreate.getLayout = (page: ReactElement) => {
+VoiceBotEdit.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default VoiceBotCreate;
+export default VoiceBotEdit;

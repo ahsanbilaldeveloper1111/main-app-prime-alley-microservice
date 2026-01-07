@@ -1,19 +1,22 @@
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
+  useState,
+  useEffect,
+  useCallback
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
+import { ListVoiceBots, DeleteVoiceBot } from "@utils/aiml";
+import { toast } from "react-toastify";
+import ConfirmModal from "@pages/partial/ConfirmModal";
 
-import { useState } from 'react';
-
-import { Container, Row, Col } from 'react-bootstrap';
+import { Row, Col } from 'react-bootstrap';
 import {
   Search,
   Plus,
@@ -21,7 +24,6 @@ import {
   BarChart3,
   Pause,
   Play,
-  Filter,
   Bot,
   Calendar,
   Phone,
@@ -30,13 +32,8 @@ import {
   XCircle,
   Clock,
   MoreVertical,
-  Settings,
-  HelpCircle,
-  User,
-  Home
+  Trash2
 } from 'lucide-react';
-import CampaignListingPage from '@components/campaign-listing';
-import VoiceBotCreation from './voicebot-create';
 import { useRouter } from 'next/router';
 
 interface Bot {
@@ -47,7 +44,7 @@ interface Bot {
   languageFlag: string;
   callerId: string;
   trunkId: string;
-  status: 'Active' | 'Inactive' | 'Paused';
+  status: 'Active' | 'Inactive' | 'Paused' | 'active' | 'inactive' | 'paused' | 'draft' | 'testing';
 }
 
 interface Campaign {
@@ -69,77 +66,138 @@ const AIMLProfiles = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [trunkFilter, setTrunkFilter] = useState<string>('all');
   const [expandedActions, setExpandedActions] = useState<number | null>(null);
+  const [bots, setBots] = useState<Bot[]>([]);
+  const [isLoadingBots, setIsLoadingBots] = useState<boolean>(false);
+  const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [selectedBotForDelete, setSelectedBotForDelete] = useState<Bot | null>(null);
 
-  const [bots, setBots] = useState<Bot[]>([
-    {
-      id: 1,
-      name: 'Support Bot',
-      description: 'Handles support inquiries',
-      language: 'English',
-      languageFlag: '🇺🇸',
-      callerId: '+12223334455',
-      trunkId: 'SipCom-01',
-      status: 'Active'
-    },
-    {
-      id: 2,
-      name: 'Sales Bot',
-      description: 'Sales inquiry chatbot',
-      language: 'Spanish',
-      languageFlag: '🇪🇸',
-      callerId: '+34444555666',
-      trunkId: 'SipCom-01',
-      status: 'Active'
-    },
-    {
-      id: 3,
-      name: 'Assistant Bot',
-      description: 'General assistant bot',
-      language: 'French',
-      languageFlag: '🇫🇷',
-      callerId: '+551122336644',
-      trunkId: 'SipCom-02',
-      status: 'Active'
+  // Normalize bot data from API to match Bot interface
+  const normalizeBot = (bot: any): Bot => {
+    // Map API status to display status
+    const normalizeStatus = (status: string): 'Active' | 'Inactive' | 'Paused' => {
+      const lowerStatus = status?.toLowerCase() || '';
+      if (lowerStatus === 'active') return 'Active';
+      if (lowerStatus === 'paused') return 'Paused';
+      if (lowerStatus === 'inactive') return 'Inactive';
+      return 'Inactive';
+    };
+
+    // Extract language from voice_model or region, default to English
+    const extractLanguage = (voiceModel?: string, region?: string): string => {
+      if (voiceModel) {
+        // Extract language code from voice model (e.g., "en-US-Wavenet-G" -> "English")
+        const langCode = voiceModel.split('-')[0]?.toLowerCase();
+        const languageMap: Record<string, string> = {
+          'en': 'English',
+          'es': 'Spanish',
+          'fr': 'French',
+          'de': 'German',
+          'it': 'Italian',
+          'pt': 'Portuguese',
+          'zh': 'Chinese',
+          'ja': 'Japanese',
+          'ko': 'Korean'
+        };
+        return languageMap[langCode] || 'English';
+      }
+      return 'English';
+    };
+
+    // Get language flag emoji
+    const getLanguageFlag = (language: string): string => {
+      const flagMap: Record<string, string> = {
+        'English': '🇺🇸',
+        'Spanish': '🇪🇸',
+        'French': '🇫🇷',
+        'German': '🇩🇪',
+        'Italian': '🇮🇹',
+        'Portuguese': '🇵🇹',
+        'Chinese': '🇨🇳',
+        'Japanese': '🇯🇵',
+        'Korean': '🇰🇷'
+      };
+      return flagMap[language] || '🇺🇸';
+    };
+
+    const language = extractLanguage(bot.voice_model, bot.region);
+
+    return {
+      id: bot.id || 0,
+      name: bot.bot_name || bot.name || 'Unnamed Bot',
+      description: bot.description || '',
+      language: language,
+      languageFlag: getLanguageFlag(language),
+      callerId: bot.caller_id || bot.callerId || '',
+      trunkId: bot.trunk || bot.trunkId || '',
+      status: normalizeStatus(bot.status)
+    };
+  };
+
+  // Fetch voice bots from API
+  const fetchVoiceBots = useCallback(async () => {
+    setIsLoadingBots(true);
+    try {
+      const response = await ListVoiceBots();
+      // Handle nested structure: response.results.data
+      const botsData = response?.results?.data || response?.bots || response?.data || [];
+      const normalizedBots = botsData.map(normalizeBot);
+      setBots(normalizedBots);
+    } catch (error) {
+      console.error('Error fetching voice bots:', error);
+      toast.error('Failed to fetch voice bots');
+      setBots([]);
+    } finally {
+      setIsLoadingBots(false);
     }
-  ]);
+  }, []);
 
-  const [campaigns] = useState<Campaign[]>([
-    {
-      id: 1,
-      name: 'Summer Promotion',
-      description: 'Summer sales campaign',
-      startDate: '2024-06-01',
-      endDate: '2024-08-31',
-      status: 'Active',
-      botsCount: 5
-    },
-    {
-      id: 2,
-      name: 'Customer Feedback',
-      description: 'Collecting customer feedback',
-      startDate: '2024-05-15',
-      endDate: '2024-07-15',
-      status: 'Active',
-      botsCount: 3
-    },
-    {
-      id: 3,
-      name: 'Holiday Campaign',
-      description: 'End of year holiday campaign',
-      startDate: '2024-12-01',
-      endDate: '2024-12-31',
-      status: 'Scheduled',
-      botsCount: 8
-    }
-  ]);
+  // Load bots on mount and refresh
+  useEffect(() => {
+    fetchVoiceBots();
+  }, [fetchVoiceBots, refreshKey]);
 
-  const handlePauseBot = (id: number) => {
+
+  const handlePauseBot = async (id: number) => {
+    // TODO: Implement API call to pause/resume bot when endpoint is available
+    // For now, update local state
     setBots(bots.map(bot => 
       bot.id === id 
         ? { ...bot, status: bot.status === 'Active' ? 'Paused' : 'Active' } 
         : bot
     ));
+    // Refresh the list after update
+    setRefreshKey(prev => prev + 1);
   };
+
+  const handleEditBot = (bot: Bot) => {
+    router.push(`/ai-ml/profiles/voicebot-edit?id=${bot.id}`);
+  };
+
+  const handleDeleteBot = (bot: Bot) => {
+    setSelectedBotForDelete(bot);
+    setShowDeleteModal(true);
+    setExpandedActions(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedBotForDelete) return;
+
+    try {
+      await DeleteVoiceBot(selectedBotForDelete.id);
+      setShowDeleteModal(false);
+      setSelectedBotForDelete(null);
+      // Refresh the list after deletion
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Error deleting bot:', error);
+      // Error handling is done in DeleteVoiceBot function
+    }
+  };
+
+  // Get unique values for filters
+  const uniqueLanguages = Array.from(new Set(bots.map(bot => bot.language))).sort((a, b) => a.localeCompare(b));
+  const uniqueTrunks = Array.from(new Set(bots.map(bot => bot.trunkId).filter(Boolean))).sort((a, b) => a.localeCompare(b));
 
   const filteredBots = bots.filter(bot => {
     const matchesSearch = bot.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -151,17 +209,7 @@ const AIMLProfiles = () => {
     return matchesSearch && matchesLanguage && matchesStatus && matchesTrunk;
   });
 
-  const getStatusVariant = (status: string): string => {
-    switch (status) {
-      case 'Active': return 'success';
-      case 'Paused': return 'warning';
-      case 'Inactive': return 'secondary';
-      case 'Completed': return 'info';
-      case 'Scheduled': return 'primary';
-      default: return 'secondary';
-    }
-  };
-const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case 'Active': return <CheckCircle size={14} />;
       case 'Paused': return <Clock size={14} />;
@@ -261,9 +309,9 @@ const getStatusIcon = (status: string) => {
                     }}
                   >
                     <option value="all">All Languages</option>
-                    <option value="English">English</option>
-                    <option value="Spanish">Spanish</option>
-                    <option value="French">French</option>
+                    {uniqueLanguages.map(lang => (
+                      <option key={lang} value={lang}>{lang}</option>
+                    ))}
                   </select>
                 </Col>
   
@@ -321,8 +369,9 @@ const getStatusIcon = (status: string) => {
                     }}
                   >
                     <option value="all">All Trunks</option>
-                    <option value="SipCom-01">SipCom-01</option>
-                    <option value="SipCom-02">SipCom-02</option>
+                    {uniqueTrunks.map(trunk => (
+                      <option key={trunk} value={trunk}>{trunk}</option>
+                    ))}
                   </select>
                 </Col>
   
@@ -434,7 +483,10 @@ const getStatusIcon = (status: string) => {
                               minWidth: '180px'
                             }}>
                               <div
-                                onClick={() => setExpandedActions(null)}
+                                onClick={() => {
+                                  handleEditBot(bot);
+                                  setExpandedActions(null);
+                                }}
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
@@ -452,7 +504,8 @@ const getStatusIcon = (status: string) => {
                                 <Edit size={16} />
                                 Edit Bot
                               </div>
-                              <div
+                              
+                              {/* <div
                                 onClick={() => setExpandedActions(null)}
                                 style={{
                                   display: 'flex',
@@ -500,6 +553,27 @@ const getStatusIcon = (status: string) => {
                                     Resume Bot
                                   </>
                                 )}
+                              </div> */}
+                             
+                              <div
+                                onClick={() => {
+                                  handleDeleteBot(bot);
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  padding: '10px 16px',
+                                  fontSize: '14px',
+                                  color: '#dc2626',
+                                  cursor: 'pointer',
+                                  transition: 'background-color 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fef2f2'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                              >
+                                <Trash2 size={16} />
+                                Delete Bot
                               </div>
                             </div>
                           )}
@@ -510,7 +584,14 @@ const getStatusIcon = (status: string) => {
                 </table>
               </div>
   
-              {filteredBots.length === 0 && (
+              {isLoadingBots && (
+                <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                  <Bot size={48} color="#d1d5db" style={{ marginBottom: '16px' }} />
+                  <p style={{ fontSize: '16px', color: '#6b7280', margin: 0 }}>Loading voice bots...</p>
+                </div>
+              )}
+
+              {!isLoadingBots && filteredBots.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '60px 20px' }}>
                   <Bot size={48} color="#d1d5db" style={{ marginBottom: '16px' }} />
                   <p style={{ fontSize: '16px', color: '#6b7280', margin: 0 }}>No bots found matching your criteria</p>
@@ -518,6 +599,27 @@ const getStatusIcon = (status: string) => {
               )}
             </div>
           </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setSelectedBotForDelete(null);
+        }}
+        title="Delete Voice Bot"
+        description={`Are you sure you want to delete the voice bot "${selectedBotForDelete?.name}"? This action cannot be undone.`}
+        targetName={selectedBotForDelete?.name || ''}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          setShowDeleteModal(false);
+          setSelectedBotForDelete(null);
+        }}
+        confirmButtonText="Delete"
+        confirmButtonVariant="danger"
+        requireTextConfirmation={true}
+        requiredConfirmationText="delete"
+      />
 
     </React.Fragment>
   );

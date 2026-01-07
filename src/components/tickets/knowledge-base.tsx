@@ -97,7 +97,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
     };
 
     if (router.isReady) {
-      fetchTopics();
+    fetchTopics();
     }
   }, [router.isReady, router.query.topicId]);
 
@@ -280,8 +280,8 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
   // Create dynamic tabs with "All" as first tab (only when there are multiple types)
   const tabs = uniqueTypes.length > 1
     ? [
-        { id: 'all', label: 'All' },
-        ...uniqueTypes.map((type) => ({ id: type.toLowerCase().replaceAll(/\s+/g, '-'), label: type }))
+    { id: 'all', label: 'All' },
+    ...uniqueTypes.map((type) => ({ id: type.toLowerCase().replaceAll(/\s+/g, '-'), label: type }))
       ]
     : uniqueTypes.map((type) => ({ id: type.toLowerCase().replaceAll(/\s+/g, '-'), label: type }));
 

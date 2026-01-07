@@ -552,3 +552,126 @@ export const GetImagicalTranscriptions = async (params: any = {}) => {
     throw error;
   }
 };
+
+export const CreateVoiceBot = async (payload: any) => {
+  try {
+    const response = await axiosInstance.post('aiml/create-voice-bot', payload);
+
+    if(response.data){
+      const responseData = response.data;
+      if (responseData.status) {
+        toast.success(responseData.message || 'Voice bot created successfully');
+        return responseData;
+      } else {
+        toast.error(responseData.error || 'Failed to create voice bot');
+        return false;
+      }
+    } else {
+      toast.error('Failed to create voice bot');
+      return false;
+    }
+  } catch (error: any) {
+    console.error('CreateVoiceBot error:', error);
+    const errorMessage = error.response?.data?.error || error.message || 'Failed to create voice bot';
+    toast.error(errorMessage);
+    throw error;
+  }
+};
+
+export const ListVoiceBots = async () => {
+  try {
+    const response = await axiosInstance.get('aiml/list-voice-bots');
+
+    if(response.data){
+      const responseData = response.data;
+      // Handle nested structure: response.results.data
+      if (responseData.results && responseData.results.data) {
+        return responseData;
+      }
+      // Fallback for different response structures
+      return responseData;
+    } else {
+      toast.error('Failed to get voice bots');
+      return { results: { data: [] } };
+    }
+  } catch (error: any) {
+    console.error('ListVoiceBots error:', error);
+    const errorMessage = error.response?.data?.error || error.message || 'Failed to get voice bots';
+    toast.error(errorMessage);
+    return { results: { data: [] } };
+  }
+};
+
+export const GetVoiceBotById = async (id: number | string) => {
+  try {
+    const response = await axiosInstance.get(`aiml/get-voice-bot-by-id/${id}`);
+
+    if(response.data){
+      const responseData = response.data;
+      if (responseData.status) {
+        return responseData.data;
+      } else {
+        toast.error(responseData.error || 'Failed to get voice bot');
+        return null;
+      }
+    } else {
+      toast.error('Failed to get voice bot');
+      return null;
+    }
+  } catch (error: any) {
+    console.error('GetVoiceBotById error:', error);
+    const errorMessage = error.response?.data?.error || error.message || 'Failed to get voice bot';
+    toast.error(errorMessage);
+    return null;
+  }
+};
+
+export const UpdateVoiceBot = async (id: number | string, payload: any) => {
+  try {
+    const response = await axiosInstance.post(`aiml/update-voice-bot/${id}`, payload);
+
+    if(response.data){
+      const responseData = response.data;
+      if (responseData.status) {
+        toast.success(responseData.message || 'Voice bot updated successfully');
+        return responseData;
+      } else {
+        toast.error(responseData.error || 'Failed to update voice bot');
+        return false;
+      }
+    } else {
+      toast.error('Failed to update voice bot');
+      return false;
+    }
+  } catch (error: any) {
+    console.error('UpdateVoiceBot error:', error);
+    const errorMessage = error.response?.data?.error || error.message || 'Failed to update voice bot';
+    toast.error(errorMessage);
+    throw error;
+  }
+};
+
+export const DeleteVoiceBot = async (id: number | string) => {
+  try {
+    const response = await axiosInstance.post(`aiml/delete-voice-bot/${id}`);
+
+    if(response.data){
+      const responseData = response.data;
+      if (responseData.status) {
+        toast.success(responseData.message || 'Voice bot deleted successfully');
+        return responseData;
+      } else {
+        toast.error(responseData.error || 'Failed to delete voice bot');
+        return false;
+      }
+    } else {
+      toast.error('Failed to delete voice bot');
+      return false;
+    }
+  } catch (error: any) {
+    console.error('DeleteVoiceBot error:', error);
+    const errorMessage = error.response?.data?.error || error.message || 'Failed to delete voice bot';
+    toast.error(errorMessage);
+    throw error;
+  }
+};

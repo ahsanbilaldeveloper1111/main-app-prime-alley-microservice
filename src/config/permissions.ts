@@ -97,6 +97,14 @@ export const routePermissions: RoutePermission[] = [
                 path: '/uptime-sla',
                 permissions: [PERMISSIONS.VIEW_NETOPS_UPTIME_SLA]
             },
+            {
+                path: '/select-server',
+                permissions: [PERMISSIONS.NETOPS_SERVICES]
+            },
+            {
+                path: '/application-monitoring',
+                permissions: [PERMISSIONS.NETOPS_SERVICES]
+            },
         ]
     },
      
