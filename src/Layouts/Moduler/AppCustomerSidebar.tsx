@@ -421,6 +421,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <FileText size={16} />,
           permission: PERMISSIONS.TMS_SERVICES,
           url: '/tms/audit-logs'
+        },
+        {
+          id: 'live-calls-campaigns-management',
+          title: 'Campaigns Management',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/live-calls/management/campaigns'
+        },
+        {
+          id: 'live-calls-agent-management',
+          title: 'Agent Management',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/live-calls/management/agents'
         }
       ]
       .filter(item => !item.permission || hasPermission(item.permission))

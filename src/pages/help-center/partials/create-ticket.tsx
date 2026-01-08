@@ -1,96 +1,70 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Row, Col, Card, Form, Button, Badge } from 'react-bootstrap';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Row, Col, Card, Form, Button } from 'react-bootstrap';
 import {
-  ChevronLeft,
-  Bold,
-  Italic,
-  Underline,
-  List,
-  ListOrdered,
-  AlignLeft,
-  AlignCenter,
-  Code,
-  MoreHorizontal,
   Paperclip,
-  Plus,
-  RotateCcw,
-  Phone,
   CheckCircle2,
   ChevronRight,
+  X,
   FileQuestion,
-  Clock,
-  X
+  Phone,
+  Plus,
+  RotateCcw,
+  Eye,
+  Trash2
 } from 'lucide-react';
-import { CreateTicket as CreateTicketAPI } from '@utils/tickets';
-import { GetAllModules, GetAllSubmodules, GetAllSubmoduleChildren } from '@utils/ticket-module';
+import { CreateUserTicket } from '@utils/tickets';
+import { GetAllModules } from '@utils/ticket-module';
 import { GetAllStatuses } from '@utils/ticket-statuses';
 import { GetAllTypes } from '@utils/ticket-types';
-import { GetHierarchyData } from '@utils/users';
-import { ModuleSlug } from '@utils/Helper';
-import { useSession } from 'next-auth/react';
 import { toast } from 'react-toastify';
-import moment from 'moment';
-import Select from 'react-select';
-import CreatableSelect from 'react-select/creatable';
+import RichTextEditor from './RichTextEditor';
 
 interface CreateTicketProps {
   onBack: () => void;
 }
 
 const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
-  const { data: session } = useSession();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Form state
-  const [newTicketTitle, setNewTicketTitle] = useState<string>("");
-  const [newTicketDescription, setNewTicketDescription] = useState<string>("");
+  const [category, setCategory] = useState<string>("");
+  const [subject, setSubject] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
+  const [descriptionHTML, setDescriptionHTML] = useState<string>("");
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [currentStep, setCurrentStep] = useState<number>(1);
+  
+  // Legacy state for API compatibility
   const [newTicketType, setNewTicketType] = useState<string>("");
   const [newTicketStatus, setNewTicketStatus] = useState<string>("");
   const [newTicketModule, setNewTicketModule] = useState<string>("");
-  const [newTicketSubmodule, setNewTicketSubmodule] = useState<string>("");
-  const [newTicketSubmoduleChild, setNewTicketSubmoduleChild] = useState<string>("");
+  const [newTicketSubmodule] = useState<string>("");
+  const [newTicketSubmoduleChild] = useState<string>("");
   const [newTicketPriority, setNewTicketPriority] = useState<string>("");
-  const [newTicketDueDate, setNewTicketDueDate] = useState<string>("");
-  const [newTicketUserExtension, setNewTicketUserExtension] = useState<string[]>([]);
-  const [newTicketImages, setNewTicketImages] = useState<File[]>([]);
-  const [newTicketTags, setNewTicketTags] = useState<string[]>([]);
   
   // Data state
   const [modules, setModules] = useState<any[]>([]);
   const [types, setTypes] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
-  const [submodules, setSubmodules] = useState<any[]>([]);
-  const [submoduleChildren, setSubmoduleChildren] = useState<any[]>([]);
-  const [extensions, setExtensions] = useState<any[]>([]);
   
   // UI state
   const [creatingTicket, setCreatingTicket] = useState<boolean>(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submittedTicketId, setSubmittedTicketId] = useState('');
-  
-  // Default tags suggestions
-  const defaultTags = [
-    "urgent",
-    "bug",
-    "feature",
-    "enhancement",
-    "documentation"
-  ];
 
   // Fetch initial data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [modulesData, typesData, statusesData, hierarchyData] = await Promise.all([
+        const [modulesData, typesData, statusesData] = await Promise.all([
           GetAllModules(),
           GetAllTypes(),
-          GetAllStatuses(),
-          GetHierarchyData(ModuleSlug.TICKET)
+          GetAllStatuses()
         ]);
         
         setModules(modulesData || []);
         setTypes(typesData || []);
         setStatuses(statusesData || []);
-        setExtensions(hierarchyData?.extensions || []);
       } catch (error) {
         console.error('Error fetching data:', error);
       }
@@ -99,43 +73,214 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
     fetchData();
   }, []);
 
-  // Fetch submodules when module changes
-  const fetchSubmodules = useCallback(async (moduleId: string) => {
-    if (moduleId) {
-      try {
-        const submoduleData = await GetAllSubmodules();
-        const filteredSubmodules = submoduleData?.filter((sub: any) => sub.module_id == moduleId) || [];
-        setSubmodules(filteredSubmodules);
-        setNewTicketSubmodule("");
-        setNewTicketSubmoduleChild("");
-        setSubmoduleChildren([]);
-      } catch (error) {
-        console.error("Error fetching submodules:", error);
-      }
-    } else {
-      setSubmodules([]);
-      setNewTicketSubmodule("");
-      setNewTicketSubmoduleChild("");
-      setSubmoduleChildren([]);
-    }
-  }, []);
 
-  // Fetch submodule children when submodule changes
-  const fetchSubmoduleChildren = useCallback(async (submoduleId: string) => {
-    if (submoduleId) {
-      try {
-        const childrenData = await GetAllSubmoduleChildren();
-        const filteredChildren = childrenData?.filter((child: any) => child.submodule_id == submoduleId) || [];
-        setSubmoduleChildren(filteredChildren);
-        setNewTicketSubmoduleChild("");
-      } catch (error) {
-        console.error("Error fetching submodule children:", error);
-      }
-    } else {
-      setSubmoduleChildren([]);
-      setNewTicketSubmoduleChild("");
+  // Handle file upload
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const fileArray = Array.from(files);
+    const maxFiles = 3;
+    const maxSize = 1 * 1024 * 1024; // 1MB
+
+    if (attachedFiles.length + fileArray.length > maxFiles) {
+      toast.error(`Maximum ${maxFiles} files allowed`);
+      return;
     }
-  }, []);
+
+    const validFiles: File[] = [];
+    for (const file of fileArray) {
+      if (file.size > maxSize) {
+        toast.error(`${file.name} exceeds 1MB limit`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    setAttachedFiles([...attachedFiles, ...validFiles]);
+    
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Remove file
+  const removeFile = (index: number) => {
+    setAttachedFiles(attachedFiles.filter((_, i) => i !== index));
+  };
+
+  const handleEditorChange = (html: string, text: string) => {
+    setDescriptionHTML(html);
+    setDescription(text);
+  };
+
+  const stripHTML = (html: string): string => {
+    const tmp = document.createElement('DIV');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  };
+
+  const handleSubmit = useCallback(async () => {
+    // Validation
+    if (!category) {
+      toast.error("Please select a category");
+      return;
+    }
+    if (!subject?.trim() || subject?.trim()?.length < 5) {
+      toast.error("Please enter a subject (Min: 5 chars)");
+      return;
+    }
+    // Get plain text from HTML for validation
+    const plainText = descriptionHTML ? stripHTML(descriptionHTML) : description;
+    if (plainText.length < 50 || plainText.length > 500) {
+      toast.error("Description must be between 50 and 500 characters");
+      return;
+    }
+
+    // Validate files
+    if (attachedFiles && attachedFiles.length > 0) {
+      const maxSize = 1 * 1024 * 1024; // 1 MB
+      for (let i = 0; i < attachedFiles.length; i++) {
+        const file = attachedFiles[i];
+        if (file.size > maxSize) {
+          toast.error(`File ${i + 1} size must be less than 1MB`);
+          return;
+        }
+      }
+    }
+
+    // Get ticket type ID from category
+    const typeId = category || newTicketType || (types.length > 0 ? types[0].id : '');
+    
+    // Convert priority to number (0=low, 1=medium, 2=high, 4=critical)
+    const priority = Number.parseInt(newTicketPriority || "0", 10);
+
+    // Use HTML description if available, otherwise use plain text
+    const ticketDescription = descriptionHTML || description;
+
+    setCreatingTicket(true);
+    try {
+      const response: any = await CreateUserTicket(
+        subject,
+        ticketDescription,
+        Number.parseInt(typeId.toString(), 10),
+        priority,
+        attachedFiles.length > 0 ? attachedFiles : undefined
+      );
+      
+      if (response && (response.id || response.ticket_id)) {
+        const ticketId = response.id || response.ticket_id;
+        setSubmittedTicketId(ticketId.toString());
+        setIsSubmitted(true);
+        toast.success("Ticket created successfully!");
+      } else {
+        toast.error("Failed to create ticket");
+      }
+    } catch (error: any) {
+      console.error("Error creating ticket:", error);
+      toast.error(error?.response?.data?.message || "Failed to create ticket");
+    } finally {
+      setCreatingTicket(false);
+    }
+  }, [
+    category,
+    subject,
+    description,
+    descriptionHTML,
+    attachedFiles,
+    newTicketType,
+    newTicketPriority,
+    types
+  ]);
+
+  const steps = [
+    { number: 1, label: 'Describe Issue' },
+    { number: 2, label: 'Select Priority' },
+    { number: 3, label: 'Review' }
+  ];
+
+  if (isSubmitted) {
+    return (
+      <div style={{ background: '#f4f7fa', minHeight: '100vh', padding: '40px 20px' }}>
+        <Card style={{
+          background: '#fff',
+          border: '1px solid #e9ecef',
+          borderRadius: '8px',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+          textAlign: 'center',
+          padding: '60px 40px',
+          maxWidth: '600px',
+          margin: '0 auto'
+        }}>
+          <div style={{
+            width: '80px',
+            height: '80px',
+            borderRadius: '50%',
+            background: '#1de9b6',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 24px'
+          }}>
+            <CheckCircle2 size={40} color="#fff" strokeWidth={2.5} />
+          </div>
+
+          <h2 style={{
+            fontSize: '28px',
+            fontWeight: '700',
+            color: '#2c3e50',
+            marginBottom: '16px'
+          }}>
+            Ticket Submitted!
+          </h2>
+
+          <p style={{
+            fontSize: '16px',
+            color: '#495057',
+            marginBottom: '40px'
+          }}>
+            Your ticket <span style={{ color: '#4680ff', fontWeight: '600' }}>{submittedTicketId}</span> has been successfully created.
+          </p>
+
+          <Button
+            onClick={onBack}
+            style={{
+              background: '#4680ff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '12px 32px',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            View My Tickets
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  const helpSuggestions = [
+    {
+      title: 'Setting Up Two-Factor Authentication',
+      description: 'Read step-by-step guide',
+      icon: CheckCircle2,
+      color: '#4680ff'
+    },
+    {
+      title: 'Troubleshooting 2FA Issues',
+      description: 'Explore common solutions',
+      icon: FileQuestion,
+      color: '#04a9f5'
+    }
+  ];
+
+  const frequentTopics = [
+    'Setting Up Two-Factor Authentication',
+    'How do I change my billing plan?',
+    "Can't find your answer?"
+  ];
 
   const suggestedArticles = [
     {
@@ -161,354 +306,13 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
     }
   ];
 
-  const helpSuggestions = [
-    {
-      title: 'Setting Up Two-Factor Authentication',
-      description: 'Read step-by-step guide',
-      icon: CheckCircle2,
-      color: '#4680ff'
-    },
-    {
-      title: 'Troubleshooting 2FA Issues',
-      description: 'Explore common solutions',
-      icon: FileQuestion,
-      color: '#04a9f5'
-    }
-  ];
-
-  const frequentTopics = [
-    'Setting Up Two-Factor Authentication',
-    'How do I change my billing plan?',
-    "Can't find your answer?"
-  ];
-
-  const handleSubmit = useCallback(async () => {
-    // Validation
-    if (!newTicketTitle?.trim() || newTicketTitle?.trim()?.length < 5) {
-      toast.error("Please enter a ticket title (Min: 5 chars)");
-      return;
-    }
-    if (!newTicketType) {
-      toast.error("Please select a ticket type");
-      return;
-    }
-    if (newTicketDescription.length < 50 || newTicketDescription.length > 500) {
-      toast.error("Ticket description must be between 50 and 500 characters");
-      return;
-    }
-    if (!newTicketStatus) {
-      toast.error("Please select a ticket status");
-      return;
-    }
-    if (!newTicketModule) {
-      toast.error("Please select a ticket module");
-      return;
-    }
-    if (!newTicketSubmodule) {
-      toast.error("Please select a ticket primary issue");
-      return;
-    }
-    if (!newTicketPriority) {
-      toast.error("Please select a ticket priority");
-      return;
-    }
-
-    // Validate images
-    if (newTicketImages && newTicketImages.length > 0) {
-      const maxSize = 5 * 1024 * 1024; // 5 MB
-      for (let i = 0; i < newTicketImages.length; i++) {
-        const image = newTicketImages[i];
-        if (!image.type?.includes("image/")) {
-          toast.error(`Attachment ${i + 1} must be an image (jpeg, png, jpg, gif)`);
-          return;
-        }
-        if (image.size > maxSize) {
-          toast.error(`Attachment ${i + 1} size must be less than 5MB`);
-          return;
-        }
-      }
-    }
-
-    const formData = new FormData();
-    formData.append("title", newTicketTitle);
-    formData.append("description", newTicketDescription);
-    formData.append("ticket_type_id", newTicketType);
-    formData.append("ticket_status_id", newTicketStatus);
-    formData.append("module_id", newTicketModule);
-    if (newTicketSubmodule) {
-      formData.append("submodule_id", newTicketSubmodule);
-    }
-    if (newTicketSubmoduleChild) {
-      formData.append("submodule_child_id", newTicketSubmoduleChild);
-    }
-    formData.append("priority", newTicketPriority || "0");
-    formData.append("created_by", session?.user?.phone || "");
-    
-    if (newTicketDueDate) {
-      formData.append("due_date", newTicketDueDate);
-    }
-    
-    if (session?.user?.permissions?.includes("assign-user-tickets") && newTicketUserExtension && newTicketUserExtension.length > 0) {
-      newTicketUserExtension.forEach((ext) => {
-        formData.append("user_extension[]", ext);
-      });
-    }
-    
-    if (newTicketTags && newTicketTags.length > 0) {
-      newTicketTags.forEach((tag) => {
-        formData.append("tags[]", tag);
-      });
-    }
-    
-    if (newTicketImages && newTicketImages.length > 0) {
-      newTicketImages.forEach((image) => {
-        formData.append("image[]", image);
-      });
-    }
-
-    setCreatingTicket(true);
-    let response = null;
-    try {
-      response = await CreateTicketAPI(formData);
-    } catch (error) {
-      toast.error("Failed to create ticket");
-      console.error("Create ticket error:", error);
-    } finally {
-      setCreatingTicket(false);
-    }
-    
-    if (response) {
-      // Generate a ticket ID for display
-      const ticketId = '#' + Math.floor(100000 + Math.random() * 900000);
-      setSubmittedTicketId(ticketId);
-      setIsSubmitted(true);
-      
-      // Reset form
-      setNewTicketTitle("");
-      setNewTicketDescription("");
-      setNewTicketType("");
-      setNewTicketStatus("");
-      setNewTicketModule("");
-      setNewTicketSubmodule("");
-      setNewTicketSubmoduleChild("");
-      setNewTicketPriority("");
-      setNewTicketDueDate("");
-      setNewTicketUserExtension([]);
-      setNewTicketTags([]);
-      setNewTicketImages([]);
-      setSubmodules([]);
-      setSubmoduleChildren([]);
-    }
-  }, [
-    newTicketTitle,
-    newTicketDescription,
-    newTicketType,
-    newTicketStatus,
-    newTicketModule,
-    newTicketSubmodule,
-    newTicketSubmoduleChild,
-    newTicketPriority,
-    newTicketDueDate,
-    newTicketUserExtension,
-    newTicketTags,
-    newTicketImages,
-    session?.user?.phone,
-    session?.user?.permissions
-  ]);
-
   return (
-    <div style={{ background: '#f4f7fa', minHeight: '100vh', paddingBottom: '40px' }}>
-      {/* Breadcrumb */}
-      <div style={{ marginBottom: '20px' }}>
-        <Button
-          variant="link"
-          onClick={onBack}
-          style={{
-            textDecoration: 'none',
-            color: '#6c757d',
-            fontSize: '14px',
-            padding: 0,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '5px'
-          }}
-        >
-          <ChevronLeft size={16} /> Help Center
-        </Button>
-        <span style={{ color: '#6c757d', margin: '0 8px' }}>›</span>
-        <span 
-          onClick={onBack}
-          style={{ color: '#6c757d', fontSize: '14px', cursor: 'pointer' }}
-        >
-          My Tickets
-        </span>
-        <span style={{ color: '#6c757d', margin: '0 8px' }}>›</span>
-        <span style={{ color: '#2c3e50', fontWeight: '600', fontSize: '14px' }}>
-          Create Ticket
-        </span>
-      </div>
-      <Row className="g-3">
-        {/* Main Content: Form or Success Message */}
-        <Col xs={12} lg={8}>
-          {isSubmitted ? (
-            <Card style={{
-              background: '#fff',
-              border: '1px solid #e9ecef',
-              borderRadius: '8px',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-              textAlign: 'center',
-              padding: '60px 40px'
-            }}>
-              <div style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '50%',
-                background: '#1de9b6',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 24px'
-              }}>
-                <CheckCircle2 size={40} color="#fff" strokeWidth={2.5} />
-              </div>
-
-              <h2 style={{
-                fontSize: '28px',
-                fontWeight: '700',
-                color: '#2c3e50',
-                marginBottom: '16px'
-              }}>
-                Ticket Submitted!
-              </h2>
-
-              <p style={{
-                fontSize: '16px',
-                color: '#495057',
-                marginBottom: '8px'
-              }}>
-                Your ticket <span style={{ color: '#4680ff', fontWeight: '600' }}>{submittedTicketId}</span> has been successfully created.
-              </p>
-
-              <p style={{
-                fontSize: '15px',
-                color: '#6c757d',
-                marginBottom: '40px'
-              }}>
-                Our support team will get back to you shortly.
-              </p>
-
-              {/* Expected Response Time Card */}
-              <Card style={{
-                background: '#f8f9fa',
-                border: '1px solid #e9ecef',
-                borderRadius: '8px',
-                padding: '24px',
-                marginBottom: '32px',
-                textAlign: 'left'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '16px'
-                }}>
-                  <div style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '8px',
-                    background: '#f4c22b',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Clock size={24} color="#fff" />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <h5 style={{
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      color: '#2c3e50',
-                      marginBottom: '8px'
-                    }}>
-                      Expected Response Time
-                    </h5>
-                    <p style={{
-                      fontSize: '15px',
-                      color: '#495057',
-                      marginBottom: '8px'
-                    }}>
-                      Within <Badge bg="secondary" style={{ fontSize: '11px', fontWeight: '500' }}>1 business day</Badge>
-                    </p>
-                    <p style={{
-                      fontSize: '13px',
-                      color: '#6c757d',
-                      marginBottom: 0
-                    }}>
-                      Standard Support: Mon-Fri, 9 AM - 5 PM
-                    </p>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Action Buttons */}
-              <div style={{
-                display: 'flex',
-                gap: '12px',
-                justifyContent: 'center',
-                flexWrap: 'wrap'
-              }}>
-                <Button
-                  onClick={onBack}
-                  style={{
-                    background: '#4680ff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    padding: '12px 32px',
-                    fontSize: '14px',
-                    fontWeight: '500'
-                  }}
-                >
-                  View My Tickets
-                </Button>
-                <Button
-                  variant="outline-secondary"
-                  onClick={() => {
-                    setIsSubmitted(false);
-                    setNewTicketTitle("");
-                    setNewTicketDescription("");
-                    setNewTicketType("");
-                    setNewTicketStatus("");
-                    setNewTicketModule("");
-                    setNewTicketSubmodule("");
-                    setNewTicketSubmoduleChild("");
-                    setNewTicketPriority("");
-                    setNewTicketDueDate("");
-                    setNewTicketUserExtension([]);
-                    setNewTicketTags([]);
-                    setNewTicketImages([]);
-                    setSubmodules([]);
-                    setSubmoduleChildren([]);
-                    setSubmittedTicketId('');
-                    // Reset file input
-                    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-                    if (fileInput) {
-                      fileInput.value = "";
-                    }
-                  }}
-                  style={{
-                    borderRadius: '6px',
-                    padding: '12px 32px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    border: '1px solid #dee2e6',
-                    color: '#495057'
-                  }}
-                >
-                  Create Another Ticket
-                </Button>
-              </div>
-            </Card>
-          ) : (
+    <div >
+      <div >
+        <Row className="g-3">
+          {/* Main Content - Left Column */}
+          <Col xs={12} lg={8}>
+            {/* Form Card */}
             <Card style={{
               background: '#fff',
               border: '1px solid #e9ecef',
@@ -517,613 +321,593 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
             }}>
               <Card.Body style={{ padding: '32px' }}>
                 {/* Header */}
-                <div style={{ marginBottom: '24px' }}>
-                  <h2 style={{
-                    fontSize: '28px',
+                <div style={{ marginBottom: '32px' }}>
+                  <h1 style={{
+                    fontSize: '32px',
                     fontWeight: '700',
                     color: '#2c3e50',
                     marginBottom: '8px'
                   }}>
                     Create Ticket
-                  </h2>
+                  </h1>
                   <p style={{
-                    fontSize: '15px',
+                    fontSize: '16px',
                     color: '#6c757d',
                     marginBottom: '24px'
                   }}>
                     Tell us how we can assist you
                   </p>
 
-                </div>
-
-                {/* Title */}
-                <div style={{ marginBottom: '24px' }}>
-                  <Form.Label style={{
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    marginBottom: '8px'
-                  }}>
-                    Ticket Title <span style={{ color: '#dc3545' }}>*</span>
-                  </Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="Enter a brief summary of the issue..."
-                    value={newTicketTitle}
-                    onChange={(e) => setNewTicketTitle(e.target.value)}
-                    style={{
-                      fontSize: '14px',
-                      padding: '10px 14px',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '6px'
-                    }}
-                  />
-                  <Form.Text style={{ fontSize: '12px', color: '#6c757d' }}>
-                    Minimum 5 characters required
-                  </Form.Text>
-                </div>
-
-                {/* Type and Priority Row */}
-                <Row className="g-3" style={{ marginBottom: '24px' }}>
-                  <Col md={6}>
-                    <Form.Label style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#2c3e50',
-                      marginBottom: '8px'
-                    }}>
-                      Ticket Type <span style={{ color: '#dc3545' }}>*</span>
-                    </Form.Label>
-                    <Form.Select
-                      value={newTicketType}
-                      onChange={(e) => setNewTicketType(e.target.value)}
-                      style={{
-                        fontSize: '14px',
-                        padding: '10px 14px',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '6px'
-                      }}
-                    >
-                      <option value="">Select Type</option>
-                      {types.map((type: any) => (
-                        <option key={type.id} value={type.id}>
-                          {type.name}
-                        </option>
-                      ))}
-                    </Form.Select>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Label style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#2c3e50',
-                      marginBottom: '8px'
-                    }}>
-                      Priority <span style={{ color: '#dc3545' }}>*</span>
-                    </Form.Label>
-                    <Form.Select
-                      value={newTicketPriority}
-                      onChange={(e) => setNewTicketPriority(e.target.value)}
-                      style={{
-                        fontSize: '14px',
-                        padding: '10px 14px',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '6px'
-                      }}
-                    >
-                      <option value="">Select Priority</option>
-                      <option value="0">Low</option>
-                      <option value="1">Medium</option>
-                      <option value="2">High</option>
-                      <option value="3">Critical</option>
-                    </Form.Select>
-                  </Col>
-                </Row>
-
-                {/* Module and Status Row */}
-                <Row className="g-3" style={{ marginBottom: '24px' }}>
-                  <Col md={6}>
-                    <Form.Label style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#2c3e50',
-                      marginBottom: '8px'
-                    }}>
-                      Module <span style={{ color: '#dc3545' }}>*</span>
-                    </Form.Label>
-                    <Form.Select
-                      value={newTicketModule}
-                      onChange={(e) => {
-                        setNewTicketModule(e.target.value);
-                        fetchSubmodules(e.target.value);
-                      }}
-                      style={{
-                        fontSize: '14px',
-                        padding: '10px 14px',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '6px'
-                      }}
-                    >
-                      <option value="">Select Module</option>
-                      {modules.map((module: any) => (
-                        <option key={module.id} value={module.id}>
-                          {module.name}
-                        </option>
-                      ))}
-                    </Form.Select>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Label style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#2c3e50',
-                      marginBottom: '8px'
-                    }}>
-                      Status <span style={{ color: '#dc3545' }}>*</span>
-                    </Form.Label>
-                    <Form.Select
-                      value={newTicketStatus}
-                      onChange={(e) => setNewTicketStatus(e.target.value)}
-                      style={{
-                        fontSize: '14px',
-                        padding: '10px 14px',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '6px'
-                      }}
-                    >
-                      <option value="">Select Status</option>
-                      {statuses.map((status: any) => (
-                        <option key={status.id} value={status.id}>
-                          {status.name}
-                        </option>
-                      ))}
-                    </Form.Select>
-                  </Col>
-                </Row>
-
-                {/* Submodule and Submodule Child Row */}
-                <Row className="g-3" style={{ marginBottom: '24px' }}>
-                  <Col md={6}>
-                    <Form.Label style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#2c3e50',
-                      marginBottom: '8px'
-                    }}>
-                      Primary Issue <span style={{ color: '#dc3545' }}>*</span>
-                    </Form.Label>
-                    <Form.Select
-                      value={newTicketSubmodule}
-                      onChange={(e) => {
-                        setNewTicketSubmodule(e.target.value);
-                        fetchSubmoduleChildren(e.target.value);
-                      }}
-                      disabled={!newTicketModule || submodules.length === 0}
-                      style={{
-                        fontSize: '14px',
-                        padding: '10px 14px',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '6px'
-                      }}
-                    >
-                      <option value="">Select Primary Issue</option>
-                      {submodules.map((submodule: any) => (
-                        <option key={submodule.id} value={submodule.id}>
-                          {submodule.name}
-                        </option>
-                      ))}
-                    </Form.Select>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Label style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#2c3e50',
-                      marginBottom: '8px'
-                    }}>
-                      Specific Problem (Optional)
-                    </Form.Label>
-                    <Form.Select
-                      value={newTicketSubmoduleChild}
-                      onChange={(e) => setNewTicketSubmoduleChild(e.target.value)}
-                      disabled={!newTicketSubmodule || submoduleChildren.length === 0}
-                      style={{
-                        fontSize: '14px',
-                        padding: '10px 14px',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '6px'
-                      }}
-                    >
-                      <option value="">Select Specific Problem</option>
-                      {submoduleChildren.map((child: any) => (
-                        <option key={child.id} value={child.id}>
-                          {child.name}
-                        </option>
-                      ))}
-                    </Form.Select>
-                  </Col>
-                </Row>
-
-                {/* Due Date */}
-                <div style={{ marginBottom: '24px' }}>
-                  <Form.Label style={{
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    marginBottom: '8px'
-                  }}>
-                    Due Date (Optional)
-                  </Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={newTicketDueDate}
-                    onChange={(e) => setNewTicketDueDate(e.target.value)}
-                    min={moment().format("YYYY-MM-DD")}
-                    style={{
-                      fontSize: '14px',
-                      padding: '10px 14px',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '6px'
-                    }}
-                  />
-                </div>
-
-                {/* User Extension (if permission) */}
-                {session?.user?.permissions?.includes("assign-user-tickets") && (
-                  <div style={{ marginBottom: '24px' }}>
-                    <Form.Label style={{
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#2c3e50',
-                      marginBottom: '8px'
-                    }}>
-                      Assign To (Optional)
-                    </Form.Label>
-                    <Select
-                      isMulti
-                      value={newTicketUserExtension.map((extId) => {
-                        const ext = extensions.find((ext: any) => ext.id.toString() === extId.toString());
-                        return ext ? { value: ext.id, label: ext.display_name } : null;
-                      }).filter(Boolean)}
-                      onChange={(selectedOptions: any) => {
-                        const values = selectedOptions ? selectedOptions.map((opt: any) => opt.value) : [];
-                        setNewTicketUserExtension(values);
-                      }}
-                      options={extensions.map((extension: any) => ({
-                        value: extension.id,
-                        label: extension.display_name,
-                      }))}
-                      placeholder="Select User Extension(s)"
-                      isClearable
-                      isSearchable
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          fontSize: '14px',
-                          padding: '2px 0',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '6px'
-                        })
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* Tags */}
-                <div style={{ marginBottom: '24px' }}>
-                  <Form.Label style={{
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    marginBottom: '8px'
-                  }}>
-                    Tags (Optional)
-                  </Form.Label>
-                  <CreatableSelect
-                    isMulti
-                    value={newTicketTags.map((tag) => ({ value: tag, label: tag }))}
-                    onChange={(selectedOptions: any) => {
-                      const values = selectedOptions ? selectedOptions.map((opt: any) => opt.value) : [];
-                      setNewTicketTags(values);
-                    }}
-                    options={defaultTags.map((tag) => ({ value: tag, label: tag }))}
-                    placeholder="Select or create tags"
-                    isClearable
-                    isSearchable
-                    formatCreateLabel={(inputValue) => `Create "${inputValue}"`}
-                    styles={{
-                      control: (base) => ({
-                        ...base,
-                        fontSize: '14px',
-                        padding: '2px 0',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '6px'
-                      })
-                    }}
-                  />
-                </div>
-
-                {/* Describe the issue */}
-                <div style={{ marginBottom: '24px' }}>
-                  <Form.Label style={{
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    marginBottom: '8px'
-                  }}>
-                    Describe the issue
-                  </Form.Label>
-
-                  {/* Rich Text Toolbar */}
+                  {/* Step Progress Indicator */}
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px',
-                    padding: '8px 12px',
-                    background: '#f8f9fa',
-                    border: '1px solid #dee2e6',
-                    borderBottom: 'none',
-                    borderRadius: '6px 6px 0 0'
+                    gap: '12px',
+                    marginBottom: '0'
                   }}>
-                    <Button
-                      variant="link"
-                      style={{
-                        padding: '6px',
-                        color: '#6c757d',
-                        minWidth: 'auto',
-                        border: 'none'
-                      }}
-                    >
-                      <Bold size={16} />
-                    </Button>
-                    <Button
-                      variant="link"
-                      style={{
-                        padding: '6px',
-                        color: '#6c757d',
-                        minWidth: 'auto',
-                        border: 'none'
-                      }}
-                    >
-                      <Italic size={16} />
-                    </Button>
-                    <Button
-                      variant="link"
-                      style={{
-                        padding: '6px',
-                        color: '#6c757d',
-                        minWidth: 'auto',
-                        border: 'none'
-                      }}
-                    >
-                      <Underline size={16} />
-                    </Button>
-                    <div style={{
-                      width: '1px',
-                      height: '20px',
-                      background: '#dee2e6',
-                      margin: '0 4px'
-                    }} />
-                    <Button
-                      variant="link"
-                      style={{
-                        padding: '6px',
-                        color: '#6c757d',
-                        minWidth: 'auto',
-                        border: 'none'
-                      }}
-                    >
-                      <List size={16} />
-                    </Button>
-                    <Button
-                      variant="link"
-                      style={{
-                        padding: '6px',
-                        color: '#6c757d',
-                        minWidth: 'auto',
-                        border: 'none'
-                      }}
-                    >
-                      <ListOrdered size={16} />
-                    </Button>
-                    <div style={{
-                      width: '1px',
-                      height: '20px',
-                      background: '#dee2e6',
-                      margin: '0 4px'
-                    }} />
-                    <Button
-                      variant="link"
-                      style={{
-                        padding: '6px',
-                        color: '#6c757d',
-                        minWidth: 'auto',
-                        border: 'none'
-                      }}
-                    >
-                      <AlignLeft size={16} />
-                    </Button>
-                    <Button
-                      variant="link"
-                      style={{
-                        padding: '6px',
-                        color: '#6c757d',
-                        minWidth: 'auto',
-                        border: 'none'
-                      }}
-                    >
-                      <AlignCenter size={16} />
-                    </Button>
-                    <div style={{
-                      width: '1px',
-                      height: '20px',
-                      background: '#dee2e6',
-                      margin: '0 4px'
-                    }} />
-                    <Button
-                      variant="link"
-                      style={{
-                        padding: '6px',
-                        color: '#6c757d',
-                        minWidth: 'auto',
-                        border: 'none'
-                      }}
-                    >
-                      <Code size={16} />
-                    </Button>
-                    <div style={{ marginLeft: 'auto' }}>
-                      <Button
-                        variant="link"
-                        style={{
-                          padding: '6px',
-                          color: '#6c757d',
-                          minWidth: 'auto',
-                          border: 'none'
-                        }}
-                      >
-                        <MoreHorizontal size={16} />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Text Area */}
-                  <Form.Control
-                    as="textarea"
-                    rows={6}
-                    placeholder="Describe your issue in detail (Min: 50 chars, Max: 500 chars)..."
-                    value={newTicketDescription}
-                    onChange={(e) => setNewTicketDescription(e.target.value)}
-                    maxLength={500}
-                    style={{
-                      fontSize: '14px',
-                      padding: '12px 14px',
-                      border: '1px solid #dee2e6',
-                      borderTop: 'none',
-                      borderRadius: '0 0 6px 6px',
-                      resize: 'none'
-                    }}
-                  />
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    marginTop: '8px',
-                    padding: '0 4px'
-                  }}>
-                    <Form.Text style={{ 
-                      fontSize: '12px', 
-                      color: newTicketDescription.length < 50 ? '#dc3545' : '#28a745'
-                    }}>
-                      {newTicketDescription.length < 50 
-                        ? `Minimum 50 characters required (${50 - newTicketDescription.length} more needed)`
-                        : 'Description looks good!'}
-                    </Form.Text>
-                    <Form.Text style={{ fontSize: '12px', color: '#6c757d' }}>
-                      {newTicketDescription.length}/500 characters
-                    </Form.Text>
+                    {steps.map((step, index) => (
+                      <React.Fragment key={step.number}>
+                        <div 
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            cursor: step.number <= currentStep + 1 ? 'pointer' : 'default'
+                          }}
+                          onClick={() => {
+                            // Allow navigation to any step that's been reached or is the next step
+                            if (step.number <= currentStep + 1) {
+                              setCurrentStep(step.number);
+                            }
+                          }}
+                        >
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            background: currentStep >= step.number ? '#4680ff' : '#e9ecef',
+                            color: currentStep >= step.number ? '#fff' : '#6c757d',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '14px',
+                            fontWeight: '600'
+                          }}>
+                            {currentStep > step.number ? <CheckCircle2 size={16} /> : step.number}
+                          </div>
+                          <span style={{
+                            fontSize: '14px',
+                            fontWeight: currentStep === step.number ? '600' : '400',
+                            color: currentStep >= step.number ? '#4680ff' : '#6c757d'
+                          }}>
+                            {step.label}
+                          </span>
+                        </div>
+                        {index < steps.length - 1 && (
+                          <ChevronRight size={16} color="#6c757d" />
+                        )}
+                      </React.Fragment>
+                    ))}
                   </div>
                 </div>
+            {/* Category */}
+            <div style={{ marginBottom: '24px' }}>
+              <Form.Label style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#2c3e50',
+                marginBottom: '8px',
+                display: 'block'
+              }}>
+                Category
+              </Form.Label>
+              <Form.Select
+                value={category}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  // Map category to type
+                  setNewTicketType(e.target.value);
+                }}
+                style={{
+                  fontSize: '14px',
+                  padding: '10px 14px',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '6px',
+                  width: '100%'
+                }}
+              >
+                <option value="">Select a category</option>
+                {types.map((type: any) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
+              </Form.Select>
+            </div>
 
-                {/* Add Images */}
+            {/* Subject */}
+            <div style={{ marginBottom: '24px' }}>
+              <Form.Label style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#2c3e50',
+                marginBottom: '8px',
+                display: 'block'
+              }}>
+                Subject
+              </Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="Enter a brief summary of the issue..."
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                style={{
+                  fontSize: '14px',
+                  padding: '10px 14px',
+                  border: '1px solid #dee2e6',
+                  borderRadius: '6px'
+                }}
+              />
+            </div>
+
+            {/* Describe the issue */}
+            <div style={{ marginBottom: '24px' }}>
+              <Form.Label style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#2c3e50',
+                marginBottom: '8px',
+                display: 'block'
+              }}>
+                Describe the issue
+              </Form.Label>
+
+              <RichTextEditor
+                value={descriptionHTML}
+                onChange={handleEditorChange}
+                placeholder="Describe your issue in detail..."
+                minHeight="150px"
+                maxHeight="300px"
+                maxLength={500}
+              />
+            </div>
+
+            {/* File Upload Section */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '16px',
+              paddingTop: '16px',
+              borderTop: '1px solid #e9ecef',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                flexWrap: 'wrap'
+              }}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  style={{ display: 'none' }}
+                />
+                <Button
+                  variant="outline-secondary"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={attachedFiles.length >= 3}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 16px',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '6px',
+                    background: '#fff',
+                    color: '#495057',
+                    fontSize: '14px'
+                  }}
+                >
+                  <Paperclip size={16} />
+                  Add screenshot
+                </Button>
+                <span style={{
+                  fontSize: '13px',
+                  color: '#6c757d'
+                }}>
+                  Max 3 files (Up to 1MB Each)
+                </span>
+              </div>
+              {currentStep === 1 ? (
+                <Button
+                  onClick={() => {
+                    // Validate step 1 before moving forward
+                    if (!category) {
+                      toast.error("Please select a category");
+                      return;
+                    }
+                    if (!subject?.trim() || subject?.trim()?.length < 5) {
+                      toast.error("Please enter a subject (Min: 5 chars)");
+                      return;
+                    }
+                    if (description.length < 50) {
+                      toast.error("Description must be at least 50 characters");
+                      return;
+                    }
+                    setCurrentStep(2);
+                  }}
+                  style={{
+                    background: '#4680ff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '10px 24px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    minWidth: '120px'
+                  }}
+                >
+                  Next
+                </Button>
+              ) : currentStep === 3 ? (
+                <></>
+              ) : null}
+            </div>
+
+            {/* Additional Info Text - Only show on step 1 */}
+            {currentStep === 1 && (
+              <>
+                <p style={{
+                  fontSize: '13px',
+                  color: '#6c757d',
+                  marginBottom: '24px',
+                  fontStyle: 'italic'
+                }}>
+                  Need to share more details? You can send additional screenshots after ticket creation.
+                </p>
+
+                {/* Attached Files Preview */}
+                {attachedFiles.length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                    marginBottom: '24px'
+                  }}>
+                    {attachedFiles.map((file, index: number) => (
+                      <div
+                        key={`${file.name}-${file.size}-${index}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '8px 12px',
+                          background: '#f8f9fa',
+                          border: '1px solid #dee2e6',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          color: '#495057'
+                        }}
+                      >
+                        <Paperclip size={14} />
+                        <span style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {file.name}
+                        </span>
+                        <button
+                          onClick={() => removeFile(index)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#6c757d',
+                            cursor: 'pointer',
+                            padding: '0',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Step 2: Select Priority */}
+            {currentStep === 2 && (
+              <div>
+                <h3 style={{
+                  fontSize: '20px',
+                  fontWeight: '600',
+                  color: '#2c3e50',
+                  marginBottom: '24px'
+                }}>
+                  Select Priority
+                </h3>
                 <div style={{ marginBottom: '24px' }}>
                   <Form.Label style={{
                     fontSize: '14px',
                     fontWeight: '600',
                     color: '#2c3e50',
-                    marginBottom: '8px'
+                    marginBottom: '8px',
+                    display: 'block'
                   }}>
-                    Attachments (Optional)
+                    Priority <span style={{ color: '#dc3545' }}>*</span>
                   </Form.Label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => {
-                      const files = Array.from(e.target.files || []);
-                      if (files.length > 3) {
-                        toast.error("Maximum 3 images allowed");
-                        const limitedFiles = files.slice(0, 3);
-                        setNewTicketImages(limitedFiles);
-                        // Reset file input
-                        const fileInput = e.target;
-                        const dataTransfer = new DataTransfer();
-                        limitedFiles.forEach(file => dataTransfer.items.add(file));
-                        fileInput.files = dataTransfer.files;
-                      } else {
-                        setNewTicketImages(files);
-                      }
-                    }}
+                  <Form.Select
+                    value={newTicketPriority}
+                    onChange={(e) => setNewTicketPriority(e.target.value)}
                     style={{
                       fontSize: '14px',
-                      padding: '8px',
+                      padding: '10px 14px',
                       border: '1px solid #dee2e6',
                       borderRadius: '6px',
                       width: '100%'
                     }}
-                  />
-                  <Form.Text style={{ fontSize: '12px', color: '#6c757d', display: 'block', marginTop: '4px' }}>
-                    Supported formats: JPG, PNG, GIF. Max size: 5MB per image. Maximum 3 images.
-                  </Form.Text>
-                  
-                  {newTicketImages.length > 0 && (
-                    <div style={{ marginTop: '12px' }}>
-                      <div style={{ 
-                        display: 'flex', 
-                        flexWrap: 'wrap', 
-                        gap: '8px' 
-                      }}>
-                        {newTicketImages.map((file, index) => (
-                          <Badge 
-                            key={index}
-                            bg="light" 
-                            text="dark" 
-                            style={{ 
-                              padding: '8px 12px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              fontSize: '12px'
-                            }}
-                          >
-                            <Paperclip size={14} />
-                            <span>{file.name}</span>
-                            <span style={{ color: '#6c757d' }}>
-                              ({(file.size / 1024).toFixed(1)} KB)
-                            </span>
-                            <Button
-                              variant="link"
-                              size="sm"
-                              style={{
-                                padding: 0,
-                                minWidth: 'auto',
-                                color: '#dc3545',
-                                textDecoration: 'none'
-                              }}
-                              onClick={() => {
-                                setNewTicketImages(newTicketImages.filter((_, i) => i !== index));
-                                // Reset file input
-                                const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-                                if (fileInput) {
-                                  fileInput.value = "";
-                                }
-                              }}
-                            >
-                              <X size={14} />
-                            </Button>
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  >
+                    <option value="">Select Priority</option>
+                    <option value="0">Low</option>
+                    <option value="1">Medium</option>
+                    <option value="2">High</option>
+                    <option value="3">Critical</option>
+                  </Form.Select>
                 </div>
 
-                {/* Submit Button */}
+                {/* Navigation Buttons */}
                 <div style={{
                   display: 'flex',
-                  justifyContent: 'flex-end',
-                  marginTop: '24px',
-                  paddingTop: '24px',
+                  justifyContent: 'space-between',
+                  paddingTop: '16px',
                   borderTop: '1px solid #e9ecef'
                 }}>
+                  <Button
+                    variant="outline-secondary"
+                    onClick={() => setCurrentStep(1)}
+                    style={{
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      padding: '10px 24px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      color: '#495057',
+                      background: '#fff'
+                    }}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (!newTicketPriority) {
+                        toast.error("Please select a priority");
+                        return;
+                      }
+                      setCurrentStep(3);
+                    }}
+                    style={{
+                      background: '#4680ff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '10px 24px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      minWidth: '120px'
+                    }}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Review */}
+            {currentStep === 3 && (
+              <div>
+                <h3 style={{
+                  fontSize: '20px',
+                  fontWeight: '600',
+                  color: '#2c3e50',
+                  marginBottom: '24px'
+                }}>
+                  Review
+                </h3>
+                
+                <div style={{ marginBottom: '24px' }}>
+                  <div style={{
+                    padding: '16px',
+                    background: '#f8f9fa',
+                    borderRadius: '8px',
+                    border: '1px solid #e9ecef'
+                  }}>
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{
+                        fontSize: '12px',
+                        color: '#6c757d',
+                        display: 'block',
+                        marginBottom: '4px'
+                      }}>Category</label>
+                      <p style={{
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: '#2c3e50',
+                        margin: 0
+                      }}>
+                        {types.find((t: any) => t.id.toString() === category)?.name || 'Not selected'}
+                      </p>
+                    </div>
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{
+                        fontSize: '12px',
+                        color: '#6c757d',
+                        display: 'block',
+                        marginBottom: '4px'
+                      }}>Subject</label>
+                      <p style={{
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: '#2c3e50',
+                        margin: 0
+                      }}>{subject || 'Not provided'}</p>
+                    </div>
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{
+                        fontSize: '12px',
+                        color: '#6c757d',
+                        display: 'block',
+                        marginBottom: '4px'
+                      }}>Description</label>
+                      <p style={{
+                        fontSize: '14px',
+                        color: '#2c3e50',
+                        margin: 0,
+                        whiteSpace: 'pre-wrap'
+                      }}>{description || 'Not provided'}</p>
+                    </div>
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{
+                        fontSize: '12px',
+                        color: '#6c757d',
+                        display: 'block',
+                        marginBottom: '4px'
+                      }}>Priority</label>
+                      <p style={{
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: '#2c3e50',
+                        margin: 0
+                      }}>
+                        {newTicketPriority === '0' ? 'Low' : 
+                         newTicketPriority === '1' ? 'Medium' : 
+                         newTicketPriority === '2' ? 'High' : 
+                         newTicketPriority === '3' ? 'Critical' : 'Not selected'}
+                      </p>
+                    </div>
+                    <div>
+                      <label style={{
+                        fontSize: '12px',
+                        color: '#6c757d',
+                        display: 'block',
+                        marginBottom: '8px'
+                      }}>Attachments</label>
+                      {attachedFiles.length > 0 ? (
+                        <div style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '8px'
+                        }}>
+                          {attachedFiles.map((file, index: number) => (
+                            <div
+                              key={`${file.name}-${file.size}-${index}`}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 12px',
+                                background: '#fff',
+                                border: '1px solid #dee2e6',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                color: '#495057'
+                              }}
+                            >
+                              <Paperclip size={14} />
+                              <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {file.name}
+                              </span>
+                              <span style={{ color: '#6c757d', fontSize: '11px' }}>
+                                ({(file.size / 1024).toFixed(1)} KB)
+                              </span>
+                              <button
+                                onClick={() => {
+                                  // Create a preview URL for the file
+                                  const url = URL.createObjectURL(file);
+                                  window.open(url, '_blank');
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#4680ff',
+                                  cursor: 'pointer',
+                                  padding: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  borderRadius: '4px',
+                                  transition: 'background 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#f0f4ff';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'none';
+                                }}
+                                title="View file"
+                              >
+                                <Eye size={14} />
+                              </button>
+                              <button
+                                onClick={() => removeFile(index)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#dc3545',
+                                  cursor: 'pointer',
+                                  padding: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  borderRadius: '4px',
+                                  transition: 'background 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = '#fff5f5';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'none';
+                                }}
+                                title="Remove file"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p style={{
+                          fontSize: '14px',
+                          color: '#6c757d',
+                          margin: 0,
+                          fontStyle: 'italic'
+                        }}>No attachments</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Navigation Buttons */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  paddingTop: '16px',
+                  borderTop: '1px solid #e9ecef'
+                }}>
+                  <Button
+                    variant="outline-secondary"
+                    onClick={() => setCurrentStep(2)}
+                    style={{
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      padding: '10px 24px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      color: '#495057',
+                      background: '#fff'
+                    }}
+                  >
+                    Back
+                  </Button>
                   <Button
                     onClick={handleSubmit}
                     disabled={creatingTicket}
@@ -1134,318 +918,310 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                       padding: '12px 32px',
                       fontSize: '14px',
                       fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      opacity: creatingTicket ? 0.6 : 1
+                      minWidth: '140px'
                     }}
                   >
-                    {creatingTicket ? 'Creating...' : 'Submit Ticket'}
+                    {creatingTicket ? 'Submitting...' : 'Submit Ticket'}
                   </Button>
                 </div>
-              </Card.Body>
-            </Card>
-          )}
-        </Col>
-        {/* Sidebar - Always Visible */}
-        <Col xs={12} lg={4}>
-          {/* Help Suggestions */}
-          <Card style={{
-            background: '#fff',
-            border: '1px solid #e9ecef',
-            borderRadius: '8px',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            marginBottom: '16px'
-          }}>
-            <Card.Body style={{ padding: '20px' }}>
-              <h5 style={{
-                fontSize: '16px',
-                fontWeight: '600',
-                color: '#2c3e50',
-                marginBottom: '16px'
-              }}>
-                Look like you need help with Two-Factor Authentication?
-              </h5>
-
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-                marginBottom: '20px'
-              }}>
-                {helpSuggestions.map((suggestion, index) => {
-                  const Icon = suggestion.icon;
-                  return (
-                    <div
-                      key={index}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '12px',
-                        padding: '12px',
-                        background: '#f8f9fa',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = '#f0f4f8';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = '#f8f9fa';
-                      }}
-                    >
-                      <div style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '8px',
-                        background: suggestion.color + '20',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
-                      }}>
-                        <Icon size={18} color={suggestion.color} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <h6 style={{
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          color: '#2c3e50',
-                          marginBottom: '2px',
-                          lineHeight: '1.3'
-                        }}>
-                          {suggestion.title}
-                        </h6>
-                        <p style={{
-                          fontSize: '12px',
-                          color: '#6c757d',
-                          marginBottom: 0,
-                          lineHeight: '1.3'
-                        }}>
-                          {suggestion.description}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
               </div>
+            )}
+          </Card.Body>
+        </Card>
+          </Col>
 
-              {/* Did this help? */}
-              <div style={{
-                paddingTop: '16px',
-                borderTop: '1px solid #e9ecef'
-              }}>
+          {/* Sidebar - Right Column */}
+          <Col xs={12} lg={4}>
+            {/* Help Suggestions Card */}
+            <Card style={{
+              background: '#fff',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              marginBottom: '16px'
+            }}>
+              <Card.Body style={{ padding: '20px' }}>
+                <h5 style={{
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: '#2c3e50',
+                  marginBottom: '16px'
+                }}>
+                  Look like you need help with Two-Factor Authentication?
+                </h5>
+
                 <div style={{
                   display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '12px'
+                  flexDirection: 'column',
+                  gap: '12px',
+                  marginBottom: '20px'
                 }}>
-                  <span style={{
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#2c3e50'
-                  }}>
-                    Did this help?
-                  </span>
-                  <ChevronRight size={16} color="#6c757d" />
-                </div>
-
-                <Row className="g-2">
-                  <Col xs={6}>
-                    <Button
-                      variant="outline-secondary"
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        fontSize: '13px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        border: '1px solid #dee2e6',
-                        color: '#495057'
-                      }}
-                    >
-                      <FileQuestion size={16} />
-                      FA Q
-                    </Button>
-                  </Col>
-                  <Col xs={6}>
-                    <Button
-                      variant="outline-secondary"
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        fontSize: '13px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        border: '1px solid #dee2e6',
-                        color: '#495057'
-                      }}
-                    >
-                      <Phone size={16} />
-                      No, continue with ticket
-                    </Button>
-                  </Col>
-                </Row>
-              </div>
-            </Card.Body>
-          </Card>
-
-          {/* Frequently Used Topics */}
-          <Card style={{
-            background: '#fff',
-            border: '1px solid #e9ecef',
-            borderRadius: '8px',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-          }}>
-            <Card.Body style={{ padding: '20px' }}>
-              <h5 style={{
-                fontSize: '16px',
-                fontWeight: '600',
-                color: '#2c3e50',
-                marginBottom: '16px'
-              }}>
-                Frequently Used Topics
-              </h5>
-
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0'
-              }}>
-                {frequentTopics.map((topic, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '12px 0',
-                      cursor: 'pointer',
-                      borderBottom: index < frequentTopics.length - 1 ? '1px solid #f0f0f0' : 'none'
-                    }}
-                  >
-                    <span style={{
-                      fontSize: '13px',
-                      color: '#495057'
-                    }}>
-                      {topic}
-                    </span>
-                    <ChevronRight size={16} color="#c0c0c0" />
-                  </div>
-                ))}
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-      {/* Suggested Articles - Always Visible at Bottom */}
-      <Row className="g-3" style={{ marginTop: '16px' }}>
-        <Col xs={12}>
-          <Card style={{
-            background: '#fff',
-            border: '1px solid #e9ecef',
-            borderRadius: '8px',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-          }}>
-            <Card.Body style={{ padding: '20px' }}>
-              <h5 style={{
-                fontSize: '15px',
-                fontWeight: '600',
-                color: '#2c3e50',
-                marginBottom: '16px'
-              }}>
-                Suggested Articles
-              </h5>
-              <Row className="g-3">
-                {suggestedArticles.map((article, index) => {
-                  const Icon = article.icon;
-                  return (
-                    <Col xs={12} sm={4} key={index}>
-                      <div style={{
-                        padding: '16px',
-                        background: '#f8f9fa',
-                        border: '1px solid #e9ecef',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        height: '100%'
-                      }}
+                  {helpSuggestions.map((suggestion) => {
+                    const Icon = suggestion.icon;
+                    return (
+                      <div
+                        key={suggestion.title}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '12px',
+                          padding: '12px',
+                          background: '#f8f9fa',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = '#f0f4f8';
-                          e.currentTarget.style.borderColor = article.color;
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.background = '#f8f9fa';
-                          e.currentTarget.style.borderColor = '#e9ecef';
-                        }}>
+                        }}
+                      >
                         <div style={{
-                          width: '40px',
-                          height: '40px',
+                          width: '36px',
+                          height: '36px',
                           borderRadius: '8px',
-                          background: article.color + '20',
+                          background: suggestion.color + '20',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          marginBottom: '12px'
+                          flexShrink: 0
                         }}>
-                          <Icon size={20} color={article.color} />
+                          <Icon size={18} color={suggestion.color} />
                         </div>
-                        <h6 style={{
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          color: '#2c3e50',
-                          marginBottom: '2px',
-                          lineHeight: '1.3'
-                        }}>
-                          {article.title}
-                        </h6>
-                        <p style={{
-                          fontSize: '13px',
-                          fontWeight: '600',
-                          color: '#2c3e50',
-                          marginBottom: '8px',
-                          lineHeight: '1.3'
-                        }}>
-                          {article.subtitle}
-                        </p>
-                        <p style={{
-                          fontSize: '12px',
-                          color: '#6c757d',
-                          marginBottom: 0,
-                          lineHeight: '1.4'
-                        }}>
-                          {article.description}
-                        </p>
+                        <div style={{ flex: 1 }}>
+                          <h6 style={{
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            color: '#2c3e50',
+                            marginBottom: '2px',
+                            lineHeight: '1.3'
+                          }}>
+                            {suggestion.title}
+                          </h6>
+                          <p style={{
+                            fontSize: '12px',
+                            color: '#6c757d',
+                            marginBottom: 0,
+                            lineHeight: '1.3'
+                          }}>
+                            {suggestion.description}
+                          </p>
+                        </div>
                       </div>
-                    </Col>
-                  );
-                })}
-              </Row>
-              <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                <Button
-                  variant="link"
-                  style={{
-                    fontSize: '13px',
-                    color: '#4680ff',
-                    textDecoration: 'none',
-                    display: 'inline-flex',
+                    );
+                  })}
+                </div>
+
+                {/* Did this help? */}
+                <div style={{
+                  paddingTop: '16px',
+                  borderTop: '1px solid #e9ecef'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
                     alignItems: 'center',
-                    gap: '6px'
+                    marginBottom: '12px'
+                  }}>
+                    <span style={{
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      color: '#2c3e50'
+                    }}>
+                      Did this help?
+                    </span>
+                    <ChevronRight size={16} color="#6c757d" />
+                  </div>
+
+                  <Row className="g-2">
+                    <Col xs={6}>
+                      <Button
+                        variant="outline-secondary"
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          border: '1px solid #dee2e6',
+                          color: '#495057'
+                        }}
+                      >
+                        <FileQuestion size={16} />
+                        FA Q
+                      </Button>
+                    </Col>
+                    <Col xs={6}>
+                      <Button
+                        variant="outline-secondary"
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          border: '1px solid #dee2e6',
+                          color: '#495057'
+                        }}
+                      >
+                        <Phone size={16} />
+                        No, continue with ticket
+                      </Button>
+                    </Col>
+                  </Row>
+                </div>
+              </Card.Body>
+            </Card>
+
+            {/* Frequently Used Topics Card */}
+            <Card style={{
+              background: '#fff',
+              border: '1px solid #e9ecef',
+              borderRadius: '8px',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+            }}>
+              <Card.Body style={{ padding: '20px' }}>
+                <h5 style={{
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: '#2c3e50',
+                  marginBottom: '16px'
+                }}>
+                  Frequently Used Topics
+                </h5>
+
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0'
+                }}>
+                  {frequentTopics.map((topic, index) => (
+                    <div
+                      key={topic}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 0',
+                        cursor: 'pointer',
+                        borderBottom: index < frequentTopics.length - 1 ? '1px solid #f0f0f0' : 'none'
+                      }}
+                    >
+                      <span style={{
+                        fontSize: '13px',
+                        color: '#495057'
+                      }}>
+                        {topic}
+                      </span>
+                      <ChevronRight size={16} color="#c0c0c0" />
+                    </div>
+                  ))}
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Suggested Articles Section */}
+        <div style={{ marginTop: '32px' }}>
+          <h5 style={{
+            fontSize: '18px',
+            fontWeight: '600',
+            color: '#2c3e50',
+            marginBottom: '20px'
+          }}>
+            Suggested Articles
+          </h5>
+          <Row className="g-3">
+            {suggestedArticles.map((article) => {
+              const Icon = article.icon;
+              return (
+                <Col xs={12} sm={4} key={`${article.title}-${article.subtitle}`}>
+                  <div style={{
+                    padding: '16px',
+                    background: '#fff',
+                    border: '1px solid #e9ecef',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    height: '100%',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                   }}
-                >
-                  See All Suggestions <ChevronRight size={16} />
-                </Button>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.style.borderColor = article.color;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#fff';
+                      e.currentTarget.style.borderColor = '#e9ecef';
+                    }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '8px',
+                      background: article.color + '20',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: '12px'
+                    }}>
+                      <Icon size={20} color={article.color} />
+                    </div>
+                    <h6 style={{
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#2c3e50',
+                      marginBottom: '2px',
+                      lineHeight: '1.3'
+                    }}>
+                      {article.title}
+                    </h6>
+                    <p style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: '#2c3e50',
+                      marginBottom: '8px',
+                      lineHeight: '1.3'
+                    }}>
+                      {article.subtitle}
+                    </p>
+                    <p style={{
+                      fontSize: '12px',
+                      color: '#6c757d',
+                      marginBottom: 0,
+                      lineHeight: '1.4'
+                    }}>
+                      {article.description}
+                    </p>
+                  </div>
+                </Col>
+              );
+            })}
+          </Row>
+          <div style={{ textAlign: 'center', marginTop: '16px' }}>
+            <Button
+              variant="link"
+              style={{
+                fontSize: '13px',
+                color: '#4680ff',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: 0
+              }}
+            >
+              See All Suggestions <ChevronRight size={16} />
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

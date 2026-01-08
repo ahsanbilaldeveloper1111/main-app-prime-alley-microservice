@@ -293,6 +293,57 @@ export const UpdateTicketDetails = async (
     }
   };
 
+  export const CreateUserTicket = async (
+    title: string,
+    description: string,
+    ticket_type_id: number,
+    priority: number,
+    images?: File[]
+  ) => {
+    try {
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('ticket_type_id', ticket_type_id.toString());
+      formData.append('ticket_status_id', '1');
+      formData.append('priority', priority.toString());
+      
+      // Append images if provided
+      if (images && images.length > 0) {
+        images.forEach((image) => {
+          formData.append('image[]', image);
+        });
+      }
+
+      const response = await axiosInstance.post('/tickets/create-user-ticket', formData);
+
+      if(response){
+        const responseData = response.data;
+        if(responseData.code == 200){
+          if(responseData?.data?.success == true){
+            toast.success(responseData?.data?.message || 'Ticket created successfully');
+            return responseData?.data;
+          }else{
+            toast.error(responseData?.data?.message || 'Failed to create ticket');
+            return false;
+          }
+        }else{
+          toast.error(responseData.message || 'Failed to create ticket');
+          return false;
+        } 
+      }else{
+        toast.error('Failed to create ticket');
+        return false;
+      }
+      
+    } catch (error: any) {
+      console.error('Error creating user ticket:', error);
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to create ticket';
+      toast.error(errorMessage);
+      throw error;
+    }
+  };
+
 export const GetTicket = async (id: string) => {
   try {
     const response = await axiosInstance.post(`/tickets/view-ticket`, {

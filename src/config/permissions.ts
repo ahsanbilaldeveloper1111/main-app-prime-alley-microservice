@@ -385,6 +385,8 @@ export const routePermissions: RoutePermission[] = [
             { path: '/products',permissions: [PERMISSIONS.VIEW_CRM_PRODUCTS]},
             { path: '/history',permissions: [PERMISSIONS.VIEW_CRM_HISTORY]},
             { path: '/reports',permissions: [PERMISSIONS.VIEW_CRM_REPORTS]},
+            { path: '/industries',permissions: [PERMISSIONS.CRM_SERVICES]},
+            { path: '/deal-templates',permissions: [PERMISSIONS.CRM_SERVICES]},
         ]
     },
     
@@ -572,6 +574,8 @@ export const routePermissions: RoutePermission[] = [
             { path: '/',permissions: ['view-cti']},
             { path: '/new',permissions: ['view-cti']},
             { path: '/dialer',permissions: ['dial-call-cti', 'merge-call-cti', 'transfer-call-cti']},
+            { path: '/management/campaigns',permissions: [PERMISSIONS.TMS_SERVICES]},
+            { path: '/management/agents',permissions: [PERMISSIONS.TMS_SERVICES]},
 
         ]
     }

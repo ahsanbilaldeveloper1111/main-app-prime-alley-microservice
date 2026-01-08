@@ -1,46 +1,40 @@
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
+  useState,
+  useEffect,
+  useCallback
 } from "react";
 import { useRouter } from 'next/router';
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 
-import { useState } from 'react';
-import { Container, Row, Col } from 'react-bootstrap';
+import { ListCampaigns, DeleteCampaign, ListVoiceBots, UpdateCampaign, DispatchCampaign, GetCampaignById, GetVoiceBotById } from "@utils/aiml";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import { toast } from "react-toastify";
+import { Row, Col } from 'react-bootstrap';
 import {
   Search,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   MoreVertical,
   Users,
   MessageSquare,
   TrendingUp,
   Edit,
   BarChart3,
-  Download,
   Copy,
   Pause,
   Play,
-  Calendar,
-  CheckCircle,
-  XCircle,
-  Clock,
   Phone,
   Bell,
   Target,
   Gift,
-  ArrowLeft,
-  Plus
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import CampaignAnalyticsPage from '@components/campaign-reports';
 
 interface Campaign {
   id: number;
@@ -56,6 +50,7 @@ interface Campaign {
   callsMade: number;
   answered: number;
   failed: number;
+  status?: string;
 }
 
 interface CampaignDetail {
@@ -78,104 +73,292 @@ const AIMLCampaigns = () => {
   const [selectedBotProfile, setSelectedBotProfile] = useState<string>('all');
   const [selectedClient, setSelectedClient] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('running');
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [currentPage] = useState<number>(1);
   const [expandedActions, setExpandedActions] = useState<number | null>(null);
   const [showReports, setShowReports] = useState<boolean>(false);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [voiceBots, setVoiceBots] = useState<any[]>([]);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [selectedCampaignForDelete, setSelectedCampaignForDelete] = useState<Campaign | null>(null);
+  const [showDispatchModal, setShowDispatchModal] = useState<boolean>(false);
+  const [selectedCampaignForDispatch, setSelectedCampaignForDispatch] = useState<Campaign | null>(null);
+  const [isDispatching, setIsDispatching] = useState<boolean>(false);
   
-  const [selectedCampaign, setSelectedCampaign] = useState<CampaignDetail>({
-    name: 'Follow-Up Campaign',
-    callsMade: 225,
-    answered: 167,
-    keyOutcomes: 9,
-    successRate: 74,
-    failed: 14,
-    recentOutcomes: [
-      { label: '5 Follow Up Scheduled', color: 'primary' },
-      { label: '2 Left Voicemail', color: 'info' },
-      { label: '11 Escalated to Support', color: 'warning' }
-    ]
+  const [selectedCampaign, setSelectedCampaign] = useState<CampaignDetail | null>(null);
+
+  // Icon mapping based on campaign name or type
+  const getCampaignIcon = (name: string, type?: string) => {
+    const nameLower = name.toLowerCase();
+    if (nameLower.includes('follow') || nameLower.includes('support')) {
+      return <Phone size={20} color="white" />;
+    } else if (nameLower.includes('sales')) {
+      return <Bell size={20} color="white" />;
+    } else if (nameLower.includes('feedback') || nameLower.includes('survey')) {
+      return <Target size={20} color="white" />;
+    } else if (nameLower.includes('promotion') || nameLower.includes('holiday')) {
+      return <Gift size={20} color="white" />;
+    }
+    return <Phone size={20} color="white" />;
+  };
+
+  const getCampaignIconColor = (index: number) => {
+    const colors = ['#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#f97316'];
+    return colors[index % colors.length];
+  };
+
+  // Normalize campaign data from API
+  const normalizeCampaign = (campaign: any, index: number): Campaign => {
+    const status = campaign.status || 'inactive';
+    const isActive = status === 'active';
+    
+    // Calculate progress (mock for now, can be replaced with actual data)
+    const progress = isActive ? Math.floor(Math.random() * 30 + 60) : 0;
+    
+    return {
+      id: campaign.id || 0,
+      name: campaign.name || 'Unnamed Campaign',
+      icon: getCampaignIcon(campaign.name || ''),
+      iconColor: getCampaignIconColor(index),
+      botProfile: campaign.voice_bot_name || 'No Bot Assigned',
+      client: campaign.client_workspace || campaign.owner || 'N/A',
+      type: campaign.type || 'Outbound',
+      scheduled: campaign.schedule_time ? new Date(campaign.schedule_time).toLocaleDateString() : 'Not Scheduled',
+      progress: progress,
+      progressColor: progress > 70 ? '#20c997' : progress > 40 ? '#ffc107' : '#dc3545',
+      callsMade: campaign.numbers_count || 0,
+      answered: Math.floor((campaign.numbers_count || 0) * 0.7),
+      failed: Math.floor((campaign.numbers_count || 0) * 0.1),
+      status: status // Store original status
+    };
+  };
+
+  // Fetch campaigns from API
+  const fetchCampaigns = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const params: any = {
+        page: currentPage,
+        page_size: 50
+      };
+      
+      if (selectedBotProfile !== 'all') {
+        params.voice_bot_id = Number.parseInt(selectedBotProfile, 10);
+      }
+
+      const response = await ListCampaigns(params);
+      const campaignsData = response?.results?.data || [];
+      const normalizedCampaigns = campaignsData.map((campaign: any, index: number) => 
+        normalizeCampaign(campaign, index)
+      );
+      
+      setCampaigns(normalizedCampaigns);
+      
+      // Set first campaign as selected if available
+      if (normalizedCampaigns.length > 0 && !selectedCampaign) {
+        const firstCampaign = normalizedCampaigns[0];
+        setSelectedCampaign({
+          name: firstCampaign.name,
+          callsMade: firstCampaign.callsMade,
+          answered: firstCampaign.answered,
+          keyOutcomes: 9,
+          successRate: firstCampaign.progress,
+          failed: firstCampaign.failed,
+          recentOutcomes: [
+            { label: '5 Follow Up Scheduled', color: 'primary' },
+            { label: '2 Left Voicemail', color: 'info' },
+            { label: '11 Escalated to Support', color: 'warning' }
+          ]
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching campaigns:', error);
+      setCampaigns([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentPage, selectedBotProfile]);
+
+  // Fetch voice bots for filter dropdown
+  const fetchVoiceBots = useCallback(async () => {
+    try {
+      const response = await ListVoiceBots();
+      const botsData = response?.results?.data || response?.bots || response?.data || [];
+      setVoiceBots(botsData);
+    } catch (error) {
+      console.error('Error fetching voice bots:', error);
+    }
+  }, []);
+
+  // Load data on mount and when filters change
+  useEffect(() => {
+    fetchVoiceBots();
+  }, [fetchVoiceBots]);
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, [fetchCampaigns]);
+
+  // Filter campaigns based on search and filters
+  const filteredCampaigns = campaigns.filter(campaign => {
+    const matchesSearch = campaign.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         campaign.botProfile.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesBot = selectedBotProfile === 'all' || campaign.botProfile === selectedBotProfile;
+    const matchesStatus = statusFilter === 'running' ? campaign.progress > 0 : campaign.progress === 0;
+    
+    return matchesSearch && matchesBot && matchesStatus;
   });
 
-  const [campaigns] = useState<Campaign[]>([
-    {
-      id: 1,
-      name: 'Follow-Up Campaign',
-      icon: <Phone size={20} color="white" />,
-      iconColor: '#3b82f6',
-      botProfile: 'Gandalf Support Bot',
-      client: 'Client A',
-      type: 'Inbound',
-      scheduled: 'This Week',
-      progress: 74,
-      progressColor: '#20c997',
-      callsMade: 225,
-      answered: 167,
-      failed: 14
-    },
-    {
-      id: 2,
-      name: 'Spanish Sales Campaign',
-      icon: <Bell size={20} color="white" />,
-      iconColor: '#f59e0b',
-      botProfile: 'Spanish Sales Bot',
-      client: 'Client B',
-      type: 'Outbound',
-      scheduled: 'This Week',
-      progress: 76,
-      progressColor: '#ffc107',
-      callsMade: 189,
-      answered: 143,
-      failed: 12
-    },
-    {
-      id: 3,
-      name: 'Customer Feedback',
-      icon: <Target size={20} color="white" />,
-      iconColor: '#8b5cf6',
-      botProfile: 'Support Bot',
-      client: 'Client C',
-      type: 'Inbound',
-      scheduled: 'Last 7 Days',
-      progress: 96,
-      progressColor: '#20c997',
-      callsMade: 312,
-      answered: 299,
-      failed: 8
-    },
-    {
-      id: 4,
-      name: 'Holiday Promotion',
-      icon: <Gift size={20} color="white" />,
-      iconColor: '#ec4899',
-      botProfile: 'Sales Bot',
-      client: 'Client D',
-      type: 'Outbound',
-      scheduled: 'Next Week',
-      progress: 45,
-      progressColor: '#ffc107',
-      callsMade: 98,
-      answered: 44,
-      failed: 22
-    }
-  ]);
+  // Handle campaign selection
+  const handleCampaignSelect = (campaign: Campaign) => {
+    setSelectedCampaign({
+      name: campaign.name,
+      callsMade: campaign.callsMade,
+      answered: campaign.answered,
+      keyOutcomes: 9,
+      successRate: campaign.progress,
+      failed: campaign.failed,
+      recentOutcomes: [
+        { label: '5 Follow Up Scheduled', color: 'primary' },
+        { label: '2 Left Voicemail', color: 'info' },
+        { label: '11 Escalated to Support', color: 'warning' }
+      ]
+    });
+  };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'Active': return <CheckCircle size={14} />;
-      case 'Paused': return <Clock size={14} />;
-      case 'Scheduled': return <Calendar size={14} />;
-      default: return <XCircle size={14} />;
+  // Handle edit campaign
+  const handleEditCampaign = (campaignId: number) => {
+    router.push(`/ai-ml/campaigns/edit-campaign?id=${campaignId}`);
+  };
+
+  // Handle pause/resume campaign
+  const handlePauseResumeCampaign = async (campaignId: number, currentStatus: string) => {
+    try {
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      await UpdateCampaign(campaignId, { status: newStatus });
+      // Refresh campaigns list
+      fetchCampaigns();
+      setExpandedActions(null);
+    } catch (error) {
+      console.error('Error updating campaign status:', error);
     }
   };
 
-  const totalPages = 3;
+  // Handle delete campaign - show modal
+  const handleDeleteCampaign = (campaign: Campaign) => {
+    setSelectedCampaignForDelete(campaign);
+    setShowDeleteModal(true);
+    setExpandedActions(null);
+  };
+
+  // Confirm delete campaign
+  const handleConfirmDelete = async () => {
+    if (!selectedCampaignForDelete) return;
+
+    try {
+      await DeleteCampaign(selectedCampaignForDelete.id);
+      setShowDeleteModal(false);
+      setSelectedCampaignForDelete(null);
+      // Refresh campaigns list
+      fetchCampaigns();
+      // Clear selected campaign if it was deleted
+      if (selectedCampaign && selectedCampaign.name === selectedCampaignForDelete.name) {
+        setSelectedCampaign(null);
+      }
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      // Error handling is done in DeleteCampaign function
+    }
+  };
+
+  // Handle dispatch campaign - show modal
+  const handleDispatchCampaign = (campaign: Campaign) => {
+    setSelectedCampaignForDispatch(campaign);
+    setShowDispatchModal(true);
+    setExpandedActions(null);
+  };
+
+  // Confirm dispatch campaign
+  const handleConfirmDispatch = async () => {
+    if (!selectedCampaignForDispatch) return;
+
+    setIsDispatching(true);
+    try {
+      // Fetch campaign details to get phone numbers and voice_bot_id
+      const campaignDetails = await GetCampaignById(selectedCampaignForDispatch.id);
+      
+      if (!campaignDetails) {
+        toast.error('Failed to fetch campaign details');
+        setIsDispatching(false);
+        return;
+      }
+
+      // Prepare dispatch payload
+      // Convert phone numbers to comma-separated string
+      let phoneNumbersString = '';
+      if (campaignDetails?.numbers_to_call) {
+        if (Array.isArray(campaignDetails.numbers_to_call)) {
+          phoneNumbersString = campaignDetails.numbers_to_call.join(',');
+        } else if (typeof campaignDetails.numbers_to_call === 'string') {
+          phoneNumbersString = campaignDetails.numbers_to_call;
+        } else if (typeof campaignDetails.numbers_to_call === 'object') {
+          // If it's an object, try to extract values
+          phoneNumbersString = Object.values(campaignDetails.numbers_to_call).join(',');
+        }
+      }
+
+      const dispatchPayload: any = {
+        phone_numbers: phoneNumbersString,
+        client_info: '3', // Hardcoded as requested
+      };
+
+      // Fetch voice bot details to get trunk_id and context
+      if (campaignDetails.voice_bot_id) {
+        const voiceBotDetails = await GetVoiceBotById(campaignDetails.voice_bot_id);
+        
+        if (voiceBotDetails) {
+          // Get trunk_id from voice bot (could be in trunk or sip_trunk_id field)
+          if (voiceBotDetails.trunk) {
+            dispatchPayload.trunk_id = voiceBotDetails.trunk.toString();
+          } else if (voiceBotDetails.sip_trunk_id) {
+            dispatchPayload.trunk_id = voiceBotDetails.sip_trunk_id.toString();
+          }
+          
+          // Get context from voice bot (greeting_prompt)
+          if (voiceBotDetails.greeting_prompt) {
+            dispatchPayload.vbot_context = voiceBotDetails.greeting_prompt;
+          }
+        }
+      }
+
+      await DispatchCampaign(dispatchPayload);
+      
+      // Refresh campaigns list
+      fetchCampaigns();
+      setShowDispatchModal(false);
+      setSelectedCampaignForDispatch(null);
+    } catch (error) {
+      console.error('Error dispatching campaign:', error);
+      // Error handling is done in DispatchCampaign function
+    } finally {
+      setIsDispatching(false);
+    }
+  };
+
 
   // Prepare pie chart data
-  const pieChartData = [
+  const pieChartData = selectedCampaign ? [
     { name: 'Answered', value: selectedCampaign.answered, color: '#198754' },
     { name: 'Failed', value: selectedCampaign.failed, color: '#dc3545' },
     { name: 'Pending', value: selectedCampaign.callsMade - selectedCampaign.answered - selectedCampaign.failed, color: '#ffc107' }
-  ];
+  ] : [];
+
+  // Calculate stats from campaigns
+  const activeCampaigns = campaigns.filter(c => c.progress > 0).length;
+  const totalCalls = campaigns.reduce((sum, c) => sum + c.callsMade, 0);
+  const avgSuccessRate = campaigns.length > 0 
+    ? Math.round(campaigns.reduce((sum, c) => sum + c.progress, 0) / campaigns.length)
+    : 0;
 
   return (
     <React.Fragment>
@@ -223,7 +406,7 @@ const AIMLCampaigns = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ color: '#6c757d', marginBottom: '0.5rem', fontSize: '0.95rem', fontWeight: '500' }}>Active Campaigns</div>
-                    <div style={{ fontSize: '3rem', fontWeight: '700', color: '#0d6efd' }}>4</div>
+                    <div style={{ fontSize: '3rem', fontWeight: '700', color: '#0d6efd' }}>{activeCampaigns}</div>
                   </div>
                   <div style={{
                     width: '56px',
@@ -245,7 +428,7 @@ const AIMLCampaigns = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ color: '#6c757d', marginBottom: '0.5rem', fontSize: '0.95rem', fontWeight: '500' }}>Total Calls</div>
-                    <div style={{ fontSize: '3rem', fontWeight: '700', color: '#0dcaf0' }}>824</div>
+                    <div style={{ fontSize: '3rem', fontWeight: '700', color: '#0dcaf0' }}>{totalCalls}</div>
                   </div>
                   <div style={{
                     width: '56px',
@@ -267,7 +450,7 @@ const AIMLCampaigns = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <div style={{ color: '#6c757d', marginBottom: '0.5rem', fontSize: '0.95rem', fontWeight: '500' }}>Avg Success Rate</div>
-                    <div style={{ fontSize: '3rem', fontWeight: '700', color: '#198754' }}>73%</div>
+                    <div style={{ fontSize: '3rem', fontWeight: '700', color: '#198754' }}>{avgSuccessRate}%</div>
                   </div>
                   <div style={{
                     width: '56px',
@@ -333,8 +516,11 @@ const AIMLCampaigns = () => {
                   }}
                 >
                   <option value="all">All Bot Profiles</option>
-                  <option value="gandalf">Gandalf Support Bot</option>
-                  <option value="spanish">Spanish Sales Bot</option>
+                  {voiceBots.map((bot) => (
+                    <option key={bot.id} value={bot.id}>
+                      {bot.bot_name || bot.name || 'Unnamed Bot'}
+                    </option>
+                  ))}
                 </select>
               </Col>
 
@@ -417,29 +603,30 @@ const AIMLCampaigns = () => {
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Campaign Name</th>
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Bot Profile</th>
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Client</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Type</th>
+                    {/* <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Type</th> */}
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Progress</th>
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {campaigns.map((campaign) => (
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#6c757d' }}>
+                        Loading campaigns...
+                      </td>
+                    </tr>
+                  ) : filteredCampaigns.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#6c757d' }}>
+                        No campaigns found
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredCampaigns.map((campaign) => (
                     <tr 
                       key={campaign.id} 
                       style={{ transition: 'background-color 0.2s', cursor: 'pointer' }}
-                      onClick={() => setSelectedCampaign({
-                        name: campaign.name,
-                        callsMade: campaign.callsMade,
-                        answered: campaign.answered,
-                        keyOutcomes: 9,
-                        successRate: campaign.progress,
-                        failed: campaign.failed,
-                        recentOutcomes: [
-                          { label: '5 Follow Up Scheduled', color: 'primary' },
-                          { label: '2 Left Voicemail', color: 'info' },
-                          { label: '11 Escalated to Support', color: 'warning' }
-                        ]
-                      })}
+                      onClick={() => handleCampaignSelect(campaign)}
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
@@ -462,7 +649,7 @@ const AIMLCampaigns = () => {
                       </td>
                       <td style={{ padding: '16px', fontSize: '14px', color: '#6b7280', borderBottom: '1px solid #f3f4f6' }}>{campaign.botProfile}</td>
                       <td style={{ padding: '16px', fontSize: '14px', color: '#1f2937', borderBottom: '1px solid #f3f4f6' }}>{campaign.client}</td>
-                      <td style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+                      {/* <td style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
                         <span style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -476,7 +663,7 @@ const AIMLCampaigns = () => {
                         }}>
                           {campaign.type}
                         </span>
-                      </td>
+                      </td> */}
                       <td style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div style={{ 
@@ -537,6 +724,7 @@ const AIMLCampaigns = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setExpandedActions(null);
+                                handleEditCampaign(campaign.id);
                               }}
                               style={{
                                 display: 'flex',
@@ -580,7 +768,7 @@ const AIMLCampaigns = () => {
                             <div
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setExpandedActions(null);
+                                handleDispatchCampaign(campaign);
                               }}
                               style={{
                                 display: 'flex',
@@ -590,19 +778,72 @@ const AIMLCampaigns = () => {
                                 fontSize: '14px',
                                 color: '#1f2937',
                                 cursor: 'pointer',
-                                transition: 'background-color 0.2s'
+                                transition: 'background-color 0.2s',
+                                borderBottom: '1px solid #f3f4f6'
                               }}
                               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
                               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                             >
-                              <Pause size={16} />
-                              Pause Campaign
+                              <Phone size={16} />
+                              Dispatch Campaign
+                            </div>
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePauseResumeCampaign(campaign.id, campaign.status || 'inactive');
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '10px 16px',
+                                fontSize: '14px',
+                                color: '#1f2937',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s',
+                                borderBottom: '1px solid #f3f4f6'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                              {campaign.status === 'active' ? (
+                                <>
+                                  <Pause size={16} />
+                                  Pause Campaign
+                                </>
+                              ) : (
+                                <>
+                                  <Play size={16} />
+                                  Resume Campaign
+                                </>
+                              )}
+                            </div>
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteCampaign(campaign);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '10px 16px',
+                                fontSize: '14px',
+                                color: '#dc3545',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fef2f2'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                              <Trash2 size={16} />
+                              Delete Campaign
                             </div>
                           </div>
                         )}
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>
@@ -612,8 +853,10 @@ const AIMLCampaigns = () => {
         {/* Right Sidebar - Campaign Details */}
         <Col xs={12} xl={3}>
           <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937', margin: 0 }}>{selectedCampaign.name}</h3>
+            {selectedCampaign ? (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937', margin: 0 }}>{selectedCampaign.name}</h3>
               <button style={{
                 padding: '6px',
                 border: 'none',
@@ -626,128 +869,134 @@ const AIMLCampaigns = () => {
             </div>
 
             {/* Call Distribution Chart */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#495057' }}>
-                Call Distribution
-              </h4>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={pieChartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {pieChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend 
-                    verticalAlign="bottom" 
-                    height={36}
-                    iconType="circle"
-                    formatter={(value, entry: any) => (
-                      <span style={{ fontSize: '0.875rem', color: '#495057' }}>
-                        {value}: {entry.payload.value}
-                      </span>
-                    )}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            {selectedCampaign && pieChartData.length > 0 && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#495057' }}>
+                  Call Distribution
+                </h4>
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={pieChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={36}
+                      iconType="circle"
+                      formatter={(value, entry: any) => (
+                        <span style={{ fontSize: '0.875rem', color: '#495057' }}>
+                          {value}: {entry.payload.value}
+                        </span>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
             {/* Stats Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              <div style={{ 
-                padding: '1rem',
-                backgroundColor: '#f8f9fa',
-                borderRadius: '8px',
-                borderLeft: '4px solid #0d6efd'
-              }}>
-                <div style={{ fontSize: '0.875rem', color: '#6c757d', marginBottom: '0.25rem' }}>
-                  Total Calls
+            {selectedCampaign && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div style={{ 
+                  padding: '1rem',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '8px',
+                  borderLeft: '4px solid #0d6efd'
+                }}>
+                  <div style={{ fontSize: '0.875rem', color: '#6c757d', marginBottom: '0.25rem' }}>
+                    Total Calls
+                  </div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
+                    {selectedCampaign.callsMade}
+                  </div>
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                  {selectedCampaign.callsMade}
+                <div style={{ 
+                  padding: '1rem',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '8px',
+                  borderLeft: '4px solid #198754'
+                }}>
+                  <div style={{ fontSize: '0.875rem', color: '#6c757d', marginBottom: '0.25rem' }}>
+                    Answered
+                  </div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
+                    {selectedCampaign.answered}
+                  </div>
+                </div>
+                <div style={{ 
+                  padding: '1rem',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '8px',
+                  borderLeft: '4px solid #dc3545'
+                }}>
+                  <div style={{ fontSize: '0.875rem', color: '#6c757d', marginBottom: '0.25rem' }}>
+                    Failed
+                  </div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
+                    {selectedCampaign.failed}
+                  </div>
+                </div>
+                <div style={{ 
+                  padding: '1rem',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '8px',
+                  borderLeft: '4px solid #0dcaf0'
+                }}>
+                  <div style={{ fontSize: '0.875rem', color: '#6c757d', marginBottom: '0.25rem' }}>
+                    Success Rate
+                  </div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
+                    {selectedCampaign.successRate}%
+                  </div>
                 </div>
               </div>
-              <div style={{ 
-                padding: '1rem',
-                backgroundColor: '#f8f9fa',
-                borderRadius: '8px',
-                borderLeft: '4px solid #198754'
-              }}>
-                <div style={{ fontSize: '0.875rem', color: '#6c757d', marginBottom: '0.25rem' }}>
-                  Answered
-                </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                  {selectedCampaign.answered}
-                </div>
-              </div>
-              <div style={{ 
-                padding: '1rem',
-                backgroundColor: '#f8f9fa',
-                borderRadius: '8px',
-                borderLeft: '4px solid #dc3545'
-              }}>
-                <div style={{ fontSize: '0.875rem', color: '#6c757d', marginBottom: '0.25rem' }}>
-                  Failed
-                </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                  {selectedCampaign.failed}
-                </div>
-              </div>
-              <div style={{ 
-                padding: '1rem',
-                backgroundColor: '#f8f9fa',
-                borderRadius: '8px',
-                borderLeft: '4px solid #0dcaf0'
-              }}>
-                <div style={{ fontSize: '0.875rem', color: '#6c757d', marginBottom: '0.25rem' }}>
-                  Success Rate
-                </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-                  {selectedCampaign.successRate}%
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* Recent Outcomes */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: '600', color: '#495057', margin: 0 }}>Recent Outcomes</h4>
-                <span style={{
-                  padding: '4px 8px',
-                  backgroundColor: '#6c757d',
-                  color: 'white',
-                  borderRadius: '12px',
-                  fontSize: '0.75rem',
-                  fontWeight: '600'
-                }}>3</span>
-              </div>
+            {selectedCampaign && (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h4 style={{ fontSize: '1rem', fontWeight: '600', color: '#495057', margin: 0 }}>Recent Outcomes</h4>
+                  <span style={{
+                    padding: '4px 8px',
+                    backgroundColor: '#6c757d',
+                    color: 'white',
+                    borderRadius: '12px',
+                    fontSize: '0.75rem',
+                    fontWeight: '600'
+                  }}>{selectedCampaign.recentOutcomes.length}</span>
+                </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {selectedCampaign.recentOutcomes.map((outcome, index) => (
-                  <span 
-                    key={index}
-                    style={{
-                      padding: '8px 12px',
-                      backgroundColor: outcome.color === 'primary' ? '#cfe2ff' : outcome.color === 'info' ? '#cff4fc' : '#fff3cd',
-                      color: outcome.color === 'primary' ? '#084298' : outcome.color === 'info' ? '#055160' : '#664d03',
-                      borderRadius: '6px',
-                      fontSize: '0.875rem',
-                      fontWeight: '500'
-                    }}
-                  >
-                    {outcome.label}
-                  </span>
-                ))}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {selectedCampaign.recentOutcomes.map((outcome, index) => (
+                    <span 
+                      key={index}
+                      style={{
+                        padding: '8px 12px',
+                        backgroundColor: outcome.color === 'primary' ? '#cfe2ff' : outcome.color === 'info' ? '#cff4fc' : '#fff3cd',
+                        color: outcome.color === 'primary' ? '#084298' : outcome.color === 'info' ? '#055160' : '#664d03',
+                        borderRadius: '6px',
+                        fontSize: '0.875rem',
+                        fontWeight: '500'
+                      }}
+                    >
+                      {outcome.label}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Quick Actions */}
             <div>
@@ -841,10 +1090,59 @@ const AIMLCampaigns = () => {
                 </button>
               </div>
             </div>
+              </>
+            ) : (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#6c757d' }}>
+                Select a campaign to view details
+              </div>
+            )}
           </div>
         </Col>
       </Row>
     </div>
+
+    {/* Delete Confirmation Modal */}
+    <ConfirmModal
+      show={showDeleteModal}
+      onHide={() => {
+        setShowDeleteModal(false);
+        setSelectedCampaignForDelete(null);
+      }}
+      title="Delete Campaign"
+      description={`Are you sure you want to delete the campaign "${selectedCampaignForDelete?.name}"? This action cannot be undone.`}
+      targetName={selectedCampaignForDelete?.name || ''}
+      onConfirm={handleConfirmDelete}
+      onCancel={() => {
+        setShowDeleteModal(false);
+        setSelectedCampaignForDelete(null);
+      }}
+      confirmButtonText="Delete"
+      confirmButtonVariant="danger"
+      requireTextConfirmation={true}
+      requiredConfirmationText="delete"
+    />
+
+    {/* Dispatch Confirmation Modal */}
+    <ConfirmModal
+      show={showDispatchModal}
+      onHide={() => {
+        setShowDispatchModal(false);
+        setSelectedCampaignForDispatch(null);
+      }}
+      title="Dispatch Campaign"
+      description={`Are you sure you want to dispatch the campaign "${selectedCampaignForDispatch?.name}"? This will initiate calls for this campaign.`}
+      targetName={selectedCampaignForDispatch?.name || ''}
+      onConfirm={handleConfirmDispatch}
+      onCancel={() => {
+        setShowDispatchModal(false);
+        setSelectedCampaignForDispatch(null);
+      }}
+      confirmButtonText={isDispatching ? "Dispatching..." : "Dispatch"}
+      confirmButtonVariant="primary"
+      requireTextConfirmation={true}
+      requiredConfirmationText="dispatch"
+      loading={isDispatching}
+    />
     </React.Fragment>
   );
 };

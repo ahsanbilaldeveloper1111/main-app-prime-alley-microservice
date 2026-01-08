@@ -13,6 +13,7 @@ import {
   RotateCcw,
   AlertCircle
 } from 'lucide-react';
+import { useRouter } from 'next/router';
 import { FaWhatsapp } from 'react-icons/fa';
 
 interface ContactSupportProps {
@@ -28,21 +29,31 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
   onRequestCall,
   onSendMessage 
 }) => {
+  const router = useRouter();
+  const handleEmailSupport = () => {
+    globalThis.location.href = 'mailto:info@primealley.com';
+  };
+
+  const handleRequestCall = () => {
+    globalThis.location.href = 'tel:+97143035555';
+  };
+
   const mainOptions = [
     {
       icon: MessageCircle,
       title: 'Live Chat',
       description: 'Chat with a live agent for immediate assistance.',
-      buttonText: 'Start a chat',
+      buttonText: 'Offline',
       buttonAction: onStartChat,
-      color: '#4680ff'
+      color: '#7db9f5',
+      disabled: true
     },
     {
       icon: Phone,
       title: 'Request Call Back',
       description: 'Schedule a call with our support team to get help.',
       buttonText: 'Request a call',
-      buttonAction: onRequestCall,
+      buttonAction: handleRequestCall,
       color: '#5babf6'
     },
     {
@@ -50,8 +61,8 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
       title: 'Email Support',
       description: 'Submit a support ticket for assistance via email.',
       buttonText: 'Send a message',
-      buttonAction: onSendMessage,
-      color: '#7db9f5'
+      buttonAction: handleEmailSupport,
+      color: '#5babf6'
     }
   ];
 
@@ -134,10 +145,10 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
         <Col xs={12} lg={8}>
           {/* Contact Options */}
           <Row className="g-3 mb-3">
-            {mainOptions.map((option, index) => {
+            {mainOptions.map((option) => {
               const Icon = option.icon;
               return (
-                <Col xs={12} md={4} key={index}>
+                <Col xs={12} md={4} key={option.title}>
                   <Card style={{
                     background: '#fff',
                     border: '1px solid #e9ecef',
@@ -177,8 +188,9 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                     </p>
                     <Button
                       onClick={option.buttonAction}
+                      disabled={option.disabled || false}
                       style={{
-                        background: option.color,
+                        background: option.disabled ? '#c0c0c0' : option.color,
                         border: 'none',
                         borderRadius: '6px',
                         padding: '10px 20px',
@@ -188,7 +200,9 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '8px'
+                        gap: '8px',
+                        cursor: option.disabled ? 'not-allowed' : 'pointer',
+                        opacity: option.disabled ? 0.6 : 1
                       }}
                     >
                       {option.buttonText} <ChevronRight size={16} />
@@ -223,12 +237,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                   }}>
                     Prefer to call us?
                   </span>
-                  <span style={{
-                    fontSize: '13px',
-                    color: '#6c757d'
-                  }}>
-                    The offa-diúl contacts
-                  </span>
+                 
                 </div>
                 <div style={{
                   display: 'flex',
@@ -246,12 +255,12 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      border: '1px solid #4680ff',
-                      color: '#4680ff'
+                     
                     }}
+                    onClick={handleRequestCall}
                   >
                     <PhoneCall size={18} />
-                    +1 (800) 123-4567
+                    +971 4 303 5555
                   </Button>
                   <Button
                     variant="outline-success"
@@ -263,15 +272,15 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      border: '1px solid #25D366',
-                      color: '#25D366'
+                     
                     }}
                   >
                     <FaWhatsapp size={18} />
-                    +(5-9)/ #AG 35DD
+                    WhatsApp
                   </Button>
                   <Button
                     variant="outline-secondary"
+                    onClick={() => router.push('/help-center/my-tickets/new')}
                     style={{
                       borderRadius: '6px',
                       padding: '8px 16px',
@@ -280,8 +289,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      border: '1px solid #6c757d',
-                      color: '#6c757d'
+                      
                     }}
                   >
                     <Ticket size={18} />
@@ -309,10 +317,10 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                 Suggested Articles
               </h5>
               <Row className="g-3 mb-3">
-                {suggestedArticles.map((article, index) => {
+                {suggestedArticles.map((article) => {
                   const Icon = article.icon;
                   return (
-                    <Col xs={12} sm={4} key={index}>
+                    <Col xs={12} sm={4} key={article.title}>
                       <div style={{
                         padding: '20px',
                         background: '#f8f9fa',
@@ -367,6 +375,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
               <div style={{ textAlign: 'center' }}>
                 <Button
                   variant="link"
+                  onClick={() => router.push('/help-center/knowledge-base')}
                   style={{
                     fontSize: '14px',
                     color: '#4680ff',
@@ -417,7 +426,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                 marginBottom: '8px',
                 lineHeight: '1.5'
               }}>
-                Mon - Fri: 8am - 9pm (ET)
+                Mon - Fri: 9am - 6pm (GMT 4+)
               </p>
               <p style={{
                 fontSize: '14px',
@@ -443,9 +452,9 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '6px',
-                    border: '1px solid #4680ff',
-                    color: '#4680ff'
+                    
                   }}
+                  onClick={handleRequestCall}
                 >
                   <PhoneCall size={16} />
                   Click to call
@@ -462,8 +471,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '6px',
-                    border: '1px solid #25D366',
-                    color: '#25D366'
+                    
                   }}
                 >
                   <FaWhatsapp size={16} />
@@ -495,16 +503,16 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                 flexDirection: 'column',
                 gap: '0'
               }}>
-                {faqs.map((faq, index) => (
+                {faqs.map((faq) => (
                   <div
-                    key={index}
+                    key={faq}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '12px 0',
                       cursor: 'pointer',
-                      borderBottom: index < faqs.length - 1 ? '1px solid #f0f0f0' : 'none'
+                      borderBottom: faqs.indexOf(faq) < faqs.length - 1 ? '1px solid #f0f0f0' : 'none'
                     }}
                   >
                     <span style={{
@@ -535,9 +543,11 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
               justifyContent: 'center',
               gap: '8px'
             }}
+            disabled={true}
           >
-            Still need help? Start a chat
+             Offline
           </Button>
+          {/* Still need help? Start a chat */}
         </Col>
       </Row>
     </div>

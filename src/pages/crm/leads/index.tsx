@@ -548,7 +548,7 @@ const CrmLeads = () => {
   const [leadsSearch, setLeadsSearch] = useState("");
   const [showLeadViewModal, setShowLeadViewModal] = useState(false);
   const [viewingLead, setViewingLead] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<string>("lead-info");
+  const [activeTab, setActiveTab] = useState<string>("general-info");
   const [loadingLead, setLoadingLead] = useState(false);
   const [showLeadHistoryModal, setShowLeadHistoryModal] = useState(false);
 
@@ -1470,7 +1470,7 @@ const CrmLeads = () => {
       }
 
       setViewingLead(leadData);
-      setActiveTab("lead-info"); // Reset to first tab when opening modal
+      //setActiveTab("lead-info"); // Reset to first tab when opening modal
       setShowLeadViewModal(true);
     } catch (error) {
       console.error("Failed to fetch lead:", error);
@@ -3620,82 +3620,35 @@ const CrmLeads = () => {
                 {/* Tabs Navigation */}
                 <div className="lead-detail-filter-buttons   mb-4">
                   <button
-                    className={`lead-detail-filter-button ${activeTab === "lead-info" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("lead-info")}
+                    className={`lead-detail-filter-button ${activeTab === "general-info" ? 'active' : ''}`}
+                    onClick={() => setActiveTab("general-info")}
                     style={{
-                      backgroundColor: activeTab === "lead-info" ? "#4680ff" : 'white',
+                      backgroundColor: activeTab === "general-info" ? "#4680ff" : 'white',
                       borderColor: "#4680ff",
-                      color: activeTab === "lead-info" ? 'white' : "#4680ff"
+                      color: activeTab === "general-info" ? 'white' : "#4680ff"
                     }}
                   >
                     <Target className="filter-icon" size={18} />
-                    <span>Lead Information</span>
+                    <span>General Information</span>
                   </button>
                   <button
-                    className={`lead-detail-filter-button ${activeTab === "company-info" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("company-info")}
+                    className={`lead-detail-filter-button ${activeTab === "campaign-prospect" ? 'active' : ''}`}
+                    onClick={() => setActiveTab("campaign-prospect")}
                     style={{
-                      backgroundColor: activeTab === "company-info" ? "#4680ff" : 'white',
+                      backgroundColor: activeTab === "campaign-prospect" ? "#4680ff" : 'white',
                       borderColor: "#4680ff",
-                      color: activeTab === "company-info" ? 'white' : "#4680ff"
-                    }}
-                  >
-                    <Building2 className="filter-icon" size={18} />
-                    <span>Company Information</span>
-                  </button>
-                  <button
-                    className={`lead-detail-filter-button ${activeTab === "contact-persons" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("contact-persons")}
-                    style={{
-                      backgroundColor: activeTab === "contact-persons" ? "#4680ff" : 'white',
-                      borderColor: "#4680ff",
-                      color: activeTab === "contact-persons" ? 'white' : "#4680ff"
-                    }}
-                  >
-                    <Users className="filter-icon" size={18} />
-                    <span>Contact Persons ({viewingLead.contact_persons && Array.isArray(viewingLead.contact_persons) ? viewingLead.contact_persons.length : 0})</span>
-                  </button>
-                  <button
-                    className={`lead-detail-filter-button ${activeTab === "campaign-info" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("campaign-info")}
-                    style={{
-                      backgroundColor: activeTab === "campaign-info" ? "#4680ff" : 'white',
-                      borderColor: "#4680ff",
-                      color: activeTab === "campaign-info" ? 'white' : "#4680ff"
+                      color: activeTab === "campaign-prospect" ? 'white' : "#4680ff"
                     }}
                   >
                     <FileText className="filter-icon" size={18} />
-                    <span>Campaign Information</span>
-                  </button>
-                  <button
-                    className={`lead-detail-filter-button ${activeTab === "prospect-info" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("prospect-info")}
-                    style={{
-                      backgroundColor: activeTab === "prospect-info" ? "#4680ff" : 'white',
-                      borderColor: "#4680ff",
-                      color: activeTab === "prospect-info" ? 'white' : "#4680ff"
-                    }}
-                  >
-                    <FileText className="filter-icon" size={18} />
-                    <span>Prospect Information</span>
-                  </button>
-                  <button
-                    className={`lead-detail-filter-button ${activeTab === "prospect-fields" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("prospect-fields")}
-                    style={{
-                      backgroundColor: activeTab === "prospect-fields" ? "#4680ff" : 'white',
-                      borderColor: "#4680ff",
-                      color: activeTab === "prospect-fields" ? 'white' : "#4680ff"
-                    }}
-                  >
-                    <FileText className="filter-icon" size={18} />
-                    <span>Prospect Fields</span>
+                    <span>Campaign & Prospect</span>
                   </button>
                 </div>
 
                 {/* Tab Content */}
-                {activeTab === "lead-info" && (
+                {activeTab === "general-info" && (
                   <div style={{ paddingTop: "20px" }}>
+                      {/* Lead Information Section */}
                       <div
                         style={{
                           fontSize: "16px",
@@ -4027,27 +3980,25 @@ const CrmLeads = () => {
                     </div>
                   </div>
                 </div>
-                  </div>
-                )}
 
-                {activeTab === "company-info" && (
-                  <div style={{ paddingTop: "20px" }}>
-                    <div
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: 600,
-                        color: "#1f2937",
-                        marginBottom: "20px",
-                        paddingBottom: "10px",
-                        borderBottom: "2px solid #f8f9fa",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
-                      <Building2 size={18} style={{ color: "#4680ff" }} />
-                      Company Information
-                    </div>
+                      {/* Company Information Section */}
+                      <div
+                        style={{
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          color: "#1f2937",
+                          marginTop: "40px",
+                          marginBottom: "20px",
+                          paddingBottom: "10px",
+                          borderBottom: "2px solid #f8f9fa",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                        }}
+                      >
+                        <Building2 size={18} style={{ color: "#4680ff" }} />
+                        Company Information
+                      </div>
                     {viewingLead.company_name ? (
                       <>
                     <div
@@ -4287,16 +4238,14 @@ const CrmLeads = () => {
                     No company information available
                   </div>
                 )}
-              </div>
-            )}
 
-                {activeTab === "contact-persons" && (
-                  <div style={{ paddingTop: "20px" }}>
+                      {/* Contact Persons Section */}
                       <div
                         style={{
                           fontSize: "16px",
                           fontWeight: 600,
                           color: "#1f2937",
+                          marginTop: "40px",
                           marginBottom: "20px",
                           paddingBottom: "10px",
                           borderBottom: "2px solid #f8f9fa",
@@ -4402,8 +4351,9 @@ const CrmLeads = () => {
                   </div>
                 )}
 
-                {activeTab === "campaign-info" && (
+                {activeTab === "campaign-prospect" && (
                   <div style={{ paddingTop: "20px" }}>
+                      {/* Campaign Information Section */}
                       <div
                         style={{
                           fontSize: "16px",
@@ -4530,16 +4480,14 @@ const CrmLeads = () => {
                         No campaign information available
                       </div>
                     )}
-                  </div>
-                )}
 
-                {activeTab === "prospect-info" && (
-                  <div style={{ paddingTop: "20px" }}>
+                      {/* Prospect Information Section */}
                       <div
                         style={{
                           fontSize: "16px",
                           fontWeight: 600,
                           color: "#1f2937",
+                          marginTop: "40px",
                           marginBottom: "20px",
                           paddingBottom: "10px",
                           borderBottom: "2px solid #f8f9fa",
@@ -4997,16 +4945,14 @@ const CrmLeads = () => {
                     No prospect information available
                   </div>
                 )}
-              </div>
-            )}
 
-                {activeTab === "prospect-fields" && (
-                  <div style={{ paddingTop: "20px" }}>
+                      {/* Prospect Fields Section */}
                       <div
                         style={{
                           fontSize: "16px",
                           fontWeight: 600,
                           color: "#1f2937",
+                          marginTop: "40px",
                           marginBottom: "20px",
                           paddingBottom: "10px",
                           borderBottom: "2px solid #f8f9fa",

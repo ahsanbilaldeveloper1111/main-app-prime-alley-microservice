@@ -469,7 +469,7 @@ const Settings = () => {
                   </div>
                 )}
 
-                Telco G{/* ateway Content */}
+               {/*  Telco Gateway Content */}
                 {activeTab === "telco-gateway" && shouldRenderTab("telco-gateway", activeTelcoTab) && (
                   <div>
                     {activeTelcoTab === "assign-devices" && <GsmAssign />}

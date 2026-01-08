@@ -2051,6 +2051,10 @@ const CrmCampaigns = () => {
                       </th>
                     )}
                     {selectedCampaignsColumns.includes('campaignUsers') && <th>Campaign Users</th>}
+
+                    {selectedCampaignsColumns.includes('campaignsCreatedBy') && <th>Created By</th>}
+
+                    
                     {selectedCampaignsColumns.includes('created') && (
                       <th 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -2130,6 +2134,16 @@ const CrmCampaigns = () => {
                             <span className="text-muted small">
                               {getUserNames(campaign.user_extensions || [])}
                             </span>
+                          </td>
+                        )}
+                        {selectedCampaignsColumns.includes('campaignsCreatedBy') && (
+                          <td>
+                            <small className="text-muted">
+                              {campaign.created_by ? (() => {
+                                const extension = extensions.find(ext => ext.id == campaign.created_by || ext.extension == campaign.created_by);
+                                return extension?.display_name || extension?.name || campaign.created_by;
+                              })() : 'Unknown'}
+                            </small>
                           </td>
                         )}
                         {selectedCampaignsColumns.includes('created') && (
