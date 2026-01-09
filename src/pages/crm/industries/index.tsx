@@ -11,6 +11,9 @@ import {
   CreateIndustryPayload,
   UpdateIndustryPayload,
 } from "@utils/crm";
+import { hasPermission } from "@utils/Helper";
+import { formatDateTimeToLocal } from "@utils/Helper";
+import { GlobalDateFormat } from "@utils/Helper";
 import {
   Button,
   Form,
@@ -35,8 +38,9 @@ import {
 } from "lucide-react";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-
+import { useSession } from "next-auth/react";
 const IndustriesPage = () => {
+  const { data: session } = useSession();
   // State
   const [industries, setIndustries] = useState<IndustryData[]>([]);
   const [totalIndustries, setTotalIndustries] = useState(0);
@@ -70,7 +74,9 @@ const IndustriesPage = () => {
         params.search = search;
       }
       const response = await getIndustries(params);
-      setIndustries(response.data || []);
+
+      console.log(response, "response industries");
+      setIndustries(response?.data || []);
       setTotalIndustries(response.total || 0);
     } catch (error: any) {
       console.error("Failed to fetch industries:", error);
@@ -178,6 +184,7 @@ const IndustriesPage = () => {
                   Manage industry categories for your CRM
                 </p>
               </div>
+              {session?.user?.permissions?.includes('add-crm-industry') && (
               <Button
                 variant="primary"
                 onClick={() => handleOpenModal()}
@@ -186,6 +193,7 @@ const IndustriesPage = () => {
                 <PlusCircle size={18} />
                 Add Industry
               </Button>
+              )}
             </div>
           </Card.Body>
         </Card>
@@ -193,22 +201,24 @@ const IndustriesPage = () => {
         {/* Search Bar */}
         <Card className="border-0 shadow-sm mb-3">
           <Card.Body className="p-3">
-            <InputGroup>
-              <Form.Control
-                type="text"
-                placeholder="Search industries by name or description..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleSearch();
-                  }
-                }}
-              />
-              <Button variant="outline-secondary" onClick={handleSearch}>
-                <Search size={16} />
-              </Button>
-            </InputGroup>
+            <Form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSearch();
+              }}
+            >
+              <InputGroup>
+                <Form.Control
+                  type="text"
+                  placeholder="Search industries by name or description..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                <Button variant="outline-secondary" type="submit">
+                  <Search size={16} />
+                </Button>
+              </InputGroup>
+            </Form>
           </Card.Body>
         </Card>
 
@@ -221,21 +231,14 @@ const IndustriesPage = () => {
                 <p className="mt-2 text-muted">Loading industries...</p>
               </div>
             ) : industries.length === 0 ? (
-              <div className="text-center p-5">
-                <Building2 size={48} className="text-muted mb-3" />
-                <p className="text-muted">No industries found</p>
-                <Button variant="primary" onClick={() => handleOpenModal()}>
-                  <PlusCircle size={18} className="me-2" />
-                  Add First Industry
-                </Button>
-              </div>
+              <></>
             ) : (
               <>
                 <div className="table-responsive">
                   <Table hover className="mb-0">
                     <thead className="table-light">
                       <tr>
-                        <th>ID</th>
+                       
                         <th>Name</th>
                         <th>Description</th>
                         <th>Created At</th>
@@ -243,26 +246,21 @@ const IndustriesPage = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {industries.map((industry) => (
-                        <tr key={industry.id}>
+                      {industries && industries.length > 0 && industries.map((industry) => (
+                        <tr key={industry?.id}>
                           <td>
-                            <Badge bg="light" text="dark">
-                              #{industry.id}
-                            </Badge>
-                          </td>
-                          <td>
-                            <div className="fw-semibold">{industry.name}</div>
-                          </td>
-                          <td>
-                            <div className="text-muted small">
-                              {industry.description || (
-                                <span className="fst-italic">No description</span>
-                              )}
+                            <div className="small text-muted">
+                              {industry?.name}
                             </div>
                           </td>
                           <td>
                             <div className="small text-muted">
-                              {new Date(industry.created_at).toLocaleDateString()}
+                              {industry?.description}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="small text-muted">
+                              {formatDateTimeToLocal(industry?.created_at, GlobalDateFormat)}
                             </div>
                           </td>
                           <td>
@@ -274,6 +272,7 @@ const IndustriesPage = () => {
                               >
                                 <Eye size={14} />
                               </Button>
+                              {session?.user?.permissions?.includes('edit-crm-industry') && (
                               <Button
                                 variant="outline-primary"
                                 size="sm"
@@ -281,6 +280,8 @@ const IndustriesPage = () => {
                               >
                                 <Edit size={14} />
                               </Button>
+                              )}
+                              {session?.user?.permissions?.includes('delete-crm-industry') && (
                               <Button
                                 variant="outline-danger"
                                 size="sm"
@@ -291,6 +292,7 @@ const IndustriesPage = () => {
                               >
                                 <Trash2 size={14} />
                               </Button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -444,20 +446,7 @@ const IndustriesPage = () => {
                   )}
                 </div>
               </div>
-              <div className="mb-3">
-                <Form.Label className="text-muted small">Created At</Form.Label>
-                <div>
-                  {new Date(viewingIndustry.created_at).toLocaleString()}
-                </div>
-              </div>
-              {viewingIndustry.updated_at && (
-                <div className="mb-3">
-                  <Form.Label className="text-muted small">Updated At</Form.Label>
-                  <div>
-                    {new Date(viewingIndustry.updated_at).toLocaleString()}
-                  </div>
-                </div>
-              )}
+              
             </Modal.Body>
             <Modal.Footer>
               <Button variant="secondary" onClick={() => setShowViewModal(false)}>

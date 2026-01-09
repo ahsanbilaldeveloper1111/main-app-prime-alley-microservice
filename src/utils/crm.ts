@@ -3281,15 +3281,11 @@ export const getIndustries = async (
   try {
     const response = await axiosInstance.get("/crm/industries", { params });
     const responseData: any = response.data?.data;
+   
     if (responseData?.data) {
-      return {
-        data: responseData.data,
-        total: responseData.total || responseData.data.length,
-        current_page: responseData.current_page || 1,
-        per_page: responseData.per_page || 15,
-        last_page: responseData.last_page || 1,
-      };
+      return responseData?.data;
     }
+    
     return extractData<PaginationWrapper<IndustryData>>(response.data);
   } catch (error: any) {
     toast.error(error?.response?.data?.message || error?.message || "Failed to fetch industries");
@@ -3405,13 +3401,7 @@ export const getDealTemplates = async (
     const response = await axiosInstance.get("/crm/deal-templates", { params });
     const responseData: any = response.data?.data;
     if (responseData?.data) {
-      return {
-        data: responseData.data,
-        total: responseData.total || responseData.data.length,
-        current_page: responseData.current_page || 1,
-        per_page: responseData.per_page || 15,
-        last_page: responseData.last_page || 1,
-      };
+      return responseData?.data;
     }
     return extractData<PaginationWrapper<DealTemplateData>>(response.data);
   } catch (error: any) {

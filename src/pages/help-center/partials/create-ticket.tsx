@@ -168,18 +168,16 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
         priority,
         attachedFiles.length > 0 ? attachedFiles : undefined
       );
-      
-      if (response && (response.id || response.ticket_id)) {
-        const ticketId = response.id || response.ticket_id;
-        setSubmittedTicketId(ticketId.toString());
+      console.log(response, "response cti");
+      if (response && (response?.data?.id )) {
+        const ticketId = response?.data?.id;
+        setSubmittedTicketId(ticketId?.toString());
         setIsSubmitted(true);
         toast.success("Ticket created successfully!");
-      } else {
-        toast.error("Failed to create ticket");
-      }
+      } 
     } catch (error: any) {
       console.error("Error creating ticket:", error);
-      toast.error(error?.response?.data?.message || "Failed to create ticket");
+      
     } finally {
       setCreatingTicket(false);
     }

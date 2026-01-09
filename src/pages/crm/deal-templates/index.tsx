@@ -13,6 +13,7 @@ import {
   getIndustries,
   IndustryData,
 } from "@utils/crm";
+import { useSession } from "next-auth/react";
 import {
   Button,
   Row,
@@ -46,6 +47,7 @@ import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 
 const DealTemplatesPage = () => {
+  const { data: session } = useSession();
   // State
   const [templates, setTemplates] = useState<DealTemplateData[]>([]);
   const [industries, setIndustries] = useState<IndustryData[]>([]);
@@ -222,10 +224,10 @@ const DealTemplatesPage = () => {
     e.preventDefault();
     
     // Validation
-    if (!formData.industry_id) {
-      toast.error("Please select an industry");
-      return;
-    }
+    // if (!formData.industry_id) {
+    //   toast.error("Please select an industry");
+    //   return;
+    // }
     if (!formData.name.trim()) {
       toast.error("Please enter a template name");
       return;
@@ -247,7 +249,7 @@ const DealTemplatesPage = () => {
     try {
       setSubmitting(true);
       const payload: CreateDealTemplatePayload | UpdateDealTemplatePayload = {
-        industry_id: formData.industry_id,
+      //  industry_id: formData.industry_id,
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
         fields: fields.map((f) => ({
@@ -322,6 +324,7 @@ const DealTemplatesPage = () => {
                   Manage deal templates with custom fields for different industries
                 </p>
               </div>
+              {session?.user?.permissions?.includes('add-crm-deal-templates') && (
               <Button
                 variant="primary"
                 onClick={() => handleOpenModal()}
@@ -330,6 +333,7 @@ const DealTemplatesPage = () => {
                 <PlusCircle size={18} />
                 Add Template
               </Button>
+              )}
             </div>
           </Card.Body>
         </Card>
@@ -356,30 +360,7 @@ const DealTemplatesPage = () => {
                   </Button>
                 </InputGroup>
               </Col>
-              <Col md={6}>
-                <Select
-                  options={[
-                    { value: null, label: "All Industries" },
-                    ...industryOptions,
-                  ]}
-                  value={
-                    selectedIndustryFilter
-                      ? industryOptions.find((opt) => opt.value === selectedIndustryFilter)
-                      : { value: null, label: "All Industries" }
-                  }
-                  onChange={(selected) =>
-                    setSelectedIndustryFilter(selected?.value || null)
-                  }
-                  placeholder="Filter by industry..."
-                  isClearable
-                  styles={{
-                    control: (provided) => ({
-                      ...provided,
-                      minHeight: "38px",
-                    }),
-                  }}
-                />
-              </Col>
+             
             </Row>
           </Card.Body>
         </Card>
@@ -407,34 +388,22 @@ const DealTemplatesPage = () => {
                   <Table hover className="mb-0">
                     <thead className="table-light">
                       <tr>
-                        <th>ID</th>
+                       
                         <th>Name</th>
-                        <th>Industry</th>
+                       
                         <th>Description</th>
                         <th>Fields</th>
                         <th className="text-end">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {templates.map((template) => (
+                      {templates && templates.length > 0 && templates.map((template) => (
                         <tr key={template.id}>
-                          <td>
-                            <Badge bg="light" text="dark">
-                              #{template.id}
-                            </Badge>
-                          </td>
+                         
                           <td>
                             <div className="fw-semibold">{template.name}</div>
                           </td>
-                          <td>
-                            <div>
-                              {template.industry ? (
-                                <Badge bg="info">{template.industry.name}</Badge>
-                              ) : (
-                                <span className="text-muted">N/A</span>
-                              )}
-                            </div>
-                          </td>
+                         
                           <td>
                             <div className="text-muted small">
                               {template.description || (
@@ -547,33 +516,7 @@ const DealTemplatesPage = () => {
           </Modal.Header>
           <Form onSubmit={handleSubmit}>
             <Modal.Body style={{ maxHeight: "70vh", overflowY: "auto" }}>
-              <Form.Group className="mb-3">
-                <Form.Label>
-                  Industry <span className="text-danger">*</span>
-                </Form.Label>
-                <Select
-                  options={industryOptions}
-                  value={
-                    formData.industry_id
-                      ? industryOptions.find((opt) => opt.value === formData.industry_id)
-                      : null
-                  }
-                  onChange={(selected) =>
-                    setFormData({
-                      ...formData,
-                      industry_id: selected?.value || null,
-                    })
-                  }
-                  placeholder="Select industry..."
-                  isDisabled={loadingIndustries}
-                  styles={{
-                    control: (provided) => ({
-                      ...provided,
-                      minHeight: "38px",
-                    }),
-                  }}
-                />
-              </Form.Group>
+              
               <Form.Group className="mb-3">
                 <Form.Label>
                   Name <span className="text-danger">*</span>

@@ -7,9 +7,11 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  getIndustries,
   CrmProduct,
   CreateProductPayload,
   UpdateProductPayload,
+  IndustryData,
 } from "@utils/crm";
 import {
   Button,
@@ -183,6 +185,8 @@ interface ProductDisplayData {
   status: "Active" | "Inactive";
   description: string;
   created: string;
+  industry?: IndustryData | null;
+  industry_id?: number | null;
 }
 
 const ProductsPage = () => {
@@ -225,7 +229,10 @@ const ProductsPage = () => {
     brand: "",
     isActive: true,
     description: "",
+    industry_id: null as number | null,
   });
+  const [industries, setIndustries] = useState<IndustryData[]>([]);
+  const [loadingIndustries, setLoadingIndustries] = useState(false);
   const [deletingProduct, setDeletingProduct] = useState<ProductDisplayData | null>(null);
   const [showProductDeleteModal, setShowProductDeleteModal] = useState(false);
   const [showProductViewModal, setShowProductViewModal] = useState(false);
@@ -422,6 +429,23 @@ const ProductsPage = () => {
     );
   };
 
+  // Fetch industries
+  const fetchIndustries = async () => {
+    try {
+      setLoadingIndustries(true);
+      const response = await getIndustries({ per_page: 1000 });
+      setIndustries(response.data);
+    } catch (error: any) {
+      // Error toast is handled in the API function
+    } finally {
+      setLoadingIndustries(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchIndustries();
+  }, []);
+
   // Convert CrmProduct to ProductDisplayData
   const convertToDisplayData = (product: CrmProduct): ProductDisplayData => {
     return {
@@ -435,6 +459,8 @@ const ProductsPage = () => {
       status: product.active ? "Active" : "Inactive",
       description: product.description || "",
       created: new Date(product.created_at).toLocaleDateString(),
+      industry: (product as any).industry || null,
+      industry_id: (product as any).industry_id || null,
     };
   };
 
@@ -555,6 +581,7 @@ const ProductsPage = () => {
         brand: product.brand,
         isActive: product.status === "Active",
         description: product.description,
+        industry_id: product.industry_id || product.industry?.id || null,
       });
     } else {
       setEditingProduct(null);
@@ -567,6 +594,7 @@ const ProductsPage = () => {
         brand: "",
         isActive: true,
         description: "",
+        industry_id: null,
       });
     }
     setShowProductModal(true);
@@ -574,10 +602,17 @@ const ProductsPage = () => {
 
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate industry is selected
+    if (!productFormData.industry_id) {
+      toast.error("Please select an industry");
+      return;
+    }
+    
     try {
       if (editingProduct) {
         // Update existing product
-        const updatePayload: UpdateProductPayload = {
+        const updatePayload: any = {
           id: editingProduct.id,
           name: productFormData.productName,
           description: productFormData.description,
@@ -587,11 +622,12 @@ const ProductsPage = () => {
           brand: productFormData.brand,
           active: productFormData.isActive,
           currency: productFormData.currency,
+          industry_id: productFormData.industry_id,
         };
         await updateProduct(updatePayload);
       } else {
         // Create new product
-        const createPayload: CreateProductPayload = {
+        const createPayload: any = {
           name: productFormData.productName,
           description: productFormData.description,
           sku: productFormData.sku,
@@ -600,6 +636,7 @@ const ProductsPage = () => {
           brand: productFormData.brand,
           active: productFormData.isActive,
           currency: productFormData.currency,
+          industry_id: productFormData.industry_id,
         };
         await createProduct(createPayload);
       }
@@ -676,6 +713,41 @@ const ProductsPage = () => {
           </Modal.Header>
           <Modal.Body>
             <Form onSubmit={handleProductSubmit}>
+              <Row>
+                <Col md={12}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">
+                      Industry <span className="text-danger">*</span>
+                    </Form.Label>
+                    <Select
+                      options={industries.map((ind) => ({ value: ind.id, label: ind.name }))}
+                      value={
+                        productFormData.industry_id
+                          ? {
+                              value: productFormData.industry_id,
+                              label: industries.find((ind) => ind.id === productFormData.industry_id)?.name || "",
+                            }
+                          : null
+                      }
+                      onChange={(selected) =>
+                        setProductFormData({
+                          ...productFormData,
+                          industry_id: selected ? selected.value : null,
+                        })
+                      }
+                      placeholder="Select industry..."
+                      styles={customSelectStyles}
+                      isLoading={loadingIndustries}
+                      isDisabled={loadingIndustries}
+                      isClearable={false}
+                      required
+                    />
+                    <Form.Text className="text-muted">
+                      Select the industry this product belongs to
+                    </Form.Text>
+                  </Form.Group>
+                </Col>
+              </Row>
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
@@ -962,6 +1034,49 @@ const ProductsPage = () => {
                     {viewingProduct.productName}
                   </div>
                 </div>
+                {(viewingProduct.industry || viewingProduct.industry_id) && (
+                  <div
+                    style={{
+                      background: "#f8f9fa",
+                      padding: "16px",
+                      borderRadius: "10px",
+                      transition: "all 0.3s",
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = "#e5e7eb";
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = "#f8f9fa";
+                      e.currentTarget.style.transform = "translateY(0)";
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: "#6b7280",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      Industry
+                    </div>
+                    <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                      <Badge
+                        bg="primary"
+                        className="bg-opacity-10 text-dark"
+                        style={{ padding: "6px 14px", fontSize: "13px" }}
+                      >
+                        <Building2 size={14} style={{ marginRight: "6px" }} />
+                        {viewingProduct.industry?.name ||
+                          industries.find((ind) => ind.id === viewingProduct.industry_id)?.name ||
+                          "N/A"}
+                      </Badge>
+                    </div>
+                  </div>
+                )}
                 <div
                   style={{
                     background: "#f8f9fa",

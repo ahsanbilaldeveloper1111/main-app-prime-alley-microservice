@@ -367,7 +367,7 @@ const MyTicketsPage = () => {
                                   padding: '12px',
                                   color: '#2c3e50',
                                   border: 'none'
-                                }}>{ticket.module?.name || 'N/A'}</td>
+                                }}>{ticket?.type?.name || 'N/A'}</td>
                                 <td style={{ padding: '12px', border: 'none' }}>
                                   <div style={{
                                     display: 'inline-flex',
