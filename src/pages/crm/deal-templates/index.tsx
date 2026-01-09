@@ -248,23 +248,37 @@ const DealTemplatesPage = () => {
 
     try {
       setSubmitting(true);
-      const payload: CreateDealTemplatePayload | UpdateDealTemplatePayload = {
-      //  industry_id: formData.industry_id,
-        name: formData.name.trim(),
-        description: formData.description.trim() || undefined,
-        fields: fields.map((f) => ({
-          field_name: f.field_name.trim(),
-          field_type: f.field_type,
-          options: f.field_type === "dropdown" ? f.options : null,
-          is_required: f.is_required,
-          sort_order: f.sort_order,
-        })),
-      };
+      
+      const fieldsPayload = fields.map((f) => ({
+        field_name: f.field_name.trim(),
+        field_type: f.field_type,
+        options: f.field_type === "dropdown" ? f.options : null,
+        is_required: f.is_required,
+        sort_order: f.sort_order,
+      }));
 
       if (editingTemplate) {
-        await updateDealTemplate(editingTemplate.id, payload);
+        // Update payload doesn't require industry_id
+        const updatePayload: UpdateDealTemplatePayload = {
+          name: formData.name.trim(),
+          description: formData.description.trim() || undefined,
+          fields: fieldsPayload,
+        };
+        await updateDealTemplate(editingTemplate.id, updatePayload);
       } else {
-        await createDealTemplate(payload);
+        // Create payload requires industry_id
+        if (!formData.industry_id) {
+          toast.error("Please select an industry");
+          setSubmitting(false);
+          return;
+        }
+        const createPayload: CreateDealTemplatePayload = {
+          industry_id: formData.industry_id,
+          name: formData.name.trim(),
+          description: formData.description.trim() || undefined,
+          fields: fieldsPayload,
+        };
+        await createDealTemplate(createPayload);
       }
       setShowModal(false);
       setEditingTemplate(null);
