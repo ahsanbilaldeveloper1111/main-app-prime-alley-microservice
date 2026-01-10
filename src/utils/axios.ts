@@ -144,6 +144,8 @@ axiosInstance.interceptors.response.use(
       } else if (error.response.status === 403) {
         //console.log('Forbidden');
         toast.error('Forbidden');
+      } else if (error.response.status === 429) {
+        toast.error('Too many requests. Please try again in a few moments.');
       }
     }
     return Promise.reject(error);

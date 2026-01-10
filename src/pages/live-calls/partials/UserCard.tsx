@@ -32,6 +32,7 @@ interface UserCardProps {
   selectedTone: Record<string, string>
   isDnInActiveCall: (dn: string) => boolean
   userAddress?: string | null
+  monitoringStartTime?: Record<string, Date>
 }
 
 const UserCard: React.FC<UserCardProps> = ({
@@ -56,7 +57,8 @@ const UserCard: React.FC<UserCardProps> = ({
   startMonitoringLocal,
   selectedTone,
   isDnInActiveCall,
-  userAddress
+  userAddress,
+  monitoringStartTime
 }) => {
 
   // Get user extension data (image and team names)
@@ -244,9 +246,23 @@ const UserCard: React.FC<UserCardProps> = ({
   const monitoredAgentHasActiveCall = monitoredAgentCall && 
     ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED'].includes(monitoredAgentCall.currentState || '')
 
+  // Get monitored agent's call startTime
+  const monitoredAgentCallStartTime = monitoredAgentCall?.parties?.[0]?.startTime || 
+                                      monitoredAgentCall?.eventTime || 
+                                      null
+
   // Get call details
   const callFrom = call?.parties?.[0]?.callingAddress || 'N/A'
   const callTo = call?.parties?.[0]?.calledAddress || 'N/A'
+  // Get call startTime from parties array - prioritize parties[0].startTime (most accurate for ANSWERED/CONNECTED)
+  // This is the actual call start time from the API, not eventTime
+  // Check both parties array and direct call properties for startTime
+  const callStartTime = call?.parties?.[0]?.startTime || 
+                       call?.startTime || 
+                       call?.eventTime || 
+                       null
+  // Get callId for unique timer key (ensures different calls on same DN have separate timers)
+  const callId = call?.callId || call?.parties?.[0]?.callId || null
 
   // Determine card border style
   const getCardStyle = () => {
@@ -422,7 +438,9 @@ const UserCard: React.FC<UserCardProps> = ({
                   >
                     <CallTimer 
                       dn={dn}
-                      isActive={active && call ? true : false} 
+                      isActive={active && call ? true : false}
+                      startTime={callStartTime}
+                      callId={callId}
                     />
                   </div>
                 )}
@@ -453,13 +471,15 @@ const UserCard: React.FC<UserCardProps> = ({
                     </span>
                   </div>
                 )}
-                {monitoredAgentHasActiveCall && monitoredAgentDn && (
+                {monitoredAgentDn && (
                   <div className="d-flex justify-content-between mb-0">
                     <span className="text-muted">Duration:</span>
                     <span className="fw-semibold text-dark">
                       <CallTimer 
-                        dn={monitoredAgentDn}
-                        isActive={monitoredAgentHasActiveCall} 
+                        dn={`${dn}_monitoring_${monitoredAgentDn}`}
+                        isActive={true}
+                        startTime={monitoringStartTime?.[monitoredAgentDn] || undefined}
+                        callId={undefined}
                       />
                     </span>
                   </div>

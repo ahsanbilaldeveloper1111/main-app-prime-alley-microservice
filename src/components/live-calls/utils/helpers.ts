@@ -1,5 +1,6 @@
 import { CtiDevice, ActiveMonitoring } from './types'
 import { SECTION_CONFIG } from './constants'
+import moment from 'moment'
 
 /**
  * Get card level status based on device states
@@ -29,9 +30,63 @@ export const categorizeDns = (
   // Check if this DN is a supervisor doing monitoring - show in supervision section
   // activeMonitoring.monitor = supervisor's DN who is monitoring
   // activeMonitoring.dn = agent's DN being monitored
-  if (activeMonitoring.monitor && activeMonitoring.monitor === dn && activeMonitoring.type) {
-    // This DN is a supervisor doing monitoring - show in supervision section
-    return 'supervision'
+  // Proceed if monitoring state is set (deviceName may be pending)
+  if (activeMonitoring.monitor && activeMonitoring.monitor === dn && activeMonitoring.type && activeMonitoring.dn) {
+    // Check if there's an active call between supervisor and agent (the monitoring call itself)
+    const allCallsForSupervisor = getCallStatesForDn(dn) // Supervisor's calls
+    const hasActiveMonitoringCall = allCallsForSupervisor.some((call: any) => {
+      // Skip terminating calls
+      if (call.isTerminating) return false
+      if (!call.parties || call.parties.length === 0) return false
+      
+      // Check if this call involves both supervisor and the agent being monitored
+      const hasMatchingParties = call.parties.some((p: any) => {
+        const involvesSupervisor = p.callingAddress === dn || p.calledAddress === dn
+        const involvesAgent = p.callingAddress === activeMonitoring.dn || p.calledAddress === activeMonitoring.dn
+        return involvesSupervisor && involvesAgent
+      })
+      
+      if (!hasMatchingParties) return false
+      
+      // Check if any party is still active (not DROPPED/DISCONNECTED)
+      return call.parties.some((p: any) => {
+        const involvesSupervisor = p.callingAddress === dn || p.calledAddress === dn
+        const involvesAgent = p.callingAddress === activeMonitoring.dn || p.calledAddress === activeMonitoring.dn
+        const isActive = p.callStatus !== 'DROPPED' && p.callStatus !== 'DISCONNECTED'
+        return involvesSupervisor && involvesAgent && isActive
+      })
+    })
+    
+    // If monitoring call is active, show in supervision
+    // We don't require the monitored call to be active because:
+    // 1. The monitored call might be between the agent and a customer (108→103), which we don't track directly
+    // 2. The monitoring call (107→103) being active is sufficient to show the supervisor in supervision
+    if (hasActiveMonitoringCall) {
+      return 'supervision'
+    }
+    
+    // If deviceName is not set yet, still show in supervision (monitoring is starting, deviceName will be set from events)
+    // This handles cases where monitoring was started but deviceName hasn't been extracted from events yet
+    if (!activeMonitoring.deviceName) {
+      return 'supervision'
+    }
+    
+    // If monitoring call is not active but deviceName is set, check if monitored call is active
+    if (activeMonitoring.deviceName) {
+      const monitoredCall = getCallStateForDevice(activeMonitoring.dn, activeMonitoring.deviceName)
+      
+      // Show in supervision if monitored call is active (even if monitoring call ended)
+      if (monitoredCall && !monitoredCall.isTerminating && monitoredCall.parties && monitoredCall.parties.length > 0) {
+        const hasActiveParties = monitoredCall.parties.some((p: any) => 
+          p.callStatus !== 'DROPPED' && p.callStatus !== 'DISCONNECTED'
+        )
+        if (hasActiveParties) {
+          return 'supervision'
+        }
+      }
+    }
+    
+    // Fall through to other checks if neither monitoring call nor monitored call is active
   }
   
   // Check if DN has active calls (On Call)
@@ -312,21 +367,75 @@ export const getLocalStorageCallStatesInfo = () => {
  */
 export const calculateLongestCallDuration = (callStateMap: Record<string, any>): string => {
   const allCalls = Object.values(callStateMap || {}).filter((call: any) => 
-    !call.isTerminating && call.eventTime
+    !call.isTerminating && 
+    call.parties && 
+    call.parties.length > 0 &&
+    call.parties.some((p: any) => 
+      p.callStatus !== 'DROPPED' && 
+      p.callStatus !== 'DISCONNECTED' &&
+      ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED'].includes(p.callStatus)
+    )
   )
   
   if (allCalls.length === 0) return '--:--'
   
   const callsWithDuration = allCalls.map((call: any) => {
-    const eventTime = new Date(call.eventTime).getTime()
+    // Use the same logic as call timers: prioritize parties[0].startTime
+    let startTime: Date | null = null
+    
+    // Priority 1: Use startTime from the first party (most accurate)
+    if (call.parties && call.parties.length > 0 && call.parties[0].startTime) {
+      try {
+        // Parse as UTC (API typically sends UTC timestamps)
+        const parsedMoment = moment.utc(call.parties[0].startTime)
+        if (parsedMoment.isValid()) {
+          startTime = parsedMoment.toDate()
+        }
+      } catch (e) {
+        // Fallback to direct Date parsing
+        startTime = new Date(call.parties[0].startTime)
+      }
+    }
+    
+    // Priority 2: Use call.startTime if available
+    if (!startTime && call.startTime) {
+      try {
+        const parsedMoment = moment.utc(call.startTime)
+        if (parsedMoment.isValid()) {
+          startTime = parsedMoment.toDate()
+        }
+      } catch (e) {
+        startTime = new Date(call.startTime)
+      }
+    }
+    
+    // Priority 3: Use eventTime as last resort
+    if (!startTime && call.eventTime) {
+      try {
+        const parsedMoment = moment.utc(call.eventTime)
+        if (parsedMoment.isValid()) {
+          startTime = parsedMoment.toDate()
+        }
+      } catch (e) {
+        startTime = new Date(call.eventTime)
+      }
+    }
+    
+    if (!startTime) {
+      return { ...call, durationSeconds: 0 }
+    }
+    
     const now = Date.now()
-    const durationSeconds = Math.floor((now - eventTime) / 1000)
+    const startTimeMs = startTime.getTime()
+    const durationSeconds = Math.max(0, Math.floor((now - startTimeMs) / 1000))
     return { ...call, durationSeconds }
-  })
+  }).filter((call: any) => call.durationSeconds > 0)
+  
+  if (callsWithDuration.length === 0) return '--:--'
   
   const longest = callsWithDuration.reduce((max: any, call: any) => {
     return call.durationSeconds > max.durationSeconds ? call : max
-  }, callsWithDuration[0] || { durationSeconds: 0 })
+  }, callsWithDuration[0])
   
   if (longest.durationSeconds === 0) return '--:--'
   

@@ -202,6 +202,7 @@ export default function useCtiStomp(
   // Store latest callback functions in refs to avoid stale closures
   // These will be initialized after the functions are defined
   const handleCallEventRef = useRef<typeof handleCallEvent | null>(null);
+  const handleOngoingCallsRef = useRef<((data: any) => void) | null>(null);
   const groupDevicesByDnAndDeviceNameRef = useRef<
     typeof groupDevicesByDnAndDeviceName | null
   >(null);
@@ -739,6 +740,89 @@ export default function useCtiStomp(
     [saveCallStatesToStorage, dnsMap] // Include dnsMap so non-master tabs have access to latest device info
   );
 
+  // Handle ongoing calls response
+  const handleOngoingCalls = useCallback(
+    (data: { callsByDn?: Record<string, any> }) => {
+      if (!data || !data.callsByDn) {
+        console.log('[useCtiStomp] No callsByDn in ongoing calls response');
+        return;
+      }
+
+      const callsByDn = data.callsByDn || {};
+      console.log('[useCtiStomp] Processing ongoing calls:', Object.keys(callsByDn).length, 'DNs');
+
+      setCallStateMap((prev) => {
+        const updated = { ...prev };
+
+        // Process each DN's call data
+        Object.entries(callsByDn).forEach(([dn, callData]: [string, any]) => {
+          // Only process if callId is not null
+          if (!callData.callId) {
+            return;
+          }
+
+          const callId = callData.callId;
+
+          // Check if call should be included (has active participants and not terminating)
+          const shouldInclude = 
+            callData.hasActiveParticipants !== false && 
+            callData.isTerminating !== true &&
+            callData.parties &&
+            callData.parties.length > 0;
+
+          if (!shouldInclude) {
+            // Remove from callStateMap if it exists
+            if (updated[callId]) {
+              delete updated[callId];
+            }
+            return;
+          }
+
+          // Determine current state from parties or callData
+          let currentState = callData.eventType || callData.currentState;
+          if (!currentState && callData.parties && callData.parties.length > 0) {
+            const firstParty = callData.parties[0];
+            if (firstParty.callStatus) {
+              currentState = firstParty.callStatus;
+            }
+          }
+
+          // Filter out DROPPED/DISCONNECTED parties
+          const activeParties = (callData.parties || []).filter(
+            (p: any) =>
+              p.callStatus !== 'DROPPED' && p.callStatus !== 'DISCONNECTED'
+          );
+
+          if (activeParties.length === 0) {
+            // Remove from callStateMap if no active parties
+            if (updated[callId]) {
+              delete updated[callId];
+            }
+            return;
+          }
+
+          // Add or update call in callStateMap
+          updated[callId] = {
+            ...callData,
+            callId,
+            currentState: currentState || 'UNKNOWN',
+            parties: activeParties,
+            hasActiveParticipants: callData.hasActiveParticipants !== false,
+            isTerminating: callData.isTerminating === true,
+            eventTime: callData.eventTime || new Date().toISOString(),
+          };
+
+          console.log(`[useCtiStomp] Added/updated ongoing call: ${callId} for DN: ${dn}, state: ${currentState}`);
+        });
+
+        // Save updated state to localStorage
+        saveCallStatesToStorage(updated);
+        return updated;
+      });
+    },
+    [saveCallStatesToStorage]
+  );
+
   // Group devices by DN and deviceName
   const groupDevicesByDnAndDeviceName = useCallback(
     (deviceArray: CtiDevice[]) => {
@@ -822,11 +906,13 @@ export default function useCtiStomp(
   // Update refs when callbacks change (after all functions are defined)
   useEffect(() => {
     handleCallEventRef.current = handleCallEvent;
+    handleOngoingCallsRef.current = handleOngoingCalls;
     groupDevicesByDnAndDeviceNameRef.current = groupDevicesByDnAndDeviceName;
     updateSummaryDataRef.current = updateSummaryData;
     publishStompMessageRef.current = publishStompMessage;
   }, [
     handleCallEvent,
+    handleOngoingCalls,
     groupDevicesByDnAndDeviceName,
     updateSummaryData,
     publishStompMessage,
@@ -2390,6 +2476,17 @@ export default function useCtiStomp(
                       "/app/request/initial-state",
                       ""
                     );
+                    // Request ongoing calls after initial state
+                    publishStompMessageRef.current(
+                      "/app/request/ongoing-calls",
+                      ""
+                    );
+                  }
+                  break;
+                
+                case "ongoing_calls":
+                  if (handleOngoingCallsRef.current) {
+                    handleOngoingCallsRef.current(data.data);
                   }
                   break;
               }

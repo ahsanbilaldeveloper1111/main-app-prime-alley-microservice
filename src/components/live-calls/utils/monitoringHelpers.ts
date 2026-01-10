@@ -138,14 +138,35 @@ export const stopSilentMonitoring = async (
 ): Promise<boolean> => {
   try {
     // Use the monitor device that was used when starting monitoring
-    if (!activeMonitoring?.monitorDeviceType || !activeMonitoring?.monitorDeviceName) {
-      console.error('Monitor device information not available')
-      return false
+    // If not available in activeMonitoring, try to get from dnsMap
+    let monitorDeviceType = activeMonitoring?.monitorDeviceType
+    let monitorDeviceName = activeMonitoring?.monitorDeviceName
+    
+    if (!monitorDeviceType || !monitorDeviceName) {
+      // Fallback: get from dnsMap for the supervisor
+      if (userAddress && dnsMap[userAddress]) {
+        const devices = Object.values(dnsMap[userAddress].devices || {}) as any[]
+        if (devices.length > 0) {
+          // Prefer registered device, otherwise use first available
+          const device = devices.find((d: any) => d.terminalState === 'REGISTERED') || devices[0]
+          monitorDeviceName = monitorDeviceName || device?.deviceName
+          monitorDeviceType = monitorDeviceType || device?.deviceType
+        }
+      }
+      
+      if (!monitorDeviceType || !monitorDeviceName) {
+        console.error('Monitor device information not available', {
+          activeMonitoring,
+          userAddress,
+          hasDnsMap: userAddress ? !!dnsMap[userAddress] : false
+        })
+        return false
+      }
     }
     
     const stopParams = {
-      monitorDeviceType: activeMonitoring.monitorDeviceType,
-      monitorDeviceName: activeMonitoring.monitorDeviceName,
+      monitorDeviceType: monitorDeviceType,
+      monitorDeviceName: monitorDeviceName,
       monitor: userAddress || ''
     }
 
@@ -180,14 +201,35 @@ export const stopWhisperMonitoring = async (
 ): Promise<boolean> => {
   try {
     // Use the monitor device that was used when starting monitoring
-    if (!activeMonitoring?.monitorDeviceType || !activeMonitoring?.monitorDeviceName) {
-      console.error('Monitor device information not available')
-      return false
+    // If not available in activeMonitoring, try to get from dnsMap
+    let monitorDeviceType = activeMonitoring?.monitorDeviceType
+    let monitorDeviceName = activeMonitoring?.monitorDeviceName
+    
+    if (!monitorDeviceType || !monitorDeviceName) {
+      // Fallback: get from dnsMap for the supervisor
+      if (userAddress && dnsMap[userAddress]) {
+        const devices = Object.values(dnsMap[userAddress].devices || {}) as any[]
+        if (devices.length > 0) {
+          // Prefer registered device, otherwise use first available
+          const device = devices.find((d: any) => d.terminalState === 'REGISTERED') || devices[0]
+          monitorDeviceName = monitorDeviceName || device?.deviceName
+          monitorDeviceType = monitorDeviceType || device?.deviceType
+        }
+      }
+      
+      if (!monitorDeviceType || !monitorDeviceName) {
+        console.error('Monitor device information not available', {
+          activeMonitoring,
+          userAddress,
+          hasDnsMap: userAddress ? !!dnsMap[userAddress] : false
+        })
+        return false
+      }
     }
     
     const stopParams = {
-      monitorDeviceType: activeMonitoring.monitorDeviceType,
-      monitorDeviceName: activeMonitoring.monitorDeviceName,
+      monitorDeviceType: monitorDeviceType,
+      monitorDeviceName: monitorDeviceName,
       monitor: userAddress || ''
     }
 
@@ -223,14 +265,35 @@ export const stopBargeInMonitoringLocal = async (
 ): Promise<boolean> => {
   try {
     // Use the monitor device that was used when starting monitoring
-    if (!activeMonitoring?.monitorDeviceType || !activeMonitoring?.monitorDeviceName) {
-      console.error('Monitor device information not available')
-      return false
+    // If not available in activeMonitoring, try to get from dnsMap
+    let monitorDeviceType = activeMonitoring?.monitorDeviceType
+    let monitorDeviceName = activeMonitoring?.monitorDeviceName
+    
+    if (!monitorDeviceType || !monitorDeviceName) {
+      // Fallback: get from dnsMap for the supervisor
+      if (userAddress && dnsMap[userAddress]) {
+        const devices = Object.values(dnsMap[userAddress].devices || {}) as any[]
+        if (devices.length > 0) {
+          // Prefer registered device, otherwise use first available
+          const device = devices.find((d: any) => d.terminalState === 'REGISTERED') || devices[0]
+          monitorDeviceName = monitorDeviceName || device?.deviceName
+          monitorDeviceType = monitorDeviceType || device?.deviceType
+        }
+      }
+      
+      if (!monitorDeviceType || !monitorDeviceName) {
+        console.error('Monitor device information not available', {
+          activeMonitoring,
+          userAddress,
+          hasDnsMap: userAddress ? !!dnsMap[userAddress] : false
+        })
+        return false
+      }
     }
     
     const stopParams = {
-      monitorDeviceType: activeMonitoring.monitorDeviceType,
-      monitorDeviceName: activeMonitoring.monitorDeviceName,
+      monitorDeviceType: monitorDeviceType,
+      monitorDeviceName: monitorDeviceName,
       monitor: userAddress || ''
     }
 

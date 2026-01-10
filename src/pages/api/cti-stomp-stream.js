@@ -211,8 +211,39 @@ const setupSubscriptions = (client, connectionKey) => {
     }
   });
   
+  // Subscribe to ongoing-calls
+  const sub4 = client.subscribe('/user/topic/ongoing-calls', (message) => {
+    console.log('STOMP ongoing-calls message received');
+    try {
+      const payload = JSON.parse(message.body);
+      const currentStreams = sseStreams.get(connectionKey) || [];
+      
+      currentStreams.forEach((res, index) => {
+        if (!res.destroyed && !res.closed) {
+          try {
+            const sseData = `data: ${JSON.stringify({ type: 'ongoing_calls', data: payload })}\n\n`;
+            res.write(sseData);
+            if (res.flush) {
+              res.flush();
+            }
+          } catch (error_) {
+            console.error(`❌ Error writing ongoing-calls to stream ${index + 1}:`, error_);
+            // Remove destroyed streams from the list
+            const streams = sseStreams.get(connectionKey) || [];
+            const streamIndex = streams.indexOf(res);
+            if (streamIndex > -1) {
+              streams.splice(streamIndex, 1);
+            }
+          }
+        }
+      });
+    } catch (err) {
+      console.error('Error parsing ongoing-calls payload:', err);
+    }
+  });
+  
   // Store all subscriptions for this connection
-  subscriptions.push(sub1, sub2, sub3);
+  subscriptions.push(sub1, sub2, sub3, sub4);
   connectionSubscriptions.set(connectionKey, subscriptions);
   
   // Mark subscriptions as set up

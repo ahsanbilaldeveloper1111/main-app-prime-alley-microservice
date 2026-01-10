@@ -27,6 +27,7 @@ interface SectionContainerProps {
   selectedTone: Record<string, string>
   isDnInActiveCall: (dn: string) => boolean
   userAddress?: string | null
+  monitoringStartTime?: Record<string, Date>
   isCollapsed: boolean
   onToggle: () => void
 }
@@ -52,6 +53,7 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
   selectedTone,
   isDnInActiveCall,
   userAddress,
+  monitoringStartTime,
   isCollapsed,
   onToggle
 }) => {
@@ -170,6 +172,7 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
               selectedTone={selectedTone}
               isDnInActiveCall={isDnInActiveCall}
               userAddress={userAddress}
+              monitoringStartTime={monitoringStartTime}
             />
           ))}
         </div>

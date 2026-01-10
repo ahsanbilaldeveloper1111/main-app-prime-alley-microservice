@@ -278,6 +278,272 @@ const LiveCallDashboard = () => {
     return Object.values(categorizedDns).filter(section => section === 'downOffline').length;
   }, [categorizedDns]);
 
+  // Helper function to clear monitoring state
+  const clearMonitoringState = useCallback((monitoredDn: string, reason: string = 'call ended') => {
+    console.log('[Monitoring] clearMonitoringState called', { monitoredDn, reason, currentState: activeMonitoring })
+    setActiveMonitoring({ dn: null, type: null, deviceName: null, monitor: undefined })
+    setMonitoringStartTime(prev => {
+      const newState = { ...prev }
+      delete newState[monitoredDn]
+      return newState
+    })
+    setSelectedMonitor(prev => {
+      const newState = { ...prev }
+      delete newState[monitoredDn]
+      return newState
+    })
+    setSelectedTone(prev => {
+      const newState = { ...prev }
+      delete newState[monitoredDn]
+      return newState
+    })
+    setTempMonitorSelection(prev => {
+      const newState = { ...prev }
+      delete newState[monitoredDn]
+      return newState
+    })
+    setNotification({
+      type: 'info',
+      message: `Monitoring automatically stopped for ${monitoredDn} - ${reason}`
+    })
+  }, [setActiveMonitoring, setMonitoringStartTime, setSelectedMonitor, setSelectedTone, setTempMonitorSelection, setNotification, activeMonitoring])
+
+  // Listen for DROPPED/DISCONNECTED events to clear monitoring state immediately
+  useEffect(() => {
+    if (!activeMonitoring.dn || !activeMonitoring.deviceName || !eventLog || eventLog.length === 0) return
+
+    const monitoredDn = activeMonitoring.dn
+    const monitoredDeviceName = activeMonitoring.deviceName
+    const supervisorDn = activeMonitoring.monitor // Supervisor's DN (e.g., 107)
+
+    // Check the most recent events for DROPPED/DISCONNECTED events related to monitoring
+    // Only check the LAST event to avoid processing old events repeatedly
+    const lastEvent = eventLog[eventLog.length - 1]
+    if (!lastEvent || !lastEvent.parties || lastEvent.parties.length === 0) return
+
+    // Case 1: Check for CallObservationEndedEvImpl event - this always means monitoring ended
+    // IMPORTANT: Only clear if this is a DISCONNECTED event, not if monitoring is being established
+    if (lastEvent.eventName === 'CallObservationEndedEvImpl' && lastEvent.eventType === 'DISCONNECTED' && supervisorDn) {
+      const involvesSupervisorAndAgent = lastEvent.parties.some((p: any) => {
+        const involvesSupervisor = p.callingAddress === supervisorDn || p.calledAddress === supervisorDn
+        const involvesAgent = p.callingAddress === monitoredDn || p.calledAddress === monitoredDn
+        return involvesSupervisor && involvesAgent
+      })
+
+      // Only clear if the call is actually terminating (not just starting)
+      if (involvesSupervisorAndAgent && lastEvent.isTerminating === true) {
+        console.log('[Monitoring] Clearing monitoring state - CallObservationEndedEvImpl detected', { 
+          supervisorDn, 
+          monitoredDn, 
+          eventType: lastEvent.eventType, 
+          eventName: lastEvent.eventName,
+          callId: lastEvent.callId,
+          isTerminating: lastEvent.isTerminating
+        })
+        clearMonitoringState(monitoredDn, 'monitoring call ended')
+        return
+      }
+    }
+
+    // Case 2: DROPPED/DISCONNECTED event involving the monitored DN and device (agent's call ended)
+    // Only process if this is the last event and call is actually terminating
+    if ((lastEvent.eventType === 'DROPPED' || lastEvent.eventType === 'DISCONNECTED') && 
+        lastEvent.isTerminating === true && 
+        lastEvent.hasActiveParticipants === false) {
+      const involvesMonitoredDn = lastEvent.parties.some((p: any) => 
+        (p.callingAddress === monitoredDn || p.calledAddress === monitoredDn) &&
+        (p.callingDeviceName === monitoredDeviceName || p.calledDeviceName === monitoredDeviceName)
+      )
+
+      if (involvesMonitoredDn) {
+        console.log('[Monitoring] Clearing monitoring state - agent call ended', { 
+          monitoredDn, 
+          eventType: lastEvent.eventType, 
+          callId: lastEvent.callId,
+          isTerminating: lastEvent.isTerminating
+        })
+        clearMonitoringState(monitoredDn, 'call dropped')
+        return
+      }
+    }
+
+    // Case 3: DISCONNECTED event involving both supervisor and agent (monitoring call ended)
+    // This happens when the supervisor ends the monitoring call (e.g., from Jabber)
+    // Only process if this is the last event and call is actually terminating
+    if ((lastEvent.eventType === 'DISCONNECTED' || lastEvent.eventType === 'DROPPED') && 
+        supervisorDn && 
+        lastEvent.isTerminating === true && 
+        lastEvent.hasActiveParticipants === false) {
+      const involvesSupervisorAndAgent = lastEvent.parties.some((p: any) => {
+        const involvesSupervisor = p.callingAddress === supervisorDn || p.calledAddress === supervisorDn
+        const involvesAgent = p.callingAddress === monitoredDn || p.calledAddress === monitoredDn
+        return involvesSupervisor && involvesAgent
+      })
+
+      if (involvesSupervisorAndAgent) {
+        console.log('[Monitoring] Clearing monitoring state - monitoring call ended', { 
+          supervisorDn, 
+          monitoredDn, 
+          eventType: lastEvent.eventType, 
+          eventName: lastEvent.eventName,
+          callId: lastEvent.callId,
+          isTerminating: lastEvent.isTerminating,
+          hasActiveParticipants: lastEvent.hasActiveParticipants
+        })
+        clearMonitoringState(monitoredDn, 'monitoring call ended')
+        return
+      }
+    }
+  }, [eventLog, activeMonitoring.dn, activeMonitoring.deviceName, activeMonitoring.monitor, clearMonitoringState])
+
+  // Detect monitoring start from events and set monitoring state
+  // Use a ref to track the last processed event sequence to avoid re-processing
+  const lastProcessedEventSequenceRef = useRef<number | null>(null)
+  
+  useEffect(() => {
+    if (!eventLog || eventLog.length === 0 || !dnsMap || !isInitialized || !userAddress) return
+
+    // Only process the most recent event to avoid infinite loops
+    const lastEvent = eventLog[eventLog.length - 1]
+    if (!lastEvent || !lastEvent.parties || lastEvent.parties.length === 0) return
+    
+    // Skip if we've already processed this event
+    if (lastProcessedEventSequenceRef.current !== null && 
+        lastEvent.sequence !== undefined && 
+        lastEvent.sequence <= lastProcessedEventSequenceRef.current) {
+      return
+    }
+
+    // Case 1: Event has explicit monitoring info (isMonitoring: true) - HIGHEST PRIORITY
+    if (lastEvent.isMonitoring && lastEvent.monitoring && lastEvent.parties && lastEvent.parties.length > 0) {
+      const monitoring = lastEvent.monitoring as any
+      const monitorDn = monitoring.monitorDn // Supervisor DN (e.g., 107)
+      const monitoredDn = monitoring.monitoredDn // Agent DN (e.g., 103)
+      const monitoringType = monitoring.monitoringType // e.g., "SILENT", "WHISPER", "BARGE_IN"
+
+      // Only set if this is for the current user (supervisor)
+      if (monitorDn === userAddress && monitoredDn && monitoringType) {
+        // Find the monitored device name from the event parties
+        // Check all parties to find the one involving the monitored DN
+        // The monitored DN could be either callingAddress or calledAddress
+        let monitoredDeviceName: string | null = null
+        
+        // First, try to find party where monitoredDn is the calledAddress (supervisor calling agent)
+        let monitoredParty = lastEvent.parties.find((p: any) => 
+          p.calledAddress === monitoredDn && p.callingAddress === monitorDn
+        )
+        if (monitoredParty) {
+          monitoredDeviceName = monitoredParty.calledDeviceName || monitoredParty.callingDeviceName || null
+        }
+        
+        // If not found, try where monitoredDn is the callingAddress (agent calling supervisor)
+        if (!monitoredDeviceName) {
+          monitoredParty = lastEvent.parties.find((p: any) => 
+            p.callingAddress === monitoredDn && p.calledAddress === monitorDn
+          )
+          if (monitoredParty) {
+            monitoredDeviceName = monitoredParty.callingDeviceName || monitoredParty.calledDeviceName || null
+          }
+        }
+        
+        // If still not found, try any party involving monitoredDn
+        if (!monitoredDeviceName) {
+          monitoredParty = lastEvent.parties.find((p: any) => 
+            p.calledAddress === monitoredDn || p.callingAddress === monitoredDn
+          )
+          if (monitoredParty) {
+            // If monitoredDn is calledAddress, use calledDeviceName; if callingAddress, use callingDeviceName
+            monitoredDeviceName = monitoredDn === monitoredParty.calledAddress 
+              ? monitoredParty.calledDeviceName 
+              : monitoredParty.callingDeviceName || null
+          }
+        }
+        
+        // If not found in parties, try to get from dnsMap (get first registered device or first available)
+        if (!monitoredDeviceName && dnsMap[monitoredDn]) {
+          const devices = Object.values(dnsMap[monitoredDn].devices || {}) as any[]
+          if (devices.length > 0) {
+            // Prefer registered device, otherwise use first available
+            monitoredDeviceName = devices.find((d: any) => d.terminalState === 'REGISTERED')?.deviceName || devices[0]?.deviceName || null
+          }
+        }
+
+        // Set monitoring state - always update if monitoring info is present in event
+        // This ensures monitoring is recognized immediately, even if deviceName is not found yet
+        const shouldUpdate = !activeMonitoring.dn || 
+                             activeMonitoring.dn !== monitoredDn || 
+                             (monitoredDeviceName && activeMonitoring.deviceName !== monitoredDeviceName) ||
+                             activeMonitoring.monitor !== monitorDn ||
+                             activeMonitoring.type !== monitoringType
+
+        if (shouldUpdate) {
+          // Get monitor device information from the event or dnsMap
+          // The supervisor's device is in the event parties (callingDeviceName when supervisor is calling)
+          let monitorDeviceName: string | undefined = undefined
+          let monitorDeviceType: string | undefined = undefined
+          
+          // Try to get from event parties (supervisor is the calling party)
+          const supervisorParty = lastEvent.parties.find((p: any) => 
+            p.callingAddress === monitorDn || p.calledAddress === monitorDn
+          )
+          if (supervisorParty) {
+            monitorDeviceName = supervisorParty.callingDeviceName || supervisorParty.calledDeviceName || undefined
+            // Try to get device type from dnsMap
+            if (monitorDeviceName && dnsMap[monitorDn]) {
+              const devices = Object.values(dnsMap[monitorDn].devices || {}) as any[]
+              const device = devices.find((d: any) => d.deviceName === monitorDeviceName)
+              if (device) {
+                monitorDeviceType = device.deviceType || undefined
+              }
+            }
+          }
+          
+          // Fallback: get from dnsMap if not found in event
+          if (!monitorDeviceName && dnsMap[monitorDn]) {
+            const devices = Object.values(dnsMap[monitorDn].devices || {}) as any[]
+            if (devices.length > 0) {
+              // Prefer registered device, otherwise use first available
+              const device = devices.find((d: any) => d.terminalState === 'REGISTERED') || devices[0]
+              monitorDeviceName = device?.deviceName || undefined
+              monitorDeviceType = device?.deviceType || undefined
+            }
+          }
+          
+          console.log('[Monitoring] Setting monitoring state from event (Case 1 - isMonitoring: true)', {
+            monitorDn,
+            monitoredDn,
+            monitoringType,
+            monitoredDeviceName: monitoredDeviceName || 'pending',
+            monitorDeviceName: monitorDeviceName || 'pending',
+            monitorDeviceType: monitorDeviceType || 'pending',
+            eventName: lastEvent.eventName,
+            eventType: lastEvent.eventType,
+            callId: lastEvent.callId,
+            sequence: lastEvent.sequence,
+            currentState: activeMonitoring,
+            partyInfo: monitoredParty,
+            allParties: lastEvent.parties
+          })
+          setActiveMonitoring({
+            dn: monitoredDn,
+            type: monitoringType,
+            monitor: monitorDn,
+            deviceName: monitoredDeviceName || undefined,
+            monitorDeviceName: monitorDeviceName,
+            monitorDeviceType: monitorDeviceType
+          })
+          if (!monitoringStartTime[monitoredDn]) {
+            setMonitoringStartTime(prev => ({ ...prev, [monitoredDn]: new Date() }))
+          }
+          // Mark this event as processed
+          if (lastEvent.sequence !== undefined) {
+            lastProcessedEventSequenceRef.current = lastEvent.sequence
+          }
+        }
+      }
+    }
+  }, [eventLog, dnsMap, isInitialized, userAddress, activeMonitoring, setActiveMonitoring, setMonitoringStartTime, monitoringStartTime])
+
   // Auto-clear monitoring state when call ends
   useEffect(() => {
     if (!activeMonitoring.dn || !activeMonitoring.deviceName || !isInitialized || !dnsMap) return
@@ -287,48 +553,25 @@ const LiveCallDashboard = () => {
     const monitoredDevice = dnsMap[monitoredDn]?.devices?.[monitoredDeviceName]
     
     if (!monitoredDevice) {
-      setActiveMonitoring({ dn: null, type: null, deviceName: null })
-      setMonitoringStartTime(prev => {
-        const newState = { ...prev }
-        delete newState[monitoredDn]
-        return newState
-      })
+      clearMonitoringState(monitoredDn, 'device not found')
       return
     }
 
     const deviceCall = getCallStateForDevice(monitoredDn, monitoredDeviceName)
     const isDeviceActiveCall = deviceCall && 
-      ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED', 'RINGING'].includes(deviceCall.currentState || '')
+      !deviceCall.isTerminating &&
+      deviceCall.parties &&
+      deviceCall.parties.length > 0 &&
+      deviceCall.parties.some((p: any) => 
+        p.callStatus !== 'DROPPED' && 
+        p.callStatus !== 'DISCONNECTED' &&
+        ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED', 'RINGING'].includes(p.callStatus)
+      )
 
     if (!isDeviceActiveCall) {
-     // console.log('Call ended, clearing monitoring state for:', monitoredDn, monitoredDeviceName)
-      setActiveMonitoring({ dn: null, type: null, deviceName: null })
-      setMonitoringStartTime(prev => {
-        const newState = { ...prev }
-        delete newState[monitoredDn]
-        return newState
-      })
-      setSelectedMonitor(prev => {
-        const newState = { ...prev }
-        delete newState[monitoredDn]
-        return newState
-      })
-      setSelectedTone(prev => {
-        const newState = { ...prev }
-        delete newState[monitoredDn]
-        return newState
-      })
-      setTempMonitorSelection(prev => {
-        const newState = { ...prev }
-        delete newState[monitoredDn]
-        return newState
-      })
-      setNotification({
-        type: 'info',
-        message: `Monitoring automatically stopped for ${monitoredDn} - call ended`
-      })
+      clearMonitoringState(monitoredDn, 'call ended')
     }
-  }, [activeMonitoring, dnsMap, isInitialized, getCallStateForDevice, categorizedDns, hasActiveCalls, setActiveMonitoring, setMonitoringStartTime, setSelectedMonitor, setSelectedTone, setTempMonitorSelection, setNotification])
+  }, [activeMonitoring, dnsMap, isInitialized, getCallStateForDevice, categorizedDns, hasActiveCalls, clearMonitoringState])
 
   // Handle FLIP animations when cards change sections
   useEffect(() => {
@@ -595,6 +838,7 @@ const LiveCallDashboard = () => {
         selectedTone={selectedTone}
         isDnInActiveCall={isDnInActiveCall}
         userAddress={userAddress}
+        monitoringStartTime={monitoringStartTime}
         loading={loading}
         selectedTeam={selectedTeam}
         selectedStatus={selectedStatus}

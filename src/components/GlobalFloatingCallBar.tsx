@@ -502,6 +502,7 @@ const GlobalFloatingCallBar: React.FC = () => {
 
   // Get the first active call (for display) - prefer connected calls, include onHold
   // Filter to only show calls involving the current user's phone number
+  // Exclude monitoring calls (calls between supervisor and agent being monitored)
   const activeCall = React.useMemo(() => {
     const call = Array.from(activeCalls.values())
       .filter((call) => {
@@ -514,7 +515,49 @@ const GlobalFloatingCallBar: React.FC = () => {
         // Also filter by status
         const hasValidStatus = ["connected", "ringing", "dialing", "onHold"].includes(call.status);
         
-        return involvesUser && hasValidStatus;
+        // Exclude monitoring calls - check if this call is a monitoring call (supervisor to agent)
+        // A monitoring call is identified by:
+        // 1. Checking callStateMap for isMonitoring flag (for the monitored call itself)
+        // 2. Checking eventLog for active monitoring sessions (for the monitoring call between supervisor and agent)
+        let isMonitoringCall = false
+        
+        // Check 1: Check callStateMap for isMonitoring flag
+        if (call.callId && callStateMap && callStateMap[call.callId]) {
+          const callState = callStateMap[call.callId]
+          if (callState.isMonitoring === true || (callState.monitoring && callState.monitoring.monitorDn === userAddress)) {
+            isMonitoringCall = true
+          }
+        }
+        
+        // Check 2: Check eventLog for active monitoring sessions
+        // If there's a recent event with isMonitoring: true where userAddress is the monitor
+        // and the call involves both the supervisor and the monitored agent, it's a monitoring call
+        if (!isMonitoringCall && eventLog && eventLog.length > 0 && userAddress) {
+          // Check recent events (last 50 events) for active monitoring sessions
+          const recentEvents = eventLog.slice(-50)
+          for (const evt of recentEvents) {
+            if (evt.isMonitoring && evt.monitoring && evt.parties && evt.parties.length > 0) {
+              const monitoring = evt.monitoring as any
+              const monitorDn = monitoring.monitorDn // Supervisor DN (e.g., 107)
+              const monitoredDn = monitoring.monitoredDn // Agent DN (e.g., 103)
+              
+              // If this event shows userAddress is monitoring someone
+              if (monitorDn === userAddress && monitoredDn) {
+                // Check if the current call involves both supervisor and the monitored agent
+                const callInvolvesSupervisor = call.callingAddress === userAddress || call.calledAddress === userAddress
+                const callInvolvesMonitoredAgent = call.callingAddress === monitoredDn || call.calledAddress === monitoredDn
+                
+                // If the call involves both, it's the monitoring call (supervisor to agent)
+                if (callInvolvesSupervisor && callInvolvesMonitoredAgent) {
+                  isMonitoringCall = true
+                  break
+                }
+              }
+            }
+          }
+        }
+        
+        return involvesUser && hasValidStatus && !isMonitoringCall;
       })
       .sort((a, b) => {
         // Prioritize connected calls, then onHold, then ringing
@@ -554,20 +597,64 @@ const GlobalFloatingCallBar: React.FC = () => {
             }
           }
           
-          // Calculate duration using eventTime from callStateMap (UTC) for accuracy
-          // This matches the approach in CtiContext - only calculate for connected calls
+          // Calculate duration using the same priority as call timers: parties[0].startTime > startTime > eventTime
+          // This matches the approach in UserCard and calculateLongestCallDuration - only calculate for connected calls
           if (call.status === 'connected') {
-            if (callState.eventTime) {
-              // Use eventTime from callStateMap (UTC) - most accurate
-              const now = new Date();
-              const eventTime = moment.utc(callState.eventTime).toDate();
-              call.duration = Math.max(0, Math.round((now.getTime() - eventTime.getTime()) / 1000));
-            } else if (call.startTime) {
-              // Fallback: use startTime if eventTime not available
-              // Parse startTime as UTC if it's a string, otherwise use Date directly
-              const startTime = call.startTime instanceof Date 
-                ? call.startTime 
-                : moment.utc(call.startTime).toDate();
+            let startTime: Date | null = null;
+            
+            // Priority 1: Use startTime from the first party (most accurate)
+            if (callState.parties && callState.parties.length > 0 && callState.parties[0].startTime) {
+              try {
+                // Parse as UTC (API typically sends UTC timestamps)
+                const parsedMoment = moment.utc(callState.parties[0].startTime);
+                if (parsedMoment.isValid()) {
+                  startTime = parsedMoment.toDate();
+                }
+              } catch (e) {
+                // Fallback to direct Date parsing
+                startTime = new Date(callState.parties[0].startTime);
+              }
+            }
+            
+            // Priority 2: Use callState.startTime if available
+            if (!startTime && callState.startTime) {
+              try {
+                const parsedMoment = moment.utc(callState.startTime);
+                if (parsedMoment.isValid()) {
+                  startTime = parsedMoment.toDate();
+                }
+              } catch (e) {
+                startTime = new Date(callState.startTime);
+              }
+            }
+            
+            // Priority 3: Use call.startTime from activeCalls if available
+            if (!startTime && call.startTime) {
+              try {
+                const parsedMoment = moment.utc(call.startTime);
+                if (parsedMoment.isValid()) {
+                  startTime = parsedMoment.toDate();
+                }
+              } catch (e) {
+                startTime = call.startTime instanceof Date 
+                  ? call.startTime 
+                  : new Date(call.startTime);
+              }
+            }
+            
+            // Priority 4: Use eventTime as last resort
+            if (!startTime && callState.eventTime) {
+              try {
+                const parsedMoment = moment.utc(callState.eventTime);
+                if (parsedMoment.isValid()) {
+                  startTime = parsedMoment.toDate();
+                }
+              } catch (e) {
+                startTime = new Date(callState.eventTime);
+              }
+            }
+            
+            if (startTime) {
               const now = new Date();
               call.duration = Math.max(0, Math.round((now.getTime() - startTime.getTime()) / 1000));
             }
@@ -586,6 +673,93 @@ const GlobalFloatingCallBar: React.FC = () => {
       }
       return call;
   }, [activeCalls, userAddress, callStateMap]);
+
+  // Real-time duration update for active calls
+  const [currentDuration, setCurrentDuration] = React.useState<number | null>(null);
+  
+  React.useEffect(() => {
+    if (!activeCall || activeCall.status !== 'connected') {
+      setCurrentDuration(null);
+      return;
+    }
+
+    // Calculate initial duration
+    const calculateDuration = () => {
+      if (!activeCall.callId || !callStateMap || !callStateMap[activeCall.callId]) {
+        return activeCall.duration || 0;
+      }
+
+      const callState = callStateMap[activeCall.callId];
+      let startTime: Date | null = null;
+      
+      // Priority 1: Use startTime from the first party (most accurate)
+      if (callState.parties && callState.parties.length > 0 && callState.parties[0].startTime) {
+        try {
+          const parsedMoment = moment.utc(callState.parties[0].startTime);
+          if (parsedMoment.isValid()) {
+            startTime = parsedMoment.toDate();
+          }
+        } catch (e) {
+          startTime = new Date(callState.parties[0].startTime);
+        }
+      }
+      
+      // Priority 2: Use callState.startTime if available
+      if (!startTime && callState.startTime) {
+        try {
+          const parsedMoment = moment.utc(callState.startTime);
+          if (parsedMoment.isValid()) {
+            startTime = parsedMoment.toDate();
+          }
+        } catch (e) {
+          startTime = new Date(callState.startTime);
+        }
+      }
+      
+      // Priority 3: Use call.startTime from activeCalls if available
+      if (!startTime && activeCall.startTime) {
+        try {
+          const parsedMoment = moment.utc(activeCall.startTime);
+          if (parsedMoment.isValid()) {
+            startTime = parsedMoment.toDate();
+          }
+        } catch (e) {
+          startTime = activeCall.startTime instanceof Date 
+            ? activeCall.startTime 
+            : new Date(activeCall.startTime);
+        }
+      }
+      
+      // Priority 4: Use eventTime as last resort
+      if (!startTime && callState.eventTime) {
+        try {
+          const parsedMoment = moment.utc(callState.eventTime);
+          if (parsedMoment.isValid()) {
+            startTime = parsedMoment.toDate();
+          }
+        } catch (e) {
+          startTime = new Date(callState.eventTime);
+        }
+      }
+      
+      if (startTime) {
+        const now = new Date();
+        return Math.max(0, Math.round((now.getTime() - startTime.getTime()) / 1000));
+      }
+      
+      return activeCall.duration || 0;
+    };
+
+    // Set initial duration
+    setCurrentDuration(calculateDuration());
+
+    // Update every second
+    const interval = setInterval(() => {
+      setCurrentDuration(calculateDuration());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeCall, callStateMap]);
 
   // Determine the other party's number (the person we're talking to, not ourselves)
   const otherPartyNumber = React.useMemo(() => {
@@ -1342,7 +1516,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                 }}
               >
                 <span className="text-success" style={{ fontWeight: "500" }}>Connected</span>
-                <span style={{ color: "#94a3b8" }}>{activeCall.duration ? formatDuration(activeCall.duration) : "00:00"}</span>
+                <span style={{ color: "#94a3b8" }}>{currentDuration !== null ? formatDuration(currentDuration) : (activeCall.duration ? formatDuration(activeCall.duration) : "00:00")}</span>
               </div>
             )}
 
@@ -1822,9 +1996,9 @@ const GlobalFloatingCallBar: React.FC = () => {
                   {activeCallUserName}
                 </div>
                 <div className="d-flex align-items-center gap-2">
-                  {activeCall.status === "connected" && activeCall.duration !== undefined && (
+                  {activeCall.status === "connected" && (currentDuration !== null || activeCall.duration !== undefined) && (
                     <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
-                      {formatDuration(activeCall.duration)}
+                      {formatDuration(currentDuration !== null ? currentDuration : (activeCall.duration || 0))}
                     </span>
                   )}
                   <span

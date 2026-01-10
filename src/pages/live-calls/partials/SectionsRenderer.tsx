@@ -27,6 +27,7 @@ interface SectionsRendererProps {
   selectedTone: Record<string, string>
   isDnInActiveCall: (dn: string) => boolean
   userAddress?: string | null
+  monitoringStartTime?: Record<string, Date>
   loading: boolean
   selectedTeam: string
   selectedStatus: string
@@ -59,6 +60,7 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
   selectedTone,
   isDnInActiveCall,
   userAddress,
+  monitoringStartTime,
   loading,
   selectedTeam,
   selectedStatus,
@@ -248,6 +250,7 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
                 selectedTone={selectedTone}
                 isDnInActiveCall={isDnInActiveCall}
                 userAddress={userAddress}
+                monitoringStartTime={monitoringStartTime}
                 isCollapsed={collapsedSections[sectionKey] || false}
                 onToggle={() => toggleSection(sectionKey)}
               />
