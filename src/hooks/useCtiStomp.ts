@@ -4,6 +4,7 @@ import axiosInstance from "@utils/axios";
 import { getCrossTabCtiManager } from "../utils/crossTabCtiManager";
 import { useAuth } from "./useAuth";
 import { useRouter } from "next/router";
+import { getGlobalExcludedPaths } from "@utils/Helper";
 
 interface CtiDevice {
   dn: string;
@@ -99,6 +100,8 @@ export default function useCtiStomp(
       ? "global-cti-instance"
       : instanceId || generateInstanceId()
   );
+
+  const globalExcludedPaths = getGlobalExcludedPaths();
 
   // Cross-tab manager for sharing connection across tabs
   const crossTabManagerRef = useRef(getCrossTabCtiManager());
@@ -847,7 +850,7 @@ export default function useCtiStomp(
     isGettingTokenRef.current = true;
 
     try {
-      if(!isAuthenticated) {
+      if(typeof window !== 'undefined' && globalExcludedPaths.some(path => window.location.pathname?.includes(path)) && !isAuthenticated) {
         throw new Error("User not authenticated");
       }
       const response = await axiosInstance.get("/cti/connect", {

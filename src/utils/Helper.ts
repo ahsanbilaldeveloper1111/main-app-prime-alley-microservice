@@ -1051,3 +1051,5 @@ function isValide164PhoneNumber(value: unknown): boolean {
   }
   return false;
 }
+
+export const getGlobalExcludedPaths = () => ["/auth/signin"];
