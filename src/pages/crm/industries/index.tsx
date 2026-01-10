@@ -7,9 +7,11 @@ import {
   createIndustry,
   updateIndustry,
   deleteIndustry,
+  getCrmProducts,
   IndustryData,
   CreateIndustryPayload,
   UpdateIndustryPayload,
+  CrmProduct,
 } from "@utils/crm";
 import { hasPermission } from "@utils/Helper";
 import { formatDateTimeToLocal } from "@utils/Helper";
@@ -61,6 +63,8 @@ const IndustriesPage = () => {
     description: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  const [industryProducts, setIndustryProducts] = useState<CrmProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
 
   // Fetch industries
   const fetchIndustries = async () => {
@@ -156,9 +160,29 @@ const IndustriesPage = () => {
   };
 
   // Handle view
-  const handleView = (industry: IndustryData) => {
+  const handleView = async (industry: IndustryData) => {
     setViewingIndustry(industry);
     setShowViewModal(true);
+    // Fetch products for this industry
+    await fetchIndustryProducts(industry.id);
+  };
+
+  // Fetch products for an industry
+  const fetchIndustryProducts = async (industryId: number) => {
+    setLoadingProducts(true);
+    try {
+      const response = await getCrmProducts({
+        page: 1,
+        per_page: 100,
+        industry_id: industryId,
+      });
+      setIndustryProducts(response.data || []);
+    } catch (error: any) {
+      console.error("Failed to fetch industry products:", error);
+      setIndustryProducts([]);
+    } finally {
+      setLoadingProducts(false);
+    }
   };
 
   // Pagination helpers
@@ -445,6 +469,59 @@ const IndustriesPage = () => {
                     <span className="text-muted fst-italic">No description</span>
                   )}
                 </div>
+              </div>
+
+              {/* Products Section */}
+              <div className="mb-3 mt-4">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <Form.Label className="text-muted small mb-0">Products</Form.Label>
+                  <Badge bg="primary">{industryProducts.length}</Badge>
+                </div>
+                {loadingProducts ? (
+                  <div className="text-center py-3">
+                    <Spinner animation="border" size="sm" variant="primary" />
+                    <p className="text-muted small mt-2 mb-0">Loading products...</p>
+                  </div>
+                ) : industryProducts.length === 0 ? (
+                  <div className="text-center py-3 border rounded">
+                    <p className="text-muted small mb-0">No products found for this industry</p>
+                  </div>
+                ) : (
+                  <div className="border rounded" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    <Table hover size="sm" className="mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th style={{ fontSize: '0.75rem', padding: '8px' }}>Product Name</th>
+                          <th style={{ fontSize: '0.75rem', padding: '8px' }}>SKU</th>
+                          <th style={{ fontSize: '0.75rem', padding: '8px' }}>Price</th>
+                          <th style={{ fontSize: '0.75rem', padding: '8px' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {industryProducts.map((product) => (
+                          <tr key={product.id}>
+                            <td style={{ fontSize: '0.875rem', padding: '8px' }}>
+                              {product.name}
+                            </td>
+                            <td style={{ fontSize: '0.875rem', padding: '8px' }}>
+                              <Badge bg="light" text="dark" className="font-monospace">
+                                {product.sku}
+                              </Badge>
+                            </td>
+                            <td style={{ fontSize: '0.875rem', padding: '8px' }}>
+                              {product.currency} {Number.parseFloat(product.price || '0').toFixed(2)}
+                            </td>
+                            <td style={{ fontSize: '0.875rem', padding: '8px' }}>
+                              <Badge bg={product.active ? "success" : "secondary"}>
+                                {product.active ? "Active" : "Inactive"}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </div>
+                )}
               </div>
               
             </Modal.Body>

@@ -230,7 +230,7 @@ const ProductsPage = () => {
     brand: "",
     isActive: true,
     description: "",
-    industry_ids: [] as number[],
+    industry_id: null as number | null,
   });
   const [industries, setIndustries] = useState<IndustryData[]>([]);
   const [loadingIndustries, setLoadingIndustries] = useState(false);
@@ -587,11 +587,7 @@ const ProductsPage = () => {
         brand: product.brand,
         isActive: product.status === "Active",
         description: product.description,
-        industry_ids: product.industry_id 
-          ? [product.industry_id] 
-          : product.industry?.id 
-          ? [product.industry.id] 
-          : [],
+        industry_id: product.industry_id || product.industry?.id || null,
       });
     } else {
       setEditingProduct(null);
@@ -604,7 +600,7 @@ const ProductsPage = () => {
         brand: "",
         isActive: true,
         description: "",
-        industry_ids: [],
+        industry_id: null,
       });
     }
     setShowProductModal(true);
@@ -614,8 +610,8 @@ const ProductsPage = () => {
     e.preventDefault();
     
     // Validate industry is selected
-    if (!productFormData.industry_ids || productFormData.industry_ids.length === 0) {
-      toast.error("Please select at least one industry");
+    if (!productFormData.industry_id) {
+      toast.error("Please select an industry");
       return;
     }
     
@@ -632,7 +628,7 @@ const ProductsPage = () => {
           brand: productFormData.brand,
           active: productFormData.isActive,
           currency: productFormData.currency,
-          industry_ids: productFormData.industry_ids,
+          industry_id: productFormData.industry_id,
         };
         await updateProduct(updatePayload);
       } else {
@@ -646,7 +642,7 @@ const ProductsPage = () => {
           brand: productFormData.brand,
           active: productFormData.isActive,
           currency: productFormData.currency,
-          industry_ids: productFormData.industry_ids,
+          industry_id: productFormData.industry_id,
         };
         await createProduct(createPayload);
       }
@@ -813,19 +809,18 @@ const ProductsPage = () => {
                       Industry <span className="text-danger">*</span>
                     </Form.Label>
                     <Select
-                      isMulti
                       options={industries.map((ind) => ({ value: ind.id, label: ind.name }))}
-                      value={productFormData.industry_ids.map((id) => {
-                        const industry = industries.find((ind) => ind.id === id);
-                        return industry ? { value: industry.id, label: industry.name } : null;
-                      }).filter(Boolean) as { value: number; label: string }[]}
+                      value={productFormData.industry_id ? {
+                        value: productFormData.industry_id,
+                        label: industries.find((ind) => ind.id === productFormData.industry_id)?.name || ''
+                      } : null}
                       onChange={(selected) =>
                         setProductFormData({
                           ...productFormData,
-                          industry_ids: selected ? selected.map((option) => option.value) : [],
+                          industry_id: selected ? selected.value : null,
                         })
                       }
-                      placeholder="Select industries..."
+                      placeholder="Select industry..."
                       styles={customSelectStyles}
                       isLoading={loadingIndustries}
                       isDisabled={loadingIndustries}
@@ -833,7 +828,7 @@ const ProductsPage = () => {
                       required
                     />
                     <Form.Text className="text-muted">
-                      Select one or more industries this product belongs to
+                      Select the industry this product belongs to
                     </Form.Text>
                   </Form.Group>
                 </Col>
