@@ -44,6 +44,31 @@ const CALL_STATES_STORAGE_KEY = "cti_call_states";
 const CALL_STATES_TIMESTAMP_KEY = "cti_call_states_timestamp";
 const STORAGE_EXPIRY_HOURS = 24; // Call states expire after 24 hours
 
+// Master tab keys (matching crossTabCtiManager)
+const MASTER_TAB_KEY = 'cti_master_tab_id';
+const MASTER_TAB_HEARTBEAT_KEY = 'cti_master_tab_id_heartbeat';
+const MASTER_TAB_TIMEOUT = 5000; // 5 seconds
+
+// Helper for safe localStorage access
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  removeItem: (key: string): void => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // Ignore errors
+    }
+  }
+};
+
 // Generate unique instance ID for each hook instance
 let instanceCounter = 0;
 const generateInstanceId = () => {
@@ -106,6 +131,7 @@ export default function useCtiStomp(
   // Cross-tab manager for sharing connection across tabs
   const crossTabManagerRef = useRef(getCrossTabCtiManager());
   const [isMasterTab, setIsMasterTab] = useState(false);
+  const [eventSource, setEventSource] = useState<EventSource | null>(null);
 
   // Router for checking current page
   const router = useRouter();
@@ -897,7 +923,6 @@ export default function useCtiStomp(
       );
       return;
     }
-
     // If user is not authenticated, close any existing connection and return
     if (!isAuthenticated) {
       console.log(
@@ -960,7 +985,7 @@ export default function useCtiStomp(
       
       return;
     }
-
+    
     // CRITICAL: Early return if already initialized with active connection OR already connecting
     // This prevents duplicate initialization if useEffect runs multiple times
     // (e.g., due to React StrictMode double-mounting in development)
@@ -974,19 +999,36 @@ export default function useCtiStomp(
       }
       
       // Check if already initialized with active connection
+      // FIX: During client-side navigation, verify connection is actually OPEN, not just that ref exists
+      // A closed connection should trigger re-initialization
       if (
         isInitializedRef.current &&
         eventSourceRef.current &&
-        (eventSourceRef.current.readyState === EventSource.OPEN || 
-         eventSourceRef.current.readyState === EventSource.CONNECTING)
+        eventSourceRef.current.readyState === EventSource.OPEN
       ) {
         console.log(
-          `[${instanceIdRef.current}] useEffect triggered but already initialized with active/connecting connection, skipping...`
+          `[${instanceIdRef.current}] useEffect triggered but already initialized with active connection, skipping...`
         );
         return;
       }
+      
+      // If connection exists but is not OPEN (CLOSED or CONNECTING), we should re-initialize
+      // This handles cases where connection was closed during navigation
+      if (eventSourceRef.current && eventSourceRef.current.readyState !== EventSource.OPEN) {
+        console.log(
+          `[${instanceIdRef.current}] Connection exists but state is ${eventSourceRef.current.readyState} (not OPEN), will re-initialize...`
+        );
+        // Close the stale connection before re-initializing
+        try {
+          eventSourceRef.current.close();
+        } catch (err) {
+          // Ignore errors
+        }
+        eventSourceRef.current = null;
+        isInitializedRef.current = false;
+        setIsInitialized(false);
+      }
     }
-
     // Helper function to fully close and cleanup all connections
     const fullyCloseConnection = async (
       preserveReconnecting: boolean = false
@@ -1060,7 +1102,7 @@ export default function useCtiStomp(
       // Wait a bit to ensure all connections are fully closed
       await new Promise((resolve) => setTimeout(resolve, 1000));
     };
-
+    
     // Reconnection function with exponential backoff and retry logic
     const attemptReconnection = async (maxAttempts: number = 5) => {
       const currentInstanceId = instanceIdRef.current;
@@ -1233,6 +1275,8 @@ export default function useCtiStomp(
       // CRITICAL: Immediately store the EventSource to prevent duplicate creation
       // This must happen synchronously before any other code can run
       eventSourceRef.current = eventSource;
+      // Also update state for consistency
+      setEventSource(eventSource);
 
       eventSource.onopen = () => {
         const currentInstanceId = instanceIdRef.current;
@@ -1588,34 +1632,105 @@ export default function useCtiStomp(
       if (isGlobalInstance && manager.isCrossTabSupported()) {
         // Master election happens synchronously in constructor, but check immediately
         // If not master yet, the useEffect will handle initialization when we become master
-        const isMaster = manager.isMasterTab();
+        let isMaster = manager.isMasterTab();
         
         if (!isMaster) {
           console.log(
-            `[${currentInstanceId}] Not master tab, waiting for state from master tab...`
+            `[${currentInstanceId}] Not master tab, checking for stale master entry...`
           );
           
-          // If on live-calls page, demand first subscription data
-          const isLiveCallsPage = router.pathname?.includes('live-calls') || 
-                                  (typeof globalThis !== 'undefined' && globalThis.window?.location.pathname?.includes('live-calls'));
+          // FIX: If we're the only tab (no other master exists), force master election
+          // This handles the case where stale localStorage prevents master election
+          const masterTabId = safeLocalStorage.getItem(MASTER_TAB_KEY);
+          const lastHeartbeat = safeLocalStorage.getItem(MASTER_TAB_HEARTBEAT_KEY);
           
-          if (isLiveCallsPage && manager.isCrossTabSupported()) {
-            // Request initial state from master tab via cross-tab manager
-            manager.requestAction('requestInitialState', {}).catch((error) => {
-              console.log(`[${currentInstanceId}] Failed to request initial state from master:`, error);
-            });
-            console.log(`[${currentInstanceId}] Requested initial state for live-calls page from master tab`);
+          if (masterTabId && lastHeartbeat) {
+            const heartbeatTime = parseInt(lastHeartbeat, 10);
+            const timeSinceHeartbeat = Date.now() - heartbeatTime;
+            // If heartbeat is stale, clear it and retry master election
+            if (timeSinceHeartbeat > MASTER_TAB_TIMEOUT) {
+              console.log(
+                `[${currentInstanceId}] Stale master detected (${Math.round(timeSinceHeartbeat / 1000)}s old), clearing and retrying master election...`
+              );
+              safeLocalStorage.removeItem(MASTER_TAB_KEY);
+              safeLocalStorage.removeItem(MASTER_TAB_HEARTBEAT_KEY);
+              // Retry master election - this should make us master now
+              isMaster = manager.isMasterTab();
+              if (isMaster) {
+                console.log(
+                  `[${currentInstanceId}] Successfully became master after clearing stale entry, proceeding with initialization...`
+                );
+                // Continue with initialization below
+              } else {
+                // Still not master, return early
+                console.log(
+                  `[${currentInstanceId}] Still not master after clearing stale entry, waiting for state from master tab...`
+                );
+                // If on live-calls page, demand first subscription data
+                const isLiveCallsPage = router.pathname?.includes('live-calls') || 
+                                        (typeof globalThis !== 'undefined' && globalThis.window?.location.pathname?.includes('live-calls'));
+                
+                if (isLiveCallsPage && manager.isCrossTabSupported()) {
+                  // Request initial state from master tab via cross-tab manager
+                  manager.requestAction('requestInitialState', {}).catch((error) => {
+                    console.log(`[${currentInstanceId}] Failed to request initial state from master:`, error);
+                  });
+                  console.log(`[${currentInstanceId}] Requested initial state for live-calls page from master tab`);
+                }
+                
+                isConnectingRef.current = false;
+                isGettingTokenRef.current = false;
+                setIsInitialized(true);
+                setError(null);
+                return null;
+              }
+            } else {
+              // Master is still active, return early
+              console.log(
+                `[${currentInstanceId}] Active master tab exists, waiting for state from master tab...`
+              );
+              // If on live-calls page, demand first subscription data
+              const isLiveCallsPage = router.pathname?.includes('live-calls') || 
+                                      (typeof globalThis !== 'undefined' && globalThis.window?.location.pathname?.includes('live-calls'));
+              
+              if (isLiveCallsPage && manager.isCrossTabSupported()) {
+                // Request initial state from master tab via cross-tab manager
+                manager.requestAction('requestInitialState', {}).catch((error) => {
+                  console.log(`[${currentInstanceId}] Failed to request initial state from master:`, error);
+                });
+                console.log(`[${currentInstanceId}] Requested initial state for live-calls page from master tab`);
+              }
+              
+              isConnectingRef.current = false;
+              isGettingTokenRef.current = false;
+              setIsInitialized(true);
+              setError(null);
+              return null;
+            }
+          } else {
+            // No master exists, we should become master
+            // Force master election by calling isMasterTab() again
+            console.log(
+              `[${currentInstanceId}] No master exists, forcing master election...`
+            );
+            isMaster = manager.isMasterTab();
+            if (isMaster) {
+              console.log(
+                `[${currentInstanceId}] No master exists, became master, proceeding with initialization...`
+              );
+              // Continue with initialization below
+            } else {
+              // Still not master (shouldn't happen), return early
+              console.log(
+                `[${currentInstanceId}] Failed to become master when none exists, waiting...`
+              );
+              isConnectingRef.current = false;
+              isGettingTokenRef.current = false;
+              setIsInitialized(true);
+              setError(null);
+              return null;
+            }
           }
-          
-          // Reset connecting flag since we're not initializing
-          isConnectingRef.current = false;
-          isGettingTokenRef.current = false; // Reset token flag
-          // Don't create connection - we'll receive state from master tab
-          // Set initialized to true immediately so features work (they'll forward to master)
-          // The actual state will be synced when we receive it from master
-          setIsInitialized(true);
-          setError(null);
-          return null;
         }
         
         console.log(
@@ -1673,24 +1788,67 @@ export default function useCtiStomp(
         return null;
       }
     };
-
     // Initialize on mount
     // CRITICAL: Check if already initialized before calling initialize()
     // This prevents duplicate initialization if component mounts twice (e.g., React StrictMode)
     let cleanup: (() => void) | null = null;
     
-    if (
-      isGlobalInstance &&
-      isInitializedRef.current &&
+    // FIX: After page reload, check if we need to clear stale master status
+    // When tab reopens, localStorage might have stale master entry
+    if (isGlobalInstance && crossTabManagerRef.current.isCrossTabSupported()) {
+      const manager = crossTabManagerRef.current;
+      // Force check master status immediately to clear any stale entries
+      const currentIsMaster = manager.isMasterTab();
+      
+      // If we're not master but should be (only one tab), check for stale master entry
+      if (!currentIsMaster) {
+        const masterTabId = safeLocalStorage.getItem(MASTER_TAB_KEY);
+        const lastHeartbeat = safeLocalStorage.getItem(MASTER_TAB_HEARTBEAT_KEY);
+        
+        if (masterTabId && lastHeartbeat) {
+          const heartbeatTime = parseInt(lastHeartbeat, 10);
+          const timeSinceHeartbeat = Date.now() - heartbeatTime;
+          // If heartbeat is stale (>5 seconds), clear it and force master election
+          if (timeSinceHeartbeat > MASTER_TAB_TIMEOUT) {
+            console.log(
+              `[${instanceIdRef.current}] Stale master detected (${Math.round(timeSinceHeartbeat / 1000)}s old), clearing and forcing master election...`
+            );
+            safeLocalStorage.removeItem(MASTER_TAB_KEY);
+            safeLocalStorage.removeItem(MASTER_TAB_HEARTBEAT_KEY);
+            // Force master election by checking again
+            manager.isMasterTab(); // This will trigger re-election
+          }
+        }
+      }
+    }
+    
+    // Only skip if there's actually an active connection (not just stale refs)
+    // FIX: During client-side navigation, verify connection is actually OPEN
+    // If connection is closed or doesn't exist, re-initialize
+    const hasActiveConnection = isGlobalInstance &&
       eventSourceRef.current &&
-      eventSourceRef.current.readyState === EventSource.OPEN
-    ) {
+      eventSourceRef.current.readyState === EventSource.OPEN;
+    
+    if (hasActiveConnection) {
       console.log(
         `[${instanceIdRef.current}] Already initialized with active connection, skipping initialization...`
       );
+      setIsInitialized(true);
+      setError(null);
     } else {
+      // FIX: Always attempt initialization if connection is not active
+      // This handles both page reload and client-side navigation cases
+      // The initialize() function has its own checks to prevent duplicates
+      console.log(
+        `[${instanceIdRef.current}] Attempting initialization (isInitializedRef: ${isInitializedRef.current}, eventSourceRef: ${!!eventSourceRef.current}, readyState: ${eventSourceRef.current?.readyState})...`
+      );
       initialize().then((cleanupFn) => {
         cleanup = cleanupFn;
+      }).catch((error) => {
+        console.error(`[${instanceIdRef.current}] Initialization error:`, error);
+        setError("Failed to initialize connection");
+        isConnectingRef.current = false;
+        isGettingTokenRef.current = false;
       });
     }
 
@@ -1723,8 +1881,12 @@ export default function useCtiStomp(
       });
     };
     // Depend on authentication state to reinitialize after login
+    // Also depend on router pathname to detect client-side navigation
+    // This ensures connection initializes when navigating via router.push()
     // isGlobalInstance is checked inside the effect, so we don't need it as a dependency
-  }, [isAuthenticated, authInitialized]);
+    // FIX: Removed eventSource from dependencies - it causes unnecessary re-runs
+    // Connection state is tracked via eventSourceRef, not the eventSource state
+  }, [isAuthenticated, authInitialized, router.pathname]);
 
   // Helper: Get devices array for a DN
   const getDevicesForDn = useCallback(
@@ -2092,7 +2254,7 @@ export default function useCtiStomp(
           // CRITICAL: Immediately store the EventSource to prevent duplicate creation
           // This must happen synchronously before any other code can run
           eventSourceRef.current = eventSource;
-
+          setEventSource(eventSource);
           eventSource.onopen = () => {
            // console.log(`[${currentInstanceId}] ✅ Master tab connection opened`);
             isConnectingRef.current = false;
