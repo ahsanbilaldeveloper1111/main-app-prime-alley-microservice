@@ -3364,7 +3364,6 @@ export interface DealTemplateData {
 }
 
 export interface CreateDealTemplatePayload {
-  industry_id: number;
   name: string;
   description?: string;
   fields: Array<{

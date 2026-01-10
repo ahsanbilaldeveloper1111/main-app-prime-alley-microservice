@@ -268,7 +268,6 @@ const DealTemplatesPage = () => {
         // Create payload requires industry_id
         
         const createPayload: CreateDealTemplatePayload = {
-          industry_id: formData.industry_id,
           name: formData.name.trim(),
           description: formData.description.trim() || undefined,
           fields: fieldsPayload,
