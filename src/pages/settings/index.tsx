@@ -25,7 +25,8 @@ import {
   CheckCircle,
   ArrowUp,
   HelpCircle,
-  Tag
+  Tag,
+  FileText
 } from 'lucide-react';
 
 import "@assets/scss/common.scss";
@@ -40,8 +41,10 @@ import Ranks from "@pages/controlhub/ranks";
 
 // Import CRM components
 import Campaigns from "@pages/crm/campaigns";
+import Industries from "@pages/crm/industries";
 import Products from "@pages/crm/products";
 import Stages from "@pages/crm/stages";
+import DealTemplates from "@pages/crm/deal-templates";
 
 // Import Telco Gateway components
 import GsmAssign from "@pages/gsm/assign";
@@ -189,7 +192,7 @@ const Settings = () => {
     },
     {
       key: "telco-gateway",
-      title: "Telco Gateway",
+      title: "Carrier Gateway",
       icon: Phone,
       color: "#ff9800",
       permission: PERMISSIONS.GSM_SERVICES
@@ -236,8 +239,10 @@ const Settings = () => {
     ],
     "crm": [
       { key: "campaigns", title: "Campaigns", icon: Megaphone, color: "#0d6efd", permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS },
+      { key: "industries", title: "Industries", icon: Building2, color: "#6c757d", permission: PERMISSIONS.VIEW_CRM_INDUSTRIES },
       { key: "products", title: "Products", icon: Package, color: "#198754", permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
-      { key: "stages", title: "Stages", icon: Layers, color: "#ff9800", permission: PERMISSIONS.VIEW_CRM_STAGES }
+      { key: "stages", title: "Stages", icon: Layers, color: "#ff9800", permission: PERMISSIONS.VIEW_CRM_STAGES },
+      { key: "deal-templates", title: "Deal Templates", icon: FileText, color: "#9c27b0", permission: PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES }
     ],
     "telco-gateway": [
       { key: "assign-devices", title: "Assign Devices", icon: SettingsIcon, color: "#0d6efd", permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT },
@@ -464,12 +469,14 @@ const Settings = () => {
                 {activeTab === "crm" && shouldRenderTab("crm", activeCrmTab) && (
                   <div>
                     {activeCrmTab === "campaigns" && <Campaigns />}
+                    {activeCrmTab === "industries" && <Industries />}
                     {activeCrmTab === "products" && <Products />}
                     {activeCrmTab === "stages" && <Stages />}
+                    {activeCrmTab === "deal-templates" && <DealTemplates />}
                   </div>
                 )}
 
-                {/* Telco Gateway Content */}
+               {/*  Telco Gateway Content */}
                 {activeTab === "telco-gateway" && shouldRenderTab("telco-gateway", activeTelcoTab) && (
                   <div>
                     {activeTelcoTab === "assign-devices" && <GsmAssign />}

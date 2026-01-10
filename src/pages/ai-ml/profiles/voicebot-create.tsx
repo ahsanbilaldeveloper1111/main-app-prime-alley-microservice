@@ -1,32 +1,39 @@
 import "@assets/scss/datatable-style.scss";
-import React, { useState,ReactElement } from 'react';
-import { Settings, HelpCircle, User, Phone, ChevronDown, Check, Play, MoreVertical, Home, FileText, Mic, Shield, PlayCircle } from 'lucide-react';
+import React, { useState, ReactElement, useEffect, useCallback } from 'react';
+import { Phone, ChevronDown, Check, Play, MoreVertical, FileText, Mic, Shield, PlayCircle } from 'lucide-react';
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
+import axiosInstance from "@utils/axios";
+import { CreateVoiceBot } from "@utils/aiml";
+import { toast } from "react-toastify";
+import { useRouter } from 'next/router';
 
-
+interface Trunk {
+  sip_trunk_id: string;
+  name: string;
+  address: string;
+  numbers: string[];
+}
 
 const VoiceBotCreate = () => {
-
-
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('basics');
-  const [botName, setBotName] = useState('Support Bot');
-  const [description, setDescription] = useState('Handles support inquiries');
+  const [botName, setBotName] = useState('');
+  const [description, setDescription] = useState('');
   const [tags, setTags] = useState('Description');
   const [category, setCategory] = useState('Acquisition');
   const [owner, setOwner] = useState('Tiffany Reid');
-  const [status, setStatus] = useState('Active');
-  const [trunk, setTrunk] = useState('sipTrunk1');
-  const [callerId, setCallerId] = useState('+12223334455');
+  const [status, setStatus] = useState('active');
+  const [trunk, setTrunk] = useState('');
+  const [callerId, setCallerId] = useState('');
   const [region, setRegion] = useState('United States');
   const [ttsProvider, setTtsProvider] = useState('Google Cloud TTS');
   const [languageCode, setLanguageCode] = useState('en-US-Wavenet-G');
-  const [voice, setVoice] = useState('en-US-Wavenet-G');
+  const [voice, setVoice] = useState('en-US-Wavenet-G (Male)');
   const [greetingPrompt, setGreetingPrompt] = useState('Hello, this is the RingEdge support bot. How can I assist you today?');
   const [systemPrompt, setSystemPrompt] = useState('Default System Context');
   const [concurrency, setConcurrency] = useState('Max 10 Calls');
@@ -38,6 +45,198 @@ const VoiceBotCreate = () => {
   const [callbackWaiting, setCallbackWaiting] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [expandedValidation, setExpandedValidation] = useState<string | null>(null);
+  
+  // API-related states
+  const [trunks, setTrunks] = useState<Trunk[]>([]);
+  const [isLoadingTrunks, setIsLoadingTrunks] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedTrunkData, setSelectedTrunkData] = useState<Trunk | null>(null);
+
+  // Fetch trunks from API
+  const fetchTrunks = useCallback(async () => {
+    setIsLoadingTrunks(true);
+    try {
+      const response = await axiosInstance.get('aiml/list-trunks');
+      const received = (response?.data?.trunks ?? []).map((trunk: Trunk) => ({
+        ...trunk,
+        numbers: Array.isArray(trunk.numbers) ? trunk.numbers : [],
+      }));
+      setTrunks(received);
+      // Set default trunk if available and no trunk is selected
+      if (received.length > 0) {
+        setTrunk(prevTrunk => {
+          if (!prevTrunk && received.length > 0) {
+            const firstTrunk = received[0];
+            setSelectedTrunkData(firstTrunk);
+            // Set default caller ID from first trunk's numbers if available
+            if (firstTrunk.numbers && firstTrunk.numbers.length > 0) {
+              setCallerId(firstTrunk.numbers[0]);
+            }
+            return firstTrunk.sip_trunk_id;
+          }
+          return prevTrunk;
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching trunks:', error);
+      toast.error('Failed to fetch trunks');
+    } finally {
+      setIsLoadingTrunks(false);
+    }
+  }, []);
+
+  // Load trunks on mount
+  useEffect(() => {
+    fetchTrunks();
+  }, []);
+
+  // Update selected trunk data when trunk changes
+  useEffect(() => {
+    const selectedTrunk = trunks.find(t => t.sip_trunk_id === trunk);
+    setSelectedTrunkData(selectedTrunk || null);
+    // Update caller ID when trunk changes
+    if (selectedTrunk && selectedTrunk.numbers && selectedTrunk.numbers.length > 0) {
+      if (!callerId || !selectedTrunk.numbers.includes(callerId)) {
+        setCallerId(selectedTrunk.numbers[0]);
+      }
+    }
+  }, [trunk, trunks]);
+
+  // Parse business hours from string to object format
+  const parseBusinessHours = (hoursString: string): Record<string, any> | null => {
+    if (hoursString === '0 Selected' || !hoursString) {
+      return null;
+    }
+
+    // Handle predefined options
+    if (hoursString === '24/7') {
+      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      const hours: Record<string, any> = {};
+      days.forEach(day => {
+        hours[day] = { enabled: true, start: '00:00', end: '23:59' };
+      });
+      return hours;
+    }
+
+    if (hoursString === 'Business Hours') {
+      return {
+        monday: { enabled: true, start: '09:00', end: '17:00' },
+        tuesday: { enabled: true, start: '09:00', end: '17:00' },
+        wednesday: { enabled: true, start: '09:00', end: '17:00' },
+        thursday: { enabled: true, start: '09:00', end: '17:00' },
+        friday: { enabled: true, start: '09:00', end: '17:00' },
+      };
+    }
+
+    if (hoursString === 'Extended Hours') {
+      return {
+        monday: { enabled: true, start: '08:00', end: '20:00' },
+        tuesday: { enabled: true, start: '08:00', end: '20:00' },
+        wednesday: { enabled: true, start: '08:00', end: '20:00' },
+        thursday: { enabled: true, start: '08:00', end: '20:00' },
+        friday: { enabled: true, start: '08:00', end: '20:00' },
+      };
+    }
+
+    if (hoursString === 'Weekend Included') {
+      return {
+        monday: { enabled: true, start: '09:00', end: '18:00' },
+        tuesday: { enabled: true, start: '09:00', end: '18:00' },
+        wednesday: { enabled: true, start: '09:00', end: '18:00' },
+        thursday: { enabled: true, start: '09:00', end: '18:00' },
+        friday: { enabled: true, start: '09:00', end: '18:00' },
+        saturday: { enabled: true, start: '09:00', end: '18:00' },
+        sunday: { enabled: true, start: '09:00', end: '18:00' },
+      };
+    }
+
+    // For custom schedule, return null (would need custom UI to configure)
+    if (hoursString === 'Custom Schedule') {
+      return null;
+    }
+
+    return null;
+  };
+
+  // Extract concurrency limit number from string
+  const getConcurrencyLimit = (concurrencyString: string): number => {
+    const regex = /\d+/;
+    const match = regex.exec(concurrencyString);
+    return match ? Number.parseInt(match[0], 10) : 10;
+  };
+
+  // Handle form submission
+  const handleSubmit = async (saveAsDraft: boolean = false) => {
+    // Validation
+    if (!botName.trim()) {
+      toast.error('Bot name is required');
+      return;
+    }
+
+    if (!trunk) {
+      toast.error('Please select a trunk');
+      return;
+    }
+
+    if (!callerId) {
+      toast.error('Please select a caller ID');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const businessHoursObj = parseBusinessHours(businessHours);
+      
+      // Clean category value to remove any emojis or extra characters
+      const cleanCategory = category ? category.replace(/📁/g, '').trim() : undefined;
+      
+      const payload: any = {
+        bot_name: botName.trim(),
+        description: description.trim() || undefined,
+        category: cleanCategory || undefined,
+        tags: tags || undefined,
+        owner: owner || undefined,
+        status: saveAsDraft ? 'draft' : status.toLowerCase(),
+        trunk: trunk,
+        caller_id: callerId,
+        region: region || undefined,
+        tts_provider: ttsProvider || undefined,
+        voice_model: languageCode || undefined,
+        voice_type: voice || undefined,
+        greeting_prompt: greetingPrompt || undefined,
+        system_prompt: systemPrompt || undefined,
+        concurrency_limit: getConcurrencyLimit(concurrency),
+        timezone: timezone || undefined,
+        complete_context: completeContext,
+        recording_consent: recordingConsent,
+        dnc_registry_check: dncrCheck,
+        callback_waiting: callbackWaiting,
+      };
+
+      // Only include business_hours if it's configured
+      if (businessHoursObj) {
+        payload.business_hours = businessHoursObj;
+      }
+
+      const response = await CreateVoiceBot(payload);
+
+      if (response && response.status) {
+        // Navigate back to profiles list
+        router.push('/ai-ml/profiles');
+      }
+    } catch (error: any) {
+      console.error('Error creating voice bot:', error);
+      // Error handling is done in CreateVoiceBot function
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle cancel
+  const handleCancel = () => {
+    router.push('/ai-ml/profiles');
+  };
 
   // Dynamic validation logic
   const validationItems = [
@@ -68,10 +267,10 @@ const VoiceBotCreate = () => {
     { 
       id: 'region',
       label: 'Region & Telephony', 
-      checked: region.length > 0 && callerId.length > 0,
-      message: region.length > 0 && callerId.length > 0
+      checked: region.length > 0 && callerId.length > 0 && trunk.length > 0,
+      message: region.length > 0 && callerId.length > 0 && trunk.length > 0
         ? `Configured for ${region} with caller ID ${callerId}`
-        : 'Please select region and caller ID'
+        : 'Please select region, trunk, and caller ID'
     },
     { 
       id: 'business',
@@ -242,10 +441,10 @@ const VoiceBotCreate = () => {
                         cursor: 'pointer'
                       }}
                     >
-                      <option>📁 Acquisition</option>
-                      <option>📁 Sales</option>
-                      <option>📁 Support</option>
-                      <option>📁 Customer Service</option>
+                      <option value="Acquisition">📁 Acquisition</option>
+                      <option value="Sales">📁 Sales</option>
+                      <option value="Support">📁 Support</option>
+                      <option value="Customer Service">📁 Customer Service</option>
                     </select>
                   </div>
 
@@ -286,16 +485,16 @@ const VoiceBotCreate = () => {
                         border: '1px solid #e5e7eb',
                         borderRadius: '6px',
                         fontSize: '14px',
-                        color: status === 'Active' ? '#059669' : status === 'Inactive' ? '#6b7280' : status === 'Draft' ? '#d97706' : '#3b82f6',
-                        backgroundColor: status === 'Active' ? '#d1fae5' : status === 'Inactive' ? '#f3f4f6' : status === 'Draft' ? '#fef3c7' : '#dbeafe',
+                        color: status === 'active' ? '#059669' : status === 'inactive' ? '#6b7280' : status === 'draft' ? '#d97706' : '#3b82f6',
+                        backgroundColor: status === 'active' ? '#d1fae5' : status === 'inactive' ? '#f3f4f6' : status === 'draft' ? '#fef3c7' : '#dbeafe',
                         fontWeight: 500,
                         cursor: 'pointer'
                       }}
                     >
-                      <option value="Active">✓ Active</option>
-                      <option value="Inactive">○ Inactive</option>
-                      <option value="Draft">✎ Draft</option>
-                      <option value="Testing">⚡ Testing</option>
+                      <option value="active">✓ Active</option>
+                      <option value="inactive">○ Inactive</option>
+                      <option value="draft">✎ Draft</option>
+                      <option value="testing">⚡ Testing</option>
                     </select>
                   </div>
                 </div>
@@ -313,6 +512,7 @@ const VoiceBotCreate = () => {
                     <select
                       value={trunk}
                       onChange={(e) => setTrunk(e.target.value)}
+                      disabled={isLoadingTrunks}
                       style={{
                         width: '100%',
                         padding: '10px 12px',
@@ -320,12 +520,25 @@ const VoiceBotCreate = () => {
                         borderRadius: '6px',
                         fontSize: '14px',
                         color: '#1f2937',
-                        backgroundColor: 'white',
-                        cursor: 'pointer'
+                        backgroundColor: isLoadingTrunks ? '#f3f4f6' : 'white',
+                        cursor: isLoadingTrunks ? 'not-allowed' : 'pointer',
+                        opacity: isLoadingTrunks ? 0.6 : 1
                       }}
                     >
-                      <option>sipTrunk1</option>
-                      <option>sipTrunk2</option>
+                      {isLoadingTrunks ? (
+                        <option>Loading trunks...</option>
+                      ) : trunks.length === 0 ? (
+                        <option value="">No trunks available</option>
+                      ) : (
+                        <>
+                          <option value="">Select a trunk</option>
+                          {trunks.map((t) => (
+                            <option key={t.sip_trunk_id} value={t.sip_trunk_id}>
+                              {t.name} ({t.sip_trunk_id})
+                            </option>
+                          ))}
+                        </>
+                      )}
                     </select>
                   </div>
 
@@ -336,6 +549,7 @@ const VoiceBotCreate = () => {
                     <select
                       value={callerId}
                       onChange={(e) => setCallerId(e.target.value)}
+                      disabled={!selectedTrunkData || isLoadingTrunks}
                       style={{
                         width: '100%',
                         padding: '10px 12px',
@@ -343,12 +557,25 @@ const VoiceBotCreate = () => {
                         borderRadius: '6px',
                         fontSize: '14px',
                         color: '#1f2937',
-                        backgroundColor: 'white',
-                        cursor: 'pointer'
+                        backgroundColor: !selectedTrunkData ? '#f3f4f6' : 'white',
+                        cursor: !selectedTrunkData ? 'not-allowed' : 'pointer',
+                        opacity: !selectedTrunkData ? 0.6 : 1
                       }}
                     >
-                      <option>📞 +12223334455</option>
-                      <option>📞 +19876543210</option>
+                      {!selectedTrunkData ? (
+                        <option value="">Select a trunk first</option>
+                      ) : selectedTrunkData.numbers.length === 0 ? (
+                        <option value="">No numbers available</option>
+                      ) : (
+                        <>
+                          <option value="">Select caller ID</option>
+                          {selectedTrunkData.numbers.map((num) => (
+                            <option key={num} value={num}>
+                              📞 {num}
+                            </option>
+                          ))}
+                        </>
+                      )}
                     </select>
                   </div>
 
@@ -740,10 +967,10 @@ const VoiceBotCreate = () => {
             <div style={{ marginBottom: '24px' }}>
               <Phone size={32} color="rgba(255,255,255,0.6)" style={{ marginBottom: '16px' }} />
               <div style={{ fontSize: '24px', fontWeight: 600, color: 'white', marginBottom: '4px' }}>
-                +1 (222) 333-4455
+                {callerId || 'No Caller ID'}
               </div>
               <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)' }}>
-                United States
+                {region || 'No Region'}
               </div>
             </div>
 
@@ -756,7 +983,7 @@ const VoiceBotCreate = () => {
               height: '60px',
               marginBottom: '24px'
             }}>
-              {[...Array(40)].map((_, i) => (
+              {[...new Array(40)].map((_, i) => (
                 <div
                   key={i}
                   style={{
@@ -889,53 +1116,74 @@ const VoiceBotCreate = () => {
       borderRadius: '12px',
       boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
     }}>
-      <button style={{
-        padding: '10px 24px',
-        backgroundColor: 'transparent',
-        border: 'none',
-        color: '#6b7280',
-        fontSize: '14px',
-        fontWeight: 500,
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px'
-      }}>
+      <button 
+        onClick={handleCancel}
+        disabled={isSubmitting}
+        style={{
+          padding: '10px 24px',
+          backgroundColor: 'transparent',
+          border: 'none',
+          color: '#6b7280',
+          fontSize: '14px',
+          fontWeight: 500,
+          cursor: isSubmitting ? 'not-allowed' : 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          opacity: isSubmitting ? 0.6 : 1
+        }}
+      >
         ← Cancel
       </button>
 
       <div style={{ display: 'flex', gap: '12px' }}>
-        <button style={{
-          padding: '10px 24px',
-          backgroundColor: 'transparent',
-          border: '1px solid #e5e7eb',
-          color: '#6b7280',
-          fontSize: '14px',
-          fontWeight: 500,
-          borderRadius: '8px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px'
-        }}>
+        <button 
+          onClick={() => handleSubmit(true)}
+          disabled={isSubmitting || !botName.trim()}
+          style={{
+            padding: '10px 24px',
+            backgroundColor: 'transparent',
+            border: '1px solid #e5e7eb',
+            color: '#6b7280',
+            fontSize: '14px',
+            fontWeight: 500,
+            borderRadius: '8px',
+            cursor: (isSubmitting || !botName.trim()) ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            opacity: (isSubmitting || !botName.trim()) ? 0.6 : 1
+          }}
+        >
           📄 Save Draft
         </button>
 
-        <button style={{
-          padding: '10px 32px',
-          backgroundColor: '#667eea',
-          border: 'none',
-          color: 'white',
-          fontSize: '14px',
-          fontWeight: 500,
-          borderRadius: '8px',
-          cursor: 'pointer',
-          transition: 'all 0.2s'
-        }}
-        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#5568d3'}
-        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#667eea'}
+        <button 
+          onClick={() => handleSubmit(false)}
+          disabled={isSubmitting || !botName.trim()}
+          style={{
+            padding: '10px 32px',
+            backgroundColor: isSubmitting || !botName.trim() ? '#9ca3af' : '#667eea',
+            border: 'none',
+            color: 'white',
+            fontSize: '14px',
+            fontWeight: 500,
+            borderRadius: '8px',
+            cursor: (isSubmitting || !botName.trim()) ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            if (!isSubmitting && botName.trim()) {
+              e.currentTarget.style.backgroundColor = '#5568d3';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isSubmitting && botName.trim()) {
+              e.currentTarget.style.backgroundColor = '#667eea';
+            }
+          }}
         >
-          Save & Continue
+          {isSubmitting ? 'Saving...' : 'Save & Continue'}
         </button>
       </div>
     </div>

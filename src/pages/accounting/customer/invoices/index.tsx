@@ -2239,7 +2239,7 @@ const InvoiceList = () => {
                               </td>
                               <td className="text-end">
                                 <strong>
-                                  {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.line_total || '0'))}
+                                  {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.tax_amount || '0') + parseFloat(item.line_total || '0'))}
                                 </strong>
                               </td>
                             </tr>

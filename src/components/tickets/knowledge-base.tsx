@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { Row, Col, Card, Button, Form, Badge } from 'react-bootstrap';
 import {
   ChevronLeft,
@@ -30,6 +31,7 @@ interface KnowledgeBaseProps {
 }
 
 const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2FA', onArticleClick }) => {
+  const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('all');
@@ -54,14 +56,35 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
         const response = await ListFAQTopics({ page: 1, perPage: 100 });
         if (response && response.data) {
           setFaqTopics(response.data);
-          // Set first topic as selected if available
-          if (response.data.length > 0) {
+          // Check if topicId is in URL query params
+          const topicIdFromUrl = router.query.topicId ? Number.parseInt(router.query.topicId as string, 10) : null;
+          if (topicIdFromUrl && !isNaN(topicIdFromUrl)) {
+            const topicFromUrl = response.data.find((t: any) => t.id === topicIdFromUrl);
+            if (topicFromUrl) {
+              setSelectedCategory(topicFromUrl.name);
+              setSelectedTopicId(topicFromUrl.id);
+            } else if (response.data.length > 0) {
+              setSelectedCategory(response.data[0].name);
+              setSelectedTopicId(response.data[0].id);
+            }
+          } else if (response.data.length > 0) {
             setSelectedCategory(response.data[0].name);
             setSelectedTopicId(response.data[0].id);
           }
         } else if (Array.isArray(response)) {
           setFaqTopics(response);
-          if (response.length > 0) {
+          // Check if topicId is in URL query params
+          const topicIdFromUrl = router.query.topicId ? Number.parseInt(router.query.topicId as string, 10) : null;
+          if (topicIdFromUrl && !isNaN(topicIdFromUrl)) {
+            const topicFromUrl = response.find((t: any) => t.id === topicIdFromUrl);
+            if (topicFromUrl) {
+              setSelectedCategory(topicFromUrl.name);
+              setSelectedTopicId(topicFromUrl.id);
+            } else if (response.length > 0) {
+              setSelectedCategory(response[0].name);
+              setSelectedTopicId(response[0].id);
+            }
+          } else if (response.length > 0) {
             setSelectedCategory(response[0].name);
             setSelectedTopicId(response[0].id);
           }
@@ -73,8 +96,10 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
       }
     };
 
+    if (router.isReady) {
     fetchTopics();
-  }, []);
+    }
+  }, [router.isReady, router.query.topicId]);
 
   // Fetch FAQ items when topic is selected
   useEffect(() => {
@@ -252,11 +277,13 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
 
   const uniqueTypes = getUniqueTypes();
   
-  // Create dynamic tabs with "All" as first tab
-  const tabs = [
+  // Create dynamic tabs with "All" as first tab (only when there are multiple types)
+  const tabs = uniqueTypes.length > 1
+    ? [
     { id: 'all', label: 'All' },
     ...uniqueTypes.map((type) => ({ id: type.toLowerCase().replaceAll(/\s+/g, '-'), label: type }))
-  ];
+      ]
+    : uniqueTypes.map((type) => ({ id: type.toLowerCase().replaceAll(/\s+/g, '-'), label: type }));
 
   // Transform FAQ items to articles format
   const formatDate = (dateString: string) => {

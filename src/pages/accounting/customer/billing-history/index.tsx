@@ -142,11 +142,11 @@ const BillingHistory = () => {
     
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Billing History" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Payment History" />
 
       <PageHeader
-        title="Billing History"
-        description="View your billing history and manage your payments."
+        title="Payment History"
+        description="View your payment history and manage your payments."
         showSearch={false}
         
       />

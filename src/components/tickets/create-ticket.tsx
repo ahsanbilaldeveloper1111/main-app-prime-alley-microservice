@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Container, Row, Col, Card, Form, Button, Badge } from 'react-bootstrap';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Row, Col, Card, Form, Button, Badge } from 'react-bootstrap';
 import {
   ChevronLeft,
   Bold,
@@ -18,27 +18,124 @@ import {
   CheckCircle2,
   ChevronRight,
   FileQuestion,
-  Clock
+  Clock,
+  X
 } from 'lucide-react';
+import { CreateTicket as CreateTicketAPI } from '@utils/tickets';
+import { GetAllModules, GetAllSubmodules, GetAllSubmoduleChildren } from '@utils/ticket-module';
+import { GetAllStatuses } from '@utils/ticket-statuses';
+import { GetAllTypes } from '@utils/ticket-types';
+import { GetHierarchyData } from '@utils/users';
+import { ModuleSlug } from '@utils/Helper';
+import { useSession } from 'next-auth/react';
+import { toast } from 'react-toastify';
+import moment from 'moment';
+import Select from 'react-select';
+import CreatableSelect from 'react-select/creatable';
 
 interface CreateTicketProps {
   onBack: () => void;
 }
 
 const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [category, setCategory] = useState('');
-  const [subject, setSubject] = useState('');
-  const [description, setDescription] = useState('');
+  const { data: session } = useSession();
+  
+  // Form state
+  const [newTicketTitle, setNewTicketTitle] = useState<string>("");
+  const [newTicketDescription, setNewTicketDescription] = useState<string>("");
+  const [newTicketType, setNewTicketType] = useState<string>("");
+  const [newTicketStatus, setNewTicketStatus] = useState<string>("");
+  const [newTicketModule, setNewTicketModule] = useState<string>("");
+  const [newTicketSubmodule, setNewTicketSubmodule] = useState<string>("");
+  const [newTicketSubmoduleChild, setNewTicketSubmoduleChild] = useState<string>("");
+  const [newTicketPriority, setNewTicketPriority] = useState<string>("");
+  const [newTicketDueDate, setNewTicketDueDate] = useState<string>("");
+  const [newTicketUserExtension, setNewTicketUserExtension] = useState<string[]>([]);
+  const [newTicketImages, setNewTicketImages] = useState<File[]>([]);
+  const [newTicketTags, setNewTicketTags] = useState<string[]>([]);
+  
+  // Data state
+  const [modules, setModules] = useState<any[]>([]);
+  const [types, setTypes] = useState<any[]>([]);
+  const [statuses, setStatuses] = useState<any[]>([]);
+  const [submodules, setSubmodules] = useState<any[]>([]);
+  const [submoduleChildren, setSubmoduleChildren] = useState<any[]>([]);
+  const [extensions, setExtensions] = useState<any[]>([]);
+  
+  // UI state
+  const [creatingTicket, setCreatingTicket] = useState<boolean>(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submittedTicketId, setSubmittedTicketId] = useState('');
 
-  const steps = [
-    { number: 1, label: 'Describe Issue', active: currentStep === 1 },
-    { number: 2, label: 'Select Priority', active: currentStep === 2 },
-    { number: 3, label: 'Fill Details', active: currentStep === 3 },
-    { number: 4, label: 'Review', active: currentStep === 4 }
+  // Default tags suggestions
+  const defaultTags = [
+    "urgent",
+    "bug",
+    "feature",
+    "enhancement",
+    "documentation"
   ];
+
+  // Fetch initial data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [modulesData, typesData, statusesData, hierarchyData] = await Promise.all([
+          GetAllModules(),
+          GetAllTypes(),
+          GetAllStatuses(),
+          GetHierarchyData(ModuleSlug.TICKET)
+        ]);
+        
+        setModules(modulesData || []);
+        setTypes(typesData || []);
+        setStatuses(statusesData || []);
+        setExtensions(hierarchyData?.extensions || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+    
+    fetchData();
+  }, []);
+
+  // Fetch submodules when module changes
+  const fetchSubmodules = useCallback(async (moduleId: string) => {
+    if (moduleId) {
+      try {
+        const submoduleData = await GetAllSubmodules();
+        const filteredSubmodules = submoduleData?.filter((sub: any) => sub.module_id == moduleId) || [];
+        setSubmodules(filteredSubmodules);
+        setNewTicketSubmodule("");
+        setNewTicketSubmoduleChild("");
+        setSubmoduleChildren([]);
+      } catch (error) {
+        console.error("Error fetching submodules:", error);
+      }
+    } else {
+      setSubmodules([]);
+      setNewTicketSubmodule("");
+      setNewTicketSubmoduleChild("");
+      setSubmoduleChildren([]);
+    }
+  }, []);
+
+  // Fetch submodule children when submodule changes
+  const fetchSubmoduleChildren = useCallback(async (submoduleId: string) => {
+    if (submoduleId) {
+      try {
+        const childrenData = await GetAllSubmoduleChildren();
+        const filteredChildren = childrenData?.filter((child: any) => child.submodule_id == submoduleId) || [];
+        setSubmoduleChildren(filteredChildren);
+        setNewTicketSubmoduleChild("");
+      } catch (error) {
+        console.error("Error fetching submodule children:", error);
+      }
+    } else {
+      setSubmoduleChildren([]);
+      setNewTicketSubmoduleChild("");
+    }
+  }, []);
 
   const suggestedArticles = [
     {
@@ -85,12 +182,139 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
     "Can't find your answer?"
   ];
 
-  const handleSubmit = () => {
-    // Generate a random ticket ID
-    const newTicketId = '#' + Math.floor(100000 + Math.random() * 900000);
-    setSubmittedTicketId(newTicketId);
+  const handleSubmit = useCallback(async () => {
+    // Validation
+    if (!newTicketTitle?.trim() || newTicketTitle?.trim()?.length < 5) {
+      toast.error("Please enter a ticket title (Min: 5 chars)");
+      return;
+    }
+    if (!newTicketType) {
+      toast.error("Please select a ticket type");
+      return;
+    }
+    if (newTicketDescription.length < 50 || newTicketDescription.length > 500) {
+      toast.error("Ticket description must be between 50 and 500 characters");
+      return;
+    }
+    if (!newTicketStatus) {
+      toast.error("Please select a ticket status");
+      return;
+    }
+    if (!newTicketModule) {
+      toast.error("Please select a ticket module");
+      return;
+    }
+    if (!newTicketSubmodule) {
+      toast.error("Please select a ticket primary issue");
+      return;
+    }
+    if (!newTicketPriority) {
+      toast.error("Please select a ticket priority");
+      return;
+    }
+
+    // Validate images
+    if (newTicketImages && newTicketImages.length > 0) {
+      const maxSize = 5 * 1024 * 1024; // 5 MB
+      for (let i = 0; i < newTicketImages.length; i++) {
+        const image = newTicketImages[i];
+        if (!image.type?.includes("image/")) {
+          toast.error(`Attachment ${i + 1} must be an image (jpeg, png, jpg, gif)`);
+          return;
+        }
+        if (image.size > maxSize) {
+          toast.error(`Attachment ${i + 1} size must be less than 5MB`);
+          return;
+        }
+      }
+    }
+
+    const formData = new FormData();
+    formData.append("title", newTicketTitle);
+    formData.append("description", newTicketDescription);
+    formData.append("ticket_type_id", newTicketType);
+    formData.append("ticket_status_id", newTicketStatus);
+    formData.append("module_id", newTicketModule);
+    if (newTicketSubmodule) {
+      formData.append("submodule_id", newTicketSubmodule);
+    }
+    if (newTicketSubmoduleChild) {
+      formData.append("submodule_child_id", newTicketSubmoduleChild);
+    }
+    formData.append("priority", newTicketPriority || "0");
+    formData.append("created_by", session?.user?.phone || "");
+    
+    if (newTicketDueDate) {
+      formData.append("due_date", newTicketDueDate);
+    }
+    
+    if (session?.user?.permissions?.includes("assign-user-tickets") && newTicketUserExtension && newTicketUserExtension.length > 0) {
+      newTicketUserExtension.forEach((ext) => {
+        formData.append("user_extension[]", ext);
+      });
+    }
+    
+    if (newTicketTags && newTicketTags.length > 0) {
+      newTicketTags.forEach((tag) => {
+        formData.append("tags[]", tag);
+      });
+    }
+    
+    if (newTicketImages && newTicketImages.length > 0) {
+      newTicketImages.forEach((image) => {
+        formData.append("image[]", image);
+      });
+    }
+
+    setCreatingTicket(true);
+    let response = null;
+    try {
+      response = await CreateTicketAPI(formData);
+    } catch (error) {
+      toast.error("Failed to create ticket");
+      console.error("Create ticket error:", error);
+    } finally {
+      setCreatingTicket(false);
+    }
+    
+    if (response) {
+      // Generate a ticket ID for display
+      const ticketId = '#' + Math.floor(100000 + Math.random() * 900000);
+      setSubmittedTicketId(ticketId);
     setIsSubmitted(true);
-  };
+      
+      // Reset form
+      setNewTicketTitle("");
+      setNewTicketDescription("");
+      setNewTicketType("");
+      setNewTicketStatus("");
+      setNewTicketModule("");
+      setNewTicketSubmodule("");
+      setNewTicketSubmoduleChild("");
+      setNewTicketPriority("");
+      setNewTicketDueDate("");
+      setNewTicketUserExtension([]);
+      setNewTicketTags([]);
+      setNewTicketImages([]);
+      setSubmodules([]);
+      setSubmoduleChildren([]);
+    }
+  }, [
+    newTicketTitle,
+    newTicketDescription,
+    newTicketType,
+    newTicketStatus,
+    newTicketModule,
+    newTicketSubmodule,
+    newTicketSubmoduleChild,
+    newTicketPriority,
+    newTicketDueDate,
+    newTicketUserExtension,
+    newTicketTags,
+    newTicketImages,
+    session?.user?.phone,
+    session?.user?.permissions
+  ]);
 
   return (
     <div style={{ background: '#f4f7fa', minHeight: '100vh', paddingBottom: '40px' }}>
@@ -250,10 +474,26 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                   variant="outline-secondary"
                   onClick={() => {
                     setIsSubmitted(false);
-                    setCategory('');
-                    setSubject('');
-                    setDescription('');
+                    setNewTicketTitle("");
+                    setNewTicketDescription("");
+                    setNewTicketType("");
+                    setNewTicketStatus("");
+                    setNewTicketModule("");
+                    setNewTicketSubmodule("");
+                    setNewTicketSubmoduleChild("");
+                    setNewTicketPriority("");
+                    setNewTicketDueDate("");
+                    setNewTicketUserExtension([]);
+                    setNewTicketTags([]);
+                    setNewTicketImages([]);
+                    setSubmodules([]);
+                    setSubmoduleChildren([]);
                     setSubmittedTicketId('');
+                    // Reset file input
+                    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                    if (fileInput) {
+                      fileInput.value = "";
+                    }
                   }}
                   style={{
                     borderRadius: '6px',
@@ -294,40 +534,9 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                     Tell us how we can assist you
                   </p>
 
-                  {/* Progress Steps */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    flexWrap: 'wrap'
-                  }}>
-                    {steps.map((step, index) => (
-                      <React.Fragment key={step.number}>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '8px 16px',
-                          borderRadius: '20px',
-                          background: step.active ? '#4680ff' : '#e9ecef',
-                          color: step.active ? '#fff' : '#6c757d',
-                          fontSize: '13px',
-                          fontWeight: '500',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease'
-                        }}>
-                          <span>{step.number}</span>
-                          <span>{step.label}</span>
-                        </div>
-                        {index < steps.length - 1 && (
-                          <ChevronRight size={16} color="#c0c0c0" />
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </div>
                 </div>
 
-                {/* Category */}
+                {/* Title */}
                 <div style={{ marginBottom: '24px' }}>
                   <Form.Label style={{
                     fontSize: '14px',
@@ -335,43 +544,13 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                     color: '#2c3e50',
                     marginBottom: '8px'
                   }}>
-                    Category
-                  </Form.Label>
-                  <Form.Select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    style={{
-                      fontSize: '14px',
-                      padding: '10px 14px',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '6px',
-                      color: category ? '#2c3e50' : '#adb5bd'
-                    }}
-                  >
-                    <option value="">Select a category</option>
-                    <option value="billing">Billing & Payments</option>
-                    <option value="technical">Technical Support</option>
-                    <option value="account">Account Management</option>
-                    <option value="feature">Feature Request</option>
-                    <option value="other">Other</option>
-                  </Form.Select>
-                </div>
-
-                {/* Subject */}
-                <div style={{ marginBottom: '24px' }}>
-                  <Form.Label style={{
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#2c3e50',
-                    marginBottom: '8px'
-                  }}>
-                    Subject
+                    Ticket Title <span style={{ color: '#dc3545' }}>*</span>
                   </Form.Label>
                   <Form.Control
                     type="text"
                     placeholder="Enter a brief summary of the issue..."
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
+                    value={newTicketTitle}
+                    onChange={(e) => setNewTicketTitle(e.target.value)}
                     style={{
                       fontSize: '14px',
                       padding: '10px 14px',
@@ -379,7 +558,67 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                       borderRadius: '6px'
                     }}
                   />
-                </div>
+                  <Form.Text style={{ fontSize: '12px', color: '#6c757d' }}>
+                    Minimum 5 characters required
+                  </Form.Text>
+                        </div>
+
+                {/* Type and Priority Row */}
+                <Row className="g-3" style={{ marginBottom: '24px' }}>
+                  <Col md={6}>
+                    <Form.Label style={{
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#2c3e50',
+                      marginBottom: '8px'
+                    }}>
+                      Ticket Type <span style={{ color: '#dc3545' }}>*</span>
+                    </Form.Label>
+                    <Form.Select
+                      value={newTicketType}
+                      onChange={(e) => setNewTicketType(e.target.value)}
+                      style={{
+                        fontSize: '14px',
+                        padding: '10px 14px',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '6px'
+                      }}
+                    >
+                      <option value="">Select Type</option>
+                      {types.map((type: any) => (
+                        <option key={type.id} value={type.id}>
+                          {type.name}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Label style={{
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#2c3e50',
+                      marginBottom: '8px'
+                    }}>
+                      Priority <span style={{ color: '#dc3545' }}>*</span>
+                    </Form.Label>
+                    <Form.Select
+                      value={newTicketPriority}
+                      onChange={(e) => setNewTicketPriority(e.target.value)}
+                      style={{
+                        fontSize: '14px',
+                        padding: '10px 14px',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '6px'
+                      }}
+                    >
+                      <option value="">Select Priority</option>
+                      <option value="0">Low</option>
+                      <option value="1">Medium</option>
+                      <option value="2">High</option>
+                      <option value="3">Critical</option>
+                    </Form.Select>
+                  </Col>
+                </Row>
 
                 {/* Describe the issue */}
                 <div style={{ marginBottom: '24px' }}>
@@ -528,9 +767,10 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                   <Form.Control
                     as="textarea"
                     rows={6}
-                    placeholder="Lisa, how little your complete in figh ivvay:"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Describe your issue in detail (Min: 50 chars, Max: 500 chars)..."
+                    value={newTicketDescription}
+                    onChange={(e) => setNewTicketDescription(e.target.value)}
+                    maxLength={500}
                     style={{
                       fontSize: '14px',
                       padding: '12px 14px',
@@ -540,70 +780,146 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                       resize: 'none'
                     }}
                   />
-                </div>
-
-                {/* Add Screenshot */}
                 <div style={{
                   display: 'flex',
-                  alignItems: 'center',
                   justifyContent: 'space-between',
+                    marginTop: '8px',
+                    padding: '0 4px'
+                  }}>
+                    <Form.Text style={{ 
+                      fontSize: '12px', 
+                      color: newTicketDescription.length < 50 ? '#dc3545' : '#28a745'
+                    }}>
+                      {newTicketDescription.length < 50 
+                        ? `Minimum 50 characters required (${50 - newTicketDescription.length} more needed)`
+                        : 'Description looks good!'}
+                    </Form.Text>
+                    <Form.Text style={{ fontSize: '12px', color: '#6c757d' }}>
+                      {newTicketDescription.length}/500 characters
+                    </Form.Text>
+                  </div>
+                </div>
+
+                {/* Add Images */}
+                <div style={{ marginBottom: '24px' }}>
+                  <Form.Label style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#2c3e50',
                   marginBottom: '8px'
                 }}>
+                    Attachments (Optional)
+                  </Form.Label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (files.length > 3) {
+                        toast.error("Maximum 3 images allowed");
+                        const limitedFiles = files.slice(0, 3);
+                        setNewTicketImages(limitedFiles);
+                        // Reset file input
+                        const fileInput = e.target;
+                        const dataTransfer = new DataTransfer();
+                        limitedFiles.forEach(file => dataTransfer.items.add(file));
+                        fileInput.files = dataTransfer.files;
+                      } else {
+                        setNewTicketImages(files);
+                      }
+                    }}
+                    style={{
+                      fontSize: '14px',
+                      padding: '8px',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      width: '100%'
+                    }}
+                  />
+                  <Form.Text style={{ fontSize: '12px', color: '#6c757d', display: 'block', marginTop: '4px' }}>
+                    Supported formats: JPG, PNG, GIF. Max size: 5MB per image. Maximum 3 images.
+                  </Form.Text>
+                  
+                  {newTicketImages.length > 0 && (
+                    <div style={{ marginTop: '12px' }}>
                   <div style={{
                     display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px'
+                        flexWrap: 'wrap', 
+                        gap: '8px' 
                   }}>
-                    <Button
-                      variant="link"
+                        {newTicketImages.map((file, index) => (
+                          <Badge 
+                            key={index}
+                            bg="light" 
+                            text="dark" 
                       style={{
-                        padding: '8px 16px',
-                        fontSize: '13px',
-                        color: '#4680ff',
-                        textDecoration: 'none',
+                              padding: '8px 12px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '6px',
-                        background: '#fff'
+                              fontSize: '12px'
                       }}
                     >
-                      <Paperclip size={16} />
-                      Add screenshot
-                    </Button>
-                    <span style={{
-                      fontSize: '12px',
-                      color: '#6c757d'
-                    }}>
-                      Max 3 files (Up to 20MB Each)
+                            <Paperclip size={14} />
+                            <span>{file.name}</span>
+                            <span style={{ color: '#6c757d' }}>
+                              ({(file.size / 1024).toFixed(1)} KB)
                     </span>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              style={{
+                                padding: 0,
+                                minWidth: 'auto',
+                                color: '#dc3545',
+                                textDecoration: 'none'
+                              }}
+                              onClick={() => {
+                                setNewTicketImages(newTicketImages.filter((_, i) => i !== index));
+                                // Reset file input
+                                const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                                if (fileInput) {
+                                  fileInput.value = "";
+                                }
+                              }}
+                            >
+                              <X size={14} />
+                            </Button>
+                          </Badge>
+                        ))}
                   </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Submit Button */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  marginTop: '24px',
+                  paddingTop: '24px',
+                  borderTop: '1px solid #e9ecef'
+                }}>
                   <Button
                     onClick={handleSubmit}
+                    disabled={creatingTicket}
                     style={{
                       background: '#4680ff',
                       border: 'none',
                       borderRadius: '6px',
-                      padding: '10px 32px',
+                      padding: '12px 32px',
                       fontSize: '14px',
                       fontWeight: '500',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px'
+                      gap: '8px',
+                      opacity: creatingTicket ? 0.6 : 1
                     }}
                   >
-                    Submit Ticket
+                    {creatingTicket ? 'Creating...' : 'Submit Ticket'}
                   </Button>
                 </div>
-
-                <p style={{
-                  fontSize: '12px',
-                  color: '#6c757d',
-                  marginBottom: '24px'
-                }}>
-                  Need to share more details? You can send additional screenshots after ticket creation.
-                </p>
               </Card.Body>
             </Card>
           )}

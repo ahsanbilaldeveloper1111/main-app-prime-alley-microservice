@@ -3245,3 +3245,233 @@ export const downloadExampleCsv = (): void => {
   // Clean up the URL object
   URL.revokeObjectURL(url);
 };
+
+// Industry Management Interfaces
+export interface IndustryData {
+  id: number;
+  company_id?: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  products?: any[];
+  deal_templates?: any[];
+}
+
+export interface CreateIndustryPayload {
+  company_id?: string;
+  name: string;
+  description?: string;
+}
+
+export interface UpdateIndustryPayload {
+  name: string;
+  description?: string;
+}
+
+// Industry Management API
+export const getIndustries = async (
+  params: {
+    company_id?: string;
+    search?: string;
+    per_page?: number;
+    page?: number;
+  } = {}
+): Promise<PaginationWrapper<IndustryData>> => {
+  try {
+    const response = await axiosInstance.get("/crm/industries", { params });
+    const responseData: any = response.data?.data;
+   
+    if (responseData?.data) {
+      return responseData?.data;
+    }
+    
+    return extractData<PaginationWrapper<IndustryData>>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch industries");
+    throw error;
+  }
+};
+
+export const getIndustry = async (id: number): Promise<IndustryData> => {
+  try {
+    const response = await axiosInstance.get(`/crm/industries/${id}`);
+    return extractData<IndustryData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch industry");
+    throw error;
+  }
+};
+
+export const createIndustry = async (data: CreateIndustryPayload): Promise<IndustryData> => {
+  try {
+    const response = await axiosInstance.post("/crm/industries", data);
+    toast.success("Industry created successfully");
+    return extractData<IndustryData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to create industry");
+    throw error;
+  }
+};
+
+export const updateIndustry = async (
+  id: number,
+  data: UpdateIndustryPayload
+): Promise<IndustryData> => {
+  try {
+    const response = await axiosInstance.put(`/crm/industries/${id}`, data);
+    toast.success("Industry updated successfully");
+    return extractData<IndustryData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to update industry");
+    throw error;
+  }
+};
+
+export const deleteIndustry = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/industries/${id}`);
+    toast.success("Industry deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete industry");
+    throw error;
+  }
+};
+
+// Deal Template Management Interfaces
+export interface DealTemplateField {
+  id?: number;
+  deal_template_id?: number;
+  field_name: string;
+  field_type: "text" | "dropdown";
+  options?: string[] | null;
+  is_required: boolean;
+  sort_order: number;
+}
+
+export interface DealTemplateData {
+  id: number;
+  industry_id: number;
+  name: string;
+  description: string | null;
+  created_at?: string;
+  updated_at?: string;
+  fields?: DealTemplateField[];
+  industry?: {
+    id: number;
+    name: string;
+  };
+}
+
+export interface CreateDealTemplatePayload {
+  industry_id: number;
+  name: string;
+  description?: string;
+  fields: Array<{
+    field_name: string;
+    field_type: "text" | "dropdown";
+    options?: string[] | null;
+    is_required: boolean;
+    sort_order: number;
+  }>;
+}
+
+export interface UpdateDealTemplatePayload {
+  name: string;
+  description?: string;
+  fields: Array<{
+    field_name: string;
+    field_type: "text" | "dropdown";
+    options?: string[] | null;
+    is_required: boolean;
+    sort_order: number;
+  }>;
+}
+
+// Deal Template Management API
+export const getDealTemplates = async (
+  params: {
+    industry_id?: number;
+    search?: string;
+    per_page?: number;
+    page?: number;
+  } = {}
+): Promise<PaginationWrapper<DealTemplateData>> => {
+  try {
+    const response = await axiosInstance.get("/crm/deal-templates", { params });
+    const responseData: any = response.data?.data;
+    if (responseData?.data) {
+      return responseData?.data;
+    }
+    return extractData<PaginationWrapper<DealTemplateData>>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch deal templates");
+    throw error;
+  }
+};
+
+export const getDealTemplate = async (id: number): Promise<DealTemplateData> => {
+  try {
+    const response = await axiosInstance.get(`/crm/deal-templates/${id}`);
+    return extractData<DealTemplateData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch deal template");
+    throw error;
+  }
+};
+
+export const createDealTemplate = async (
+  data: CreateDealTemplatePayload
+): Promise<DealTemplateData> => {
+  try {
+    const response = await axiosInstance.post("/crm/deal-templates", data);
+    toast.success("Deal template created successfully");
+    return extractData<DealTemplateData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to create deal template");
+    throw error;
+  }
+};
+
+export const updateDealTemplate = async (
+  id: number,
+  data: UpdateDealTemplatePayload
+): Promise<DealTemplateData> => {
+  try {
+    const response = await axiosInstance.put(`/crm/deal-templates/${id}`, data);
+    toast.success("Deal template updated successfully");
+    return extractData<DealTemplateData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to update deal template");
+    throw error;
+  }
+};
+
+export const deleteDealTemplate = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/deal-templates/${id}`);
+    toast.success("Deal template deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete deal template");
+    throw error;
+  }
+};
+
+export const getRelevantDealTemplate = async (
+  params: {
+    lead_id?: number;
+    deal_id?: number;
+  }
+): Promise<DealTemplateData | null> => {
+  try {
+    const response = await axiosInstance.get("/crm/deal-templates/relevant/get", { params });
+    return extractData<DealTemplateData>(response.data);
+  } catch (error: any) {
+    // Return null if no template found (not an error)
+    if (error?.response?.status === 404) {
+      return null;
+    }
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch relevant deal template");
+    throw error;
+  }
+};

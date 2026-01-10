@@ -285,12 +285,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       url: '',
       subItems: [
         {
+          id: 'ai-bot-trunk-profiles',
+          title: 'Trunk Profiles',
+          icon: <Bot size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/ai-ml/trunk-profiles'
+        },
+        {
           id: 'ai-bot-profile',
           title: 'Voice Bot Profiles',
           icon: <Bot size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
           url: '/ai-ml/profiles'
         },
+        
         {
           id: 'ai-bot-campaigns',
           title: 'Campaigns',
@@ -413,6 +421,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <FileText size={16} />,
           permission: PERMISSIONS.TMS_SERVICES,
           url: '/tms/audit-logs'
+        },
+        {
+          id: 'live-calls-campaigns-management',
+          title: 'Campaigns Management',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/live-calls/management/campaigns'
+        },
+        {
+          id: 'live-calls-agent-management',
+          title: 'Agent Management',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/live-calls/management/agents'
         }
       ]
       .filter(item => !item.permission || hasPermission(item.permission))
@@ -462,6 +484,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <Monitor size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_UPTIME_SLA,
           url: '/netops/uptime-sla'
+        },
+        {
+          id: 'netops-select-server',
+          title: 'Select Server',
+          icon: <Server size={16} />,
+          permission: PERMISSIONS.NETOPS_SERVICES,
+          url: '/netops/select-server'
+        },
+        {
+          id: 'netops-application-monitoring',
+          title: 'Application Monitoring',
+          icon: <Monitor size={16} />,
+          permission: PERMISSIONS.NETOPS_SERVICES,
+          url: '/netops/application-monitoring'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
@@ -525,12 +561,26 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: MENU_LABELS.COMPLIANCES,
       url: '',
       subItems: [
+        // {
+        //   id: 'dncr-check-number',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.DNCR,
+        //   icon: <PhoneCall size={16} />,
+        //   permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
+        //   url: '/dncr/check-number'
+        // },
         {
-          id: 'dncr-check-number',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.DNCR,
+          id: 'dncr-api-number-check',
+          title: "API Number Check",
           icon: <PhoneCall size={16} />,
           permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
-          url: '/dncr/check-number'
+          url: '/dncr/api-number-check'
+        },
+        {
+          id: 'dncr-cdr-records',
+          title: "CDR Records",
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
+          url: '/dncr/cdr-records'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
@@ -577,7 +627,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             },
             { 
               id: 'billing-history', 
-              title: 'Billing History', 
+              title: 'Payment History', 
               icon: <FileText size={16} />, 
               url: '/accounting/customer/billing-history', permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING },
             

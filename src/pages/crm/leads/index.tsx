@@ -548,6 +548,7 @@ const CrmLeads = () => {
   const [leadsSearch, setLeadsSearch] = useState("");
   const [showLeadViewModal, setShowLeadViewModal] = useState(false);
   const [viewingLead, setViewingLead] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<string>("general-info");
   const [loadingLead, setLoadingLead] = useState(false);
   const [showLeadHistoryModal, setShowLeadHistoryModal] = useState(false);
 
@@ -1469,6 +1470,7 @@ const CrmLeads = () => {
       }
 
       setViewingLead(leadData);
+      //setActiveTab("lead-info"); // Reset to first tab when opening modal
       setShowLeadViewModal(true);
     } catch (error) {
       console.error("Failed to fetch lead:", error);
@@ -3565,23 +3567,104 @@ const CrmLeads = () => {
               </div>
             ) : (
               <>
-                {/* Lead Information Section */}
-                <div
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: 600,
-                    color: "#1f2937",
-                    marginBottom: "20px",
-                    paddingBottom: "10px",
-                    borderBottom: "2px solid #f8f9fa",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                  }}
-                >
-                  <Target size={18} style={{ color: "#4680ff" }} />
-                  Lead Information
+                <style>{`
+                  .lead-detail-filter-buttons {
+                    display: flex;
+                    flex-direction: row;
+                    align-items: center;
+                    gap: 12px;
+                    flex-wrap: wrap;
+                    margin-bottom: 0;
+                    padding: 0;
+                    width: 100%;
+                  }
+
+                  .lead-detail-filter-button {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    border: 1px solid;
+                    font-weight: 500;
+                    font-size: 14px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    background: white;
+                    white-space: nowrap;
+                  }
+
+                  .lead-detail-filter-button:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                  }
+
+                  .lead-detail-filter-button.active {
+                    color: white;
+                  }
+
+                  .lead-detail-filter-button.active .filter-icon {
+                    color: white;
+                  }
+
+                  .lead-detail-filter-button:not(.active) .filter-icon {
+                    color: inherit;
+                  }
+
+                  .filter-icon {
+                    width: 18px;
+                    height: 18px;
+                    flex-shrink: 0;
+                  }
+                `}</style>
+                {/* Tabs Navigation */}
+                <div className="lead-detail-filter-buttons   mb-4">
+                  <button
+                    className={`lead-detail-filter-button ${activeTab === "general-info" ? 'active' : ''}`}
+                    onClick={() => setActiveTab("general-info")}
+                    style={{
+                      backgroundColor: activeTab === "general-info" ? "#4680ff" : 'white',
+                      borderColor: "#4680ff",
+                      color: activeTab === "general-info" ? 'white' : "#4680ff"
+                    }}
+                  >
+                    <Target className="filter-icon" size={18} />
+                    <span>General Information</span>
+                  </button>
+                  <button
+                    className={`lead-detail-filter-button ${activeTab === "campaign-prospect" ? 'active' : ''}`}
+                    onClick={() => setActiveTab("campaign-prospect")}
+                    style={{
+                      backgroundColor: activeTab === "campaign-prospect" ? "#4680ff" : 'white',
+                      borderColor: "#4680ff",
+                      color: activeTab === "campaign-prospect" ? 'white' : "#4680ff"
+                    }}
+                  >
+                    <FileText className="filter-icon" size={18} />
+                    <span>Campaign & Prospect</span>
+                  </button>
                 </div>
+
+                {/* Tab Content */}
+                {activeTab === "general-info" && (
+                  <div style={{ paddingTop: "20px" }}>
+                      {/* Lead Information Section */}
+                      <div
+                        style={{
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          color: "#1f2937",
+                          marginBottom: "20px",
+                          paddingBottom: "10px",
+                          borderBottom: "2px solid #f8f9fa",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                        }}
+                      >
+                        <Target size={18} style={{ color: "#4680ff" }} />
+                        Lead Information
+                      </div>
                 <div
                   style={{
                     display: "grid",
@@ -3898,25 +3981,26 @@ const CrmLeads = () => {
                   </div>
                 </div>
 
-                {/* Company Information Section */}
-                {viewingLead.company_name && (
-                  <>
-                    <div
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: 600,
-                        color: "#1f2937",
-                        marginBottom: "20px",
-                        paddingBottom: "10px",
-                        borderBottom: "2px solid #f8f9fa",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
-                      <Building2 size={18} style={{ color: "#4680ff" }} />
-                      Company Information
-                    </div>
+                      {/* Company Information Section */}
+                      <div
+                        style={{
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          color: "#1f2937",
+                          marginTop: "40px",
+                          marginBottom: "20px",
+                          paddingBottom: "10px",
+                          borderBottom: "2px solid #f8f9fa",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                        }}
+                      >
+                        <Building2 size={18} style={{ color: "#4680ff" }} />
+                        Company Information
+                      </div>
+                    {viewingLead.company_name ? (
+                      <>
                     <div
                       style={{
                         display: "grid",
@@ -4143,18 +4227,25 @@ const CrmLeads = () => {
                       )}
                     </div>
                   </>
+                ) : (
+                  <div style={{
+                    padding: "40px",
+                    textAlign: "center",
+                    color: "#6b7280",
+                    background: "#f8f9fa",
+                    borderRadius: "10px"
+                  }}>
+                    No company information available
+                  </div>
                 )}
 
-                {/* Contact Persons Section */}
-                {viewingLead.contact_persons &&
-                  Array.isArray(viewingLead.contact_persons) &&
-                  viewingLead.contact_persons.length > 0 && (
-                    <>
+                      {/* Contact Persons Section */}
                       <div
                         style={{
                           fontSize: "16px",
                           fontWeight: 600,
                           color: "#1f2937",
+                          marginTop: "40px",
                           marginBottom: "20px",
                           paddingBottom: "10px",
                           borderBottom: "2px solid #f8f9fa",
@@ -4164,8 +4255,12 @@ const CrmLeads = () => {
                         }}
                       >
                         <Users size={18} style={{ color: "#4680ff" }} />
-                        Contact Persons ({viewingLead.contact_persons.length})
+                        Contact Persons ({viewingLead.contact_persons && Array.isArray(viewingLead.contact_persons) ? viewingLead.contact_persons.length : 0})
                       </div>
+                      {viewingLead.contact_persons &&
+                        Array.isArray(viewingLead.contact_persons) &&
+                        viewingLead.contact_persons.length > 0 ? (
+                        <>
                       <div
                         style={{
                           display: "grid",
@@ -4241,82 +4336,52 @@ const CrmLeads = () => {
                           )
                         )}
                       </div>
-                    </>
-                  )}
+                      </>
+                    ) : (
+                      <div style={{
+                        padding: "40px",
+                        textAlign: "center",
+                        color: "#6b7280",
+                        background: "#f8f9fa",
+                        borderRadius: "10px"
+                      }}>
+                        No contact persons available
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                {/* Campaign Information */}
-                {viewingLead.campaign && (
-                  <>
-                    <div
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: 600,
-                        color: "#1f2937",
-                        marginBottom: "20px",
-                        paddingBottom: "10px",
-                        borderBottom: "2px solid #f8f9fa",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
-                      <FileText size={18} style={{ color: "#4680ff" }} />
-                      Campaign Information
-                    </div>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fit, minmax(250px, 1fr))",
-                        gap: "20px",
-                        marginBottom: "30px",
-                      }}
-                    >
+                {activeTab === "campaign-prospect" && (
+                  <div style={{ paddingTop: "20px" }}>
+                      {/* Campaign Information Section */}
                       <div
                         style={{
-                          background: "#f8f9fa",
-                          padding: "16px",
-                          borderRadius: "10px",
-                          transition: "all 0.3s",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = "#e5e7eb";
-                          e.currentTarget.style.transform = "translateY(-2px)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = "#f8f9fa";
-                          e.currentTarget.style.transform = "translateY(0)";
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          color: "#1f2937",
+                          marginBottom: "20px",
+                          paddingBottom: "10px",
+                          borderBottom: "2px solid #f8f9fa",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
                         }}
                       >
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.5px",
-                            marginBottom: "6px",
-                          }}
-                        >
-                          Campaign Name
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "15px",
-                            color: "#1f2937",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {viewingLead.campaign.name}
-                        </div>
+                        <FileText size={18} style={{ color: "#4680ff" }} />
+                        Campaign Information
                       </div>
-                      {viewingLead.campaign_field_values &&
-                        Object.keys(viewingLead.campaign_field_values).length >
-                          0 &&
-                        Object.entries(viewingLead.campaign_field_values).map(
-                          ([key, value]: [string, any]) => (
+                      {viewingLead.campaign ? (
+                        <>
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns:
+                                "repeat(auto-fit, minmax(250px, 1fr))",
+                              gap: "20px",
+                              marginBottom: "30px",
+                            }}
+                          >
                             <div
-                              key={key}
                               style={{
                                 background: "#f8f9fa",
                                 padding: "16px",
@@ -4325,13 +4390,11 @@ const CrmLeads = () => {
                               }}
                               onMouseOver={(e) => {
                                 e.currentTarget.style.background = "#e5e7eb";
-                                e.currentTarget.style.transform =
-                                  "translateY(-2px)";
+                                e.currentTarget.style.transform = "translateY(-2px)";
                               }}
                               onMouseOut={(e) => {
                                 e.currentTarget.style.background = "#f8f9fa";
-                                e.currentTarget.style.transform =
-                                  "translateY(0)";
+                                e.currentTarget.style.transform = "translateY(0)";
                               }}
                             >
                               <div
@@ -4344,7 +4407,7 @@ const CrmLeads = () => {
                                   marginBottom: "6px",
                                 }}
                               >
-                                {key}
+                                Campaign Name
                               </div>
                               <div
                                 style={{
@@ -4353,34 +4416,91 @@ const CrmLeads = () => {
                                   fontWeight: 500,
                                 }}
                               >
-                                {String(value)}
+                                {viewingLead.campaign.name}
                               </div>
                             </div>
-                          )
-                        )}
-                    </div>
-                  </>
-                )}
+                            {viewingLead.campaign_field_values &&
+                              Object.keys(viewingLead.campaign_field_values).length >
+                                0 &&
+                              Object.entries(viewingLead.campaign_field_values).map(
+                                ([key, value]: [string, any]) => (
+                                  <div
+                                    key={key}
+                                    style={{
+                                      background: "#f8f9fa",
+                                      padding: "16px",
+                                      borderRadius: "10px",
+                                      transition: "all 0.3s",
+                                    }}
+                                    onMouseOver={(e) => {
+                                      e.currentTarget.style.background = "#e5e7eb";
+                                      e.currentTarget.style.transform =
+                                        "translateY(-2px)";
+                                    }}
+                                    onMouseOut={(e) => {
+                                      e.currentTarget.style.background = "#f8f9fa";
+                                      e.currentTarget.style.transform =
+                                        "translateY(0)";
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 600,
+                                        color: "#6b7280",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        marginBottom: "6px",
+                                      }}
+                                    >
+                                      {key}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "15px",
+                                        color: "#1f2937",
+                                        fontWeight: 500,
+                                      }}
+                                    >
+                                      {String(value)}
+                                    </div>
+                                  </div>
+                                )
+                              )}
+                          </div>
+                      </>
+                    ) : (
+                      <div style={{
+                        padding: "40px",
+                        textAlign: "center",
+                        color: "#6b7280",
+                        background: "#f8f9fa",
+                        borderRadius: "10px"
+                      }}>
+                        No campaign information available
+                      </div>
+                    )}
 
-                {/* Prospect Information */}
-                {viewingLead.crm_data && (
-                  <>
-                    <div
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: 600,
-                        color: "#1f2937",
-                        marginBottom: "20px",
-                        paddingBottom: "10px",
-                        borderBottom: "2px solid #f8f9fa",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
-                      <FileText size={18} style={{ color: "#4680ff" }} />
-                      Prospect Information
-                    </div>
+                      {/* Prospect Information Section */}
+                      <div
+                        style={{
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          color: "#1f2937",
+                          marginTop: "40px",
+                          marginBottom: "20px",
+                          paddingBottom: "10px",
+                          borderBottom: "2px solid #f8f9fa",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                        }}
+                      >
+                        <FileText size={18} style={{ color: "#4680ff" }} />
+                        Prospect Information
+                      </div>
+                      {viewingLead.crm_data ? (
+                        <>
                     <div
                       style={{
                         display: "grid",
@@ -4759,83 +4879,95 @@ const CrmLeads = () => {
                         </div>
                       )}
                     </div>
-    {/* Scheduled Call Information */}
-    {viewingLead.crm_data?.note && (
-                      <>
+                    {/* Scheduled Call Information */}
+                    {viewingLead.crm_data?.note && (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fit, minmax(250px, 1fr))",
+                          gap: "20px",
+                          marginBottom: "30px",
+                        }}
+                      >
                         <div
                           style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              "repeat(auto-fit, minmax(250px, 1fr))",
-                            gap: "20px",
-                            marginBottom: "30px",
+                            background: "#f8f9fa",
+                            padding: "16px",
+                            borderRadius: "10px",
+                            transition: "all 0.3s",
+                            gridColumn: "span 2",
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = "#e5e7eb";
+                            e.currentTarget.style.transform =
+                              "translateY(-2px)";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = "#f8f9fa";
+                            e.currentTarget.style.transform = "translateY(0)";
                           }}
                         >
                           <div
                             style={{
-                              background: "#f8f9fa",
-                              padding: "16px",
-                              borderRadius: "10px",
-                              transition: "all 0.3s",
-                              gridColumn: "span 2",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = "#e5e7eb";
-                              e.currentTarget.style.transform =
-                                "translateY(-2px)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = "#f8f9fa";
-                              e.currentTarget.style.transform = "translateY(0)";
+                              fontSize: "12px",
+                              fontWeight: 600,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
                             }}
                           >
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                fontWeight: 600,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}
-                            >
-                              Scheduled Call Notes
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "15px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                whiteSpace: "pre-wrap",
-                              }}
-                            >
-                              {viewingLead.crm_data.note}
-                            </div>
+                            Scheduled Call Notes
                           </div>
-                        </div>
-                      </>
-                    )}
-                    {/* Prospect Fields */}
-                    {viewingLead.crm_data.data &&
-                      typeof viewingLead.crm_data.data === "object" &&
-                      Object.keys(viewingLead.crm_data.data).length > 0 && (
-                        <>
                           <div
                             style={{
-                              fontSize: "16px",
-                              fontWeight: 600,
+                              fontSize: "15px",
                               color: "#1f2937",
-                              marginBottom: "20px",
-                              paddingBottom: "10px",
-                              borderBottom: "2px solid #f8f9fa",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "10px",
+                              fontWeight: 500,
+                              whiteSpace: "pre-wrap",
                             }}
                           >
-                            <FileText size={18} style={{ color: "#4680ff" }} />
-                            Prospect Fields
+                            {viewingLead.crm_data.note}
                           </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={{
+                    padding: "40px",
+                    textAlign: "center",
+                    color: "#6b7280",
+                    background: "#f8f9fa",
+                    borderRadius: "10px"
+                  }}>
+                    No prospect information available
+                  </div>
+                )}
+
+                      {/* Prospect Fields Section */}
+                      <div
+                        style={{
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          color: "#1f2937",
+                          marginTop: "40px",
+                          marginBottom: "20px",
+                          paddingBottom: "10px",
+                          borderBottom: "2px solid #f8f9fa",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                        }}
+                      >
+                        <FileText size={18} style={{ color: "#4680ff" }} />
+                        Prospect Fields
+                      </div>
+                      {viewingLead.crm_data?.data &&
+                        typeof viewingLead.crm_data.data === "object" &&
+                        Object.keys(viewingLead.crm_data.data).length > 0 ? (
+                        <>
                           <div
                             style={{
                               display: "grid",
@@ -4897,11 +5029,19 @@ const CrmLeads = () => {
                                 </div>
                               ))}
                           </div>
-                        </>
-                      )}
-
-                
-                  </>
+                      </>
+                    ) : (
+                      <div style={{
+                        padding: "40px",
+                        textAlign: "center",
+                        color: "#6b7280",
+                        background: "#f8f9fa",
+                        borderRadius: "10px"
+                      }}>
+                        No prospect fields available
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Lost Reason */}

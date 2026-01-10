@@ -1,16 +1,22 @@
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
+  useState,
+  useEffect,
+  useCallback
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 
-import  { useState } from 'react';
+import { CreateCampaign, ListVoiceBots } from "@utils/aiml";
+import { toast } from "react-toastify";
+import { useRouter } from 'next/router';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import parsePhoneNumber from "libphonenumber-js";
 import { 
     DollarSign, 
     Phone, 
@@ -25,9 +31,7 @@ import {
     Edit2,
     Upload,
     TrendingUp,
-    Users,
-    FileText,
-    User
+    Users
   } from 'lucide-react';
 import ContextScriptScreen from '@components/context-scripts';
 import CallSettingsScreen from '@components/call-settings';
@@ -53,21 +57,24 @@ interface CampaignData {
   
 
 const CustomerDashboard = () => {
+  const router = useRouter();
   const [activeStep, setActiveStep] = useState<number>(1);
-  const [activeMainTab, setActiveMainTab] = useState<string>('campaigns');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [voiceBots, setVoiceBots] = useState<any[]>([]);
+  const [isLoadingBots, setIsLoadingBots] = useState<boolean>(false);
 
   const [formData, setFormData] = useState<CampaignData>({
-    campaignName: 'Follow-Up Campaign',
-    botProfile: 'Gandalf Support Bot',
-    clientId: 'May 29 - Jun 4, 2024',
+    campaignName: '',
+    botProfile: '',
+    clientId: '',
     dialerStrategy: 'Progressive Dialing',
-    transferCallsTo: '+1 (987) 123-456',
-    transferFallbackTo: '+1 (987) 654-321',
+    transferCallsTo: '',
+    transferFallbackTo: '',
     retries: 15,
     dncCompliance: true,
-    owner: 'Tiffany Reid',
+    owner: '',
     clientWorkspace: '',
-    scheduleStart: 'May 29 - Jun 4, 2024',
+    scheduleStart: '',
     scheduleEnd: '',
     timezone: 'Pacific Time (GMT-7)',
     concurrency: 10,
@@ -80,7 +87,12 @@ const CustomerDashboard = () => {
   const [retriesEnabled, setRetriesEnabled] = useState<boolean>(false);
   const [uploadedContacts, setUploadedContacts] = useState<number>(0);
   const [validContacts, setValidContacts] = useState<number>(0);
+  const [mobileContacts, setMobileContacts] = useState<number>(0);
   const [uploadedFileName, setUploadedFileName] = useState<string>('');
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [manualNumbers, setManualNumbers] = useState<string>('');
+  const [scheduleStartDate, setScheduleStartDate] = useState<Date | null>(null);
+  const [scheduleEndDate, setScheduleEndDate] = useState<Date | null>(null);
 
   const steps = [
     { number: 1, label: 'Basics' },
@@ -93,15 +105,189 @@ const CustomerDashboard = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Fetch voice bots for dropdown
+  const fetchVoiceBots = useCallback(async () => {
+    setIsLoadingBots(true);
+    try {
+      const response = await ListVoiceBots();
+      const botsData = response?.results?.data || response?.bots || response?.data || [];
+      setVoiceBots(botsData);
+      // Set default bot if available
+      if (botsData.length > 0 && !formData.botProfile) {
+        handleInputChange('botProfile', botsData[0].id.toString());
+      }
+    } catch (error) {
+      console.error('Error fetching voice bots:', error);
+    } finally {
+      setIsLoadingBots(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchVoiceBots();
+  }, [fetchVoiceBots]);
+
+  // Validate phone number in E.164 format
+  const isValidE164 = (phoneNumber: string): boolean => {
+    try {
+      // Remove whitespace and clean the number
+      const cleaned = phoneNumber.trim().replace(/\s+/g, '');
+      // E.164 format: must start with + and contain only digits after that
+      if (!cleaned.startsWith('+')) {
+        return false;
+      }
+      // Parse and validate using libphonenumber-js
+      const parsed = parsePhoneNumber(cleaned);
+      return parsed?.isValid() ?? false;
+    } catch {
+      return false;
+    }
+  };
+
+  // Check if number is mobile
+  const isMobileNumber = (phoneNumber: string): boolean => {
+    try {
+      const cleaned = phoneNumber.trim().replace(/\s+/g, '');
+      const parsed = parsePhoneNumber(cleaned);
+      if (parsed?.isValid()) {
+        // Check if it's a mobile number type
+        const numberType = parsed.getType();
+        return numberType === 'MOBILE' || numberType === 'FIXED_LINE_OR_MOBILE';
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  // Parse and validate manual numbers
+  useEffect(() => {
+    if (manualNumbers.trim()) {
+      // Split by comma or newline
+      const numbers = manualNumbers
+        .split(/[,\n]/)
+        .map(num => num.trim())
+        .filter(num => num.length > 0);
+
+      const totalCount = numbers.length;
+      const validNumbers = numbers.filter(isValidE164);
+      const validCount = validNumbers.length;
+      const mobileCount = validNumbers.filter(isMobileNumber).length;
+
+      setUploadedContacts(totalCount);
+      setValidContacts(validCount);
+      setMobileContacts(mobileCount);
+    } else {
+      setUploadedContacts(0);
+      setValidContacts(0);
+      setMobileContacts(0);
+    }
+  }, [manualNumbers]);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setUploadedFileName(file.name);
-      // Simulate file processing - replace with actual logic
-      const mockContactCount = Math.floor(Math.random() * 1000) + 100;
-      const mockValidCount = Math.floor(mockContactCount * 0.95);
-      setUploadedContacts(mockContactCount);
-      setValidContacts(mockValidCount);
+      setUploadedFile(file);
+      
+      try {
+        // Read file content
+        const text = await file.text();
+        
+        // Parse CSV - handle both comma and newline separated values
+        const numbers: string[] = [];
+        const lines = text.split(/\r?\n/);
+        
+        lines.forEach(line => {
+          // Split by comma and process each value
+          const values = line.split(',').map(val => val.trim()).filter(val => val.length > 0);
+          numbers.push(...values);
+        });
+        
+        // Remove empty values and duplicates
+        const uniqueNumbers = Array.from(new Set(numbers.filter(num => num.length > 0)));
+        
+        // Validate numbers
+        const totalCount = uniqueNumbers.length;
+        const validNumbers = uniqueNumbers.filter(isValidE164);
+        const validCount = validNumbers.length;
+        const mobileCount = validNumbers.filter(isMobileNumber).length;
+        
+        setUploadedContacts(totalCount);
+        setValidContacts(validCount);
+        setMobileContacts(mobileCount);
+      } catch (error) {
+        console.error('Error reading file:', error);
+        toast.error('Error reading file. Please check the file format.');
+        setUploadedContacts(0);
+        setValidContacts(0);
+        setMobileContacts(0);
+      }
+    }
+  };
+
+  // Handle form submission
+  const handleSubmit = async () => {
+    if (!formData.campaignName) {
+      toast.error('Please enter a campaign name');
+      return;
+    }
+
+    if (!formData.botProfile) {
+      toast.error('Please select a bot profile');
+      return;
+    }
+
+    if (!uploadedFile && !manualNumbers && uploadedContacts === 0) {
+      toast.error('Please upload a contacts file or enter phone numbers');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload: any = {
+        voice_bot_id: Number.parseInt(formData.botProfile, 10),
+        name: formData.campaignName,
+        description: formData.clientId || '',
+        context: '', // Will be set from step 2
+        status: 'active',
+      };
+
+      // Add optional fields
+      if (formData.clientId) payload.client_id = formData.clientId;
+      if (formData.dialerStrategy) payload.dialer_strategy = formData.dialerStrategy;
+      if (formData.transferCallsTo && transferCallsEnabled) payload.transfer_calls_to = formData.transferCallsTo;
+      if (formData.transferFallbackTo && transferFallbackEnabled) payload.transfer_fallback_to = formData.transferFallbackTo;
+      if (formData.retries && retriesEnabled) payload.retries = formData.retries;
+      if (formData.dncCompliance !== undefined) payload.dnc_compliance = formData.dncCompliance;
+      if (formData.owner) payload.owner = formData.owner;
+      if (formData.clientWorkspace) payload.client_workspace = formData.clientWorkspace;
+      if (formData.scheduleStart) payload.schedule_start = formData.scheduleStart;
+      if (formData.scheduleEnd) payload.schedule_end = formData.scheduleEnd;
+      if (formData.timezone) payload.timezone = formData.timezone;
+      if (formData.concurrency) payload.concurrency = formData.concurrency;
+      if (formData.recordingConsent !== undefined) payload.recording_consent = formData.recordingConsent;
+      if (formData.dncrCheck !== undefined) payload.dncr_check = formData.dncrCheck;
+
+      // Handle file upload or manual numbers
+      if (uploadedFile) {
+        payload.numbers_file = uploadedFile;
+        await CreateCampaign(payload, true);
+      } else if (manualNumbers) {
+        payload.numbers_to_call = manualNumbers;
+        await CreateCampaign(payload, false);
+      } else {
+        toast.error('Please provide phone numbers');
+        return;
+      }
+
+      // Success - redirect to campaigns list
+      //toast.success('Campaign created successfully');
+      router.push('/ai-ml/campaigns');
+    } catch (error) {
+      console.error('Error creating campaign:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -175,7 +361,7 @@ const CustomerDashboard = () => {
                <h3 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '2rem', color: '#1f2937' }}>
                  Basics
                </h3>
- 
+
              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
                {/* Left Column */}
                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -188,6 +374,7 @@ const CustomerDashboard = () => {
                      type="text"
                      value={formData.campaignName}
                      onChange={(e) => handleInputChange('campaignName', e.target.value)}
+                     tabIndex={1}
                      style={{
                        width: '100%',
                        padding: '0.75rem',
@@ -203,44 +390,49 @@ const CustomerDashboard = () => {
                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#495057' }}>
                      Bot Profile
                    </label>
-                   <select
-                     value={formData.botProfile}
-                     onChange={(e) => handleInputChange('botProfile', e.target.value)}
+                  <select
+                    value={formData.botProfile}
+                    onChange={(e) => handleInputChange('botProfile', e.target.value)}
+                    disabled={isLoadingBots}
+                    tabIndex={3}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #ced4da',
+                      borderRadius: '6px',
+                      fontSize: '1rem',
+                      backgroundColor: isLoadingBots ? '#e9ecef' : 'white'
+                    }}
+                  >
+                    <option value="">Select Bot Profile</option>
+                    {voiceBots.map((bot) => (
+                      <option key={bot.id} value={bot.id}>
+                        {bot.bot_name || bot.name || 'Unnamed Bot'}
+                      </option>
+                    ))}
+                  </select>
+                 </div>
+ 
+                 {/* Description */}
+                 <div>
+                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#495057' }}>
+                     Description
+                   </label>
+                   <textarea
+                     value={formData.clientId}
+                     onChange={(e) => handleInputChange('clientId', e.target.value)}
+                     tabIndex={5}
                      style={{
                        width: '100%',
                        padding: '0.75rem',
                        border: '1px solid #ced4da',
                        borderRadius: '6px',
                        fontSize: '1rem',
-                       backgroundColor: 'white'
+                       minHeight: '80px',
+                       resize: 'vertical'
                      }}
-                   >
-                     <option>Gandalf Support Bot</option>
-                     <option>Sales Bot</option>
-                     <option>Assistant Bot</option>
-                   </select>
-                 </div>
- 
-                 {/* Client ID */}
-                 <div>
-                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#495057' }}>
-                     Client ID
-                   </label>
-                   <div style={{ position: 'relative' }}>
-                     <Calendar size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6c757d' }} />
-                     <input
-                       type="text"
-                       value={formData.clientId}
-                       onChange={(e) => handleInputChange('clientId', e.target.value)}
-                       style={{
-                         width: '100%',
-                         padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                         border: '1px solid #ced4da',
-                         borderRadius: '6px',
-                         fontSize: '1rem'
-                       }}
-                     />
-                   </div>
+                     placeholder="Enter campaign description"
+                   />
                  </div>
  
                  {/* Dialer Strategy */}
@@ -251,6 +443,7 @@ const CustomerDashboard = () => {
                    <select
                      value={formData.dialerStrategy}
                      onChange={(e) => handleInputChange('dialerStrategy', e.target.value)}
+                     tabIndex={7}
                      style={{
                        width: '100%',
                        padding: '0.75rem',
@@ -305,6 +498,7 @@ const CustomerDashboard = () => {
                      value={formData.transferCallsTo}
                      onChange={(e) => handleInputChange('transferCallsTo', e.target.value)}
                      disabled={!transferCallsEnabled}
+                     tabIndex={9}
                      style={{
                        width: '100%',
                        padding: '0.75rem',
@@ -355,6 +549,7 @@ const CustomerDashboard = () => {
                      value={formData.transferFallbackTo}
                      onChange={(e) => handleInputChange('transferFallbackTo', e.target.value)}
                      disabled={!transferFallbackEnabled}
+                     tabIndex={11}
                      style={{
                        width: '100%',
                        padding: '0.75rem',
@@ -405,6 +600,7 @@ const CustomerDashboard = () => {
                        value={formData.retries}
                        onChange={(e) => handleInputChange('retries', parseInt(e.target.value))}
                        disabled={!retriesEnabled}
+                       tabIndex={13}
                        style={{
                          padding: '0.75rem',
                          border: '1px solid #ced4da',
@@ -414,7 +610,7 @@ const CustomerDashboard = () => {
                          width: '80px'
                        }}
                      >
-                       {[...Array(30)].map((_, i) => (
+                       {new Array(30).fill(null).map((_, i) => (
                          <option key={i + 1} value={i + 1}>{i + 1}</option>
                        ))}
                      </select>
@@ -483,25 +679,26 @@ const CustomerDashboard = () => {
                        alignItems: 'center',
                        justifyContent: 'center',
                        color: 'white',
-                       fontWeight: '600'
+                       fontWeight: '600',
+                       flexShrink: 0
                      }}>
-                       TR
+                       {formData.owner ? formData.owner.charAt(0).toUpperCase() : ''}
                      </div>
-                     <select
+                     <input
+                       type="text"
                        value={formData.owner}
                        onChange={(e) => handleInputChange('owner', e.target.value)}
+                       placeholder="Enter owner name"
+                       tabIndex={2}
                        style={{
                          flex: 1,
                          border: 'none',
                          outline: 'none',
                          fontSize: '1rem',
-                         backgroundColor: 'transparent'
+                         backgroundColor: 'transparent',
+                         padding: 0
                        }}
-                     >
-                       <option>Tiffany Reid</option>
-                       <option>John Doe</option>
-                       <option>Jane Smith</option>
-                     </select>
+                     />
                    </div>
                  </div>
  
@@ -510,56 +707,55 @@ const CustomerDashboard = () => {
                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#495057' }}>
                      Client / Workspace
                    </label>
-                   <select
+                   <input
+                     type="text"
                      value={formData.clientWorkspace}
                      onChange={(e) => handleInputChange('clientWorkspace', e.target.value)}
+                     placeholder="Enter client or workspace name"
+                     tabIndex={4}
                      style={{
                        width: '100%',
                        padding: '0.75rem',
                        border: '1px solid #ced4da',
                        borderRadius: '6px',
                        fontSize: '1rem',
-                       color: '#6c757d',
+                       color: '#1f2937',
                        backgroundColor: 'white'
                      }}
-                   >
-                     <option value="">Select client or workspace</option>
-                     <option>Workspace 1</option>
-                     <option>Workspace 2</option>
-                   </select>
+                   />
                  </div>
  
-                 {/* Schedule */}
+                 {/* Schedule Start */}
                  <div>
                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#495057' }}>
-                     Schedule
+                     Schedule Start
                    </label>
-                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                     <input
-                       type="text"
-                       value={formData.scheduleStart}
-                       onChange={(e) => handleInputChange('scheduleStart', e.target.value)}
-                       style={{
-                         flex: 1,
-                         padding: '0.75rem',
-                         border: '1px solid #ced4da',
-                         borderRadius: '6px',
-                         fontSize: '1rem'
+                   <div style={{ position: 'relative' }}>
+                     <DatePicker
+                       selected={scheduleStartDate}
+                       onChange={(date: Date | null) => {
+                         setScheduleStartDate(date);
+                         if (date) {
+                           handleInputChange('scheduleStart', date.toISOString().split('T')[0]);
+                         } else {
+                           handleInputChange('scheduleStart', '');
+                         }
                        }}
+                       placeholderText="Select start date"
+                       showTimeSelect
+                       timeFormat="HH:mm"
+                       timeIntervals={15}
+                       timeCaption="Time"
+                       dateFormat="MMM dd, yyyy h:mm aa"
+                       minDate={new Date()}
+                       className="form-control"
+                       wrapperClassName="date-picker-wrapper"
+                       tabIndex={6}
                      />
-                     <button style={{
-                       padding: '0.75rem',
-                       border: '1px solid #ced4da',
-                       borderRadius: '6px',
-                       backgroundColor: 'white',
-                       cursor: 'pointer'
-                     }}>
-                       <Calendar size={20} color="#6c757d" />
-                     </button>
                    </div>
                  </div>
  
-                 {/* Timezone (First) */}
+                 {/* Timezone */}
                  <div>
                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#495057' }}>
                      Timezone
@@ -567,29 +763,7 @@ const CustomerDashboard = () => {
                    <select
                      value={formData.timezone}
                      onChange={(e) => handleInputChange('timezone', e.target.value)}
-                     style={{
-                       width: '100%',
-                       padding: '0.75rem',
-                       border: '1px solid #ced4da',
-                       borderRadius: '6px',
-                       fontSize: '1rem',
-                       backgroundColor: 'white'
-                     }}
-                   >
-                     <option>Pacific Time (GMT-7)</option>
-                     <option>Eastern Time (GMT-5)</option>
-                     <option>Central Time (GMT-6)</option>
-                   </select>
-                 </div>
- 
-                 {/* Timezone (Second - duplicate in design) */}
-                 <div>
-                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#495057' }}>
-                     Timezone
-                   </label>
-                   <select
-                     value={formData.timezone}
-                     onChange={(e) => handleInputChange('timezone', e.target.value)}
+                     tabIndex={8}
                      style={{
                        width: '100%',
                        padding: '0.75rem',
@@ -614,7 +788,8 @@ const CustomerDashboard = () => {
                      <BarChart3 size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6c757d' }} />
                      <select
                        value={formData.concurrency}
-                       onChange={(e) => handleInputChange('concurrency', parseInt(e.target.value))}
+                       onChange={(e) => handleInputChange('concurrency', Number.parseInt(e.target.value, 10))}
+                       tabIndex={10}
                        style={{
                          width: '100%',
                          padding: '0.75rem 0.75rem 0.75rem 2.5rem',
@@ -745,23 +920,50 @@ const CustomerDashboard = () => {
                    Drag & drop or click to browse
                  </div>
                </label>
+
+               {/* Manual Number Entry */}
+               <div style={{ marginTop: '1rem' }}>
+                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#495057' }}>
+                   Or Enter Phone Numbers (comma-separated)
+                 </label>
+                 <textarea
+                   value={manualNumbers}
+                   onChange={(e) => setManualNumbers(e.target.value)}
+                   placeholder="+1234567890,+0987654321,+1122334455"
+                   style={{
+                     width: '100%',
+                     padding: '0.75rem',
+                     border: '1px solid #ced4da',
+                     borderRadius: '6px',
+                     fontSize: '0.875rem',
+                     minHeight: '80px',
+                     resize: 'vertical'
+                   }}
+                 />
+               </div>
  
                {/* Contact Stats */}
-               <div style={{ 
-                 marginTop: '1rem',
-                 padding: '1rem',
-                 backgroundColor: '#f8f9fa',
-                 borderRadius: '8px'
-               }}>
-                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                   <span style={{ fontSize: '0.875rem', color: '#6c757d' }}>Total Contacts</span>
-                   <span style={{ fontSize: '1rem', fontWeight: '600', color: '#1f2937' }}>{uploadedContacts.toLocaleString()}</span>
+               {(uploadedContacts > 0 || validContacts > 0) && (
+                 <div style={{ 
+                   marginTop: '1rem',
+                   padding: '1rem',
+                   backgroundColor: '#f8f9fa',
+                   borderRadius: '8px'
+                 }}>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                     <span style={{ fontSize: '0.875rem', color: '#6c757d' }}>Total Contacts</span>
+                     <span style={{ fontSize: '1rem', fontWeight: '600', color: '#1f2937' }}>{uploadedContacts.toLocaleString()}</span>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                     <span style={{ fontSize: '0.875rem', color: '#6c757d' }}>Valid Numbers (E.164)</span>
+                     <span style={{ fontSize: '1rem', fontWeight: '600', color: '#059669' }}>{validContacts.toLocaleString()}</span>
+                   </div>
+                   {/* <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                     <span style={{ fontSize: '0.875rem', color: '#6c757d' }}>Mobile Numbers</span>
+                     <span style={{ fontSize: '1rem', fontWeight: '600', color: '#0d6efd' }}>{mobileContacts.toLocaleString()}</span>
+                   </div> */}
                  </div>
-                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                   <span style={{ fontSize: '0.875rem', color: '#6c757d' }}>Valid Numbers</span>
-                   <span style={{ fontSize: '1rem', fontWeight: '600', color: '#059669' }}>{validContacts.toLocaleString()}</span>
-                 </div>
-               </div>
+               )}
              </div>
  
              {/* Campaign Summary Card */}
@@ -969,7 +1171,7 @@ const CustomerDashboard = () => {
                  }}>
                    <span style={{ fontSize: '0.95rem', color: '#6c757d' }}>Max Concurrency</span>
                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
-                     <span style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937' }}>10</span>
+                     <span style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937' }}>{formData.concurrency}</span>
                      <span style={{ fontSize: '0.875rem', color: '#6c757d' }}>Parallel Calls</span>
                    </div>
                  </div>
@@ -1099,7 +1301,7 @@ const CustomerDashboard = () => {
                  }}>
                    <BarChart3 size={20} color="#4f46e5" />
                    <div>
-                     <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937' }}>10</div>
+                     <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937' }}>{formData.concurrency}</div>
                      <div style={{ fontSize: '0.75rem', color: '#6c757d' }}>Parallel Calls</div>
                    </div>
                  </div>
@@ -1165,7 +1367,9 @@ const CustomerDashboard = () => {
                    </div>
                    <div>
                      <label style={{ fontSize: '0.875rem', color: '#6c757d', marginBottom: '0.25rem', display: 'block' }}>Bot Profile</label>
-                     <p style={{ fontSize: '1rem', color: '#1f2937', fontWeight: '500' }}>{formData.botProfile}</p>
+                     <p style={{ fontSize: '1rem', color: '#1f2937', fontWeight: '500' }}>
+                       {voiceBots.find(b => b.id.toString() === formData.botProfile)?.bot_name || voiceBots.find(b => b.id.toString() === formData.botProfile)?.name || formData.botProfile || 'Not selected'}
+                     </p>
                    </div>
                    <div>
                      <label style={{ fontSize: '0.875rem', color: '#6c757d', marginBottom: '0.25rem', display: 'block' }}>Owner</label>
@@ -1451,16 +1655,18 @@ const CustomerDashboard = () => {
                  </p>
  
                  <button
+                   onClick={handleSubmit}
+                   disabled={isSubmitting}
                    style={{
                      width: '100%',
                      padding: '1rem',
                      border: 'none',
                      borderRadius: '8px',
-                     backgroundColor: '#198754',
+                     backgroundColor: isSubmitting ? '#6c757d' : '#198754',
                      color: 'white',
                      fontSize: '1.1rem',
                      fontWeight: '600',
-                     cursor: 'pointer',
+                     cursor: isSubmitting ? 'not-allowed' : 'pointer',
                      marginBottom: '0.75rem',
                      transition: 'all 0.2s',
                      display: 'flex',
@@ -1468,11 +1674,11 @@ const CustomerDashboard = () => {
                      justifyContent: 'center',
                      gap: '0.5rem'
                    }}
-                   onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#157347'}
-                   onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#198754'}
+                   onMouseOver={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = '#157347')}
+                   onMouseOut={(e) => !isSubmitting && (e.currentTarget.style.backgroundColor = '#198754')}
                  >
                    <Rocket size={20} />
-                   Launch Campaign
+                   {isSubmitting ? 'Creating Campaign...' : 'Launch Campaign'}
                  </button>
  
                  <button
@@ -1633,25 +1839,48 @@ const CustomerDashboard = () => {
              >
                Save Draft
              </button>
-             <button
-               onClick={() => activeStep < 4 && setActiveStep(activeStep + 1)}
-               style={{
-                 display: 'flex',
-                 alignItems: 'center',
-                 gap: '0.5rem',
-                 padding: '0.75rem 1.5rem',
-                 border: 'none',
-                 borderRadius: '8px',
-                 backgroundColor: '#0d6efd',
-                 fontSize: '1rem',
-                 fontWeight: '500',
-                 color: 'white',
-                 cursor: 'pointer'
-               }}
-             >
-               Next
-               <ChevronRight size={20} />
-             </button>
+                {activeStep === 4 ? (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.75rem 1.5rem',
+                      border: 'none',
+                      borderRadius: '8px',
+                      backgroundColor: isSubmitting ? '#6c757d' : '#198754',
+                      fontSize: '1rem',
+                      fontWeight: '500',
+                      color: 'white',
+                      cursor: isSubmitting ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {isSubmitting ? 'Creating...' : 'Launch Campaign'}
+                    <Rocket size={20} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => activeStep < 4 && setActiveStep(activeStep + 1)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.75rem 1.5rem',
+                      border: 'none',
+                      borderRadius: '8px',
+                      backgroundColor: '#0d6efd',
+                      fontSize: '1rem',
+                      fontWeight: '500',
+                      color: 'white',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Next
+                    <ChevronRight size={20} />
+                  </button>
+                )}
            </div>
          </div>
        </div>

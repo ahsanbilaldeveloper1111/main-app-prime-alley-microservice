@@ -20,6 +20,10 @@ import {
   getCrmDataCounts,
   assignCrmDataAdvanced,
   downloadExampleCsv,
+  getIndustries,
+  getDealTemplates,
+  IndustryData,
+  DealTemplateData,
 } from "@utils/crm";
 import {
   Button,
@@ -74,6 +78,7 @@ import {
   Briefcase,
   RefreshCw,
   UserPlus,
+  Building2,
 } from 'lucide-react';
 import { toast } from "react-toastify";
 import Select from "react-select";
@@ -330,6 +335,12 @@ const CrmCampaigns = () => {
   const [extensions, setExtensions] = useState<any[]>([]);
   const [campaignUsers, setCampaignUsers] = useState<readonly any[]>([]);
 
+  // Industries and Deal Templates
+  const [industries, setIndustries] = useState<IndustryData[]>([]);
+  const [dealTemplates, setDealTemplates] = useState<DealTemplateData[]>([]);
+  const [selectedIndustries, setSelectedIndustries] = useState<readonly any[]>([]);
+  const [selectedDealTemplate, setSelectedDealTemplate] = useState<any>(null);
+
   // Upload modal states
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -437,6 +448,34 @@ const CrmCampaigns = () => {
     };
     loadCampaigns();
   }, [refreshKey]);
+
+  // Load industries
+  useEffect(() => {
+    const loadIndustries = async () => {
+      try {
+        const response = await getIndustries({ per_page: 1000 });
+        setIndustries(response.data || []);
+      } catch (error) {
+        console.error("Failed to load industries:", error);
+        setIndustries([]);
+      }
+    };
+    loadIndustries();
+  }, []);
+
+  // Load deal templates
+  useEffect(() => {
+    const loadDealTemplates = async () => {
+      try {
+        const response = await getDealTemplates({ per_page: 1000 });
+        setDealTemplates(response.data || []);
+      } catch (error) {
+        console.error("Failed to load deal templates:", error);
+        setDealTemplates([]);
+      }
+    };
+    loadDealTemplates();
+  }, []);
 
   // Helper function to get user names from extensions
   const getUserNames = (userExtensions: any[]) => {
@@ -784,6 +823,8 @@ const CrmCampaigns = () => {
     });
     setCampaignFields([]);
     setCampaignUsers([]);
+    setSelectedIndustries([]);
+    setSelectedDealTemplate(null);
     setNewField({
       field_name: "",
       field_type: "string",
@@ -824,6 +865,60 @@ const CrmCampaigns = () => {
       } else {
         setCampaignUsers([]);
       }
+
+      // Set industries from industries array or industry_ids
+      const industriesData = (campaignData as any).industries;
+      const industryIds = (campaignData as any).industry_ids;
+      
+      if (industriesData && Array.isArray(industriesData) && industriesData.length > 0) {
+        // Use industries array if available (from API response)
+        const selectedIndustriesOptions = industriesData
+          .map((industry: any) => ({
+            value: industry.id.toString(),
+            label: industry.name || `Industry ${industry.id}`,
+            id: industry.id
+          }))
+          .filter(Boolean);
+        setSelectedIndustries(selectedIndustriesOptions);
+      } else if (industryIds && Array.isArray(industryIds) && industryIds.length > 0) {
+        // Fallback to industry_ids if industries array is not available
+        const selectedIndustriesOptions = industryIds
+          .map((industryId: number) => {
+            const industry = industries.find(ind => ind.id === industryId);
+            return {
+              value: industryId.toString(),
+              label: industry?.name || `Industry ${industryId}`,
+              id: industryId
+            };
+          })
+          .filter(Boolean);
+        setSelectedIndustries(selectedIndustriesOptions);
+      } else {
+        setSelectedIndustries([]);
+      }
+
+      // Set deal template from deal_template object or deal_template_id
+      const dealTemplateData = (campaignData as any).deal_template;
+      const dealTemplateId = (campaignData as any).deal_template_id;
+      
+      if (dealTemplateData && dealTemplateData.id) {
+        // Use deal_template object if available (from API response)
+        setSelectedDealTemplate({
+          value: dealTemplateData.id.toString(),
+          label: dealTemplateData.name || `Deal Template ${dealTemplateData.id}`,
+          id: dealTemplateData.id
+        });
+      } else if (dealTemplateId) {
+        // Fallback to deal_template_id if deal_template object is not available
+        const dealTemplate = dealTemplates.find(dt => dt.id === parseInt(dealTemplateId.toString()));
+        setSelectedDealTemplate({
+          value: dealTemplateId.toString(),
+          label: dealTemplate?.name || `Deal Template ${dealTemplateId}`,
+          id: parseInt(dealTemplateId.toString())
+        });
+      } else {
+        setSelectedDealTemplate(null);
+      }
       
       // Reset newField form
       setNewField({
@@ -841,7 +936,7 @@ const CrmCampaigns = () => {
     } finally {
       setLoading(false);
     }
-  }, [extensions]);
+  }, [extensions, industries, dealTemplates]);
 
   const handleViewCampaign = useCallback(async (campaign: any) => {
     try {
@@ -1011,6 +1106,8 @@ const CrmCampaigns = () => {
         status: formData.status as 'active' | 'inactive',
         fields: cleanedFields,
         campaign_users: campaignUsers.map(user => user.value),
+        industry_ids: selectedIndustries.map((ind: any) => parseInt(ind.value || ind.id)),
+        deal_template_id: selectedDealTemplate ? parseInt(selectedDealTemplate.value || selectedDealTemplate.id) : undefined,
       };
 
       if (showEditModal && selectedCampaign) {
@@ -1031,7 +1128,7 @@ const CrmCampaigns = () => {
     } finally {
       setLoading(false);
     }
-  }, [formData, campaignFields, campaignUsers, showEditModal, selectedCampaign, getTodayDate]);
+  }, [formData, campaignFields, campaignUsers, selectedIndustries, selectedDealTemplate, showEditModal, selectedCampaign, getTodayDate]);
 
   // Field management functions
   const handleAddField = useCallback(() => {
@@ -2051,6 +2148,10 @@ const CrmCampaigns = () => {
                       </th>
                     )}
                     {selectedCampaignsColumns.includes('campaignUsers') && <th>Campaign Users</th>}
+
+                    {selectedCampaignsColumns.includes('campaignsCreatedBy') && <th>Created By</th>}
+
+                    
                     {selectedCampaignsColumns.includes('created') && (
                       <th 
                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -2132,6 +2233,16 @@ const CrmCampaigns = () => {
                             </span>
                           </td>
                         )}
+                        {selectedCampaignsColumns.includes('campaignsCreatedBy') && (
+                          <td>
+                            <small className="text-muted">
+                              {campaign.created_by ? (() => {
+                                const extension = extensions.find(ext => ext.id == campaign.created_by || ext.extension == campaign.created_by);
+                                return extension?.display_name || extension?.name || campaign.created_by;
+                              })() : 'Unknown'}
+                            </small>
+                          </td>
+                        )}
                         {selectedCampaignsColumns.includes('created') && (
                           <td>
                             <small className="text-muted">
@@ -2198,6 +2309,8 @@ const CrmCampaigns = () => {
           setShowEditModal(false);
           setSelectedCampaign(null);
           setCampaignUsers([]);
+          setSelectedIndustries([]);
+          setSelectedDealTemplate(null);
           setNewField({
             field_name: "",
             field_type: "string",
@@ -2281,6 +2394,63 @@ const CrmCampaigns = () => {
               placeholder="Enter campaign description (optional)"
             />
           </Form.Group>
+
+          <Row>
+            <Col md={6}>
+              <Form.Group className="mb-4">
+                <Form.Label>Industries</Form.Label>
+                <Select
+                  isMulti
+                  value={selectedIndustries}
+                  onChange={(selected) => setSelectedIndustries(selected || [])}
+                  options={industries.map((industry) => ({
+                    value: industry.id.toString(),
+                    label: industry.name,
+                    id: industry.id,
+                  }))}
+                  placeholder="Select industries..."
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderColor: "#ced4da",
+                      boxShadow: "none",
+                      fontSize: "14px",
+                    }),
+                  }}
+                />
+                <Form.Text className="text-muted">
+                  Select one or more industries for this campaign.
+                </Form.Text>
+              </Form.Group>
+            </Col>
+            <Col md={6}>
+              <Form.Group className="mb-4">
+                <Form.Label>Deal Template</Form.Label>
+                <Select
+                  value={selectedDealTemplate}
+                  onChange={(selected) => setSelectedDealTemplate(selected)}
+                  options={dealTemplates.map((template) => ({
+                    value: template.id.toString(),
+                    label: template.name,
+                    id: template.id,
+                  }))}
+                  placeholder="Select deal template..."
+                  isClearable
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      borderColor: "#ced4da",
+                      boxShadow: "none",
+                      fontSize: "14px",
+                    }),
+                  }}
+                />
+                <Form.Text className="text-muted">
+                  Select a deal template for this campaign (optional).
+                </Form.Text>
+              </Form.Group>
+            </Col>
+          </Row>
 
           <Form.Group className="mb-4">
             <Form.Label>Campaign Users</Form.Label>
@@ -2469,6 +2639,8 @@ const CrmCampaigns = () => {
               setShowEditModal(false);
               setSelectedCampaign(null);
               setCampaignUsers([]);
+              setSelectedIndustries([]);
+              setSelectedDealTemplate(null);
               setNewField({
                 field_name: "",
                 field_type: "string",
@@ -2676,6 +2848,149 @@ const CrmCampaigns = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Industries Section */}
+                {(() => {
+                  const industriesData = (selectedCampaign as any).industries;
+                  const industryIds = (selectedCampaign as any).industry_ids;
+                  
+                  // Use industries array if available, otherwise fallback to industry_ids
+                  const industriesToShow = industriesData && Array.isArray(industriesData) && industriesData.length > 0
+                    ? industriesData
+                    : (industryIds && Array.isArray(industryIds) && industryIds.length > 0
+                        ? industryIds.map((id: number) => {
+                            const industry = industries.find(ind => ind.id === id);
+                            return industry || { id, name: `Industry ${id}` };
+                          })
+                        : []);
+                  
+                  if (industriesToShow.length > 0) {
+                    return (
+                      <>
+                        <div style={{
+                          fontSize: '16px',
+                          fontWeight: 600,
+                          color: '#1f2937',
+                          marginBottom: '20px',
+                          paddingBottom: '10px',
+                          borderBottom: '2px solid #f8f9fa',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px'
+                        }}>
+                          <Building2 size={18} style={{ color: '#4680ff' }} />
+                          Industries ({industriesToShow.length})
+                        </div>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                          gap: '12px',
+                          marginBottom: '30px'
+                        }}>
+                          {industriesToShow.map((industry: any, index: number) => {
+                            const industryName = industry.name || `Industry ${industry.id || industry}`;
+                            return (
+                              <div key={index} style={{
+                                background: '#f8f9fa',
+                                padding: '12px',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                transition: 'all 0.3s'
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.background = '#e5e7eb';
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.background = '#f8f9fa';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                              }}>
+                                {industryName}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* Deal Template Section */}
+                {(() => {
+                  const dealTemplateData = (selectedCampaign as any).deal_template;
+                  const dealTemplateId = (selectedCampaign as any).deal_template_id;
+                  
+                  // Use deal_template object if available, otherwise fallback to deal_template_id
+                  let templateToShow = null;
+                  if (dealTemplateData && dealTemplateData.id) {
+                    templateToShow = dealTemplateData;
+                  } else if (dealTemplateId) {
+                    const dealTemplate = dealTemplates.find(dt => dt.id === parseInt(dealTemplateId.toString()));
+                    templateToShow = dealTemplate || { id: dealTemplateId, name: `Deal Template ${dealTemplateId}` };
+                  }
+                  
+                  if (templateToShow) {
+                    return (
+                      <>
+                        <div style={{
+                          fontSize: '16px',
+                          fontWeight: 600,
+                          color: '#1f2937',
+                          marginBottom: '20px',
+                          paddingBottom: '10px',
+                          borderBottom: '2px solid #f8f9fa',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px'
+                        }}>
+                          <FileText size={18} style={{ color: '#4680ff' }} />
+                          Deal Template
+                        </div>
+                        <div style={{
+                          background: '#f8f9fa',
+                          padding: '16px',
+                          borderRadius: '10px',
+                          transition: 'all 0.3s',
+                          marginBottom: '30px'
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.background = '#e5e7eb';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.background = '#f8f9fa';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: '#6b7280',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '6px'
+                          }}>Template Name</div>
+                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                            {templateToShow.name || `Deal Template ${templateToShow.id}`}
+                          </div>
+                          {templateToShow.description && (
+                            <div style={{ 
+                              fontSize: '13px', 
+                              color: '#6b7280', 
+                              marginTop: '8px',
+                              wordWrap: 'break-word',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {templateToShow.description}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* Date Information Section */}
                 <div style={{

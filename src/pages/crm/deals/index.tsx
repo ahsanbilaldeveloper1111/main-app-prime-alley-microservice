@@ -458,6 +458,7 @@ const CrmDeals = () => {
   const [showDealHistoryModal, setShowDealHistoryModal] = useState(false);
   const [relatedLead, setRelatedLead] = useState<any>(null);
   const [loadingLead, setLoadingLead] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("general-info");
   
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -2482,21 +2483,96 @@ const CrmDeals = () => {
               </div>
             ) : (
               <>
-                {/* Deal Information Section */}
-                <div style={{
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  marginBottom: '20px',
-                  paddingBottom: '10px',
-                  borderBottom: '2px solid #f8f9fa',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}>
-                  <Handshake size={18} style={{ color: '#4680ff' }} />
-                  Deal Information
+                <style jsx>{`
+                  .lead-detail-filter-buttons {
+                    display: flex;
+                    gap: 12px;
+                    flex-wrap: wrap;
+                    margin-bottom: 24px;
+                  }
+
+                  .lead-detail-filter-button {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    border: 1px solid;
+                  }
+
+                  .lead-detail-filter-button:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                  }
+
+                  .lead-detail-filter-button.active {
+                    color: white;
+                  }
+
+                  .lead-detail-filter-button.active .filter-icon {
+                    color: white;
+                  }
+
+                  .lead-detail-filter-button:not(.active) .filter-icon {
+                    color: inherit;
+                  }
+
+                  .filter-icon {
+                    width: 18px;
+                    height: 18px;
+                    flex-shrink: 0;
+                  }
+                `}</style>
+                {/* Tabs Navigation */}
+                <div className="lead-detail-filter-buttons   mb-4">
+                  <button
+                    className={`lead-detail-filter-button ${activeTab === "general-info" ? 'active' : ''}`}
+                    onClick={() => setActiveTab("general-info")}
+                    style={{
+                      backgroundColor: activeTab === "general-info" ? "#4680ff" : 'white',
+                      borderColor: "#4680ff",
+                      color: activeTab === "general-info" ? 'white' : "#4680ff"
+                    }}
+                  >
+                    <Handshake className="filter-icon" size={18} />
+                    <span>General Information</span>
+                  </button>
+                  <button
+                    className={`lead-detail-filter-button ${activeTab === "campaign-prospect" ? 'active' : ''}`}
+                    onClick={() => setActiveTab("campaign-prospect")}
+                    style={{
+                      backgroundColor: activeTab === "campaign-prospect" ? "#4680ff" : 'white',
+                      borderColor: "#4680ff",
+                      color: activeTab === "campaign-prospect" ? 'white' : "#4680ff"
+                    }}
+                  >
+                    <FileText className="filter-icon" size={18} />
+                    <span>Campaign & Prospect</span>
+                  </button>
                 </div>
+
+                {/* Tab Content */}
+                {activeTab === "general-info" && (
+                  <div style={{ paddingTop: "20px" }}>
+                      {/* Deal Information Section */}
+                      <div style={{
+                        fontSize: '16px',
+                        fontWeight: 600,
+                        color: '#1f2937',
+                        marginBottom: '20px',
+                        paddingBottom: '10px',
+                        borderBottom: '2px solid #f8f9fa',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
+                      }}>
+                        <Handshake size={18} style={{ color: '#4680ff' }} />
+                        Deal Information
+                      </div>
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -2622,23 +2698,24 @@ const CrmDeals = () => {
                   </div>
                 </div>
 
-                {/* Company Information */}
-                {viewingDeal.company_name && (
-                  <>
-                    <div style={{
-                      fontSize: '16px',
-                      fontWeight: 600,
-                      color: '#1f2937',
-                      marginBottom: '20px',
-                      paddingBottom: '10px',
-                      borderBottom: '2px solid #f8f9fa',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px'
-                    }}>
-                      <Building2 size={18} style={{ color: '#4680ff' }} />
-                      Client information
-                    </div>
+                      {/* Client Information Section */}
+                      {viewingDeal.company_name && (
+                        <>
+                          <div style={{
+                            fontSize: '16px',
+                            fontWeight: 600,
+                            color: '#1f2937',
+                            marginTop: '40px',
+                            marginBottom: '20px',
+                            paddingBottom: '10px',
+                            borderBottom: '2px solid #f8f9fa',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px'
+                          }}>
+                            <Building2 size={18} style={{ color: '#4680ff' }} />
+                            Client information
+                          </div>
                     <div style={{
                       display: 'grid',
                       gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -2682,27 +2759,28 @@ const CrmDeals = () => {
                           </div>
                         </div>
                       )}
-                    </div>
-                  </>
-                )}
+                        </div>
+                      </>
+                    )}
 
-                {/* Lead Information */}
-                {relatedLead && (
-                  <>
-                    <div style={{
-                      fontSize: '16px',
-                      fontWeight: 600,
-                      color: '#1f2937',
-                      marginBottom: '20px',
-                      paddingBottom: '10px',
-                      borderBottom: '2px solid #f8f9fa',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px'
-                    }}>
-                      <Target size={18} style={{ color: '#4680ff' }} />
-                      Lead Information
-                    </div>
+                      {/* Lead Information Section */}
+                      {relatedLead && (
+                        <>
+                          <div style={{
+                            fontSize: '16px',
+                            fontWeight: 600,
+                            color: '#1f2937',
+                            marginTop: '40px',
+                            marginBottom: '20px',
+                            paddingBottom: '10px',
+                            borderBottom: '2px solid #f8f9fa',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px'
+                          }}>
+                            <Target size={18} style={{ color: '#4680ff' }} />
+                            Lead Information
+                          </div>
                     <div style={{
                       display: 'grid',
                       gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -2834,191 +2912,31 @@ const CrmDeals = () => {
                           </div>
                         </div>
                       )}
-                    </div>
-
-                    {/* Lead Company Information */}
-                    {/* {relatedLead.company_name && (
-                      <>
-                        <div style={{
-                          fontSize: '16px',
-                          fontWeight: 600,
-                          color: '#1f2937',
-                          marginBottom: '20px',
-                          paddingBottom: '10px',
-                          borderBottom: '2px solid #f8f9fa',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px'
-                        }}>
-                          <Building2 size={18} style={{ color: '#4680ff' }} />
-                          Lead Company Information
-                        </div>
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                          gap: '20px',
-                          marginBottom: '30px'
-                        }}>
-                          <div style={{
-                            background: '#f8f9fa',
-                            padding: '16px',
-                            borderRadius: '10px',
-                            transition: 'all 0.3s'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = '#e5e7eb';
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = '#f8f9fa';
-                            e.currentTarget.style.transform = 'translateY(0)';
-                          }}>
-                            <div style={{
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              color: '#6b7280',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.5px',
-                              marginBottom: '6px'
-                            }}>Company Name</div>
-                            <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                              <Building2 size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                              {relatedLead.company_name}
-                            </div>
-                          </div>
-                          {relatedLead.industry && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
-                              <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>Industry</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                                {relatedLead.industry}
-                              </div>
-                            </div>
-                          )}
-                          {relatedLead.business_type && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
-                              <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>Business Type</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                                {relatedLead.business_type}
-                              </div>
-                            </div>
-                          )}
-                          {relatedLead.company_size && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
-                              <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>Company Size</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                                {relatedLead.company_size}
-                              </div>
-                            </div>
-                          )}
-                          {(relatedLead.company_city || relatedLead.company_country) && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
-                              <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>Location</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                                {[relatedLead.company_city, relatedLead.company_country].filter(Boolean).join(', ') || 'N/A'}
-                              </div>
-                            </div>
-                          )}
                         </div>
                       </>
-                    )} */}
+                    )}
+                  </div>
+                )}
 
-                    {/* Campaign Information */}
-                    {relatedLead.campaign && (
-                      <>
-                        <div style={{
-                          fontSize: '16px',
-                          fontWeight: 600,
-                          color: '#1f2937',
-                          marginBottom: '20px',
-                          paddingBottom: '10px',
-                          borderBottom: '2px solid #f8f9fa',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px'
-                        }}>
-                          <FileText size={18} style={{ color: '#4680ff' }} />
-                          Campaign Information
-                        </div>
+                {activeTab === "campaign-prospect" && (
+                  <div style={{ paddingTop: "20px" }}>
+                      {/* Campaign Information Section */}
+                      {relatedLead.campaign && (
+                        <>
+                          <div style={{
+                            fontSize: '16px',
+                            fontWeight: 600,
+                            color: '#1f2937',
+                            marginBottom: '20px',
+                            paddingBottom: '10px',
+                            borderBottom: '2px solid #f8f9fa',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px'
+                          }}>
+                            <FileText size={18} style={{ color: '#4680ff' }} />
+                            Campaign Information
+                          </div>
                         <div style={{
                           display: 'grid',
                           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -3081,27 +2999,28 @@ const CrmDeals = () => {
                               </div>
                             ))
                           )}
-                        </div>
-                      </>
-                    )}
+                          </div>
+                        </>
+                      )}
 
-                    {/* Prospect Information */}
-                    {relatedLead.crm_data && (
-                      <>
-                        <div style={{
-                          fontSize: '16px',
-                          fontWeight: 600,
-                          color: '#1f2937',
-                          marginBottom: '20px',
-                          paddingBottom: '10px',
-                          borderBottom: '2px solid #f8f9fa',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px'
-                        }}>
-                          <FileText size={18} style={{ color: '#4680ff' }} />
-                          Prospect Information
-                        </div>
+                      {/* Prospect Information Section */}
+                      {relatedLead.crm_data && (
+                        <>
+                          <div style={{
+                            fontSize: '16px',
+                            fontWeight: 600,
+                            color: '#1f2937',
+                            marginTop: '40px',
+                            marginBottom: '20px',
+                            paddingBottom: '10px',
+                            borderBottom: '2px solid #f8f9fa',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px'
+                          }}>
+                            <FileText size={18} style={{ color: '#4680ff' }} />
+                            Prospect Information
+                          </div>
                         <div style={{
                           display: 'grid',
                           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -3285,25 +3204,26 @@ const CrmDeals = () => {
                               </div>
                             </div>
                           )}
-                        </div>
-                        
-                        {/* Prospect Fields */}
-                        {relatedLead.crm_data.data && typeof relatedLead.crm_data.data === 'object' && Object.keys(relatedLead.crm_data.data).length > 0 && (
-                          <>
-                            <div style={{
-                              fontSize: '16px',
-                              fontWeight: 600,
-                              color: '#1f2937',
-                              marginBottom: '20px',
-                              paddingBottom: '10px',
-                              borderBottom: '2px solid #f8f9fa',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '10px'
-                            }}>
-                              <FileText size={18} style={{ color: '#4680ff' }} />
-                              Prospect Fields
-                            </div>
+                          </div>
+                          
+                          {/* Prospect Fields Section */}
+                          {relatedLead.crm_data.data && typeof relatedLead.crm_data.data === 'object' && Object.keys(relatedLead.crm_data.data).length > 0 && (
+                            <>
+                              <div style={{
+                                fontSize: '16px',
+                                fontWeight: 600,
+                                color: '#1f2937',
+                                marginTop: '40px',
+                                marginBottom: '20px',
+                                paddingBottom: '10px',
+                                borderBottom: '2px solid #f8f9fa',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px'
+                              }}>
+                                <FileText size={18} style={{ color: '#4680ff' }} />
+                                Prospect Fields
+                              </div>
                             <div style={{
                               display: 'grid',
                               gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
@@ -3341,11 +3261,11 @@ const CrmDeals = () => {
                                 </div>
                               ))}
                             </div>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </>
+                            </>
+                          )}
+                        </>
+                      )}
+                  </div>
                 )}
 
                 {/* Meetings Timeline */}

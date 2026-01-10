@@ -26,7 +26,6 @@ export const routePermissions: RoutePermission[] = [
     {path: '/resources/contact-support',permissions: ['']},
     {path:'/manager-dashboard',permissions: ['']},
     {path:'/unified-workspace',permissions: [PERMISSIONS.VIEW_UNIFIED_WORKSPACE]},
-    {path:'/help-center',permissions: ['']},
     {path:'/live-call-updated',permissions: ['']},
     {path:'/test-image-storage',permissions: ['']},
     {path:'/billing',permissions: ['']},
@@ -38,6 +37,21 @@ export const routePermissions: RoutePermission[] = [
     {path:'/faqs/items',permissions: ['']},
     {path:'/faqs/topics',permissions: ['']},
     {path:'/faqs/types',permissions: ['']},
+    {
+        path: '/help-center',
+        permissions: [''],
+        children: [
+            { path: '/knowledge-base', permissions: [''] },
+            { path: '/knowledge-base/[id]', permissions: [''] },
+            { path: '/my-tickets', permissions: [''] },
+            { path: '/my-tickets/new', permissions: [''] },
+            { path: '/my-tickets/[id]', permissions: [''] },
+            { path: '/contact-support', permissions: [''] },
+            { path: '/system-status', permissions: [''] },
+        ]
+    },
+
+    
 
     {
         path: '/dashboards',
@@ -82,6 +96,14 @@ export const routePermissions: RoutePermission[] = [
             {
                 path: '/uptime-sla',
                 permissions: [PERMISSIONS.VIEW_NETOPS_UPTIME_SLA]
+            },
+            {
+                path: '/select-server',
+                permissions: [PERMISSIONS.NETOPS_SERVICES]
+            },
+            {
+                path: '/application-monitoring',
+                permissions: [PERMISSIONS.NETOPS_SERVICES]
             },
         ]
     },
@@ -291,6 +313,10 @@ export const routePermissions: RoutePermission[] = [
                 permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]
             },
             {
+                path: '/trunk-profiles',
+                permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]
+            },
+            {
                 path: '/profiles',
                 permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]
             },
@@ -359,6 +385,8 @@ export const routePermissions: RoutePermission[] = [
             { path: '/products',permissions: [PERMISSIONS.VIEW_CRM_PRODUCTS]},
             { path: '/history',permissions: [PERMISSIONS.VIEW_CRM_HISTORY]},
             { path: '/reports',permissions: [PERMISSIONS.VIEW_CRM_REPORTS]},
+            { path: '/industries',permissions: [PERMISSIONS.CRM_SERVICES]},
+            { path: '/deal-templates',permissions: [PERMISSIONS.CRM_SERVICES]},
         ]
     },
     
@@ -446,7 +474,9 @@ export const routePermissions: RoutePermission[] = [
         path: '/dncr',
         permissions: [PERMISSIONS.DNCR_SERVICES],
         children: [
-            { path: '/check-number',permissions: ['check-numbers-dncr']}
+            { path: '/check-number',permissions: ['check-numbers-dncr']},
+            { path: '/api-number-check',permissions: ['check-numbers-dncr']},
+            { path: '/cdr-records',permissions: ['check-numbers-dncr']},
         ]
     },
 
@@ -544,6 +574,8 @@ export const routePermissions: RoutePermission[] = [
             { path: '/',permissions: ['view-cti']},
             { path: '/new',permissions: ['view-cti']},
             { path: '/dialer',permissions: ['dial-call-cti', 'merge-call-cti', 'transfer-call-cti']},
+            { path: '/management/campaigns',permissions: [PERMISSIONS.TMS_SERVICES]},
+            { path: '/management/agents',permissions: [PERMISSIONS.TMS_SERVICES]},
 
         ]
     }
