@@ -269,6 +269,11 @@ MENU_COLORS: {
 
     GSM_SERVICES: 'gsm-services',
 
+    WORK_PLANNER_SERVICES: 'work-planner-services',
+    VIEW_RECURRING_REMINDERS_WORK_PLANNER: 'view-recurring-reminders-work-planner',
+    VIEW_DIAL_TODO_WORK_PLANNER: 'view-dial-todo-work-planner',
+    VIEW_TASKSLIST_WORK_PLANNER: 'view-tasks-work-planner',
+
 
     CALL_LOGS_SERVICES: 'call-logs-services',
     CALL_RECORDINGS_SERVICES: 'call-recordings-services',
@@ -310,6 +315,9 @@ MENU_COLORS: {
 
     DNCR_SERVICES: 'dncr-services',
     CHECK_NUMBERS_DNCR: 'check-numbers-dncr',
+    VIEW_CDR_DNCR: 'view-cdr-dncr',
+    VIEW_LOCAL_DND_CALL_BLOCK_DNCR: 'view-local-dnd-blocks-dncr',
+
 
     ACCOUNTS_SERVICES: 'accounts-services',
 

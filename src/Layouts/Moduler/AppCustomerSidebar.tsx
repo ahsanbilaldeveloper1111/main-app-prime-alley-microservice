@@ -48,7 +48,10 @@ import {
   MonitorCheck,
   User,
   VoicemailIcon,
-  Bot
+  Bot,
+  Calendar,
+  Bell,
+  Clock
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -579,8 +582,15 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'dncr-cdr-records',
           title: "CDR Records",
           icon: <FileText size={16} />,
-          permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
+          permission: PERMISSIONS.VIEW_CDR_DNCR,
           url: '/dncr/cdr-records'
+        },
+        {
+          id: 'dncr-local-dnd-call-block',
+          title: "Add Records",
+          icon: <PhoneCall size={16} />,
+          permission: PERMISSIONS.VIEW_LOCAL_DND_CALL_BLOCK_DNCR,
+          url: '/dncr/add-records'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
@@ -640,6 +650,43 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             // },
             
 
+      ]
+      .filter(item => !item.permission || hasPermission(item.permission))
+    }, 
+
+    {
+      id: 'work-planner',
+      key: 'work-planner',
+      permission: PERMISSIONS.WORK_PLANNER_SERVICES,
+      icon: <Calendar size={20} />,
+      color: MENU_COLORS.BILLING,
+      title: "Work Planner",
+      label: "Work Planner",
+      url: '',
+      subItems: [
+
+            { 
+              id: 'work-planner-recurring-reminders', 
+              title: 'Recurring Reminders', 
+              icon: <Bell size={16} />, 
+              url: '/work-planner/recurring-reminders', 
+              permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
+            },
+            { 
+              id: 'work-planner-dial-todo', 
+              title: 'Dial Todo', 
+              icon: <Clock size={16} />, 
+              url: '/work-planner/dial-todo', 
+              permission: PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER 
+            },
+            {
+              id: 'work-planner-call-time',
+              title: 'Tasks List',
+              icon: <Clock size={16} />,
+              url: '/work-planner/tasks-list',
+              permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
+            }
+            
       ]
       .filter(item => !item.permission || hasPermission(item.permission))
     }, 

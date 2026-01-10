@@ -204,6 +204,7 @@ const ProductsPage = () => {
   });
   const [productsSearch, setProductsSearch] = useState("");
   const [productsFilters, setProductsFilters] = useState({
+    industry_ids: [] as number[],
     category: null as string | null,
     brand: [] as string[],
     status: null as string | null,
@@ -229,7 +230,7 @@ const ProductsPage = () => {
     brand: "",
     isActive: true,
     description: "",
-    industry_id: null as number | null,
+    industry_ids: [] as number[],
   });
   const [industries, setIndustries] = useState<IndustryData[]>([]);
   const [loadingIndustries, setLoadingIndustries] = useState(false);
@@ -484,6 +485,11 @@ const ProductsPage = () => {
         params.active = false;
       }
 
+      // Industry filter
+      if (productsFilters.industry_ids.length > 0) {
+        params.industry_ids = productsFilters.industry_ids;
+      }
+
       // Category filter
       if (productsFilters.category) {
         params.category = productsFilters.category;
@@ -581,7 +587,11 @@ const ProductsPage = () => {
         brand: product.brand,
         isActive: product.status === "Active",
         description: product.description,
-        industry_id: product.industry_id || product.industry?.id || null,
+        industry_ids: product.industry_id 
+          ? [product.industry_id] 
+          : product.industry?.id 
+          ? [product.industry.id] 
+          : [],
       });
     } else {
       setEditingProduct(null);
@@ -594,7 +604,7 @@ const ProductsPage = () => {
         brand: "",
         isActive: true,
         description: "",
-        industry_id: null,
+        industry_ids: [],
       });
     }
     setShowProductModal(true);
@@ -604,8 +614,8 @@ const ProductsPage = () => {
     e.preventDefault();
     
     // Validate industry is selected
-    if (!productFormData.industry_id) {
-      toast.error("Please select an industry");
+    if (!productFormData.industry_ids || productFormData.industry_ids.length === 0) {
+      toast.error("Please select at least one industry");
       return;
     }
     
@@ -622,7 +632,7 @@ const ProductsPage = () => {
           brand: productFormData.brand,
           active: productFormData.isActive,
           currency: productFormData.currency,
-          industry_id: productFormData.industry_id,
+          industry_ids: productFormData.industry_ids,
         };
         await updateProduct(updatePayload);
       } else {
@@ -636,7 +646,7 @@ const ProductsPage = () => {
           brand: productFormData.brand,
           active: productFormData.isActive,
           currency: productFormData.currency,
-          industry_id: productFormData.industry_id,
+          industry_ids: productFormData.industry_ids,
         };
         await createProduct(createPayload);
       }
@@ -713,41 +723,6 @@ const ProductsPage = () => {
           </Modal.Header>
           <Modal.Body>
             <Form onSubmit={handleProductSubmit}>
-              <Row>
-                <Col md={12}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="fw-semibold">
-                      Industry <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Select
-                      options={industries.map((ind) => ({ value: ind.id, label: ind.name }))}
-                      value={
-                        productFormData.industry_id
-                          ? {
-                              value: productFormData.industry_id,
-                              label: industries.find((ind) => ind.id === productFormData.industry_id)?.name || "",
-                            }
-                          : null
-                      }
-                      onChange={(selected) =>
-                        setProductFormData({
-                          ...productFormData,
-                          industry_id: selected ? selected.value : null,
-                        })
-                      }
-                      placeholder="Select industry..."
-                      styles={customSelectStyles}
-                      isLoading={loadingIndustries}
-                      isDisabled={loadingIndustries}
-                      isClearable={false}
-                      required
-                    />
-                    <Form.Text className="text-muted">
-                      Select the industry this product belongs to
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-              </Row>
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
@@ -832,6 +807,36 @@ const ProductsPage = () => {
               </Row>
 
               <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">
+                      Industry <span className="text-danger">*</span>
+                    </Form.Label>
+                    <Select
+                      isMulti
+                      options={industries.map((ind) => ({ value: ind.id, label: ind.name }))}
+                      value={productFormData.industry_ids.map((id) => {
+                        const industry = industries.find((ind) => ind.id === id);
+                        return industry ? { value: industry.id, label: industry.name } : null;
+                      }).filter(Boolean) as { value: number; label: string }[]}
+                      onChange={(selected) =>
+                        setProductFormData({
+                          ...productFormData,
+                          industry_ids: selected ? selected.map((option) => option.value) : [],
+                        })
+                      }
+                      placeholder="Select industries..."
+                      styles={customSelectStyles}
+                      isLoading={loadingIndustries}
+                      isDisabled={loadingIndustries}
+                      isClearable
+                      required
+                    />
+                    <Form.Text className="text-muted">
+                      Select one or more industries this product belongs to
+                    </Form.Text>
+                  </Form.Group>
+                </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
                     <Form.Label className="fw-semibold">Category</Form.Label>
@@ -1451,6 +1456,7 @@ const ProductsPage = () => {
           showAdvancedFilters={showAdvancedFilters}
           onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
           advancedFilterCount={
+            productsFilters.industry_ids.length +
             (productsFilters.category ? 1 : 0) +
             productsFilters.brand.length +
             (productsFilters.status ? 1 : 0)
@@ -1462,6 +1468,29 @@ const ProductsPage = () => {
           <Card className="border-0 shadow-sm mb-4">
             <Card.Body>
               <Row className="g-3 align-items-end">
+                <Col md={2}>
+                  <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
+                  <Select
+                    isMulti
+                    options={industries.map((ind) => ({ value: ind.id, label: ind.name }))}
+                    value={productsFilters.industry_ids.map((id) => {
+                      const industry = industries.find((ind) => ind.id === id);
+                      return industry ? { value: industry.id, label: industry.name } : null;
+                    }).filter(Boolean) as { value: number; label: string }[]}
+                    onChange={(selected) => {
+                      setProductsFilters((prev) => ({
+                        ...prev,
+                        industry_ids: selected ? selected.map((option) => option.value) : [],
+                      }));
+                      setProductsPagination({ ...productsPagination, currentPage: 1 });
+                    }}
+                    placeholder="Select industries..."
+                    styles={customSelectStyles}
+                    isLoading={loadingIndustries}
+                    isDisabled={loadingIndustries}
+                    isClearable
+                  />
+                </Col>
                 <Col md={2}>
                   <Form.Label className="small fw-bold mb-2">Category</Form.Label>
                   <CreatableSelect
@@ -1526,6 +1555,7 @@ const ProductsPage = () => {
                       className="d-flex align-items-center justify-content-center"
                       onClick={() => {
                         setProductsFilters({
+                          industry_ids: [],
                           category: null,
                           brand: [],
                           status: null,

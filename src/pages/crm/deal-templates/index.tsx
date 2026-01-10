@@ -72,6 +72,7 @@ const DealTemplatesPage = () => {
     description: "",
   });
   const [fields, setFields] = useState<Array<{
+    id: string;
     field_name: string;
     field_type: "text" | "dropdown";
     options: string[];
@@ -144,6 +145,7 @@ const DealTemplatesPage = () => {
       });
       setFields(
         (template.fields || []).map((field) => ({
+          id: `field-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
           field_name: field.field_name,
           field_type: field.field_type,
           options: field.options || [],
@@ -168,6 +170,7 @@ const DealTemplatesPage = () => {
     setFields([
       ...fields,
       {
+        id: `field-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         field_name: "",
         field_type: "text",
         options: [],
@@ -223,11 +226,7 @@ const DealTemplatesPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validation
-    // if (!formData.industry_id) {
-    //   toast.error("Please select an industry");
-    //   return;
-    // }
+    
     if (!formData.name.trim()) {
       toast.error("Please enter a template name");
       return;
@@ -267,11 +266,7 @@ const DealTemplatesPage = () => {
         await updateDealTemplate(editingTemplate.id, updatePayload);
       } else {
         // Create payload requires industry_id
-        if (!formData.industry_id) {
-          toast.error("Please select an industry");
-          setSubmitting(false);
-          return;
-        }
+        
         const createPayload: CreateDealTemplatePayload = {
           industry_id: formData.industry_id,
           name: formData.name.trim(),
@@ -582,7 +577,7 @@ const DealTemplatesPage = () => {
                 ) : (
                   <div className="d-flex flex-column gap-3">
                     {fields.map((field, index) => (
-                      <Card key={`field-${index}-${field.field_name}`} className="border">
+                      <Card key={field.id} className="border">
                         <Card.Body>
                           <div className="d-flex justify-content-between align-items-start mb-3">
                             <div className="d-flex align-items-center gap-2">

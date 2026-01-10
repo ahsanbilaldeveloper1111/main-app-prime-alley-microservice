@@ -476,7 +476,19 @@ export const routePermissions: RoutePermission[] = [
         children: [
             { path: '/check-number',permissions: ['check-numbers-dncr']},
             { path: '/api-number-check',permissions: ['check-numbers-dncr']},
-            { path: '/cdr-records',permissions: ['check-numbers-dncr']},
+            { path: '/cdr-records',permissions: ['view-cdr-dncr']},
+            { path: '/add-records',permissions: ['view-local-dnd-blocks-dncr']},
+        ]
+    },
+
+    //work planner services start
+    {
+        path: '/work-planner',
+        permissions: [PERMISSIONS.WORK_PLANNER_SERVICES],
+        children: [
+            { path: '/recurring-reminders',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
+            { path: '/dial-todo',permissions: [PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER]},
+            { path: '/tasks-list',permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER]},
         ]
     },
 

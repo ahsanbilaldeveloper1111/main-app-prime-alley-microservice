@@ -436,6 +436,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                     if (loggedInUserUsername) {
                       setShowResetPasswordModal(true);
                     }
+                    onClose?.();
                   }}
                 >
                   <div className="profile-menu-content">
@@ -448,7 +449,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               </li>
               )}
               <li className="profile-menu-item">
-                <button className="profile-menu-button">
+                <button className="profile-menu-button" onClick={() => onClose?.()}>
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
                       <Shield size={20} />
@@ -459,7 +460,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               </li>
 
               <li className="profile-menu-item">
-                <button className="profile-menu-button">
+                <button className="profile-menu-button" onClick={() => onClose?.()}>
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
                       <History size={20} />
@@ -478,7 +479,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               
 
               <li className="profile-menu-item">
-                <button className="profile-menu-button">
+                <button className="profile-menu-button" onClick={() => onClose?.()}>
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
                       <Flag size={20} />
@@ -490,7 +491,10 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
 {session?.user?.permissions?.includes('view-crm-tasks') && (
               <li className="profile-menu-item">
-                <button className="profile-menu-button" onClick={() => router.push('/crm/tasks')} >
+                <button className="profile-menu-button" onClick={() => {
+                  router.push('/crm/tasks');
+                  onClose?.();
+                }} >
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
                       <Calendar size={20} />
@@ -502,7 +506,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               )}
 
               <li className="profile-menu-item">
-                <button className="profile-menu-button" >
+                <button className="profile-menu-button" onClick={() => onClose?.()}>
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
                       <Calendar size={20} />
@@ -518,7 +522,10 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             {/* Section 4 */}
             <div className="profile-menu-section">
               <li className="profile-menu-item">
-                <button className="profile-menu-button" onClick={() => router.push('/profile')} >
+                <button className="profile-menu-button" onClick={() => {
+                  router.push('/profile');
+                  onClose?.();
+                }} >
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
                       <User size={20} />
@@ -532,7 +539,10 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               {session?.user?.permissions?.includes('view-ticket-tickets') && (
               <li className="profile-menu-item">
                 <button className="profile-menu-button"
-                  onClick={() => router.push('/tickets/list')}
+                  onClick={() => {
+                    router.push('/tickets/list');
+                    onClose?.();
+                  }}
                 >
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
@@ -545,7 +555,10 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
               )}
               <li className="profile-menu-item">
                 <button className="profile-menu-button"
-                  onClick={() => router.push('/settings')}
+                  onClick={() => {
+                    router.push('/settings');
+                    onClose?.();
+                  }}
                 >
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
@@ -572,7 +585,10 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
 
               <li className="profile-menu-item">
                 <button className="profile-menu-button"
-                  onClick={() => signOut({ callbackUrl: '/auth/signin',redirect: true })}
+                  onClick={() => {
+                    onClose?.();
+                    signOut({ callbackUrl: '/auth/signin',redirect: true });
+                  }}
                 >
                   <div className="profile-menu-content">
                     <div className="profile-menu-icon">
