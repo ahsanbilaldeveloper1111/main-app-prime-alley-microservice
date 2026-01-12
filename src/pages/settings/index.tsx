@@ -2,11 +2,13 @@ import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
   useState,
+  useEffect,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { Col, Row, Card } from "react-bootstrap";
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import { 
   Users as UsersIcon, 
   Briefcase, 
@@ -80,6 +82,7 @@ const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS,BASE_URL } = HEADER_CONSTAN
 
 const Settings = () => {
   const { data: session } = useSession();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>("user-management");
   const [activeUserManagementTab, setActiveUserManagementTab] = useState<string>("user-directory");
   const [activeCrmTab, setActiveCrmTab] = useState<string>("campaigns");
@@ -98,6 +101,83 @@ const Settings = () => {
   const [visitedBillingTab, setVisitedBillingTab] = useState<boolean>(false);
   const [visitedHelpCenterTabs, setVisitedHelpCenterTabs] = useState<Set<string>>(new Set(["modules"]));
 
+  // Initialize tabs from URL on mount
+  useEffect(() => {
+    if (router.isReady) {
+      const { tab, subtab } = router.query;
+      
+      if (tab && typeof tab === 'string') {
+        const mainTab = tab;
+        setActiveTab(mainTab);
+        setVisitedTabs(prev => new Set(prev).add(mainTab));
+        
+        // Set sub-tab based on main tab
+        if (subtab && typeof subtab === 'string') {
+          switch (mainTab) {
+            case "user-management":
+              setActiveUserManagementTab(subtab);
+              setVisitedUserManagementTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "crm":
+              setActiveCrmTab(subtab);
+              setVisitedCrmTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "tickets":
+              setActiveTicketsTab(subtab);
+              setVisitedTicketsTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "telco-gateway":
+              setActiveTelcoTab(subtab);
+              setVisitedTelcoTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "devices-management":
+              setActiveNetopsTab(subtab);
+              setVisitedNetopsTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "help-center":
+              setActiveHelpCenterTab(subtab);
+              setVisitedHelpCenterTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "billing":
+              setVisitedBillingTab(true);
+              break;
+          }
+        } else {
+          // If no subtab in URL, set default subtab for the main tab
+          switch (mainTab) {
+            case "user-management":
+              setActiveUserManagementTab("user-directory");
+              setVisitedUserManagementTabs(prev => new Set(prev).add("user-directory"));
+              break;
+            case "crm":
+              setActiveCrmTab("campaigns");
+              setVisitedCrmTabs(prev => new Set(prev).add("campaigns"));
+              break;
+            case "tickets":
+              setActiveTicketsTab("statuses");
+              setVisitedTicketsTabs(prev => new Set(prev).add("statuses"));
+              break;
+            case "telco-gateway":
+              setActiveTelcoTab("assign-devices");
+              setVisitedTelcoTabs(prev => new Set(prev).add("assign-devices"));
+              break;
+            case "devices-management":
+              setActiveNetopsTab("devices-list");
+              setVisitedNetopsTabs(prev => new Set(prev).add("devices-list"));
+              break;
+            case "help-center":
+              setActiveHelpCenterTab("modules");
+              setVisitedHelpCenterTabs(prev => new Set(prev).add("modules"));
+              break;
+            case "billing":
+              setVisitedBillingTab(true);
+              break;
+          }
+        }
+      }
+    }
+  }, [router.isReady, router.query]);
+
   // Handle main tab change
   const handleMainTabChange = (key: string | null) => {
     const tabKey = key || "user-management";
@@ -107,6 +187,33 @@ const Settings = () => {
     if (tabKey === "billing") {
       setVisitedBillingTab(true);
     }
+    
+    // Update URL
+    const defaultSubTab = getDefaultSubTab(tabKey);
+    if (tabKey === "billing") {
+      router.replace({
+        pathname: router.pathname,
+        query: { ...router.query, tab: tabKey }
+      }, undefined, { shallow: true });
+    } else {
+      router.replace({
+        pathname: router.pathname,
+        query: { ...router.query, tab: tabKey, subtab: defaultSubTab }
+      }, undefined, { shallow: true });
+    }
+  };
+
+  // Get default sub-tab for a main tab
+  const getDefaultSubTab = (mainTab: string): string => {
+    switch (mainTab) {
+      case "user-management": return "user-directory";
+      case "crm": return "campaigns";
+      case "tickets": return "statuses";
+      case "telco-gateway": return "assign-devices";
+      case "devices-management": return "devices-list";
+      case "help-center": return "modules";
+      default: return "";
+    }
   };
 
   // Handle sub-tab changes
@@ -114,36 +221,60 @@ const Settings = () => {
     const tabKey = key || "user-directory";
     setActiveUserManagementTab(tabKey);
     setVisitedUserManagementTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "user-management", subtab: tabKey }
+    }, undefined, { shallow: true });
   };
 
   const handleCrmTabChange = (key: string | null) => {
     const tabKey = key || "campaigns";
     setActiveCrmTab(tabKey);
     setVisitedCrmTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "crm", subtab: tabKey }
+    }, undefined, { shallow: true });
   };
 
   const handleTicketsTabChange = (key: string | null) => {
     const tabKey = key || "statuses";
     setActiveTicketsTab(tabKey);
     setVisitedTicketsTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "tickets", subtab: tabKey }
+    }, undefined, { shallow: true });
   };
 
   const handleTelcoTabChange = (key: string | null) => {
     const tabKey = key || "assign-devices";
     setActiveTelcoTab(tabKey);
     setVisitedTelcoTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "telco-gateway", subtab: tabKey }
+    }, undefined, { shallow: true });
   };
 
   const handleNetopsTabChange = (key: string | null) => {
     const tabKey = key || "devices-list";
     setActiveNetopsTab(tabKey);
     setVisitedNetopsTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "devices-management", subtab: tabKey }
+    }, undefined, { shallow: true });
   };
 
   const handleHelpCenterTabChange = (key: string | null) => {
     const tabKey = key || "modules";
     setActiveHelpCenterTab(tabKey);
     setVisitedHelpCenterTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "help-center", subtab: tabKey }
+    }, undefined, { shallow: true });
   };
 
   // Check if a tab should render
@@ -240,7 +371,7 @@ const Settings = () => {
     "crm": [
       { key: "campaigns", title: "Campaigns", icon: Megaphone, color: "#0d6efd", permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS },
       { key: "industries", title: "Industries", icon: Building2, color: "#6c757d", permission: PERMISSIONS.VIEW_CRM_INDUSTRIES },
-      // { key: "products", title: "Products", icon: Package, color: "#198754", permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
+      { key: "products", title: "Products", icon: Package, color: "#198754", permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
       { key: "stages", title: "Stages", icon: Layers, color: "#ff9800", permission: PERMISSIONS.VIEW_CRM_STAGES },
       { key: "deal-templates", title: "Deal Templates", icon: FileText, color: "#9c27b0", permission: PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES }
     ],
@@ -470,7 +601,7 @@ const Settings = () => {
                   <div>
                     {activeCrmTab === "campaigns" && <Campaigns />}
                     {activeCrmTab === "industries" && <Industries />}
-                    {/* {activeCrmTab === "products" && <Products />} */}
+                    {activeCrmTab === "products" && <Products />}
                     {activeCrmTab === "stages" && <Stages />}
                     {activeCrmTab === "deal-templates" && <DealTemplates />}
                   </div>

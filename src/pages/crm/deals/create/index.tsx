@@ -47,6 +47,8 @@ const CreateDeal = () => {
   const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>([]);
   const [selectedIndustryId, setSelectedIndustryId] = useState<number | null>(null);
   const [loadingIndustries, setLoadingIndustries] = useState(false);
+  const [allIndustries, setAllIndustries] = useState<IndustryData[]>([]);
+  const [loadingAllIndustries, setLoadingAllIndustries] = useState(false);
   const [estimationItems, setEstimationItems] = useState<Array<{
     product_id: number;
     product_service: string;
@@ -77,7 +79,7 @@ const CreateDeal = () => {
     assigned_to: null as string | null,
     expected_close_date: "",
     company_name: "",
-    industry: "",
+    industry_ids: [] as number[],
     decision_maker_title: "",
     decision_maker_name: "",
     decision_maker_phone_country_code: "",
@@ -111,6 +113,24 @@ const CreateDeal = () => {
     fetchStages();
     fetchExtensions();
     // Don't fetch all products initially - wait for industry selection
+  }, []);
+
+  // Fetch all industries
+  useEffect(() => {
+    const fetchAllIndustries = async () => {
+      try {
+        setLoadingAllIndustries(true);
+        const response = await getIndustries({ per_page: 1000 });
+        setAllIndustries(response.data || []);
+      } catch (error) {
+        console.error("Failed to fetch industries:", error);
+        toast.error("Failed to fetch industries");
+      } finally {
+        setLoadingAllIndustries(false);
+      }
+    };
+    
+    fetchAllIndustries();
   }, []);
 
   // Fetch products by industry
@@ -178,6 +198,17 @@ const CreateDeal = () => {
               campaignIndustryIds.includes(ind.id)
             );
             setCampaignIndustries(filteredIndustries);
+            
+            // Auto-select campaign industries if formData.industry_ids is empty
+            setFormData((prevFormData) => {
+              if (!prevFormData.industry_ids || prevFormData.industry_ids.length === 0) {
+                return {
+                  ...prevFormData,
+                  industry_ids: campaignIndustryIds,
+                };
+              }
+              return prevFormData;
+            });
             
             // If only one industry, auto-select it and fetch products
             if (filteredIndustries.length === 1) {
@@ -340,11 +371,17 @@ const CreateDeal = () => {
   const validateStep1 = (): boolean => {
     const requiredFields = [
       { field: 'company_name' as const, name: 'Company Name' },
-      { field: 'industry' as const, name: 'Industry' },
       { field: 'decision_maker_name' as const, name: 'Decision Maker Name' },
       { field: 'decision_maker_email' as const, name: 'Decision Maker Email', type: ValidationType.EMAIL },
       { field: 'decision_maker_phone' as const, name: 'Decision Maker Phone' },
     ];
+    
+    // Validate industry_ids separately since it's an array
+    if (!formData.industry_ids || formData.industry_ids.length === 0) {
+      toast.error('Industry is required');
+      return false;
+    }
+    
     return checkRequiredFields(formData, requiredFields);
   };
 
@@ -441,7 +478,7 @@ const CreateDeal = () => {
         assigned_to: formData.assigned_to,
         expected_close_date: formData.expected_close_date,
         company_name: formData.company_name,
-        industry: formData.industry,
+        industry_ids: formData.industry_ids,
         decision_maker_title: formData.decision_maker_title,
         decision_maker_name: formData.decision_maker_name,
         decision_maker_phone_country_code: formData.decision_maker_phone_country_code,
@@ -822,18 +859,25 @@ const CreateDeal = () => {
                     <Col md={6}>
                       <Form.Group className="mb-3">
                         <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
-                        <Form.Select 
-                          value={formData.industry}
-                          onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                        <Select
+                          isMulti
+                          options={allIndustries.map((ind) => ({ value: ind.id, label: ind.name }))}
+                          value={formData.industry_ids.map((id) => {
+                            const industry = allIndustries.find((ind) => ind.id === id);
+                            return industry ? { value: industry.id, label: industry.name } : null;
+                          }).filter(Boolean) as any}
+                          onChange={(selected) =>
+                            setFormData({
+                              ...formData,
+                              industry_ids: selected ? selected.map((option: any) => option.value) : [],
+                            })
+                          }
+                          placeholder="Select industries..."
+                          isLoading={loadingAllIndustries}
+                          isDisabled={loadingAllIndustries}
+                          isClearable
                           required
-                        >
-                          <option value="">Select Industry</option>
-                          <option value="Individual/Residential">Individual/Residential</option>
-                          <option value="Corporate">Corporate</option>
-                          <option value="Retail">Retail</option>
-                          <option value="Office">Office</option>
-                          <option value="Mixed-use">Mixed-use</option>
-                        </Form.Select>
+                        />
                       </Form.Group>
                     </Col>
                     <Col md={4}>
@@ -1466,34 +1510,41 @@ const CreateDeal = () => {
                 <Modal.Body>
                   <Row className="g-3">
                     {/* Industry Selection */}
-                    {campaignIndustries.length > 0 && (
-                      <Col md={12}>
-                        <Form.Group>
-                          <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
-                          <Select
-                            value={selectedIndustryId ? {
-                              value: selectedIndustryId,
-                              label: campaignIndustries.find(ind => ind.id === selectedIndustryId)?.name || ""
-                            } : null}
-                            onChange={handleIndustryChange}
-                            options={campaignIndustries.map(industry => ({
-                              value: industry.id,
-                              label: industry.name
-                            }))}
-                            placeholder="Select industry..."
-                            isSearchable
-                            isLoading={loadingIndustries}
-                            isDisabled={loadingIndustries || campaignIndustries.length === 1}
-                            required
-                          />
-                          {campaignIndustries.length === 1 && (
-                            <Form.Text className="text-muted">
-                              Only one industry available for this campaign
-                            </Form.Text>
-                          )}
-                        </Form.Group>
-                      </Col>
-                    )}
+                    {(() => {
+                      // Get industries from user selection or campaign industries
+                      const availableIndustries = formData.industry_ids && formData.industry_ids.length > 0
+                        ? allIndustries.filter(ind => formData.industry_ids.includes(ind.id))
+                        : campaignIndustries;
+                      
+                      return availableIndustries.length > 0 ? (
+                        <Col md={12}>
+                          <Form.Group>
+                            <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
+                            <Select
+                              value={selectedIndustryId ? {
+                                value: selectedIndustryId,
+                                label: availableIndustries.find(ind => ind.id === selectedIndustryId)?.name || ""
+                              } : null}
+                              onChange={handleIndustryChange}
+                              options={availableIndustries.map(industry => ({
+                                value: industry.id,
+                                label: industry.name
+                              }))}
+                              placeholder="Select industry..."
+                              isSearchable
+                              isLoading={loadingIndustries || loadingAllIndustries}
+                              isDisabled={loadingIndustries || loadingAllIndustries || availableIndustries.length === 1}
+                              required
+                            />
+                            {availableIndustries.length === 1 && (
+                              <Form.Text className="text-muted">
+                                Only one industry available
+                              </Form.Text>
+                            )}
+                          </Form.Group>
+                        </Col>
+                      ) : null;
+                    })()}
                     
                     <Col md={12}>
                       <Form.Group>

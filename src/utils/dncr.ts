@@ -157,11 +157,9 @@ import axiosInstance from "./axios";
   };
 
   // Bulk Add Local DND Blocks
-  export const bulkAddLocalDNDBlocks = async (csvData: string) => {
+  export const bulkAddLocalDNDBlocks = async (payload: { records: Array<{ called_number: string; comments?: string }> }) => {
     try {
-      const response = await axiosInstance.post<BulkAddLocalDNDResponse>('/dncr/local-dnd-blocks/bulk-add', {
-        csv_data: csvData
-      });
+      const response = await axiosInstance.post<BulkAddLocalDNDResponse>('/dncr/local-dnd-blocks/bulk-add', payload);
       return response.data;
     } catch (error: any) {
       console.error('Error bulk adding Local DND blocks:', error);

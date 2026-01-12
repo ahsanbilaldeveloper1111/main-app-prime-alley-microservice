@@ -184,6 +184,17 @@ const EditDeal = () => {
             );
             setCampaignIndustries(filteredIndustries);
             
+            // Auto-select campaign industries if formData.industry_ids is empty
+            setFormData((prevFormData) => {
+              if (!prevFormData.industry_ids || prevFormData.industry_ids.length === 0) {
+                return {
+                  ...prevFormData,
+                  industry_ids: campaignIndustryIds,
+                };
+              }
+              return prevFormData;
+            });
+            
             // If only one industry, auto-select it and fetch products
             if (filteredIndustries.length === 1) {
               setSelectedIndustryId(filteredIndustries[0].id);
@@ -1671,34 +1682,41 @@ const EditDeal = () => {
                 <Modal.Body>
                   <Row className="g-3">
                     {/* Industry Selection */}
-                    {campaignIndustries.length > 0 && (
-                      <Col md={12}>
-                        <Form.Group>
-                          <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
-                          <Select
-                            value={selectedIndustryId ? {
-                              value: selectedIndustryId,
-                              label: campaignIndustries.find(ind => ind.id === selectedIndustryId)?.name || ""
-                            } : null}
-                            onChange={handleIndustryChange}
-                            options={campaignIndustries.map(industry => ({
-                              value: industry.id,
-                              label: industry.name
-                            }))}
-                            placeholder="Select industry..."
-                            isSearchable
-                            isLoading={loadingIndustries}
-                            isDisabled={loadingIndustries || campaignIndustries.length === 1}
-                            required
-                          />
-                          {campaignIndustries.length === 1 && (
-                            <Form.Text className="text-muted">
-                              Only one industry available for this campaign
-                            </Form.Text>
-                          )}
-                        </Form.Group>
-                      </Col>
-                    )}
+                    {(() => {
+                      // Get industries from user selection or campaign industries
+                      const availableIndustries = formData.industry_ids && formData.industry_ids.length > 0
+                        ? allIndustries.filter(ind => formData.industry_ids.includes(ind.id))
+                        : campaignIndustries;
+                      
+                      return availableIndustries.length > 0 ? (
+                        <Col md={12}>
+                          <Form.Group>
+                            <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
+                            <Select
+                              value={selectedIndustryId ? {
+                                value: selectedIndustryId,
+                                label: availableIndustries.find(ind => ind.id === selectedIndustryId)?.name || ""
+                              } : null}
+                              onChange={handleIndustryChange}
+                              options={availableIndustries.map(industry => ({
+                                value: industry.id,
+                                label: industry.name
+                              }))}
+                              placeholder="Select industry..."
+                              isSearchable
+                              isLoading={loadingIndustries || loadingAllIndustries}
+                              isDisabled={loadingIndustries || loadingAllIndustries || availableIndustries.length === 1}
+                              required
+                            />
+                            {availableIndustries.length === 1 && (
+                              <Form.Text className="text-muted">
+                                Only one industry available
+                              </Form.Text>
+                            )}
+                          </Form.Group>
+                        </Col>
+                      ) : null;
+                    })()}
                     
                     <Col md={12}>
                       <Form.Group>

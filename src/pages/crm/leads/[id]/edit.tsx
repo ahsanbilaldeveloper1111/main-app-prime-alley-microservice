@@ -13,6 +13,8 @@ import {
   getCrmData,
   getCrmDataById,
   CrmDataItem,
+  getIndustries,
+  IndustryData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge } from "react-bootstrap";
@@ -50,7 +52,7 @@ const EditLead = () => {
     company_name: "",
     company_contact: "",
     company_description: "",
-    industry: "",
+    industry_ids: [] as number[],
     business_type: "",
     company_country: "",
     company_province: "",
@@ -93,6 +95,10 @@ const EditLead = () => {
   const [fetching, setFetching] = useState(true);
   const [isOpportunity, setIsOpportunity] = useState(false);
   const isInitialLoad = useRef(true);
+  const [allIndustries, setAllIndustries] = useState<IndustryData[]>([]);
+  const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>([]);
+  const [loadingAllIndustries, setLoadingAllIndustries] = useState(false);
+  const [loadingIndustries, setLoadingIndustries] = useState(false);
 
   // Location state
   const [selectedCountry, setSelectedCountry] = useState<{
@@ -271,7 +277,11 @@ const EditLead = () => {
           company_name: leadData.company_name || "",
           company_contact: leadData.company_contact || "",
           company_description: leadData.company_description || "",
-          industry: leadDataAny.industry || "",
+          industry_ids: (leadDataAny.industry_ids && Array.isArray(leadDataAny.industry_ids))
+            ? leadDataAny.industry_ids.map((id: any) => Number(id)).filter((id: number) => !Number.isNaN(id))
+            : (leadDataAny.industries && Array.isArray(leadDataAny.industries))
+            ? leadDataAny.industries.map((ind: any) => typeof ind === 'object' ? Number(ind.id) : Number(ind)).filter((id: number) => !Number.isNaN(id))
+            : [],
           business_type: leadDataAny.business_type || "",
           company_country: leadDataAny.company_country || "",
           company_province: leadDataAny.company_province || "",
@@ -305,16 +315,59 @@ const EditLead = () => {
         isInitialLoad.current = false;
         
         // Use campaign from response if available, otherwise fetch it
+        let campaignData: CampaignData | null = null;
         if (leadDataAny.campaign && campaignId) {
           // Campaign is already in the response
-          setSelectedCampaign(leadDataAny.campaign);
+          campaignData = leadDataAny.campaign;
+          setSelectedCampaign(campaignData);
         } else if (campaignId) {
           // Fetch campaign details if not in response
           try {
-            const campaign = await getCampaignById(campaignId);
-            setSelectedCampaign(campaign);
+            campaignData = await getCampaignById(campaignId);
+            setSelectedCampaign(campaignData);
           } catch (error) {
             console.error("Failed to fetch campaign:", error);
+          }
+        }
+
+        // Fetch campaign industries and auto-select if available
+        if (campaignData) {
+          try {
+            setLoadingIndustries(true);
+            const industriesData = (campaignData as any).industries;
+            const industryIds = (campaignData as any).industry_ids;
+            
+            let campaignIndustryIds: number[] = [];
+            if (industriesData && Array.isArray(industriesData)) {
+              campaignIndustryIds = industriesData.map((ind: any) => typeof ind === 'object' ? ind.id : ind);
+            } else if (industryIds && Array.isArray(industryIds)) {
+              campaignIndustryIds = industryIds;
+            }
+            
+            if (campaignIndustryIds.length > 0) {
+              // Fetch all industries and filter to only show campaign industries
+              const allIndustriesResponse = await getIndustries({ per_page: 1000 });
+              const allIndustriesList = allIndustriesResponse.data || [];
+              const filteredIndustries = allIndustriesList.filter((ind: IndustryData) => 
+                campaignIndustryIds.includes(ind.id)
+              );
+              setCampaignIndustries(filteredIndustries);
+              
+              // Auto-select campaign industries if formData.industry_ids is empty
+              setFormData((prevFormData) => {
+                if (!prevFormData.industry_ids || prevFormData.industry_ids.length === 0) {
+                  return {
+                    ...prevFormData,
+                    industry_ids: campaignIndustryIds,
+                  };
+                }
+                return prevFormData;
+              });
+            }
+          } catch (error) {
+            console.error("Failed to fetch campaign industries:", error);
+          } finally {
+            setLoadingIndustries(false);
           }
         }
 
@@ -382,6 +435,24 @@ const EditLead = () => {
     fetchExtensions();
     fetchCampaigns();
     fetchCrmData();
+  }, []);
+
+  // Fetch all industries
+  useEffect(() => {
+    const fetchAllIndustries = async () => {
+      try {
+        setLoadingAllIndustries(true);
+        const response = await getIndustries({ per_page: 1000 });
+        setAllIndustries(response.data || []);
+      } catch (error) {
+        console.error("Failed to fetch industries:", error);
+        toast.error("Failed to fetch industries");
+      } finally {
+        setLoadingAllIndustries(false);
+      }
+    };
+    
+    fetchAllIndustries();
   }, []);
 
   // Refetch stages when type changes (but not on initial load)
@@ -693,7 +764,7 @@ const EditLead = () => {
         ...(formData.source && { source: formData.source }),
         ...(formData.description && { description: formData.description }),
         ...(formData.company_name && { company_name: formData.company_name }),
-        ...(formData.industry && { industry: formData.industry }),
+        ...(formData.industry_ids && formData.industry_ids.length > 0 && { industry_ids: formData.industry_ids }),
         ...(formData.business_type && { business_type: formData.business_type }),
         ...(formData.company_country && { company_country: formData.company_country }),
         ...(formData.company_province && { company_province: formData.company_province }),
@@ -1141,17 +1212,24 @@ const EditLead = () => {
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>Industry</Form.Label>
-                                <Form.Select
-                                  value={formData.industry}
-                                  onChange={(e) => handleInputChange("industry", e.target.value)}
-                                >
-                                  <option value="">Select Industry</option>
-                                  <option value="Individual/Residential">Individual/Residential</option>
-                                  <option value="Corporate">Corporate</option>
-                                  <option value="Retail">Retail</option>
-                                  <option value="Office">Office</option>
-                                  <option value="Mixed-use">Mixed-use</option>
-                                </Form.Select>
+                                <Select
+                                  isMulti
+                                  options={allIndustries.map((ind) => ({ value: ind.id, label: ind.name }))}
+                                  value={formData.industry_ids.map((id) => {
+                                    const industry = allIndustries.find((ind) => ind.id === id);
+                                    return industry ? { value: industry.id, label: industry.name } : null;
+                                  }).filter(Boolean) as any}
+                                  onChange={(selected) =>
+                                    setFormData({
+                                      ...formData,
+                                      industry_ids: selected ? selected.map((option: any) => option.value) : [],
+                                    })
+                                  }
+                                  placeholder="Select industries..."
+                                  isLoading={loadingAllIndustries}
+                                  isDisabled={loadingAllIndustries}
+                                  isClearable
+                                />
                               </Form.Group>
                             </Col>
                             <Col md={6}>

@@ -292,9 +292,43 @@ const AnalyzeRecordings = () => {
             cell: (props: any) => {
                 return (
                     <div>
-                        <Badge bg={props?.status === 'completed' ? 'success' : 'warning'}>
-                            {props?.status === 'completed' ? 'Completed' : 'Pending'}
-                        </Badge>
+                        {(() => {
+                            const status = props?.status?.toLowerCase();
+                            
+                            switch (status) {
+                                case 'complete':
+                                case 'completed':
+                                    return (
+                                        <Badge bg="success">
+                                            Completed
+                                        </Badge>
+                                    );
+                                case 'in_progress':
+                                    return (
+                                        <Badge bg="info">
+                                            In Progress
+                                        </Badge>
+                                    );
+                                case 'incomplete':
+                                    return (
+                                        <Badge bg="warning">
+                                            Incomplete
+                                        </Badge>
+                                    );
+                                case 'queued':
+                                    return (
+                                        <Badge bg="secondary">
+                                            Queued
+                                        </Badge>
+                                    );
+                                default:
+                                    return (
+                                        <Badge bg="secondary">
+                                            {status || 'Unknown'}
+                                        </Badge>
+                                    );
+                            }
+                        })()}
                     </div>
                 )
             }

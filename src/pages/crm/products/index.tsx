@@ -204,7 +204,7 @@ const ProductsPage = () => {
   });
   const [productsSearch, setProductsSearch] = useState("");
   const [productsFilters, setProductsFilters] = useState({
-    industry_ids: [] as number[],
+    industry_id: null as number | null,
     category: null as string | null,
     brand: [] as string[],
     status: null as string | null,
@@ -486,8 +486,8 @@ const ProductsPage = () => {
       }
 
       // Industry filter
-      if (productsFilters.industry_ids.length > 0) {
-        params.industry_ids = productsFilters.industry_ids;
+      if (productsFilters.industry_id) {
+        params.industry_id = productsFilters.industry_id;
       }
 
       // Category filter
@@ -1447,7 +1447,7 @@ const ProductsPage = () => {
           showAdvancedFilters={showAdvancedFilters}
           onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
           advancedFilterCount={
-            productsFilters.industry_ids.length +
+            (productsFilters.industry_id ? 1 : 0) +
             (productsFilters.category ? 1 : 0) +
             productsFilters.brand.length +
             (productsFilters.status ? 1 : 0)
@@ -1462,20 +1462,19 @@ const ProductsPage = () => {
                 <Col md={2}>
                   <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
                   <Select
-                    isMulti
                     options={industries.map((ind) => ({ value: ind.id, label: ind.name }))}
-                    value={productsFilters.industry_ids.map((id) => {
-                      const industry = industries.find((ind) => ind.id === id);
-                      return industry ? { value: industry.id, label: industry.name } : null;
-                    }).filter(Boolean) as { value: number; label: string }[]}
+                    value={productsFilters.industry_id ? {
+                      value: productsFilters.industry_id,
+                      label: industries.find((ind) => ind.id === productsFilters.industry_id)?.name || ''
+                    } : null}
                     onChange={(selected) => {
                       setProductsFilters((prev) => ({
                         ...prev,
-                        industry_ids: selected ? selected.map((option) => option.value) : [],
+                        industry_id: selected ? selected.value : null,
                       }));
                       setProductsPagination({ ...productsPagination, currentPage: 1 });
                     }}
-                    placeholder="Select industries..."
+                    placeholder="Select industry..."
                     styles={customSelectStyles}
                     isLoading={loadingIndustries}
                     isDisabled={loadingIndustries}
@@ -1546,7 +1545,7 @@ const ProductsPage = () => {
                       className="d-flex align-items-center justify-content-center"
                       onClick={() => {
                         setProductsFilters({
-                          industry_ids: [],
+                          industry_id: null,
                           category: null,
                           brand: [],
                           status: null,

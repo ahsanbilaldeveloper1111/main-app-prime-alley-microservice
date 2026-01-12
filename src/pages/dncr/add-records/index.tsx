@@ -115,7 +115,6 @@ const AddRecords = () => {
       try {
         const response = await addLocalDNDBlock({
           called_number: calledNumber.trim(),
-          company_name: companyName.trim() || undefined,
           comments: comments.trim() || undefined
         });
 
@@ -163,10 +162,10 @@ const AddRecords = () => {
     // Download sample CSV
     const downloadSampleCSV = () => {
       const sampleData = [
-        ['called_number', 'company_name', 'comments'],
-        ['0501234567', 'Acme Corporation', 'Bulk upload - Campaign 2026'],
-        ['0557890123', 'Tech Solutions Ltd', 'DND List Import'],
-        ['0509876543', 'Global Industries', 'Customer requested block']
+        ['called_number', 'comments'],
+        ['10101010', 'Bulk upload - Campaign 2026'],
+        ['10101010', 'DND List Import'],
+        ['100101001', 'Customer requested block']
       ];
 
       const csvContent = sampleData.map(row => row.join(',')).join('\n');
@@ -190,15 +189,52 @@ const AddRecords = () => {
   
       setBulkSubmitting(true);
       try {
-        const response = await bulkAddLocalDNDBlocks(csvPreview);
+        // Parse CSV text into records array
+        const lines = csvPreview.trim().split('\n');
+        if (lines.length < 2) {
+          toast.error('CSV file must contain at least a header row and one data row');
+          setBulkSubmitting(false);
+          return;
+        }
+
+        // Skip header row (first line)
+        const dataLines = lines.slice(1);
+        const records = dataLines
+          .map((line) => {
+            // Handle CSV parsing (simple comma split, can be enhanced for quoted values)
+            const values = line.split(',').map(v => v.trim());
+            if (values.length >= 2 && values[0]) {
+              return {
+                called_number: values[0],
+                comments: values[1] || ''
+              };
+            }
+            return null;
+          })
+          .filter((record): record is { called_number: string; comments: string } => 
+            record !== null && !!record?.called_number
+          );
+
+        if (records.length === 0) {
+          toast.error('No valid records found in CSV file');
+          setBulkSubmitting(false);
+          return;
+        }
+
+        // Format payload as required
+        const payload = {
+          records: records
+        };
+
+        const response = await bulkAddLocalDNDBlocks(payload);
         
         if (response?.status === 'success') {
           toast.success(response.message || `Successfully added ${response.records_added || 0} record(s)`);
           setCsvFile(null);
           setCsvPreview('');
-        // Reset file input
-        const fileInput = document.getElementById('csvFileInput') as HTMLInputElement;
-        if (fileInput) fileInput.value = '';
+          // Reset file input
+          const fileInput = document.getElementById('csvFileInput') as HTMLInputElement;
+          if (fileInput) fileInput.value = '';
           // Refresh the data
           fetchData();
         } else {
@@ -459,7 +495,7 @@ const AddRecords = () => {
                   <Upload size={18} /> Bulk Add Records (CSV)
                 </h6>
                 <p style={{ color: '#6c757d', fontSize: '0.875rem', marginBottom: '1rem' }}>
-                  Upload a CSV file with columns: <strong>called_number</strong>, <strong>company_name</strong>, <strong>comments</strong>
+                  Upload a CSV file with columns: <strong>called_number</strong>, <strong>comments</strong>
                 </p>
                 
                 <div className="mb-3">
@@ -490,9 +526,10 @@ const AddRecords = () => {
                     overflowX: 'auto'
                   }}>
                     <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-{`called_number,company_name,comments
-0501234567,Acme Corporation,Bulk upload
-0557890123,Tech Solutions Ltd,DND List`}
+{`called_number,comments
+10101010,Bulk upload - Campaign 2026
+10101010,DND List Import
+100101001,Customer requested block`}
                     </pre>
                   </div>
                 </div>
