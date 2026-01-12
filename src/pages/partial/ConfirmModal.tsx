@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button, Form, Modal } from 'react-bootstrap';
 import { AlertCircle } from 'lucide-react';
 
@@ -52,8 +52,17 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
     }
   }, [show]);
 
+  // Case-insensitive comparison - recalculates when confirmText or requiredConfirmationText changes
+  const isValidConfirmation = useMemo(() => {
+    if (!requireTextConfirmation) return true;
+    if (!confirmText || !requiredConfirmationText) return false;
+    const trimmedConfirm = confirmText.trim().toLowerCase();
+    const trimmedRequired = requiredConfirmationText.trim().toLowerCase();
+    return trimmedConfirm === trimmedRequired;
+  }, [confirmText, requiredConfirmationText, requireTextConfirmation]);
+
   const handleConfirm = () => {
-    if (!requireTextConfirmation || confirmText.trim().toLowerCase() === requiredConfirmationText.toLowerCase()) {
+    if (isValidConfirmation) {
       onConfirm(confirmText);
     }
   };
@@ -71,8 +80,6 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
       onHide();
     }
   };
-
-  const isValidConfirmation = !requireTextConfirmation || confirmText.trim().toLowerCase() === requiredConfirmationText.toLowerCase();
   const displayPlaceholder = confirmationPlaceholder || `Type ${requiredConfirmationText.toUpperCase()}`;
 
   return (

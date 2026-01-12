@@ -1353,7 +1353,7 @@ const CrmDeals = () => {
       stageColor: deal.stage?.color || 'grey',
       dealType: deal.deal_type || '',
       value: deal.net_value || deal.grand_total || '0',
-      currency: deal.currency || 'USD',
+      currency: deal.currency || 'AED',
       probability: deal?.stage?.probability || 0,
 
 
@@ -2638,7 +2638,7 @@ const CrmDeals = () => {
                       marginBottom: '6px'
                     }}>Deal Value</div>
                     <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                      {viewingDeal.currency || 'USD'} {parseFloat(String(viewingDeal.net_value || viewingDeal.grand_total || 0)).toLocaleString()}
+                      {viewingDeal.currency || 'AED'} {parseFloat(String(viewingDeal.net_value || viewingDeal.grand_total || 0)).toLocaleString()}
                     </div>
                   </div>
                   <div style={{
@@ -3593,7 +3593,7 @@ const CrmDeals = () => {
                   <Col md={3}>
                     <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px' }}>Current Value</div>
                     <div style={{ fontSize: '16px', fontWeight: 600, color: '#198754' }}>
-                      {viewingDeal.currency || 'USD'} {parseFloat(String(viewingDeal.net_value || viewingDeal.grand_total || 0)).toLocaleString()}
+                      {viewingDeal.currency || 'AED'} {parseFloat(String(viewingDeal.net_value || viewingDeal.grand_total || 0)).toLocaleString()}
                     </div>
                   </Col>
                   <Col md={3}>

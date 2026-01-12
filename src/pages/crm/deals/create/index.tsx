@@ -9,10 +9,13 @@ import {
   getCrmProducts,
   createEstimate,
   getRelevantDealTemplate,
+  getCampaignById,
+  getIndustries,
   CrmProduct,
   StageData,
   DealTemplateData,
   DealTemplateField,
+  IndustryData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
@@ -40,6 +43,10 @@ const CreateDeal = () => {
   const [extensions, setExtensions] = useState<any[]>([]);
   const [products, setProducts] = useState<CrmProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [campaign, setCampaign] = useState<any>(null);
+  const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>([]);
+  const [selectedIndustryId, setSelectedIndustryId] = useState<number | null>(null);
+  const [loadingIndustries, setLoadingIndustries] = useState(false);
   const [estimationItems, setEstimationItems] = useState<Array<{
     product_id: number;
     product_service: string;
@@ -88,7 +95,7 @@ const CreateDeal = () => {
     contract_sent: false,
     contract_received: false,
     follow_up_date: "",
-    currency: "USD",
+    currency: "AED",
     tax_percentage: "0",
     standard_discount_percentage: "0",
     special_discount_percentage: "0",
@@ -103,18 +110,99 @@ const CreateDeal = () => {
   useEffect(() => {
     fetchStages();
     fetchExtensions();
-    fetchProducts();
+    // Don't fetch all products initially - wait for industry selection
   }, []);
 
-  const fetchProducts = async () => {
+  // Fetch products by industry
+  const fetchProductsByIndustry = async (industryId: number) => {
     try {
       setLoadingProducts(true);
-      const response = await getCrmProducts({ per_page: 100 });
+      const response = await getCrmProducts({ 
+        per_page: 100,
+        industry_id: industryId 
+      });
       setProducts(response.data || []);
     } catch (error) {
       console.error("Failed to fetch products:", error);
+      toast.error("Failed to fetch products for selected industry");
     } finally {
       setLoadingProducts(false);
+    }
+  };
+
+  // Handle industry selection change
+  const handleIndustryChange = async (selectedOption: any) => {
+    const industryId = selectedOption?.value || null;
+    setSelectedIndustryId(industryId);
+    
+    // Reset product selection when industry changes
+    setItemFormData({
+      ...itemFormData,
+      product_id: null,
+      product_service: "",
+      unit_price: 0,
+    });
+    
+    if (industryId) {
+      await fetchProductsByIndustry(industryId);
+    } else {
+      setProducts([]);
+    }
+  };
+
+  // Fetch campaign and industries when lead is loaded
+  useEffect(() => {
+    const fetchCampaignAndIndustries = async () => {
+      if (sourceLead?.campaign_id) {
+        try {
+          setLoadingIndustries(true);
+          const campaignData = await getCampaignById(sourceLead.campaign_id);
+          setCampaign(campaignData);
+          
+          // Get industries from campaign (could be industries array or industry_ids)
+          const industriesData = (campaignData as any).industries;
+          const industryIds = (campaignData as any).industry_ids;
+          
+          let campaignIndustryIds: number[] = [];
+          if (industriesData && Array.isArray(industriesData)) {
+            campaignIndustryIds = industriesData.map((ind: any) => typeof ind === 'object' ? ind.id : ind);
+          } else if (industryIds && Array.isArray(industryIds)) {
+            campaignIndustryIds = industryIds;
+          }
+          
+          if (campaignIndustryIds.length > 0) {
+            // Fetch all industries and filter to only show campaign industries
+            const allIndustriesResponse = await getIndustries({ per_page: 1000 });
+            const allIndustries = allIndustriesResponse.data || [];
+            const filteredIndustries = allIndustries.filter((ind: IndustryData) => 
+              campaignIndustryIds.includes(ind.id)
+            );
+            setCampaignIndustries(filteredIndustries);
+            
+            // If only one industry, auto-select it and fetch products
+            if (filteredIndustries.length === 1) {
+              setSelectedIndustryId(filteredIndustries[0].id);
+              await fetchProductsByIndustry(filteredIndustries[0].id);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch campaign/industries:", error);
+        } finally {
+          setLoadingIndustries(false);
+        }
+      }
+    };
+    
+    if (sourceLead) {
+      fetchCampaignAndIndustries();
+    }
+  }, [sourceLead]);
+
+  const fetchProducts = async () => {
+    // This function is kept for backward compatibility but should not be used
+    // Products should be fetched by industry
+    if (selectedIndustryId) {
+      await fetchProductsByIndustry(selectedIndustryId);
     }
   };
 
@@ -693,15 +781,7 @@ const CreateDeal = () => {
                           }}
                           required
                         >
-                          <option value="USD">USD</option>
-                          <option value="GBP">GBP</option>
-                          <option value="EUR">EUR</option>
-                          <option value="PKR">PKR</option>
-                          <option value="INR">INR</option>
-                          <option value="AUD">AUD</option>
-                          <option value="CAD">CAD</option>
-                          <option value="JPY">JPY</option>
-                          <option value="CNY">CNY</option>
+                         
                           <option value="AED">AED</option>
                         </Form.Select>
                       </Form.Group>
@@ -1218,7 +1298,7 @@ const CreateDeal = () => {
                                   )}
                                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                                     <div style={{ fontWeight: 500 }}>
-                                      {formData.currency || 'USD'} {parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      {formData.currency || 'AED'} {parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </div>
                                     {showConversionInfo && (
                                       <div className="small text-muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
@@ -1227,7 +1307,7 @@ const CreateDeal = () => {
                                     )}
                                   </td>
                                   <td style={{ textAlign: 'right', fontWeight: 600, color: '#212529', whiteSpace: 'nowrap' }}>
-                                    {formData.currency || 'USD'} {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {formData.currency || 'AED'} {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                   <td>
                                     <div className="d-flex gap-1 justify-content-center">
@@ -1292,7 +1372,7 @@ const CreateDeal = () => {
                                     <strong>Subtotal:</strong>
                                   </td>
                                   <td style={{ textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                    {formData.currency || 'USD'} {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {formData.currency || 'AED'} {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                 </tr>
                                 {totalDiscount > 0 && (
@@ -1303,7 +1383,7 @@ const CreateDeal = () => {
                                       </span>
                                     </td>
                                     <td style={{ textAlign: 'right', color: '#dc3545', whiteSpace: 'nowrap' }}>
-                                      - {formData.currency || 'USD'} {totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      - {formData.currency || 'AED'} {totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                   </tr>
                                 )}
@@ -1313,7 +1393,7 @@ const CreateDeal = () => {
                                       <strong>Tax ({formData.tax_percentage}%):</strong>
                                     </td>
                                     <td style={{ textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                      {formData.currency || 'USD'} {taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      {formData.currency || 'AED'} {taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                   </tr>
                                 )}
@@ -1322,7 +1402,7 @@ const CreateDeal = () => {
                                     <strong style={{ fontSize: '1rem' }}>Total:</strong>
                                   </td>
                                   <td style={{ textAlign: 'right', fontWeight: 700, fontSize: '1rem', color: '#198754', paddingTop: '16px', paddingBottom: '16px', paddingRight: '20px', whiteSpace: 'nowrap' }}>
-                                    {formData.currency || 'USD'} {netValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {formData.currency || 'AED'} {netValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                 </tr>
                               </tfoot>
@@ -1385,6 +1465,36 @@ const CreateDeal = () => {
               }} noValidate>
                 <Modal.Body>
                   <Row className="g-3">
+                    {/* Industry Selection */}
+                    {campaignIndustries.length > 0 && (
+                      <Col md={12}>
+                        <Form.Group>
+                          <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
+                          <Select
+                            value={selectedIndustryId ? {
+                              value: selectedIndustryId,
+                              label: campaignIndustries.find(ind => ind.id === selectedIndustryId)?.name || ""
+                            } : null}
+                            onChange={handleIndustryChange}
+                            options={campaignIndustries.map(industry => ({
+                              value: industry.id,
+                              label: industry.name
+                            }))}
+                            placeholder="Select industry..."
+                            isSearchable
+                            isLoading={loadingIndustries}
+                            isDisabled={loadingIndustries || campaignIndustries.length === 1}
+                            required
+                          />
+                          {campaignIndustries.length === 1 && (
+                            <Form.Text className="text-muted">
+                              Only one industry available for this campaign
+                            </Form.Text>
+                          )}
+                        </Form.Group>
+                      </Col>
+                    )}
+                    
                     <Col md={12}>
                       <Form.Group>
                         <Form.Label>Product <span className="text-danger">*</span></Form.Label>
@@ -1448,10 +1558,10 @@ const CreateDeal = () => {
                               label: `${product.name} (${product.sku}) - ${productCurrency} ${originalPrice.toFixed(2)}`,
                             };
                           })}
-                          placeholder="Select a product"
+                          placeholder={selectedIndustryId ? "Select a product" : "Please select an industry first"}
                           isSearchable
                           isLoading={loadingProducts}
-                          isDisabled={editingItemIndex !== null}
+                          isDisabled={editingItemIndex !== null || !selectedIndustryId || loadingProducts}
                         />
                       </Form.Group>
                     </Col>

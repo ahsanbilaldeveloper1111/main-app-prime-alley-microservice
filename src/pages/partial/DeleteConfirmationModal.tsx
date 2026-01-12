@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Button, Form, Modal } from 'react-bootstrap';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { AlertCircle } from 'lucide-react';
 
 interface DeleteConfirmationModalProps {
@@ -30,8 +30,15 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
     }
   }, [show]);
 
+  // Case-insensitive validation - recalculates when confirmText changes
+  const isValidConfirmation = useMemo(() => {
+    if (!confirmText) return false;
+    const trimmedConfirm = confirmText.trim().toLowerCase();
+    return trimmedConfirm === "delete";
+  }, [confirmText]);
+
   const handleConfirm = () => {
-    if (confirmText === "DELETE") {
+    if (isValidConfirmation) {
       onConfirm();
     }
   };
@@ -92,12 +99,19 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
         </Button>
         <Button
           variant="danger"
-          disabled={confirmText !== "DELETE" || loading}
+          disabled={!isValidConfirmation || loading}
           onClick={handleConfirm}
         >
           {loading ? (
             <>
-              <div className="spinner-border spinner-border-sm me-1" role="status" />
+              <Spinner
+                as="span"
+                animation="border"
+                size="sm"
+                role="status"
+                aria-hidden="true"
+                className="me-2"
+              />
               Deleting...
             </>
           ) : (

@@ -633,20 +633,20 @@ const LiveCallDashboard = () => {
         const { GetCallLegs } = await import('@utils/dialer')
         const activeCallIds = getActiveCallIdsFromLocalStorageRef.current()
         
-        if (activeCallIds && activeCallIds.length > 0 && !hasCalledGetCallLegsRef.current) {
-          hasCalledGetCallLegsRef.current = true
-          try {
-            const params = {
-              callIds: activeCallIds
-            }
+        // if (activeCallIds && activeCallIds.length > 0 && !hasCalledGetCallLegsRef.current) {
+        //   hasCalledGetCallLegsRef.current = true
+        //   try {
+        //     const params = {
+        //       callIds: activeCallIds
+        //     }
             
-            const response = await GetCallLegs(params)
-            console.log('GetCallLegs response:', response)
-          } catch (error) {
-            console.error('Error calling GetCallLegs:', error)
-            hasCalledGetCallLegsRef.current = false
-          }
-        }
+        //     const response = await GetCallLegs(params)
+        //     console.log('GetCallLegs response:', response)
+        //   } catch (error) {
+        //     console.error('Error calling GetCallLegs:', error)
+        //     hasCalledGetCallLegsRef.current = false
+        //   }
+        // }
       }
       
       executeOnAllLoaded()

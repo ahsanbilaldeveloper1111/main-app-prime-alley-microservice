@@ -121,9 +121,9 @@ const AddRecords = () => {
 
         if (response?.status === 'success') {
           toast.success(response.message || 'Record added successfully');
-          setCalledNumber('');
-          setCompanyName('');
-          setComments('');
+        setCalledNumber('');
+        setCompanyName('');
+        setComments('');
           // Refresh the data
           fetchData();
         } else {
@@ -187,7 +187,7 @@ const AddRecords = () => {
         toast.error('Please select a CSV file');
         return;
       }
-
+  
       setBulkSubmitting(true);
       try {
         const response = await bulkAddLocalDNDBlocks(csvPreview);
@@ -196,9 +196,9 @@ const AddRecords = () => {
           toast.success(response.message || `Successfully added ${response.records_added || 0} record(s)`);
           setCsvFile(null);
           setCsvPreview('');
-          // Reset file input
-          const fileInput = document.getElementById('csvFileInput') as HTMLInputElement;
-          if (fileInput) fileInput.value = '';
+        // Reset file input
+        const fileInput = document.getElementById('csvFileInput') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
           // Refresh the data
           fetchData();
         } else {
@@ -241,7 +241,7 @@ const AddRecords = () => {
         setDeleting(false);
       }
     };
-
+  
     // Handle bulk delete
     const handleBulkDeleteClick = () => {
       if (selectedItems.length === 0) {
@@ -264,7 +264,7 @@ const AddRecords = () => {
           setSelectedItems([]);
           // Refresh the data
           fetchData();
-        } else {
+      } else {
           toast.error('Failed to delete records');
         }
       } catch (err: any) {
@@ -298,11 +298,11 @@ const AddRecords = () => {
       try {
         const date = new Date(dateTimeStr);
         return date.toLocaleString('en-US', {
-          year: 'numeric',
+        year: 'numeric',
           month: '2-digit',
           day: '2-digit',
           hour: '2-digit',
-          minute: '2-digit',
+        minute: '2-digit',
           hour12: false
         }).replace(',', '');
       } catch {
@@ -331,7 +331,7 @@ const AddRecords = () => {
       setCurrentPage(1);
       setSelectedItems([]); // Clear selections when filters reset
     };
-
+  
     // Refresh data
     const handleRefresh = () => {
       handleResetFilters();
@@ -551,20 +551,20 @@ const AddRecords = () => {
               </h6>
               <div className="d-flex align-items-center gap-2">
                 {selectedItems.length > 0 && (
-                  <Button
+                <Button
                     variant="danger"
-                    size="sm"
+                  size="sm"
                     onClick={handleBulkDeleteClick}
-                    style={{ 
+                  style={{ 
                       border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '0.875rem',
-                      padding: '0.375rem 0.75rem'
-                    }}
-                  >
-                    <Trash2 size={14} style={{ marginRight: '4px' }} />
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    padding: '0.375rem 0.75rem'
+                  }}
+                >
+                  <Trash2 size={14} style={{ marginRight: '4px' }} />
                     Delete Selected ({selectedItems.length})
-                  </Button>
+                </Button>
                 )}
                 <Button
                   variant="light"
@@ -620,21 +620,21 @@ const AddRecords = () => {
               </Col>
               <Col md={4}>
                 <div className="d-flex gap-2">
-                  <Form.Select
-                    value={itemsPerPage}
+                <Form.Select
+                  value={itemsPerPage}
                     onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-                    style={{ 
-                      padding: '0.5rem 0.75rem',
-                      fontSize: '0.875rem',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '8px'
-                    }}
-                  >
-                    <option value={10}>10 per page</option>
-                    <option value={25}>25 per page</option>
-                    <option value={50}>50 per page</option>
-                    <option value={100}>100 per page</option>
-                  </Form.Select>
+                  style={{ 
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.875rem',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '8px'
+                  }}
+                >
+                  <option value={10}>10 per page</option>
+                  <option value={25}>25 per page</option>
+                  <option value={50}>50 per page</option>
+                  <option value={100}>100 per page</option>
+                </Form.Select>
                   <Button
                     variant="primary"
                     size="sm"
@@ -708,33 +708,33 @@ const AddRecords = () => {
                       return apiData.map((record) => (
                         <tr key={record.id} style={{ borderBottom: '1px solid #dee2e6' }}>
                           <td style={{ padding: '12px', border: 'none' }}>
-                            <Form.Check
-                              type="checkbox"
+                          <Form.Check
+                            type="checkbox"
                               checked={selectedItems.includes(record.id)}
                               onChange={() => handleSelectRecord(record.id)}
-                            />
-                          </td>
+                          />
+                        </td>
                           <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{record.id}</td>
                           <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{record.called_number}</td>
                           <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{record.company_name || '-'}</td>
                           <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{formatDateTime(record.date_time)}</td>
-                          <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
+                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
                             <span style={{ color: '#6c757d' }}>{record.comments || '-'}</span>
                           </td>
                           <td style={{ padding: '12px', border: 'none' }}>
-                            <Button
+                          <Button
                               variant="link"
-                              size="sm"
+                            size="sm"
                               onClick={() => handleDeleteClick(record)}
-                              style={{
-                                color: '#dc3545',
+                            style={{ 
+                              color: '#dc3545',
                                 padding: '4px 8px',
                                 textDecoration: 'none'
-                              }}
+                            }}
                               title="Delete record"
-                            >
+                          >
                               <Trash2 size={16} />
-                            </Button>
+                          </Button>
                           </td>
                         </tr>
                       ));
@@ -752,56 +752,56 @@ const AddRecords = () => {
             </div>
 
             {/* Pagination */}
-            <div className="d-flex justify-content-between align-items-center p-3 border-top" style={{ borderColor: '#dee2e6 !important' }}>
-              <span style={{ color: '#6c757d', fontSize: '0.875rem' }}>
+              <div className="d-flex justify-content-between align-items-center p-3 border-top" style={{ borderColor: '#dee2e6 !important' }}>
+                <span style={{ color: '#6c757d', fontSize: '0.875rem' }}>
                 {totalRecords} Records | Page {currentPage} of {totalPages || 1}
-              </span>
-              <div className="d-flex align-items-center gap-2">
-                <Button
-                  variant="light"
-                  size="sm"
+                </span>
+                <div className="d-flex align-items-center gap-2">
+                  <Button
+                    variant="light"
+                    size="sm"
                   onClick={handleFirstPage}
-                  disabled={currentPage === 1}
-                  style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
-                >
+                    disabled={currentPage === 1}
+                    style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
+                  >
                   <ChevronsLeft size={16} />
-                </Button>
-                <Button
-                  variant="light"
-                  size="sm"
+                  </Button>
+                  <Button
+                    variant="light"
+                    size="sm"
                   onClick={handlePrevPage}
-                  disabled={currentPage === 1}
-                  style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
-                >
+                    disabled={currentPage === 1}
+                    style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
+                  >
                   <ChevronLeft size={16} />
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  style={{ backgroundColor: '#4f46e5', border: 'none', minWidth: '32px' }}
-                >
-                  {currentPage}
-                </Button>
-                <Button
-                  variant="light"
-                  size="sm"
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    style={{ backgroundColor: '#4f46e5', border: 'none', minWidth: '32px' }}
+                  >
+                    {currentPage}
+                  </Button>
+                  <Button
+                    variant="light"
+                    size="sm"
                   onClick={handleNextPage}
                   disabled={currentPage === totalPages || totalPages === 0}
-                  style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
-                >
+                    style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
+                  >
                   <ChevronRight size={16} />
-                </Button>
-                <Button
-                  variant="light"
-                  size="sm"
+                  </Button>
+                  <Button
+                    variant="light"
+                    size="sm"
                   onClick={handleLastPage}
                   disabled={currentPage === totalPages || totalPages === 0}
-                  style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
-                >
+                    style={{ backgroundColor: '#f8f9fa', border: '1px solid #dee2e6', color: '#212529' }}
+                  >
                   <ChevronsRight size={16} />
-                </Button>
+                  </Button>
+                </div>
               </div>
-            </div>
           </Card.Body>
         </Card>
 

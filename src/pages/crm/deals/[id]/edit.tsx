@@ -8,8 +8,14 @@ import {
   getStages,
   getCrmProducts,
   createEstimate,
+  getCampaignById,
+  getIndustries,
+  getLead,
   CrmProduct,
   StageData,
+  IndustryData,
+  DealTemplateData,
+  DealTemplateField,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
@@ -45,6 +51,13 @@ const EditDeal = () => {
   const isInitialLoad = useRef(true);
   const [products, setProducts] = useState<CrmProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [campaign, setCampaign] = useState<any>(null);
+  const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>([]);
+  const [selectedIndustryId, setSelectedIndustryId] = useState<number | null>(null);
+  const [loadingIndustries, setLoadingIndustries] = useState(false);
+  const [sourceLead, setSourceLead] = useState<any>(null);
+  const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(null);
+  const [templateFieldsData, setTemplateFieldsData] = useState<Record<string, any>>({});
   const [estimationItems, setEstimationItems] = useState<Array<{
     product_id: number;
     product_service: string;
@@ -91,7 +104,7 @@ const EditDeal = () => {
     contract_sent: false,
     contract_received: false,
     follow_up_date: "",
-    currency: "USD",
+    currency: "AED",
     tax_percentage: "0",
     standard_discount_percentage: "0",
     special_discount_percentage: "0",
@@ -100,18 +113,99 @@ const EditDeal = () => {
   useEffect(() => {
     fetchStages();
     fetchExtensions();
-    fetchProducts();
+    // Don't fetch all products initially - wait for industry selection
   }, []);
 
-  const fetchProducts = async () => {
+  // Fetch products by industry
+  const fetchProductsByIndustry = async (industryId: number) => {
     try {
       setLoadingProducts(true);
-      const response = await getCrmProducts({ per_page: 100 });
+      const response = await getCrmProducts({ 
+        per_page: 100,
+        industry_id: industryId 
+      });
       setProducts(response.data || []);
     } catch (error) {
       console.error("Failed to fetch products:", error);
+      toast.error("Failed to fetch products for selected industry");
     } finally {
       setLoadingProducts(false);
+    }
+  };
+
+  // Handle industry selection change
+  const handleIndustryChange = async (selectedOption: any) => {
+    const industryId = selectedOption?.value || null;
+    setSelectedIndustryId(industryId);
+    
+    // Reset product selection when industry changes
+    setItemFormData({
+      ...itemFormData,
+      product_id: null,
+      product_service: "",
+      unit_price: 0,
+    });
+    
+    if (industryId) {
+      await fetchProductsByIndustry(industryId);
+    } else {
+      setProducts([]);
+    }
+  };
+
+  // Fetch campaign and industries when deal is loaded
+  useEffect(() => {
+    const fetchCampaignAndIndustries = async () => {
+      if (sourceLead?.campaign_id) {
+        try {
+          setLoadingIndustries(true);
+          const campaignData = await getCampaignById(sourceLead.campaign_id);
+          setCampaign(campaignData);
+          
+          // Get industries from campaign (could be industries array or industry_ids)
+          const industriesData = (campaignData as any).industries;
+          const industryIds = (campaignData as any).industry_ids;
+          
+          let campaignIndustryIds: number[] = [];
+          if (industriesData && Array.isArray(industriesData)) {
+            campaignIndustryIds = industriesData.map((ind: any) => typeof ind === 'object' ? ind.id : ind);
+          } else if (industryIds && Array.isArray(industryIds)) {
+            campaignIndustryIds = industryIds;
+          }
+          
+          if (campaignIndustryIds.length > 0) {
+            // Fetch all industries and filter to only show campaign industries
+            const allIndustriesResponse = await getIndustries({ per_page: 1000 });
+            const allIndustries = allIndustriesResponse.data || [];
+            const filteredIndustries = allIndustries.filter((ind: IndustryData) => 
+              campaignIndustryIds.includes(ind.id)
+            );
+            setCampaignIndustries(filteredIndustries);
+            
+            // If only one industry, auto-select it and fetch products
+            if (filteredIndustries.length === 1) {
+              setSelectedIndustryId(filteredIndustries[0].id);
+              await fetchProductsByIndustry(filteredIndustries[0].id);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch campaign/industries:", error);
+        } finally {
+          setLoadingIndustries(false);
+        }
+      }
+    };
+    
+    if (sourceLead) {
+      fetchCampaignAndIndustries();
+    }
+  }, [sourceLead]);
+
+  const fetchProducts = async () => {
+    // This function is kept for backward compatibility but should not be used
+    // Products should be fetched by industry
+    if (selectedIndustryId) {
+      await fetchProductsByIndustry(selectedIndustryId);
     }
   };
 
@@ -154,11 +248,32 @@ const EditDeal = () => {
           contract_sent: deal.contract_sent || false,
           contract_received: deal.contract_received || false,
           follow_up_date: formatDate(deal.follow_up_date),
-          currency: deal.currency || "USD",
+          currency: deal.currency || "AED",
           tax_percentage: (deal as any).tax_percentage?.toString() || "0",
           standard_discount_percentage: (deal as any).standard_discount_percentage?.toString() || "0",
           special_discount_percentage: (deal as any).special_discount_percentage?.toString() || "0",
         });
+
+        // Fetch lead data if ticket_id exists (ticket_id contains the lead_id)
+        if (deal.ticket_id) {
+          try {
+            const leadData: any = await getLead(Number(deal.ticket_id));
+            setSourceLead(leadData);
+          } catch (error) {
+            console.error("Failed to fetch lead:", error);
+            // Don't show error toast as lead is optional
+          }
+        }
+
+        // Extract deal_template from deal response
+        const dealTemplateData = (deal as any).deal_template;
+        if (dealTemplateData) {
+          setDealTemplate(dealTemplateData);
+          
+          // Load existing template field values from deal
+          const dealTemplateFieldValues = (deal as any).deal_template_field_values || {};
+          setTemplateFieldsData(dealTemplateFieldValues);
+        }
 
         // Set additional data
         // Sort estimates by created_at date (newest first) to ensure latest revision is always first
@@ -198,7 +313,7 @@ const EditDeal = () => {
               description: item.description || "",
               qty: item.qty || 1,
               unit_price: item.unit_price || 0,
-              original_currency: item.original_currency || deal.currency || "USD",
+              original_currency: item.original_currency || deal.currency || "AED",
               original_price: item.original_price || item.unit_price || 0,
             })));
           } else {
@@ -212,7 +327,7 @@ const EditDeal = () => {
             description: item.description || "",
             qty: item.qty || 1,
             unit_price: item.unit_price || 0,
-            original_currency: item.original_currency || deal.currency || "USD",
+            original_currency: item.original_currency || deal.currency || "AED",
             original_price: item.original_price || item.unit_price || 0,
           })));
         }
@@ -274,11 +389,25 @@ const EditDeal = () => {
   };
 
   const validateStep2 = (): boolean => {
+    // If deal template exists, validate template fields instead
+    if (dealTemplate && dealTemplate.fields && dealTemplate.fields.length > 0) {
+      for (const field of dealTemplate.fields) {
+        if (field.is_required) {
+          const fieldValue = templateFieldsData[field.field_name];
+          if (!fieldValue || (typeof fieldValue === 'string' && fieldValue.trim() === '')) {
+            toast.error(`${field.field_name} is required`);
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+    
+    // Fallback to original validation if no template
     const requiredFields = [
       { field: 'deal_type' as const, name: 'Deal Type' },
       { field: 'contract_length' as const, name: 'Contract Length' },
       { field: 'billing_model' as const, name: 'Billing Model' },
-     // { field: 'payment_terms' as const, name: 'Payment Terms' },
       { field: 'risk_level' as const, name: 'Risk Level' },
     ];
     return checkRequiredFields(formData, requiredFields);
@@ -362,6 +491,15 @@ const EditDeal = () => {
         negotiation_bar: negotiationBar,
         probability: probability,
       };
+
+      // Add deal template data if template exists
+      if (dealTemplate && dealTemplate.id) {
+        payload.deal_template_id = dealTemplate.id;
+        // Add template field values
+        Object.entries(templateFieldsData).forEach(([key, value]) => {
+          payload[`deal_template_field_values[${key}]`] = value;
+        });
+      }
 
       if (formData.ticket_id) {
         payload.ticket_id = formData.ticket_id;
@@ -622,15 +760,7 @@ const EditDeal = () => {
                           }}
                           required
                         >
-                          <option value="USD">USD</option>
-                          <option value="GBP">GBP</option>
-                          <option value="EUR">EUR</option>
-                          <option value="PKR">PKR</option>
-                          <option value="INR">INR</option>
-                          <option value="AUD">AUD</option>
-                          <option value="CAD">CAD</option>
-                          <option value="JPY">JPY</option>
-                          <option value="CNY">CNY</option>
+                          
                           <option value="AED">AED</option>
                         </Form.Select>
                       </Form.Group>
@@ -779,8 +909,94 @@ const EditDeal = () => {
               </Card>
             )}
 
-            {/* Step 2: Deal Characteristics */}
-            {formStep === 2 && (
+            {/* Step 2: Deal Characteristics - Based on Deal Template */}
+            {formStep === 2 && dealTemplate && (
+              <Card className="mb-3 border-0 bg-light">
+                <Card.Body>
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h5 className="fw-bold mb-0 text-info">DEAL CHARACTERISTICS</h5>
+                    {dealTemplate.name && (
+                      <Badge bg="info" className="ms-2">
+                        Template: {dealTemplate.name}
+                      </Badge>
+                    )}
+                  </div>
+                  {dealTemplate.description && (
+                    <div className="alert alert-info mb-4">
+                      <small>{dealTemplate.description}</small>
+                    </div>
+                  )}
+                  {dealTemplate.fields && dealTemplate.fields.length > 0 ? (
+                    <Row>
+                      {(() => {
+                        const fieldsArray = dealTemplate.fields || [];
+                        const sortedFields = [...fieldsArray].sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
+                        return sortedFields.map((field: DealTemplateField) => {
+                          const fieldValue = templateFieldsData[field.field_name] || '';
+                          
+                          return (
+                            <Col md={6} key={field.field_name}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>
+                                  {field.field_name}
+                                  {field.is_required && <span className="text-danger"> *</span>}
+                                </Form.Label>
+                                {field.field_type === 'dropdown' ? (
+                                  <Form.Select
+                                    value={fieldValue}
+                                    onChange={(e) => setTemplateFieldsData({
+                                      ...templateFieldsData,
+                                      [field.field_name]: e.target.value
+                                    })}
+                                    required={field.is_required}
+                                  >
+                                    <option value="">Select {field.field_name}</option>
+                                    {field.options && Array.isArray(field.options) && field.options.map((option: string, index: number) => (
+                                      <option key={index} value={option}>
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </Form.Select>
+                                ) : field.field_type === 'text' || !field.field_type ? (
+                                  <Form.Control
+                                    type="text"
+                                    value={fieldValue}
+                                    onChange={(e) => setTemplateFieldsData({
+                                      ...templateFieldsData,
+                                      [field.field_name]: e.target.value
+                                    })}
+                                    placeholder={`Enter ${field.field_name}`}
+                                    required={field.is_required}
+                                  />
+                                ) : (
+                                  <Form.Control
+                                    type={field.field_type === 'date' ? 'date' : field.field_type === 'email' ? 'email' : 'text'}
+                                    value={fieldValue}
+                                    onChange={(e) => setTemplateFieldsData({
+                                      ...templateFieldsData,
+                                      [field.field_name]: e.target.value
+                                    })}
+                                    placeholder={`Enter ${field.field_name}`}
+                                    required={field.is_required}
+                                  />
+                                )}
+                              </Form.Group>
+                            </Col>
+                          );
+                        });
+                      })()}
+                    </Row>
+                  ) : (
+                    <div className="text-center py-4 text-muted">
+                      <p>No fields defined in this template.</p>
+                    </div>
+                  )}
+                </Card.Body>
+              </Card>
+            )}
+
+            {/* Fallback: Original Characteristics if no template */}
+            {formStep === 2 && !dealTemplate && (
               <Card className="mb-3 border-0 bg-light">
                 <Card.Body>
                   <h5 className="fw-bold mb-4 text-info">DEAL CHARACTERISTICS</h5>
@@ -895,17 +1111,6 @@ const EditDeal = () => {
                         </Form.Select>
                       </Form.Group>
                     </Col>
-                    {/* <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Competitors</Form.Label>
-                        <Form.Control 
-                          type="text" 
-                          value={formData.competitors}
-                          onChange={(e) => setFormData({ ...formData, competitors: e.target.value })}
-                          placeholder="Enter competitor names (comma separated)"
-                        />
-                      </Form.Group>
-                    </Col> */}
                   </Row>
                 </Card.Body>
               </Card>
@@ -1259,7 +1464,7 @@ const EditDeal = () => {
                                   )}
                                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                                     <div style={{ fontWeight: 500 }}>
-                                      {formData.currency || 'USD'} {parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      {formData.currency || 'AED'} {parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </div>
                                     {showConversionInfo && (
                                       <div className="small text-muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
@@ -1268,7 +1473,7 @@ const EditDeal = () => {
                                     )}
                                   </td>
                                   <td style={{ textAlign: 'right', fontWeight: 600, color: '#212529', whiteSpace: 'nowrap' }}>
-                                    {formData.currency || 'USD'} {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {formData.currency || 'AED'} {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                   <td>
                                     <div className="d-flex gap-1 justify-content-center">
@@ -1335,7 +1540,7 @@ const EditDeal = () => {
                                     <strong>Subtotal:</strong>
                                   </td>
                                   <td style={{ textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                    {formData.currency || 'USD'} {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {formData.currency || 'AED'} {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                 </tr>
                                 {totalDiscount > 0 && (
@@ -1346,7 +1551,7 @@ const EditDeal = () => {
                                       </span>
                                     </td>
                                     <td style={{ textAlign: 'right', color: '#dc3545', whiteSpace: 'nowrap' }}>
-                                      - {formData.currency || 'USD'} {totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      - {formData.currency || 'AED'} {totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                   </tr>
                                 )}
@@ -1356,7 +1561,7 @@ const EditDeal = () => {
                                       <strong>Tax ({formData.tax_percentage}%):</strong>
                                     </td>
                                     <td style={{ textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                      {formData.currency || 'USD'} {taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      {formData.currency || 'AED'} {taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                   </tr>
                                 )}
@@ -1365,7 +1570,7 @@ const EditDeal = () => {
                                     <strong style={{ fontSize: '1rem' }}>Total:</strong>
                                   </td>
                                   <td style={{ textAlign: 'right', fontWeight: 700, fontSize: '1rem', color: '#198754', paddingTop: '16px', paddingBottom: '16px', paddingRight: '20px', whiteSpace: 'nowrap' }}>
-                                    {formData.currency || 'USD'} {netValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {formData.currency || 'AED'} {netValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                 </tr>
                               </tfoot>
@@ -1428,6 +1633,36 @@ const EditDeal = () => {
               }} noValidate>
                 <Modal.Body>
                   <Row className="g-3">
+                    {/* Industry Selection */}
+                    {campaignIndustries.length > 0 && (
+                      <Col md={12}>
+                        <Form.Group>
+                          <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
+                          <Select
+                            value={selectedIndustryId ? {
+                              value: selectedIndustryId,
+                              label: campaignIndustries.find(ind => ind.id === selectedIndustryId)?.name || ""
+                            } : null}
+                            onChange={handleIndustryChange}
+                            options={campaignIndustries.map(industry => ({
+                              value: industry.id,
+                              label: industry.name
+                            }))}
+                            placeholder="Select industry..."
+                            isSearchable
+                            isLoading={loadingIndustries}
+                            isDisabled={loadingIndustries || campaignIndustries.length === 1}
+                            required
+                          />
+                          {campaignIndustries.length === 1 && (
+                            <Form.Text className="text-muted">
+                              Only one industry available for this campaign
+                            </Form.Text>
+                          )}
+                        </Form.Group>
+                      </Col>
+                    )}
+                    
                     <Col md={12}>
                       <Form.Group>
                         <Form.Label>Product <span className="text-danger">*</span></Form.Label>
@@ -1489,10 +1724,10 @@ const EditDeal = () => {
                               label: `${product.name} (${product.sku}) - ${productCurrency} ${originalPrice.toFixed(2)}`,
                             };
                           })}
-                          placeholder="Select a product"
+                          placeholder={selectedIndustryId ? "Select a product" : "Please select an industry first"}
                           isSearchable
                           isLoading={loadingProducts}
-                          isDisabled={editingItemIndex !== null}
+                          isDisabled={editingItemIndex !== null || !selectedIndustryId || loadingProducts}
                         />
                       </Form.Group>
                     </Col>

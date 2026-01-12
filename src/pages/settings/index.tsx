@@ -240,7 +240,7 @@ const Settings = () => {
     "crm": [
       { key: "campaigns", title: "Campaigns", icon: Megaphone, color: "#0d6efd", permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS },
       { key: "industries", title: "Industries", icon: Building2, color: "#6c757d", permission: PERMISSIONS.VIEW_CRM_INDUSTRIES },
-      { key: "products", title: "Products", icon: Package, color: "#198754", permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
+      // { key: "products", title: "Products", icon: Package, color: "#198754", permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
       { key: "stages", title: "Stages", icon: Layers, color: "#ff9800", permission: PERMISSIONS.VIEW_CRM_STAGES },
       { key: "deal-templates", title: "Deal Templates", icon: FileText, color: "#9c27b0", permission: PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES }
     ],
@@ -470,7 +470,7 @@ const Settings = () => {
                   <div>
                     {activeCrmTab === "campaigns" && <Campaigns />}
                     {activeCrmTab === "industries" && <Industries />}
-                    {activeCrmTab === "products" && <Products />}
+                    {/* {activeCrmTab === "products" && <Products />} */}
                     {activeCrmTab === "stages" && <Stages />}
                     {activeCrmTab === "deal-templates" && <DealTemplates />}
                   </div>

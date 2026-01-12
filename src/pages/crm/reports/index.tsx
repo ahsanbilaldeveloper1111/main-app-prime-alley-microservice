@@ -907,19 +907,19 @@ const CrmReports = () => {
                         </div>
                         <div className="text-end">
                           <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
-                            TOTAL VALUE (USD)
+                            TOTAL VALUE (AED)
                           </p>
                         </div>
                       </div>
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {(() => {
-                          const usdValue = dealValue?.by_currency?.find(c => c.currency === 'USD')?.total_value || 0;
-                          if (usdValue >= 1000000) {
-                            return `$${(usdValue / 1000000).toFixed(1)}M`;
-                          } else if (usdValue >= 1000) {
-                            return `$${(usdValue / 1000).toFixed(1)}K`;
+                          const AEDValue = dealValue?.by_currency?.find(c => c.currency === 'AED')?.total_value || 0;
+                          if (AEDValue >= 1000000) {
+                            return `$${(AEDValue / 1000000).toFixed(1)}M`;
+                          } else if (AEDValue >= 1000) {
+                            return `$${(AEDValue / 1000).toFixed(1)}K`;
                           }
-                          return `$${usdValue.toFixed(2)}`;
+                          return `$${AEDValue.toFixed(2)}`;
                         })()}
                       </h2>
                       <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
@@ -936,19 +936,19 @@ const CrmReports = () => {
                         </div>
                         <div className="text-end">
                           <p className="text-muted text-uppercase small mb-1" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
-                            TOTAL VALUE (USD)
+                            TOTAL VALUE (AED)
                           </p>
                         </div>
                       </div>
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {(() => {
-                          const usdValue = dealValue?.by_currency?.find(c => c.currency === 'USD')?.total_value || 0;
-                          if (usdValue >= 1000000) {
-                            return `$${(usdValue / 1000000).toFixed(1)}M`;
-                          } else if (usdValue >= 1000) {
-                            return `$${(usdValue / 1000).toFixed(1)}K`;
+                          const AEDValue = dealValue?.by_currency?.find(c => c.currency === 'AED')?.total_value || 0;
+                          if (AEDValue >= 1000000) {
+                            return `$${(AEDValue / 1000000).toFixed(1)}M`;
+                          } else if (AEDValue >= 1000) {
+                            return `$${(AEDValue / 1000).toFixed(1)}K`;
                           }
-                          return `$${usdValue.toFixed(2)}`;
+                          return `$${AEDValue.toFixed(2)}`;
                         })()}
                       </h2>
                       <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
@@ -1516,10 +1516,10 @@ const CrmReports = () => {
                       </div>
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {(() => {
-                          const usdValue = orderSummary?.by_currency?.find(c => c.currency === 'USD')?.total_value || 0;
-                          if (usdValue >= 1000000) return `$${(usdValue / 1000000).toFixed(1)}M`;
-                          if (usdValue >= 1000) return `$${(usdValue / 1000).toFixed(1)}K`;
-                          return `$${usdValue.toFixed(2)}`;
+                          const AEDValue = orderSummary?.by_currency?.find(c => c.currency === 'AED')?.total_value || 0;
+                          if (AEDValue >= 1000000) return `$${(AEDValue / 1000000).toFixed(1)}M`;
+                          if (AEDValue >= 1000) return `$${(AEDValue / 1000).toFixed(1)}K`;
+                          return `$${AEDValue.toFixed(2)}`;
                         })()}
                       </h2>
                       <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
@@ -1542,10 +1542,10 @@ const CrmReports = () => {
                       </div>
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {(() => {
-                          const usdValue = orderSummary?.by_currency?.find(c => c.currency === 'USD')?.total_value || 0;
-                          if (usdValue >= 1000000) return `$${(usdValue / 1000000).toFixed(1)}M`;
-                          if (usdValue >= 1000) return `$${(usdValue / 1000).toFixed(1)}K`;
-                          return `$${usdValue.toFixed(2)}`;
+                          const AEDValue = orderSummary?.by_currency?.find(c => c.currency === 'AED')?.total_value || 0;
+                          if (AEDValue >= 1000000) return `$${(AEDValue / 1000000).toFixed(1)}M`;
+                          if (AEDValue >= 1000) return `$${(AEDValue / 1000).toFixed(1)}K`;
+                          return `$${AEDValue.toFixed(2)}`;
                         })()}
                       </h2>
                       <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
@@ -1570,9 +1570,9 @@ const CrmReports = () => {
                       </div>
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {(() => {
-                          const usdAvg = orderSummary?.by_currency?.find(c => c.currency === 'USD')?.avg_value || 0;
-                          if (usdAvg >= 1000) return `$${(usdAvg / 1000).toFixed(1)}K`;
-                          return `$${usdAvg.toFixed(2)}`;
+                          const AEDAvg = orderSummary?.by_currency?.find(c => c.currency === 'AED')?.avg_value || 0;
+                          if (AEDAvg >= 1000) return `$${(AEDAvg / 1000).toFixed(1)}K`;
+                          return `$${AEDAvg.toFixed(2)}`;
                         })()}
                       </h2>
                       <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>
@@ -1595,9 +1595,9 @@ const CrmReports = () => {
                       </div>
                       <h2 className="mb-2 fw-bold text-end" style={{ fontSize: '1.75rem' }}>
                         {(() => {
-                          const usdAvg = orderSummary?.by_currency?.find(c => c.currency === 'USD')?.avg_value || 0;
-                          if (usdAvg >= 1000) return `$${(usdAvg / 1000).toFixed(1)}K`;
-                          return `$${usdAvg.toFixed(2)}`;
+                          const AEDAvg = orderSummary?.by_currency?.find(c => c.currency === 'AED')?.avg_value || 0;
+                          if (AEDAvg >= 1000) return `$${(AEDAvg / 1000).toFixed(1)}K`;
+                          return `$${AEDAvg.toFixed(2)}`;
                         })()}
                       </h2>
                       <div className="d-flex align-items-center justify-content-end mt-2" style={{ minHeight: '20px' }}>

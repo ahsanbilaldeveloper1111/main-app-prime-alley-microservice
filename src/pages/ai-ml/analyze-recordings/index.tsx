@@ -9,7 +9,7 @@ import { Button, Modal, Row, Form, Badge } from 'react-bootstrap';
 import { Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
-import { ModuleSlug, formatDateTimeToLocal, GlobalDateTimeFormat, formatDuration, encodeAnalysisData, GlobalDateFormat } from '@utils/Helper';
+import { ModuleSlug, formatDateTimeToLocal, GlobalDateTimeFormat, formatDuration, encodeAnalysisData, GlobalDateFormat, convertDateTimeWithOffsetToLocal, GlobalTimeFormat } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 import BarFilters from '@components/BarFilters';
@@ -199,7 +199,7 @@ const AnalyzeRecordings = () => {
             cell: (props: any) => {
                 return (
                     <div style={{textTransform: 'uppercase'}}>
-                        {formatDateTimeToLocal(props.DateTime, GlobalDateFormat as string)}
+                        {convertDateTimeWithOffsetToLocal(props.DateTime,undefined, GlobalDateFormat as string)}
                     </div>
                 )
             }
@@ -212,7 +212,7 @@ const AnalyzeRecordings = () => {
             cell: (props: any) => {
                 return (
                     <div>
-                        {formatDateTimeToLocal(props.DateTime, 'HH:mm:ss')}
+                        {convertDateTimeWithOffsetToLocal(props.DateTime,undefined, GlobalTimeFormat as string)}
                     </div>
                 )
             }

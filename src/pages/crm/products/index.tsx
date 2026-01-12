@@ -225,7 +225,7 @@ const ProductsPage = () => {
     productName: "",
     sku: "",
     price: "",
-    currency: "USD",
+    currency: "AED",
     category: "",
     brand: "",
     isActive: true,
@@ -595,7 +595,7 @@ const ProductsPage = () => {
         productName: "",
         sku: "",
         price: "",
-        currency: "USD",
+        currency: "AED",
         category: "",
         brand: "",
         isActive: true,
@@ -790,11 +790,7 @@ const ProductsPage = () => {
                         setProductFormData({ ...productFormData, currency: e.target.value })
                       }
                     >
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="GBP">GBP</option>
-                      <option value="INR">INR</option>
-                      <option value="AUD">AUD</option>
+                     
                       <option value="AED">AED</option>
                     </Form.Select>
                     <Form.Text className="text-muted">Select the currency for this product</Form.Text>

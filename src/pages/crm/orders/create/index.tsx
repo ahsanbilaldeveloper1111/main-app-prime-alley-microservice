@@ -92,7 +92,7 @@ const CreateOrder = () => {
     tax_percentage: "0",
     standard_discount_percentage: "0",
     special_discount_percentage: "0",
-    currency: "USD",
+    currency: "AED",
     industry: "",
     order_approval_status: "",
     fulfillment_status: "",
@@ -178,7 +178,7 @@ const CreateOrder = () => {
             customer_phone: phoneNumber,
             customer_phone_country_code: phoneCountryCode,
             customer_address: "",
-            currency: dealData.currency || "USD",
+            currency: dealData.currency || "AED",
             industry: dealData.industry || "",
             tax_percentage: latestEstimate?.tax_percentage || "0",
             standard_discount_percentage: latestEstimate?.standard_discount_percentage || "0",
@@ -190,7 +190,7 @@ const CreateOrder = () => {
           // But we need to ensure they're converted to order currency if different
           if (latestEstimate?.estimation_chart) {
             const estimateCurrency = latestEstimate.currency || dealData.currency;
-            const orderCurrency = dealData.currency || "USD";
+            const orderCurrency = dealData.currency || "AED";
             
             // If estimate currency matches order currency, use prices as-is
             // Otherwise, we'll convert them (but this should be rare since order inherits deal currency)
@@ -344,9 +344,9 @@ const CreateOrder = () => {
   // Validation functions for each step
   const validateStep0 = (): boolean => {
     const requiredFields = [
-      { field: 'customer_name' as const, name: 'Customer Name' },
-      { field: 'customer_email' as const, name: 'Customer Email', type: ValidationType.EMAIL },
-      { field: 'customer_phone' as const, name: 'Customer Phone' },
+      { field: 'customer_name' as const, name: 'Company Name' },
+      { field: 'customer_email' as const, name: 'Company Email', type: ValidationType.EMAIL },
+      { field: 'customer_phone' as const, name: 'Company Phone' },
       { field: 'order_date' as const, name: 'Order Date' },
       { field: 'order_stage_id' as const, name: 'Stage' },
       { field: 'currency' as const, name: 'Currency' },
@@ -589,31 +589,31 @@ const CreateOrder = () => {
                   <Row>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Customer Name <span className="text-danger">*</span></Form.Label>
+                        <Form.Label>Company Name <span className="text-danger">*</span></Form.Label>
                         <Form.Control 
                           type="text" 
                           value={formData.customer_name}
                           onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                          placeholder="Enter customer name" 
+                          placeholder="Enter company name" 
                           required 
                         />
                       </Form.Group>
                     </Col>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Customer Email <span className="text-danger">*</span></Form.Label>
+                        <Form.Label>Company Email <span className="text-danger">*</span></Form.Label>
                         <Form.Control 
                           type="email" 
                           value={formData.customer_email}
                           onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
-                          placeholder="customer@example.com" 
+                          placeholder="company@example.com" 
                           required 
                         />
                       </Form.Group>
                     </Col>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Customer Phone <span className="text-danger">*</span></Form.Label>
+                        <Form.Label>Company Phone <span className="text-danger">*</span></Form.Label>
                         <div className="phone-input-wrapper">
                           <PhoneInput
                             international
@@ -663,7 +663,7 @@ const CreateOrder = () => {
                     </Col>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Customer Address</Form.Label>
+                        <Form.Label>Company Address</Form.Label>
                         <Form.Control 
                           type="text" 
                           value={formData.customer_address}
@@ -767,15 +767,7 @@ const CreateOrder = () => {
                           }}
                           required
                         >
-                          <option value="USD">USD</option>
-                          <option value="GBP">GBP</option>
-                          <option value="EUR">EUR</option>
-                          <option value="PKR">PKR</option>
-                          <option value="INR">INR</option>
-                          <option value="AUD">AUD</option>
-                          <option value="CAD">CAD</option>
-                          <option value="JPY">JPY</option>
-                          <option value="CNY">CNY</option>
+                         
                           <option value="AED">AED</option>
                         </Form.Select>
                       </Form.Group>
@@ -1081,7 +1073,7 @@ const CreateOrder = () => {
                                   )}
                                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                                     <div style={{ fontWeight: 500 }}>
-                                      {formData.currency || 'USD'} {parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      {formData.currency || 'AED'} {parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </div>
                                     {showConversionInfo && (
                                       <div className="small text-muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
@@ -1090,7 +1082,7 @@ const CreateOrder = () => {
                                     )}
                                   </td>
                                   <td style={{ textAlign: 'right', fontWeight: 600, color: '#212529', whiteSpace: 'nowrap' }}>
-                                    {formData.currency || 'USD'} {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {formData.currency || 'AED'} {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                   <td>
                                     <div className="d-flex gap-1 justify-content-center">
@@ -1151,7 +1143,7 @@ const CreateOrder = () => {
                                   <strong>Subtotal:</strong>
                                 </td>
                                   <td style={{ textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                    {formData.currency || 'USD'} {totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {formData.currency || 'AED'} {totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                               </tr>
                               {totals.totalDiscount > 0 && (
@@ -1162,7 +1154,7 @@ const CreateOrder = () => {
                                     </span>
                                   </td>
                                   <td style={{ textAlign: 'right', color: '#dc3545', whiteSpace: 'nowrap' }}>
-                                    - {formData.currency || 'USD'} {totals.totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    - {formData.currency || 'AED'} {totals.totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                 </tr>
                               )}
@@ -1172,7 +1164,7 @@ const CreateOrder = () => {
                                     <strong>Tax ({formData.tax_percentage}%):</strong>
                                   </td>
                                   <td style={{ textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                    {formData.currency || 'USD'} {totals.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {formData.currency || 'AED'} {totals.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                 </tr>
                               )}
@@ -1181,7 +1173,7 @@ const CreateOrder = () => {
                                   <strong style={{ fontSize: '1rem' }}>Total:</strong>
                                 </td>
                                   <td style={{ textAlign: 'right', fontWeight: 700, fontSize: '1rem', color: '#198754', paddingTop: '16px', paddingBottom: '16px', paddingRight: '20px', whiteSpace: 'nowrap' }}>
-                                    {formData.currency || 'USD'} {totals.netValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {formData.currency || 'AED'} {totals.netValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                               </tr>
                             </tfoot>
@@ -1361,11 +1353,11 @@ const CreateOrder = () => {
                                       )}
                                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                                         <div style={{ fontWeight: 500 }}>
-                                          {formData.currency || 'USD'} {parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                          {formData.currency || 'AED'} {parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </div>
                                       </td>
                                       <td style={{ textAlign: 'right', fontWeight: 600, color: '#212529', whiteSpace: 'nowrap' }}>
-                                        {formData.currency || 'USD'} {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        {formData.currency || 'AED'} {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                       </td>
                                     </tr>
                                   );
@@ -1378,7 +1370,7 @@ const CreateOrder = () => {
                                       <strong>Subtotal:</strong>
                                     </td>
                                     <td style={{ textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                      {formData.currency || 'USD'} {totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      {formData.currency || 'AED'} {totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                   </tr>
                                   {totals.totalDiscount > 0 && (
@@ -1389,7 +1381,7 @@ const CreateOrder = () => {
                                         </span>
                                       </td>
                                       <td style={{ textAlign: 'right', color: '#dc3545', whiteSpace: 'nowrap' }}>
-                                        - {formData.currency || 'USD'} {totals.totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        - {formData.currency || 'AED'} {totals.totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                       </td>
                                     </tr>
                                   )}
@@ -1399,7 +1391,7 @@ const CreateOrder = () => {
                                         <strong>Tax ({formData.tax_percentage}%):</strong>
                                       </td>
                                       <td style={{ textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                        {formData.currency || 'USD'} {totals.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        {formData.currency || 'AED'} {totals.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                       </td>
                                     </tr>
                                   )}
@@ -1408,7 +1400,7 @@ const CreateOrder = () => {
                                       <strong style={{ fontSize: '1rem' }}>Total:</strong>
                                     </td>
                                     <td style={{ textAlign: 'right', fontWeight: 700, fontSize: '1rem', color: '#198754', paddingTop: '16px', paddingBottom: '16px', paddingRight: '20px', whiteSpace: 'nowrap' }}>
-                                      {formData.currency || 'USD'} {totals.netValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      {formData.currency || 'AED'} {totals.netValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                   </tr>
                                 </tfoot>

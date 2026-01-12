@@ -1791,7 +1791,23 @@ export const getCrmProducts = async (
   params: PaginationParams = {}
 ): Promise<PaginationWrapper<CrmProduct>> => {
   try {
-    const response = await axiosInstance.get("/crm/products", { params });
+    // Configure paramsSerializer to send arrays with brackets: industry_ids=[1,2,3]
+    const response = await axiosInstance.get("/crm/products", { 
+      params,
+      paramsSerializer: (params: any) => {
+        const searchParams = new URLSearchParams();
+        Object.keys(params).forEach((key) => {
+          const value = params[key];
+          if (Array.isArray(value)) {
+            // Send with brackets: industry_ids=[1,2,3]
+            searchParams.append(key, `[${value.join(',')}]`);
+          } else if (value !== null && value !== undefined && value !== '') {
+            searchParams.append(key, String(value));
+          }
+        });
+        return searchParams.toString();
+      }
+    });
     return extractData<PaginationWrapper<CrmProduct>>(response.data);
   } catch (error: any) {
     toast.error(

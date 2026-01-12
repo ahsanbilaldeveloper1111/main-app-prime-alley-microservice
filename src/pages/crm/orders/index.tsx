@@ -105,6 +105,8 @@ import {
   Download as DownloadIcon,
   RotateCcw,
   AlertCircle,
+  Handshake,
+  Info,
 } from "lucide-react";
 import {
   PieChart,
@@ -453,6 +455,7 @@ const CrmOrders = () => {
   const [relatedLead, setRelatedLead] = useState<any>(null);
   const [loadingDeal, setLoadingDeal] = useState(false);
   const [loadingLead, setLoadingLead] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("tab1");
 
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -1317,7 +1320,7 @@ const CrmOrders = () => {
       stageColor: order.stage?.color || "grey",
       stageId: order.order_stage_id || null,
       value: order.final_amount || order.total_amount || "0",
-      currency: order.currency || "USD",
+      currency: order.currency || "AED",
       approvalStatus: order.order_approval_status || null,
       fulfillmentStatus: order.fulfillment_status || null,
       paymentStatus: order.payment_status || null,
@@ -2093,7 +2096,7 @@ const CrmOrders = () => {
             >
               {[
                 { key: "orderNumber", label: "Order Number" },
-                { key: "customer", label: "Customer" },
+                { key: "customer", label: "Company" },
                 { key: "deal", label: "Linked Deal" },
                 { key: "stage", label: "Stage" },
                 { key: "value", label: "Value" },
@@ -2227,7 +2230,7 @@ const CrmOrders = () => {
                           )
                         }
                       >
-                        Customer {renderSortIcon("customer", ordersPagination)}
+                        Company {renderSortIcon("customer", ordersPagination)}
                       </th>
                     )}
                     {selectedOrdersColumns.includes("deal") && (
@@ -2461,7 +2464,7 @@ const CrmOrders = () => {
                                   </div>
                                 </>
                               ) : (
-                                <div>No Customer</div>
+                                <div>No Company</div>
                               )}
                             </div>
                           </td>
@@ -2847,7 +2850,109 @@ const CrmOrders = () => {
               </div>
             ) : (
               <>
-                {/* Order Information Section */}
+                <style jsx>{`
+                  .lead-detail-filter-buttons {
+                    display: flex;
+                    gap: 12px;
+                    flex-wrap: wrap;
+                    margin-bottom: 24px;
+                  }
+
+                  .lead-detail-filter-button {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.3s;
+                    border: 1px solid;
+                  }
+
+                  .lead-detail-filter-button:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                  }
+
+                  .lead-detail-filter-button.active {
+                    color: white;
+                  }
+
+                  .lead-detail-filter-button.active .filter-icon {
+                    color: white;
+                  }
+
+                  .lead-detail-filter-button:not(.active) .filter-icon {
+                    color: inherit;
+                  }
+
+                  .filter-icon {
+                    width: 18px;
+                    height: 18px;
+                    flex-shrink: 0;
+                  }
+                `}</style>
+                {/* Tabs Navigation */}
+                <div className="lead-detail-filter-buttons mb-4">
+                  <button
+                    className={`lead-detail-filter-button ${activeTab === "tab1" ? 'active' : ''}`}
+                    onClick={() => setActiveTab("tab1")}
+                    style={{
+                      backgroundColor: activeTab === "tab1" ? "#4680ff" : 'white',
+                      borderColor: "#4680ff",
+                      color: activeTab === "tab1" ? 'white' : "#4680ff"
+                    }}
+                  >
+                    <Handshake className="filter-icon" size={18} />
+                    <span>General Information</span>
+                  </button>
+
+                  <button
+                    className={`lead-detail-filter-button ${activeTab === "tab2" ? 'active' : ''}`}
+                    onClick={() => setActiveTab("tab2")}
+                    style={{
+                      backgroundColor: activeTab === "tab2" ? "#4680ff" : 'white',
+                      borderColor: "#4680ff",
+                      color: activeTab === "tab2" ? 'white' : "#4680ff"
+                    }}
+                  >
+                    <FileText className="filter-icon" size={18} />
+                    <span>Lead/Deal Information</span>
+                  </button>
+
+                  <button
+                    className={`lead-detail-filter-button ${activeTab === "additional-info" ? 'active' : ''}`}
+                    onClick={() => setActiveTab("additional-info")}
+                    style={{
+                      backgroundColor: activeTab === "additional-info" ? "#4680ff" : 'white',
+                      borderColor: "#4680ff",
+                      color: activeTab === "additional-info" ? 'white' : "#4680ff"
+                    }}
+                  >
+                    <Info className="filter-icon" size={18} />
+                    <span>Additional Information</span>
+                  </button>
+
+                  <button
+                    className={`lead-detail-filter-button ${activeTab === "history" ? 'active' : ''}`}
+                    onClick={() => setActiveTab("history")}
+                    style={{
+                      backgroundColor: activeTab === "history" ? "#4680ff" : 'white',
+                      borderColor: "#4680ff",
+                      color: activeTab === "history" ? 'white' : "#4680ff"
+                    }}
+                  >
+                    <History className="filter-icon" size={18} />
+                    <span>History</span>
+                  </button>
+                </div>
+
+                {/* Tab Content */}
+                {activeTab === "tab1" && (
+                  <div style={{ paddingTop: "20px" }}>
+                    {/* Order Information Section */}
                 <div
                   style={{
                     fontSize: "16px",
@@ -3049,7 +3154,7 @@ const CrmOrders = () => {
                         fontWeight: 500,
                       }}
                     >
-                      {viewingOrder.currency || "USD"}{" "}
+                      {viewingOrder.currency || "AED"}{" "}
                       {parseFloat(
                         viewingOrder.final_amount ||
                           viewingOrder.total_amount ||
@@ -3199,7 +3304,7 @@ const CrmOrders = () => {
                   }}
                 >
                   <User size={18} style={{ color: "#4680ff" }} />
-                  Customer Information
+                  Company Information
                 </div>
                 <div
                   style={{
@@ -3239,7 +3344,7 @@ const CrmOrders = () => {
                       }}
                     >
                       <User size={14} />
-                      Customer Name
+                      Company Name
                     </div>
                     <div
                       style={{
@@ -3405,7 +3510,333 @@ const CrmOrders = () => {
                   )}
                 </div>
 
-                {/* Deal Information */}
+                
+
+                {/* Order Items/Products */}
+                {viewingOrder.items &&
+                  Array.isArray(viewingOrder.items) &&
+                  viewingOrder.items.length > 0 && (
+                    <>
+                      <div
+                        style={{
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          color: "#1f2937",
+                          marginBottom: "20px",
+                          paddingBottom: "10px",
+                          borderBottom: "2px solid #f8f9fa",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                        }}
+                      >
+                        <Package size={18} style={{ color: "#4680ff" }} />
+                        Order Items ({viewingOrder.items.length})
+                      </div>
+                      <div
+                        style={{
+                          marginBottom: "30px",
+                          width: "100%",
+                          overflowX: "auto",
+                        }}
+                      >
+                        <div
+                          className="table-responsive custom-table-order"
+                          style={{ width: "100%" }}
+                        >
+                          <Table
+                            hover
+                            style={{
+                              width: "100%",
+                              marginBottom: 0,
+                              tableLayout: "auto",
+                            }}
+                          >
+                            <thead style={{ background: "#f8f9fa" }}>
+                              <tr>
+                                <th>#</th>
+                                <th>Product Name</th>
+                                <th>SKU</th>
+                                <th>Quantity</th>
+                                {viewingOrder.items.some(
+                                  (item: any) => item.description
+                                ) && <th>Description</th>}
+                                <th>Unit Price</th>
+                                <th
+                                  style={{
+                                    maxWidth: "100px",
+                                    minWidth: "unset",
+                                  }}
+                                >
+                                  Total Price
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {viewingOrder.items.map(
+                                (item: any, index: number) => (
+                                  <tr key={item.id || index}>
+                                    <td>{index + 1}</td>
+                                    <td className="fw-semibold">
+                                      {item.product_name ||
+                                        item.product?.name ||
+                                        "N/A"}
+                                    </td>
+                                    <td>{item.product?.sku || "N/A"}</td>
+                                    <td>{item.quantity || "0"}</td>
+                                    {viewingOrder.items.some(
+                                      (i: any) => i.description
+                                    ) && (
+                                      <td
+                                        style={{
+                                          maxWidth: "200px",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        {item.description || "-"}
+                                      </td>
+                                    )}
+                                    <td>
+                                      {viewingOrder.currency || "AED"}{" "}
+                                      {parseFloat(
+                                        item.unit_price || "0"
+                                      ).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                    </td>
+                                    <td
+                                      style={{
+                                        maxWidth: "100px",
+                                        minWidth: "unset",
+                                      }}
+                                      className="fw-semibold"
+                                    >
+                                      {viewingOrder.currency || "AED"}{" "}
+                                      {parseFloat(
+                                        item.total_price || "0"
+                                      ).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                    </td>
+                                  </tr>
+                                )
+                              )}
+                            </tbody>
+                            <tfoot
+                              style={{ background: "#f8f9fa", fontWeight: 600 }}
+                            >
+                              <tr>
+                                <td
+                                  colSpan={
+                                    viewingOrder.items.some(
+                                      (item: any) => item.description
+                                    )
+                                      ? 6
+                                      : 5
+                                  }
+                                  className="text-end"
+                                >
+                                  Subtotal:
+                                </td>
+                                <td
+                                  style={{
+                                    maxWidth: "100px",
+                                    minWidth: "unset",
+                                  }}
+                                >
+                                  {viewingOrder.currency || "AED"}{" "}
+                                  {parseFloat(
+                                    viewingOrder.total_amount || "0"
+                                  ).toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </td>
+                              </tr>
+                              {viewingOrder.discount_amount &&
+                                parseFloat(viewingOrder.discount_amount) >
+                                  0 && (
+                                  <tr>
+                                    <td
+                                      colSpan={
+                                        viewingOrder.items.some(
+                                          (item: any) => item.description
+                                        )
+                                          ? 6
+                                          : 5
+                                      }
+                                      className="text-end"
+                                    >
+                                      Discount:
+                                    </td>
+                                    <td
+                                      style={{
+                                        maxWidth: "100px",
+                                        minWidth: "unset",
+                                      }}
+                                    >
+                                      - {viewingOrder.currency || "AED"}{" "}
+                                      {parseFloat(
+                                        viewingOrder.discount_amount
+                                      ).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                    </td>
+                                  </tr>
+                                )}
+                              {viewingOrder.tax_amount &&
+                                parseFloat(viewingOrder.tax_amount) > 0 && (
+                                  <tr>
+                                    <td
+                                      colSpan={
+                                        viewingOrder.items.some(
+                                          (item: any) => item.description
+                                        )
+                                          ? 6
+                                          : 5
+                                      }
+                                      className="text-end"
+                                    >
+                                      Tax:
+                                    </td>
+                                    <td
+                                      style={{
+                                        maxWidth: "100px",
+                                        minWidth: "unset",
+                                      }}
+                                    >
+                                      {viewingOrder.currency || "AED"}{" "}
+                                      {parseFloat(
+                                        viewingOrder.tax_amount
+                                      ).toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                    </td>
+                                  </tr>
+                                )}
+                              <tr style={{ fontSize: "16px" }}>
+                                <td
+                                  colSpan={
+                                    viewingOrder.items.some(
+                                      (item: any) => item.description
+                                    )
+                                      ? 6
+                                      : 5
+                                  }
+                                  className="text-end"
+                                >
+                                  Total:
+                                </td>
+                                <td
+                                  style={{
+                                    maxWidth: "100px",
+                                    minWidth: "unset",
+                                  }}
+                                >
+                                  {viewingOrder.currency || "AED"}{" "}
+                                  {parseFloat(
+                                    viewingOrder.final_amount ||
+                                      viewingOrder.total_amount ||
+                                      "0"
+                                  ).toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </Table>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+               
+
+               
+
+                {/* Action Buttons */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "12px",
+                    flexWrap: "wrap",
+                    paddingTop: "20px",
+                    borderTop: "1px solid #e5e7eb",
+                  }}
+                >
+                  {session?.user?.permissions?.includes("edit-crm-orders") && (
+                    <Button
+                      variant="primary"
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        fontWeight: 500,
+                        fontSize: "14px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        background: "#4680ff",
+                        border: "none",
+                      }}
+                      onClick={() => {
+                        setShowOrderViewModal(false);
+                        window.location.href = `/crm/orders/${viewingOrder.id}/edit`;
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = "#3b6ce5";
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                        e.currentTarget.style.boxShadow =
+                          "0 4px 12px rgba(70, 128, 255, 0.4)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = "#4680ff";
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <Edit size={16} />
+                      Edit Order
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline-secondary"
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      fontWeight: 500,
+                      fontSize: "14px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                    onClick={() => setShowOrderViewModal(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
+                  </div>
+                )}
+
+                {activeTab === "tab2" && (
+                  <div style={{ paddingTop: "20px" }}>
+                    <div
+                      style={{
+                        fontSize: "16px",
+                        fontWeight: 600,
+                        color: "#1f2937",
+                        marginBottom: "20px",
+                        paddingBottom: "10px",
+                        borderBottom: "2px solid #f8f9fa",
+                      }}
+                    >
+                      {/* Deal Information */}
                 {relatedDeal && (
                   <>
                     <div
@@ -3561,7 +3992,7 @@ const CrmOrders = () => {
                               fontWeight: 500,
                             }}
                           >
-                            {relatedDeal.currency || "USD"}{" "}
+                            {relatedDeal.currency || "AED"}{" "}
                             {parseFloat(
                               String(
                                 relatedDeal.net_value ||
@@ -4837,11 +5268,17 @@ const CrmOrders = () => {
                     )}
                   </>
                 )}
+                    </div>
+                    
+                  </div>
+                )}
 
-                {/* Order Items/Products */}
-                {viewingOrder.items &&
-                  Array.isArray(viewingOrder.items) &&
-                  viewingOrder.items.length > 0 && (
+                {activeTab === "history" && (
+                  <div>
+                     {/* History */}
+                {viewingOrder.histories &&
+                  Array.isArray(viewingOrder.histories) &&
+                  viewingOrder.histories.length > 0 && (
                     <>
                       <div
                         style={{
@@ -4856,234 +5293,140 @@ const CrmOrders = () => {
                           gap: "10px",
                         }}
                       >
-                        <Package size={18} style={{ color: "#4680ff" }} />
-                        Order Items ({viewingOrder.items.length})
+                        <History size={18} style={{ color: "#4680ff" }} />
+                        Activity History ({viewingOrder.histories.length})
                       </div>
                       <div
                         style={{
+                          position: "relative",
+                          paddingLeft: "30px",
                           marginBottom: "30px",
-                          width: "100%",
-                          overflowX: "auto",
                         }}
                       >
                         <div
-                          className="table-responsive custom-table-order"
-                          style={{ width: "100%" }}
-                        >
-                          <Table
-                            hover
-                            style={{
-                              width: "100%",
-                              marginBottom: 0,
-                              tableLayout: "auto",
-                            }}
-                          >
-                            <thead style={{ background: "#f8f9fa" }}>
-                              <tr>
-                                <th>#</th>
-                                <th>Product Name</th>
-                                <th>SKU</th>
-                                <th>Quantity</th>
-                                {viewingOrder.items.some(
-                                  (item: any) => item.description
-                                ) && <th>Description</th>}
-                                <th>Unit Price</th>
-                                <th
-                                  style={{
-                                    maxWidth: "100px",
-                                    minWidth: "unset",
-                                  }}
-                                >
-                                  Total Price
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {viewingOrder.items.map(
-                                (item: any, index: number) => (
-                                  <tr key={item.id || index}>
-                                    <td>{index + 1}</td>
-                                    <td className="fw-semibold">
-                                      {item.product_name ||
-                                        item.product?.name ||
-                                        "N/A"}
-                                    </td>
-                                    <td>{item.product?.sku || "N/A"}</td>
-                                    <td>{item.quantity || "0"}</td>
-                                    {viewingOrder.items.some(
-                                      (i: any) => i.description
-                                    ) && (
-                                      <td
-                                        style={{
-                                          maxWidth: "200px",
-                                          overflow: "hidden",
-                                          textOverflow: "ellipsis",
-                                          whiteSpace: "nowrap",
-                                        }}
-                                      >
-                                        {item.description || "-"}
-                                      </td>
-                                    )}
-                                    <td>
-                                      {viewingOrder.currency || "USD"}{" "}
-                                      {parseFloat(
-                                        item.unit_price || "0"
-                                      ).toLocaleString(undefined, {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      })}
-                                    </td>
-                                    <td
-                                      style={{
-                                        maxWidth: "100px",
-                                        minWidth: "unset",
-                                      }}
-                                      className="fw-semibold"
-                                    >
-                                      {viewingOrder.currency || "USD"}{" "}
-                                      {parseFloat(
-                                        item.total_price || "0"
-                                      ).toLocaleString(undefined, {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      })}
-                                    </td>
-                                  </tr>
-                                )
-                              )}
-                            </tbody>
-                            <tfoot
-                              style={{ background: "#f8f9fa", fontWeight: 600 }}
+                          style={{
+                            content: "",
+                            position: "absolute",
+                            left: "8px",
+                            top: 0,
+                            bottom: 0,
+                            width: "2px",
+                            background: "#e5e7eb",
+                          }}
+                        />
+                        {viewingOrder.histories.map(
+                          (history: any, idx: number) => (
+                            <div
+                              key={history.id || idx}
+                              style={{
+                                position: "relative",
+                                paddingBottom: "20px",
+                              }}
                             >
-                              <tr>
-                                <td
-                                  colSpan={
-                                    viewingOrder.items.some(
-                                      (item: any) => item.description
-                                    )
-                                      ? 6
-                                      : 5
-                                  }
-                                  className="text-end"
-                                >
-                                  Subtotal:
-                                </td>
-                                <td
+                              <div
+                                style={{
+                                  content: "",
+                                  position: "absolute",
+                                  left: "-26px",
+                                  top: "4px",
+                                  width: "12px",
+                                  height: "12px",
+                                  borderRadius: "50%",
+                                  background:
+                                    history.event === "created"
+                                      ? "#10b981"
+                                      : "#4680ff",
+                                  border: "3px solid white",
+                                  boxShadow: "0 0 0 2px #e5e7eb",
+                                }}
+                              />
+                              <div
+                                style={{
+                                  background: "#f8f9fa",
+                                  padding: "12px 16px",
+                                  borderRadius: "8px",
+                                }}
+                              >
+                                <div
                                   style={{
-                                    maxWidth: "100px",
-                                    minWidth: "unset",
+                                    fontSize: "12px",
+                                    color: "#6b7280",
+                                    fontWeight: 600,
+                                    marginBottom: "4px",
                                   }}
                                 >
-                                  {viewingOrder.currency || "USD"}{" "}
-                                  {parseFloat(
-                                    viewingOrder.total_amount || "0"
-                                  ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </td>
-                              </tr>
-                              {viewingOrder.discount_amount &&
-                                parseFloat(viewingOrder.discount_amount) >
-                                  0 && (
-                                  <tr>
-                                    <td
-                                      colSpan={
-                                        viewingOrder.items.some(
-                                          (item: any) => item.description
-                                        )
-                                          ? 6
-                                          : 5
-                                      }
-                                      className="text-end"
-                                    >
-                                      Discount:
-                                    </td>
-                                    <td
-                                      style={{
-                                        maxWidth: "100px",
-                                        minWidth: "unset",
-                                      }}
-                                    >
-                                      - {viewingOrder.currency || "USD"}{" "}
-                                      {parseFloat(
-                                        viewingOrder.discount_amount
-                                      ).toLocaleString(undefined, {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      })}
-                                    </td>
-                                  </tr>
-                                )}
-                              {viewingOrder.tax_amount &&
-                                parseFloat(viewingOrder.tax_amount) > 0 && (
-                                  <tr>
-                                    <td
-                                      colSpan={
-                                        viewingOrder.items.some(
-                                          (item: any) => item.description
-                                        )
-                                          ? 6
-                                          : 5
-                                      }
-                                      className="text-end"
-                                    >
-                                      Tax:
-                                    </td>
-                                    <td
-                                      style={{
-                                        maxWidth: "100px",
-                                        minWidth: "unset",
-                                      }}
-                                    >
-                                      {viewingOrder.currency || "USD"}{" "}
-                                      {parseFloat(
-                                        viewingOrder.tax_amount
-                                      ).toLocaleString(undefined, {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      })}
-                                    </td>
-                                  </tr>
-                                )}
-                              <tr style={{ fontSize: "16px" }}>
-                                <td
-                                  colSpan={
-                                    viewingOrder.items.some(
-                                      (item: any) => item.description
-                                    )
-                                      ? 6
-                                      : 5
-                                  }
-                                  className="text-end"
-                                >
-                                  Total:
-                                </td>
-                                <td
+                                  {new Date(
+                                    history.created_at
+                                  ).toLocaleString()}
+                                </div>
+                                <div
                                   style={{
-                                    maxWidth: "100px",
-                                    minWidth: "unset",
+                                    fontSize: "14px",
+                                    color: "#1f2937",
+                                    marginBottom: "4px",
+                                    fontWeight: 500,
                                   }}
                                 >
-                                  {viewingOrder.currency || "USD"}{" "}
-                                  {parseFloat(
-                                    viewingOrder.final_amount ||
-                                      viewingOrder.total_amount ||
-                                      "0"
-                                  ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </td>
-                              </tr>
-                            </tfoot>
-                          </Table>
-                        </div>
+                                  {history.event === "created"
+                                    ? "Created"
+                                    : history.event === "updated"
+                                    ? "Updated"
+                                    : history.event}
+                                </div>
+                                {history.description && (
+                                  <div
+                                    style={{
+                                      fontSize: "13px",
+                                      color: "#6b7280",
+                                      marginBottom: "8px",
+                                    }}
+                                  >
+                                    {history.description}
+                                  </div>
+                                )}
+                                {history.changes &&
+                                  Object.keys(history.changes).length > 0 && (
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        color: "#6b7280",
+                                      }}
+                                    >
+                                      {Object.entries(history.changes).map(
+                                        ([key, change]: [string, any]) => {
+                                          if (ignoredKeys.includes(key)) {
+                                            return <></>;
+                                          }
+                                          return (
+                                            <div
+                                              key={key}
+                                              style={{ marginTop: "4px" }}
+                                            >
+                                              <strong>{key}:</strong>{" "}
+                                              {change.old
+                                                ? `${change.old} → `
+                                                : ""}
+                                              {change.new || "N/A"}
+                                            </div>
+                                          );
+                                        }
+                                      )}
+                                    </div>
+                                  )}
+                              </div>
+                            </div>
+                          )
+                        )}
                       </div>
                     </>
                   )}
+                  </div>
+                )}
 
-                {/* Additional Order Details */}
+                {
+                  activeTab === "additional-info" && (
+                    <div>
+                       {/* Additional Order Details */}
                 <div
                   style={{
                     fontSize: "16px",
@@ -5396,213 +5739,9 @@ const CrmOrders = () => {
                     </div>
                   </>
                 )}
-
-                {/* History */}
-                {viewingOrder.histories &&
-                  Array.isArray(viewingOrder.histories) &&
-                  viewingOrder.histories.length > 0 && (
-                    <>
-                      <div
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 600,
-                          color: "#1f2937",
-                          marginBottom: "20px",
-                          paddingBottom: "10px",
-                          borderBottom: "2px solid #f8f9fa",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <History size={18} style={{ color: "#4680ff" }} />
-                        Activity History ({viewingOrder.histories.length})
-                      </div>
-                      <div
-                        style={{
-                          position: "relative",
-                          paddingLeft: "30px",
-                          marginBottom: "30px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            content: "",
-                            position: "absolute",
-                            left: "8px",
-                            top: 0,
-                            bottom: 0,
-                            width: "2px",
-                            background: "#e5e7eb",
-                          }}
-                        />
-                        {viewingOrder.histories.map(
-                          (history: any, idx: number) => (
-                            <div
-                              key={history.id || idx}
-                              style={{
-                                position: "relative",
-                                paddingBottom: "20px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  content: "",
-                                  position: "absolute",
-                                  left: "-26px",
-                                  top: "4px",
-                                  width: "12px",
-                                  height: "12px",
-                                  borderRadius: "50%",
-                                  background:
-                                    history.event === "created"
-                                      ? "#10b981"
-                                      : "#4680ff",
-                                  border: "3px solid white",
-                                  boxShadow: "0 0 0 2px #e5e7eb",
-                                }}
-                              />
-                              <div
-                                style={{
-                                  background: "#f8f9fa",
-                                  padding: "12px 16px",
-                                  borderRadius: "8px",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    fontSize: "12px",
-                                    color: "#6b7280",
-                                    fontWeight: 600,
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  {new Date(
-                                    history.created_at
-                                  ).toLocaleString()}
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "14px",
-                                    color: "#1f2937",
-                                    marginBottom: "4px",
-                                    fontWeight: 500,
-                                  }}
-                                >
-                                  {history.event === "created"
-                                    ? "Created"
-                                    : history.event === "updated"
-                                    ? "Updated"
-                                    : history.event}
-                                </div>
-                                {history.description && (
-                                  <div
-                                    style={{
-                                      fontSize: "13px",
-                                      color: "#6b7280",
-                                      marginBottom: "8px",
-                                    }}
-                                  >
-                                    {history.description}
-                                  </div>
-                                )}
-                                {history.changes &&
-                                  Object.keys(history.changes).length > 0 && (
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        color: "#6b7280",
-                                      }}
-                                    >
-                                      {Object.entries(history.changes).map(
-                                        ([key, change]: [string, any]) => {
-                                          if (ignoredKeys.includes(key)) {
-                                            return <></>;
-                                          }
-                                          return (
-                                            <div
-                                              key={key}
-                                              style={{ marginTop: "4px" }}
-                                            >
-                                              <strong>{key}:</strong>{" "}
-                                              {change.old
-                                                ? `${change.old} → `
-                                                : ""}
-                                              {change.new || "N/A"}
-                                            </div>
-                                          );
-                                        }
-                                      )}
-                                    </div>
-                                  )}
-                              </div>
-                            </div>
-                          )
-                        )}
-                      </div>
-                    </>
-                  )}
-
-                {/* Action Buttons */}
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "12px",
-                    flexWrap: "wrap",
-                    paddingTop: "20px",
-                    borderTop: "1px solid #e5e7eb",
-                  }}
-                >
-                  {session?.user?.permissions?.includes("edit-crm-orders") && (
-                    <Button
-                      variant="primary"
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: "8px",
-                        fontWeight: 500,
-                        fontSize: "14px",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        background: "#4680ff",
-                        border: "none",
-                      }}
-                      onClick={() => {
-                        setShowOrderViewModal(false);
-                        window.location.href = `/crm/orders/${viewingOrder.id}/edit`;
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#3b6ce5";
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow =
-                          "0 4px 12px rgba(70, 128, 255, 0.4)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "#4680ff";
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    >
-                      <Edit size={16} />
-                      Edit Order
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline-secondary"
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: "8px",
-                      fontWeight: 500,
-                      fontSize: "14px",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                    onClick={() => setShowOrderViewModal(false)}
-                  >
-                    Close
-                  </Button>
-                </div>
+                    </div>
+                  )
+                }
               </>
             )}
           </Modal.Body>
