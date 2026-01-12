@@ -20,6 +20,7 @@ import {
   AddAssigneeComment,
   loadImage,
   GetTicket,
+  DashboardData,
 } from "@utils/tickets";
 import { GetHierarchyData } from "@utils/users";
 import { GetAllStatuses } from "@utils/ticket-statuses";
@@ -44,11 +45,23 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
-import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircle, X, Paperclip, FileText, Tag, Calendar, Clock, Download, MessageCircle, Send, CircleCheckBig } from "lucide-react";
+import { User,Edit,Trash2,Eye,Plus, Filter, Search,Info, AlertCircle, CheckCircle, X, Paperclip, FileText, Tag, Calendar, Clock, Download, MessageCircle, Send, CircleCheckBig, BarChart3, Ticket } from "lucide-react";
 
 import ThemeSelect from "@components/ThemeSelect";
 import Select from "react-select";
 import { useRouter } from "next/router";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from "recharts";
 
 interface SelectOption {
   value: number;
@@ -88,6 +101,50 @@ const getStatusBadgeColor = (status: string) => {
 
 const priorityLabels = ["Low", "Medium", "High", "Critical"];
 
+// KPI Card Component
+interface KPICardData {
+  title: string;
+  value: string;
+  icon: React.ReactNode;
+  color: string;
+}
+
+const KPICard: React.FC<KPICardData> = ({
+  title,
+  value,
+  icon,
+  color,
+}) => {
+  return (
+    <Card
+      className="h-100"
+      style={{
+        cursor: "default",
+        transition: "all 0.2s ease",
+        border: "1px solid #e9ecef",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "translateY(-4px)";
+        e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "none";
+      }}
+    >
+      <Card.Body>
+        <div className="d-flex justify-content-between align-items-start mb-3">
+          <div className={`bg-${color} bg-opacity-10 rounded p-3`}>
+            <div className={`text-${color}`}>{icon}</div>
+          </div>
+        </div>
+        <h3 className="mb-1">{value}</h3>
+        <p className="text-muted mb-0 small">{title}</p>
+      </Card.Body>
+    </Card>
+  );
+};
+
 const TicketList = () => {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -102,6 +159,11 @@ const TicketList = () => {
 
   const [hierarchyData, setHierarchyData] = useState<any>([]);
   const [extensions, setExtensions] = useState<any>([]);
+
+  // Analytics state
+  const [showTicketsAnalytics, setShowTicketsAnalytics] = useState(false);
+  const [statusSummary, setStatusSummary] = useState<any[]>([]);
+  const [totalTickets, setTotalTickets] = useState(0);
 
   // Comment-related states
   const [comments, setComments] = useState<any[]>([]);
@@ -404,6 +466,28 @@ const TicketList = () => {
     };
     fetchHierarchyData();
   }, []);
+
+  // Fetch dashboard data for analytics
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const data = await DashboardData(currentFilters);
+        
+        if (data && data.total_tickets !== undefined) {
+          setTotalTickets(data.total_tickets || 0);
+        }
+        if (data && data.statuses !== undefined) {
+          setStatusSummary(data.statuses);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      }
+    };
+
+    if (showTicketsAnalytics) {
+      fetchDashboardData();
+    }
+  }, [showTicketsAnalytics, currentFilters]);
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -1636,16 +1720,89 @@ const TicketList = () => {
         //   />
         // }
         buttons={
-          session?.user?.permissions?.includes("create-ticket-tickets") && (
-            <Button variant="primary" onClick={openCreateTicketModal}>
-              <Plus size={18} className="me-2" />
-              Add Ticket
+          <div className="d-flex flex-wrap gap-2">
+            <Button
+              variant={showTicketsAnalytics ? "primary" : "outline-secondary"}
+              onClick={() => setShowTicketsAnalytics(!showTicketsAnalytics)}
+            >
+              <BarChart3 size={16} className="me-2" />
+              {showTicketsAnalytics ? "Hide Analytics" : "Show Analytics"}
             </Button>
-          )
+            {session?.user?.permissions?.includes("create-ticket-tickets") && (
+              <Button variant="primary" onClick={openCreateTicketModal}>
+                <Plus size={18} className="me-2" />
+                Add Ticket
+              </Button>
+            )}
+          </div>
         }
         leftGrid={3}
         rightGrid={9}
       />
+
+      {/* Analytics Section - Collapsible */}
+      {showTicketsAnalytics && (
+        <>
+          {/* Summary Stats using KPICard */}
+          <Row className="mb-4">
+            <Col lg={3} md={6} className="mb-3">
+              <KPICard
+                title="Total Tickets"
+                value={totalTickets.toString()}
+                icon={<Ticket size={24} />}
+                color="primary"
+              />
+            </Col>
+            {statusSummary.map((status: any, index: number) => (
+              <Col lg={3} md={6} className="mb-3" key={index}>
+                <KPICard
+                  title={status.name}
+                  value={status.count?.toString() || "0"}
+                  icon={<Ticket size={24} />}
+                  color={
+                    status.name?.toLowerCase() === "resolved" || status.name?.toLowerCase() === "closed"
+                      ? "success"
+                      : status.name?.toLowerCase() === "in progress"
+                      ? "warning"
+                      : status.name?.toLowerCase() === "open"
+                      ? "primary"
+                      : "info"
+                  }
+                />
+              </Col>
+            ))}
+          </Row>
+
+          {/* Analytics Charts */}
+          {/* {statusSummary.length > 0 && (
+            <Row className="mb-4">
+              <Col md={12} className="mb-3">
+                <Card className="border-0 shadow-sm h-100">
+                  <Card.Body>
+                    <h6 className="fw-bold mb-3">Ticket Status Distribution</h6>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart
+                        data={statusSummary.map((status: any) => ({
+                          status: status.name,
+                          count: status.count || 0,
+                        }))}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="status" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#0d6efd" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+          )} */}
+        </>
+      )}
+
+      
 
       {session?.user?.permissions?.includes("view-ticket-tickets") && (
 

@@ -973,7 +973,7 @@ const AnalyzeRecordings = () => {
                                         { value: 'in_progress', label: 'IN_PROGRESS' },
                                         { value: 'queued', label: 'QUEUED' },
                                         { value: 'completed', label: 'COMPLETED' },
-                                        { value: 'in_complete', label: 'IN_COMPLETE' },
+                                        { value: 'incomplete', label: 'IN_COMPLETE' },
                                         
                                     ]}
                                     placeholder="Select analysis status"

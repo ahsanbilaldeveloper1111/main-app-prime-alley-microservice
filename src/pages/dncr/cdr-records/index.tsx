@@ -1,18 +1,21 @@
 import "@assets/scss/datatable-style.scss";
+import parsePhoneNumber from "libphonenumber-js";
 import React, {
   ReactElement,
   useState,
   useEffect,
   useCallback,
+  useMemo,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import axiosInstance from "@utils/axios";
+import { convertDateTimeWithOffsetToLocal, GlobalDateTimeFormat } from "@utils/Helper";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import { Row, Col, Card, Form, Button, Table, Dropdown } from 'react-bootstrap';
-import { TrendingUp, Shield, RefreshCw, XCircle, X, Clock, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar } from 'lucide-react';
+import { Row, Col, Card, Form, Button, Table, Dropdown, Badge, Popover, OverlayTrigger } from 'react-bootstrap';
+import { TrendingUp, Shield, RefreshCw, XCircle, X, Clock, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar, Phone } from 'lucide-react';
 import { LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 
@@ -68,6 +71,136 @@ interface MappedCDRRecord {
   allowLocalDNCL: string;
   allowRepetition: string;
 }
+
+// Phone Container Component
+const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => void }) => {
+  const [showPopover, setShowPopover] = useState(false);
+
+  const parsePhone = useCallback((phone: string) => {
+    if (!phone)
+      return {
+        phone: "N/A",
+        countryCode: "",
+      };
+    try {
+      const parsedPhone = parsePhoneNumber(phone);
+      return {
+        phone: parsedPhone?.formatInternational() || phone,
+        countryCode: parsedPhone?.country || "",
+      };
+    } catch (e) {
+      console.error(e);
+      return {
+        phone: phone,
+        countryCode: "",
+      };
+    }
+  }, []);
+  const getFlagImgSrc = useCallback((countryCode: string) => {
+    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
+  }, []);
+  const phoneNumber = useMemo(() => {
+    return phone
+      ? parsePhone(phone)
+      : {
+          phone: "N/A",
+          countryCode: "",
+        };
+  }, [phone, parsePhone]);
+
+  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
+
+  const phoneBadge = (
+    <Badge 
+      bg="info" 
+      className="bg-opacity-10 text-dark"
+      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      onMouseEnter={() => setShowPopover(true)}
+      onMouseLeave={() => setShowPopover(false)}
+    >
+      <div className="d-flex align-items-center gap-2">
+        {phoneNumber?.countryCode && (
+          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
+        )}
+        {phoneNumber.phone}
+      </div>
+    </Badge>
+  );
+
+  if (!onClick) {
+    return phoneBadge;
+  }
+
+  const popover = (
+    <Popover 
+      id={`phone-popover-${phone}`} 
+      style={{ 
+        maxWidth: '160px', 
+        pointerEvents: 'auto',
+        border: 'none',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+        borderRadius: '8px'
+      }}
+      onMouseEnter={() => setShowPopover(true)}
+      onMouseLeave={() => setShowPopover(false)}
+    >
+      <Popover.Body 
+        className="p-0"
+        style={{ 
+          padding: '8px',
+          borderRadius: '8px'
+        }}
+      >
+        <Button
+          variant="default"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+            setShowPopover(false);
+          }}
+          className="d-flex align-items-center justify-content-center gap-2 w-100"
+          style={{ 
+            fontSize: '13px', 
+            fontWeight: '600',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: '1px solid #dee2e6',
+            backgroundColor: 'transparent',
+            color: '#212529',
+            boxShadow: 'none',
+            transition: 'all 0.2s ease',
+            minHeight: '36px'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.backgroundColor = '#f8f9fa';
+            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+        >
+          <Phone size={18} style={{ strokeWidth: 2.5 }} />
+          <span>Call</span>
+        </Button>
+      </Popover.Body>
+    </Popover>
+  );
+
+  return (
+    <OverlayTrigger
+      show={showPopover}
+      placement="top"
+      overlay={popover}
+      trigger={[]}
+    >
+      <span style={{ display: 'inline-block' }}>{phoneBadge}</span>
+    </OverlayTrigger>
+  );
+};
 
 // Component definitions moved outside
 const StatCard: React.FC<{ icon: React.ReactNode; title: string; value: string | number; subtitle?: string; chart?: React.ReactNode; bgClass?: string }> = ({ icon, title, value, subtitle, chart, bgClass = '' }) => (
@@ -899,9 +1032,14 @@ const CDRRecords = () => {
                       return currentRecords.map((row) => (
                         <tr key={row.id} style={{ borderBottom: '1px solid #dee2e6' }}>
                         <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.id}</td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.dateTime}</td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.calling}</td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.called}</td>
+                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
+                          {convertDateTimeWithOffsetToLocal(row?.dateTime,undefined, GlobalDateTimeFormat as string)}</td>
+                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
+                          <PhoneContainer phone={row.calling} />
+                        </td>
+                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
+                          <PhoneContainer phone={row.called} />
+                        </td>
                         <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.userId}</td>
                         <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
                           <span style={{ color: '#6c757d' }}>{row.localDND}</span>
