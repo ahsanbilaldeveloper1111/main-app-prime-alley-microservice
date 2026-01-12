@@ -55,6 +55,8 @@ const EditDeal = () => {
   const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>([]);
   const [selectedIndustryId, setSelectedIndustryId] = useState<number | null>(null);
   const [loadingIndustries, setLoadingIndustries] = useState(false);
+  const [allIndustries, setAllIndustries] = useState<IndustryData[]>([]);
+  const [loadingAllIndustries, setLoadingAllIndustries] = useState(false);
   const [sourceLead, setSourceLead] = useState<any>(null);
   const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(null);
   const [templateFieldsData, setTemplateFieldsData] = useState<Record<string, any>>({});
@@ -86,7 +88,7 @@ const EditDeal = () => {
     assigned_to: null as string | null,
     expected_close_date: "",
     company_name: "",
-    industry: "",
+    industry_ids: [] as number[],
     decision_maker_title: "",
     decision_maker_name: "",
     decision_maker_phone_country_code: "",
@@ -201,6 +203,24 @@ const EditDeal = () => {
     }
   }, [sourceLead]);
 
+  // Fetch all industries
+  useEffect(() => {
+    const fetchAllIndustries = async () => {
+      try {
+        setLoadingAllIndustries(true);
+        const response = await getIndustries({ per_page: 1000 });
+        setAllIndustries(response.data || []);
+      } catch (error) {
+        console.error("Failed to fetch industries:", error);
+        toast.error("Failed to fetch industries");
+      } finally {
+        setLoadingAllIndustries(false);
+      }
+    };
+    
+    fetchAllIndustries();
+  }, []);
+
   const fetchProducts = async () => {
     // This function is kept for backward compatibility but should not be used
     // Products should be fetched by industry
@@ -230,7 +250,11 @@ const EditDeal = () => {
           assigned_to: deal.assigned_to || null,
           expected_close_date: formatDate(deal.expected_close_date),
           company_name: deal.company_name || "",
-          industry: deal.industry || "",
+          industry_ids: (deal as any).industry_ids && Array.isArray((deal as any).industry_ids) 
+            ? (deal as any).industry_ids.map((id: any) => Number(id)).filter((id: number) => !Number.isNaN(id))
+            : (deal as any).industries && Array.isArray((deal as any).industries)
+            ? (deal as any).industries.map((ind: any) => typeof ind === 'object' ? Number(ind.id) : Number(ind)).filter((id: number) => !Number.isNaN(id))
+            : [],
           decision_maker_title: deal.decision_maker_title || "",
           decision_maker_name: deal.decision_maker_name || (deal as any).main_decision_maker?.name || "",
           decision_maker_phone_country_code: deal.decision_maker_phone_country_code || (deal as any).main_decision_maker?.phone_country_code || "",
@@ -380,11 +404,17 @@ const EditDeal = () => {
   const validateStep1 = (): boolean => {
     const requiredFields = [
       { field: 'company_name' as const, name: 'Company Name' },
-      { field: 'industry' as const, name: 'Industry' },
       { field: 'decision_maker_name' as const, name: 'Decision Maker Name' },
       { field: 'decision_maker_email' as const, name: 'Decision Maker Email', type: ValidationType.EMAIL },
       { field: 'decision_maker_phone' as const, name: 'Decision Maker Phone' },
     ];
+    
+    // Validate industry_ids separately since it's an array
+    if (!formData.industry_ids || formData.industry_ids.length === 0) {
+      toast.error('Industry is required');
+      return false;
+    }
+    
     return checkRequiredFields(formData, requiredFields);
   };
 
@@ -469,7 +499,7 @@ const EditDeal = () => {
         assigned_to: formData.assigned_to,
         expected_close_date: formData.expected_close_date,
         company_name: formData.company_name,
-        industry: formData.industry,
+        industry_ids: formData.industry_ids,
         decision_maker_title: formData.decision_maker_title,
         decision_maker_name: formData.decision_maker_name,
         decision_maker_phone_country_code: formData.decision_maker_phone_country_code,
@@ -801,18 +831,25 @@ const EditDeal = () => {
                     <Col md={6}>
                       <Form.Group className="mb-3">
                         <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
-                        <Form.Select 
-                          value={formData.industry}
-                          onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                        <Select
+                          isMulti
+                          options={allIndustries.map((ind) => ({ value: ind.id, label: ind.name }))}
+                          value={formData.industry_ids.map((id) => {
+                            const industry = allIndustries.find((ind) => ind.id === id);
+                            return industry ? { value: industry.id, label: industry.name } : null;
+                          }).filter(Boolean) as any}
+                          onChange={(selected) =>
+                            setFormData({
+                              ...formData,
+                              industry_ids: selected ? selected.map((option: any) => option.value) : [],
+                            })
+                          }
+                          placeholder="Select industries..."
+                          isLoading={loadingAllIndustries}
+                          isDisabled={loadingAllIndustries}
+                          isClearable
                           required
-                        >
-                          <option value="">Select Industry</option>
-                          <option value="Individual/Residential">Individual/Residential</option>
-                          <option value="Corporate">Corporate</option>
-                          <option value="Retail">Retail</option>
-                          <option value="Office">Office</option>
-                          <option value="Mixed-use">Mixed-use</option>
-                        </Form.Select>
+                        />
                       </Form.Group>
                     </Col>
                     <Col md={4}>

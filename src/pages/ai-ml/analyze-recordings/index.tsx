@@ -192,27 +192,27 @@ const AnalyzeRecordings = () => {
     // Table columns configuration for call recordings
     const columns = [
         {
-            key: 'DateTime',
+            key: 'datetime',
             name: 'Date',
             selector: (row: any) => row.DateTime,
             sortable: true,
             cell: (props: any) => {
                 return (
                     <div style={{textTransform: 'uppercase'}}>
-                        {convertDateTimeWithOffsetToLocal(props.DateTime,undefined, GlobalDateFormat as string)}
+                        {convertDateTimeWithOffsetToLocal(props.datetime,undefined, GlobalDateFormat as string)}
                     </div>
                 )
             }
         },
         {
-            key: 'DateTime',
+            key: 'datetime',
             name: 'Time',
             selector: (row: any) => row.DateTime,
             sortable: true,
             cell: (props: any) => {
                 return (
                     <div>
-                        {convertDateTimeWithOffsetToLocal(props.DateTime,undefined, GlobalTimeFormat as string)}
+                        {convertDateTimeWithOffsetToLocal(props.datetime,undefined, GlobalTimeFormat as string)}
                     </div>
                 )
             }
