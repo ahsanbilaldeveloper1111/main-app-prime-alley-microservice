@@ -292,6 +292,7 @@ MENU_COLORS: {
     TRANSCRIPTION_ANALYZE_RECORDINGS_AIML: 'analyze-recordings-aiml',
     TRANSLATE_AIML: 'translate-aiml',
     OUTBOUND_CALLS_AIML: 'outbound-call-aiml',
+    LIVE_CHAT_AIML: 'live-chat-users',
 
     CTI_SERVICES: 'cti-services',
     VIEW_CTI:'view-cti',

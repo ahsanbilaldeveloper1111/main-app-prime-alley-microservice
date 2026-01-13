@@ -37,6 +37,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/faqs/items',permissions: ['']},
     {path:'/faqs/topics',permissions: ['']},
     {path:'/faqs/types',permissions: ['']},
+    {path:'/chat',permissions: [PERMISSIONS.LIVE_CHAT_AIML]},
     {
         path: '/help-center',
         permissions: [''],
@@ -489,6 +490,10 @@ export const routePermissions: RoutePermission[] = [
             { path: '/recurring-reminders',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
             { path: '/dial-todo',permissions: [PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER]},
             { path: '/tasks-list',permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER]},
+            { path: '/projects',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
+            { path: '/projects/dashboard',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
+            { path: '/saved-views',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
+            { path: '/roles-settings',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
         ]
     },
 

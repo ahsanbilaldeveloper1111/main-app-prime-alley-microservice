@@ -13,6 +13,7 @@ import {
   getIndustries,
   IndustryData,
 } from "@utils/crm";
+import FormModal from "@pages/partial/FormModal";
 import { useSession } from "next-auth/react";
 import {
   Button,
@@ -223,10 +224,7 @@ const DealTemplatesPage = () => {
   };
 
   // Handle submit
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    
+  const handleSubmit = async () => {
     if (!formData.name.trim()) {
       toast.error("Please enter a template name");
       return;
@@ -350,7 +348,7 @@ const DealTemplatesPage = () => {
         <Card className="border-0 shadow-sm mb-3">
           <Card.Body className="p-3">
             <Row className="g-3">
-              <Col md={6}>
+              <Col md={12}>
                 <InputGroup>
                   <Form.Control
                     type="text"
@@ -511,20 +509,14 @@ const DealTemplatesPage = () => {
         </Card>
 
         {/* Create/Edit Modal */}
-        <Modal
+        <FormModal
           show={showModal}
           onHide={() => setShowModal(false)}
-          centered
+          title={editingTemplate ? "Edit Deal Template" : "Add New Deal Template"}
+          desc="Please fill in the details below to create or update a deal template."
           size="lg"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>
-              {editingTemplate ? "Edit Deal Template" : "Add New Deal Template"}
-            </Modal.Title>
-          </Modal.Header>
-          <Form onSubmit={handleSubmit}>
-            <Modal.Body style={{ maxHeight: "70vh", overflowY: "auto" }}>
-              
+          formHtml={
+            <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
               <Form.Group className="mb-3">
                 <Form.Label>
                   Name <span className="text-danger">*</span>
@@ -700,28 +692,17 @@ const DealTemplatesPage = () => {
                   </div>
                 )}
               </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button
-                variant="secondary"
-                onClick={() => setShowModal(false)}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button variant="primary" type="submit" disabled={submitting}>
-                {submitting ? (
-                  <>
-                    <Spinner size="sm" className="me-2" />
-                    {editingTemplate ? "Updating..." : "Creating..."}
-                  </>
-                ) : (
-                  editingTemplate ? "Update" : "Create"
-                )}
-              </Button>
-            </Modal.Footer>
-          </Form>
-        </Modal>
+            </div>
+          }
+          submitButtonText={editingTemplate ? "Update" : "Create"}
+          cancelButtonText="Cancel"
+          onSubmit={handleSubmit}
+          onCancel={() => setShowModal(false)}
+          submitButtonVariant="primary"
+          cancelButtonVariant="secondary"
+          isSubmitting={submitting}
+          isSubmitDisabled={submitting}
+        />
 
         {/* Delete Confirmation Modal */}
         <DeleteConfirmationModal

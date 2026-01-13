@@ -752,6 +752,7 @@ const ProductsPage = () => {
                       }
                       placeholder="Enter SKU"
                       required
+                      disabled={!!editingProduct}
                     />
                     <Form.Text className="text-muted">
                       Unique product identifier (e.g., PROD-001)
@@ -1459,7 +1460,7 @@ const ProductsPage = () => {
           <Card className="border-0 shadow-sm mb-4">
             <Card.Body>
               <Row className="g-3 align-items-end">
-                <Col md={2}>
+                <Col sm={6} md={4} xl={4}>
                   <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
                   <Select
                     options={industries.map((ind) => ({ value: ind.id, label: ind.name }))}
@@ -1481,7 +1482,7 @@ const ProductsPage = () => {
                     isClearable
                   />
                 </Col>
-                <Col md={2}>
+                <Col sm={6} md={4} xl={4}>
                   <Form.Label className="small fw-bold mb-2">Category</Form.Label>
                   <CreatableSelect
                     options={uniqueCategories.map((cat) => ({ value: cat, label: cat }))}
@@ -1499,7 +1500,7 @@ const ProductsPage = () => {
                   />
                 </Col>
                 
-                <Col md={2}>
+                <Col sm={6} md={4} xl={4}>
                   <Form.Label className="small fw-bold mb-2">Status</Form.Label>
                   <Select
                     options={[
@@ -1528,7 +1529,7 @@ const ProductsPage = () => {
                     isClearable
                   />
                 </Col>
-                <Col md={2}>
+                <Col sm={6} md={4} xl={4}>
                   <div className="d-flex gap-2">
                     {/* <Button
                       variant="primary"
@@ -1556,7 +1557,7 @@ const ProductsPage = () => {
                         setProductsPagination({ ...productsPagination, currentPage: 1 });
                       }}
                     >
-                      Reset
+                      Reset All Filters
                     </Button>
                   </div>
                 </Col>

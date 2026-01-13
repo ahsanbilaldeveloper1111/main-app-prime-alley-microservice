@@ -10,6 +10,7 @@ import { NotificationProvider } from '../contexts/NotificationContext';
 import { CtiProvider } from '../contexts/CtiContext';
 import { DialerModalProvider } from '../contexts/DialerModalContext';
 import { IncomingCallProvider } from '../contexts/IncomingCallContext';
+import GlobalInputCapitalization from './GlobalInputCapitalization';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -34,6 +35,7 @@ export default function Providers({ children, store }: ProvidersProps) {
             {/* <FirebaseNotificationProvider> */}
               <TokenServiceProvider>
                 <SessionHandler>
+                  <GlobalInputCapitalization />
                   {store ? (
                     <Provider store={store}>
                       {children}

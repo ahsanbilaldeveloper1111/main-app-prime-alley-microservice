@@ -65,7 +65,6 @@ import {
   Pie, 
   Cell, 
   ResponsiveContainer, 
-  Tooltip,
   BarChart,
   Bar,
   XAxis,
@@ -963,13 +962,13 @@ const StagesManagement = () => {
                             label={({ type, count }: any) => `${type}: ${count}`}
                             outerRadius={80}
                             fill="#8884d8"
+                            
                             dataKey="count"
                           >
                             {analyticsData.stagesByType.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={entry.fill} />
                             ))}
                           </Pie>
-                          <Tooltip />
                         </PieChart>
                       </ResponsiveContainer>
                     </Card.Body>

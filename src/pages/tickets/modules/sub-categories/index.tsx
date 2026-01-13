@@ -275,8 +275,8 @@ const ModuleSubCategories = () => {
       sortable: true,
       cell: (props: any) => {
         return (
-          <span className="px-3 py-2 badge bg-light" 
-          style={{ fontWeight: '500', fontSize: '0.813rem', backgroundColor: `${props.submodule?.color}20`, color: props.submodule?.color, border: `1px solid ${props.submodule?.color}40` }}>
+          <span className="px-3 py-2 badge bg-outline-secondary text-secondary" 
+          style={{  fontSize: '0.813rem',  border: `1px solid ${props.submodule?.color}40` }}>
             {props.submodule?.name || 'Unknown'}
           </span>
         );

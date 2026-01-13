@@ -417,7 +417,7 @@ export const AddAssigneeComment = async (ticketId: string, content: string, user
     if(response.data){
       const responseData = response.data;
       if(responseData.code == 200){
-        toast.success('Assignee comment added successfully');
+        toast.success('Comment added successfully');
         return true;
       }else{
         toast.error(responseData.message);

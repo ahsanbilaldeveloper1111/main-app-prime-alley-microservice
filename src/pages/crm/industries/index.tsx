@@ -779,6 +779,7 @@ const IndustriesPage = () => {
                       }
                       placeholder="Enter SKU"
                       required
+                      disabled={!!editingProduct}
                     />
                   </Form.Group>
                 </Col>

@@ -69,44 +69,7 @@ const FormModal: React.FC<FormModalProps> = ({
 
 
   return (
-    // <div id="form-modal" className="modal customModal" style={{display: 'flex'}}>
-    //   <div className="modal-content">
-    //     <span className="close-btn" id="form-close-btn" onClick={handleClose}>
-    //       <i className="fas fa-times"></i>
-    //     </span>
-        
-    //     <h2 id="form-modal-title">{title}</h2>
-        
-    //     <p id="form-modal-text">
-    //       {desc}
-    //     </p>
-
-    //     <div className="form-content">
-    //       {formHtml}
-    //     </div>
-        
-    //     <div className="modal-footer">
-    //       <button 
-    //         className={`btn btn-${cancelButtonVariant}`} 
-    //         id="form-cancel-btn" 
-    //         style={{display: 'inline-block'}}
-    //         onClick={handleCancel}
-    //       >
-    //         {cancelButtonText}
-    //       </button>
-    //       {ShowSubmitButton && (
-    //         <button 
-    //         className={`btn btn-${submitButtonVariant}`} 
-    //         id="form-submit-btn" 
-    //         onClick={handleSubmit}
-    //         disabled={isSubmitting}
-    //       >
-    //         {isSubmitting ? 'Submitting...' : submitButtonText}
-    //       </button>
-    //       )}
-    //     </div>
-    //   </div>
-    // </div>
+    
     <Modal 
       show={show} 
       onHide={onHide} 
