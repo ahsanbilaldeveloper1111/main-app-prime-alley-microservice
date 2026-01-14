@@ -41,6 +41,7 @@ import {
   Grid3x3,
   Bell
 } from 'lucide-react';
+import CreateTaskModal from '@components/work-planner/createtask-modal';
 
 interface Task {
   id: string;
@@ -59,197 +60,196 @@ interface Task {
 
 const TasksList = () => {
 
-    const [tasks, setTasks] = useState<Task[]>([
-        {
-          id: '#1023',
-          title: 'Fix login issue',
-          status: 'In Progress',
-          priority: 'High',
-          project: 'Website Redesign',
-          assignee: 'John D.',
-          assigneeInitials: 'JD',
-          dueDate: 'Apr 25, 2024',
-          assignees: [
-            { name: 'John D.', initials: 'JD' },
-            { name: 'Sarah K.', initials: 'SK' }
-          ],
-          description: 'Fix authentication issues on login page',
-          comments: 3
-        },
-        {
-          id: '#0987',
-          title: 'Prepare Sales Report',
-          status: 'To Do',
-          priority: 'Medium',
-          project: 'Sales Update',
-          assignee: 'Me',
-          assigneeInitials: 'ME',
-          dueDate: 'Apr 24, 2024'
-        },
-        {
-          id: '#1154',
-          title: 'Customer Onboarding',
-          status: 'In Review',
-          priority: 'High',
-          project: 'Client Portal',
-          assignee: 'Alicia P.',
-          assigneeInitials: 'AP',
-          dueDate: 'Apr 23, 2024'
-        },
-        {
-          id: '#0876',
-          title: 'Server Backup Setup',
-          status: 'Overdue',
-          priority: 'High',
-          project: 'IT Infrastructure',
-          assignee: 'Mike W.',
-          assigneeInitials: 'MW',
-          dueDate: 'Apr 20, 2024'
-        },
-        {
-          id: '#1090',
-          title: 'Update User Guide',
-          status: 'In Progress',
-          priority: 'Low',
-          project: 'Product Launch',
-          assignee: 'Sarah K.',
-          assigneeInitials: 'SK',
-          dueDate: 'Apr 27, 2024'
-        },
-        {
-          id: '#0945',
-          title: 'Schedule Team Meeting',
-          status: 'To Do',
-          priority: 'Medium',
-          project: 'Marketing Campaign',
-          assignee: 'Me',
-          assigneeInitials: 'ME',
-          dueDate: 'Apr 24, 2024'
-        },
-        {
-          id: '#1121',
-          title: 'Bug Fix for Mobile App',
-          status: 'In Progress',
-          priority: 'High',
-          project: 'Mobile App Dev',
-          assignee: 'Jason T.',
-          assigneeInitials: 'JT',
-          dueDate: 'Apr 21, 2024'
-        },
-        {
-          id: '#0843',
-          title: 'Review Support Tickets',
-          status: 'To Do',
-          priority: 'Low',
-          project: 'Customer Support',
-          assignee: 'Emily R.',
-          assigneeInitials: 'ER',
-          dueDate: 'Apr 23, 2024'
-        }
-      ]);
+  const [tasks, setTasks] = useState<Task[]>([
+    {
+      id: '#1023',
+      title: 'Fix login issue',
+      status: 'In Progress',
+      priority: 'High',
+      project: 'Website Redesign',
+      assignee: 'John D.',
+      assigneeInitials: 'JD',
+      dueDate: 'Apr 25, 2024',
+      assignees: [
+        { name: 'John D.', initials: 'JD' },
+        { name: 'Sarah K.', initials: 'SK' }
+      ],
+      description: 'Fix authentication issues on login page',
+      comments: 3
+    },
+    {
+      id: '#0987',
+      title: 'Prepare Sales Report',
+      status: 'To Do',
+      priority: 'Medium',
+      project: 'Sales Update',
+      assignee: 'Me',
+      assigneeInitials: 'ME',
+      dueDate: 'Apr 24, 2024'
+    },
+    {
+      id: '#1154',
+      title: 'Customer Onboarding',
+      status: 'In Review',
+      priority: 'High',
+      project: 'Client Portal',
+      assignee: 'Alicia P.',
+      assigneeInitials: 'AP',
+      dueDate: 'Apr 23, 2024'
+    },
+    {
+      id: '#0876',
+      title: 'Server Backup Setup',
+      status: 'Overdue',
+      priority: 'High',
+      project: 'IT Infrastructure',
+      assignee: 'Mike W.',
+      assigneeInitials: 'MW',
+      dueDate: 'Apr 20, 2024'
+    },
+    {
+      id: '#1090',
+      title: 'Update User Guide',
+      status: 'In Progress',
+      priority: 'Low',
+      project: 'Product Launch',
+      assignee: 'Sarah K.',
+      assigneeInitials: 'SK',
+      dueDate: 'Apr 27, 2024'
+    },
+    {
+      id: '#0945',
+      title: 'Schedule Team Meeting',
+      status: 'To Do',
+      priority: 'Medium',
+      project: 'Marketing Campaign',
+      assignee: 'Me',
+      assigneeInitials: 'ME',
+      dueDate: 'Apr 24, 2024'
+    },
+    {
+      id: '#1121',
+      title: 'Bug Fix for Mobile App',
+      status: 'In Progress',
+      priority: 'High',
+      project: 'Mobile App Dev',
+      assignee: 'Jason T.',
+      assigneeInitials: 'JT',
+      dueDate: 'Apr 21, 2024'
+    },
+    {
+      id: '#0843',
+      title: 'Review Support Tickets',
+      status: 'To Do',
+      priority: 'Low',
+      project: 'Customer Support',
+      assignee: 'Emily R.',
+      assigneeInitials: 'ER',
+      dueDate: 'Apr 23, 2024'
+    }
+  ]);
+
+  const [selectedTask, setSelectedTask] = useState<Task | null>(tasks[0]);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [showCreateTask, setShowCreateTask] = useState(false);
+  const [activeTab, setActiveTab] = useState('My Work');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterProject, setFilterProject] = useState('All Projects');
+  const [filterAssignee, setFilterAssignee] = useState('All Assignees');
+  const [filterStatus, setFilterStatus] = useState('All Status');
+  const [filterPriority, setFilterPriority] = useState('All Priority');
+  const [filterDueDate, setFilterDueDate] = useState('All Dates');
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+
+  const stats = {
+    openTasks: 128,
+    overdue: 12,
+    dueThisWeek: 34,
+    unassigned: 9,
+    highPriority: 17
+  };
+
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case 'To Do': return 'info';
+      case 'In Progress': return 'warning';
+      case 'In Review': return 'secondary';
+      case 'Overdue': return 'danger';
+      default: return 'primary';
+    }
+  };
+
+  const getPriorityVariant = (priority: string) => {
+    switch (priority) {
+      case 'High': return 'danger';
+      case 'Medium': return 'warning';
+      case 'Low': return 'success';
+      default: return 'secondary';
+    }
+  };
+
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setShowTaskDetail(true);
+  };
+
+  const handleSelectTask = (taskId: string) => {
+    const newSelected = new Set(selectedTasks);
+    if (newSelected.has(taskId)) {
+      newSelected.delete(taskId);
+    } else {
+      newSelected.add(taskId);
+    }
+    setSelectedTasks(newSelected);
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedTasks(new Set(filteredTasks.map(t => t.id)));
+    } else {
+      setSelectedTasks(new Set());
+    }
+  };
+
+  const clearFilters = () => {
+    setFilterProject('All Projects');
+    setFilterAssignee('All Assignees');
+    setFilterStatus('All Status');
+    setFilterPriority('All Priority');
+    setFilterDueDate('All Dates');
+    setSearchTerm('');
+  };
+
+  const filteredTasks = tasks.filter(task => {
+    const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         task.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesProject = filterProject === 'All Projects' || task.project === filterProject;
+    const matchesAssignee = filterAssignee === 'All Assignees' || task.assignee === filterAssignee;
+    const matchesStatus = filterStatus === 'All Status' || task.status === filterStatus;
+    const matchesPriority = filterPriority === 'All Priority' || task.priority === filterPriority;
     
-      const [selectedTask, setSelectedTask] = useState<Task | null>(tasks[0]);
-      const [showTaskDetail, setShowTaskDetail] = useState(false);
-      const [activeTab, setActiveTab] = useState('My Work');
-      const [searchTerm, setSearchTerm] = useState('');
-      const [filterProject, setFilterProject] = useState('All Projects');
-      const [filterAssignee, setFilterAssignee] = useState('All Assignees');
-      const [filterStatus, setFilterStatus] = useState('All Status');
-      const [filterPriority, setFilterPriority] = useState('All Priority');
-      const [filterDueDate, setFilterDueDate] = useState('All Dates');
-      const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
-    
-      const stats = {
-        openTasks: 128,
-        overdue: 12,
-        dueThisWeek: 34,
-        unassigned: 9,
-        highPriority: 17
-      };
-    
-      const getStatusVariant = (status: string) => {
-        switch (status) {
-          case 'To Do': return 'info';
-          case 'In Progress': return 'warning';
-          case 'In Review': return 'secondary';
-          case 'Overdue': return 'danger';
-          default: return 'primary';
-        }
-      };
-    
-      const getPriorityVariant = (priority: string) => {
-        switch (priority) {
-          case 'High': return 'danger';
-          case 'Medium': return 'warning';
-          case 'Low': return 'success';
-          default: return 'secondary';
-        }
-      };
-    
-      const handleTaskClick = (task: Task) => {
-        setSelectedTask(task);
-        setShowTaskDetail(true);
-      };
-    
-      const handleSelectTask = (taskId: string) => {
-        const newSelected = new Set(selectedTasks);
-        if (newSelected.has(taskId)) {
-          newSelected.delete(taskId);
-        } else {
-          newSelected.add(taskId);
-        }
-        setSelectedTasks(newSelected);
-      };
-    
-      const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.checked) {
-          setSelectedTasks(new Set(filteredTasks.map(t => t.id)));
-        } else {
-          setSelectedTasks(new Set());
-        }
-      };
-    
-      const clearFilters = () => {
-        setFilterProject('All Projects');
-        setFilterAssignee('All Assignees');
-        setFilterStatus('All Status');
-        setFilterPriority('All Priority');
-        setFilterDueDate('All Dates');
-        setSearchTerm('');
-      };
-    
-      const filteredTasks = tasks.filter(task => {
-        const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             task.id.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesProject = filterProject === 'All Projects' || task.project === filterProject;
-        const matchesAssignee = filterAssignee === 'All Assignees' || task.assignee === filterAssignee;
-        const matchesStatus = filterStatus === 'All Status' || task.status === filterStatus;
-        const matchesPriority = filterPriority === 'All Priority' || task.priority === filterPriority;
-        
-        return matchesSearch && matchesProject && matchesAssignee && matchesStatus && matchesPriority;
-      });
-    
-      const projects = ['All Projects', ...Array.from(new Set(tasks.map(t => t.project)))];
-      const assignees = ['All Assignees', ...Array.from(new Set(tasks.map(t => t.assignee)))];
-      const statuses = ['All Status', 'To Do', 'In Progress', 'In Review', 'Overdue'];
-      const priorities = ['All Priority', 'Low', 'Medium', 'High'];
-    
+    return matchesSearch && matchesProject && matchesAssignee && matchesStatus && matchesPriority;
+  });
+
+  const projects = ['All Projects', ...Array.from(new Set(tasks.map(t => t.project)))];
+  const assignees = ['All Assignees', ...Array.from(new Set(tasks.map(t => t.assignee)))];
+  const statuses = ['All Status', 'To Do', 'In Progress', 'In Review', 'Overdue'];
+  const priorities = ['All Priority', 'Low', 'Medium', 'High'];
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
 
-
+      <>
       <style>{`
-      .table-responsive .table th:last-child, .table-responsive .table td:last-child {
-          min-width: initial !important;
+       
+        
+        .header-section {
+          background-color: white;
+          padding: 1.5rem 0;
+          margin-bottom: 2rem;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
-        .table-responsive .table th:first-child, .table-responsive .table td:first-child {
-          min-width: initial !important;
-          max-width: initial !important;
-        }
-        
-        
-        
         
         .stat-card {
           border: none;
@@ -333,60 +333,6 @@ const TasksList = () => {
           font-size: 0.875rem;
           opacity: 0.8;
           margin: 0;
-        }
-        
-        .filters-section {
-          background-color: white;
-          padding: 1.5rem;
-          border-radius: 12px;
-          margin-bottom: 1.5rem;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-        
-        .search-input {
-          border-radius: 8px;
-          border: 1px solid #e2e8f0;
-          padding: 0.625rem 1rem 0.625rem 2.5rem;
-        }
-        
-        .search-icon {
-          position: absolute;
-          left: 0.75rem;
-          top: 50%;
-          transform: translateY(-50%);
-          color: #94a3b8;
-        }
-        
-        .filter-dropdown .dropdown-toggle {
-          border: 1px solid #e2e8f0;
-          border-radius: 8px;
-          background-color: white;
-          color: #334155;
-          padding: 0.625rem 1rem;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          width: 100%;
-        }
-        
-        .clear-filters-btn {
-          color: #3b82f6;
-          background: #eff6ff;
-          border: 1px solid #bfdbfe;
-          border-radius: 8px;
-          font-size: 0.875rem;
-          cursor: pointer;
-          padding: 0.625rem 1rem;
-          font-weight: 500;
-          transition: all 0.2s;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-        
-        .clear-filters-btn:hover {
-          background: #dbeafe;
-          border-color: #93c5fd;
         }
         
         .tabs-section {
@@ -594,14 +540,20 @@ const TasksList = () => {
             font-size: 0.875rem;
           }
         }
+           .table-responsive .table th:last-child, .table-responsive .table td:last-child {
+          min-width: initial !important;
+        }
+        .table-responsive .table th:first-child, .table-responsive .table td:first-child {
+          min-width: initial !important;
+          max-width: initial !important;
+        }
       `}</style>
 
-    
+     
 
       <div className="task-dashboard">
         <div className="header-section">
-          <Card >
-            <Card.Body>
+          <Container fluid>
             <Row className="align-items-center mb-4">
               <Col>
                 <div className="d-flex align-items-center">
@@ -611,7 +563,11 @@ const TasksList = () => {
               </Col>
               <Col xs="auto">
                 <div className="d-flex gap-2">
-                  <Button variant="primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Button 
+                    variant="primary" 
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    onClick={() => setShowCreateTask(true)}
+                  >
                     <Plus size={18} />
                     <span>Create Task</span>
                   </Button>
@@ -691,120 +647,185 @@ const TasksList = () => {
                 </Card>
               </Col>
             </Row>
-            </Card.Body>
-          </Card>
+          </Container>
         </div>
 
-       
-          <div className="filters-section">
-            <Row className="align-items-center g-2 gx-2">
-              <Col lg={3} md={12}>
-                <InputGroup>
-                  <span className="search-icon">
-                    <Search size={18} />
-                  </span>
-                  <Form.Control
-                    type="text"
-                    placeholder="Search tasks"
-                    className="search-input"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </InputGroup>
-              </Col>
-              <Col lg={2} md={4} sm={6}>
-                <Dropdown className="filter-dropdown w-100">
-                  <Dropdown.Toggle variant="outline-secondary">
-                    <span className="me-auto">Project</span>
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    {projects.map(project => (
-                      <Dropdown.Item 
-                        key={project}
-                        active={filterProject === project}
-                        onClick={() => setFilterProject(project)}
-                      >
-                        {project}
-                      </Dropdown.Item>
-                    ))}
-                  </Dropdown.Menu>
-                </Dropdown>
-              </Col>
-              <Col lg={1} md={4} sm={6}>
-                <Dropdown className="filter-dropdown w-100">
-                  <Dropdown.Toggle variant="outline-secondary">
-                    <span className="me-auto">Assignee</span>
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    {assignees.map(assignee => (
-                      <Dropdown.Item 
-                        key={assignee}
-                        active={filterAssignee === assignee}
-                        onClick={() => setFilterAssignee(assignee)}
-                      >
-                        {assignee}
-                      </Dropdown.Item>
-                    ))}
-                  </Dropdown.Menu>
-                </Dropdown>
-              </Col>
-              <Col lg={1} md={4} sm={6}>
-                <Dropdown className="filter-dropdown w-100">
-                  <Dropdown.Toggle variant="outline-secondary">
-                    <span className="me-auto">Status</span>
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    {statuses.map(status => (
-                      <Dropdown.Item 
-                        key={status}
-                        active={filterStatus === status}
-                        onClick={() => setFilterStatus(status)}
-                      >
-                        {status}
-                      </Dropdown.Item>
-                    ))}
-                  </Dropdown.Menu>
-                </Dropdown>
-              </Col>
-              <Col lg={1} md={4} sm={6}>
-                <Dropdown className="filter-dropdown w-100">
-                  <Dropdown.Toggle variant="outline-secondary">
-                    <span className="me-auto">Priority</span>
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    {priorities.map(priority => (
-                      <Dropdown.Item 
-                        key={priority}
-                        active={filterPriority === priority}
-                        onClick={() => setFilterPriority(priority)}
-                      >
-                        {priority}
-                      </Dropdown.Item>
-                    ))}
-                  </Dropdown.Menu>
-                </Dropdown>
-              </Col>
-              <Col lg={2} md={4} sm={6}>
-                <Dropdown className="filter-dropdown w-100">
-                  <Dropdown.Toggle variant="outline-secondary">
-                    <span className="me-auto">Due: {filterDueDate}</span>
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu>
-                    <Dropdown.Item onClick={() => setFilterDueDate('All Dates')}>All Dates</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setFilterDueDate('Today')}>Today</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setFilterDueDate('This Week')}>This Week</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setFilterDueDate('This Month')}>This Month</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setFilterDueDate('Overdue')}>Overdue</Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
-              </Col>
-              <Col lg={2} md={12}>
-                <button className="clear-filters-btn w-100" onClick={clearFilters}>
-                  <X size={16} />
-                  <span>Clear Filters</span>
-                </button>
-              </Col>
-            </Row>
+        <Container fluid>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '1.5rem',
+            borderRadius: '12px',
+            marginBottom: '1.5rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+          }}>
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap' as const,
+              gap: '1rem'
+            }}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '1 1 150px' }}>
+                <Search size={16} color="#6B7280" style={{ position: 'absolute', left: '0.75rem', pointerEvents: 'none' }} />
+                <input
+                  type="text"
+                  placeholder="Search tasks..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    paddingLeft: '2.5rem',
+                    border: '1px solid #E5E9F2',
+                    borderRadius: '6px',
+                    fontSize: '0.9rem',
+                    outline: 'none',
+                    fontFamily: 'inherit'
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#4680FF'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#E5E9F2'}
+                />
+              </div>
+
+              <select
+                value={filterProject}
+                onChange={(e) => setFilterProject(e.target.value)}
+                style={{
+                  flex: '1 1 130px',
+                  padding: '0.75rem',
+                  border: '1px solid #E5E9F2',
+                  borderRadius: '6px',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  backgroundColor: 'white'
+                }}
+              >
+                <option value="">Project</option>
+                {projects.map(project => (
+                  <option key={project} value={project}>
+                    {project}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filterAssignee}
+                onChange={(e) => setFilterAssignee(e.target.value)}
+                style={{
+                  flex: '1 1 130px',
+                  padding: '0.75rem',
+                  border: '1px solid #E5E9F2',
+                  borderRadius: '6px',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  backgroundColor: 'white'
+                }}
+              >
+                <option value="">Assignee</option>
+                {assignees.map(assignee => (
+                  <option key={assignee} value={assignee}>
+                    {assignee}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                style={{
+                  flex: '1 1 120px',
+                  padding: '0.75rem',
+                  border: '1px solid #E5E9F2',
+                  borderRadius: '6px',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  backgroundColor: 'white'
+                }}
+              >
+                <option value="">Status</option>
+                {statuses.map(status => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filterPriority}
+                onChange={(e) => setFilterPriority(e.target.value)}
+                style={{
+                  flex: '1 1 120px',
+                  padding: '0.75rem',
+                  border: '1px solid #E5E9F2',
+                  borderRadius: '6px',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  backgroundColor: 'white'
+                }}
+              >
+                <option value="">Priority</option>
+                {priorities.map(priority => (
+                  <option key={priority} value={priority}>
+                    {priority}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filterDueDate}
+                onChange={(e) => setFilterDueDate(e.target.value)}
+                style={{
+                  flex: '1 1 140px',
+                  padding: '0.75rem',
+                  border: '1px solid #E5E9F2',
+                  borderRadius: '6px',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  backgroundColor: 'white'
+                }}
+              >
+                <option value="All Dates">Due: All Dates</option>
+                <option value="Today">Today</option>
+                <option value="This Week">This Week</option>
+                <option value="This Month">This Month</option>
+                <option value="Overdue">Overdue</option>
+              </select>
+
+              <button
+                onClick={clearFilters}
+                style={{
+                  flex: '0 1 auto',
+                  padding: '0.625rem 1rem',
+                  backgroundColor: 'white',
+                  color: '#4680FF',
+                  border: '1px solid #4680FF',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.2s',
+                  fontFamily: 'inherit',
+                  whiteSpace: 'nowrap' as const
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
+              >
+                Clear Filters
+                <X size={16} />
+              </button>
+            </div>
           </div>
 
           <div className="tabs-section">
@@ -893,7 +914,7 @@ const TasksList = () => {
               </Table>
             </div>
           </div>
-       
+        </Container>
       </div>
 
       <Offcanvas 
@@ -1027,6 +1048,22 @@ const TasksList = () => {
           )}
         </Offcanvas.Body>
       </Offcanvas>
+
+      <CreateTaskModal
+        show={showCreateTask}
+        onHide={() => setShowCreateTask(false)}
+        onCreate={(data) => {
+          console.log('Task created:', data);
+          setShowCreateTask(false);
+          // TODO: Add task to tasks array
+        }}
+        onCreateAndOpen={(data) => {
+          console.log('Task created and opening:', data);
+          setShowCreateTask(false);
+          // TODO: Add task to tasks array and open detail panel
+        }}
+      />
+    </>
      
 
     </React.Fragment>

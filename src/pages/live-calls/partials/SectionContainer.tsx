@@ -85,8 +85,7 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
         onToggle()
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasContent, isCollapsed])
+  }, [hasContent, isCollapsed, onToggle])
 
   return (
     <div className="mb-4" data-section={sectionKey}>

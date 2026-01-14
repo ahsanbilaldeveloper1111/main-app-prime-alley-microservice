@@ -38,15 +38,25 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
     globalThis.location.href = 'tel:+97143035555';
   };
 
+  const handleWhatsApp = () => {
+    // Format phone number for WhatsApp (remove spaces and keep +)
+    const phoneNumber = '+97143035555';
+    // Pre-filled message
+    const message = encodeURIComponent('Hello, I need support assistance.');
+    // Open WhatsApp
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   const mainOptions = [
     {
       icon: MessageCircle,
       title: 'Live Chat',
       description: 'Chat with a live agent for immediate assistance.',
-      buttonText: 'Offline',
+      buttonText: 'Online',
       buttonAction: onStartChat,
-      color: '#7db9f5',
-      disabled: true
+      color: '#5babf6',
+      disabled: false
     },
     {
       icon: Phone,
@@ -264,6 +274,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                   </Button>
                   <Button
                     variant="outline-success"
+                    onClick={handleWhatsApp}
                     style={{
                       borderRadius: '6px',
                       padding: '8px 16px',
@@ -461,6 +472,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
                 </Button>
                 <Button
                   variant="outline-success"
+                  onClick={handleWhatsApp}
                   style={{
                     flex: 1,
                     borderRadius: '6px',
@@ -528,26 +540,7 @@ const ContactSupport: React.FC<ContactSupportProps> = ({
             </Card.Body>
           </Card>
 
-          {/* Still need help */}
-          <Button
-            style={{
-              background: '#4680ff',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '12px',
-              fontSize: '14px',
-              fontWeight: '500',
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
-            disabled={true}
-          >
-             Offline
-          </Button>
-          {/* Still need help? Start a chat */}
+        
         </Col>
       </Row>
     </div>

@@ -66,7 +66,7 @@ import { LineChart, Line,} from 'recharts';
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import { GlobalDateTimeFormat } from "@utils/Helper";
+import { GlobalDateTimeFormat,formatNumber ,convertDateTimeWithOffsetToLocal} from "@utils/Helper";
 
 // KPI Card Component
 interface KPICardData {
@@ -149,10 +149,10 @@ const CHART_COLORS = [
 ];
 
 // Helper function to format numbers with commas
-const formatNumber = (value: number | undefined | null): string => {
-  const num = value || 0;
-  return num.toLocaleString('en-US');
-};
+// const formatNumber = (value: number | undefined | null): string => {
+//   const num = value || 0;
+//   return num.toLocaleString('en-US');
+// };
 
 const CrmDashboard = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -873,10 +873,10 @@ const CrmDashboard = () => {
                 
                 <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 500, marginBottom: '12px', display: 'grid', gridTemplateColumns: '36px 1fr 120px 80px 140px', gap: '8px', paddingLeft: '4px' }}>
                   <span></span>
-                  <span>Lead Name</span>
-                  <span style={{ textAlign: 'right' }}>Campaign Name</span>
-                  <span style={{ textAlign: 'center' }}>Stage At</span>
-                  <span style={{ textAlign: 'right' }}>Created At</span>
+                  <span>Lead</span>
+                  <span style={{ textAlign: 'left' }}>Campaign Name</span>
+                  <span style={{ textAlign: 'right' }}>Stage At</span>
+                  {/* <span style={{ textAlign: 'right' }}>Created At</span> */}
                 </div>
 
                 <ListGroup variant="flush">
@@ -892,14 +892,11 @@ const CrmDashboard = () => {
                             {initials}
                           </div>
                           <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>{lead.name || '-'}</span>
-                          <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500, textAlign: 'right' }}>{campaignName}</span>
-                          <span style={{ fontSize: '13px', color: stageColor, fontWeight: 500, textAlign: 'center' }}>{stageName}</span>
-                          <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>
-                            {(() => {
-                              const formatted = moment.utc(lead.created_at).local().format('DD MMM YYYY,hh:mm:ss A');
-                              return formatted.replace(/(\d{2} )(\w{3})( \d{4})/, (match, day, month, year) => `${day}${month.toUpperCase()}${year}`);
-                            })()}
-                          </span>
+                          <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500, textAlign: 'left' }}>{campaignName}</span>
+                          <span style={{ fontSize: '13px', color: stageColor, fontWeight: 500, textAlign: 'right' }}>{stageName}</span>
+                          {/* <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>
+                            {convertDateTimeWithOffsetToLocal(lead.created_at,undefined,'DD MMM YYYY,hh:mm:ss A')}
+                          </span> */}
                         </div>
                       </ListGroup.Item>
                     );

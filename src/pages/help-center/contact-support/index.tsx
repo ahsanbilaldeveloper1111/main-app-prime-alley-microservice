@@ -13,7 +13,10 @@ const ContactSupportPage = () => {
   };
 
   const handleStartChat = () => {
-    console.log('Start chat clicked');
+    // Dispatch custom event to open chatbot
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('open-chatbot'));
+    }
   };
 
   const handleRequestCall = () => {

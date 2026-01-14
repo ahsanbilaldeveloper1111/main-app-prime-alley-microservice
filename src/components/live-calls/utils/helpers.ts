@@ -364,6 +364,8 @@ export const getLocalStorageCallStatesInfo = () => {
 
 /**
  * Calculate longest call duration
+ * Note: Calls are limited to 1 hour. After 1 hour, calls automatically end and need to be re-called.
+ * This function caps ongoing calls at 1 hour and uses endTime if available.
  */
 export const calculateLongestCallDuration = (callStateMap: Record<string, any>): string => {
   const allCalls = Object.values(callStateMap || {}).filter((call: any) => 
@@ -379,20 +381,61 @@ export const calculateLongestCallDuration = (callStateMap: Record<string, any>):
   
   if (allCalls.length === 0) return '--:--'
   
+  const ONE_HOUR_IN_SECONDS = 3600 // 1 hour limit
+  
   const callsWithDuration = allCalls.map((call: any) => {
-    // Use the same logic as call timers: prioritize parties[0].startTime
+    // DEBUG: Log call details to identify 52-hour issue
+    const debugInfo: any = {
+      callId: call.callId,
+      isTerminating: call.isTerminating,
+      hasActiveParticipants: call.hasActiveParticipants,
+      partiesCount: call.parties?.length || 0,
+      parties: call.parties?.map((p: any) => ({
+        callStatus: p.callStatus,
+        startTime: p.startTime,
+        endTime: p.endTime
+      })) || []
+    }
     let startTime: Date | null = null
+    let endTime: Date | null = null
     
+    // FIRST: Check for endTime (call has ended) - this is the priority
+    // Priority 1: Check endTime in parties first
+    if (call.parties && call.parties.length > 0) {
+      const firstParty = call.parties[0]
+      if (firstParty.endTime) {
+        try {
+          const parsedMoment = moment.utc(firstParty.endTime)
+          if (parsedMoment.isValid()) {
+            endTime = parsedMoment.toDate()
+          }
+        } catch (e) {
+          endTime = new Date(firstParty.endTime)
+        }
+      }
+    }
+    
+    // Priority 2: Check call.endTime if not found in parties
+    if (!endTime && call.endTime) {
+      try {
+        const parsedMoment = moment.utc(call.endTime)
+        if (parsedMoment.isValid()) {
+          endTime = parsedMoment.toDate()
+        }
+      } catch (e) {
+        endTime = new Date(call.endTime)
+      }
+    }
+    
+    // SECOND: Get startTime (needed for both ended and ongoing calls)
     // Priority 1: Use startTime from the first party (most accurate)
     if (call.parties && call.parties.length > 0 && call.parties[0].startTime) {
       try {
-        // Parse as UTC (API typically sends UTC timestamps)
         const parsedMoment = moment.utc(call.parties[0].startTime)
         if (parsedMoment.isValid()) {
           startTime = parsedMoment.toDate()
         }
       } catch (e) {
-        // Fallback to direct Date parsing
         startTime = new Date(call.parties[0].startTime)
       }
     }
@@ -409,7 +452,7 @@ export const calculateLongestCallDuration = (callStateMap: Record<string, any>):
       }
     }
     
-    // Priority 3: Use eventTime as last resort
+    // Priority 3: Use eventTime as last resort for startTime
     if (!startTime && call.eventTime) {
       try {
         const parsedMoment = moment.utc(call.eventTime)
@@ -422,13 +465,59 @@ export const calculateLongestCallDuration = (callStateMap: Record<string, any>):
     }
     
     if (!startTime) {
+      debugInfo.error = 'No startTime found'
+      console.warn('[calculateLongestCallDuration] No startTime for call:', debugInfo)
       return { ...call, durationSeconds: 0 }
     }
     
-    const now = Date.now()
-    const startTimeMs = startTime.getTime()
-    const durationSeconds = Math.max(0, Math.floor((now - startTimeMs) / 1000))
-    return { ...call, durationSeconds }
+    // DEBUG: Add timing info
+    debugInfo.startTime = startTime.toISOString()
+    debugInfo.endTime = endTime ? endTime.toISOString() : null
+    debugInfo.startTimeSource = call.parties?.[0]?.startTime ? 'parties[0].startTime' : 
+                                 call.startTime ? 'call.startTime' : 
+                                 call.eventTime ? 'call.eventTime' : 'unknown'
+    debugInfo.endTimeSource = call.parties?.[0]?.endTime ? 'parties[0].endTime' : 
+                              call.endTime ? 'call.endTime' : null
+    
+    // Calculate duration
+    let durationSeconds: number
+    if (endTime) {
+      // Call has ended - use actual endTime (no cap needed, endTime is the actual end)
+      const startTimeMs = startTime.getTime()
+      const endTimeMs = endTime.getTime()
+      durationSeconds = Math.max(0, Math.floor((endTimeMs - startTimeMs) / 1000))
+      debugInfo.durationType = 'ended'
+      debugInfo.durationSeconds = durationSeconds
+      debugInfo.durationHours = (durationSeconds / 3600).toFixed(2)
+    } else {
+      // Ongoing call - calculate from startTime to now, but cap at 1 hour
+      const now = Date.now()
+      const startTimeMs = startTime.getTime()
+      const calculatedDuration = Math.max(0, Math.floor((now - startTimeMs) / 1000))
+      // Cap at 1 hour (calls automatically end after 1 hour)
+      durationSeconds = Math.min(calculatedDuration, ONE_HOUR_IN_SECONDS)
+      debugInfo.durationType = 'ongoing'
+      debugInfo.calculatedDurationSeconds = calculatedDuration
+      debugInfo.calculatedDurationHours = (calculatedDuration / 3600).toFixed(2)
+      debugInfo.cappedDurationSeconds = durationSeconds
+      
+      // WARNING: If calculated duration is > 1 hour, this indicates a problem
+      if (calculatedDuration > ONE_HOUR_IN_SECONDS) {
+        console.warn('[calculateLongestCallDuration] ⚠️ Call duration exceeds 1 hour limit:', {
+          ...debugInfo,
+          issue: 'Call appears to be ongoing for more than 1 hour. Possible causes:',
+          possibleCauses: [
+            '1. Stale startTime from old call that was not properly cleaned up',
+            '2. Missing endTime when call should have ended',
+            '3. Call not being removed from callStateMap when it ended',
+            '4. Timezone/date parsing issue causing incorrect startTime',
+            '5. eventTime fallback used instead of actual startTime'
+          ]
+        })
+      }
+    }
+    
+    return { ...call, durationSeconds, _debug: debugInfo }
   }).filter((call: any) => call.durationSeconds > 0)
   
   if (callsWithDuration.length === 0) return '--:--'
@@ -438,6 +527,16 @@ export const calculateLongestCallDuration = (callStateMap: Record<string, any>):
   }, callsWithDuration[0])
   
   if (longest.durationSeconds === 0) return '--:--'
+  
+  // DEBUG: Log the longest call details if it's suspiciously long
+  if (longest.durationSeconds > ONE_HOUR_IN_SECONDS) {
+    console.warn('[calculateLongestCallDuration] 🚨 Longest call exceeds 1 hour:', {
+      callId: longest.callId,
+      durationSeconds: longest.durationSeconds,
+      durationHours: (longest.durationSeconds / 3600).toFixed(2),
+      debug: longest._debug
+    })
+  }
   
   const hours = Math.floor(longest.durationSeconds / 3600)
   const minutes = Math.floor((longest.durationSeconds % 3600) / 60)
