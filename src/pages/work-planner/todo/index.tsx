@@ -1,16 +1,21 @@
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
+  useState,
+  useEffect,
+  useCallback
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-
-import  { useState } from 'react';
+import { listTasks, getTask, updateTask, deleteTask } from "@utils/tasks";
+import { useHierarchyData } from "@components/filters/useHierarchyData";
+import { ModuleSlug, formatDateForTable } from "@utils/Helper";
+import { Spinner } from "react-bootstrap";
+import CreateTaskModal from '@components/work-planner/createtask-modal';
+import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import { 
   Calendar, 
   Tag, 
@@ -48,6 +53,35 @@ interface Task {
   icon: React.ReactNode;
   completed: boolean;
   category: 'scheduled' | 'anytime' | 'overdue';
+  rawData?: any; // Store raw API data
+}
+
+interface ApiTodoTask {
+  id: number;
+  task_id: string;
+  title: string;
+  description?: string;
+  priority: string;
+  due_date?: string;
+  due_time?: string;
+  is_completed?: boolean;
+  status?: {
+    id: number;
+    name: string;
+    color?: string;
+  } | null;
+  labels?: Array<{
+    id: number;
+    name: string;
+    color: string;
+  }>;
+  assignees?: Array<{
+    extension_number: string;
+  }>;
+  project?: {
+    id: number;
+    name: string;
+  } | null;
 }
 
 interface LinkedRecord {
@@ -58,7 +92,6 @@ interface LinkedRecord {
   icon: React.ReactNode;
 }
 
-
 const DialTodo = () => {
     const [activeTab, setActiveTab] = useState<'today' | 'completed' | 'overdue' | 'upcoming'>('today');
     const [filterDate, setFilterDate] = useState('today');
@@ -66,86 +99,267 @@ const DialTodo = () => {
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [showAddTask, setShowAddTask] = useState(false);
     const [showConvertModal, setShowConvertModal] = useState(false);
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [pagination, setPagination] = useState({
+      page: 1,
+      limit: 20,
+      total: 0,
+      last_page: 1
+    });
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deletingTask, setDeletingTask] = useState(false);
+    const [editingTask, setEditingTask] = useState<any>(null);
+    const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
+    const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
+    
+    // Fetch extensions for assignees
+    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
   
-    // Dummy tasks data
-    const [tasks, setTasks] = useState<Task[]>([
-      {
-        id: '1',
-        time: '9:00',
-        title: 'Call with Ahmad',
-        label: 'Sales',
-        labelColor: '#28a745',
-        icon: <Phone size={16} />,
-        completed: false,
-        category: 'scheduled'
-      },
-      {
-        id: '2',
-        time: '11:00',
-        title: 'Review Support Ticket',
-        label: 'Support',
-        labelColor: '#007bff',
-        icon: <FileText size={16} />,
-        completed: false,
-        category: 'scheduled'
-      },
-      {
-        id: '3',
-        time: '2:00',
-        title: 'Follow up on Invoice #1023',
-        label: 'Finance',
-        labelColor: '#fd7e14',
-        icon: <CreditCard size={16} />,
-        completed: false,
-        category: 'scheduled'
-      },
-      {
-        id: '4',
-        title: 'Prepare Meeting Agenda',
-        label: 'General',
-        labelColor: '#6c757d',
-        icon: <FileText size={16} />,
-        completed: false,
-        category: 'anytime'
-      },
-      {
-        id: '5',
-        title: 'Pick up dry cleaning',
-        label: 'Meeting',
-        labelColor: '#17a2b8',
-        icon: <Calendar size={16} />,
-        completed: false,
-        category: 'anytime'
-      },
-      {
-        id: '6',
-        title: 'Research new software tools',
-        label: 'Work',
-        labelColor: '#28a745',
-        icon: <Briefcase size={16} />,
-        completed: false,
-        category: 'anytime'
-      },
-      {
-        id: '7',
-        title: 'Send report to client',
-        label: 'Report',
-        labelColor: '#dc3545',
-        icon: <Mail size={16} />,
-        completed: false,
-        category: 'overdue'
-      },
-      {
-        id: '8',
-        title: 'Buy office supplies',
-        label: 'Errands',
-        labelColor: '#dc3545',
-        icon: <CreditCard size={16} />,
-        completed: false,
-        category: 'overdue'
+    // Helper function to find extension name
+    const findExtensionName = (extensionNumber: string): string => {
+      if (!extensionNumber || !hierarchyDataExtensions) return extensionNumber || 'Unassigned';
+      const extension = (hierarchyDataExtensions as any[]).find(
+        (ext: any) => ext.id === extensionNumber || ext.extension_number === extensionNumber
+      );
+      return extension?.name || extensionNumber || 'Unassigned';
+    };
+
+    // Helper function to get label icon based on label name
+    const getLabelIcon = (labelName: string): React.ReactNode => {
+      const lowerName = labelName.toLowerCase();
+      if (lowerName.includes('sales') || lowerName.includes('call')) return <Phone size={16} />;
+      if (lowerName.includes('support') || lowerName.includes('ticket')) return <FileText size={16} />;
+      if (lowerName.includes('finance') || lowerName.includes('invoice')) return <CreditCard size={16} />;
+      if (lowerName.includes('meeting')) return <Users size={16} />;
+      if (lowerName.includes('work') || lowerName.includes('project')) return <Briefcase size={16} />;
+      if (lowerName.includes('email') || lowerName.includes('mail')) return <Mail size={16} />;
+      return <FileText size={16} />;
+    };
+
+    // Map API task to Todo Task format
+    const mapApiTaskToTodoTask = (apiTask: ApiTodoTask): Task => {
+      // Format time from due_time or due_date
+      const formatTime = () => {
+        if (apiTask.due_time) {
+          return apiTask.due_time;
+        }
+        if (apiTask.due_date) {
+          try {
+            const date = new Date(apiTask.due_date);
+            return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+          } catch {
+            return undefined;
+          }
+        }
+        return undefined;
+      };
+
+      // Determine category based on due_date and completion status
+      const getCategory = (): 'scheduled' | 'anytime' | 'overdue' => {
+        if (apiTask.is_completed) return 'scheduled'; // Completed tasks go to scheduled
+        
+        if (!apiTask.due_date) return 'anytime';
+        
+        try {
+          const dueDate = new Date(apiTask.due_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          dueDate.setHours(0, 0, 0, 0);
+          
+          if (dueDate.getTime() < today.getTime()) {
+            return 'overdue';
+          }
+          
+          if (dueDate.getTime() === today.getTime() || apiTask.due_time) {
+            return 'scheduled';
+          }
+          
+          return 'anytime';
+        } catch {
+          return 'anytime';
+        }
+      };
+
+      // Get first label or default
+      const firstLabel = apiTask.labels && apiTask.labels.length > 0 
+        ? apiTask.labels[0] 
+        : { name: 'General', color: '#6c757d' };
+
+      return {
+        id: apiTask.task_id || `#${apiTask.id}`,
+        time: formatTime(),
+        title: apiTask.title || '',
+        label: firstLabel.name,
+        labelColor: firstLabel.color || '#6c757d',
+        icon: getLabelIcon(firstLabel.name),
+        completed: apiTask.is_completed || false,
+        category: getCategory(),
+        rawData: apiTask
+      };
+    };
+
+    // Fetch todo tasks from API
+    const fetchTasks = useCallback(async () => {
+      try {
+        setLoading(true);
+        
+        const params: any = {
+          page: pagination.page,
+          limit: pagination.limit,
+          type: 'todo', // Key difference: type is 'todo'
+          search: searchTerm,
+          order: {
+            column: 'created_at',
+            dir: 'desc'
+          },
+          withRelations: [
+            'project',
+            'status',
+            'assignees',
+            'labels'
+          ]
+        };
+
+        // Add filters based on activeTab
+        if (activeTab === 'completed') {
+          params.is_completed = true;
+        } else if (activeTab === 'overdue') {
+          params.is_completed = false;
+          // Filter for overdue will be handled client-side based on due_date
+        }
+
+        const response = await listTasks(params);
+        
+        if (response && response.data) {
+          let mappedTasks = response.data.map(mapApiTaskToTodoTask);
+          
+          // Client-side filtering for overdue
+          if (activeTab === 'overdue') {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            mappedTasks = mappedTasks.filter((task: Task) => {
+              if (task.completed || !task.rawData?.due_date) return false;
+              try {
+                const dueDate = new Date(task.rawData.due_date);
+                dueDate.setHours(0, 0, 0, 0);
+                return dueDate.getTime() < today.getTime();
+              } catch {
+                return false;
+              }
+            });
+          }
+          
+          setTasks(mappedTasks);
+          
+          if (response.pagination) {
+            setPagination(prev => ({
+              page: response.pagination.page || 1,
+              limit: response.pagination.limit || 20,
+              total: response.pagination.total || 0,
+              last_page: response.pagination.last_page || 1
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching todo tasks:', error);
+      } finally {
+        setLoading(false);
       }
-    ]);
+    }, [pagination.page, pagination.limit, searchTerm, activeTab, hierarchyDataExtensions]);
+
+    // Fetch tasks when dependencies change
+    useEffect(() => {
+      if (!hierarchyLoading) {
+        fetchTasks();
+      }
+    }, [fetchTasks, hierarchyLoading]);
+
+    // Handle task toggle (complete/uncomplete)
+    const handleTaskToggle = async (taskId: string) => {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task?.rawData?.id) return;
+      
+      try {
+        const payload: any = {
+          is_completed: !task.completed
+        };
+        const result = await updateTask(task.rawData.id, payload);
+        if (result) {
+          fetchTasks();
+        }
+      } catch (error) {
+        console.error('Error toggling task:', error);
+      }
+    };
+
+    // Handle task click - fetch full details
+    const handleTaskClick = async (task: Task) => {
+      setSelectedTask(task);
+      
+      if (task.rawData?.id) {
+        try {
+          setLoadingTaskDetail(true);
+          const withRelations = ['project', 'status', 'assignees', 'labels'];
+          const taskData = await getTask(task.rawData.id, withRelations);
+          if (taskData) {
+            const updatedTask = mapApiTaskToTodoTask(taskData);
+            setSelectedTask(updatedTask);
+            // Update task in list
+            setTasks(prev => prev.map(t => 
+              t.id === task.id ? updatedTask : t
+            ));
+          }
+        } catch (error) {
+          console.error('Error fetching task details:', error);
+        } finally {
+          setLoadingTaskDetail(false);
+        }
+      }
+    };
+
+    // Handle delete task
+    const handleDeleteTask = async () => {
+      if (!selectedTask?.rawData?.id) return;
+      
+      try {
+        setDeletingTask(true);
+        const result = await deleteTask(selectedTask.rawData.id);
+        if (result) {
+          setShowDeleteModal(false);
+          setSelectedTask(null);
+          fetchTasks();
+        }
+      } catch (error) {
+        console.error('Error deleting task:', error);
+      } finally {
+        setDeletingTask(false);
+      }
+    };
+
+    // Handle create/update task
+    const handleCreateTask = async (formData: any) => {
+      try {
+        await fetchTasks();
+        setShowCreateTaskModal(false);
+        setEditingTask(null);
+      } catch (error) {
+        console.error('Error creating/updating task:', error);
+      }
+    };
+
+    // Handle edit task
+    const handleEditTask = () => {
+      if (!selectedTask?.rawData) return;
+      setEditingTask(selectedTask.rawData);
+      setSelectedTask(null);
+      setShowCreateTaskModal(true);
+    };
   
+    
+  
+    // Hardcoded linked records for fallback (when API doesn't provide linked_records)
     const linkedRecords: LinkedRecord[] = [
       {
         id: '1',
@@ -170,21 +384,11 @@ const DialTodo = () => {
       }
     ];
   
-    const handleTaskToggle = (taskId: string) => {
-      setTasks(tasks.map(task => 
-        task.id === taskId ? { ...task, completed: !task.completed } : task
-      ));
-    };
-  
-    const handleTaskClick = (task: Task) => {
-      setSelectedTask(task);
-    };
-  
     const getTaskCounts = () => {
       const today = tasks.filter(t => t.category === 'scheduled' || t.category === 'anytime').length;
       const completed = tasks.filter(t => t.completed).length;
-      const overdue = tasks.filter(t => t.category === 'overdue').length;
-      const upcoming = 7;
+      const overdue = tasks.filter(t => t.category === 'overdue' && !t.completed).length;
+      const upcoming = tasks.filter(t => !t.completed && t.category !== 'overdue').length;
       return { today, completed, overdue, upcoming };
     };
   
@@ -194,12 +398,13 @@ const DialTodo = () => {
       if (activeTab === 'completed') return task.completed;
       if (activeTab === 'overdue') return task.category === 'overdue' && !task.completed;
       if (activeTab === 'today') return task.category === 'scheduled' || task.category === 'anytime' || task.category === 'overdue';
+      if (activeTab === 'upcoming') return !task.completed && task.category !== 'overdue';
       return true;
     });
   
-    const scheduledTasks = filteredTasks.filter(t => t.category === 'scheduled');
-    const anytimeTasks = filteredTasks.filter(t => t.category === 'anytime');
-    const overdueTasks = filteredTasks.filter(t => t.category === 'overdue');
+    const scheduledTasks = filteredTasks.filter(t => t.category === 'scheduled' && !t.completed);
+    const anytimeTasks = filteredTasks.filter(t => t.category === 'anytime' && !t.completed);
+    const overdueTasks = filteredTasks.filter(t => t.category === 'overdue' && !t.completed);
   
 
   return (
@@ -222,7 +427,10 @@ const DialTodo = () => {
               flexWrap: 'wrap'
             }}>
               <button
-                onClick={() => setShowAddTask(true)}
+                onClick={() => {
+                  setEditingTask(null);
+                  setShowCreateTaskModal(true);
+                }}
                 style={{
                   backgroundColor: '#5b8fd8',
                   color: 'white',
@@ -469,7 +677,9 @@ const DialTodo = () => {
                 </div>
                 <input
                   type="text"
-                  placeholder="Add a new task and press Enter..."
+                  placeholder="Search tasks..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '10px 14px 10px 38px',
@@ -489,6 +699,13 @@ const DialTodo = () => {
                   }}
                 />
               </div>
+
+              {/* Loading State */}
+              {loading && (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <Spinner animation="border" />
+                </div>
+              )}
 
               {/* Scheduled Tasks */}
               {scheduledTasks.length > 0 && (
@@ -816,58 +1033,70 @@ const DialTodo = () => {
                   </div>
                 </div>
 
-              <p style={{ 
-                color: '#718096', 
-                fontSize: '13px',
-                marginBottom: '18px',
-                lineHeight: '1.5'
-              }}>
-                Discuss new leads and targets.
-              </p>
-
-              <div style={{ 
-                marginBottom: '18px',
-                padding: '14px',
-                backgroundColor: '#f8fafc',
-                borderRadius: '6px'
-              }}>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  marginBottom: '8px',
-                  fontSize: '13px'
-                }}>
-                  <span style={{ color: '#718096', fontWeight: '500' }}>Due Time:</span>
-                  <span style={{ fontWeight: '600', color: '#2d3748' }}>9:00 AM</span>
+              {loadingTaskDetail ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <Spinner animation="border" size="sm" />
                 </div>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  marginBottom: '8px',
-                  fontSize: '13px'
-                }}>
-                  <span style={{ color: '#718096', fontWeight: '500' }}>Reminder:</span>
-                  <span style={{ color: '#2d3748' }}>15 min before</span>
-                </div>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  fontSize: '13px'
-                }}>
-                  <span style={{ color: '#718096', fontWeight: '500' }}>Label:</span>
-                  <span style={{
-                    padding: '3px 10px',
-                    backgroundColor: '#d4edda',
-                    color: '#155724',
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontWeight: '600'
+              ) : (
+                <>
+                  <p style={{ 
+                    color: '#718096', 
+                    fontSize: '13px',
+                    marginBottom: '18px',
+                    lineHeight: '1.5'
                   }}>
-                    SALES
-                  </span>
-                </div>
-              </div>
+                    {selectedTask?.rawData?.description?.replace(/<[^>]*>/g, '') || 'No description'}
+                  </p>
+
+                  <div style={{ 
+                    marginBottom: '18px',
+                    padding: '14px',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '6px'
+                  }}>
+                    {selectedTask?.time && (
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        marginBottom: '8px',
+                        fontSize: '13px'
+                      }}>
+                        <span style={{ color: '#718096', fontWeight: '500' }}>Due Time:</span>
+                        <span style={{ fontWeight: '600', color: '#2d3748' }}>{selectedTask.time}</span>
+                      </div>
+                    )}
+                    {selectedTask?.rawData?.due_date && (
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        marginBottom: '8px',
+                        fontSize: '13px'
+                      }}>
+                        <span style={{ color: '#718096', fontWeight: '500' }}>Due Date:</span>
+                        <span style={{ fontWeight: '600', color: '#2d3748' }}>{formatDateForTable(selectedTask.rawData.due_date)}</span>
+                      </div>
+                    )}
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '13px'
+                    }}>
+                      <span style={{ color: '#718096', fontWeight: '500' }}>Label:</span>
+                      <span style={{
+                        padding: '3px 10px',
+                        backgroundColor: selectedTask?.labelColor || '#6c757d',
+                        color: 'white',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: '600'
+                      }}>
+                        {selectedTask?.label?.toUpperCase() || 'GENERAL'}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div style={{ 
                 marginTop: '20px',
@@ -886,7 +1115,72 @@ const DialTodo = () => {
                 }}>
                   <LinkIcon size={14} /> Linked Records
                 </h3>
-                {linkedRecords.map(record => (
+                {selectedTask?.rawData?.linked_records && selectedTask.rawData.linked_records.length > 0 ? (
+                  selectedTask.rawData.linked_records.map((record: any, idx: number) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '10px',
+                        backgroundColor: '#f8fafc',
+                        borderRadius: '6px',
+                        marginBottom: '6px',
+                        cursor: 'pointer',
+                        border: '1px solid #e8eef5',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#edf2f7';
+                        e.currentTarget.style.borderColor = '#cbd5e0';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#e8eef5';
+                      }}
+                    >
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        backgroundColor: '#4e6fa5',
+                        borderRadius: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white'
+                      }}>
+                        <LinkIcon size={18} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ 
+                          fontWeight: '600', 
+                          fontSize: '13px',
+                          color: '#2d3748'
+                        }}>
+                          {record.title || record.name || 'Linked Record'}
+                        </div>
+                        <div style={{ 
+                          fontSize: '11px', 
+                          color: '#718096'
+                        }}>
+                          {record.type || 'Record'}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ 
+                    padding: '10px',
+                    color: '#718096',
+                    fontSize: '13px',
+                    textAlign: 'center'
+                  }}>
+                    No linked records
+                  </div>
+                )}
+                {/* Fallback to hardcoded records if no API data */}
+                {(!selectedTask?.rawData?.linked_records || selectedTask.rawData.linked_records.length === 0) && linkedRecords.map(record => (
                   <div
                     key={record.id}
                     style={{
@@ -956,7 +1250,7 @@ const DialTodo = () => {
                 marginBottom: '8px'
               }}>
                 <button 
-                  onClick={() => setShowConvertModal(true)}
+                  onClick={handleEditTask}
                   style={{
                     padding: '10px',
                     backgroundColor: '#4e6fa5',
@@ -975,25 +1269,28 @@ const DialTodo = () => {
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#3d5a87'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4e6fa5'}
                 >
-                  Convert to Task
+                  <Pencil size={14} />
+                  Edit Task
                 </button>
-                <button style={{
-                  padding: '10px',
-                  backgroundColor: 'white',
-                  color: '#4a5568',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                <button 
+                  onClick={() => setShowConvertModal(true)}
+                  style={{
+                    padding: '10px',
+                    backgroundColor: 'white',
+                    color: '#4a5568',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                 >
                   <LinkIcon size={14} />
                   Link Record
@@ -1005,50 +1302,63 @@ const DialTodo = () => {
                 gridTemplateColumns: '1fr 1fr',
                 gap: '8px'
               }}>
-                <button style={{
-                  padding: '10px',
-                  backgroundColor: 'white',
-                  color: '#4a5568',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                <button 
+                  onClick={() => {
+                    if (selectedTask?.rawData) {
+                      setEditingTask({ ...selectedTask.rawData, title: `${selectedTask.rawData.title} (Copy)` });
+                      setShowCreateTaskModal(true);
+                    }
+                  }}
+                  style={{
+                    padding: '10px',
+                    backgroundColor: 'white',
+                    color: '#4a5568',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                 >
                   <Copy size={14} />
                   Duplicate
                 </button>
-                <button style={{
-                  padding: '10px',
-                  backgroundColor: 'white',
-                  color: '#e53e3e',
-                  border: '1px solid #feb2b2',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#fff5f5';
-                  e.currentTarget.style.borderColor = '#fc8181';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white';
-                  e.currentTarget.style.borderColor = '#feb2b2';
-                }}
+                <button 
+                  onClick={() => {
+                    if (selectedTask) {
+                      setShowDeleteModal(true);
+                    }
+                  }}
+                  style={{
+                    padding: '10px',
+                    backgroundColor: 'white',
+                    color: '#e53e3e',
+                    border: '1px solid #feb2b2',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#fff5f5';
+                    e.currentTarget.style.borderColor = '#fc8181';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white';
+                    e.currentTarget.style.borderColor = '#feb2b2';
+                  }}
                 >
                   <Trash2 size={14} />
                   Delete
@@ -1059,6 +1369,31 @@ const DialTodo = () => {
           </div>
         </div>
       </div>
+
+      {/* Create/Edit Task Modal */}
+      <CreateTaskModal
+        show={showCreateTaskModal}
+        onHide={() => {
+          setShowCreateTaskModal(false);
+          setEditingTask(null);
+        }}
+        onCreate={handleCreateTask}
+        onCreateAndOpen={handleCreateTask}
+        extensions={hierarchyDataExtensions as any}
+        task={editingTask}
+        isEdit={!!editingTask}
+        taskType="todo"
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteTask}
+        itemName={selectedTask ? `${selectedTask.id} ${selectedTask.title}` : undefined}
+        itemType="todo task"
+        loading={deletingTask}
+      />
 
       {/* Convert to Task Modal */}
       <ConvertToTaskModal

@@ -488,12 +488,21 @@ export const routePermissions: RoutePermission[] = [
         permissions: [PERMISSIONS.WORK_PLANNER_SERVICES],
         children: [
             { path: '/recurring-reminders',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
-            { path: '/dial-todo',permissions: [PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER]},
+            { path: '/todo',permissions: [PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER]},
             { path: '/tasks-list',permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER]},
             { path: '/projects',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
             { path: '/projects/dashboard',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
             { path: '/saved-views',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
             { path: '/roles-settings',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
+        ]
+    },
+    // management services start
+    {
+        path: '/staff-management',
+        permissions: [PERMISSIONS.STAFF_MANAGEMENT_SERVICES],
+        children: [
+            { path: '/employees',permissions: [PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT]},
+            { path: '/employees/dashboard',permissions: [PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT]},
         ]
     },
 

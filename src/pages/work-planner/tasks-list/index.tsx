@@ -1,6 +1,9 @@
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
+  useState,
+  useEffect,
+  useCallback
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -9,7 +12,10 @@ import GenericListPage from "@components/GenericListPage";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import  { useState } from 'react';
+import { listTasks, listProjects, getTask, updateTask, deleteTask } from "@utils/tasks";
+import { useHierarchyData } from "@components/filters/useHierarchyData";
+import { ModuleSlug } from "@utils/Helper";
+import { Spinner } from "react-bootstrap";
 import { 
   Container, 
   Row, 
@@ -39,15 +45,19 @@ import {
   Users,
   Star,
   Grid3x3,
-  Bell
+  Bell,
+  Edit,
+  Trash2
 } from 'lucide-react';
+import SelectBox from '@components/SelectBox';
 import CreateTaskModal from '@components/work-planner/createtask-modal';
+import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 
 interface Task {
   id: string;
   title: string;
-  status: 'To Do' | 'In Progress' | 'In Review' | 'Overdue';
-  priority: 'Low' | 'Medium' | 'High';
+  status: 'To Do' | 'In Progress' | 'In Review' | 'Overdue' | string;
+  priority: 'Low' | 'Medium' | 'High' | string;
   project: string;
   assignee: string;
   assigneeInitials: string;
@@ -55,119 +65,298 @@ interface Task {
   assignees?: Array<{ name: string; initials: string }>;
   description?: string;
   comments?: number;
+  rawData?: any; // Store raw API data for detail view
 }
 
+interface ApiTask {
+  id: number;
+  task_id: string;
+  title: string;
+  description?: string;
+  priority: string;
+  due_date?: string;
+  due_time?: string;
+  project?: {
+    id: number;
+    name: string;
+  } | null;
+  status?: {
+    id: number;
+    name: string;
+    color?: string;
+  } | null;
+  assignees?: Array<{
+    extension_number: string;
+  }>;
+  labels?: Array<any>;
+  comments?: Array<any>;
+  is_completed?: boolean;
+}
 
 const TasksList = () => {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    last_page: 1
+  });
+  const [summary, setSummary] = useState({
+    openTasks: 0,
+    overdue: 0,
+    dueThisWeek: 0,
+    unassigned: 0,
+    highPriority: 0
+  });
+  const [projects, setProjects] = useState<string[]>(['All Projects']);
+  const [allProjects, setAllProjects] = useState<Array<{ id: number; name: string }>>([]);
 
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: '#1023',
-      title: 'Fix login issue',
-      status: 'In Progress',
-      priority: 'High',
-      project: 'Website Redesign',
-      assignee: 'John D.',
-      assigneeInitials: 'JD',
-      dueDate: 'Apr 25, 2024',
-      assignees: [
-        { name: 'John D.', initials: 'JD' },
-        { name: 'Sarah K.', initials: 'SK' }
-      ],
-      description: 'Fix authentication issues on login page',
-      comments: 3
-    },
-    {
-      id: '#0987',
-      title: 'Prepare Sales Report',
-      status: 'To Do',
-      priority: 'Medium',
-      project: 'Sales Update',
-      assignee: 'Me',
-      assigneeInitials: 'ME',
-      dueDate: 'Apr 24, 2024'
-    },
-    {
-      id: '#1154',
-      title: 'Customer Onboarding',
-      status: 'In Review',
-      priority: 'High',
-      project: 'Client Portal',
-      assignee: 'Alicia P.',
-      assigneeInitials: 'AP',
-      dueDate: 'Apr 23, 2024'
-    },
-    {
-      id: '#0876',
-      title: 'Server Backup Setup',
-      status: 'Overdue',
-      priority: 'High',
-      project: 'IT Infrastructure',
-      assignee: 'Mike W.',
-      assigneeInitials: 'MW',
-      dueDate: 'Apr 20, 2024'
-    },
-    {
-      id: '#1090',
-      title: 'Update User Guide',
-      status: 'In Progress',
-      priority: 'Low',
-      project: 'Product Launch',
-      assignee: 'Sarah K.',
-      assigneeInitials: 'SK',
-      dueDate: 'Apr 27, 2024'
-    },
-    {
-      id: '#0945',
-      title: 'Schedule Team Meeting',
-      status: 'To Do',
-      priority: 'Medium',
-      project: 'Marketing Campaign',
-      assignee: 'Me',
-      assigneeInitials: 'ME',
-      dueDate: 'Apr 24, 2024'
-    },
-    {
-      id: '#1121',
-      title: 'Bug Fix for Mobile App',
-      status: 'In Progress',
-      priority: 'High',
-      project: 'Mobile App Dev',
-      assignee: 'Jason T.',
-      assigneeInitials: 'JT',
-      dueDate: 'Apr 21, 2024'
-    },
-    {
-      id: '#0843',
-      title: 'Review Support Tickets',
-      status: 'To Do',
-      priority: 'Low',
-      project: 'Customer Support',
-      assignee: 'Emily R.',
-      assigneeInitials: 'ER',
-      dueDate: 'Apr 23, 2024'
-    }
-  ]);
-
-  const [selectedTask, setSelectedTask] = useState<Task | null>(tasks[0]);
-  const [showTaskDetail, setShowTaskDetail] = useState(false);
-  const [showCreateTask, setShowCreateTask] = useState(false);
-  const [activeTab, setActiveTab] = useState('My Work');
+  // Filter state variables - declared early so they can be used in fetchTasks callback
   const [searchTerm, setSearchTerm] = useState('');
   const [filterProject, setFilterProject] = useState('All Projects');
   const [filterAssignee, setFilterAssignee] = useState('All Assignees');
   const [filterStatus, setFilterStatus] = useState('All Status');
   const [filterPriority, setFilterPriority] = useState('All Priority');
   const [filterDueDate, setFilterDueDate] = useState('All Dates');
-  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
 
-  const stats = {
-    openTasks: 128,
-    overdue: 12,
-    dueThisWeek: 34,
-    unassigned: 9,
-    highPriority: 17
+  // Fetch extensions for CreateTaskModal - MUST load first before other APIs
+  const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
+  
+  // Get assignees list from hierarchyDataExtensions
+  const assigneesList = hierarchyDataExtensions && Array.isArray(hierarchyDataExtensions)
+    ? (hierarchyDataExtensions as any[]).map((ext: any) => ({
+        id: ext.id || ext.extension_number || '',
+        name: ext.name || ext.id || ext.extension_number || 'Unknown'
+      }))
+    : [];
+  
+  // Create assignees array for dropdown (includes "All Assignees" option)
+  const assignees = ['All Assignees', ...assigneesList.map(ext => ext.name)];
+
+  // Map API task to UI Task
+  const mapApiTaskToTask = (apiTask: ApiTask): Task => {
+    const getStatusName = (status: any) => {
+      if (!status) return 'To Do';
+      return status.name || 'To Do';
+    };
+
+    const getPriorityName = (priority: string) => {
+      const priorityMap: Record<string, string> = {
+        'low': 'Low',
+        'normal': 'Medium',
+        'high': 'High'
+      };
+      return priorityMap[priority] || 'Medium';
+    };
+
+    const formatDate = (dateStr: string | null | undefined) => {
+      if (!dateStr) return '';
+      try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch {
+        return '';
+      }
+    };
+
+    const getAssigneeInfo = (assignees: any[]) => {
+      if (!assignees || assignees.length === 0) {
+        return { assignee: 'Unassigned', assigneeInitials: 'UN', assignees: [] };
+      }
+      
+      const firstAssignee = assignees[0];
+      const extensionNumber = firstAssignee.extension_number || '';
+      
+      // Find name from hierarchyDataExtensions
+      const findExtensionName = (extNumber: string): string => {
+        if (!extNumber || !hierarchyDataExtensions) return extNumber;
+        const extension = (hierarchyDataExtensions as any[]).find(
+          (ext: any) => ext.id === extNumber || ext.extension_number === extNumber
+        );
+        return extension?.name || extNumber;
+      };
+      
+      const assigneeName = findExtensionName(extensionNumber);
+      const initials = assigneeName !== extensionNumber 
+        ? assigneeName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+        : extensionNumber.substring(0, 2).toUpperCase() || 'UN';
+      
+      const assigneesList = assignees.map((a: any) => {
+        const extNum = a.extension_number || '';
+        const name = findExtensionName(extNum);
+        return {
+          name: name,
+          initials: name !== extNum
+            ? name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+            : (extNum || 'UN').substring(0, 2).toUpperCase()
+        };
+      });
+
+      return {
+        assignee: assigneeName || 'Unassigned',
+        assigneeInitials: initials,
+        assignees: assigneesList
+      };
+    };
+
+    const assigneeInfo = getAssigneeInfo(apiTask.assignees || []);
+
+    return {
+      id: apiTask.task_id || `#${apiTask.id}`,
+      title: apiTask.title || '',
+      status: getStatusName(apiTask.status),
+      priority: getPriorityName(apiTask.priority || 'normal'),
+      project: apiTask.project?.name || 'No Project',
+      assignee: assigneeInfo.assignee,
+      assigneeInitials: assigneeInfo.assigneeInitials,
+      dueDate: formatDate(apiTask.due_date),
+      assignees: assigneeInfo.assignees,
+      description: apiTask.description?.replace(/<[^>]*>/g, '') || '',
+      comments: apiTask.comments?.length || 0,
+      rawData: apiTask
+    };
   };
+
+  // Fetch tasks from API
+  const fetchTasks = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      const params: any = {
+        page: pagination.page,
+        limit: pagination.limit,
+        search: searchTerm,
+        order: {
+          column: 'created_at',
+          dir: 'desc'
+        },
+        withRelations: [
+          'project',
+          'status',
+          'assignees',
+          'labels',
+          'comments',
+          'parent',
+          'parent.status',
+          'parent.project',
+          'parent.assignees',
+          'parent.children',
+          'children',
+          'children.status',
+          'children.assignees'
+        ]
+      };
+
+      // Add filters
+      if (filterProject !== 'All Projects' && filterProject) {
+        // Find project ID from tasks or pass as string (will need project list API)
+        // For now, we'll filter client-side if project name is provided
+      }
+      
+      if (filterStatus !== 'All Status' && filterStatus) {
+        // Map status name to status_id if needed
+        // For now, filter client-side
+      }
+
+      if (filterPriority !== 'All Priority' && filterPriority) {
+        const priorityMap: Record<string, string> = {
+          'Low': 'low',
+          'Medium': 'normal',
+          'High': 'high'
+        };
+        params.priority = priorityMap[filterPriority] || filterPriority.toLowerCase();
+      }
+
+      const response = await listTasks(params);
+      
+      if (response && response.data) {
+        const mappedTasks = response.data.map(mapApiTaskToTask);
+        setTasks(mappedTasks);
+        
+        if (response.pagination) {
+          setPagination(prev => {
+            // Only update if values actually changed to prevent infinite loop
+            const newPagination = {
+              page: response.pagination.page || 1,
+              limit: response.pagination.limit || 20,
+              total: response.pagination.total || 0,
+              last_page: response.pagination.last_page || 1
+            };
+            // Only update if something actually changed
+            if (prev.page !== newPagination.page || 
+                prev.limit !== newPagination.limit || 
+                prev.total !== newPagination.total || 
+                prev.last_page !== newPagination.last_page) {
+              return newPagination;
+            }
+            return prev;
+          });
+        }
+        
+        if (response.summary) {
+          setSummary({
+            openTasks: response.summary.open || response.summary.total || 0,
+            overdue: response.summary.overdue || 0,
+            dueThisWeek: response.summary.dueThisWeek || 0,
+            unassigned: response.summary.unassigned || 0,
+            highPriority: response.summary.highPriority || 0
+          });
+        }
+
+        // Assignees are now from hierarchyDataExtensions, no need to extract from tasks
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.page, pagination.limit, searchTerm, filterProject, filterStatus, filterPriority]);
+
+  // Fetch projects list
+  // Wait for hierarchy data to load first, then fetch projects
+  useEffect(() => {
+    if (hierarchyLoading) return; // Wait for hierarchy data to load
+    
+    const fetchProjectsList = async () => {
+      try {
+        const response = await listProjects({ page: 1, limit: 100 });
+        if (response && response.success === true && response.data && Array.isArray(response.data)) {
+          const projectsList = response.data.map((project: any) => ({
+            id: project.id,
+            name: project.name
+          }));
+          setAllProjects(projectsList);
+          // Update projects filter dropdown
+          setProjects(['All Projects', ...projectsList.map((project: { id: number; name: string }) => project.name)]);
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+      }
+    };
+    fetchProjectsList();
+  }, [hierarchyLoading]);
+
+  // Wait for hierarchy data to load first, then fetch tasks
+  useEffect(() => {
+    if (hierarchyLoading) return; // Wait for hierarchy data to load
+    fetchTasks();
+  }, [fetchTasks, hierarchyLoading]);
+
+  // Update pagination when filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, [searchTerm, filterProject, filterStatus, filterPriority, filterAssignee, filterDueDate]);
+
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [showCreateTask, setShowCreateTask] = useState(false);
+  const [activeTab, setActiveTab] = useState('My Work');
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingTask, setDeletingTask] = useState(false);
+  const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
+  const [editingTask, setEditingTask] = useState<any>(null);
 
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -188,9 +377,67 @@ const TasksList = () => {
     }
   };
 
-  const handleTaskClick = (task: Task) => {
+  const handleTaskClick = async (task: Task) => {
     setSelectedTask(task);
     setShowTaskDetail(true);
+    
+    // Fetch full task data using getTask API with relations
+    if (task.rawData?.id) {
+      try {
+        setLoadingTaskDetail(true);
+        const withRelations = [
+          'parent',
+          'parent.status',
+          'parent.project',
+          'parent.assignees',
+          'parent.children',
+          'children',
+          'children.status',
+          'children.assignees'
+        ];
+        const taskData = await getTask(task.rawData.id, withRelations);
+        if (taskData) {
+          // Update selectedTask with full data
+          setSelectedTask({
+            ...task,
+            rawData: taskData
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching task details:', error);
+      } finally {
+        setLoadingTaskDetail(false);
+      }
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!selectedTask?.rawData?.id) return;
+    
+    try {
+      setDeletingTask(true);
+      const result = await deleteTask(selectedTask.rawData.id);
+      if (result) {
+        setShowDeleteModal(false);
+        setShowTaskDetail(false);
+        setSelectedTask(null);
+        // Refresh tasks list
+        fetchTasks();
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    } finally {
+      setDeletingTask(false);
+    }
+  };
+
+  const handleEditTask = () => {
+    if (!selectedTask?.rawData) return;
+    
+    // Set the task to edit and open the modal
+    setEditingTask(selectedTask.rawData);
+    setShowTaskDetail(false);
+    setShowCreateTask(true);
   };
 
   const handleSelectTask = (taskId: string) => {
@@ -228,13 +475,24 @@ const TasksList = () => {
     const matchesStatus = filterStatus === 'All Status' || task.status === filterStatus;
     const matchesPriority = filterPriority === 'All Priority' || task.priority === filterPriority;
     
-    return matchesSearch && matchesProject && matchesAssignee && matchesStatus && matchesPriority;
+    return matchesProject && matchesAssignee && matchesStatus && matchesPriority;
   });
 
-  const projects = ['All Projects', ...Array.from(new Set(tasks.map(t => t.project)))];
-  const assignees = ['All Assignees', ...Array.from(new Set(tasks.map(t => t.assignee)))];
   const statuses = ['All Status', 'To Do', 'In Progress', 'In Review', 'Overdue'];
   const priorities = ['All Priority', 'Low', 'Medium', 'High'];
+  
+  // Convert to SelectBox format (value should be the actual value, not the label)
+  const projectOptions = projects.map(project => ({ value: project, label: project }));
+  const assigneeOptions = assignees.map(assignee => ({ value: assignee, label: assignee }));
+  const statusOptions = statuses.map(status => ({ value: status, label: status }));
+  const priorityOptions = priorities.map(priority => ({ value: priority, label: priority }));
+  const dueDateOptions = [
+    { value: 'All Dates', label: 'Due: All Dates' },
+    { value: 'Today', label: 'Today' },
+    { value: 'This Week', label: 'This Week' },
+    { value: 'This Month', label: 'This Month' },
+    { value: 'Overdue', label: 'Overdue' }
+  ];
 
   return (
     <React.Fragment>
@@ -572,10 +830,10 @@ const TasksList = () => {
                     <span>Create Task</span>
                   </Button>
                   
-                  <Button variant="outline-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {/* <Button variant="outline-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <FolderPlus size={18} />
                     <span>Create Project</span>
-                  </Button>
+                  </Button> */}
                 </div>
               </Col>
             </Row>
@@ -586,7 +844,7 @@ const TasksList = () => {
                   <div className="d-flex justify-content-between align-items-start">
                     <div>
                       <h6 className="stat-label">Open Tasks</h6>
-                      <h2 className="stat-number" style={{ color: '#059669' }}>{stats.openTasks}</h2>
+                      <h2 className="stat-number" style={{ color: '#059669' }}>{summary.openTasks}</h2>
                     </div>
                     <div className="stat-icon open-tasks">
                       <CheckSquare />
@@ -599,7 +857,7 @@ const TasksList = () => {
                   <div className="d-flex justify-content-between align-items-start">
                     <div>
                       <h6 className="stat-label">Overdue</h6>
-                      <h2 className="stat-number" style={{ color: '#dc2626' }}>{stats.overdue}</h2>
+                      <h2 className="stat-number" style={{ color: '#dc2626' }}>{summary.overdue}</h2>
                     </div>
                     <div className="stat-icon overdue">
                       <AlertCircle />
@@ -612,7 +870,7 @@ const TasksList = () => {
                   <div className="d-flex justify-content-between align-items-start">
                     <div>
                       <h6 className="stat-label">Due This Week</h6>
-                      <h2 className="stat-number" style={{ color: '#2563eb' }}>{stats.dueThisWeek}</h2>
+                      <h2 className="stat-number" style={{ color: '#2563eb' }}>{summary.dueThisWeek}</h2>
                     </div>
                     <div className="stat-icon due-week">
                       <CalendarDays />
@@ -625,7 +883,7 @@ const TasksList = () => {
                   <div className="d-flex justify-content-between align-items-start">
                     <div>
                       <h6 className="stat-label">Unassigned</h6>
-                      <h2 className="stat-number" style={{ color: '#ea580c' }}>{stats.unassigned}</h2>
+                      <h2 className="stat-number" style={{ color: '#ea580c' }}>{summary.unassigned}</h2>
                     </div>
                     <div className="stat-icon unassigned">
                       <Users />
@@ -638,7 +896,7 @@ const TasksList = () => {
                   <div className="d-flex justify-content-between align-items-start">
                     <div>
                       <h6 className="stat-label">High Priority</h6>
-                      <h2 className="stat-number" style={{ color: '#9333ea' }}>{stats.highPriority}</h2>
+                      <h2 className="stat-number" style={{ color: '#9333ea' }}>{summary.highPriority}</h2>
                     </div>
                     <div className="stat-icon high-priority">
                       <Star />
@@ -685,119 +943,70 @@ const TasksList = () => {
                 />
               </div>
 
-              <select
-                value={filterProject}
-                onChange={(e) => setFilterProject(e.target.value)}
-                style={{
-                  flex: '1 1 130px',
-                  padding: '0.75rem',
-                  border: '1px solid #E5E9F2',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  backgroundColor: 'white'
-                }}
-              >
-                <option value="">Project</option>
-                {projects.map(project => (
-                  <option key={project} value={project}>
-                    {project}
-                  </option>
-                ))}
-              </select>
+              <div style={{ flex: '1 1 130px' }}>
+                <SelectBox
+                  value={filterProject === 'All Projects' ? null : filterProject}
+                  onChange={(value) => {
+                    const val = Array.isArray(value) ? value[0] : value;
+                    setFilterProject(val ? String(val) : 'All Projects');
+                  }}
+                  options={projectOptions}
+                  placeholder="Project"
+                  isSearchable
+                />
+              </div>
 
-              <select
-                value={filterAssignee}
-                onChange={(e) => setFilterAssignee(e.target.value)}
-                style={{
-                  flex: '1 1 130px',
-                  padding: '0.75rem',
-                  border: '1px solid #E5E9F2',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  backgroundColor: 'white'
-                }}
-              >
-                <option value="">Assignee</option>
-                {assignees.map(assignee => (
-                  <option key={assignee} value={assignee}>
-                    {assignee}
-                  </option>
-                ))}
-              </select>
+              <div style={{ flex: '1 1 130px' }}>
+                <SelectBox
+                  value={filterAssignee === 'All Assignees' ? null : filterAssignee}
+                  onChange={(value) => {
+                    const val = Array.isArray(value) ? value[0] : value;
+                    setFilterAssignee(val ? String(val) : 'All Assignees');
+                  }}
+                  options={assigneeOptions}
+                  placeholder="Assignee"
+                  isSearchable
+                />
+              </div>
 
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                style={{
-                  flex: '1 1 120px',
-                  padding: '0.75rem',
-                  border: '1px solid #E5E9F2',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  backgroundColor: 'white'
-                }}
-              >
-                <option value="">Status</option>
-                {statuses.map(status => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
+              <div style={{ flex: '1 1 120px' }}>
+                <SelectBox
+                  value={filterStatus === 'All Status' ? null : filterStatus}
+                  onChange={(value) => {
+                    const val = Array.isArray(value) ? value[0] : value;
+                    setFilterStatus(val ? String(val) : 'All Status');
+                  }}
+                  options={statusOptions}
+                  placeholder="Status"
+                  isSearchable
+                />
+              </div>
 
-              <select
-                value={filterPriority}
-                onChange={(e) => setFilterPriority(e.target.value)}
-                style={{
-                  flex: '1 1 120px',
-                  padding: '0.75rem',
-                  border: '1px solid #E5E9F2',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  backgroundColor: 'white'
-                }}
-              >
-                <option value="">Priority</option>
-                {priorities.map(priority => (
-                  <option key={priority} value={priority}>
-                    {priority}
-                  </option>
-                ))}
-              </select>
+              <div style={{ flex: '1 1 120px' }}>
+                <SelectBox
+                  value={filterPriority === 'All Priority' ? null : filterPriority}
+                  onChange={(value) => {
+                    const val = Array.isArray(value) ? value[0] : value;
+                    setFilterPriority(val ? String(val) : 'All Priority');
+                  }}
+                  options={priorityOptions}
+                  placeholder="Priority"
+                  isSearchable
+                />
+              </div>
 
-              <select
-                value={filterDueDate}
-                onChange={(e) => setFilterDueDate(e.target.value)}
-                style={{
-                  flex: '1 1 140px',
-                  padding: '0.75rem',
-                  border: '1px solid #E5E9F2',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  backgroundColor: 'white'
-                }}
-              >
-                <option value="All Dates">Due: All Dates</option>
-                <option value="Today">Today</option>
-                <option value="This Week">This Week</option>
-                <option value="This Month">This Month</option>
-                <option value="Overdue">Overdue</option>
-              </select>
+              <div style={{ flex: '1 1 140px' }}>
+                <SelectBox
+                  value={filterDueDate === 'All Dates' ? null : filterDueDate}
+                  onChange={(value) => {
+                    const val = Array.isArray(value) ? value[0] : value;
+                    setFilterDueDate(val ? String(val) : 'All Dates');
+                  }}
+                  options={dueDateOptions}
+                  placeholder="Due Date"
+                  isSearchable={false}
+                />
+              </div>
 
               <button
                 onClick={clearFilters}
@@ -858,6 +1067,31 @@ const TasksList = () => {
           </div>
 
           <div className="table-container">
+            {pagination.last_page > 1 && (
+              <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
+                <div>
+                  Showing {pagination.page === 1 ? 1 : ((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} tasks
+                </div>
+                <div className="d-flex gap-2">
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    disabled={pagination.page === 1}
+                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    disabled={pagination.page >= pagination.last_page}
+                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="table-responsive">
               <Table className="tasks-table" hover>
                 <thead>
@@ -876,10 +1110,25 @@ const TasksList = () => {
                     <th>Project</th>
                     <th>Assignee</th>
                     <th>Due</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTasks.map(task => (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="text-center py-5">
+                        <Spinner animation="border" variant="primary" />
+                        <div className="mt-2">Loading tasks...</div>
+                      </td>
+                    </tr>
+                  ) : filteredTasks.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="text-center py-5 text-muted">
+                        No tasks found
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredTasks.map(task => (
                     <tr key={task.id}>
                       <td onClick={(e) => e.stopPropagation()}>
                         <Form.Check 
@@ -908,8 +1157,14 @@ const TasksList = () => {
                         </div>
                       </td>
                       <td onClick={() => handleTaskClick(task)}>{task.dueDate}</td>
+                      <td>
+                        <Button variant="link" className="text-secondary p-0" onClick={() => handleTaskClick(task)}>
+                          <MoreVertical size={20} />
+                        </Button>
+                      </td>
                     </tr>
-                  ))}
+                    ))
+                  )}
                 </tbody>
               </Table>
             </div>
@@ -927,9 +1182,24 @@ const TasksList = () => {
           <Offcanvas.Title>
             <div className="d-flex align-items-center justify-content-between w-100">
               <span className="fw-bold">{selectedTask?.id} {selectedTask?.title}</span>
-              <Button variant="link" className="text-secondary p-0">
-                <MoreVertical size={20} />
-              </Button>
+              <div className="d-flex align-items-center gap-2">
+                <Button 
+                  variant="link" 
+                  className="text-primary p-0" 
+                  onClick={handleEditTask}
+                  title="Edit Task"
+                >
+                  <Edit size={20} />
+                </Button>
+                <Button 
+                  variant="link" 
+                  className="text-danger p-0" 
+                  onClick={() => setShowDeleteModal(true)}
+                  title="Delete Task"
+                >
+                  <Trash2 size={20} />
+                </Button>
+              </div>
             </div>
           </Offcanvas.Title>
         </Offcanvas.Header>
@@ -1047,21 +1317,42 @@ const TasksList = () => {
             </>
           )}
         </Offcanvas.Body>
-      </Offcanvas>
+        </Offcanvas>
+
+        {/* Delete Confirmation Modal */}
+        <DeleteConfirmationModal
+          show={showDeleteModal}
+          onHide={() => setShowDeleteModal(false)}
+          onConfirm={handleDeleteTask}
+          itemName={selectedTask ? `${selectedTask.id} ${selectedTask.title}` : undefined}
+          itemType="task"
+          loading={deletingTask}
+        />
 
       <CreateTaskModal
         show={showCreateTask}
-        onHide={() => setShowCreateTask(false)}
-        onCreate={(data) => {
-          console.log('Task created:', data);
+        onHide={() => {
           setShowCreateTask(false);
-          // TODO: Add task to tasks array
+          setEditingTask(null);
         }}
-        onCreateAndOpen={(data) => {
-          console.log('Task created and opening:', data);
+        onCreate={async (data) => {
+          console.log(editingTask ? 'Task updated:' : 'Task created:', data);
           setShowCreateTask(false);
-          // TODO: Add task to tasks array and open detail panel
+          setEditingTask(null);
+          // Refresh tasks after creation/update
+          await fetchTasks();
         }}
+        onCreateAndOpen={async (data) => {
+          console.log(editingTask ? 'Task updated and opening:' : 'Task created and opening:', data);
+          setShowCreateTask(false);
+          setEditingTask(null);
+          // Refresh tasks after creation/update
+          await fetchTasks();
+        }}
+        extensions={hierarchyDataExtensions as any}
+        labels={[]}
+        task={editingTask}
+        isEdit={!!editingTask}
       />
     </>
      

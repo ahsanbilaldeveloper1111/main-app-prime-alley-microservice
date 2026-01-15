@@ -1,28 +1,21 @@
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
+  useState,
+  useEffect,
+  useCallback
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-
-import  { useState } from 'react';
-import { 
-  Container, 
-  Row, 
-  Col, 
-  Button, 
-  Badge, 
-  Form, 
-  Dropdown,
-  Card,
-  Table,
-  InputGroup
-} from 'react-bootstrap';
+import { listTasks, getTask, updateTask, deleteTask } from "@utils/tasks";
+import { useHierarchyData } from "@components/filters/useHierarchyData";
+import { ModuleSlug, formatDateForTable } from "@utils/Helper";
+import { Spinner, Button, Form, Dropdown, Table } from 'react-bootstrap';
+import CreateTaskModal from '@components/work-planner/createtask-modal';
+import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import {
   Plus,
   Search,
@@ -58,18 +51,65 @@ interface RecurringTask {
     completed: boolean;
     status: 'active' | 'paused';
     category: 'today' | 'upcoming';
+    rawData?: any; // Store raw API data
   }
+
+interface ApiRecurringTask {
+  id: number;
+  task_id: string;
+  title: string;
+  description?: string;
+  priority: string;
+  due_date?: string;
+  next_run_at?: string;
+  reminder_minutes?: number;
+  frequency?: string;
+  frequency_config?: any;
+  is_active?: boolean;
+  is_completed?: boolean;
+  status?: {
+    id: number;
+    name: string;
+    color?: string;
+  } | null;
+  labels?: Array<{
+    id: number;
+    name: string;
+    color: string;
+  }>;
+  project?: {
+    id: number;
+    name: string;
+  } | null;
+}
+
 const RecurringReminders = () => {
     const [activeTab, setActiveTab] = useState<'active' | 'dueToday' | 'enabled'>('active');
-    const [selectedTask, setSelectedTask] = useState<string | null>('backup-server');
-    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedTask, setSelectedTask] = useState<string | null>(null);
     const [todoSearchQuery, setTodoSearchQuery] = useState('');
     const [frequencyFilter, setFrequencyFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
     const [labelsFilter, setLabelsFilter] = useState('all');
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+    const [recurringTasks, setRecurringTasks] = useState<RecurringTask[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [pagination, setPagination] = useState({
+      page: 1,
+      limit: 20,
+      total: 0,
+      last_page: 1
+    });
+    const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deletingTask, setDeletingTask] = useState(false);
+    const [editingTask, setEditingTask] = useState<any>(null);
+    const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
+    
+    // Fetch extensions for assignees
+    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
   
-    const recurringTasks: RecurringTask[] = [
+    // Hardcoded data for reference (not used - replaced by API)
+    const _hardcodedTasks: RecurringTask[] = [
       {
         id: 'review-tickets',
         name: 'Review open tickets',
@@ -167,7 +207,223 @@ const RecurringReminders = () => {
         default: return null;
       }
     };
-  
+
+    // Map API task to RecurringTask format
+    const mapApiTaskToRecurringTask = (apiTask: ApiRecurringTask): RecurringTask => {
+      // Format recurrence pattern
+      const formatRecurrence = () => {
+        if (!apiTask.frequency) return 'Not set';
+        const freq = apiTask.frequency.toLowerCase();
+        const config = apiTask.frequency_config || {};
+        
+        if (freq === 'daily') {
+          return config.weekdays_only ? 'Daily (Weekdays)' : 'Daily';
+        } else if (freq === 'weekly') {
+          const day = config.day_of_week || 'Monday';
+          return `Weekly (${day})`;
+        } else if (freq === 'monthly') {
+          const day = config.day_of_month || 1;
+          return `Monthly (Day ${day})`;
+        }
+        return apiTask.frequency.charAt(0).toUpperCase() + apiTask.frequency.slice(1);
+      };
+
+      // Format next run date
+      const formatNextRun = () => {
+        if (!apiTask.next_run_at) return 'Not scheduled';
+        try {
+          const date = new Date(apiTask.next_run_at);
+          return formatDateForTable(apiTask.next_run_at);
+        } catch {
+          return 'Invalid date';
+        }
+      };
+
+      // Format reminder
+      const formatReminder = () => {
+        if (!apiTask.reminder_minutes) return 'No reminder';
+        const minutes = apiTask.reminder_minutes;
+        if (minutes < 60) return `${minutes} min before`;
+        const hours = Math.floor(minutes / 60);
+        return hours === 1 ? '1 hour before' : `${hours} hours before`;
+      };
+
+      // Determine category based on next_run_at
+      const getCategory = (): 'today' | 'upcoming' => {
+        if (!apiTask.next_run_at) return 'upcoming';
+        try {
+          const nextRun = new Date(apiTask.next_run_at);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          nextRun.setHours(0, 0, 0, 0);
+          return nextRun.getTime() === today.getTime() ? 'today' : 'upcoming';
+        } catch {
+          return 'upcoming';
+        }
+      };
+
+      return {
+        id: apiTask.task_id || `#${apiTask.id}`,
+        name: apiTask.title || '',
+        recurrence: formatRecurrence(),
+        nextRun: formatNextRun(),
+        reminder: formatReminder(),
+        labels: (apiTask.labels || []).map(label => ({
+          text: label.name,
+          color: label.color || '#3b82f6',
+          type: label.name.toLowerCase().replace(/\s+/g, '-')
+        })),
+        completed: apiTask.is_completed || false,
+        status: apiTask.is_active ? 'active' : 'paused',
+        category: getCategory(),
+        rawData: apiTask
+      };
+    };
+
+    // Fetch recurring tasks from API
+    const fetchTasks = useCallback(async () => {
+      try {
+        setLoading(true);
+        
+        const params: any = {
+          page: pagination.page,
+          limit: pagination.limit,
+          type: 'recurring', // Key difference: type is 'recurring'
+          search: todoSearchQuery,
+          order: {
+            column: 'created_at',
+            dir: 'desc'
+          },
+          withRelations: [
+            'project',
+            'status',
+            'assignees',
+            'labels'
+          ]
+        };
+
+        // Add filters
+        if (frequencyFilter !== 'all') {
+          params.frequency = frequencyFilter;
+        }
+
+        if (statusFilter !== 'all') {
+          params.is_active = statusFilter === 'active';
+        }
+
+        const response = await listTasks(params);
+        
+        if (response && response.data) {
+          const mappedTasks = response.data.map(mapApiTaskToRecurringTask);
+          setRecurringTasks(mappedTasks);
+          
+          if (response.pagination) {
+            setPagination(prev => ({
+              page: response.pagination.page || 1,
+              limit: response.pagination.limit || 20,
+              total: response.pagination.total || 0,
+              last_page: response.pagination.last_page || 1
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching recurring tasks:', error);
+      } finally {
+        setLoading(false);
+      }
+    }, [pagination.page, pagination.limit, todoSearchQuery, frequencyFilter, statusFilter]);
+
+    // Fetch tasks when dependencies change
+    useEffect(() => {
+      if (!hierarchyLoading) {
+        fetchTasks();
+      }
+    }, [fetchTasks, hierarchyLoading]);
+
+    // Handle task click
+    const handleTaskClick = async (task: RecurringTask) => {
+      setSelectedTask(task.id);
+      setShowTaskDetail(true);
+      
+      // Fetch full task data if needed
+      if (task.rawData?.id) {
+        try {
+          setLoadingTaskDetail(true);
+          const withRelations = ['project', 'status', 'assignees', 'labels'];
+          const taskData = await getTask(task.rawData.id, withRelations);
+          if (taskData) {
+            // Update the task in the list with full data
+            setRecurringTasks(prev => prev.map(t => 
+              t.id === task.id ? { ...t, rawData: taskData } : t
+            ));
+          }
+        } catch (error) {
+          console.error('Error fetching task details:', error);
+        } finally {
+          setLoadingTaskDetail(false);
+        }
+      }
+    };
+
+    // Handle delete task
+    const handleDeleteTask = async () => {
+      const task = recurringTasks.find(t => t.id === selectedTask);
+      if (!task?.rawData?.id) return;
+      
+      try {
+        setDeletingTask(true);
+        const result = await deleteTask(task.rawData.id);
+        if (result) {
+          setShowDeleteModal(false);
+          setShowTaskDetail(false);
+          setSelectedTask(null);
+          fetchTasks();
+        }
+      } catch (error) {
+        console.error('Error deleting task:', error);
+      } finally {
+        setDeletingTask(false);
+      }
+    };
+
+    // Handle edit task
+    const handleEditTask = (task: RecurringTask) => {
+      if (!task.rawData) return;
+      setEditingTask(task.rawData);
+      setShowTaskDetail(false);
+      setShowCreateTaskModal(true);
+    };
+
+    // Handle pause/resume task
+    const handleTogglePause = async (task: RecurringTask) => {
+      if (!task.rawData?.id) return;
+      
+      try {
+        const payload: any = {
+          is_active: task.status === 'active' ? false : true
+        };
+        const result = await updateTask(task.rawData.id, payload);
+        if (result) {
+          fetchTasks();
+          setOpenDropdown(null);
+        }
+      } catch (error) {
+        console.error('Error toggling task status:', error);
+      }
+    };
+
+    // Handle create task
+    const handleCreateTask = async (formData: any) => {
+      try {
+        // Refresh tasks after creation
+        fetchTasks();
+        setShowCreateTaskModal(false);
+        setEditingTask(null);
+      } catch (error) {
+        console.error('Error creating task:', error);
+      }
+    };
+
     const selectedTaskDetails = recurringTasks.find(task => task.id === selectedTask);
   
     const filteredTasks = recurringTasks.filter(task => {
@@ -574,6 +830,10 @@ const RecurringReminders = () => {
           flexWrap: 'wrap'
         }}>
           <button
+            onClick={() => {
+              setEditingTask(null);
+              setShowCreateTaskModal(true);
+            }}
             style={{
               backgroundColor: '#5b8fd8',
               color: 'white',
@@ -853,7 +1113,13 @@ const RecurringReminders = () => {
                           </tr>
                         </thead>
                       <tbody>
-                        {filteredTasks.length === 0 ? (
+                        {loading ? (
+                          <tr>
+                            <td colSpan={7} className="text-center" style={{ padding: '3rem' }}>
+                              <Spinner animation="border" />
+                            </td>
+                          </tr>
+                        ) : filteredTasks.length === 0 ? (
                           <tr>
                             <td colSpan={7} className="text-center" style={{ padding: '3rem', color: '#718096', fontSize: '14px' }}>
                               No recurring tasks found
@@ -863,7 +1129,10 @@ const RecurringReminders = () => {
                           filteredTasks.map((task, taskIdx) => (
                             <tr
                               key={task.id}
-                              onClick={() => setSelectedTask(task.id)}
+                              onClick={() => {
+                                setSelectedTask(task.id);
+                                setShowTaskDetail(true);
+                              }}
                               style={{
                                 backgroundColor: selectedTask === task.id ? '#eff6ff' : undefined
                               }}
@@ -953,7 +1222,7 @@ const RecurringReminders = () => {
                                     <Dropdown.Item 
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        console.log('Edit task:', task.id);
+                                        handleEditTask(task);
                                       }}
                                       style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}
                                     >
@@ -963,7 +1232,7 @@ const RecurringReminders = () => {
                                     <Dropdown.Item 
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        console.log('Toggle pause:', task.id);
+                                        handleTogglePause(task);
                                       }}
                                       style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}
                                     >
@@ -979,32 +1248,12 @@ const RecurringReminders = () => {
                                         </>
                                       )}
                                     </Dropdown.Item>
-                                    <Dropdown.Item 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        console.log('Duplicate task:', task.id);
-                                      }}
-                                      style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}
-                                    >
-                                      <Grid3x3 size={14} />
-                                      <span>Duplicate</span>
-                                    </Dropdown.Item>
                                     <Dropdown.Divider style={{ margin: '4px 0' }} />
                                     <Dropdown.Item 
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        console.log('View history:', task.id);
-                                      }}
-                                      style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}
-                                    >
-                                      <Clock size={14} />
-                                      <span>View History</span>
-                                    </Dropdown.Item>
-                                    <Dropdown.Divider style={{ margin: '4px 0' }} />
-                                    <Dropdown.Item 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        console.log('Delete task:', task.id);
+                                        setSelectedTask(task.id);
+                                        setShowDeleteModal(true);
                                       }}
                                       style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#dc3545' }}
                                     >
@@ -1277,7 +1526,31 @@ const RecurringReminders = () => {
           </div>
         </div>
       </div>
-     
+
+      {/* Create/Edit Task Modal */}
+      <CreateTaskModal
+        show={showCreateTaskModal}
+        onHide={() => {
+          setShowCreateTaskModal(false);
+          setEditingTask(null);
+        }}
+        onCreate={handleCreateTask}
+        onCreateAndOpen={handleCreateTask}
+        extensions={hierarchyDataExtensions as any}
+        task={editingTask}
+        isEdit={!!editingTask}
+        taskType="recurring"
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteTask}
+        itemName={selectedTaskDetails ? `${selectedTaskDetails.id} ${selectedTaskDetails.name}` : undefined}
+        itemType="recurring task"
+        loading={deletingTask}
+      />
 
     </React.Fragment>
   );

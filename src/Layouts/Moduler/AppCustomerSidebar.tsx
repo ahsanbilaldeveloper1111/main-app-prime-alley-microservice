@@ -683,10 +683,10 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
             },
             { 
-              id: 'work-planner-dial-todo', 
-              title: 'Dial Todo', 
+              id: 'work-planner-todo-list', 
+              title: 'To Do List', 
               icon: <Clock size={16} />, 
-              url: '/work-planner/dial-todo', 
+              url: '/work-planner/todo', 
               permission: PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER 
             },
             {
@@ -697,19 +697,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
             },
             {
-              id: 'work-planner-projects',
-              title: 'Projects',
-              icon: <Folder size={16} />,
-              url: '/work-planner/projects',
-              permission: PERMISSIONS.WORK_PLANNER_SERVICES 
-            },
-            {
               id: 'work-planner-projects-dashboard',
               title: 'Projects Dashboard',
               icon: <Folder size={16} />,
               url: '/work-planner/projects/dashboard',
               permission: PERMISSIONS.WORK_PLANNER_SERVICES 
             },
+            {
+              id: 'work-planner-projects',
+              title: 'Projects',
+              icon: <Folder size={16} />,
+              url: '/work-planner/projects',
+              permission: PERMISSIONS.WORK_PLANNER_SERVICES 
+            },
+           
             {
               id: 'work-planner-saved-views',
               title: 'Saved Views',
@@ -723,6 +724,35 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               icon: <Shield size={16} />,
               url: '/work-planner/roles-settings',
               permission: PERMISSIONS.WORK_PLANNER_SERVICES 
+            }
+      ]
+      .filter(item => !item.permission || hasPermission(item.permission))
+    }, 
+
+    {
+      id: 'staff-management',
+      key: 'staff-management',
+      permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES,
+      icon: <Users size={20} />,
+      color: MENU_COLORS.BILLING,
+      title: "Staff Management",
+      label: "Staff Management",
+      url: '',
+      subItems: [
+
+            { 
+              id: 'staff-management-employees', 
+              title: 'Employees', 
+              icon: <Users size={16} />, 
+              url: '/staff-management/employees', 
+              permission: PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT 
+            },
+            { 
+              id: 'staff-management-employees-dashboard', 
+              title: 'Employees Dashboard', 
+              icon: <LayoutDashboard size={16} />, 
+              url: '/staff-management/employees/dashboard', 
+              permission: PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT 
             }
       ]
       .filter(item => !item.permission || hasPermission(item.permission))

@@ -260,6 +260,10 @@ MENU_COLORS: {
   
   // Permissions
   PERMISSIONS: {
+    STAFF_MANAGEMENT_SERVICES: 'staff-management-services',
+    VIEW_EMPLOYEES_STAFF_MANAGEMENT: 'view-employees-staff-management',
+    VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT: 'view-employees-dashboard-staff-management',
+
     CONTROL_HUB_SERVICES: 'control-hub-services',
     VIEW_USERS: 'view-users',
     VIEW_TEAMS: 'view-teams',

@@ -6,7 +6,11 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import  { useState } from 'react';
+import  { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { listProjects, createProject, updateProject, deleteProject, getProject, getRecentActivity, getOverdueTasks } from '@utils/tasks';
+import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
+import { Spinner, Modal } from 'react-bootstrap';
 import { 
   Container, 
   Row, 
@@ -49,193 +53,376 @@ import {
   CheckCircle2,
   UserPlus,
   Edit3,
-  Trash2
+  Trash2,
+  Link,
+  ExternalLink
 } from 'lucide-react';
+// API Response Types
+interface ApiProject {
+  id: number;
+  name: string;
+  description?: string;
+  color: string;
+  status: string;
+  owner_extension_number?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  created_at: string;
+  updated_at: string;
+  tasks?: Array<any>;
+  members?: Array<{ 
+    id?: number;
+    extension_number: string; 
+    role: string;
+    user?: any; // If members.user relation is loaded
+  }>;
+  labels?: Array<any>;
+  statuses?: Array<any>;
+}
+
 interface Project {
-    id: string;
-    name: string;
-    icon: React.ElementType;
-    iconColor: string;
-    members: Array<{ name: string; initials: string; color: string }>;
-    open: number;
-    overdue: number;
-    lastUpdate: string;
-    status: 'Active' | 'Completed' | 'On Hold';
-    owner: string;
-    team: string;
-  }
+  id: string;
+  name: string;
+  icon: React.ElementType;
+  iconColor: string;
+  members: Array<{ name: string; initials: string; color: string }>;
+  open: number;
+  overdue: number;
+  lastUpdate: string;
+  status: 'Active' | 'Completed' | 'On Hold';
+  owner: string;
+  team: string;
+  apiData?: ApiProject; // Store original API data
+}
 
 const WorkPlannerProjects = () => {
-    const [projects, setProjects] = useState<Project[]>([
-        {
-          id: 'PRJ-001',
-          name: 'Website Redesign',
-          icon: Palette,
-          iconColor: '#3b82f6',
-          members: [
-            { name: 'John D.', initials: 'JD', color: '#667eea' },
-            { name: 'Sarah K.', initials: 'SK', color: '#f56565' },
-            { name: 'Mike W.', initials: 'MW', color: '#48bb78' },
-            { name: 'Emily R.', initials: 'ER', color: '#ed64a6' },
-            { name: 'Jason T.', initials: 'JT', color: '#4299e1' },
-            { name: 'Lisa M.', initials: 'LM', color: '#9f7aea' },
-            { name: 'Tom H.', initials: 'TH', color: '#fc8181' }
-          ],
-          open: 19,
-          overdue: 2,
-          lastUpdate: 'Apr 23, 2024',
-          status: 'Active',
-          owner: 'John D.',
-          team: 'Design'
-        },
-        {
-          id: 'PRJ-002',
-          name: 'Mobile App Development',
-          icon: Smartphone,
-          iconColor: '#3b82f6',
-          members: [
-            { name: 'Emily R.', initials: 'ER', color: '#ed64a6' },
-            { name: 'Jason T.', initials: 'JT', color: '#4299e1' },
-            { name: 'Lisa M.', initials: 'LM', color: '#9f7aea' },
-            { name: 'David L.', initials: 'DL', color: '#4299e1' },
-            { name: 'Chris P.', initials: 'CP', color: '#ed8936' },
-            { name: 'Sam R.', initials: 'SR', color: '#667eea' }
-          ],
-          open: 14,
-          overdue: 5,
-          lastUpdate: 'Apr 22, 2024',
-          status: 'Active',
-          owner: 'Emily R.',
-          team: 'Engineering'
-        },
-        {
-          id: 'PRJ-003',
-          name: 'Marketing Campaign',
-          icon: Megaphone,
-          iconColor: '#f59e0b',
-          members: [
-            { name: 'Anna B.', initials: 'AB', color: '#f6ad55' },
-            { name: 'Tom H.', initials: 'TH', color: '#fc8181' },
-            { name: 'Nina P.', initials: 'NP', color: '#68d391' }
-          ],
-          open: 10,
-          overdue: 1,
-          lastUpdate: 'Apr 21, 2024',
-          status: 'Active',
-          owner: 'Anna B.',
-          team: 'Marketing'
-        },
-        {
-          id: 'PRJ-004',
-          name: 'IT Infrastructure',
-          icon: Monitor,
-          iconColor: '#10b981',
-          members: [
-            { name: 'David L.', initials: 'DL', color: '#4299e1' },
-            { name: 'Chris P.', initials: 'CP', color: '#ed8936' },
-            { name: 'Sam R.', initials: 'SR', color: '#667eea' },
-            { name: 'Rachel G.', initials: 'RG', color: '#9f7aea' },
-            { name: 'Kevin S.', initials: 'KS', color: '#48bb78' },
-            { name: 'Laura W.', initials: 'LW', color: '#f56565' }
-          ],
-          open: 8,
-          overdue: 3,
-          lastUpdate: 'Apr 20, 2024',
-          status: 'Active',
-          owner: 'David L.',
-          team: 'IT'
-        },
-        {
-          id: 'PRJ-005',
-          name: 'Client Portal',
-          icon: Users,
-          iconColor: '#a855f7',
-          members: [
-            { name: 'Rachel G.', initials: 'RG', color: '#9f7aea' },
-            { name: 'Kevin S.', initials: 'KS', color: '#48bb78' },
-            { name: 'Laura W.', initials: 'LW', color: '#f56565' }
-          ],
-          open: 7,
-          overdue: 2,
-          lastUpdate: 'Apr 19, 2024',
-          status: 'Active',
-          owner: 'Rachel G.',
-          team: 'Product'
-        },
-        {
-          id: 'PRJ-006',
-          name: 'Customer Support',
-          icon: Headphones,
-          iconColor: '#f97316',
-          members: [
-            { name: 'Mark T.', initials: 'MT', color: '#ed8936' },
-            { name: 'Sophia L.', initials: 'SL', color: '#4299e1' },
-            { name: 'Ben K.', initials: 'BK', color: '#68d391' }
-          ],
-          open: 6,
-          overdue: 1,
-          lastUpdate: 'Apr 13, 2024',
-          status: 'Active',
-          owner: 'Mark T.',
-          team: 'Support'
-        },
-        {
-          id: 'PRJ-007',
-          name: 'Product Launch',
-          icon: Rocket,
-          iconColor: '#06b6d4',
-          members: [
-            { name: 'Olivia M.', initials: 'OM', color: '#4299e1' },
-            { name: 'Ryan C.', initials: 'RC', color: '#f6ad55' },
-            { name: 'Emma S.', initials: 'ES', color: '#9f7aea' }
-          ],
-          open: 5,
-          overdue: 0,
-          lastUpdate: 'Apr 18, 2024',
-          status: 'Active',
-          owner: 'Olivia M.',
-          team: 'Product'
-        },
-        {
-          id: 'PRJ-008',
-          name: 'CRM Upgrade',
-          icon: Settings,
-          iconColor: '#8b5cf6',
-          members: [
-            { name: 'Alex D.', initials: 'AD', color: '#667eea' },
-            { name: 'Mia F.', initials: 'MF', color: '#ed64a6' },
-            { name: 'Jake W.', initials: 'JW', color: '#48bb78' }
-          ],
-          open: 3,
-          overdue: 4,
-          lastUpdate: 'Apr 17, 2024',
-          status: 'Active',
-          owner: 'Alex D.',
-          team: 'Engineering'
-        }
-      ]);
+    const router = useRouter();
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showProjectModal, setShowProjectModal] = useState(false);
+    const [editingProject, setEditingProject] = useState<Project | null>(null);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+    const [deleting, setDeleting] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [projectFormData, setProjectFormData] = useState({
+      name: '',
+      description: '',
+      color: '#3b82f6'
+    });
+    const [stats, setStats] = useState({
+      activeProjects: 0,
+      totalProjects: 0,
+      tasksDueThisWeek: 0,
+      overdueAcrossProjects: 0
+    });
     
-      const [activeTab, setActiveTab] = useState('All Tasks');
+    // Fetch projects on mount
+    useEffect(() => {
+      fetchProjects();
+    }, []);
+    
+    const fetchProjects = async () => {
+      try {
+        setLoading(true);
+        const response = await listProjects({ page: 1, limit: 100 });
+        
+        // Response structure: { success, message, data: [...], pagination, summary }
+        if (response && response.success === true && response.data && Array.isArray(response.data)) {
+          const projectsData = response.data.map((apiProject: ApiProject) => mapApiProjectToProject(apiProject));
+          setProjects(projectsData);
+          
+          // Update stats from response
+          if (response.summary) {
+            setStats({
+              activeProjects: response.summary.active || 0,
+              totalProjects: response.summary.total || 0,
+              tasksDueThisWeek: 0, // Calculate from tasks if needed
+              overdueAcrossProjects: 0 // Calculate from tasks if needed
+            });
+          }
+        } else if (response && response.success === false) {
+          // Error already shown by validateResponse
+          setProjects([]);
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+        setProjects([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    // Map API project to component Project interface
+    const mapApiProjectToProject = (apiProject: ApiProject): Project => {
+      // Calculate open and overdue tasks
+      const tasks = apiProject.tasks || [];
+      const openTasks = tasks.filter((t: any) => !t.is_completed).length;
+      const overdueTasks = tasks.filter((t: any) => {
+        if (!t.due_date) return false;
+        const dueDate = new Date(t.due_date);
+        return !t.is_completed && dueDate < new Date();
+      }).length;
+      
+      // Map members
+      const members = (apiProject.members || []).map((member, idx) => {
+        const colors = ['#667eea', '#f56565', '#48bb78', '#ed64a6', '#4299e1', '#9f7aea', '#fc8181'];
+        const initials = member.extension_number.substring(0, 2).toUpperCase();
+        return {
+          name: member.extension_number,
+          initials,
+          color: colors[idx % colors.length]
+        };
+      });
+      
+      // Format last update
+      const lastUpdate = apiProject.updated_at 
+        ? new Date(apiProject.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : 'N/A';
+      
+      // Default icon based on project name
+      const iconMap: { [key: string]: React.ElementType } = {
+        'website': Palette,
+        'mobile': Smartphone,
+        'marketing': Megaphone,
+        'it': Monitor,
+        'client': Users,
+        'support': Headphones,
+        'product': Rocket,
+        'crm': Settings
+      };
+      
+      const projectNameLower = apiProject.name.toLowerCase();
+      let Icon = Folder;
+      for (const [key, icon] of Object.entries(iconMap)) {
+        if (projectNameLower.includes(key)) {
+          Icon = icon;
+          break;
+        }
+      }
+      
+      return {
+        id: apiProject.id.toString(),
+        name: apiProject.name,
+        icon: Icon,
+        iconColor: apiProject.color || '#3b82f6',
+        members,
+        open: openTasks,
+        overdue: overdueTasks,
+        lastUpdate,
+        status: apiProject.status === 'active' ? 'Active' : apiProject.status === 'completed' ? 'Completed' : 'On Hold',
+        owner: members[0]?.name || 'N/A',
+        team: 'Team', // You may want to add team to API response
+        apiData: apiProject
+      };
+    };
+    
+    const handleCreateProject = () => {
+      setEditingProject(null);
+      setProjectFormData({
+        name: '',
+        description: '',
+        color: '#3b82f6'
+      });
+      setShowProjectModal(true);
+    };
+    
+    const handleEditProject = (project: Project) => {
+      setEditingProject(project);
+      setProjectFormData({
+        name: project.name,
+        description: project.apiData?.description || '',
+        color: project.iconColor
+      });
+      setShowProjectModal(true);
+    };
+    
+    const handleDeleteProject = (project: Project) => {
+      setProjectToDelete(project);
+      setShowDeleteModal(true);
+    };
+    
+    const confirmDelete = async () => {
+      if (!projectToDelete) return;
+      
+      try {
+        setDeleting(true);
+        const result = await deleteProject(projectToDelete.id);
+        if (result) {
+          await fetchProjects();
+          setShowDeleteModal(false);
+          setProjectToDelete(null);
+        }
+      } catch (error) {
+        console.error('Error deleting project:', error);
+      } finally {
+        setDeleting(false);
+      }
+    };
+    
+    const handleSubmitProject = async (e: React.FormEvent) => {
+      e.preventDefault();
+      
+      try {
+        setSubmitting(true);
+        const projectData = {
+          name: projectFormData.name,
+          description: projectFormData.description,
+          color: projectFormData.color
+        };
+        
+        let result;
+        if (editingProject) {
+          result = await updateProject(editingProject.id, projectData);
+        } else {
+          result = await createProject(projectData);
+        }
+        
+        if (result) {
+          await fetchProjects();
+          setShowProjectModal(false);
+          setEditingProject(null);
+          setProjectFormData({
+            name: '',
+            description: '',
+            color: '#3b82f6'
+          });
+        }
+      } catch (error) {
+        console.error('Error saving project:', error);
+      } finally {
+        setSubmitting(false);
+      }
+    };
+    
+    const [activeTab, setActiveTab] = useState('All Tasks');
       const [searchTerm, setSearchTerm] = useState('');
       const [filterStatus, setFilterStatus] = useState('Active');
       const [filterOwner, setFilterOwner] = useState('All Owners');
       const [filterTeam, setFilterTeam] = useState('All Teams');
-      const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
-      const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-      const [showProjectDetail, setShowProjectDetail] = useState(false);
-      const [detailTab, setDetailTab] = useState('Activity');
+    const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
+    const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+    const [selectedProjectDetails, setSelectedProjectDetails] = useState<ApiProject | null>(null);
+    const [loadingProjectDetails, setLoadingProjectDetails] = useState(false);
+    const [projectActivities, setProjectActivities] = useState<any[]>([]);
+    const [loadingActivities, setLoadingActivities] = useState(false);
+    const [overdueTasks, setOverdueTasks] = useState<any[]>([]);
+    const [loadingOverdueTasks, setLoadingOverdueTasks] = useState(false);
+    const [showProjectDetail, setShowProjectDetail] = useState(false);
+    const [detailTab, setDetailTab] = useState('Activity');
     
-      const stats = {
-        activeProjects: 14,
-        totalProjects: 20,
-        tasksDueThisWeek: 63,
-        overdueAcrossProjects: 18
-      };
+    const handleProjectClick = async (project: Project) => {
+      setSelectedProject(project);
+      setShowProjectDetail(true);
+      setLoadingProjectDetails(true);
+      setLoadingOverdueTasks(true);
+      
+      try {
+        // Fetch full project details with all relations
+        const withRelations = [
+          'members.user',
+          'tasks',
+          'tasks.assignees',
+          'tasks.labels',
+          'tasks.status',
+          'statuses',
+          'owner'
+        ];
+        
+        const [projectDetails, activities, overdue] = await Promise.all([
+          getProject(project.id, withRelations),
+          getRecentActivity(Number(project.id)),
+          getOverdueTasks(Number(project.id))
+        ]);
+        
+        if (projectDetails) {
+          setSelectedProjectDetails(projectDetails);
+        } else {
+          // Fallback to basic project data if API fails
+          setSelectedProjectDetails(project.apiData || null);
+        }
+        
+        if (activities && Array.isArray(activities)) {
+          setProjectActivities(activities);
+        } else {
+          setProjectActivities([]);
+        }
+        
+        if (overdue && Array.isArray(overdue)) {
+          setOverdueTasks(overdue);
+        } else {
+          setOverdueTasks([]);
+        }
+      } catch (error) {
+        console.error('Error fetching project details:', error);
+        // Fallback to basic project data
+        setSelectedProjectDetails(project.apiData || null);
+        setProjectActivities([]);
+        setOverdueTasks([]);
+      } finally {
+        setLoadingProjectDetails(false);
+        setLoadingActivities(false);
+        setLoadingOverdueTasks(false);
+      }
+    };
     
-      const handleProjectClick = (project: Project) => {
-        setSelectedProject(project);
-        setShowProjectDetail(true);
-      };
+    // Helper function to format time ago
+    const formatTimeAgo = (dateString: string) => {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+      
+      if (diffInSeconds < 60) return 'just now';
+      if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+      if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+      if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+      
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    
+    // Helper function to format full date and time
+    const formatDateTime = (dateString: string) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    };
+    
+    // Helper function to get initials from extension number or name
+    const getInitials = (extensionNumber: string) => {
+      if (!extensionNumber || extensionNumber === 'system') return 'SY';
+      return extensionNumber.substring(0, 2).toUpperCase();
+    };
+    
+    // Helper function to get color for avatar
+    const getAvatarColor = (extensionNumber: string, index: number) => {
+      const colors = ['#667eea', '#f56565', '#48bb78', '#ed64a6', '#4299e1', '#9f7aea', '#fc8181', '#f59e0b'];
+      if (extensionNumber === 'system') return '#6b7280';
+      return colors[index % colors.length];
+    };
+    
+    // Helper function to get status color based on action
+    const getActionColor = (action: string) => {
+      switch (action) {
+        case 'status_changed':
+          return '#3b82f6';
+        case 'updated':
+          return '#f59e0b';
+        case 'created':
+          return '#10b981';
+        case 'completed':
+          return '#10b981';
+        case 'deleted':
+          return '#ef4444';
+        default:
+          return '#6b7280';
+      }
+    };
     
       const handleSelectProject = (projectId: string) => {
         const newSelected = new Set(selectedProjects);
@@ -606,7 +793,11 @@ const WorkPlannerProjects = () => {
                 </div>
               </Col>
               <Col xs="auto">
-                <Button variant="primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Button 
+                  variant="primary" 
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  onClick={handleCreateProject}
+                >
                   <Plus size={18} />
                   <span>Create Project</span>
                 </Button>
@@ -832,7 +1023,14 @@ const WorkPlannerProjects = () => {
 
           <div className="table-container">
             <div className="table-responsive">
-              {filteredProjects.length === 0 ? (
+              {loading ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                  <Spinner animation="border" role="status" className="me-2">
+                    <span className="visually-hidden">Loading...</span>
+                  </Spinner>
+                  <p style={{ marginTop: '1rem' }}>Loading projects...</p>
+                </div>
+              ) : filteredProjects.length === 0 ? (
                 <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
                   <FolderOpen size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
                   <p style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
@@ -891,22 +1089,10 @@ const WorkPlannerProjects = () => {
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center' }}>
-                          {project.members.slice(0, 3).map((member, idx) => (
-                            <div
-                              key={idx}
-                              className="member-avatar"
-                              style={{ backgroundColor: member.color }}
-                              title={member.name}
-                            >
-                              {member.initials}
-                            </div>
-                          ))}
-                          {project.members.length > 3 && (
-                            <div className="member-count">
-                              +{project.members.length - 3}
-                            </div>
-                          )}
-                        </div>
+                          <div className="member-avatar bg-primary">
+                                {project?.members?.length || 0}
+                          </div>
+                          </div>
                       </td>
                       <td>{project.open}</td>
                       <td>
@@ -939,18 +1125,31 @@ const WorkPlannerProjects = () => {
                             </Dropdown.Toggle>
 
                             <Dropdown.Menu align="end" style={{ fontSize: '0.875rem' }}>
-                              <Dropdown.Item style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <Dropdown.Item 
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditProject(project);
+                                }}
+                              >
                                 <Settings size={14} />
                                 <span>Edit Project</span>
                               </Dropdown.Item>
-                              <Dropdown.Item style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              {/* <Dropdown.Item style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <Users size={14} />
                                 <span>Manage Team</span>
-                              </Dropdown.Item>
+                              </Dropdown.Item> */}
                               <Dropdown.Divider />
-                              <Dropdown.Item className="text-danger" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <X size={14} />
-                                <span>Archive Project</span>
+                              <Dropdown.Item 
+                                className="text-danger" 
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteProject(project);
+                                }}
+                              >
+                                <Trash2 size={14} />
+                                <span>Delete Project</span>
                               </Dropdown.Item>
                             </Dropdown.Menu>
                           </Dropdown>
@@ -973,7 +1172,7 @@ const WorkPlannerProjects = () => {
         placement="end"
         className="project-detail-panel"
       >
-        <Offcanvas.Header closeButton className="project-detail-header">
+        <Offcanvas.Header className="project-detail-header" style={{ position: 'relative' }}>
           <Offcanvas.Title>
             <div className="d-flex align-items-center gap-3">
               {selectedProject && (
@@ -994,9 +1193,75 @@ const WorkPlannerProjects = () => {
               )}
             </div>
           </Offcanvas.Title>
+          <div className="d-flex align-items-center gap-2" style={{ position: 'absolute', right: '3rem', top: '50%', transform: 'translateY(-50%)' }}>
+            {/* {selectedProject && (
+              <Button
+                variant="link"
+                className="p-0"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.open(`/work-planner/projects/${selectedProject.id}`, '_blank');
+                }}
+                style={{ 
+                  color: '#6b7280',
+                  textDecoration: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '4px'
+                }}
+                title="Open in new tab"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f3f4f6';
+                  e.currentTarget.style.color = '#3b82f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#6b7280';
+                }}
+              >
+                <ExternalLink size={18} />
+              </Button>
+            )} */}
+            <Button
+              variant="link"
+              className="p-0"
+              onClick={() => setShowProjectDetail(false)}
+              style={{ 
+                color: '#6b7280',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '4px'
+              }}
+              title="Close"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+                e.currentTarget.style.color = '#ef4444';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = '#6b7280';
+              }}
+            >
+              <X size={18} />
+            </Button>
+          </div>
         </Offcanvas.Header>
         <Offcanvas.Body className="project-detail-body">
-          {selectedProject && (
+          {loadingProjectDetails ? (
+            <div className="text-center py-5">
+              <Spinner animation="border" role="status">
+                <span className="visually-hidden">Loading project details...</span>
+              </Spinner>
+              <p className="mt-3 text-muted">Loading project details...</p>
+            </div>
+          ) : selectedProject && (
             <>
               {/* Project Stats */}
               <Row className="g-2 mb-3">
@@ -1011,9 +1276,13 @@ const WorkPlannerProjects = () => {
                 <Col xs={6}>
                   <div className="detail-section">
                     <div className="detail-label">Overdue Tasks</div>
-                    <div style={{ fontSize: '1.75rem', fontWeight: '700', color: selectedProject.overdue > 0 ? '#ef4444' : '#10b981' }}>
-                      {selectedProject.overdue}
-                    </div>
+                    {loadingOverdueTasks ? (
+                      <Spinner animation="border" size="sm" />
+                    ) : (
+                      <div style={{ fontSize: '1.75rem', fontWeight: '700', color: (overdueTasks.length > 0) ? '#ef4444' : '#10b981' }}>
+                        {overdueTasks.length}
+                      </div>
+                    )}
                   </div>
                 </Col>
               </Row>
@@ -1037,31 +1306,55 @@ const WorkPlannerProjects = () => {
                   <div className="detail-section">
                     <div className="detail-label">Owner / PM</div>
                     <div style={{ fontSize: '0.875rem', fontWeight: '500', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '50%',
-                          backgroundColor: '#667eea',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.7rem',
-                          fontWeight: '600'
-                        }}
-                      >
-                        {selectedProject.owner.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      <span>{selectedProject.owner}</span>
+                      {selectedProjectDetails?.owner_extension_number ? (
+                        <>
+                          <div
+                            style={{
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '50%',
+                              backgroundColor: '#667eea',
+                              color: 'white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.7rem',
+                              fontWeight: '600'
+                            }}
+                          >
+                            {selectedProjectDetails.owner_extension_number.substring(0, 2).toUpperCase()}
+                          </div>
+                          <span>{selectedProjectDetails.owner_extension_number}</span>
+                        </>
+                      ) : (
+                        <>
+                          <div
+                            style={{
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '50%',
+                              backgroundColor: '#667eea',
+                              color: 'white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.7rem',
+                              fontWeight: '600'
+                            }}
+                          >
+                            {selectedProject.owner.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <span>{selectedProject.owner}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </Col>
                 <Col xs={6}>
                   <div className="detail-section">
-                    <div className="detail-label">Team</div>
+                    <div className="detail-label">Status</div>
                     <Badge 
-                      bg="primary" 
+                      bg={selectedProjectDetails?.status === 'active' ? 'success' : selectedProjectDetails?.status === 'completed' ? 'secondary' : 'warning'}
                       style={{ 
                         fontSize: '0.75rem', 
                         fontWeight: '600',
@@ -1069,7 +1362,7 @@ const WorkPlannerProjects = () => {
                         display: 'inline-block'
                       }}
                     >
-                      {selectedProject.team}
+                      {(selectedProjectDetails?.status || selectedProject.status).toUpperCase()}
                     </Badge>
                   </div>
                 </Col>
@@ -1077,9 +1370,16 @@ const WorkPlannerProjects = () => {
 
               {/* Team Members */}
               <div className="detail-section">
-                <div className="detail-label">Team Members ({selectedProject.members.length})</div>
+                <div className="detail-label">Team Members ({selectedProjectDetails?.members?.length || selectedProject.members.length})</div>
                 <div className="d-flex flex-wrap gap-2">
-                  {selectedProject.members.map((member, idx) => (
+                  {(selectedProjectDetails?.members || selectedProject.members).map((member: any, idx: number) => {
+                    const memberData = selectedProjectDetails?.members?.[idx] || member;
+                    const extensionNumber = memberData.extension_number || memberData.name || '';
+                    const initials = extensionNumber.substring(0, 2).toUpperCase();
+                    const colors = ['#667eea', '#f56565', '#48bb78', '#ed64a6', '#4299e1', '#9f7aea', '#fc8181'];
+                    const color = memberData.color || colors[idx % colors.length];
+                    
+                    return (
                     <div
                       key={idx}
                       style={{
@@ -1099,7 +1399,7 @@ const WorkPlannerProjects = () => {
                           width: '28px',
                           height: '28px',
                           borderRadius: '50%',
-                          backgroundColor: member.color,
+                          backgroundColor: color,
                           color: 'white',
                           display: 'flex',
                           alignItems: 'center',
@@ -1109,13 +1409,14 @@ const WorkPlannerProjects = () => {
                           flexShrink: 0
                         }}
                       >
-                        {member.initials}
+                        {initials}
                       </div>
                       <span style={{ fontSize: '0.8125rem', fontWeight: '500', color: '#334155', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {member.name}
+                        {memberData.user?.name || extensionNumber} {memberData.role ? `(${memberData.role})` : ''}
                       </span>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1124,9 +1425,23 @@ const WorkPlannerProjects = () => {
                 <div className="detail-label">Last Updated</div>
                 <div className="d-flex align-items-center" style={{ fontSize: '0.9rem', fontWeight: '500' }}>
                   <Calendar size={16} className="me-2 text-muted" />
-                  <span>{selectedProject.lastUpdate}</span>
+                  <span>
+                    {selectedProjectDetails?.updated_at 
+                      ? new Date(selectedProjectDetails.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                      : selectedProject.lastUpdate}
+                  </span>
                 </div>
               </div>
+              
+              {/* Description */}
+              {selectedProjectDetails?.description && (
+                <div className="detail-section">
+                  <div className="detail-label">Description</div>
+                  <div style={{ fontSize: '0.875rem', color: '#475569' }}>
+                    {selectedProjectDetails.description}
+                  </div>
+                </div>
+              )}
 
               {/* Tabs for Activity/Comments/History */}
               <Nav variant="tabs" className="detail-tabs" activeKey={detailTab} onSelect={(k) => k && setDetailTab(k)}>
@@ -1137,7 +1452,7 @@ const WorkPlannerProjects = () => {
                 </Nav.Item>
                 <Nav.Item>
                   <Nav.Link eventKey="Comments">
-                    Comments (3)
+                    Comments 
                   </Nav.Link>
                 </Nav.Item>
                 <Nav.Item>
@@ -1153,114 +1468,56 @@ const WorkPlannerProjects = () => {
                 {detailTab === 'Activity' && (
                   <div>
                     <div className="detail-label" style={{ marginBottom: '1rem' }}>Recent Activity</div>
-                    <div className="d-flex flex-column gap-3">
-                      <div className="d-flex gap-2">
-                        <div style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          backgroundColor: '#667eea',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.7rem',
-                          fontWeight: '600',
-                          flexShrink: 0
-                        }}>
-                          JD
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.875rem', color: '#334155' }}>
-                            <span style={{ fontWeight: '600' }}>John D.</span> completed task 
-                            <span style={{ fontWeight: '600', color: '#3b82f6' }}> Homepage Design Review</span>
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                            2 hours ago
-                          </div>
-                        </div>
+                    {loadingActivities ? (
+                      <div className="text-center py-3">
+                        <Spinner animation="border" size="sm" />
                       </div>
-
-                      <div className="d-flex gap-2">
-                        <div style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          backgroundColor: '#f56565',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.7rem',
-                          fontWeight: '600',
-                          flexShrink: 0
-                        }}>
-                          SK
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.875rem', color: '#334155' }}>
-                            <span style={{ fontWeight: '600' }}>Sarah K.</span> added 
-                            <span style={{ fontWeight: '600', color: '#3b82f6' }}> 3 new tasks</span> to the project
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                            5 hours ago
-                          </div>
-                        </div>
+                    ) : projectActivities.length === 0 ? (
+                      <div className="text-center py-3 text-muted" style={{ fontSize: '0.875rem' }}>
+                        No recent activity
                       </div>
-
-                      <div className="d-flex gap-2">
-                        <div style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          backgroundColor: '#48bb78',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.7rem',
-                          fontWeight: '600',
-                          flexShrink: 0
-                        }}>
-                          MW
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.875rem', color: '#334155' }}>
-                            <span style={{ fontWeight: '600' }}>Mike W.</span> uploaded 
-                            <span style={{ fontWeight: '600', color: '#3b82f6' }}> design-mockups.fig</span>
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                            1 day ago
-                          </div>
-                        </div>
+                    ) : (
+                      <div className="d-flex flex-column gap-3">
+                        {projectActivities.slice(0, 10).map((activity: any, idx: number) => {
+                          const extensionNumber = activity.extension_number || 'system';
+                          const initials = getInitials(extensionNumber);
+                          const avatarColor = getAvatarColor(extensionNumber, idx);
+                          const taskTitle = activity.task?.title || activity.task?.task_id || 'Task';
+                          const actionText = activity.description || `${activity.action} task`;
+                          
+                          return (
+                            <div key={activity.id || idx} className="d-flex gap-2">
+                              <div style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                backgroundColor: avatarColor,
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.7rem',
+                                fontWeight: '600',
+                                flexShrink: 0
+                              }}>
+                                {initials}
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '0.875rem', color: '#334155' }}>
+                                  <span style={{ fontWeight: '600' }}>{extensionNumber === 'system' ? 'System' : extensionNumber}</span> {actionText}
+                                  {activity.task && (
+                                    <span style={{ fontWeight: '600', color: '#3b82f6' }}> {taskTitle}</span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                                  {formatTimeAgo(activity.created_at)}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-
-                      <div className="d-flex gap-2">
-                        <div style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          backgroundColor: '#ed64a6',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.7rem',
-                          fontWeight: '600',
-                          flexShrink: 0
-                        }}>
-                          ER
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: '0.875rem', color: '#334155' }}>
-                            <span style={{ fontWeight: '600' }}>Emily R.</span> joined the project
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                            2 days ago
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )}
 
@@ -1305,77 +1562,6 @@ const WorkPlannerProjects = () => {
                         </div>
                       </div>
 
-                      <div className="d-flex gap-2">
-                        <div style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          backgroundColor: '#f56565',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.7rem',
-                          fontWeight: '600',
-                          flexShrink: 0
-                        }}>
-                          SK
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ 
-                            backgroundColor: '#f8fafc', 
-                            padding: '0.75rem', 
-                            borderRadius: '8px',
-                            border: '1px solid #e2e8f0'
-                          }}>
-                            <div style={{ fontSize: '0.8rem', fontWeight: '600', color: '#334155', marginBottom: '0.25rem' }}>
-                              Sarah K.
-                            </div>
-                            <div style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.5rem' }}>
-                              I've updated the color scheme to match the brand guidelines. Please review when you get a chance.
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                              Apr 21, 2024 • 10:30 AM
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="d-flex gap-2">
-                        <div style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          backgroundColor: '#48bb78',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.7rem',
-                          fontWeight: '600',
-                          flexShrink: 0
-                        }}>
-                          MW
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ 
-                            backgroundColor: '#f8fafc', 
-                            padding: '0.75rem', 
-                            borderRadius: '8px',
-                            border: '1px solid #e2e8f0'
-                          }}>
-                            <div style={{ fontSize: '0.8rem', fontWeight: '600', color: '#334155', marginBottom: '0.25rem' }}>
-                              Mike W.
-                            </div>
-                            <div style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.5rem' }}>
-                              The responsive design looks good on mobile devices. Testing completed successfully! ✓
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                              Apr 20, 2024 • 2:15 PM
-                            </div>
-                          </div>
-                        </div>
-                      </div>
                     </div>
 
                     {/* Add Comment Input */}
@@ -1404,112 +1590,61 @@ const WorkPlannerProjects = () => {
                 {detailTab === 'History' && (
                   <div>
                     <div className="detail-label" style={{ marginBottom: '1rem' }}>Project History</div>
-                    <div className="d-flex flex-column gap-2">
-                      <div style={{
-                        padding: '0.75rem',
-                        backgroundColor: '#f8fafc',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                        borderLeft: '3px solid #10b981'
-                      }}>
-                        <div className="d-flex align-items-center gap-2 mb-2">
-                          <CheckCircle2 size={16} style={{ color: '#10b981' }} />
-                          <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#334155' }}>
-                            Task Completed
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.25rem' }}>
-                          <span style={{ fontWeight: '600' }}>John D.</span> marked "Homepage Design Review" as complete
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          Apr 23, 2024 at 2:30 PM
-                        </div>
+                    {loadingActivities ? (
+                      <div className="text-center py-3">
+                        <Spinner animation="border" size="sm" />
                       </div>
-
-                      <div style={{
-                        padding: '0.75rem',
-                        backgroundColor: '#f8fafc',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                        borderLeft: '3px solid #3b82f6'
-                      }}>
-                        <div className="d-flex align-items-center gap-2 mb-2">
-                          <Edit3 size={16} style={{ color: '#3b82f6' }} />
-                          <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#334155' }}>
-                            Project Updated
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.25rem' }}>
-                          <span style={{ fontWeight: '600' }}>Sarah K.</span> updated the project status to "Active"
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          Apr 22, 2024 at 9:15 AM
-                        </div>
+                    ) : projectActivities.length === 0 ? (
+                      <div className="text-center py-3 text-muted" style={{ fontSize: '0.875rem' }}>
+                        No history available
                       </div>
-
-                      <div style={{
-                        padding: '0.75rem',
-                        backgroundColor: '#f8fafc',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                        borderLeft: '3px solid #a855f7'
-                      }}>
-                        <div className="d-flex align-items-center gap-2 mb-2">
-                          <UserPlus size={16} style={{ color: '#a855f7' }} />
-                          <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#334155' }}>
-                            Member Added
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.25rem' }}>
-                          <span style={{ fontWeight: '600' }}>John D.</span> added <span style={{ fontWeight: '600' }}>Emily R.</span> to the project
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          Apr 21, 2024 at 4:00 PM
-                        </div>
+                    ) : (
+                      <div className="d-flex flex-column gap-2">
+                        {projectActivities.map((activity: any, idx: number) => {
+                          const extensionNumber = activity.extension_number || 'system';
+                          const actionColor = getActionColor(activity.action);
+                          const taskTitle = activity.task?.title || activity.task?.task_id || 'Task';
+                          const actionText = activity.description || `${activity.action} task`;
+                          
+                          return (
+                            <div key={activity.id || idx} style={{
+                              padding: '0.75rem',
+                              backgroundColor: '#f8fafc',
+                              borderRadius: '8px',
+                              border: '1px solid #e2e8f0',
+                              borderLeft: `3px solid ${actionColor}`
+                            }}>
+                              <div className="d-flex align-items-center gap-2 mb-2">
+                                {activity.action === 'status_changed' && <CheckCircle2 size={16} style={{ color: actionColor }} />}
+                                {activity.action === 'updated' && <Edit3 size={16} style={{ color: actionColor }} />}
+                                {activity.action === 'created' && <Plus size={16} style={{ color: actionColor }} />}
+                                {activity.action === 'completed' && <CheckCircle2 size={16} style={{ color: actionColor }} />}
+                                {!['status_changed', 'updated', 'created', 'completed'].includes(activity.action) && (
+                                  <AlertCircle size={16} style={{ color: actionColor }} />
+                                )}
+                                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#334155' }}>
+                                  {actionText}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.25rem' }}>
+                                <span style={{ fontWeight: '600' }}>{extensionNumber === 'system' ? 'System' : extensionNumber}</span>
+                                {activity.task && (
+                                  <> - <span style={{ fontWeight: '600', color: '#3b82f6' }}>{taskTitle}</span></>
+                                )}
+                              </div>
+                              {activity.old_values && activity.new_values && (
+                                <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem', fontStyle: 'italic' }}>
+                                  Changed: {JSON.stringify(activity.old_values)} → {JSON.stringify(activity.new_values)}
+                                </div>
+                              )}
+                              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                {formatDateTime(activity.created_at)}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-
-                      <div style={{
-                        padding: '0.75rem',
-                        backgroundColor: '#f8fafc',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                        borderLeft: '3px solid #f59e0b'
-                      }}>
-                        <div className="d-flex align-items-center gap-2 mb-2">
-                          <Clock size={16} style={{ color: '#f59e0b' }} />
-                          <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#334155' }}>
-                            Due Date Changed
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.25rem' }}>
-                          <span style={{ fontWeight: '600' }}>Mike W.</span> changed due date from Apr 25 to Apr 30
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          Apr 20, 2024 at 11:30 AM
-                        </div>
-                      </div>
-
-                      <div style={{
-                        padding: '0.75rem',
-                        backgroundColor: '#f8fafc',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                        borderLeft: '3px solid #3b82f6'
-                      }}>
-                        <div className="d-flex align-items-center gap-2 mb-2">
-                          <FolderOpen size={16} style={{ color: '#3b82f6' }} />
-                          <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#334155' }}>
-                            Project Created
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.25rem' }}>
-                          <span style={{ fontWeight: '600' }}>John D.</span> created the project
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          Apr 15, 2024 at 9:00 AM
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1517,6 +1652,122 @@ const WorkPlannerProjects = () => {
           )}
         </Offcanvas.Body>
       </Offcanvas>
+
+      {/* Project Form Modal */}
+      <Modal 
+        show={showProjectModal} 
+        onHide={() => {
+          setShowProjectModal(false);
+          setEditingProject(null);
+          setProjectFormData({
+            name: '',
+            description: '',
+            color: '#3b82f6'
+          });
+        }}
+        centered
+        size="lg"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>{editingProject ? 'Edit Project' : 'Create New Project'}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form onSubmit={handleSubmitProject}>
+            <Form.Group className="mb-3">
+              <Form.Label>Project Name <span className="text-danger">*</span></Form.Label>
+              <Form.Control
+                type="text"
+                value={projectFormData.name}
+                onChange={(e) => setProjectFormData({ ...projectFormData, name: e.target.value })}
+                placeholder="Enter project name"
+                required
+              />
+            </Form.Group>
+            
+            <Form.Group className="mb-3">
+              <Form.Label>Description</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={projectFormData.description}
+                onChange={(e) => setProjectFormData({ ...projectFormData, description: e.target.value })}
+                placeholder="Enter project description"
+              />
+            </Form.Group>
+            
+            <Form.Group className="mb-3">
+              <Form.Label>Color</Form.Label>
+              <div className="d-flex align-items-center gap-3">
+                <Form.Control
+                  type="color"
+                  value={projectFormData.color}
+                  onChange={(e) => setProjectFormData({ ...projectFormData, color: e.target.value })}
+                  style={{ width: '80px', height: '40px' }}
+                />
+                <Form.Control
+                  type="text"
+                  value={projectFormData.color}
+                  onChange={(e) => setProjectFormData({ ...projectFormData, color: e.target.value })}
+                  placeholder="#3b82f6"
+                  style={{ flex: 1 }}
+                />
+              </div>
+            </Form.Group>
+            
+            <div className="d-flex justify-content-end gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowProjectModal(false);
+                  setEditingProject(null);
+                  setProjectFormData({
+                    name: '',
+                    description: '',
+                    color: '#3b82f6'
+                  });
+                }}
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
+                disabled={submitting || !projectFormData.name.trim()}
+              >
+                {submitting ? (
+                  <>
+                    <Spinner
+                      as="span"
+                      animation="border"
+                      size="sm"
+                      role="status"
+                      aria-hidden="true"
+                      className="me-2"
+                    />
+                    {editingProject ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  editingProject ? 'Update Project' : 'Create Project'
+                )}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setProjectToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        itemName={projectToDelete?.name}
+        itemType="project"
+        loading={deleting}
+      />
     </>
 
     </React.Fragment>
