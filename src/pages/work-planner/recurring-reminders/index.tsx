@@ -99,6 +99,7 @@ const RecurringReminders = () => {
       total: 0,
       last_page: 1
     });
+    const [showTaskDetail, setShowTaskDetail] = useState(false);
     const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deletingTask, setDeletingTask] = useState(false);
