@@ -181,7 +181,8 @@ const WorkPlannerProjects = () => {
         : 'N/A';
       
       // Default icon based on project name
-      const iconMap: { [key: string]: React.ElementType } = {
+      type IconComponent = typeof Folder;
+      const iconMap: Record<string, IconComponent> = {
         'website': Palette,
         'mobile': Smartphone,
         'marketing': Megaphone,
@@ -193,10 +194,10 @@ const WorkPlannerProjects = () => {
       };
       
       const projectNameLower = apiProject.name.toLowerCase();
-      let Icon = Folder;
-      for (const [key, icon] of Object.entries(iconMap)) {
+      let Icon: IconComponent = Folder;
+      for (const key in iconMap) {
         if (projectNameLower.includes(key)) {
-          Icon = icon;
+          Icon = iconMap[key];
           break;
         }
       }
