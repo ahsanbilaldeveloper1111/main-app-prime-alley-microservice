@@ -71,6 +71,7 @@ const DealTemplatesPage = () => {
     industry_id: null as number | null,
     name: "",
     description: "",
+    is_default: false,
   });
   const [fields, setFields] = useState<Array<{
     id: string;
@@ -139,10 +140,17 @@ const DealTemplatesPage = () => {
   const handleOpenModal = async (template?: DealTemplateData) => {
     if (template) {
       setEditingTemplate(template);
+      const isDefaultValue = (template as any).is_default;
+      // Handle both string and boolean values
+      const isDefault = typeof isDefaultValue === 'string' 
+        ? isDefaultValue === 'true' 
+        : Boolean(isDefaultValue);
+      
       setFormData({
         industry_id: template.industry_id,
         name: template.name || "",
         description: template.description || "",
+        is_default: isDefault,
       });
       setFields(
         (template.fields || []).map((field) => ({
@@ -160,6 +168,7 @@ const DealTemplatesPage = () => {
         industry_id: null,
         name: "",
         description: "",
+        is_default: false,
       });
       setFields([]);
     }
@@ -256,19 +265,21 @@ const DealTemplatesPage = () => {
 
       if (editingTemplate) {
         // Update payload doesn't require industry_id
-        const updatePayload: UpdateDealTemplatePayload = {
+        const updatePayload: UpdateDealTemplatePayload & { is_default?: string } = {
           name: formData.name.trim(),
           description: formData.description.trim() || undefined,
           fields: fieldsPayload,
+          is_default: formData.is_default ? "true" : "false",
         };
         await updateDealTemplate(editingTemplate.id, updatePayload);
       } else {
         // Create payload requires industry_id
         
-        const createPayload: CreateDealTemplatePayload = {
+        const createPayload: CreateDealTemplatePayload & { is_default?: string } = {
           name: formData.name.trim(),
           description: formData.description.trim() || undefined,
           fields: fieldsPayload,
+          is_default: formData.is_default ? "true" : "false",
         };
         await createDealTemplate(createPayload);
       }
@@ -544,6 +555,21 @@ const DealTemplatesPage = () => {
                 />
               </Form.Group>
 
+              <Form.Group className="mb-3">
+                <Form.Check
+                  type="switch"
+                  id="is-default-switch"
+                  label="Default"
+                  checked={formData.is_default}
+                  onChange={(e) =>
+                    setFormData({ ...formData, is_default: e.target.checked })
+                  }
+                />
+                <Form.Text className="text-muted">
+                  Mark this template as the default template
+                </Form.Text>
+              </Form.Group>
+
               {/* Fields Section */}
               <div className="mb-3">
                 <div className="d-flex justify-content-between align-items-center mb-3">
@@ -751,6 +777,16 @@ const DealTemplatesPage = () => {
                 <div>
                   {viewingTemplate.description || (
                     <span className="text-muted fst-italic">No description</span>
+                  )}
+                </div>
+              </div>
+              <div className="mb-3">
+                <Form.Label className="text-muted small">Default</Form.Label>
+                <div>
+                  {(viewingTemplate as any).is_default ? (
+                    <Badge bg="success">Yes</Badge>
+                  ) : (
+                    <Badge bg="secondary">No</Badge>
                   )}
                 </div>
               </div>

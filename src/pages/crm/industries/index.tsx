@@ -324,9 +324,9 @@ const IndustriesPage = () => {
           <Card.Body className="p-3">
             <div className="d-flex justify-content-between align-items-center">
               <div>
-                <h5 className="mb-0 fw-bold">Industries</h5>
+                <h5 className="mb-0 fw-bold">Product Groups</h5>
                 <p className="text-muted mb-0 small">
-                  Manage industry categories for your CRM
+                  Manage product groups for your CRM
                 </p>
               </div>
               {session?.user?.permissions?.includes('add-crm-industry') && (
@@ -336,7 +336,7 @@ const IndustriesPage = () => {
                 className="d-flex align-items-center gap-2"
               >
                 <PlusCircle size={18} />
-                Add Industry
+                Add Product Group
               </Button>
               )}
             </div>
@@ -502,7 +502,7 @@ const IndustriesPage = () => {
         <Modal show={showModal} onHide={() => setShowModal(false)} centered>
           <Modal.Header closeButton>
             <Modal.Title>
-              {editingIndustry ? "Edit Industry" : "Add New Industry"}
+              {editingIndustry ? "Edit Product Group" : "Add New Product Group"}
             </Modal.Title>
           </Modal.Header>
           <Form onSubmit={handleSubmit}>
@@ -517,7 +517,7 @@ const IndustriesPage = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  placeholder="Enter industry name"
+                  placeholder="Enter product group name"
                   required
                 />
               </Form.Group>
@@ -530,7 +530,7 @@ const IndustriesPage = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  placeholder="Enter industry description"
+                  placeholder="Enter product group description"
                 />
               </Form.Group>
             </Modal.Body>
@@ -565,7 +565,7 @@ const IndustriesPage = () => {
           }}
           onConfirm={handleDelete}
           itemName={deletingIndustry?.name}
-          itemType="industry"
+          itemType="product group"
         />
 
         {/* View Modal */}
@@ -574,7 +574,7 @@ const IndustriesPage = () => {
           size="xl"
           show={showViewModal} onHide={() => setShowViewModal(false)} centered>
             <Modal.Header closeButton>
-              <Modal.Title>Industry Details</Modal.Title>
+              <Modal.Title>Product Group Details</Modal.Title>
             </Modal.Header>
             <Modal.Body>
               

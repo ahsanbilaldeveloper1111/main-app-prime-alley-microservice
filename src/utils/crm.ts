@@ -3314,7 +3314,7 @@ export const getIndustry = async (id: number): Promise<IndustryData> => {
     const response = await axiosInstance.get(`/crm/industries/${id}`);
     return extractData<IndustryData>(response.data);
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch industry");
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch product group");
     throw error;
   }
 };
@@ -3322,10 +3322,10 @@ export const getIndustry = async (id: number): Promise<IndustryData> => {
 export const createIndustry = async (data: CreateIndustryPayload): Promise<IndustryData> => {
   try {
     const response = await axiosInstance.post("/crm/industries", data);
-    toast.success("Industry created successfully");
+    toast.success("Product group created successfully");
     return extractData<IndustryData>(response.data);
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to create industry");
+    toast.error(error?.response?.data?.message || error?.message || "Failed to create product group");
     throw error;
   }
 };
@@ -3336,10 +3336,10 @@ export const updateIndustry = async (
 ): Promise<IndustryData> => {
   try {
     const response = await axiosInstance.put(`/crm/industries/${id}`, data);
-    toast.success("Industry updated successfully");
+    toast.success("Product group updated successfully");
     return extractData<IndustryData>(response.data);
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to update industry");
+    toast.error(error?.response?.data?.message || error?.message || "Failed to update product group");
     throw error;
   }
 };
@@ -3347,9 +3347,9 @@ export const updateIndustry = async (
 export const deleteIndustry = async (id: number): Promise<void> => {
   try {
     await axiosInstance.delete(`/crm/industries/${id}`);
-    toast.success("Industry deleted successfully");
+    toast.success("Product group deleted successfully");
   } catch (error: any) {
-    toast.error(error?.response?.data?.message || error?.message || "Failed to delete industry");
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete product group");
     throw error;
   }
 };
@@ -3487,6 +3487,85 @@ export const getRelevantDealTemplate = async (
       return null;
     }
     toast.error(error?.response?.data?.message || error?.message || "Failed to fetch relevant deal template");
+    throw error;
+  }
+};
+
+// Business Types Management Interfaces
+export interface BusinessTypeData {
+  id: number;
+  name: string;
+  description: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateBusinessTypePayload {
+  name: string;
+  description: string;
+}
+
+export interface UpdateBusinessTypePayload {
+  name: string;
+  description: string;
+}
+
+// Business Types Management API
+export const getBusinessTypes = async (
+  params: PaginationParams = {}
+): Promise<PaginationWrapper<BusinessTypeData>> => {
+  try {
+    const response = await axiosInstance.get("/crm/business-types", { params });
+    return extractData<PaginationWrapper<BusinessTypeData>>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch business types");
+    throw error;
+  }
+};
+
+export const getBusinessType = async (id: number): Promise<BusinessTypeData> => {
+  try {
+    const response = await axiosInstance.get(`/crm/business-types/${id}`);
+    return extractData<BusinessTypeData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch business type");
+    throw error;
+  }
+};
+
+export const createBusinessType = async (
+  data: CreateBusinessTypePayload
+): Promise<BusinessTypeData> => {
+  try {
+    const response = await axiosInstance.post("/crm/business-types", data);
+    toast.success("Business type created successfully");
+    return extractData<BusinessTypeData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to create business type");
+    throw error;
+  }
+};
+
+export const updateBusinessType = async (
+  id: number,
+  data: UpdateBusinessTypePayload
+): Promise<BusinessTypeData> => {
+  try {
+    const response = await axiosInstance.put(`/crm/business-types/${id}`, data);
+    toast.success("Business type updated successfully");
+    return extractData<BusinessTypeData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to update business type");
+    throw error;
+  }
+};
+
+export const deleteBusinessType = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/business-types/${id}`);
+    toast.success("Business type deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete business type");
     throw error;
   }
 };

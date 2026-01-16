@@ -48,6 +48,17 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
     onHide();
   };
 
+  // Handle Enter key press to submit deletion
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isValidConfirmation && !loading) {
+        handleConfirm();
+      }
+    }
+  };
+
   // Format item type for display (capitalize first letter)
   const formattedItemType = itemType.charAt(0).toUpperCase() + itemType.slice(1);
 
@@ -74,19 +85,29 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
             </div>
           )}
           
-          <div className="text-center mt-4">
-            <Form.Label className="fw-semibold">
-              Type <span className="text-danger fw-bold">DELETE</span> to confirm
-            </Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="Type DELETE"
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              autoFocus
-              disabled={loading}
-            />
-          </div>
+          <Form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (isValidConfirmation && !loading) {
+                handleConfirm();
+              }
+            }}
+          >
+            <div className="text-center mt-4">
+              <Form.Label className="fw-semibold">
+                Type <span className="text-danger fw-bold">DELETE</span> to confirm
+              </Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="Type DELETE"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                autoFocus
+                disabled={loading}
+              />
+            </div>
+          </Form>
         </div>
       </Modal.Body>
       <Modal.Footer className="border-top">

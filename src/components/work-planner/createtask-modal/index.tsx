@@ -419,7 +419,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           const extension = extensions.find((ext: any) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
-        label_ids: formData.labelIds || []
+        label_ids: formData.labelIds || [],
+        type: taskType // Add task type (regular, recurring, or todo)
       };
 
       // Add project_id if available (optional)

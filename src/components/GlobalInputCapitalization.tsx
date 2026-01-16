@@ -46,11 +46,13 @@ const GlobalInputCapitalization = () => {
         return;
       }
 
-      // Only process text inputs and textareas
+      // Only process text inputs (type="text" or no type) and textareas
+      // Explicitly exclude other input types like email, password, number, etc.
       const isTextInput = target.tagName === 'INPUT' && 
-        (target.type === 'text' || target.type === 'email' || !target.type);
+        (target.type === 'text' || target.type === '' || !target.type);
       const isTextarea = target.tagName === 'TEXTAREA';
 
+      // Only apply capitalization to text inputs and textareas
       if (!isTextInput && !isTextarea) {
         return;
       }

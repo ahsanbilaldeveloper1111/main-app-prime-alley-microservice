@@ -387,8 +387,13 @@ MENU_COLORS: {
     VIEW_CRM_DEALS_REPORTS: 'view-deals-reports-crm-reports',
     VIEW_CRM_ORDERS_REPORTS: 'view-orders-reports-crm-reports',
     VIEW_CRM_HISTORY: 'view-crm-history',
+
     VIEW_CRM_DEAL_TEMPLATES: 'view-crm-deal-templates',
     VIEW_CRM_INDUSTRIES: 'view-crm-industry',
+    VIEW_CRM_BUSINESS_TYPES: 'view-crm-business-types',
+    CREATE_CRM_BUSINESS_TYPES: 'add-crm-business-types',
+    EDIT_CRM_BUSINESS_TYPES: 'edit-crm-business-types',
+    DELETE_CRM_BUSINESS_TYPES: 'delete-crm-business-types',
 
     VIEW_GSM_DASHBOARD: 'dashboard-gsm-management',
     VIEW_GSM_MANAGEMENT: 'view-gsm-management',

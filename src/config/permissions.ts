@@ -386,8 +386,10 @@ export const routePermissions: RoutePermission[] = [
             { path: '/products',permissions: [PERMISSIONS.VIEW_CRM_PRODUCTS]},
             { path: '/history',permissions: [PERMISSIONS.VIEW_CRM_HISTORY]},
             { path: '/reports',permissions: [PERMISSIONS.VIEW_CRM_REPORTS]},
-            { path: '/industries',permissions: [PERMISSIONS.CRM_SERVICES]},
-            { path: '/deal-templates',permissions: [PERMISSIONS.CRM_SERVICES]},
+
+            { path: '/industries',permissions: [PERMISSIONS.VIEW_CRM_INDUSTRIES]},
+            { path: '/deal-templates',permissions: [PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES]},
+            { path: '/business-types',permissions: [PERMISSIONS.VIEW_CRM_BUSINESS_TYPES]},
         ]
     },
     

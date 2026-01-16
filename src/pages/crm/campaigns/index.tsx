@@ -2398,7 +2398,7 @@ const CrmCampaigns = () => {
           <Row>
             <Col md={6}>
               <Form.Group className="mb-4">
-                <Form.Label>Industries</Form.Label>
+                <Form.Label>Product Groups</Form.Label>
                 <Select
                   isMulti
                   value={selectedIndustries}
@@ -2408,7 +2408,7 @@ const CrmCampaigns = () => {
                     label: industry.name,
                     id: industry.id,
                   }))}
-                  placeholder="Select industries..."
+                  placeholder="Select product groups..."
                   styles={{
                     control: (base) => ({
                       ...base,
@@ -2419,7 +2419,7 @@ const CrmCampaigns = () => {
                   }}
                 />
                 <Form.Text className="text-muted">
-                  Select one or more industries for this campaign.
+                  Select one or more product groups for this campaign.
                 </Form.Text>
               </Form.Group>
             </Col>

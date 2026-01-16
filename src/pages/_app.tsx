@@ -31,13 +31,17 @@ const AppContent: React.FC<{ Component: NextPageWithLayout; pageProps: any; getL
   const { hasPermission } = usePermissions();
   const router = useRouter();
 
-  // Check if current route is under /help-center/
-  const isHelpCenterPage = router.pathname.startsWith('/help-center');
+  // Check if current route should exclude chatbot
+  const isLiveCallsPage = router.pathname.startsWith('/live-calls');
+  const isLoginPage = router.pathname.startsWith('/auth/signin') || 
+                      router.pathname.startsWith('/pages/login') ||
+                      router.pathname === '/login';
+  const shouldShowChatbot = !isLiveCallsPage && !isLoginPage;
 
   return (
     <>
       {getLayout(<Component {...pageProps} />)}
-      {status === 'authenticated' && session && hasPermission('live-chat-users') && isHelpCenterPage && <ChatbotWidget />}
+      {status === 'authenticated' && session && hasPermission('live-chat-users') && shouldShowChatbot && <ChatbotWidget />}
     </>
   );
 };

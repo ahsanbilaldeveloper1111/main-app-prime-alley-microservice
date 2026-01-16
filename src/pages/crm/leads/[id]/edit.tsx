@@ -15,6 +15,8 @@ import {
   CrmDataItem,
   getIndustries,
   IndustryData,
+  getBusinessTypes,
+  BusinessTypeData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge } from "react-bootstrap";
@@ -99,6 +101,12 @@ const EditLead = () => {
   const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>([]);
   const [loadingAllIndustries, setLoadingAllIndustries] = useState(false);
   const [loadingIndustries, setLoadingIndustries] = useState(false);
+
+  // Business type state
+  const [businessTypes, setBusinessTypes] = useState<BusinessTypeData[]>([]);
+  const [businessTypeId, setBusinessTypeId] = useState<number | null>(null);
+  const [businessTypeOther, setBusinessTypeOther] = useState<string>("");
+  const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
 
   // Location state
   const [selectedCountry, setSelectedCountry] = useState<{
@@ -310,6 +318,23 @@ const EditLead = () => {
               }],
         });
 
+        // Set business type state - check for business_type_id or business_type_other
+        // Note: If businessTypes haven't loaded yet, we'll handle it in useEffect
+        if (leadDataAny.business_type_id) {
+          setBusinessTypeId(Number(leadDataAny.business_type_id));
+          setBusinessTypeOther("");
+          setShowOtherBusinessType(false);
+        } else if (leadDataAny.business_type_other) {
+          setBusinessTypeId(null);
+          setBusinessTypeOther(leadDataAny.business_type_other);
+          setShowOtherBusinessType(true);
+        } else {
+          // Will be handled in useEffect after businessTypes load
+          setBusinessTypeId(null);
+          setBusinessTypeOther("");
+          setShowOtherBusinessType(false);
+        }
+
         // Fetch stages for the lead type
         await fetchStages(leadType);
         isInitialLoad.current = false;
@@ -435,7 +460,34 @@ const EditLead = () => {
     fetchExtensions();
     fetchCampaigns();
     fetchCrmData();
+    fetchBusinessTypes();
   }, []);
+
+  const fetchBusinessTypes = async () => {
+    try {
+      const businessTypesResponse = await getBusinessTypes({ per_page: 1000 });
+      setBusinessTypes(businessTypesResponse?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch business types:", error);
+    }
+  };
+
+  // Update business type when businessTypes are loaded and we have business_type from lead data
+  useEffect(() => {
+    if (businessTypes.length > 0 && formData.business_type && !businessTypeId && !businessTypeOther) {
+      const matchingType = businessTypes.find(bt => bt.name === formData.business_type);
+      if (matchingType) {
+        setBusinessTypeId(matchingType.id);
+        setBusinessTypeOther("");
+        setShowOtherBusinessType(false);
+      } else {
+        // If not found, treat as "other"
+        setBusinessTypeId(null);
+        setBusinessTypeOther(formData.business_type);
+        setShowOtherBusinessType(true);
+      }
+    }
+  }, [businessTypes, formData.business_type, businessTypeId, businessTypeOther]);
 
   // Fetch all industries
   useEffect(() => {
@@ -765,7 +817,8 @@ const EditLead = () => {
         ...(formData.description && { description: formData.description }),
         ...(formData.company_name && { company_name: formData.company_name }),
         ...(formData.industry_ids && formData.industry_ids.length > 0 && { industry_ids: formData.industry_ids }),
-        ...(formData.business_type && { business_type: formData.business_type }),
+        ...(businessTypeId && { business_type_id: String(businessTypeId) }),
+        ...(businessTypeOther && { business_type_other: businessTypeOther }),
         ...(formData.company_country && { company_country: formData.company_country }),
         ...(formData.company_province && { company_province: formData.company_province }),
         ...(formData.company_city && { company_city: formData.company_city }),
@@ -1209,45 +1262,53 @@ const EditLead = () => {
                                 />
                               </Form.Group>
                             </Col>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Industry</Form.Label>
-                                <Select
-                                  isMulti
-                                  options={allIndustries.map((ind) => ({ value: ind.id, label: ind.name }))}
-                                  value={formData.industry_ids.map((id) => {
-                                    const industry = allIndustries.find((ind) => ind.id === id);
-                                    return industry ? { value: industry.id, label: industry.name } : null;
-                                  }).filter(Boolean) as any}
-                                  onChange={(selected) =>
-                                    setFormData({
-                                      ...formData,
-                                      industry_ids: selected ? selected.map((option: any) => option.value) : [],
-                                    })
-                                  }
-                                  placeholder="Select industries..."
-                                  isLoading={loadingAllIndustries}
-                                  isDisabled={loadingAllIndustries}
-                                  isClearable
-                                />
-                              </Form.Group>
-                            </Col>
+                            
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>Business Type</Form.Label>
                                 <Form.Select
-                                  value={formData.business_type}
-                                  onChange={(e) => handleInputChange("business_type", e.target.value)}
+                                  value={showOtherBusinessType ? "other" : (businessTypeId ? String(businessTypeId) : "")}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    if (value === "other") {
+                                      setShowOtherBusinessType(true);
+                                      setBusinessTypeId(null);
+                                      setBusinessTypeOther("");
+                                    } else if (value) {
+                                      setShowOtherBusinessType(false);
+                                      setBusinessTypeId(Number(value));
+                                      setBusinessTypeOther("");
+                                    } else {
+                                      setShowOtherBusinessType(false);
+                                      setBusinessTypeId(null);
+                                      setBusinessTypeOther("");
+                                    }
+                                  }}
                                 >
-                                  <option value="">Select Type</option>
-                                  <option value="Individual">Individual</option>
-                                  <option value="Family">Family</option>
-                                  <option value="SME">SME</option>
-                                  <option value="Corporate">Corporate</option>
-                                  <option value="Enterprise">Enterprise</option>
+                                  <option value="">Select Business Type</option>
+                                  {businessTypes.map((businessType) => (
+                                    <option key={businessType.id} value={businessType.id}>
+                                      {businessType.name}
+                                    </option>
+                                  ))}
+                                  <option value="other">Other</option>
                                 </Form.Select>
                               </Form.Group>
                             </Col>
+
+                            {showOtherBusinessType && (
+                              <Col md={6}>
+                                <Form.Group className="mb-3">
+                                <Form.Label>Business Type (Other)</Form.Label>
+                                <Form.Control
+                                  type="text"
+                                  value={businessTypeOther}
+                                  onChange={(e) => setBusinessTypeOther(e.target.value)}
+                                  placeholder="Enter business type"
+                                />
+                                </Form.Group>
+                              </Col>
+                            )}
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>Company Country</Form.Label>

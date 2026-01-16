@@ -16,6 +16,8 @@ import {
   DealTemplateData,
   DealTemplateField,
   IndustryData,
+  getBusinessTypes,
+  BusinessTypeData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge, Table, Modal } from "react-bootstrap";
@@ -49,6 +51,7 @@ const CreateDeal = () => {
   const [loadingIndustries, setLoadingIndustries] = useState(false);
   const [allIndustries, setAllIndustries] = useState<IndustryData[]>([]);
   const [loadingAllIndustries, setLoadingAllIndustries] = useState(false);
+  const [showAllIndustries, setShowAllIndustries] = useState(false);
   const [estimationItems, setEstimationItems] = useState<Array<{
     product_id: number;
     product_service: string;
@@ -109,9 +112,25 @@ const CreateDeal = () => {
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [templateFieldsData, setTemplateFieldsData] = useState<Record<string, any>>({});
 
+  // Business type state
+  const [businessTypes, setBusinessTypes] = useState<BusinessTypeData[]>([]);
+  const [businessTypeId, setBusinessTypeId] = useState<number | null>(null);
+  const [businessTypeOther, setBusinessTypeOther] = useState<string>("");
+  const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
+
+  const fetchBusinessTypes = async () => {
+    try {
+      const businessTypesResponse = await getBusinessTypes({ per_page: 1000 });
+      setBusinessTypes(businessTypesResponse?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch business types:", error);
+    }
+  };
+
   useEffect(() => {
     fetchStages();
     fetchExtensions();
+    fetchBusinessTypes();
     // Don't fetch all products initially - wait for industry selection
   }, []);
 
@@ -479,6 +498,8 @@ const CreateDeal = () => {
         expected_close_date: formData.expected_close_date,
         company_name: formData.company_name,
         industry_ids: formData.industry_ids,
+        ...(businessTypeId ? { business_type_id: String(businessTypeId) } : {}),
+        ...(businessTypeOther ? { business_type_other: businessTypeOther } : {}),
         decision_maker_title: formData.decision_maker_title,
         decision_maker_name: formData.decision_maker_name,
         decision_maker_phone_country_code: formData.decision_maker_phone_country_code,
@@ -858,29 +879,53 @@ const CreateDeal = () => {
                     </Col>
                     <Col md={6}>
                       <Form.Group className="mb-3">
-                        <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
-                        <Select
-                          isMulti
-                          options={allIndustries.map((ind) => ({ value: ind.id, label: ind.name }))}
-                          value={formData.industry_ids.map((id) => {
-                            const industry = allIndustries.find((ind) => ind.id === id);
-                            return industry ? { value: industry.id, label: industry.name } : null;
-                          }).filter(Boolean) as any}
-                          onChange={(selected) =>
-                            setFormData({
-                              ...formData,
-                              industry_ids: selected ? selected.map((option: any) => option.value) : [],
-                            })
-                          }
-                          placeholder="Select industries..."
-                          isLoading={loadingAllIndustries}
-                          isDisabled={loadingAllIndustries}
-                          isClearable
+                        <Form.Label>Select Business Type <span className="text-danger">*</span></Form.Label>
+                        <Form.Select
+                          value={showOtherBusinessType ? "other" : (businessTypeId ? String(businessTypeId) : "")}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === "other") {
+                              setShowOtherBusinessType(true);
+                              setBusinessTypeId(null);
+                              setBusinessTypeOther("");
+                            } else if (value) {
+                              setShowOtherBusinessType(false);
+                              setBusinessTypeId(Number(value));
+                              setBusinessTypeOther("");
+                            } else {
+                              setShowOtherBusinessType(false);
+                              setBusinessTypeId(null);
+                              setBusinessTypeOther("");
+                            }
+                          }}
                           required
-                        />
+                        >
+                          <option value="">Select Business Type</option>
+                          {businessTypes.map((businessType) => (
+                            <option key={businessType.id} value={businessType.id}>
+                              {businessType.name}
+                            </option>
+                          ))}
+                          <option value="other">Other</option>
+                        </Form.Select>
                       </Form.Group>
                     </Col>
-                    <Col md={4}>
+
+                    {showOtherBusinessType && (
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Business Type (Other) <span className="text-danger">*</span></Form.Label>
+                          <Form.Control
+                            type="text"
+                            value={businessTypeOther}
+                            onChange={(e) => setBusinessTypeOther(e.target.value)}
+                            placeholder="Enter business type"
+                            required
+                          />
+                        </Form.Group>
+                      </Col>
+                    )}
+                    <Col md={6}>
                       <Form.Group className="mb-3">
                         <Form.Label>Decision Maker Title</Form.Label>
                         <Form.Select 
@@ -895,7 +940,7 @@ const CreateDeal = () => {
                         </Form.Select>
                       </Form.Group>
                     </Col>
-                    <Col md={8}>
+                    <Col md={6}>
                       <Form.Group className="mb-3">
                         <Form.Label>Decision Maker Name <span className="text-danger">*</span></Form.Label>
                         <Form.Control 
@@ -911,7 +956,8 @@ const CreateDeal = () => {
                       <Form.Group className="mb-3">
                         <Form.Label>Decision Maker Email <span className="text-danger">*</span></Form.Label>
                         <Form.Control 
-                          type="email" 
+                          type="email"
+                          autoCapitalize="off" 
                           value={formData.decision_maker_email}
                           onChange={(e) => setFormData({ ...formData, decision_maker_email: e.target.value })}
                           placeholder="decisionmaker@company.com" 
@@ -1179,6 +1225,7 @@ const CreateDeal = () => {
                       size="sm"
                       onClick={() => {
                         setEditingItemIndex(null);
+                        setShowAllIndustries(false);
                         setItemFormData({
                           product_id: null,
                           product_service: "",
@@ -1464,6 +1511,7 @@ const CreateDeal = () => {
             <Modal show={showAddItemModal} onHide={() => {
               setShowAddItemModal(false);
               setEditingItemIndex(null);
+              setShowAllIndustries(false);
               setItemFormData({
                 product_id: null,
                 product_service: "",
@@ -1510,16 +1558,38 @@ const CreateDeal = () => {
                 <Modal.Body>
                   <Row className="g-3">
                     {/* Industry Selection */}
-                    {(() => {
-                      // Get industries from user selection or campaign industries
-                      const availableIndustries = formData.industry_ids && formData.industry_ids.length > 0
-                        ? allIndustries.filter(ind => formData.industry_ids.includes(ind.id))
-                        : campaignIndustries;
-                      
-                      return availableIndustries.length > 0 ? (
-                        <Col md={12}>
-                          <Form.Group>
-                            <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
+                    <Col md={12}>
+                      <Form.Group>
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <Form.Label>Product Group <span className="text-danger">*</span></Form.Label>
+                          <Form.Check
+                            type="switch"
+                            id="show-all-industries"
+                            label="Show All Product Groups"
+                            checked={showAllIndustries}
+                            onChange={(e) => {
+                              setShowAllIndustries(e.target.checked);
+                              // Reset selected industry when switching
+                              setSelectedIndustryId(null);
+                              setItemFormData({
+                                ...itemFormData,
+                                product_id: null,
+                                product_service: "",
+                                unit_price: 0,
+                              });
+                              setProducts([]);
+                            }}
+                          />
+                        </div>
+                        {(() => {
+                          // Determine available industries based on switch
+                          const availableIndustries = showAllIndustries
+                            ? allIndustries
+                            : (formData.industry_ids && formData.industry_ids.length > 0
+                              ? allIndustries.filter(ind => formData.industry_ids.includes(ind.id))
+                              : campaignIndustries);
+                          
+                          return (
                             <Select
                               value={selectedIndustryId ? {
                                 value: selectedIndustryId,
@@ -1530,21 +1600,29 @@ const CreateDeal = () => {
                                 value: industry.id,
                                 label: industry.name
                               }))}
-                              placeholder="Select industry..."
+                              placeholder="Select product group..."
                               isSearchable
                               isLoading={loadingIndustries || loadingAllIndustries}
-                              isDisabled={loadingIndustries || loadingAllIndustries || availableIndustries.length === 1}
+                              isDisabled={loadingIndustries || loadingAllIndustries || (availableIndustries.length === 1 && !showAllIndustries)}
                               required
                             />
-                            {availableIndustries.length === 1 && (
-                              <Form.Text className="text-muted">
-                                Only one industry available
-                              </Form.Text>
-                            )}
-                          </Form.Group>
-                        </Col>
-                      ) : null;
-                    })()}
+                          );
+                        })()}
+                        {(() => {
+                          const availableIndustries = showAllIndustries
+                            ? allIndustries
+                            : (formData.industry_ids && formData.industry_ids.length > 0
+                              ? allIndustries.filter(ind => formData.industry_ids.includes(ind.id))
+                              : campaignIndustries);
+                          
+                          return availableIndustries.length === 1 && !showAllIndustries ? (
+                            <Form.Text className="text-muted">
+                              Only one industry available
+                            </Form.Text>
+                          ) : null;
+                        })()}
+                      </Form.Group>
+                    </Col>
                     
                     <Col md={12}>
                       <Form.Group>
@@ -1701,6 +1779,7 @@ const CreateDeal = () => {
                   <Button variant="outline-secondary" onClick={() => {
                     setShowAddItemModal(false);
                     setEditingItemIndex(null);
+                    setShowAllIndustries(false);
                     setItemFormData({
                       product_id: null,
                       product_service: "",

@@ -12,9 +12,18 @@ import {
   getCrmData,
   getCrmDataById,
   CrmDataItem,
+  getBusinessTypes,
+  BusinessTypeData,
+  getDealTemplate,
+  DealTemplateData,
+  DealTemplateField,
+  getIndustries,
+  IndustryData,
+  getCrmProducts,
+  CrmProduct,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import { Button, Row, Col, Form, Card, Alert, Badge } from "react-bootstrap";
+import { Button, Row, Col, Form, Card, Alert, Badge, Table, Modal } from "react-bootstrap";
 import Select from "react-select";
 import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber } from "react-phone-number-input";
@@ -34,6 +43,7 @@ import {
   ChevronRight,
   AlertCircle,
   X,
+  Edit,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-toastify";
@@ -104,6 +114,7 @@ const CreateLead = () => {
 
   const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
   const [crmData, setCrmData] = useState<CrmDataItem[]>([]);
+  const [businessTypes, setBusinessTypes] = useState<BusinessTypeData[]>([]);
   const [selectedCrmData, setSelectedCrmData] = useState<CrmDataItem | null>(
     null
   );
@@ -113,6 +124,44 @@ const CreateLead = () => {
   const [loading, setLoading] = useState(false);
   const [isOpportunity, setIsOpportunity] = useState(false);
   const isInitialLoad = useRef(true);
+
+  // Business type state
+  const [businessTypeId, setBusinessTypeId] = useState<number | null>(null);
+  const [businessTypeOther, setBusinessTypeOther] = useState<string>("");
+  const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
+
+  // Deal template state
+  const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(null);
+  const [templateFieldsData, setTemplateFieldsData] = useState<Record<string, any>>({});
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+
+  // Industries and estimation state
+  const [campaignIndustries, setCampaignIndustries] = useState<IndustryData[]>([]);
+  const [allIndustries, setAllIndustries] = useState<IndustryData[]>([]);
+  const [showOtherIndustries, setShowOtherIndustries] = useState(false);
+  const [selectedIndustryId, setSelectedIndustryId] = useState<number | null>(null);
+  const [estimationItems, setEstimationItems] = useState<Array<{
+    product_id: number;
+    product_service: string;
+    description: string;
+    qty: number;
+    unit_price: number;
+    original_currency: string;
+    original_price: number;
+    industry_id?: number;
+  }>>([]);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [products, setProducts] = useState<CrmProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [itemFormData, setItemFormData] = useState({
+    product_id: null as number | null,
+    product_service: "",
+    description: "",
+    qty: 1,
+    unit_price: 0,
+    industry_id: null as number | null,
+  });
 
   // Location state
   const [selectedCountry, setSelectedCountry] = useState<{
@@ -272,7 +321,18 @@ const CreateLead = () => {
     fetchExtensions();
     fetchCampaigns();
     fetchCrmData();
+    fetchBusinessTypes();
+    fetchAllIndustries();
   }, []);
+
+  const fetchAllIndustries = async () => {
+    try {
+      const industriesResponse = await getIndustries({ per_page: 1000 });
+      setAllIndustries(industriesResponse?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch all industries:", error);
+    }
+  };
 
   // Set initial type and fetch stages when router is ready
   useEffect(() => {
@@ -590,6 +650,31 @@ const CreateLead = () => {
     }
   };
 
+  const fetchBusinessTypes = async () => {
+    try {
+      const businessTypesResponse = await getBusinessTypes({ per_page: 1000 });
+      setBusinessTypes(businessTypesResponse?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch business types:", error);
+    }
+  };
+
+  const loadProductsForIndustry = async (industryId: number) => {
+    setLoadingProducts(true);
+    try {
+      const productsResponse = await getCrmProducts({
+        per_page: 1000,
+        industry_id: industryId,
+      });
+      setProducts(productsResponse?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+      setProducts([]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
   const addContactPerson = () => {
     setFormData((prev) => ({
       ...prev,
@@ -702,9 +787,8 @@ const CreateLead = () => {
         ...(formData.description && { description: formData.description }),
         ...(formData.company_name && { company_name: formData.company_name }),
         ...(formData.industry && { industry: formData.industry }),
-        ...(formData.business_type && {
-          business_type: formData.business_type,
-        }),
+        ...(businessTypeId && { business_type_id: String(businessTypeId) }),
+        ...(businessTypeOther && { business_type_other: businessTypeOther }),
         ...(formData.company_country && {
           company_country: formData.company_country,
         }),
@@ -739,6 +823,13 @@ const CreateLead = () => {
           Object.keys(formData.campaign_field_values).length > 0 && {
             campaign_field_values: formData.campaign_field_values,
           }),
+        ...(templateFieldsData &&
+          Object.keys(templateFieldsData).length > 0 && {
+            template_fields_data: templateFieldsData,
+          }),
+        ...(estimationItems.length > 0 && {
+          estimation_items: estimationItems,
+        }),
         ...(formData.contact_persons.length > 0 && {
           contact_persons: formData.contact_persons,
         }),
@@ -857,6 +948,9 @@ const CreateLead = () => {
 
     if (!campaignId) {
       setSelectedCampaign(null);
+      setDealTemplate(null);
+      setTemplateFieldsData({});
+      setCampaignIndustries([]);
       setFormData((prev) => ({
         ...prev,
         campaign_id: undefined,
@@ -903,11 +997,39 @@ const CreateLead = () => {
       }));
 
       setSelectedCampaign(campaign);
+
+      // Load deal template if available
+      const campaignWithTemplate = campaign as any;
+      if (campaignWithTemplate.deal_template_id) {
+        setLoadingTemplate(true);
+        try {
+          const template = await getDealTemplate(Number(campaignWithTemplate.deal_template_id));
+          setDealTemplate(template);
+          setTemplateFieldsData({});
+        } catch (error) {
+          console.error("Failed to fetch deal template:", error);
+          setDealTemplate(null);
+        } finally {
+          setLoadingTemplate(false);
+        }
+      } else {
+        setDealTemplate(null);
+        setTemplateFieldsData({});
+      }
+
+      // Load campaign industries
+      if (campaignWithTemplate.industries && campaignWithTemplate.industries.length > 0) {
+        setCampaignIndustries(campaignWithTemplate.industries);
+      } else {
+        setCampaignIndustries([]);
+      }
     } catch (error) {
       console.error("Failed to fetch campaign details:", error);
       // Fallback to basic campaign from list
       const basicCampaign = campaigns.find((c) => c.id === campaignId);
       setSelectedCampaign(basicCampaign || null);
+      setDealTemplate(null);
+      setCampaignIndustries([]);
     }
   };
 
@@ -1593,46 +1715,56 @@ const CreateLead = () => {
                             </Col>
                             <Col md={6}>
                               <Form.Group className="mb-3">
-                                <Form.Label>Industry</Form.Label>
-                                <Form.Select
-                                  value={formData.industry}
-                                  onChange={(e) =>
-                                    handleInputChange(
-                                      "industry",
-                                      e.target.value
-                                    )
-                                  }
-                                >
-                                  <option value="">Select Industry</option>
-                                  <option value="Individual/Residential">Individual/Residential</option>
-                                  <option value="Corporate">Corporate</option>
-                                  <option value="Retail">Retail</option>
-                                  <option value="Office">Office</option>
-                                  <option value="Mixed-use">Mixed-use</option>
-                                </Form.Select>
-                              </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
                                 <Form.Label>Business Type</Form.Label>
                                 <Form.Select
-                                  value={formData.business_type}
-                                  onChange={(e) =>
-                                    handleInputChange(
-                                      "business_type",
-                                      e.target.value
-                                    )
-                                  }
+                                  value={showOtherBusinessType ? "other" : (businessTypeId ? String(businessTypeId) : "")}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    if (value === "other") {
+                                      setShowOtherBusinessType(true);
+                                      setBusinessTypeId(null);
+                                      setBusinessTypeOther("");
+                                    } else if (value) {
+                                      setShowOtherBusinessType(false);
+                                      setBusinessTypeId(Number(value));
+                                      setBusinessTypeOther("");
+                                    } else {
+                                      setShowOtherBusinessType(false);
+                                      setBusinessTypeId(null);
+                                      setBusinessTypeOther("");
+                                    }
+                                  }}
                                 >
-                                  <option value="">Select Type</option>
-                                  <option value="Individual">Individual</option>
-                                  <option value="Family">Family</option>
-                                  <option value="SME">SME</option>
-                                  <option value="Corporate">Corporate</option>
-                                  <option value="Enterprise">Enterprise</option>
+                                  <option value="">Select Business Type</option>
+                                  {businessTypes.map((businessType) => (
+                                    <option key={businessType.id} value={businessType.id}>
+                                      {businessType.name}
+                                    </option>
+                                  ))}
+                                  <option value="other">Other</option>
                                 </Form.Select>
+                                
                               </Form.Group>
                             </Col>
+
+                            {showOtherBusinessType && (
+                                  
+                                
+                            <Col md={6}>
+                            <Form.Group className="mb-3">
+                            <Form.Label>Business Type (Other)</Form.Label>
+                            <Form.Control
+                                    type="text"
+                                    className="mt-2"
+                                    value={businessTypeOther}
+                                    onChange={(e) => setBusinessTypeOther(e.target.value)}
+                                    placeholder="Enter business type"
+                                  />
+                                  </Form.Group>
+                            </Col>
+                            )}
+
+
                             <Col md={6}>
                               <Form.Group className="mb-3">
                                 <Form.Label>Company Country</Form.Label>
@@ -1923,37 +2055,41 @@ const CreateLead = () => {
                     )}
 
                     {formStep === 3 && (
-                      <Card className="border-0 bg-light">
-                        <Card.Body>
-                          <h5 className="fw-bold mb-4 text-info">
-                            OTHER INFORMATION
-                          </h5>
-                          <Row>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>Lead Potential</Form.Label>
-                                <Form.Select
-                                  value={formData.lead_potential}
-                                  onChange={(e) =>
-                                    handleInputChange(
-                                      "lead_potential",
-                                      e.target.value
-                                    )
-                                  }
-                                >
-                                  <option value="">Select Potential</option>
-                                  <option value="Hot">Hot</option>
-                                  <option value="Warm">Warm</option>
-                                  <option value="Cold">Cold</option>
-                                </Form.Select>
-                                <Form.Text className="text-muted">
-                                  Likelihood of converting based on engagement
-                                </Form.Text>
-                              </Form.Group>
-                            </Col>
-                          </Row>
+                      <>
+                       
 
-                          {/* Campaign Custom Fields */}
+                        <Card className="border-0 bg-light">
+                          <Card.Body>
+                            <h5 className="fw-bold mb-4 text-info">
+                              OTHER INFORMATION
+                            </h5>
+                            <Row>
+                              <Col md={6}>
+                                <Form.Group className="mb-3">
+                                  <Form.Label>Lead Potential</Form.Label>
+                                  <Form.Select
+                                    value={formData.lead_potential}
+                                    onChange={(e) =>
+                                      handleInputChange(
+                                        "lead_potential",
+                                        e.target.value
+                                      )
+                                    }
+                                  >
+                                    <option value="">Select Potential</option>
+                                    <option value="Hot">Hot</option>
+                                    <option value="Warm">Warm</option>
+                                    <option value="Cold">Cold</option>
+                                  </Form.Select>
+                                  <Form.Text className="text-muted">
+                                    Likelihood of converting based on engagement
+                                  </Form.Text>
+                                </Form.Group>
+                              </Col>
+                            </Row>
+
+
+                            {/* Campaign Custom Fields */}
                           {selectedCampaign &&
                             selectedCampaign.fields &&
                             selectedCampaign.fields.length > 0 && (
@@ -1990,14 +2126,15 @@ const CreateLead = () => {
                               </div>
                             )}
 
-                          <div className="alert alert-success small mt-3">
-                            <CheckCircle size={14} className="me-1" />
-                            All required fields are marked with{" "}
-                            <span className="text-danger">*</span>. Complete all
-                            sections to create the lead.
-                          </div>
-                        </Card.Body>
-                      </Card>
+                            <div className="alert alert-success small mt-3">
+                              <CheckCircle size={14} className="me-1" />
+                              All required fields are marked with{" "}
+                              <span className="text-danger">*</span>. Complete all
+                              sections to create the lead.
+                            </div>
+                          </Card.Body>
+                        </Card>
+                      </>
                     )}
                   </div>
 
@@ -2038,6 +2175,279 @@ const CreateLead = () => {
           </div>
         </div>
       </div>
+
+      {/* Add/Edit Item Modal */}
+      {dealTemplate && (
+        <Modal
+          show={showAddItemModal}
+          onHide={() => {
+            setShowAddItemModal(false);
+            setEditingItemIndex(null);
+            setItemFormData({
+              product_id: null,
+              product_service: "",
+              description: "",
+              qty: 1,
+              unit_price: 0,
+              industry_id: null,
+            });
+            setSelectedIndustryId(null);
+          }}
+          size="lg"
+          centered
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>
+              {editingItemIndex !== null ? "Edit Item" : "Add New Item"}
+            </Modal.Title>
+          </Modal.Header>
+          <Form
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const selectedProduct = products.find(
+                (p) => p.id === itemFormData.product_id
+              );
+              const newItem = {
+                product_id: itemFormData.product_id!,
+                product_service: itemFormData.product_service,
+                description: itemFormData.description,
+                qty: itemFormData.qty,
+                unit_price: itemFormData.unit_price,
+                original_currency: selectedProduct?.currency || "AED",
+                original_price:
+                  parseFloat(selectedProduct?.price || "0") ||
+                  itemFormData.unit_price,
+                industry_id: itemFormData.industry_id || undefined,
+              };
+
+              if (editingItemIndex !== null) {
+                const updated = [...estimationItems];
+                updated[editingItemIndex] = newItem;
+                setEstimationItems(updated);
+              } else {
+                setEstimationItems([...estimationItems, newItem]);
+              }
+
+              setShowAddItemModal(false);
+              setEditingItemIndex(null);
+              setItemFormData({
+                product_id: null,
+                product_service: "",
+                description: "",
+                qty: 1,
+                unit_price: 0,
+                industry_id: null,
+              });
+              setSelectedIndustryId(null);
+            }}
+            noValidate
+          >
+            <Modal.Body>
+              <Row className="g-3">
+                {/* Industry Selection */}
+                {(() => {
+                  // Determine available industries based on campaign and switch
+                  const availableIndustries =
+                    showOtherIndustries || campaignIndustries.length === 0
+                      ? allIndustries
+                      : campaignIndustries;
+
+                  return availableIndustries.length > 0 ? (
+                    <>
+                      <Col md={12}>
+                        <Form.Group>
+                          <div className="d-flex justify-content-between align-items-center mb-2">
+                            <Form.Label>
+                              Product Group <span className="text-danger">*</span>
+                            </Form.Label>
+                            {campaignIndustries.length > 0 && (
+                              <Form.Check
+                                type="switch"
+                                id="load-other-industries"
+                                label="Load All Product Groups"
+                                checked={showOtherIndustries}
+                                onChange={(e) =>
+                                  setShowOtherIndustries(e.target.checked)
+                                }
+                              />
+                            )}
+                          </div>
+                          <Select
+                            value={
+                              itemFormData.industry_id
+                                ? {
+                                    value: itemFormData.industry_id,
+                                    label:
+                                      availableIndustries.find(
+                                        (ind) => ind.id === itemFormData.industry_id
+                                      )?.name || "",
+                                  }
+                                : null
+                            }
+                            onChange={(selectedOption: any) => {
+                              const industryId = selectedOption?.value || null;
+                              setItemFormData({
+                                ...itemFormData,
+                                industry_id: industryId,
+                              });
+                              // Load products for selected industry
+                              if (industryId) {
+                                loadProductsForIndustry(industryId);
+                              }
+                            }}
+                            options={availableIndustries.map((industry) => ({
+                              value: industry.id,
+                              label: industry.name,
+                            }))}
+                            placeholder="Select product group..."
+                            isSearchable
+                            required
+                          />
+                        </Form.Group>
+                      </Col>
+                    </>
+                  ) : null;
+                })()}
+
+                {/* Product Selection */}
+                <Col md={12}>
+                  <Form.Group>
+                    <Form.Label>
+                      Product <span className="text-danger">*</span>
+                    </Form.Label>
+                    <Select
+                      value={
+                        itemFormData.product_id
+                          ? {
+                              value: itemFormData.product_id,
+                              label:
+                                itemFormData.product_service ||
+                                products.find((p) => p.id === itemFormData.product_id)
+                                  ?.name ||
+                                "",
+                            }
+                          : null
+                      }
+                      onChange={(selectedOption: any) => {
+                        const product = products.find(
+                          (p) => p.id === selectedOption?.value
+                        );
+                        if (product) {
+                          setItemFormData({
+                            ...itemFormData,
+                            product_id: product.id,
+                            product_service: product.name,
+                            unit_price: parseFloat(product.price || "0"),
+                          });
+                        }
+                      }}
+                      options={products.map((product) => ({
+                        value: product.id,
+                        label: `${product.name} - ${product.currency} ${product.price}`,
+                      }))}
+                      placeholder="Select product..."
+                      isSearchable
+                      isDisabled={!itemFormData.industry_id || loadingProducts}
+                      required
+                    />
+                    {loadingProducts && (
+                      <Form.Text className="text-muted">
+                        Loading products...
+                      </Form.Text>
+                    )}
+                  </Form.Group>
+                </Col>
+
+                {/* Description */}
+                <Col md={12}>
+                  <Form.Group>
+                    <Form.Label>Description</Form.Label>
+                    <Form.Control
+                      as="textarea"
+                      rows={3}
+                      value={itemFormData.description}
+                      onChange={(e) =>
+                        setItemFormData({
+                          ...itemFormData,
+                          description: e.target.value,
+                        })
+                      }
+                      placeholder="Enter description (optional)"
+                    />
+                  </Form.Group>
+                </Col>
+
+                {/* Quantity */}
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>
+                      Quantity <span className="text-danger">*</span>
+                    </Form.Label>
+                    <Form.Control
+                      type="number"
+                      min="1"
+                      value={itemFormData.qty}
+                      onChange={(e) =>
+                        setItemFormData({
+                          ...itemFormData,
+                          qty: Number(e.target.value) || 1,
+                        })
+                      }
+                      required
+                    />
+                  </Form.Group>
+                </Col>
+
+                {/* Unit Price */}
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>
+                      Unit Price <span className="text-danger">*</span>
+                    </Form.Label>
+                    <Form.Control
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={itemFormData.unit_price}
+                      onChange={(e) =>
+                        setItemFormData({
+                          ...itemFormData,
+                          unit_price: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      required
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowAddItemModal(false);
+                  setEditingItemIndex(null);
+                  setItemFormData({
+                    product_id: null,
+                    product_service: "",
+                    description: "",
+                    qty: 1,
+                    unit_price: 0,
+                    industry_id: null,
+                  });
+                  setSelectedIndustryId(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button variant="primary" type="submit">
+                {editingItemIndex !== null ? "Update" : "Add"} Item
+              </Button>
+            </Modal.Footer>
+          </Form>
+        </Modal>
+      )}
     </React.Fragment>
   );
 };
