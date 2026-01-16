@@ -30,6 +30,7 @@ interface BoardTabProps {
   onViewActivity: () => void;
   onViewOverdue: () => void;
   styles: any;
+  onTaskStatusChange?: () => void;
 }
 
 const BoardTab: React.FC<BoardTabProps> = ({
@@ -58,7 +59,8 @@ const BoardTab: React.FC<BoardTabProps> = ({
   loadingOverdue,
   onViewActivity,
   onViewOverdue,
-  styles
+  styles,
+  onTaskStatusChange
 }) => {
   return (
     <>
@@ -89,6 +91,7 @@ const BoardTab: React.FC<BoardTabProps> = ({
         getAllBoardAssignees={getAllBoardAssignees}
         getAllBoardPriorities={getAllBoardPriorities}
         getTasksByStatus={getTasksByStatus}
+        onTaskStatusChange={onTaskStatusChange}
       />
       
       {/* Bottom Row - Recent Activity & Overdue Tasks */}

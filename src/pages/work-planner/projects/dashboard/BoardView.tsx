@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { Offcanvas, Button, Badge, Row, Col, Nav } from 'react-bootstrap';
 import { formatDateForTable } from '@utils/Helper';
+import { updateTask } from '@utils/tasks';
+import { toast } from 'react-toastify';
 
 interface BoardViewProps {
   selectedProject: any;
@@ -28,6 +30,7 @@ interface BoardViewProps {
   getAllBoardAssignees: () => string[];
   getAllBoardPriorities: () => string[];
   getTasksByStatus: (statusId: string | number | null) => any[];
+  onTaskStatusChange?: () => void; // Callback to refresh board data after status change
 }
 
 const BoardView: React.FC<BoardViewProps> = ({
@@ -51,17 +54,83 @@ const BoardView: React.FC<BoardViewProps> = ({
   onCreateTask,
   getAllBoardAssignees,
   getAllBoardPriorities,
-  getTasksByStatus
+  getTasksByStatus,
+  onTaskStatusChange
 }) => {
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [activeDetailTab, setActiveDetailTab] = useState('activity');
+  const [draggedTask, setDraggedTask] = useState<any>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<number | null>(null);
 
   const handleTaskClick = (task: any) => {
     setSelectedTask(task);
     setShowTaskDetail(true);
     if (onTaskClick) {
       onTaskClick(task);
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, task: any) => {
+    setDraggedTask(task);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', task.id.toString());
+    // Add visual feedback
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    // Reset visual feedback
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+    setDraggedTask(null);
+    setDragOverStatus(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, statusId: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverStatus(statusId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverStatus(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStatusId: number) => {
+    e.preventDefault();
+    setDragOverStatus(null);
+
+    if (!draggedTask || !selectedProject?.id) {
+      return;
+    }
+
+    // Don't update if dropped in the same status
+    if (draggedTask.status_id === targetStatusId || draggedTask.status?.id === targetStatusId) {
+      setDraggedTask(null);
+      return;
+    }
+
+    try {
+      // Update task status via API
+      await updateTask(draggedTask.id, {
+        status_id: targetStatusId
+      } as any);
+
+      // Refresh board data
+      if (onTaskStatusChange) {
+        onTaskStatusChange();
+      }
+
+      setDraggedTask(null);
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      toast.error('Failed to update task status');
+      setDraggedTask(null);
     }
   };
 
@@ -237,7 +306,12 @@ const BoardView: React.FC<BoardViewProps> = ({
       boxShadow: '0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
       cursor: 'grab',
       transition: 'all 0.2s ease',
-      border: '1px solid #f1f5f9'
+      border: '1px solid #f1f5f9',
+      userSelect: 'none' as const
+    },
+    columnDropZone: {
+      minHeight: '100px',
+      transition: 'background-color 0.2s'
     },
     taskTitle: {
       fontSize: '0.925rem',
@@ -474,8 +548,13 @@ const BoardView: React.FC<BoardViewProps> = ({
               key={status.id} 
               style={{
                 ...styles.column,
-                borderTop: `3px solid ${status.color || '#6B7280'}`
+                borderTop: `3px solid ${status.color || '#6B7280'}`,
+                backgroundColor: dragOverStatus === status.id ? '#F0F9FF' : '#E5E7EB',
+                border: dragOverStatus === status.id ? '2px dashed #4680FF' : 'none'
               }}
+              onDragOver={(e) => handleDragOver(e, status.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, status.id)}
             >
               <div style={styles.columnHeader}>
                 <div style={styles.columnTitle}>
@@ -521,18 +600,35 @@ const BoardView: React.FC<BoardViewProps> = ({
                   return (
                     <div
                       key={task.id}
+                      draggable
                       style={styles.taskCard}
+                      onDragStart={(e) => handleDragStart(e, task)}
+                      onDragEnd={handleDragEnd}
                       onClick={() => handleTaskClick(task)}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-3px)';
-                        e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.06)';
-                        e.currentTarget.style.borderColor = '#e2e8f0';
-                        e.currentTarget.style.cursor = 'pointer';
+                        if (draggedTask?.id !== task.id) {
+                          e.currentTarget.style.transform = 'translateY(-3px)';
+                          e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.06)';
+                          e.currentTarget.style.borderColor = '#e2e8f0';
+                          e.currentTarget.style.cursor = 'grab';
+                        }
                       }}
                       onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)';
-                        e.currentTarget.style.borderColor = '#f1f5f9';
+                        if (draggedTask?.id !== task.id) {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)';
+                          e.currentTarget.style.borderColor = '#f1f5f9';
+                          e.currentTarget.style.cursor = 'grab';
+                        }
+                      }}
+                      onMouseDown={(e) => {
+                        // Prevent text selection while dragging
+                        if (e.button === 0) {
+                          e.currentTarget.style.cursor = 'grabbing';
+                        }
+                      }}
+                      onMouseUp={(e) => {
+                        e.currentTarget.style.cursor = 'grab';
                       }}
                     >
                       <div style={styles.taskTitle}>{task.title || 'Untitled Task'}</div>

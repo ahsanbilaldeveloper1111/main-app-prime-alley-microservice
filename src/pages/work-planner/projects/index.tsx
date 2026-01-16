@@ -10,6 +10,8 @@ import  { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { listProjects, createProject, updateProject, deleteProject, getProject, getRecentActivity, getOverdueTasks } from '@utils/tasks';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
+import { ModuleSlug } from '@utils/Helper';
+import { useHierarchyData } from '@components/filters/useHierarchyData';
 import { Spinner, Modal } from 'react-bootstrap';
 import { 
   Container, 
@@ -99,6 +101,9 @@ const WorkPlannerProjects = () => {
     const router = useRouter();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
+    
+    // Fetch extensions for getting user names
+    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
     const [showProjectModal, setShowProjectModal] = useState(false);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -394,9 +399,28 @@ const WorkPlannerProjects = () => {
       });
     };
     
+    // Helper function to get user name from extension number
+    const getUserNameFromExtension = (extensionNumber: string): string => {
+      if (!extensionNumber || !hierarchyDataExtensions || hierarchyDataExtensions.length === 0) {
+        return extensionNumber || 'Unknown';
+      }
+      
+      const extension = (hierarchyDataExtensions as any[]).find((ext: any) => 
+        ext.extension_number === extensionNumber || 
+        ext.id === extensionNumber ||
+        String(ext.id) === String(extensionNumber)
+      );
+      
+      return extension?.user?.name || extension?.name || extensionNumber || 'Unknown';
+    };
+    
     // Helper function to get initials from extension number or name
     const getInitials = (extensionNumber: string) => {
       if (!extensionNumber || extensionNumber === 'system') return 'SY';
+      const userName = getUserNameFromExtension(extensionNumber);
+      if (userName !== extensionNumber && userName !== 'Unknown') {
+        return userName.split(' ').map((n: string) => n[0]).join('').substring(0, 1).toUpperCase();
+      }
       return extensionNumber.substring(0, 2).toUpperCase();
     };
     
@@ -1375,9 +1399,9 @@ const WorkPlannerProjects = () => {
                               fontWeight: '600'
                             }}
                           >
-                            {selectedProjectDetails.owner_extension_number.substring(0, 2).toUpperCase()}
+                            {getInitials(selectedProjectDetails.owner_extension_number)}
                           </div>
-                          <span>{selectedProjectDetails.owner_extension_number}</span>
+                          <span>{getUserNameFromExtension(selectedProjectDetails.owner_extension_number)}</span>
                         </>
                       ) : (
                         <>
@@ -1395,9 +1419,15 @@ const WorkPlannerProjects = () => {
                               fontWeight: '600'
                             }}
                           >
-                            {selectedProject.owner.split(' ').map(n => n[0]).join('')}
+                            {selectedProject.apiData?.owner_extension_number 
+                              ? getInitials(selectedProject.apiData.owner_extension_number)
+                              : selectedProject.owner.split(' ').map(n => n[0]).join('')}
                           </div>
-                          <span>{selectedProject.owner}</span>
+                          <span>
+                            {selectedProject.apiData?.owner_extension_number 
+                              ? getUserNameFromExtension(selectedProject.apiData.owner_extension_number)
+                              : selectedProject.owner}
+                          </span>
                         </>
                       )}
                     </div>
@@ -1462,10 +1492,10 @@ const WorkPlannerProjects = () => {
                           flexShrink: 0
                         }}
                       >
-                        {initials}
+                        {getInitials(extensionNumber)}
                       </div>
                       <span style={{ fontSize: '0.8125rem', fontWeight: '500', color: '#334155', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {memberData.user?.name || extensionNumber} {memberData.role ? `(${memberData.role})` : ''}
+                        {memberData.user?.name || getUserNameFromExtension(extensionNumber)} {memberData.role ? `(${memberData.role})` : ''}
                       </span>
                     </div>
                     );
@@ -1503,11 +1533,7 @@ const WorkPlannerProjects = () => {
                     Activity
                   </Nav.Link>
                 </Nav.Item>
-                <Nav.Item>
-                  <Nav.Link eventKey="Comments">
-                    Comments 
-                  </Nav.Link>
-                </Nav.Item>
+                
                 <Nav.Item>
                   <Nav.Link eventKey="History">
                     History
@@ -1574,70 +1600,7 @@ const WorkPlannerProjects = () => {
                   </div>
                 )}
 
-                {/* Comments Tab */}
-                {detailTab === 'Comments' && (
-                  <div>
-                    <div className="detail-label" style={{ marginBottom: '1rem' }}>Project Comments</div>
-                    <div className="d-flex flex-column gap-3">
-                      <div className="d-flex gap-2">
-                        <div style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '50%',
-                          backgroundColor: '#667eea',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.7rem',
-                          fontWeight: '600',
-                          flexShrink: 0
-                        }}>
-                          JD
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ 
-                            backgroundColor: '#f8fafc', 
-                            padding: '0.75rem', 
-                            borderRadius: '8px',
-                            border: '1px solid #e2e8f0'
-                          }}>
-                            <div style={{ fontSize: '0.8rem', fontWeight: '600', color: '#334155', marginBottom: '0.25rem' }}>
-                              John D.
-                            </div>
-                            <div style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '0.5rem' }}>
-                              Great progress on the homepage! The new layout looks much better. Can we schedule a review meeting for next week?
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                              Apr 22, 2024 • 3:45 PM
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {/* Add Comment Input */}
-                    <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
-                      <Form.Group>
-                        <Form.Control
-                          as="textarea"
-                          rows={2}
-                          placeholder="Add a comment..."
-                          style={{ fontSize: '0.875rem', borderRadius: '8px' }}
-                        />
-                        <Button 
-                          variant="primary" 
-                          size="sm" 
-                          className="mt-2"
-                          style={{ fontSize: '0.875rem' }}
-                        >
-                          Post Comment
-                        </Button>
-                      </Form.Group>
-                    </div>
-                  </div>
-                )}
+                
 
                 {/* History Tab */}
                 {detailTab === 'History' && (

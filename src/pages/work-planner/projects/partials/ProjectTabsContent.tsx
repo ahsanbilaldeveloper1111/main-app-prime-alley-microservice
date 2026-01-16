@@ -548,6 +548,13 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             onViewActivity={() => setShowActivityModal(true)}
             onViewOverdue={() => setShowTasksModal(true)}
             styles={styles}
+            onTaskStatusChange={() => {
+              // Refresh board tasks and project data when task status changes
+              if (activeTab === 'board' && selectedProject?.id) {
+                fetchBoardTasks();
+                fetchProjectData();
+              }
+            }}
           />
         ) : activeTab === 'list' ? (
           <ListTab
@@ -555,6 +562,16 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             loading={loadingListTasks}
             listSummary={listSummary}
             styles={styles}
+            selectedProject={selectedProject}
+            extensions={hierarchyDataExtensions as any}
+            labels={labels}
+            statuses={statuses}
+            onRefresh={() => {
+              if (activeTab === 'list' && selectedProject?.id) {
+                fetchListTasks();
+                fetchProjectData();
+              }
+            }}
           />
         ) : activeTab === 'members' ? (
           <MembersTab
@@ -582,7 +599,10 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             styles={styles}
           />
         ) : activeTab === 'reports' ? (
-          <TasksReports embedded={true} />
+          <>
+          {/* <TasksReports embedded={true} /> */}
+          Coming Soon
+          </>
         ) : null}
       </div>
 
