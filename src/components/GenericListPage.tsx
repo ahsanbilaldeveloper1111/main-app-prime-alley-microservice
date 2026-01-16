@@ -31,6 +31,7 @@ interface GenericListPageProps {
     exportText?: string;
     newText?: string;
     noTableHead?: boolean;
+    pageName?: string;
 }
 
 const GenericListPage: React.FC<GenericListPageProps> = ({
@@ -61,6 +62,7 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
     exportText,
     newText,
     noTableHead = false,
+   
 
 }) => {
     const [data, setData] = useState<any[]>([]);
@@ -200,6 +202,7 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
                             exportText={exportText}
                             newText={newText}
                             noTableHead={noTableHead}
+                            
                         />
             
             {showCanvas && (

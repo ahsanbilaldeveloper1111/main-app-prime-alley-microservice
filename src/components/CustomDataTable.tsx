@@ -68,6 +68,8 @@ export interface CustomDataTableProps {
   exportText?: string;
   newText?: string;
   noTableHead?: boolean;
+  // Page identifier for localStorage (if not provided, will use title)
+  pageName?: string;
 }
 
 const CustomDataTable: React.FC<CustomDataTableProps> = ({
@@ -122,15 +124,84 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   onNewClick,
   filtersText = 'Filters',
   exportText = 'Export',
-  newText = 'New GSM'
+  newText = 'New GSM',
+  // Page identifier for localStorage
+  pageName
 }) => {
+  // Helper function to convert title to a valid localStorage key
+  const titleToKey = (titleStr: string | undefined): string => {
+    if (!titleStr) return 'default';
+    let key = titleStr.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-'); // Replace non-alphanumeric with hyphens
+    // Remove leading and trailing hyphens
+    key = key.replace(/^(\-+)/, '').replace(/(\-+)$/, '');
+    return key || 'default';
+  };
+
+  // Helper functions for localStorage
+  const getStorageKey = () => {
+    const key = pageName || titleToKey(title);
+    return `datatable-columns-${key}`;
+  };
+
+  const loadColumnVisibility = (): string[] => {
+    try {
+      if (globalThis.window?.localStorage) {
+        const stored = globalThis.window.localStorage.getItem(getStorageKey());
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          // Validate that all stored columns still exist in current columns
+          const validColumns = parsed.filter((key: string) => 
+            columns.some(col => col.key === key)
+          );
+          // If we have valid columns, use them; otherwise return all columns
+          if (validColumns.length > 0) {
+            return validColumns;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading column visibility from localStorage:', error);
+    }
+    
+    // Default: return all columns
+    return columns.map(col => col.key);
+  };
+
+  const saveColumnVisibility = (visibleCols: string[]) => {
+    try {
+      if (globalThis.window?.localStorage) {
+        globalThis.window.localStorage.setItem(getStorageKey(), JSON.stringify(visibleCols));
+      }
+    } catch (error) {
+      console.error('Error saving column visibility to localStorage:', error);
+    }
+  };
+
   // State management
   const [pageSize, setPageSize] = useState<number>(defaultPageSize);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(
-    columns.map(col => col.key)
-  );
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => loadColumnVisibility());
   const [selectedRows, setSelectedRows] = useState<any[]>([]);
+
+  // Update localStorage whenever visibleColumns changes
+  useEffect(() => {
+    saveColumnVisibility(visibleColumns);
+  }, [visibleColumns]);
+
+  // Update visibleColumns when columns prop changes (e.g., new columns added)
+  useEffect(() => {
+    const currentVisible = loadColumnVisibility();
+    // Ensure all current visible columns still exist
+    const validVisible = currentVisible.filter(key => 
+      columns.some(col => col.key === key)
+    );
+    // If no valid columns or columns changed significantly, reset to all
+    if (validVisible.length === 0 || validVisible.length < columns.length * 0.5) {
+      setVisibleColumns(columns.map(col => col.key));
+    } else {
+      setVisibleColumns(validVisible);
+    }
+  }, [columns.length]); // Only re-run when number of columns changes
 
   // Sync pageSize with server-side prop
   useEffect(() => {
@@ -190,19 +261,29 @@ const CustomDataTable: React.FC<CustomDataTableProps> = ({
   };
 
   const toggleColumnVisibility = (columnKey: string) => {
-    setVisibleColumns(prev =>
-      prev.includes(columnKey)
+    setVisibleColumns(prev => {
+      const newVisible = prev.includes(columnKey)
         ? prev.filter(key => key !== columnKey)
-        : [...prev, columnKey]
-    );
+        : [...prev, columnKey];
+      // Ensure at least one column is visible
+      if (newVisible.length === 0 && columns.length > 0) {
+        return [columns[0].key];
+      }
+      return newVisible;
+    });
   };
 
   const showAllColumns = () => {
-    setVisibleColumns(columns.map(col => col.key));
+    const allColumns = columns.map(col => col.key);
+    setVisibleColumns(allColumns);
   };
 
   const hideAllColumns = () => {
-    setVisibleColumns([columns[0]?.key].filter(Boolean));
+    // Keep at least the first column visible
+    const firstColumn = columns[0]?.key;
+    if (firstColumn) {
+      setVisibleColumns([firstColumn]);
+    }
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {

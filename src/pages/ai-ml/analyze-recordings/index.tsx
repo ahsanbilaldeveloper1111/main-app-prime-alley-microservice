@@ -466,7 +466,7 @@ const AnalyzeRecordings = () => {
                 
                 const response = await GetImagicalTranscriptions(
                     { 
-                        page: 1, 
+                        page: page, 
                         limit: limit, 
                         search, 
                         start_datetime: start_datetime,

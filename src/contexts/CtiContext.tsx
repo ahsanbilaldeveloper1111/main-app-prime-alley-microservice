@@ -589,8 +589,8 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
                 
                 // Save updated call states back to localStorage
                 if (Object.keys(parsedCallStates).length > 0) {
-                  localStorage.setItem(CALL_STATES_STORAGE_KEY, JSON.stringify(parsedCallStates));
-                  localStorage.setItem(CALL_STATES_TIMESTAMP_KEY, new Date().toISOString());
+                  //localStorage.setItem(CALL_STATES_STORAGE_KEY, JSON.stringify(parsedCallStates));
+                  //localStorage.setItem(CALL_STATES_TIMESTAMP_KEY, new Date().toISOString());
                 } else {
                   // If no active calls remain, clear storage completely
                   localStorage.removeItem(CALL_STATES_STORAGE_KEY);

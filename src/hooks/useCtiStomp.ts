@@ -381,14 +381,14 @@ export default function useCtiStomp(
         );
 
         if (Object.keys(callsToPersist).length > 0) {
-          localStorage.setItem(
-            CALL_STATES_STORAGE_KEY,
-            JSON.stringify(callsToPersist)
-          );
-          localStorage.setItem(
-            CALL_STATES_TIMESTAMP_KEY,
-            new Date().toISOString()
-          );
+          // localStorage.setItem(
+          //   CALL_STATES_STORAGE_KEY,
+          //   JSON.stringify(callsToPersist)
+          // );
+          // localStorage.setItem(
+          //   CALL_STATES_TIMESTAMP_KEY,
+          //   new Date().toISOString()
+          // );
         } else {
           // If no active calls, clear storage
           localStorage.removeItem(CALL_STATES_STORAGE_KEY);

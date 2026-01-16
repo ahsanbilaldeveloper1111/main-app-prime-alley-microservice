@@ -477,8 +477,8 @@ export default function handler(req, res) {
   // Connection attempts
   const connectionAttempts = [
     `ws://${ctiServerHost}:${ctiServerPort}/ws`,
-    `ws://${ctiServerHost}/ws`,
-    `wss://${ctiServerHost}:${ctiServerPort}/ws`
+    // `ws://${ctiServerHost}/ws`,
+    // `wss://${ctiServerHost}:${ctiServerPort}/ws`
   ];
   
   console.log('===============================================');
