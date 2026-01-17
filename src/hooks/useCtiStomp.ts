@@ -778,16 +778,7 @@ export default function useCtiStomp(
             return;
           }
 
-          // Determine current state from parties or callData
-          let currentState = callData.eventType || callData.currentState;
-          if (!currentState && callData.parties && callData.parties.length > 0) {
-            const firstParty = callData.parties[0];
-            if (firstParty.callStatus) {
-              currentState = firstParty.callStatus;
-            }
-          }
-
-          // Filter out DROPPED/DISCONNECTED parties
+          // Filter out DROPPED/DISCONNECTED parties FIRST
           const activeParties = (callData.parties || []).filter(
             (p: any) =>
               p.callStatus !== 'DROPPED' && p.callStatus !== 'DISCONNECTED'
@@ -799,6 +790,49 @@ export default function useCtiStomp(
               delete updated[callId];
             }
             return;
+          }
+
+          // Determine currentState from active parties (not from first party which might be DROPPED)
+          let currentState = callData.eventType || callData.currentState;
+          
+          // If currentState is DROPPED/DISCONNECTED but we have active parties, normalize it
+          if ((currentState === 'DROPPED' || currentState === 'DISCONNECTED') && activeParties.length > 0) {
+            // Find the status from active parties
+            const connectedParty = activeParties.find((p: any) => p.callStatus === 'CONNECTED');
+            const heldParty = activeParties.find((p: any) => p.callStatus === 'ON_HOLD');
+            const retrievedParty = activeParties.find((p: any) => p.callStatus === 'RETRIEVED');
+            const answeredParty = activeParties.find((p: any) => p.callStatus === 'ANSWERED');
+            const ringingParty = activeParties.find((p: any) => p.callStatus === 'RINGING');
+            
+            if (heldParty) {
+              currentState = 'HELD';
+            } else if (retrievedParty) {
+              currentState = 'RETRIEVED';
+            } else if (connectedParty) {
+              currentState = 'ANSWERED'; // Use ANSWERED for CONNECTED
+            } else if (answeredParty) {
+              currentState = 'ANSWERED';
+            } else if (ringingParty) {
+              currentState = 'RINGING';
+            } else {
+              // Fallback to first active party's status
+              currentState = activeParties[0]?.callStatus || 'ANSWERED';
+            }
+          } else if (!currentState && activeParties.length > 0) {
+            // If no currentState, determine from active parties
+            const connectedParty = activeParties.find((p: any) => p.callStatus === 'CONNECTED');
+            const heldParty = activeParties.find((p: any) => p.callStatus === 'ON_HOLD');
+            const retrievedParty = activeParties.find((p: any) => p.callStatus === 'RETRIEVED');
+            
+            if (heldParty) {
+              currentState = 'HELD';
+            } else if (retrievedParty) {
+              currentState = 'RETRIEVED';
+            } else if (connectedParty) {
+              currentState = 'ANSWERED';
+            } else {
+              currentState = activeParties[0]?.callStatus || 'UNKNOWN';
+            }
           }
 
           // Add or update call in callStateMap

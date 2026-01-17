@@ -103,7 +103,7 @@ const WorkPlannerProjects = () => {
     const [loading, setLoading] = useState(true);
     
     // Fetch extensions for getting user names
-    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
+    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
     const [showProjectModal, setShowProjectModal] = useState(false);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);

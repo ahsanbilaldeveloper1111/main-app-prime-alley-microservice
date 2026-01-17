@@ -26,7 +26,7 @@ const WorkPlannerProjectsDetails = () => {
   const projectTabsContentRef = useRef<ProjectTabsContentRef>(null);
 
   // Fetch extensions using hierarchy API
-  const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
+  const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
 
   // Fetch project data
   useEffect(() => {

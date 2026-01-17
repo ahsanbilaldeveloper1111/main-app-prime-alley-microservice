@@ -107,7 +107,7 @@ const RecurringReminders = () => {
     const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
     
     // Fetch extensions for assignees
-    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
+    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
   
     // Hardcoded data for reference (not used - replaced by API)
     const _hardcodedTasks: RecurringTask[] = [

@@ -159,16 +159,96 @@ const UserCard: React.FC<UserCardProps> = ({
     }
   }
 
-  // Get call status
+  // Get call status - check parties array to determine effective state
   const getCallStatus = (): string | undefined => {
     if (!call || !active) return undefined
-    const currentState = call.currentState || ''
-    if (['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED'].includes(currentState)) {
-      return 'CONNECTED'
+    
+    // Check if it's a conference call (more than 2 parties or explicitly marked as conference)
+    const isConferenceCall = (call.isConference && !call.isOneToOne) || 
+                            (call.parties && call.parties.length > 2)
+    
+    // If call has parties, check party-level status (handles cases where some parties are DROPPED but others are CONNECTED)
+    if (call.parties && call.parties.length > 0) {
+      // Filter parties involving this DN
+      const filtered = call.parties.filter((p: any) => 
+        p.callingAddress === dn || p.calledAddress === dn
+      )
+      
+      if (filtered.length > 0) {
+        // Check if all parties for this DN are dropped
+        const allDropped = filtered.every((p: any) => 
+          p.callStatus === 'DROPPED' || p.callStatus === 'DISCONNECTED'
+        )
+        
+        if (allDropped) {
+          return undefined // No active call for this DN
+        }
+        
+        // Find the first active party (not DROPPED/DISCONNECTED)
+        const activeParty = filtered.find((p: any) => 
+          p.callStatus !== 'DROPPED' && p.callStatus !== 'DISCONNECTED'
+        )
+        
+        if (activeParty) {
+          const partyStatus = activeParty.callStatus || ''
+          
+          // Check if this DN is the calling party or called party
+          const isCaller = activeParty.callingAddress === dn
+          const isCallee = activeParty.calledAddress === dn
+          
+          // For conference calls, show "Conference Call"
+          if (isConferenceCall && !allDropped) {
+            return 'Conference Call'
+          }
+          
+          // For connected calls, show "ONGOING" for calling party, "CONNECTED" for called party
+          if (['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED'].includes(partyStatus)) {
+            if (isCaller) {
+              return 'ONGOING' // Calling party shows "ONGOING"
+            } else if (isCallee) {
+              return 'CONNECTED' // Called party shows "CONNECTED"
+            }
+            return 'CONNECTED' // Fallback
+          }
+          
+          if (['RINGING', 'DIALING'].includes(partyStatus)) {
+            return 'OUTGOING'
+          }
+          
+          if (partyStatus === 'ON_HOLD') {
+            return 'On Hold'
+          }
+          
+          return partyStatus
+        }
+      }
     }
+    
+    // Fallback to call.currentState if no parties or parties check didn't work
+    const currentState = call.currentState || ''
+    
+    // Check role from call object if available
+    const isCaller = call.role === 'calling'
+    const isCallee = call.role === 'called'
+    
+    // For conference calls
+    if (isConferenceCall) {
+      return 'Conference Call'
+    }
+    
+    if (['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED'].includes(currentState)) {
+      if (isCaller) {
+        return 'ONGOING' // Calling party shows "ONGOING"
+      } else if (isCallee) {
+        return 'CONNECTED' // Called party shows "CONNECTED"
+      }
+      return 'CONNECTED' // Fallback
+    }
+    
     if (['RINGING', 'DIALING'].includes(currentState)) {
       return 'OUTGOING'
     }
+    
     return currentState
   }
 
@@ -251,18 +331,34 @@ const UserCard: React.FC<UserCardProps> = ({
                                       monitoredAgentCall?.eventTime || 
                                       null
 
-  // Get call details
-  const callFrom = call?.parties?.[0]?.callingAddress || 'N/A'
-  const callTo = call?.parties?.[0]?.calledAddress || 'N/A'
-  // Get call startTime from parties array - prioritize parties[0].startTime (most accurate for ANSWERED/CONNECTED)
+  // Get call details - use active party (not DROPPED) for accurate display
+  const getActiveParty = () => {
+    if (!call?.parties || call.parties.length === 0) return null
+    // Filter parties involving this DN and find the active one
+    const filtered = call.parties.filter((p: any) => 
+      (p.callingAddress === dn || p.calledAddress === dn) &&
+      p.callStatus !== 'DROPPED' && p.callStatus !== 'DISCONNECTED'
+    )
+    // Return first active party, or fallback to first party if none found
+    return filtered[0] || call.parties.find((p: any) => 
+      p.callingAddress === dn || p.calledAddress === dn
+    ) || call.parties[0]
+  }
+  
+  const activeParty = getActiveParty()
+  const callFrom = activeParty?.callingAddress || call?.parties?.[0]?.callingAddress || 'N/A'
+  const callTo = activeParty?.calledAddress || call?.parties?.[0]?.calledAddress || 'N/A'
+  
+  // Get call startTime from active party (most accurate for ANSWERED/CONNECTED)
   // This is the actual call start time from the API, not eventTime
   // Check both parties array and direct call properties for startTime
-  const callStartTime = call?.parties?.[0]?.startTime || 
+  const callStartTime = activeParty?.startTime || 
+                       call?.parties?.[0]?.startTime || 
                        call?.startTime || 
                        call?.eventTime || 
                        null
   // Get callId for unique timer key (ensures different calls on same DN have separate timers)
-  const callId = call?.callId || call?.parties?.[0]?.callId || null
+  const callId = call?.callId || activeParty?.callId || call?.parties?.[0]?.callId || null
 
   // Determine card border style
   const getCardStyle = () => {
@@ -285,7 +381,14 @@ const UserCard: React.FC<UserCardProps> = ({
   const cardStyle = getCardStyle()
   const status = getStatus()
   const callStatus = getCallStatus()
-  const showCallControls = active && call && sectionKey !== 'downOffline'
+  // Don't show monitoring buttons when call is in RINGING/OUTGOING state
+  const isRingingCall = callStatus === 'OUTGOING' || 
+                       (call?.currentState === 'RINGING') ||
+                       (call?.parties?.some((p: any) => 
+                         (p.callingAddress === dn || p.calledAddress === dn) &&
+                         (p.callStatus === 'RINGING' || p.callStatus === 'DIALING')
+                       ))
+  const showCallControls = active && call && sectionKey !== 'downOffline' && !isRingingCall
 
   return (
     <Col 
@@ -414,13 +517,16 @@ const UserCard: React.FC<UserCardProps> = ({
                   style={{ 
                     fontSize: '0.6rem', 
                     fontWeight: '600',
-                    backgroundColor: callStatus === 'CONNECTED' ? '#dcfce7' : '#fef3c7',
-                    color: callStatus === 'CONNECTED' ? '#166534' : '#92400e',
-                    border: `1px solid ${callStatus === 'CONNECTED' ? '#bbf7d0' : '#fde68a'}`,
+                    backgroundColor: (callStatus === 'CONNECTED' || callStatus === 'ONGOING') ? '#dcfce7' : 
+                                   callStatus === 'Conference Call' ? '#e9d5ff' : '#fef3c7',
+                    color: (callStatus === 'CONNECTED' || callStatus === 'ONGOING') ? '#166534' : 
+                           callStatus === 'Conference Call' ? '#6b21a8' : '#92400e',
+                    border: `1px solid ${(callStatus === 'CONNECTED' || callStatus === 'ONGOING') ? '#bbf7d0' : 
+                            callStatus === 'Conference Call' ? '#d8b4fe' : '#fde68a'}`,
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  {callStatus === 'CONNECTED' ? <CheckCircle size={10} /> : <Phone size={10} />}
+                  {(callStatus === 'CONNECTED' || callStatus === 'ONGOING' || callStatus === 'Conference Call') ? <CheckCircle size={10} /> : <Phone size={10} />}
                   <span>{callStatus}</span>
                 </div>
                 {active && call && (

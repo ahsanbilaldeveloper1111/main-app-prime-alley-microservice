@@ -15,6 +15,7 @@ import {
   AddComment,
   AddAssigneeComment,
   loadImage,
+  UpdateTicketDetails,
 } from "@utils/tickets";
 import { GetHierarchyData } from "@utils/users";
 import { GetAllStatuses } from "@utils/ticket-statuses";
@@ -1119,8 +1120,45 @@ const TicketDetail = () => {
               <Form.Select
                 value={ticketData?.ticket_status_id}
                 className="form-control"
-                disabled={true}
+                //disabled={true}
                 style={{ fontSize: "0.875rem" }}
+                onChange={async (e) => {
+                  const newStatusId = e.target.value;
+                  if (!ticketData || !newStatusId) return;
+                  
+                  try {
+                    const result = await UpdateTicketDetails(
+                      String(ticketData.id),
+                      ticketData.title || '',
+                      ticketData.description || '',
+                      String(ticketData.ticket_type_id || ticketData.type?.id || ''),
+                      newStatusId,
+                      String(ticketData.module_id || ticketData.module?.id || ''),
+                      String(ticketData.submodule_id || ticketData.submodule?.id || ''),
+                      ticketData.submodule_child_id ? String(ticketData.submodule_child_id) : undefined,
+                      ticketData.user_extension,
+                      ticketData.priority,
+                      ticketData.due_date,
+                      undefined, // images
+                      ticketData.tags,
+                      ticketData.is_approved
+                    );
+                    
+                    if (result) {
+                      // Update local state
+                      setTicketData({
+                        ...ticketData,
+                        ticket_status_id: newStatusId
+                      });
+                      // Refresh ticket data to get latest changes
+                      fetchTicketData();
+                    }
+                    // Note: UpdateTicketDetails already shows toast messages internally
+                  } catch (error) {
+                    console.error('Error updating ticket status:', error);
+                    toast.error('Failed to update ticket status');
+                  }
+                }}
               >
                 {statuses.map((status: any) => (
                   <option key={status.id} value={status.id}>

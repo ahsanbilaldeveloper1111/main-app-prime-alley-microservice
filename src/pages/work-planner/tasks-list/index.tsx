@@ -121,7 +121,7 @@ const TasksList = () => {
   const [filterDueDate, setFilterDueDate] = useState('All Dates');
 
   // Fetch extensions for CreateTaskModal - MUST load first before other APIs
-  const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
+  const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
   
   // Get assignees list from hierarchyDataExtensions
   const assigneesList = hierarchyDataExtensions && Array.isArray(hierarchyDataExtensions)

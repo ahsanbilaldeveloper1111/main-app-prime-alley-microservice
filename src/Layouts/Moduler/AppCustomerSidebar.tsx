@@ -54,7 +54,10 @@ import {
   Clock,
   MessageCircle,
   Shield,
-  Folder
+  Folder,
+  UserPlus,
+  CheckCheck,
+  Layers2
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -739,21 +742,45 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: "Staff Management",
       url: '',
       subItems: [
-
-            { 
-              id: 'staff-management-employees', 
-              title: 'Employees', 
-              icon: <Users size={16} />, 
-              url: '/staff-management/employees', 
-              permission: PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT 
-            },
-            { 
-              id: 'staff-management-employees-dashboard', 
-              title: 'Employees Dashboard', 
-              icon: <LayoutDashboard size={16} />, 
-              url: '/staff-management/employees/dashboard', 
-              permission: PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT 
-            }
+          { 
+            id: 'staff-management-employees-dashboard', 
+            title: 'Employees Dashboard', 
+            icon: <LayoutDashboard size={16} />, 
+            url: '/staff-management/employees/dashboard', 
+            permission: PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT 
+          },
+          {
+            id: 'staff-management-employees',
+            title: 'Employees',
+            icon: <Users size={16} />,
+            url: '/staff-management/employees',
+            permission: PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT 
+          },
+          
+          { 
+            id: 'staff-management-employees-onboarding', 
+            title: 'Employees Onboarding', 
+            icon: <UserPlus size={16} />, 
+            url: '/staff-management/employees/onboarding', 
+            permission: PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT 
+          },
+          
+          { 
+            id: 'staff-management-employees-approval-request', 
+            title: 'Approval Request', 
+            icon: <CheckCheck size={16} />, 
+            url: '/staff-management/approval-request', 
+            permission: PERMISSIONS.VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT 
+          },
+          
+          { 
+            id: 'staff-management-employees-organizational-chart', 
+            title: 'Organizational Chart', 
+            icon: <Layers2 size={16} />, 
+            url: '/staff-management/organizational-chart', 
+            permission: PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT 
+          },
+          
       ]
       .filter(item => !item.permission || hasPermission(item.permission))
     }, 
@@ -1465,7 +1492,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       {/* Sidebar */}
       <div className={`sidebar-container ${!sidebarOpen ? 'mobile-hidden' : ''}`}>
         {/* Search */}
-        <div className="sidebar-search">
+        {/* <div className="sidebar-search">
           <div className="search-wrapper">
             <div className="search-icon">
               <Search size={18} />
@@ -1478,7 +1505,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               className="search-input"
             />
           </div>
-        </div>
+        </div> */}
 
         {/* Menu Items */}
         <div className="sidebar-menu">

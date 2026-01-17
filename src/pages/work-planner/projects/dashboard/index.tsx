@@ -25,7 +25,7 @@ const WorkPlannerProjectsDashboard = () => {
     const [showProjectDropdown, setShowProjectDropdown] = useState(false);
     
     // Fetch extensions for CreateTaskModal
-    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
+    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
     
     // Fetch projects list
     useEffect(() => {

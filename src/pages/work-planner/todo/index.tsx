@@ -115,7 +115,7 @@ const DialTodo = () => {
     const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
     
     // Fetch extensions for assignees
-    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
+    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
   
     // Helper function to find extension name
     const findExtensionName = (extensionNumber: string): string => {

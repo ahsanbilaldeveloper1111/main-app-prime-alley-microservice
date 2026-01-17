@@ -626,6 +626,8 @@ export const ModuleSlug = {
   CRM_LOST_REASONS: "crm-lost-reasons",
   CRM_HISTORY: "crm-history",
   CRM_REPORTS: "crm-reports",
+  WORK_PLANNER: "work-planner",
+  STAFF_MANAGEMENT: "staff-management",
 };
 
 export const formatCurrency = (amount: number | null): string => {
