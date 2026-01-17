@@ -278,6 +278,172 @@ const LiveCallDashboard = () => {
     return Object.values(categorizedDns).filter(section => section === 'downOffline').length;
   }, [categorizedDns]);
 
+  // Track registered DNs with their timestamps for oldest idle calculation
+  const [registeredDnsStore, setRegisteredDnsStore] = useState<Record<string, { deviceName: string; when: string }>>({})
+
+  // Process complete_state events to track registered devices
+  useEffect(() => {
+    if (!eventLog || eventLog.length === 0) return
+
+    // Process the latest complete_state event (find from end to get most recent)
+    const completeStateEvents = eventLog.filter((e: any) => 
+      e.type === 'initial-state' || 
+      (e.data?.type === 'complete_state') ||
+      (e.type === 'complete_state')
+    )
+    
+    if (completeStateEvents.length > 0) {
+      // Get the most recent complete_state event
+      const completeStateEvent = completeStateEvents[completeStateEvents.length - 1]
+      
+      if (completeStateEvent) {
+        let devices: any[] = []
+        
+        // Handle different event structures
+        if (completeStateEvent.data) {
+          if (Array.isArray(completeStateEvent.data)) {
+            devices = completeStateEvent.data
+          } else if (completeStateEvent.data.data && Array.isArray(completeStateEvent.data.data)) {
+            devices = completeStateEvent.data.data
+          } else if (typeof completeStateEvent.data === 'object') {
+            // It's a dnsMap structure
+            devices = Object.values(completeStateEvent.data).flatMap((dnData: any) => 
+              Object.values(dnData.devices || {})
+            )
+          }
+        }
+
+        const registered: Record<string, { deviceName: string; when: string }> = {}
+        devices.forEach((device: any) => {
+          if (device.terminalState === 'REGISTERED' && device.dn && device.deviceName && device.when) {
+            const key = `${device.dn}_${device.deviceName}`
+            registered[key] = {
+              deviceName: device.deviceName,
+              when: device.when
+            }
+          }
+        })
+        
+        if (Object.keys(registered).length > 0) {
+          setRegisteredDnsStore(prev => ({ ...prev, ...registered }))
+        }
+      }
+    }
+  }, [eventLog])
+
+  // Process dns_states events to update registered devices
+  useEffect(() => {
+    if (!eventLog || eventLog.length === 0) return
+
+    // Get the most recent dns_states events (process all to handle state changes)
+    const dnsStateEvents = eventLog
+      .filter((e: any) => 
+        e.type === 'dns_states' || 
+        (e.data?.type === 'dns_states') ||
+        (e.type === 'dns_states' && e.data)
+      )
+
+    // Process events in order (oldest to newest) to handle state transitions correctly
+    dnsStateEvents.forEach((event: any) => {
+      let device = null
+      
+      // Handle different event structures
+      if (event.data) {
+        if (event.data.data) {
+          device = event.data.data
+        } else if (event.data.dn) {
+          device = event.data
+        }
+      } else if (event.dn) {
+        device = event
+      }
+      
+      if (device && device.dn && device.deviceName) {
+        const key = `${device.dn}_${device.deviceName}`
+        
+        if (device.terminalState === 'REGISTERED' && device.when) {
+          // Add or update registered device
+          setRegisteredDnsStore(prev => ({
+            ...prev,
+            [key]: {
+              deviceName: device.deviceName,
+              when: device.when
+            }
+          }))
+        } else if (device.terminalState === 'UNREGISTERED' || device.terminalState === 'STALE') {
+          // Remove unregistered device
+          setRegisteredDnsStore(prev => {
+            const updated = { ...prev }
+            delete updated[key]
+            return updated
+          })
+        }
+      }
+    })
+  }, [eventLog])
+
+  // Also process dnsMap changes to sync with current state
+  useEffect(() => {
+    if (!dnsMap) return
+
+    const registered: Record<string, { deviceName: string; when: string }> = {}
+    Object.values(dnsMap).forEach((dnData: any) => {
+      Object.values(dnData.devices || {}).forEach((device: any) => {
+        if (device.terminalState === 'REGISTERED' && device.dn && device.deviceName) {
+          const key = `${device.dn}_${device.deviceName}`
+          // Use existing timestamp if available, otherwise use current time
+          const existing = registeredDnsStore[key]
+          registered[key] = {
+            deviceName: device.deviceName,
+            when: existing?.when || device.when || new Date().toISOString()
+          }
+        }
+      })
+    })
+
+    // Remove devices that are no longer in dnsMap
+    const currentKeys = new Set(Object.keys(registered))
+    setRegisteredDnsStore(prev => {
+      const updated: Record<string, { deviceName: string; when: string }> = {}
+      Object.entries(prev).forEach(([key, value]) => {
+        if (currentKeys.has(key)) {
+          updated[key] = value
+        }
+      })
+      return { ...updated, ...registered }
+    })
+  }, [dnsMap])
+
+  // Calculate oldest idle DN
+  const oldestIdleInfo = useMemo(() => {
+    const idleDns = Object.entries(categorizedDns)
+      .filter(([_, section]) => section === 'activeIdle')
+      .map(([dn]) => dn)
+
+    if (idleDns.length === 0) return null
+
+    // Find the oldest registered device for each idle DN
+    let oldest: { dn: string; deviceName: string; when: string } | null = null
+
+    idleDns.forEach(dn => {
+      // Find all registered devices for this DN
+      Object.entries(registeredDnsStore).forEach(([key, value]) => {
+        const [storeDn] = key.split('_')
+        if (storeDn === dn) {
+          if (!oldest || new Date(value.when) < new Date(oldest.when)) {
+            oldest = {
+              dn: storeDn,
+              deviceName: value.deviceName,
+              when: value.when
+            }
+          }
+        }
+      })
+    })
+
+    return oldest
+  }, [categorizedDns, registeredDnsStore])
+
   // Helper function to clear monitoring state
   const clearMonitoringState = useCallback((monitoredDn: string, reason: string = 'call ended') => {
     console.log('[Monitoring] clearMonitoringState called', { monitoredDn, reason, currentState: activeMonitoring })
@@ -777,6 +943,8 @@ const LiveCallDashboard = () => {
             downOfflineCount={downOfflineCount}
             callStateMap={callStateMap}
             categorizedDns={categorizedDns}
+            oldestIdleInfo={oldestIdleInfo}
+            getUserDataExtensions={getUserDataExtensions}
           />
 
           {/* Sticky Filter Bar */}

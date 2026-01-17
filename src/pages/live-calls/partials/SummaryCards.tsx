@@ -10,6 +10,8 @@ interface SummaryCardsProps {
   downOfflineCount: number
   callStateMap: Record<string, any>
   categorizedDns: Record<string, string>
+  oldestIdleInfo: { dn: string; deviceName: string; when: string } | null
+  getUserDataExtensions: () => any
 }
 
 const SummaryCards: React.FC<SummaryCardsProps> = ({
@@ -18,7 +20,9 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({
   activeIdleCount,
   downOfflineCount,
   callStateMap,
-  categorizedDns
+  categorizedDns,
+  oldestIdleInfo,
+  getUserDataExtensions
 }) => {
   const longestCallDuration = calculateLongestCallDuration(callStateMap)
 
@@ -254,16 +258,46 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({
               <div className="text-end ms-3">
                 <div className="fw-bold mb-1" style={{ fontSize: '1.75rem', lineHeight: '1', color: '#1f2937' }}>
                   {(() => {
-                    const idleDns = Object.entries(categorizedDns)
-                      .filter(([_, section]) => section === 'activeIdle')
-                      .map(([dn]) => dn)
+                    if (!oldestIdleInfo) return '--:--'
                     
-                    if (idleDns.length === 0) return '--:--'
-                    return '--:--'
+                    // Calculate duration from "when" timestamp to now
+                    const whenDate = new Date(oldestIdleInfo.when)
+                    const now = new Date()
+                    const diffMs = now.getTime() - whenDate.getTime()
+                    const diffMinutes = Math.floor(diffMs / 60000)
+                    const diffHours = Math.floor(diffMinutes / 60)
+                    const diffDays = Math.floor(diffHours / 24)
+                    
+                    // Format as HH:MM or DD:HH if more than 24 hours
+                    let timeStr = ''
+                    if (diffDays > 0) {
+                      const hours = diffHours % 24
+                      timeStr = `${diffDays}d ${hours}h`
+                    } else if (diffHours > 0) {
+                      const minutes = diffMinutes % 60
+                      timeStr = `${String(diffHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+                    } else {
+                      timeStr = `00:${String(diffMinutes).padStart(2, '0')}`
+                    }
+                    
+                    // Show time with DN: "02:30 (590)"
+                    return `${timeStr} (${oldestIdleInfo.dn})`
                   })()}
                 </div>
                 <div className="text-muted fw-semibold" style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
-                  Oldest Idle
+                  {oldestIdleInfo ? (() => {
+                    // Get user name from extension data
+                    try {
+                      const userDataExtensions = getUserDataExtensions?.() || {}
+                      const dnString = String(oldestIdleInfo.dn)
+                      const dnNumber = Number(oldestIdleInfo.dn)
+                      const userData = userDataExtensions[oldestIdleInfo.dn] || userDataExtensions[dnString] || userDataExtensions[dnNumber]
+                      const userName = userData?.name || userData?.user_name || `DN ${oldestIdleInfo.dn}`
+                      return userName
+                    } catch {
+                      return `DN ${oldestIdleInfo.dn}`
+                    }
+                  })() : 'Oldest Idle'}
                 </div>
               </div>
             </Card.Body>

@@ -1019,6 +1019,15 @@ export default function useCtiStomp(
           userAddressRef.current = userAddress;
           userTeamsRef.current = userTeams;
           userDataExtensionsRef.current = userDataExtensions;
+          
+          // Broadcast userDataExtensions to other tabs via cross-tab communication
+          if (isGlobalInstance && crossTabManagerRef.current.isMasterTab() && crossTabManagerRef.current.isCrossTabSupported()) {
+            crossTabManagerRef.current.broadcastCtiEvent({
+              type: 'user_data_extensions',
+              data: userDataExtensions
+            });
+          }
+          
           isGettingTokenRef.current = false;
           return { token, userAddress };
         } else {
@@ -2227,6 +2236,15 @@ export default function useCtiStomp(
     // Check master status periodically
     const interval = setInterval(checkMasterStatus, 2000);
 
+    // Request userDataExtensions from master tab if not available
+    if (!userDataExtensionsRef.current && manager.isCrossTabSupported() && !manager.isMasterTab()) {
+      // Request data from master tab
+      manager.broadcastCtiEvent({
+        type: 'request_user_data_extensions',
+        data: null
+      });
+    }
+
     return () => {
       clearInterval(interval);
     };
@@ -2608,6 +2626,14 @@ export default function useCtiStomp(
       } else if (event.data?.event) {
         // Direct event object
         handleCallEvent(event.data.event);
+      } else if (event.data?.type === "request_user_data_extensions") {
+        // Another tab is requesting userDataExtensions - send it if we have it
+        if (isGlobalInstance && manager.isMasterTab() && userDataExtensionsRef.current) {
+          manager.broadcastCtiEvent({
+            type: 'user_data_extensions',
+            data: userDataExtensionsRef.current
+          });
+        }
       } else if (event.data?.type === "complete_state" && event.data?.data) {
         // CRITICAL: Handle complete_state from master tab
         // This provides the initial data needed for live-calls page
@@ -2634,6 +2660,17 @@ export default function useCtiStomp(
           }
         } catch (err) {
           console.error(`[${instanceIdRef.current}] Failed to process complete_state from master:`, err);
+        }
+      } else if (event.data?.type === "user_data_extensions" && event.data?.data) {
+        // Handle userDataExtensions from master tab
+        try {
+          const extensions = event.data.data;
+          if (extensions) {
+            userDataExtensionsRef.current = extensions;
+            console.log(`[${instanceIdRef.current}] Received userDataExtensions from master tab`);
+          }
+        } catch (err) {
+          console.error(`[${instanceIdRef.current}] Failed to process userDataExtensions from master:`, err);
         }
       } else if (event.data?.type === "dns_states" && event.data?.data) {
         // Handle dns_states from master tab
