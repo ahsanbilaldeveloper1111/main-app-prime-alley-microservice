@@ -646,7 +646,7 @@ const EditDeal = () => {
             <Card className="border-0 shadow-sm">
               <Card.Header>
                 <div className="d-flex justify-content-between align-items-center">
-                  <h4 className="mb-0 app-heading">Deal Information</h4>
+                  <h4 className="mb-0 app-heading">Edit Deal Information</h4>
                   <Link href="/crm/deals">
                     <Button variant="outline-secondary" size="sm">
                       <ArrowLeft size={16} className="me-2" />

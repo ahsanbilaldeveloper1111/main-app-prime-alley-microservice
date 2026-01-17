@@ -11,6 +11,7 @@ import {
   Spinner,
   Table,
 } from "react-bootstrap";
+import { useSession } from "next-auth/react";
 import {
   getCrmDashboard,
   getCrmDashboardOverview,
@@ -155,6 +156,7 @@ const CHART_COLORS = [
 // };
 
 const CrmDashboard = () => {
+  const { data: session } = useSession();
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [recentLeads, setRecentLeads] = useState<LeadData[]>([]);
   const [recentDeals, setRecentDeals] = useState<DealData[]>([]);
@@ -803,9 +805,12 @@ const CrmDashboard = () => {
               <Card.Body>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h5 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: '#1E293B' }}>Upcoming Tasks</h5>
-                  <a href="#" style={{ fontSize: '14px', color: '#3B82F6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    Due dates <ChevronRight size={16} />
-                  </a>
+                  {session?.user?.permissions?.includes('view-crm-tasks') && (
+                  <Link href="/crm/tasks" style={{ fontSize: '14px', color: '#3B82F6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    View All <ChevronRight size={16} />
+                  </Link>
+                  )}
+
                 </div>
 
                 <ListGroup variant="flush">

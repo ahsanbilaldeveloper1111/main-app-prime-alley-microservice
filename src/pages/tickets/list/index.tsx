@@ -1170,8 +1170,8 @@ const TicketList = () => {
       toast.error("Please select a ticket type");
       return;
     }
-    if (newTicketDescription.length < 50 || newTicketDescription.length > 500) {
-      toast.error("Ticket description must be between 50 and 500 characters");
+    if (newTicketDescription.length < 50 ) {
+      toast.error("Ticket description must be at least 50 characters");
       return;
     }
     if (!newTicketStatus) {
@@ -2015,13 +2015,13 @@ const TicketList = () => {
                 id="editTicketDescription"
                 value={selectedTicketDescription || ""}
                 onChange={handleEditTicketDescriptionChange}
-                placeholder="Ticket Description (Min: 50 chars, Max: 500 chars)"
+                placeholder="Ticket Description (Min: 50 chars)"
                 rows={4}
-                maxLength={500}
+               
               ></textarea>
               <div className="d-flex justify-content-between mt-1">
                 <small className="text-muted">
-                  {selectedTicketDescription?.length || 0}/500 characters
+                  {selectedTicketDescription?.length || 0} characters
                 </small>
               </div>
             </div>
@@ -2543,9 +2543,9 @@ const TicketList = () => {
                 id="newTicketDescription"
                 value={newTicketDescription}
                 onChange={handleNewTicketDescriptionChange}
-                placeholder="Ticket Description (Min: 50 chars, Max: 500 chars)"
+                placeholder="Ticket Description (Min: 50 chars)"
                 rows={4}
-                maxLength={500}
+               
               ></textarea>
               <div className="d-flex justify-content-between mt-1">
                 <div
@@ -2567,13 +2567,7 @@ const TicketList = () => {
                         )}
                       </Form.Text>
                 </div>
-                <small
-                  className={`text-muted ${
-                    newTicketDescription.length > 500 ? "text-danger" : ""
-                  }`}
-                >
-                  {newTicketDescription.length}/500 characters
-                </small>
+                
                 
               </div>
               <Form.Text className="text-muted d-block" style={{ fontSize: '0.813rem' }}>

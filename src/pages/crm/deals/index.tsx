@@ -1,5 +1,6 @@
 import "@assets/scss/datatable-style.scss";
 import parsePhoneNumber from "libphonenumber-js";
+import { useRouter } from "next/router";
 import React, {
   ReactElement,
   useState,
@@ -433,6 +434,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
 const CrmDeals = () => {
   const { data: session } = useSession();
+  const router = useRouter();
 
   const [stages, setStages] = useState<any[]>([]);
   const [lostReasons, setLostReasons] = useState<any[]>([]);
@@ -663,6 +665,35 @@ const CrmDeals = () => {
       }
     }
   }, [activeFilter, stages]);
+  
+  // Read tab from URL on mount and when router is ready
+  useEffect(() => {
+    if (router.isReady && router.query.tab) {
+      const tabFromUrl = String(router.query.tab);
+      // Allow "all", "lost", "deleted", or any stage ID
+      const isValidFilter = tabFromUrl === 'all' || tabFromUrl === 'lost' || tabFromUrl === 'deleted' || 
+        (stages.length > 0 && stages.some((s: any) => s.id.toString() === tabFromUrl));
+      if (isValidFilter && tabFromUrl !== activeFilter) {
+        setActiveFilter(tabFromUrl);
+      }
+    }
+  }, [router.isReady, router.query.tab, stages, activeFilter]);
+  
+  // Handler to update filter and URL
+  const handleFilterChange = useCallback((filterId: string) => {
+    setActiveFilter(filterId);
+    setDealsPagination((prev) => ({ ...prev, currentPage: 1 }));
+    
+    // Update URL with tab query parameter
+    router.push(
+      {
+        pathname: router.pathname,
+        query: { ...router.query, tab: filterId }
+      },
+      undefined,
+      { shallow: true }
+    );
+  }, [router]);
 
   useEffect(() => {
     fetchDeals(dealsPagination.currentPage, dealsPagination.rowsPerPage);
@@ -1661,10 +1692,7 @@ const CrmDeals = () => {
             }
           ]}
           activeFilter={activeFilter}
-          onFilterChange={(filterId) => {
-            setActiveFilter(filterId);
-            setDealsPagination({ ...dealsPagination, currentPage: 1 });
-          }}
+          onFilterChange={handleFilterChange}
           // searchValue={dealsSearch}
           // onSearchChange={(value) => setDealsSearch(value)}
           // onSearch={() => {
@@ -2282,7 +2310,11 @@ const CrmDeals = () => {
                                   size="sm" 
                                   className="p-1" 
                                   title="Edit"
-                                  onClick={() => window.location.href = `/crm/deals/${deal.rawData?.id || deal.id}/edit`}
+                                  disabled={activeFilter === "lost"}
+                                  onClick={() => {
+                                    if (activeFilter === "lost") return;
+                                    window.location.href = `/crm/deals/${deal.rawData?.id || deal.id}/edit`;
+                                  }}
                                 >
                                   <Edit size={16} />
                                 </Button>
@@ -3444,6 +3476,7 @@ const CrmDeals = () => {
                   {session?.user?.permissions?.includes('edit-crm-deals') && (
                     <Button
                       variant="primary"
+                      disabled={activeFilter === "lost"}
                       style={{
                         padding: '10px 20px',
                         borderRadius: '8px',
@@ -3452,12 +3485,27 @@ const CrmDeals = () => {
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '8px',
-                        background: '#4680ff',
-                        border: 'none'
+                        background: activeFilter === "lost" ? "#9ca3af" : "#4680ff",
+                        border: 'none',
+                        opacity: activeFilter === "lost" ? 0.6 : 1,
+                        cursor: activeFilter === "lost" ? "not-allowed" : "pointer",
                       }}
                       onClick={() => {
+                        if (activeFilter === "lost") return;
                         setShowDealViewModal(false);
                         window.location.href = `/crm/deals/${viewingDeal.id}/edit`;
+                      }}
+                      onMouseOver={(e) => {
+                        if (activeFilter === "lost") return;
+                        e.currentTarget.style.background = "#3b6ce5";
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(70, 128, 255, 0.4)";
+                      }}
+                      onMouseOut={(e) => {
+                        if (activeFilter === "lost") return;
+                        e.currentTarget.style.background = "#4680ff";
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
                       }}
                     >
                       <Edit size={16} />

@@ -2174,7 +2174,7 @@ export const deleteDealAttachment = async (
     await axiosInstance.delete(
       `/crm/deals/${dealId}/attachments/${attachmentId}`
     );
-    toast.success("Attachment deleted successfully");
+    //toast.success("Attachment deleted successfully");
   } catch (error: any) {
     toast.error(
       error?.response?.data?.message ||
@@ -2333,7 +2333,7 @@ export const deleteOrderAttachment = async (
     await axiosInstance.delete(
       `/crm/orders/${orderId}/attachments/${attachmentId}`
     );
-    toast.success("Attachment deleted successfully");
+    //toast.success("Attachment deleted successfully");
   } catch (error: any) {
     toast.error(
       error?.response?.data?.message ||
@@ -2482,7 +2482,7 @@ export const deleteLeadFollowUp = async (
 ): Promise<void> => {
   try {
     await axiosInstance.delete(`/crm/leads/${leadId}/follow-ups/${followUpId}`);
-    toast.success("Follow-up deleted successfully");
+    toast.success("Follow-up deleted successfully!");
   } catch (error: any) {
     toast.error(
       error?.response?.data?.message ||

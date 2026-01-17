@@ -972,7 +972,7 @@ const EditLead = () => {
               <Card.Header>
                 <div className="d-flex justify-content-between align-items-center">
                   <h4 className="mb-0 app-heading">
-                    {isOpportunity ? "Opportunity" : "Lead"} Information
+                    {isOpportunity ? "Edit Opportunity" : "Edit Lead"} Information
                   </h4>
                   {selectedCrmData && (
                     <Badge bg="info" className="d-flex align-items-center">

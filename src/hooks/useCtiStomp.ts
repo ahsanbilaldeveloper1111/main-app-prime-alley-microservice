@@ -1462,15 +1462,19 @@ export default function useCtiStomp(
             return;
           }
 
-          // Check if we've received a message recently (within last 2 minutes)
+          // Check if we've received a message recently (within last 5 minutes)
+          // Note: We check for CTI events (not pings) to detect if the connection is actually working
+          // If connection is OPEN, it means SSE is alive. We only reconnect if no CTI events for 5 minutes
           const now = Date.now();
           const lastMessageTime = lastMessageTimeRef.current || connectionStartTimeRef.current || now;
           const timeSinceLastMessage = now - lastMessageTime;
 
-          // If no message received in 2 minutes, connection might be dead
-          if (timeSinceLastMessage > 120000) {
+          // If no CTI event received in 5 minutes AND connection is open, it might be stale
+          // But if connection is OPEN, it's likely still alive (SSE keeps connection open with pings)
+          // Only trigger reconnection if it's been a very long time (5 minutes) without any CTI events
+          if (timeSinceLastMessage > 300000) { // 5 minutes instead of 2 minutes
             console.log(
-              `[${currentInstanceId}] ⚠️ Health check: No message received in ${Math.round(timeSinceLastMessage / 1000)}s, triggering reconnection...`
+              `[${currentInstanceId}] ⚠️ Health check: No CTI event received in ${Math.round(timeSinceLastMessage / 1000)}s (connection is OPEN but no events), triggering reconnection...`
             );
             if (!isReconnectingRef.current) {
               isReconnectingRef.current = true;
@@ -2437,15 +2441,19 @@ export default function useCtiStomp(
                 return;
               }
 
-              // Check if we've received a message recently (within last 2 minutes)
+              // Check if we've received a message recently (within last 5 minutes)
+              // Note: We check for CTI events (not pings) to detect if the connection is actually working
+              // If connection is OPEN, it means SSE is alive. We only reconnect if no CTI events for 5 minutes
               const now = Date.now();
               const lastMessageTime = lastMessageTimeRef.current || connectionStartTimeRef.current || now;
               const timeSinceLastMessage = now - lastMessageTime;
 
-              // If no message received in 2 minutes, connection might be dead
-              if (timeSinceLastMessage > 120000) {
+              // If no CTI event received in 5 minutes AND connection is open, it might be stale
+              // But if connection is OPEN, it's likely still alive (SSE keeps connection open with pings)
+              // Only trigger reconnection if it's been a very long time (5 minutes) without any CTI events
+              if (timeSinceLastMessage > 300000) { // 5 minutes instead of 2 minutes
                 console.log(
-                  `[${currentInstanceId}] ⚠️ Health check: No message received in ${Math.round(timeSinceLastMessage / 1000)}s, triggering reconnection...`
+                  `[${currentInstanceId}] ⚠️ Health check: No CTI event received in ${Math.round(timeSinceLastMessage / 1000)}s (connection is OPEN but no events), triggering reconnection...`
                 );
                 if (!isReconnectingRef.current && attemptReconnectionRef.current) {
                   isReconnectingRef.current = true;

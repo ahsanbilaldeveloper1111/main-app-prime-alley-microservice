@@ -1,5 +1,6 @@
 import "@assets/scss/datatable-style.scss";
 import parsePhoneNumber from "libphonenumber-js";
+import { useRouter } from "next/router";
 import React, {
   ReactElement,
   useState,
@@ -429,6 +430,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
 const CrmOrders = () => {
   const { data: session } = useSession();
+  const router = useRouter();
 
   const [stages, setStages] = useState<any[]>([]);
   const [lostReasons, setLostReasons] = useState<any[]>([]);
@@ -673,6 +675,35 @@ const CrmOrders = () => {
       }
     }
   }, [activeFilter, stages]);
+  
+  // Read tab from URL on mount and when router is ready
+  useEffect(() => {
+    if (router.isReady && router.query.tab) {
+      const tabFromUrl = String(router.query.tab);
+      // Allow "all", "lost", "deleted", or any stage ID
+      const isValidFilter = tabFromUrl === "all" || tabFromUrl === "lost" || tabFromUrl === "deleted" || 
+        (stages.length > 0 && stages.some((s: any) => s.id.toString() === tabFromUrl));
+      if (isValidFilter && tabFromUrl !== activeFilter) {
+        setActiveFilter(tabFromUrl);
+      }
+    }
+  }, [router.isReady, router.query.tab, stages, activeFilter]);
+  
+  // Handler to update filter and URL
+  const handleFilterChange = useCallback((filterId: string) => {
+    setActiveFilter(filterId);
+    setOrdersPagination((prev) => ({ ...prev, currentPage: 1 }));
+    
+    // Update URL with tab query parameter
+    router.push(
+      {
+        pathname: router.pathname,
+        query: { ...router.query, tab: filterId }
+      },
+      undefined,
+      { shallow: true }
+    );
+  }, [router]);
 
   useEffect(() => {
     fetchOrders(ordersPagination.currentPage, ordersPagination.rowsPerPage);
@@ -1696,10 +1727,7 @@ const CrmOrders = () => {
             },
           ]}
           activeFilter={activeFilter}
-          onFilterChange={(filterId) => {
-            setActiveFilter(filterId);
-            setOrdersPagination({ ...ordersPagination, currentPage: 1 });
-          }}
+          onFilterChange={handleFilterChange}
           // searchValue={ordersSearch}
           
           // onSearch={() => {

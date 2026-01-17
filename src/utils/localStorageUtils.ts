@@ -23,6 +23,7 @@ export const clearAllLocalStorage = (): void => {
       // Session and authentication related
       localStorage.removeItem('last_activity')
       localStorage.removeItem('user_session_data')
+      localStorage.removeItem('sync-tokens') // Remove sync-tokens entry
       
       // Clear any other custom keys that start with your app prefix
       const keysToRemove: string[] = []
@@ -32,7 +33,9 @@ export const clearAllLocalStorage = (): void => {
           key.startsWith('cti_') ||
           key.startsWith('app_') ||
           key.startsWith('user_') ||
-          key.startsWith('session_')
+          key.startsWith('session_') ||
+          key === 'sync-tokens' || // Explicitly include sync-tokens
+          key.startsWith('sync-') // Include any sync- prefixed keys
         )) {
           keysToRemove.push(key)
         }

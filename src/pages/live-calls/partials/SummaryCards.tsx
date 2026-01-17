@@ -280,8 +280,8 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({
                       timeStr = `00:${String(diffMinutes).padStart(2, '0')}`
                     }
                     
-                    // Show time with DN: "02:30 (590)"
-                    return `${timeStr} (${oldestIdleInfo.dn})`
+                    // Show time with DN: "02:30 (590)" (${oldestIdleInfo.dn})
+                    return `${timeStr} `
                   })()}
                 </div>
                 <div className="text-muted fw-semibold" style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>

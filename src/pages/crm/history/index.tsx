@@ -1,4 +1,5 @@
 import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/router";
 import { Row, Col, Card, Button, Badge, Table, Form, Modal, InputGroup } from "react-bootstrap";
 import Select from "react-select";
 import Layout from "@layout/index";
@@ -182,6 +183,7 @@ interface ActivityRecord {
 }
 
 const HistoryPage = () => {
+  const router = useRouter();
   // New Activity Tracker States
   const [activityTypeFilter, setActivityTypeFilter] = useState('all');
   const [showActivityAdvancedFilters, setShowActivityAdvancedFilters] = useState(false);
@@ -376,6 +378,35 @@ const HistoryPage = () => {
     setPagination(prev => ({ ...prev, current_page: 1 }));
     fetchHistoryData(1);
   }, [activityFilters.agents, activityFilters.dateRange.start, activityFilters.dateRange.end, extensions, activityTypeFilter]);
+  
+  // Valid filter IDs for history
+  const validHistoryFilters = ['all', 'leads', 'deals', 'orders'];
+  
+  // Read tab from URL on mount and when router is ready
+  useEffect(() => {
+    if (router.isReady && router.query.tab) {
+      const tabFromUrl = String(router.query.tab);
+      if (validHistoryFilters.includes(tabFromUrl) && tabFromUrl !== activityTypeFilter) {
+        setActivityTypeFilter(tabFromUrl);
+      }
+    }
+  }, [router.isReady, router.query.tab, activityTypeFilter]);
+  
+  // Handler to update filter and URL
+  const handleFilterChange = useCallback((filterId: string) => {
+    setActivityTypeFilter(filterId);
+    setPagination((prev) => ({ ...prev, current_page: 1 }));
+    
+    // Update URL with tab query parameter
+    router.push(
+      {
+        pathname: router.pathname,
+        query: { ...router.query, tab: filterId }
+      },
+      undefined,
+      { shallow: true }
+    );
+  }, [router]);
 
   // Get agent options from hierarchy data (extensions)
   const availableAgents = extensions.map((ext: any) => ({
@@ -1017,8 +1048,8 @@ const HistoryPage = () => {
             icon: <ShoppingBag size={16} />
           }
         ]}
-        // activeFilter={activityTypeFilter}
-        // onFilterChange={(filterId) => setActivityTypeFilter(filterId)}
+        activeFilter={activityTypeFilter}
+        onFilterChange={handleFilterChange}
         // searchValue={activitySearch}
         // onSearchChange={(value) => setActivitySearch(value)}
         // onSearch={() => {

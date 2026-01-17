@@ -5,6 +5,7 @@ import { Col, Row, Tab, Tabs, Modal, Button, Form, Card, CardBody } from 'react-
 import Select from 'react-select';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import { ArrowLeft } from 'lucide-react';
 import '@assets/scss/tabs.scss';
 import '@assets/scss/common.scss';
 
@@ -218,6 +219,19 @@ const UserView = () => {
     return (
         <React.Fragment>
             <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/users" subTitle="Users" />
+
+            <Row className="mb-3">
+                <Col md={12}>
+                    <Button
+                        variant="outline-secondary"
+                        onClick={() => router.push('/controlhub/users')}
+                        className="d-flex align-items-center gap-2"
+                    >
+                        <ArrowLeft size={16} />
+                        Back to Users
+                    </Button>
+                </Col>
+            </Row>
 
             {showChangeStatusModal && (
                 <Modal show={showChangeStatusModal} onHide={handleCloseChangeStatusModal}>

@@ -256,10 +256,11 @@ const ModuleCategories = () => {
       cell: (props: Submodule) => {
         const moduleItem = modules.find(m => m.id == props.module_id);
         return (
-            <span className="px-3 py-2 badge bg-light" 
+            <span className="px-3 py-2 badge bg-outline-secondary text-secondary" 
             style={{ fontWeight: '500', fontSize: '0.813rem', backgroundColor: `${moduleItem?.color}20`, color: moduleItem?.color, border: `1px solid ${moduleItem?.color}40` }}>
               {moduleItem?.name || 'Unknown'}
             </span>
+             
         );
       }
     },

@@ -370,12 +370,12 @@ const Settings = () => {
       { key: "ranks-and-permissions", title: "Ranks and Permissions", icon: Shield, color: "#ff9800", permission: PERMISSIONS.VIEW_RANKS }
     ],
     "crm": [
-      { key: "campaigns", title: "Campaigns", icon: Megaphone, color: "#0d6efd", permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS },
+      { key: "stages", title: "Stages", icon: Layers, color: "#ff9800", permission: PERMISSIONS.VIEW_CRM_STAGES },
       { key: "product-groups", title: "Product Groups", icon: Building2, color: "#6c757d", permission: PERMISSIONS.VIEW_CRM_INDUSTRIES },
       { key: "products", title: "Products", icon: Package, color: "#198754", permission: PERMISSIONS.VIEW_CRM_PRODUCTS },
-      { key: "stages", title: "Stages", icon: Layers, color: "#ff9800", permission: PERMISSIONS.VIEW_CRM_STAGES },
       { key: "deal-templates", title: "Deal Templates", icon: FileText, color: "#9c27b0", permission: PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES },
-      { key: "business-types", title: "Business Types", icon: Building2, color: "#198754", permission: PERMISSIONS.VIEW_CRM_BUSINESS_TYPES }
+      { key: "business-types", title: "Business Types", icon: Building2, color: "#198754", permission: PERMISSIONS.VIEW_CRM_BUSINESS_TYPES },
+      { key: "campaigns", title: "Campaigns", icon: Megaphone, color: "#0d6efd", permission: PERMISSIONS.VIEW_CRM_CAMPAIGNS }
     ],
     "telco-gateway": [
       { key: "assign-devices", title: "Assign Devices", icon: SettingsIcon, color: "#0d6efd", permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT },

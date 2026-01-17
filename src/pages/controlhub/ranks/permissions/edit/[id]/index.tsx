@@ -7,7 +7,7 @@ import { toast } from 'react-toastify'
 import permissionsData from '@common/JsonData/PermissionsData'
 import { useRouter } from 'next/router'
 import { viewRank, assignPermissions } from '@utils/roles'
-import { CheckSquare, Square } from 'lucide-react'
+import { CheckSquare, Square, ArrowLeft } from 'lucide-react'
 import '@assets/scss/common.scss';
 
 interface Permission {
@@ -254,6 +254,19 @@ const EditRolePermission = () => {
 
         <React.Fragment>
             <BreadcrumbItem mainTitle="Controlhub" mainLink="controlhub/roles" subTitle="Permissions"  />
+
+            <Row className="mb-3">
+                <Col md={12}>
+                    <Button
+                        variant="outline-secondary"
+                        onClick={() => router.push('/controlhub/ranks')}
+                        className="d-flex align-items-center gap-2"
+                    >
+                        <ArrowLeft size={16} />
+                        Back to Ranks
+                    </Button>
+                </Col>
+            </Row>
 
             {/* <Row className='mb-3'>
                   <Col md={8}>

@@ -528,6 +528,7 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
 const CrmLeads = () => {
   const { data: session } = useSession();
+  const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
 
   const [stages, setStages] = useState<any[]>([]);
@@ -797,6 +798,35 @@ const CrmLeads = () => {
       }
     }
   }, [activeFilter, stages]);
+  
+  // Read tab from URL on mount and when router is ready
+  useEffect(() => {
+    if (router.isReady && router.query.tab) {
+      const tabFromUrl = String(router.query.tab);
+      // Allow "all", "lost", "deleted", or any stage ID
+      const isValidFilter = tabFromUrl === "all" || tabFromUrl === "lost" || tabFromUrl === "deleted" || 
+        (stages.length > 0 && stages.some((s: any) => s.id.toString() === tabFromUrl));
+      if (isValidFilter && tabFromUrl !== activeFilter) {
+        setActiveFilter(tabFromUrl);
+      }
+    }
+  }, [router.isReady, router.query.tab, stages, activeFilter]);
+  
+  // Handler to update filter and URL
+  const handleFilterChange = useCallback((filterId: string) => {
+    setActiveFilter(filterId);
+    setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
+    
+    // Update URL with tab query parameter
+    router.push(
+      {
+        pathname: router.pathname,
+        query: { ...router.query, tab: filterId }
+      },
+      undefined,
+      { shallow: true }
+    );
+  }, [router]);
 
   useEffect(() => {
     fetchLeads(
@@ -1347,7 +1377,6 @@ const CrmLeads = () => {
     expected_close_date: "",
     description: "",
   });
-  const router = useRouter();
   const handleConvertLead = useCallback((lead: any) => {
     router.push(`/crm/deals/create?lead_id=${lead.id}`);
   }, []);
@@ -1696,7 +1725,7 @@ const CrmLeads = () => {
 
       setShowDeleteFollowUpModal(false);
       setFollowUpToDelete(null);
-      toast.success("Follow-up deleted successfully!");
+      
     } catch (error) {
       console.error("Failed to delete follow-up:", error);
       toast.error("Failed to delete follow-up");
@@ -1903,7 +1932,7 @@ const CrmLeads = () => {
 
       setShowDeleteMeetingModal(false);
       setMeetingToDelete(null);
-      toast.success("Meeting deleted successfully!");
+      
     } catch (error) {
       console.error("Failed to delete meeting:", error);
       toast.error("Failed to delete meeting");
@@ -2296,10 +2325,7 @@ const CrmLeads = () => {
             },
           ]}
           activeFilter={activeFilter}
-          onFilterChange={(filterId) => {
-            setActiveFilter(filterId);
-            setLeadsPagination({ ...leadsPagination, currentPage: 1 });
-          }}
+          onFilterChange={handleFilterChange}
           // searchValue={leadsSearch}
           // onSearchChange={(value) => setLeadsSearch(value)}
           // onSearch={() => {
@@ -3198,6 +3224,7 @@ const CrmLeads = () => {
                                     size="sm"
                                     className="p-1"
                                     title="Edit"
+                                    disabled={activeFilter === "lost"}
                                     onClick={() =>
                                       (window.location.href = `/crm/leads/${
                                         lead.rawData?.id || lead.id
@@ -5650,6 +5677,7 @@ const CrmLeads = () => {
                   {session?.user?.permissions?.includes("edit-crm-leads") && (
                     <Button
                       variant="primary"
+                      disabled={activeFilter === "lost"}
                       style={{
                         padding: "10px 20px",
                         borderRadius: "8px",
@@ -5658,20 +5686,25 @@ const CrmLeads = () => {
                         display: "inline-flex",
                         alignItems: "center",
                         gap: "8px",
-                        background: "#4680ff",
+                        background: activeFilter === "lost" ? "#9ca3af" : "#4680ff",
                         border: "none",
+                        opacity: activeFilter === "lost" ? 0.6 : 1,
+                        cursor: activeFilter === "lost" ? "not-allowed" : "pointer",
                       }}
                       onClick={() => {
+                        if (activeFilter === "lost") return;
                         setShowLeadViewModal(false);
                         window.location.href = `/crm/leads/${viewingLead.id}/edit`;
                       }}
                       onMouseOver={(e) => {
+                        if (activeFilter === "lost") return;
                         e.currentTarget.style.background = "#3b6ce5";
                         e.currentTarget.style.transform = "translateY(-2px)";
                         e.currentTarget.style.boxShadow =
                           "0 4px 12px rgba(70, 128, 255, 0.4)";
                       }}
                       onMouseOut={(e) => {
+                        if (activeFilter === "lost") return;
                         e.currentTarget.style.background = "#4680ff";
                         e.currentTarget.style.transform = "translateY(0)";
                         e.currentTarget.style.boxShadow = "none";

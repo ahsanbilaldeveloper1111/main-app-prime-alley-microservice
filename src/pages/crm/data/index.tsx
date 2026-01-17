@@ -32,6 +32,7 @@ import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/router";
 import moment from "moment";
 import {
   FiUpload,
@@ -492,6 +493,7 @@ const getRandomColor = (name: string): string => {
 
 const CrmProspectsManagement = () => {
   const { data: session } = useSession();
+  const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
@@ -595,7 +597,38 @@ const CrmProspectsManagement = () => {
 
   const [showProspectsAnalytics, setShowProspectsAnalytics] = useState(false);
   const [showAllProspectStats, setShowAllProspectStats] = useState(false);
+  
+  // Valid filter IDs
+  const validFilters = ["all", "scheduled", "has_leads"];
+  
+  // Initialize activeFilter state
   const [activeFilter, setActiveFilter] = useState("all");
+  
+  // Read tab from URL on mount and when router is ready
+  useEffect(() => {
+    if (router.isReady && router.query.tab) {
+      const tabFromUrl = String(router.query.tab);
+      if (validFilters.includes(tabFromUrl)) {
+        setActiveFilter(tabFromUrl);
+      }
+    }
+  }, [router.isReady, router.query.tab]);
+  
+  // Handler to update filter and URL
+  const handleFilterChange = useCallback((filterId: string) => {
+    setActiveFilter(filterId);
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+    
+    // Update URL with tab query parameter
+    router.push(
+      {
+        pathname: router.pathname,
+        query: { ...router.query, tab: filterId }
+      },
+      undefined,
+      { shallow: true }
+    );
+  }, [router]);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [prospectsSearch, setProspectsSearch] = useState("");
   const [prospectsFilters, setProspectsFilters] = useState({
@@ -2624,10 +2657,7 @@ const CrmProspectsManagement = () => {
               },
             ]}
             activeFilter={activeFilter}
-            onFilterChange={(filterId) => {
-              setActiveFilter(filterId);
-              setPagination((prev) => ({ ...prev, currentPage: 1 }));
-            }}
+            onFilterChange={handleFilterChange}
             // searchValue={prospectsSearch}
             // onSearchChange={(value) => {
             //   setProspectsSearch(value);
@@ -3721,7 +3751,7 @@ const CrmProspectsManagement = () => {
                 <li>
                   <strong>Phone Column:</strong> Include a "phone" column (case
                   insensitive) for contact information. Phone must follow the
-                  E.164 format.
+                  E.164 format. (e.g., +14155552671)
                 </li>
                 <li>
                   <strong>Email Column:</strong> Include a "email" column for contact information. Email must be a valid email address.

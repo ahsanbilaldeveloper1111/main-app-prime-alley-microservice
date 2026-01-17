@@ -302,6 +302,33 @@ const CrmTasks = () => {
   const [formNoteToDelete, setFormNoteToDelete] = useState<number | null>(null);
   const [showDeleteFormNoteModal, setShowDeleteFormNoteModal] = useState(false);
 
+  // Valid filters for URL persistence
+  const validFilters = ['all', 'med-urgency', 'high-urgency', 'overdue'];
+
+  // Read tab from URL on mount
+  useEffect(() => {
+    if (router.isReady && router.query.tab) {
+      const tabFromUrl = String(router.query.tab);
+      if (validFilters.includes(tabFromUrl) && tabFromUrl !== activeFilter) {
+        setActiveFilter(tabFromUrl);
+      }
+    }
+  }, [router.isReady, router.query.tab]);
+
+  // Handle filter change with URL update
+  const handleFilterChange = useCallback((filterId: string) => {
+    setActiveFilter(filterId);
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+    router.push(
+      {
+        pathname: router.pathname,
+        query: { ...router.query, tab: filterId }
+      },
+      undefined,
+      { shallow: true }
+    );
+  }, [router]);
+
   // Fetch extensions
   useEffect(() => {
     const fetchExtensions = async () => {
@@ -931,10 +958,7 @@ const CrmTasks = () => {
                   { id: 'overdue', label: 'Overdue', color: '#dc3545', icon: <Activity size={16} /> },
                 ]}
                 activeFilter={activeFilter}
-                onFilterChange={(filterId) => {
-                  setActiveFilter(filterId);
-                  setPagination((prev) => ({ ...prev, currentPage: 1 }));
-                }}
+                onFilterChange={handleFilterChange}
                 searchValue={search}
                 onSearchChange={(value) => {
                   setSearch(value);
