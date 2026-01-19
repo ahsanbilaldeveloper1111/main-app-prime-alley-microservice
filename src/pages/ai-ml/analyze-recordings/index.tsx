@@ -507,14 +507,14 @@ const AnalyzeRecordings = () => {
                     if (response?.summary) {
                         setTranscriptionSummary({
                             total_transcriptions: response.summary.total_transcriptions || 0,
-                            inbound_transcriptions: response.summary.inbound_transcriptions || 0,
-                            outbound_transcriptions: response.summary.outbound_transcriptions || 0,
-                            pending_transcriptions: response.summary.pending_transcriptions || 0,
-                            processing_transcriptions: response.summary.processing_transcriptions || 0,
+                            incomplete_transcriptions: response.summary.incomplete_transcriptions || 0,
+                            in_progress_transcriptions: response.summary.in_progress_transcriptions || 0,
+                            analyzing_transcriptions: response.summary.analyzing_transcriptions || 0,
+                            analyzed_transcriptions: response.summary.analyzed_transcriptions || 0,
+                            transribing_transcriptions: response.summary.transribing_transcriptions || 0,
+                            transcribed_transcriptions: response.summary.transcribed_transcriptions || 0,
                             completed_transcriptions: response.summary.completed_transcriptions || 0,
                             failed_transcriptions: response.summary.failed_transcriptions || 0,
-                            with_transcription: response.summary.with_transcription || 0,
-                            with_analysis: response.summary.with_analysis || 0,
                         });
                     }
 
