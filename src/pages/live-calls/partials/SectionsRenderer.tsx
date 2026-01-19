@@ -70,6 +70,9 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
   toggleSection
 }) => {
   // Get user data extensions for filtering
+  // Add state to force re-render when data becomes available (for cloned tabs)
+  const [extensionsUpdateCounter, setExtensionsUpdateCounter] = React.useState(0)
+  
   const userDataExtensions = React.useMemo(() => {
     try {
       return getUserDataExtensions?.() || {}
@@ -77,7 +80,57 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
       console.error('Error getting user data extensions for filtering:', error)
       return {}
     }
-  }, [getUserDataExtensions])
+  }, [getUserDataExtensions, extensionsUpdateCounter])
+  
+  // Retry mechanism: Check periodically if data becomes available (for cloned tabs)
+  React.useEffect(() => {
+    if (!getUserDataExtensions) {
+      return
+    }
+    
+    const extensions = getUserDataExtensions() || {}
+    const hasData = Object.keys(extensions).length > 0
+    
+    if (hasData) {
+      // Data is available
+      return
+    }
+    
+    // If no data, set up a retry mechanism to check periodically
+    // This helps when a tab is cloned and data arrives via cross-tab communication
+    const maxRetries = 30 // Check for 30 seconds total
+    let retryCount = 0
+    
+    const retryInterval = setInterval(() => {
+      if (!getUserDataExtensions) {
+        clearInterval(retryInterval)
+        return
+      }
+      
+      const currentExtensions = getUserDataExtensions() || {}
+      const currentHasData = Object.keys(currentExtensions).length > 0
+      
+      if (currentHasData) {
+        // Data is now available, trigger re-render
+        setExtensionsUpdateCounter(prev => prev + 1)
+        clearInterval(retryInterval)
+      } else {
+        retryCount++
+        // Also trigger periodic updates to check for data
+        if (retryCount % 5 === 0) {
+          setExtensionsUpdateCounter(prev => prev + 1)
+        }
+        if (retryCount >= maxRetries) {
+          // Stop retrying after max attempts
+          clearInterval(retryInterval)
+        }
+      }
+    }, retryCount < 10 ? 200 : 1000) // Fast checks for first 2 seconds, then every second
+    
+    return () => {
+      clearInterval(retryInterval)
+    }
+  }, [getUserDataExtensions, extensionsUpdateCounter])
 
   // Filter function to check if DN matches filters
   const matchesFilters = React.useCallback((dn: string, section: string) => {

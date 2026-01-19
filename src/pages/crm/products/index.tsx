@@ -449,6 +449,12 @@ const ProductsPage = () => {
 
   // Convert CrmProduct to ProductDisplayData
   const convertToDisplayData = (product: CrmProduct): ProductDisplayData => {
+    // Normalize industry_id: convert string to number if needed
+    const rawIndustryId = (product as any).industry_id || (product as any).industry?.id || null;
+    const normalizedIndustryId = rawIndustryId !== null
+      ? (typeof rawIndustryId === 'string' ? Number.parseInt(rawIndustryId, 10) : rawIndustryId)
+      : null;
+    
     return {
       id: product.id,
       productName: product.name,
@@ -461,7 +467,7 @@ const ProductsPage = () => {
       description: product.description || "",
       created: new Date(product.created_at).toLocaleDateString(),
       industry: (product as any).industry || null,
-      industry_id: (product as any).industry_id || null,
+      industry_id: normalizedIndustryId,
     };
   };
 
@@ -578,6 +584,12 @@ const ProductsPage = () => {
   const handleOpenProductModal = (product?: ProductDisplayData) => {
     if (product) {
       setEditingProduct(product);
+      // Convert industry_id to number if it's a string (API sometimes returns string)
+      const industryId = product.industry_id || product.industry?.id || null;
+      const normalizedIndustryId = industryId !== null 
+        ? (typeof industryId === 'string' ? Number.parseInt(industryId, 10) : industryId)
+        : null;
+      
       setProductFormData({
         productName: product.productName,
         sku: product.sku,
@@ -587,7 +599,7 @@ const ProductsPage = () => {
         brand: product.brand,
         isActive: product.status === "Active",
         description: product.description,
-        industry_id: product.industry_id || product.industry?.id || null,
+        industry_id: normalizedIndustryId,
       });
     } else {
       setEditingProduct(null);
@@ -803,21 +815,21 @@ const ProductsPage = () => {
                 <Col md={6}>
                   <Form.Group className="mb-3">
                     <Form.Label className="fw-semibold">
-                      Industry <span className="text-danger">*</span>
+                      Product Group <span className="text-danger">*</span>
                     </Form.Label>
                     <Select
                       options={industries.map((ind) => ({ value: ind.id, label: ind.name }))}
                       value={productFormData.industry_id ? {
                         value: productFormData.industry_id,
-                        label: industries.find((ind) => ind.id === productFormData.industry_id)?.name || ''
+                        label: industries.find((ind) => ind.id === Number(productFormData.industry_id))?.name || ''
                       } : null}
                       onChange={(selected) =>
                         setProductFormData({
                           ...productFormData,
-                          industry_id: selected ? selected.value : null,
+                          industry_id: selected ? (typeof selected.value === 'string' ? Number.parseInt(selected.value, 10) : selected.value) : null,
                         })
                       }
-                      placeholder="Select industry..."
+                      placeholder="Select product group..."
                       styles={customSelectStyles}
                       isLoading={loadingIndustries}
                       isDisabled={loadingIndustries}
@@ -1058,7 +1070,7 @@ const ProductsPage = () => {
                         marginBottom: "6px",
                       }}
                     >
-                      Industry
+                      Product Group
                     </div>
                     <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
                       <Badge

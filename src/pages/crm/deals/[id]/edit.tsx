@@ -455,18 +455,19 @@ const EditDeal = () => {
       { field: 'decision_maker_phone' as const, name: 'Decision Maker Phone' },
     ];
     
-    // Validate industry_ids separately since it's an array
-    if (!formData.industry_ids || formData.industry_ids.length === 0) {
-      toast.error('Industry is required');
-      return false;
-    }
+    
     
     return checkRequiredFields(formData, requiredFields);
   };
 
   const validateStep2 = (): boolean => {
-    // If deal template exists, validate template fields instead
-    if (dealTemplate && dealTemplate.fields && dealTemplate.fields.length > 0) {
+    // If no template, skip validation (step won't be shown)
+    if (!dealTemplate) {
+      return true;
+    }
+    
+    // Validate template fields
+    if (dealTemplate.fields && dealTemplate.fields.length > 0) {
       for (const field of dealTemplate.fields) {
         if (field.is_required) {
           const fieldValue = templateFieldsData[field.field_name];
@@ -476,17 +477,8 @@ const EditDeal = () => {
           }
         }
       }
-      return true;
     }
-    
-    // Fallback to original validation if no template
-    const requiredFields = [
-      { field: 'deal_type' as const, name: 'Deal Type' },
-      { field: 'contract_length' as const, name: 'Contract Length' },
-      { field: 'billing_model' as const, name: 'Billing Model' },
-      { field: 'risk_level' as const, name: 'Risk Level' },
-    ];
-    return checkRequiredFields(formData, requiredFields);
+    return true;
   };
 
   const validateStep3 = (): boolean => {
@@ -519,21 +511,35 @@ const EditDeal = () => {
   const handleNextStep = (e: React.MouseEvent) => {
     e.preventDefault();
     if (validateCurrentStep()) {
-      setFormStep(Math.min(4, formStep + 1));
+      let nextStep = formStep + 1;
+      // Skip step 2 (Characteristics) if no template is available
+      if (nextStep === 2 && !dealTemplate) {
+        nextStep = 3;
+      }
+      setFormStep(Math.min(4, nextStep));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formStep < 4) {
-      setFormStep(formStep + 1);
+      let nextStep = formStep + 1;
+      // Skip step 2 if no template is available
+      if (nextStep === 2 && !dealTemplate) {
+        nextStep = 3;
+      }
+      setFormStep(nextStep);
       return;
     }
 
     if (!id) return;
 
     // Validate all required fields before submission
-    if (!validateStep0() || !validateStep1() || !validateStep2()) {
+    if (!validateStep0() || !validateStep1()) {
+      return;
+    }
+    // Only validate step 2 if template is available
+    if (dealTemplate && !validateStep2()) {
       return;
     }
 
@@ -676,30 +682,52 @@ const EditDeal = () => {
                   left: '0', 
                   top: '20px', 
                   height: '2px', 
-                  width: `${(formStep / 4) * 100}%`,
+                  width: `${(() => {
+                    // Calculate progress: if no template, step 2 is skipped
+                    // Map formStep to visual position (accounting for hidden step 2)
+                    const totalVisibleSteps = dealTemplate ? 5 : 4;
+                    let visualPosition = formStep;
+                    // If no template and we're past step 2, adjust visual position
+                    // formStep 0→0, formStep 1→1, formStep 3→2, formStep 4→3
+                    if (!dealTemplate && formStep > 2) {
+                      visualPosition = formStep - 1;
+                    }
+                    // Progress = (current visual position + 1) / total visible steps
+                    return ((visualPosition + 1) / totalVisibleSteps) * 100;
+                  })()}%`,
                   zIndex: 0,
                   transition: 'width 0.3s ease'
                 }}
               />
               
-              {[0, 1, 2, 3, 4].map((step) => (
-                <div 
-                  key={step}
-                  className="text-center position-relative" 
-                  style={{ cursor: 'pointer', flex: 1 }}
-                  onClick={() => setFormStep(step)}
-                >
+              {[0, 1, 2, 3, 4].map((step) => {
+                // Hide step 2 (Characteristics) if no template is available
+                if (step === 2 && !dealTemplate) {
+                  return null;
+                }
+                
+                // Calculate display number: if step 2 is hidden, adjust numbering for steps after it
+                const displayNumber = (!dealTemplate && step > 2) ? step : step + 1;
+                
+                return (
                   <div 
-                    className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= step ? 'bg-primary text-white' : 'bg-light text-muted'}`}
-                    style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                    key={step}
+                    className="text-center position-relative" 
+                    style={{ cursor: 'pointer', flex: 1 }}
+                    onClick={() => setFormStep(step)}
                   >
-                    {formStep > step ? <CheckCircle size={20} /> : step + 1}
+                    <div 
+                      className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= step ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                      style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                    >
+                      {formStep > step ? <CheckCircle size={20} /> : displayNumber}
+                    </div>
+                    <small className={`d-block mt-2 ${formStep === step ? 'fw-bold text-primary' : 'text-muted'}`}>
+                      {step === 0 ? 'Deal Info' : step === 1 ? 'Company Info' : step === 2 ? 'Characteristics' : step === 3 ? 'Progress & Notes' : 'Estimation'}
+                    </small>
                   </div>
-                  <small className={`d-block mt-2 ${formStep === step ? 'fw-bold text-primary' : 'text-muted'}`}>
-                    {step === 0 ? 'Deal Info' : step === 1 ? 'Company Info' : step === 2 ? 'Characteristics' : step === 3 ? 'Progress & Notes' : 'Estimation'}
-                  </small>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -1018,7 +1046,7 @@ const EditDeal = () => {
               </Card>
             )}
 
-            {/* Step 2: Deal Characteristics - Based on Deal Template */}
+            {/* Step 2: Deal Characteristics - Only show if template is available */}
             {formStep === 2 && dealTemplate && (
               <Card className="mb-3 border-0 bg-light">
                 <Card.Body>
@@ -1100,127 +1128,6 @@ const EditDeal = () => {
                       <p>No fields defined in this template.</p>
                     </div>
                   )}
-                </Card.Body>
-              </Card>
-            )}
-
-            {/* Fallback: Original Characteristics if no template */}
-            {formStep === 2 && !dealTemplate && (
-              <Card className="mb-3 border-0 bg-light">
-                <Card.Body>
-                  <h5 className="fw-bold mb-4 text-info">DEAL CHARACTERISTICS</h5>
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Deal Type <span className="text-danger">*</span></Form.Label>
-                        <Form.Select 
-                          value={formData.deal_type}
-                          onChange={(e) => setFormData({ ...formData, deal_type: e.target.value })}
-                          required
-                        >
-                          <option value="">Select Deal Type</option>
-                          <option value="Residential lease">Residential lease</option>
-                          <option value="Commercial lease">Commercial lease</option>
-                          <option value="Property sale">Property sale</option>
-                        </Form.Select>
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Contract Length <span className="text-danger">*</span></Form.Label>
-                        <Form.Select 
-                          value={formData.contract_length}
-                          onChange={(e) => setFormData({ ...formData, contract_length: e.target.value })}
-                          required
-                        >
-                          <option value="">Select Length</option>
-                          <option value="1m">1 month</option>
-                          <option value="3m">3 months</option>
-                          <option value="6m">6 months</option>
-                          <option value="12m">12 months</option>
-                          <option value="24m">24 months</option>
-                          <option value="36m">36 months</option>
-                          <option value="custom">Custom</option>
-                        </Form.Select>
-                      </Form.Group>
-                    </Col>
-                    {formData.contract_length === 'custom' && (
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Custom Contract Length</Form.Label>
-                          <Form.Control 
-                            type="text" 
-                            value={formData.contract_length_custom}
-                            onChange={(e) => setFormData({ ...formData, contract_length_custom: e.target.value })}
-                            placeholder="e.g., 18 months"
-                          />
-                        </Form.Group>
-                      </Col>
-                    )}
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Payment Frequency <span className="text-danger">*</span></Form.Label>
-                        <Form.Select 
-                          value={formData.billing_model}
-                          onChange={(e) => setFormData({ ...formData, billing_model: e.target.value })}
-                          required
-                        >
-                          <option value="">Select Model</option>
-                          <option value="monthly">Monthly</option>
-                          <option value="quarterly">Quarterly</option>
-                          <option value="semi_annual">Semi-Annual</option>
-                          <option value="annual">Annual</option>
-                          <option value="one_time">One-time</option>
-                        </Form.Select>
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Payment Terms </Form.Label>
-                        <Form.Select 
-                          value={formData.payment_terms}
-                          onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value })}
-                          required
-                        >
-                          <option value="">Select Terms</option>
-                          <option value="net_15">Net 15</option>
-                          <option value="net_30">Net 30</option>
-                          <option value="net_45">Net 45</option>
-                          <option value="net_60">Net 60</option>
-                          <option value="upfront">Upfront</option>
-                          <option value="custom">Custom</option>
-                        </Form.Select>
-                      </Form.Group>
-                    </Col>
-                    {formData.payment_terms === 'custom' && (
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Custom Payment Terms</Form.Label>
-                          <Form.Control 
-                            type="text" 
-                            value={formData.payment_terms_custom}
-                            onChange={(e) => setFormData({ ...formData, payment_terms_custom: e.target.value })}
-                            placeholder="e.g., 50% Upfront"
-                          />
-                        </Form.Group>
-                      </Col>
-                    )}
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Risk Level <span className="text-danger">*</span></Form.Label>
-                        <Form.Select 
-                          value={formData.risk_level}
-                          onChange={(e) => setFormData({ ...formData, risk_level: e.target.value })}
-                          required
-                        >
-                          <option value="">Select Risk Level</option>
-                          <option value="Low">Low</option>
-                          <option value="Medium">Medium</option>
-                          <option value="High">High</option>
-                        </Form.Select>
-                      </Form.Group>
-                    </Col>
-                  </Row>
                 </Card.Body>
               </Card>
             )}
@@ -1792,7 +1699,7 @@ const EditDeal = () => {
                               placeholder="Select product group..."
                               isSearchable
                               isLoading={loadingIndustries || loadingAllIndustries}
-                              isDisabled={loadingIndustries || loadingAllIndustries || (availableIndustries.length === 1 && !showAllIndustries)}
+                              isDisabled={loadingIndustries || loadingAllIndustries}
                               required
                             />
                           );
@@ -2161,7 +2068,12 @@ const EditDeal = () => {
               onClick={(e) => {
                 e.preventDefault();
                 if (formStep > 0) {
-                  setFormStep(formStep - 1);
+                  let prevStep = formStep - 1;
+                  // Skip step 2 if no template and going back from step 3
+                  if (prevStep === 2 && !dealTemplate) {
+                    prevStep = 1;
+                  }
+                  setFormStep(prevStep);
                 } else {
                   router.push("/crm/deals");
                 }

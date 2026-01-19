@@ -208,7 +208,7 @@ const DialTodo = () => {
         const params: any = {
           page: pagination.page,
           limit: pagination.limit,
-          type: 'to_do', // Key difference: type is 'todo'
+          type: 'todo', // Key difference: type is 'todo'
           search: searchTerm,
           order: {
             column: 'created_at',

@@ -285,7 +285,7 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({
                   })()}
                 </div>
                 <div className="text-muted fw-semibold" style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
-                  {oldestIdleInfo ? (() => {
+                  {/* {oldestIdleInfo ? (() => {
                     // Get user name from extension data
                     try {
                       const userDataExtensions = getUserDataExtensions?.() || {}
@@ -297,7 +297,8 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({
                     } catch {
                       return `DN ${oldestIdleInfo.dn}`
                     }
-                  })() : 'Oldest Idle'}
+                  })() : 'Oldest Idle'} */}
+                  Oldest Idle
                 </div>
               </div>
             </Card.Body>

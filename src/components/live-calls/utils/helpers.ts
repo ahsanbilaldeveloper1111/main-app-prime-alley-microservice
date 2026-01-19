@@ -90,12 +90,19 @@ export const categorizeDns = (
   }
   
   // Check if DN has active calls (On Call)
+  // This includes RINGING calls - they should appear in Live Calls section
   const allCallsForDn = getCallStatesForDn(dn)
   let hasActiveCallForDn = false
   
   if (allCallsForDn.length > 0) {
     for (const callState of allCallsForDn) {
       if (callState.isTerminating) continue
+      
+      // Check if call state is RINGING (should appear in Live Calls)
+      if (callState.currentState === 'RINGING') {
+        hasActiveCallForDn = true
+        break
+      }
       
       if (callState.parties && callState.parties.length > 0) {
         const dnParties = callState.parties.filter((p: any) => {

@@ -428,69 +428,69 @@ export default function useCtiStomp(
         }
       }
 
-      // Handle terminating events - remove call immediately
-      // This includes DISCONNECTED events with isTerminating: true or all parties DROPPED
-      if (evt.isTerminating) {
-        setCallStateMap((prev) => {
-          const { [callId]: _, ...rest } = prev;
-          const updated = { ...rest };
-          // Save updated state after removing terminated call
-          saveCallStatesToStorage(updated);
-          return updated;
-        });
-
-        // Still add terminating events to eventLog so dialer can process them
-        setEventLog((prev) => {
-          const log = [...prev, evt];
-          if (log.length > 200) log.shift();
-          return log;
-        });
-        return;
-      }
-
-      // Also handle DISCONNECTED events even if isTerminating is not explicitly set
-      // Check if all parties are DROPPED before processing
-      if (evt.eventType === "DISCONNECTED" && evt.parties) {
-        const allPartiesDroppedEarly =
-          evt.parties.length > 0 &&
-          evt.parties.every(
-            (p: any) =>
-              p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED"
-          );
-
-        if (allPartiesDroppedEarly || evt.hasActiveParticipants === false) {
-          setCallStateMap((prev) => {
-            const { [callId]: _, ...rest } = prev;
-            const updated = { ...rest };
-            saveCallStatesToStorage(updated);
-            return updated;
-          });
-
-          setEventLog((prev) => {
-            const log = [...prev, evt];
-            if (log.length > 200) log.shift();
-            return log;
-          });
-          return;
-        }
-      }
-
+      // Always append to eventLog for debugging (even if we don't update state)
       setEventLog((prev) => {
         const log = [...prev, evt];
         if (log.length > 200) log.shift();
         return log;
       });
 
+      // Parse eventTime to epoch milliseconds (source of truth for ordering)
+      const eventTimeMs = evt.eventTime ? new Date(evt.eventTime).getTime() : 0;
+      
+      // Get existing state for this callId
       setCallStateMap((prev) => {
         const updated = { ...prev };
         const base = updated[callId] || {};
+        
+        // Parse existing eventTime to epoch milliseconds
+        const existingEventTimeMs = base.eventTime ? new Date(base.eventTime).getTime() : 0;
+        
+        // Handle terminating events - remove call immediately (always process, regardless of eventTime)
+        // This includes DISCONNECTED events with isTerminating: true or all parties DROPPED
+        if (evt.isTerminating) {
+          const { [callId]: _, ...rest } = updated;
+          saveCallStatesToStorage(rest);
+          return rest;
+        }
 
-        // IMPORTANT: Always use new parties if provided in event, otherwise fall back to base parties
-        // This ensures that when parties are removed (e.g., barge-in stopped), we use the updated parties
-        const partiesToProcess =
-          evt.parties !== undefined && evt.parties !== null
-            ? evt.parties
-            : base.parties || [];
+        // Also handle DISCONNECTED events even if isTerminating is not explicitly set
+        // Check if all parties are DROPPED before processing
+        if (evt.eventType === "DISCONNECTED" && evt.parties) {
+          const allPartiesDroppedEarly =
+            evt.parties.length > 0 &&
+            evt.parties.every(
+              (p: any) =>
+                p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED"
+            );
+
+          if (allPartiesDroppedEarly || evt.hasActiveParticipants === false) {
+            const { [callId]: _, ...rest } = updated;
+            saveCallStatesToStorage(rest);
+            return rest;
+          }
+        }
+        
+        // Compare eventTime: if incoming event is older, don't regress state
+        // Exception: RINGING events get special handling (see below)
+        if (eventTimeMs < existingEventTimeMs) {
+          // Event is older - don't update state, but we already added to eventLog
+          return updated;
+        }
+        
+        // If eventTime is the same, use sequence as tie-breaker (higher sequence wins)
+        if (eventTimeMs === existingEventTimeMs && existingEventTimeMs > 0) {
+          const incomingSequence = evt.sequence || 0;
+          const existingSequence = base.sequence || 0;
+          
+          // If incoming sequence is not higher, don't update
+          if (incomingSequence <= existingSequence) {
+            return updated;
+          }
+        }
+
+        // Defensive parties merge: use evt.parties if available, otherwise keep existing, otherwise empty array
+        const partiesToProcess = evt.parties || base.parties || [];
 
         // Process parties to ensure callingDeviceType is included
         const processedParties = partiesToProcess.map((party: any) => {
@@ -584,22 +584,30 @@ export default function useCtiStomp(
         // Terminate if:
         // 1. Explicitly marked as terminating (DISCONNECTED events with isTerminating: true)
         // 2. All parties dropped/disconnected
-        // 3. No active participants flag and we have parties
+        // 3. No active participants flag and we have parties (EXCEPT for RINGING events - they should be shown)
         // 4. Event type is DISCONNECTED and no active parties (aggressive cleanup)
         // 5. No active parties remain after filtering
+        // IMPORTANT: RINGING events should NOT be terminated even if hasActiveParticipants is false,
+        // as RINGING is a valid call state that should appear in Live Calls section
         const shouldTerminate =
           evt.isTerminating ||
           allPartiesDropped ||
           (evt.hasActiveParticipants === false &&
-            processedParties.length > 0) ||
-          (!hasActiveParties && processedParties.length > 0) ||
+            processedParties.length > 0 &&
+            evt.eventType !== "RINGING") || // Don't terminate RINGING events
+          (!hasActiveParties && processedParties.length > 0 && evt.eventType !== "RINGING") || // Don't terminate RINGING events
           (evt.eventType === "DISCONNECTED" && !hasActiveParties);
 
-        // Determine the current state based on active parties, not the event type
-        // If event is DROPPED but there are still active parties, use the state from active parties
+        // RINGING precedence rule: when RINGING is received and it's the newest event by eventTime,
+        // it should overwrite the stored call state immediately (even if other events like CONNECTED/ANSWERED/RETRIEVED exist)
         let effectiveCurrentState = evt.eventType;
-        if (evt.eventType === "DROPPED" && hasActiveParties) {
-          // Find the state from active parties (now already filtered)
+        
+        // Special handling for RINGING: if this is a RINGING event and it's the newest, use it immediately
+        if (evt.eventType === "RINGING") {
+          // RINGING takes precedence when it's the newest event
+          effectiveCurrentState = "RINGING";
+        } else if (evt.eventType === "DROPPED" && hasActiveParties) {
+          // If event is DROPPED but there are still active parties, use the state from active parties
           const activeParty = activePartiesOnly[0];
           if (activeParty) {
             // Map call status to event type
@@ -618,21 +626,26 @@ export default function useCtiStomp(
         }
 
         // Store only active parties (DROPPED parties are removed immediately)
+        // Update state with new eventTime, sequence, and currentState
         updated[callId] = {
           ...base,
           callId,
           currentState: effectiveCurrentState,
           sequence: evt.sequence,
-          eventTime: evt.eventTime,
-          isConference: evt.isConference,
-          isOneToOne: evt.isOneToOne,
+          eventTime: evt.eventTime, // Store the eventTime that won (newest)
+          isConference: evt.isConference !== undefined ? evt.isConference : base.isConference,
+          isOneToOne: evt.isOneToOne !== undefined ? evt.isOneToOne : base.isOneToOne,
           parties: activePartiesOnly, // Only store active parties - DROPPED parties are removed
           isTerminating: shouldTerminate,
           hasActiveParticipants:
-            evt.hasActiveParticipants !== undefined
+            // For RINGING events, always set to true if we have active parties (even if event says false)
+            // This ensures RINGING calls appear in Live Calls section
+            evt.eventType === "RINGING" && hasActiveParties
+              ? true
+              : evt.hasActiveParticipants !== undefined
               ? evt.hasActiveParticipants
               : hasActiveParties,
-          eventName: evt.eventName,
+          eventName: evt.eventName || base.eventName,
         };
 
         // If all parties are dropped or call is terminating, remove the call state
@@ -2033,11 +2046,23 @@ export default function useCtiStomp(
 
   // Helper: Get calls involving a DN (any device)
   // IMPORTANT: Only return calls where the DN has at least one active (non-DROPPED) party
+  // RINGING calls should always be included if they have parties with RINGING status
   const getCallStatesForDn = useCallback(
     (dn: string) => {
       return Object.values(callStateMap).filter((call) => {
         // Skip terminating calls
         if (call.isTerminating) return false;
+
+        // RINGING calls should always be included if currentState is RINGING
+        // This ensures RINGING calls appear in Live Calls section even if hasActiveParticipants is false
+        if (call.currentState === "RINGING") {
+          return call.parties?.some(
+            (p: any) =>
+              (p.callingAddress === dn || p.calledAddress === dn) &&
+              (p.callStatus === "RINGING" || 
+               (p.callStatus !== "DROPPED" && p.callStatus !== "DISCONNECTED"))
+          );
+        }
 
         // Check if there's at least one active party for this DN
         return call.parties?.some(

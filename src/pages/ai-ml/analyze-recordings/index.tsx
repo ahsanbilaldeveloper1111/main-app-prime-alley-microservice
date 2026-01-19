@@ -25,14 +25,14 @@ import CircularProgressCircle from '@components/CircularProgressCircle';
 
 interface TranscriptionSummary {
     total_transcriptions: number;
-    inbound_transcriptions: number;
-    outbound_transcriptions: number;
-    pending_transcriptions: number;
-    processing_transcriptions: number;
+    incomplete_transcriptions:number;
+    in_progress_transcriptions:number;
+    analyzing_transcriptions:number;
+    analyzed_transcriptions:number;
+    transribing_transcriptions:number;
+    transcribed_transcriptions:number;
     completed_transcriptions: number;
     failed_transcriptions: number;
-    with_transcription: number;
-    with_analysis: number;
 }
 
 
@@ -83,14 +83,14 @@ const AnalyzeRecordings = () => {
 
     const [transcriptionSummary, setTranscriptionSummary] = useState<TranscriptionSummary>({
         total_transcriptions: 0,
-        inbound_transcriptions: 0,
-        outbound_transcriptions: 0,
-        pending_transcriptions: 0,
-        processing_transcriptions: 0,
+        incomplete_transcriptions: 0,
+        in_progress_transcriptions: 0,
+        analyzing_transcriptions: 0,
+        analyzed_transcriptions: 0,
+        transribing_transcriptions: 0,
+        transcribed_transcriptions: 0,
         completed_transcriptions: 0,
         failed_transcriptions: 0,
-        with_transcription: 0,
-        with_analysis: 0,
     });
 
     // Base card configuration to avoid duplication
@@ -111,61 +111,71 @@ const AnalyzeRecordings = () => {
             ...baseCardConfig
         },
         {
-            id: 'inbound-transcriptions',
-            title: 'Inbound',
-            value: transcriptionSummary.inbound_transcriptions,
-            description: 'Inbound transcriptions',
+            id: 'incomplete-transcriptions',
+            title: 'Incomplete Transcriptions',
+            value: transcriptionSummary.incomplete_transcriptions,
+            description: 'Incomplete transcriptions in the system',
             delay: 0.2,
             ...baseCardConfig
         },
         {
-            id: 'outbound-transcriptions',
-            title: 'Outbound',
-            value: transcriptionSummary.outbound_transcriptions,
-            description: 'Outbound transcriptions',
+            id: 'in-progress-transcriptions',
+            title: 'In Progress Transcriptions',
+            value: transcriptionSummary.in_progress_transcriptions,
+            description: 'In progress transcriptions in the system',
             delay: 0.3,
             ...baseCardConfig
         },
         {
-            id: 'completed-transcriptions',
-            title: 'Completed',
-            value: transcriptionSummary.completed_transcriptions,
-            description: 'Completed transcriptions',
+            id: 'analyzing-transcriptions',
+            title: 'Analyzing Transcriptions',
+            value: transcriptionSummary.analyzing_transcriptions,
+            description: 'Analyzing transcriptions in the system',
             delay: 0.4,
             ...baseCardConfig
         },
         {
-            id: 'pending-transcriptions',
-            title: 'Pending',
-            value: transcriptionSummary.pending_transcriptions,
-            description: 'Pending transcriptions',
+            id: 'analyzed-transcriptions',
+            title: 'Analyzed Transcriptions',
+            value: transcriptionSummary.analyzed_transcriptions,
+            description: 'Analyzed transcriptions in the system',
             delay: 0.5,
             ...baseCardConfig
         },
         {
-            id: 'processing-transcriptions',
-            title: 'Processing',
-            value: transcriptionSummary.processing_transcriptions,
-            description: 'Processing transcriptions',
+            id: 'transribing-transcriptions',
+            title: 'Transribing Transcriptions',
+            value: transcriptionSummary.transribing_transcriptions,
+            description: 'Transribing transcriptions in the system',
             delay: 0.6,
             ...baseCardConfig
         },
         {
-            id: 'with-analysis',
-            title: 'With Analysis',
-            value: transcriptionSummary.with_analysis,
-            description: 'Transcriptions with analysis',
+            id: 'transcribed-transcriptions',
+            title: 'Transcribed Transcriptions',
+            value: transcriptionSummary.transcribed_transcriptions,
+            description: 'Transcribed transcriptions in the system',
             delay: 0.7,
             ...baseCardConfig
         },
         {
-            id: 'with-transcription',
-            title: 'With Transcription',
-            value: transcriptionSummary.with_transcription,
-            description: 'Transcriptions available',
+            id: 'completed-transcriptions',
+            title: 'Completed Transcriptions',
+            value: transcriptionSummary.completed_transcriptions,
+            description: 'Completed transcriptions in the system',
             delay: 0.8,
             ...baseCardConfig
         },
+        {
+            id: 'failed-transcriptions',
+            title: 'Failed Transcriptions',
+            value: transcriptionSummary.failed_transcriptions,
+            description: 'Failed transcriptions in the system',
+            delay: 0.9,
+            ...baseCardConfig
+        }
+      
+        
     ], [transcriptionSummary]);
 
     const [searchValue, setSearchValue] = useState<string>('');
@@ -974,6 +984,11 @@ const AnalyzeRecordings = () => {
                                         { value: 'queued', label: 'QUEUED' },
                                         { value: 'completed', label: 'COMPLETED' },
                                         { value: 'incomplete', label: 'IN_COMPLETE' },
+                                        { value: 'analyzing', label: 'ANALYZING' },
+                                        { value: 'analyzed', label: 'ANALYZED' },
+                                        { value: 'transribing', label: 'TRANSCRIBING' },
+                                        { value: 'transcribed', label: 'TRANSCRIBED' },
+                                        
                                         
                                     ]}
                                     placeholder="Select analysis status"

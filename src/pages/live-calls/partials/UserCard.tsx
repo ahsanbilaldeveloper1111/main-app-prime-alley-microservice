@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useEffect, useState } from 'react'
 import { Button, Card, Col } from 'react-bootstrap'
 import { Eye, Phone, CheckCircle, AlertCircle, Volume2, Mic, Users, Headset } from 'lucide-react'
 import UserDummyImage from '@assets/images/user-dummy.jpg'
@@ -61,16 +61,21 @@ const UserCard: React.FC<UserCardProps> = ({
   monitoringStartTime
 }) => {
 
+  // State to force re-render when data becomes available
+  const [dataCheckCounter, setDataCheckCounter] = useState(0)
+  const [forceUpdate, setForceUpdate] = useState(0)
+  
   // Get user extension data (image and team names)
   const extensionData = useMemo(() => {
     try {
       if (!getUserDataExtensions) {
+        console.warn(`[UserCard ${dn}] getUserDataExtensions function not available`)
         return null
       }
       
       const userDataExtensions = getUserDataExtensions() || {}
       
-      // userDataExtensions structure: { [dn]: { team_name: [], image_path: string } }
+      // userDataExtensions structure: { [dn]: { team_name: [], image_path: string, name: string, user_name: string } }
       // The data is directly on userDataExtensions, not nested under 'extensions'
       const dnString = String(dn)
       const dnNumber = Number(dn)
@@ -78,14 +83,136 @@ const UserCard: React.FC<UserCardProps> = ({
       // Try different DN formats to match the key
       const data = userDataExtensions[dn] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null
       
+      if (!data) {
+        // Only log warning once to avoid spam
+        if (dataCheckCounter === 0) {
+          console.warn(`[UserCard ${dn}] No extension data found. Tried keys: ${dn}, ${dnString}, ${dnNumber}. Available keys:`, Object.keys(userDataExtensions).slice(0, 10))
+        }
+      }
+      
       return data
     } catch (error) {
       console.error(`[UserCard ${dn}] Error getting extension data:`, error)
       return null
     }
-  }, [dn, getUserDataExtensions])
+  }, [dn, getUserDataExtensions, dataCheckCounter, forceUpdate])
+  
+  // Retry mechanism: Check periodically if data becomes available (for cloned tabs)
+  // This is critical for cloned tabs where data arrives via cross-tab communication
+  useEffect(() => {
+    if (extensionData) {
+      // Data is available, no need to retry
+      return
+    }
+    
+    if (!getUserDataExtensions) {
+      return
+    }
+    
+    // More aggressive retry: Check more frequently for the first few seconds
+    // This helps when a tab is cloned and data arrives via cross-tab communication
+    const maxRetries = 30 // Check for 30 seconds total
+    let retryCount = 0
+    
+    // Check frequently (every 300ms) to catch data when it arrives via cross-tab communication
+    // This helps when a tab is cloned and data arrives asynchronously
+    const retryInterval = setInterval(() => {
+      if (!getUserDataExtensions) {
+        clearInterval(retryInterval)
+        return
+      }
+      
+      const userDataExtensions = getUserDataExtensions() || {}
+      const dnString = String(dn)
+      const dnNumber = Number(dn)
+      const data = userDataExtensions[dn] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null
+      
+      if (data) {
+        // Data is now available, trigger re-render
+        setDataCheckCounter(prev => prev + 1)
+        setForceUpdate(prev => prev + 1)
+        clearInterval(retryInterval)
+      } else {
+        retryCount++
+        // Trigger periodic updates to force re-check (every 5 retries = 1.5 seconds)
+        if (retryCount % 5 === 0) {
+          setForceUpdate(prev => prev + 1)
+        }
+        if (retryCount >= maxRetries) {
+          // Stop retrying after max attempts
+          clearInterval(retryInterval)
+        }
+      }
+    }, 300) // Check every 300ms
+    
+    return () => {
+      clearInterval(retryInterval)
+    }
+  }, [extensionData, dn, getUserDataExtensions])
+  
+  // Also listen to storage events as a backup (cross-tab communication might use localStorage)
+  useEffect(() => {
+    if (extensionData) {
+      return
+    }
+    
+    const handleStorageChange = (e: StorageEvent) => {
+      // Check if userDataExtensions might have been updated
+      if (getUserDataExtensions) {
+        const userDataExtensions = getUserDataExtensions() || {}
+        const dnString = String(dn)
+        const dnNumber = Number(dn)
+        const data = userDataExtensions[dn] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null
+        
+        if (data) {
+          setDataCheckCounter(prev => prev + 1)
+        }
+      }
+    }
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', handleStorageChange)
+      
+      return () => {
+        window.removeEventListener('storage', handleStorageChange)
+      }
+    }
+  }, [extensionData, dn, getUserDataExtensions])
+  
+  // Request data from master tab if not available (for cloned tabs)
+  useEffect(() => {
+    if (extensionData) {
+      return
+    }
+    
+    // Request userDataExtensions from master tab if not available
+    // This helps when a tab is cloned and needs to request data
+    // Use the correct BroadcastChannel name that matches crossTabCtiManager
+    if (typeof window !== 'undefined' && window.BroadcastChannel) {
+      try {
+        const channel = new BroadcastChannel('cti-broadcast-channel')
+        const message = {
+          type: 'cti_event',
+          data: {
+            type: 'request_user_data_extensions',
+            data: null
+          },
+          timestamp: Date.now(),
+          tabId: `tab-${Date.now()}`
+        }
+        channel.postMessage(message)
+        // Keep channel open briefly to ensure message is sent
+        setTimeout(() => {
+          channel.close()
+        }, 100)
+      } catch (error) {
+        // BroadcastChannel might not be available, ignore
+        console.warn(`[UserCard ${dn}] Failed to request userDataExtensions via BroadcastChannel:`, error)
+      }
+    }
+  }, [extensionData, dn])
 
-  // Get user image URL
+  // Get user image URL - ensure it always has a value
   const userImageUrl = useMemo(() => {
     if (!extensionData) {
       return UserDummyImage.src
@@ -93,11 +220,16 @@ const UserCard: React.FC<UserCardProps> = ({
     
     const imagePath = extensionData?.image_path
     if (imagePath) {
-      const url = getStorageImageUrl(imagePath)
-      return url || UserDummyImage.src
+      try {
+        const url = getStorageImageUrl(imagePath)
+        return url || UserDummyImage.src
+      } catch (error) {
+        console.error(`[UserCard ${dn}] Error getting image URL:`, error)
+        return UserDummyImage.src
+      }
     }
     return UserDummyImage.src
-  }, [extensionData])
+  }, [extensionData, dn])
 
   // Get team names for filtering
   const teamNames = useMemo(() => {
@@ -211,7 +343,17 @@ const UserCard: React.FC<UserCardProps> = ({
             return 'CONNECTED' // Fallback
           }
           
-          if (['RINGING', 'DIALING'].includes(partyStatus)) {
+          // For RINGING state: show "Calling" for caller, "Ringing" for called party
+          if (partyStatus === 'RINGING') {
+            if (isCaller) {
+              return 'Calling' // Calling party shows "Calling"
+            } else if (isCallee) {
+              return 'Ringing' // Called party shows "Ringing"
+            }
+            return 'Ringing' // Fallback
+          }
+          
+          if (partyStatus === 'DIALING') {
             return 'OUTGOING'
           }
           
@@ -245,7 +387,17 @@ const UserCard: React.FC<UserCardProps> = ({
       return 'CONNECTED' // Fallback
     }
     
-    if (['RINGING', 'DIALING'].includes(currentState)) {
+    // For RINGING state: show "Calling" for caller, "Ringing" for called party
+    if (currentState === 'RINGING') {
+      if (isCaller) {
+        return 'Calling' // Calling party shows "Calling"
+      } else if (isCallee) {
+        return 'Ringing' // Called party shows "Ringing"
+      }
+      return 'Ringing' // Fallback
+    }
+    
+    if (currentState === 'DIALING') {
       return 'OUTGOING'
     }
     
@@ -287,8 +439,12 @@ const UserCard: React.FC<UserCardProps> = ({
     ? getNormalizedMonitoringType(activeMonitoring.type)
     : undefined
 
-  // Get user name
-  const userName = extensionData?.name || extensionData?.user_name || dn
+  // Get user name - ensure it always has a value
+  const userName = useMemo(() => {
+    if (extensionData?.name) return extensionData.name
+    if (extensionData?.user_name) return extensionData.user_name
+    return String(dn) // Always return DN as fallback
+  }, [extensionData, dn])
 
   // Get monitored agent's data (when supervisor is monitoring)
   const monitoredAgentDn = isSupervisorMonitoring ? activeMonitoring.dn : null
@@ -383,12 +539,16 @@ const UserCard: React.FC<UserCardProps> = ({
   const callStatus = getCallStatus()
   // Don't show monitoring buttons when call is in RINGING/OUTGOING state
   const isRingingCall = callStatus === 'OUTGOING' || 
+                       callStatus === 'Calling' ||
+                       callStatus === 'Ringing' ||
                        (call?.currentState === 'RINGING') ||
                        (call?.parties?.some((p: any) => 
                          (p.callingAddress === dn || p.calledAddress === dn) &&
                          (p.callStatus === 'RINGING' || p.callStatus === 'DIALING')
                        ))
   const showCallControls = active && call && sectionKey !== 'downOffline' && !isRingingCall
+  // Show badge for all active calls including RINGING (separate from monitoring controls)
+  const showCallStatusBadge = active && call && callStatus && status !== 'Live Coaching'
 
   return (
     <Col 
@@ -506,8 +666,8 @@ const UserCard: React.FC<UserCardProps> = ({
             )}
 
             {/* Call Status Badge - For Live Calls agents */}
-            {/* Green = CONNECTED (Active), Amber = OUTGOING (Ringing) */}
-            {showCallControls && callStatus && status !== 'Live Coaching' && (
+            {/* Green = CONNECTED (Active), Amber = Calling/Ringing */}
+            {showCallStatusBadge && (
               <div 
                 className="d-flex flex-column align-items-end gap-1"
                 style={{ marginLeft: '8px' }}

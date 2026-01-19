@@ -10,7 +10,8 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 
-import  { useState } from 'react';
+import  { useState, useEffect } from 'react';
+import { getSystemMetrics, SystemMetric, SystemMetricsResponse } from "@utils/netops";
 import { 
   Search, 
   Server, 
@@ -38,6 +39,8 @@ const SelectServer = () => {
       const [selectedRegion, setSelectedRegion] = useState('All Regions');
       const [showEnvDropdown, setShowEnvDropdown] = useState(false);
       const [showRegionDropdown, setShowRegionDropdown] = useState(false);
+      const [serverMetrics, setServerMetrics] = useState<SystemMetric[]>([]);
+      const [loading, setLoading] = useState(false);
     
       // Environment options
       const environments = ['All Environments', 'Production', 'Staging', 'Development', 'Testing', 'UAT'];
@@ -45,148 +48,27 @@ const SelectServer = () => {
       // Region options
       const regions = ['All Regions', 'US East', 'US West', 'Europe', 'Asia Pacific', 'South America'];
     
-      const servers = [
-        {
-          name: 'unifiedops-proxy',
-          ip: '10.80.50.245',
-          environment: 'Production',
-          cpu: 24,
-          memory: 2.3,
-          disk: 6.9,
-          status: 'Healthy',
-          statusColor: 'success',
-          trend: 'up'
-        },
-        {
-          name: 'app-server-1',
-          ip: '10.80.03.64',
-          environment: 'Production',
-          cpu: 75,
-          memory: 6.8,
-          disk: 3.9,
-          status: 'Healthy',
-          statusColor: 'success',
-          trend: 'up'
-        },
-        {
-          name: 'db-primary-global',
-          ip: '10.18.00.261',
-          environment: 'Production',
-          cpu: 26,
-          memory: 3.9,
-          disk: 3.9,
-          status: 'Healthy',
-          statusColor: 'success',
-          trend: 'up'
-        },
-        {
-          name: 'web-backend-02',
-          ip: '10.185.196.472',
-          environment: 'Production',
-          cpu: 75,
-          memory: 6.9,
-          disk: 1.2,
-          status: 'Active',
-          statusColor: 'success',
-          trend: 'up'
-        },
-        {
-          name: 'mq-central-1',
-          ip: '10.156.123.53',
-          environment: 'Warning',
-          cpu: 16,
-          memory: 6.1,
-          disk: 2.81,
-          status: 'Warning',
-          statusColor: 'warning',
-          trend: 'up'
-        },
-        {
-          name: 'db-replica-east',
-          ip: '10.105.2.1174',
-          environment: 'Critical',
-          cpu: 42,
-          memory: 20.5,
-          disk: 3.9,
-          status: 'Critical',
-          statusColor: 'danger',
-          trend: 'down'
-        },
-        {
-          name: 'bastion-host',
-          ip: '10.123.140.199',
-          environment: 'Development',
-          cpu: 3.4,
-          memory: 2.3,
-          disk: 4.4,
-          status: 'Active',
-          statusColor: 'success',
-          trend: 'stable'
-        },
-        {
-          name: 'api-gateway-03',
-          ip: '10.160.160.95',
-          environment: 'Critical',
-          cpu: 35,
-          memory: 3.6,
-          disk: 2.9,
-          status: 'Critical',
-          statusColor: 'danger',
-          trend: 'down'
-        },
-        {
-          name: 'staging-web-01',
-          ip: '10.25.159.220',
-          environment: 'Staging',
-          cpu: 28,
-          memory: 2.9,
-          disk: 2.9,
-          status: 'Healthy',
-          statusColor: 'success',
-          trend: 'stable'
-        },
-        {
-          name: 'rest-ipr-01',
-          ip: '10.813.162.05',
-          environment: 'Healthy',
-          cpu: 12,
-          memory: 3.2,
-          disk: 1.8,
-          status: 'Active',
-          statusColor: 'success',
-          trend: 'up'
-        },
-        {
-          name: 'analytics-01',
-          ip: '10.148.210.02',
-          environment: 'Production',
-          cpu: 45,
-          memory: 5.4,
-          disk: 2.1,
-          status: 'Healthy',
-          statusColor: 'success',
-          trend: 'up'
-        },
-        {
-          name: 'redis-prod-01',
-          ip: '10.152.199.66',
-          environment: 'Critical',
-          cpu: 82,
-          memory: 15.2,
-          disk: 8.5,
-          status: 'Critical',
-          statusColor: 'danger',
-          trend: 'down'
+      // Helper function to determine server status based on metrics
+      const getServerStatus = (metric: SystemMetric): { status: string; statusColor: string } => {
+        const cpuPercent = metric.cpu.used_percent;
+        const memoryPercent = metric.memory.used_percent;
+        const diskPercent = metric.disk.used_percent;
+        const hasFailedServices = metric.failed_services.length > 0;
+        
+        if (hasFailedServices || cpuPercent > 90 || memoryPercent > 90 || diskPercent > 90) {
+          return { status: 'Critical', statusColor: 'danger' };
         }
-      ];
-    
-      const alerts = [
-        { name: 'app-server-2', ip: '10.234.88.54', status: 'Warning', color: 'warning' },
-        { name: 'db-replica-east', ip: '10.100.21.11:74', status: 'Warning', color: 'warning' },
-        { name: 'mq-central-1', ip: '10.106.122.28', status: 'Warning', color: 'warning' },
-        { name: 'redis-prod-01', ip: '10.189.199.08', status: 'Critical', color: 'danger' },
-        { name: 'api-gateway-03', ip: '10.148.10.0.9.90', status: 'Critical', color: 'danger' }
-      ];
+        if (cpuPercent > 70 || memoryPercent > 70 || diskPercent > 70) {
+          return { status: 'Warning', statusColor: 'warning' };
+        }
+        return { status: 'Healthy', statusColor: 'success' };
+      };
+      
+      // Helper function to get IP address from network interfaces
+      const getServerIp = (metric: SystemMetric): string => {
+        const mainInterface = metric.network.find(n => n.interface !== 'lo' && n.is_up);
+        return mainInterface?.ip || 'N/A';
+      };
     
       const getStatusIcon = (status: string) => {
         switch (status) {
@@ -213,6 +95,47 @@ const SelectServer = () => {
         };
         return colors[env as keyof typeof colors] || '#6c757d';
       };
+
+      // Fetch server metrics on component mount
+      useEffect(() => {
+        const fetchServerMetrics = async () => {
+          try {
+            setLoading(true);
+            console.log("=== Fetching System Metrics ===");
+            const response: SystemMetricsResponse = await getSystemMetrics();
+            console.log("=== System Metrics Response ===", response);
+            console.log("=== Status ===", response.status);
+            console.log("=== Count ===", response.count);
+            console.log("=== Metrics Data ===", response.metrics);
+            
+            // Log each server individually
+            response.metrics.forEach((metric, index) => {
+              console.log(`=== Server ${index + 1}: ${metric.hostname} ===`, {
+                hostname: metric.hostname,
+                timestamp: metric.timestamp,
+                os: metric.host.os,
+                kernel: metric.host.kernel,
+                architecture: metric.host.architecture,
+                cpu_used_percent: metric.cpu.used_percent,
+                memory_used_percent: metric.memory.used_percent,
+                disk_used_percent: metric.disk.used_percent,
+                uptime_seconds: metric.uptime.seconds,
+                services_count: metric.services.length,
+                failed_services_count: metric.failed_services.length,
+                has_sql: !!metric.sql
+              });
+            });
+            
+            setServerMetrics(response.metrics);
+          } catch (error: any) {
+            console.error("=== Failed to fetch system metrics ===", error);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        fetchServerMetrics();
+      }, []);
     
 
   return (
@@ -657,152 +580,176 @@ const SelectServer = () => {
               </div>
             </div>
 
-            <div className="grid-3" style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '16px'
-            }}>
-              {servers
-                .filter(server => {
-                  if (selectedGroup === 'all') return true;
-                  return server.environment === selectedGroup;
-                })
-                .map((server, idx) => (
-                <div key={idx} className="card" style={{ cursor: 'pointer' }}>
-                  <div style={{ padding: '16px' }}>
-                    <div style={{ marginBottom: '12px' }}>
-                      <h6 style={{
-                        fontSize: '15px',
-                        fontWeight: '600',
-                        marginBottom: '4px',
-                        color: '#1a1a1a'
-                      }}>
-                        {server.name}
-                      </h6>
-                      <div style={{
-                        fontSize: '12px',
-                        color: '#6c757d',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
-                        <Server size={12} />
-                        {server.ip}
-                      </div>
-                    </div>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <div style={{ fontSize: '16px', color: '#6c757d' }}>Loading server metrics...</div>
+              </div>
+            ) : serverMetrics.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <div style={{ fontSize: '16px', color: '#6c757d' }}>No server metrics available</div>
+              </div>
+            ) : (
+              <div className="grid-3" style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '16px'
+              }}>
+                {serverMetrics
+                  .filter(metric => {
+                    if (selectedGroup === 'all') return true;
+                    const status = getServerStatus(metric);
+                    return status.status === selectedGroup;
+                  })
+                  .map((metric, idx) => {
+                    const status = getServerStatus(metric);
+                    const serverIp = getServerIp(metric);
+                    return (
+                      <div key={idx} className="card" style={{ cursor: 'pointer' }}>
+                        <div style={{ padding: '16px' }}>
+                          <div style={{ marginBottom: '12px' }}>
+                            <h6 style={{
+                              fontSize: '15px',
+                              fontWeight: '600',
+                              marginBottom: '4px',
+                              color: '#1a1a1a'
+                            }}>
+                              {metric.hostname}
+                            </h6>
+                            <div style={{
+                              fontSize: '12px',
+                              color: '#6c757d',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <Server size={12} />
+                              {serverIp}
+                            </div>
+                            <div style={{
+                              fontSize: '11px',
+                              color: '#6c757d',
+                              marginTop: '4px'
+                            }}>
+                              OS: {metric.host.os.split('-')[0]}
+                            </div>
+                          </div>
 
-                    <span 
-                      className={`badge badge-${server.environment === 'Production' ? 'success' : 
-                                               server.environment === 'Critical' ? 'danger' :
-                                               server.environment === 'Warning' ? 'warning' :
-                                               server.environment === 'Development' ? 'info' : 'warning'}`}
-                      style={{ marginBottom: '16px' }}
-                    >
-                      {server.environment}
-                    </span>
-
-                    {/* Resource Usage Progress Bars */}
-                    <div style={{ marginBottom: '16px' }}>
-                      {/* CPU Usage */}
-                      <div className="metric-item">
-                        <div className="metric-label">
-                          <Cpu size={14} />
-                          <span>CPU Usage</span>
-                        </div>
-                        <div className="metric-value">
-                          <span>{server.cpu}%</span>
-                        </div>
-                        <div className="progress-container">
-                          <div 
-                            className="progress-bar" 
-                            style={{
-                              width: `${server.cpu}%`,
-                              background: server.cpu > 80 ? '#dc3545' : 
-                                         server.cpu > 60 ? '#ffc107' : '#4da6ff'
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Memory Usage */}
-                      <div className="metric-item">
-                        <div className="metric-label">
-                          <Activity size={14} />
-                          <span>Memory</span>
-                        </div>
-                        <div className="metric-value">
-                          <span>{server.memory} GB</span>
-                          <span style={{ fontSize: '11px', color: '#6c757d' }}>of 16 GB</span>
-                        </div>
-                        <div className="progress-container">
-                          <div 
-                            className="progress-bar" 
-                            style={{
-                              width: `${(server.memory / 16) * 100}%`,
-                              background: (server.memory / 16) * 100 > 80 ? '#dc3545' : 
-                                         (server.memory / 16) * 100 > 60 ? '#ffc107' : '#28a745'
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Disk Usage */}
-                      <div className="metric-item">
-                        <div className="metric-label">
-                          <HardDrive size={14} />
-                          <span>Disk Usage</span>
-                        </div>
-                        <div className="metric-value">
-                          <span>{server.disk}%</span>
-                          <span style={{ 
-                            fontSize: '11px', 
-                            color: server.disk < 10 ? '#28a745' : '#6c757d',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '2px'
-                          }}>
-                            {server.disk < 10 ? '↑' : ''} Available
+                          <span 
+                            className={`badge badge-${status.statusColor}`}
+                            style={{ marginBottom: '16px' }}
+                          >
+                            {status.status}
                           </span>
-                        </div>
-                        <div className="progress-container">
-                          <div 
-                            className="progress-bar" 
-                            style={{
-                              width: `${server.disk}%`,
-                              background: server.disk > 80 ? '#dc3545' : 
-                                         server.disk > 60 ? '#ffc107' : '#17a2b8'
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
 
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      paddingTop: '12px',
-                      borderTop: '1px solid #e9ecef'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '13px',
-                        color: server.statusColor === 'danger' ? '#dc3545' :
-                               server.statusColor === 'warning' ? '#ffc107' : '#28a745'
-                      }}>
-                        {getStatusIcon(server.status)}
-                        {server.status}
+                          {/* Resource Usage Progress Bars */}
+                          <div style={{ marginBottom: '16px' }}>
+                            {/* CPU Usage */}
+                            <div className="metric-item">
+                              <div className="metric-label">
+                                <Cpu size={14} />
+                                <span>CPU Usage</span>
+                              </div>
+                              <div className="metric-value">
+                                <span>{metric.cpu.used_percent.toFixed(1)}%</span>
+                                <span style={{ fontSize: '11px', color: '#6c757d' }}>
+                                  ({metric.cpu.cores} cores)
+                                </span>
+                              </div>
+                              <div className="progress-container">
+                                <div 
+                                  className="progress-bar" 
+                                  style={{
+                                    width: `${metric.cpu.used_percent}%`,
+                                    background: metric.cpu.used_percent > 80 ? '#dc3545' : 
+                                               metric.cpu.used_percent > 60 ? '#ffc107' : '#4da6ff'
+                                  }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Memory Usage */}
+                            <div className="metric-item">
+                              <div className="metric-label">
+                                <Activity size={14} />
+                                <span>Memory</span>
+                              </div>
+                              <div className="metric-value">
+                                <span>{metric.memory.used_gb.toFixed(2)} GB</span>
+                                <span style={{ fontSize: '11px', color: '#6c757d' }}>
+                                  of {metric.memory.total_gb.toFixed(2)} GB
+                                </span>
+                              </div>
+                              <div className="progress-container">
+                                <div 
+                                  className="progress-bar" 
+                                  style={{
+                                    width: `${metric.memory.used_percent}%`,
+                                    background: metric.memory.used_percent > 80 ? '#dc3545' : 
+                                               metric.memory.used_percent > 60 ? '#ffc107' : '#28a745'
+                                  }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Disk Usage */}
+                            <div className="metric-item">
+                              <div className="metric-label">
+                                <HardDrive size={14} />
+                                <span>Disk Usage</span>
+                              </div>
+                              <div className="metric-value">
+                                <span>{metric.disk.used_percent.toFixed(1)}%</span>
+                                <span style={{ 
+                                  fontSize: '11px', 
+                                  color: metric.disk.used_percent < 20 ? '#28a745' : '#6c757d',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '2px'
+                                }}>
+                                  {metric.disk.free_gb.toFixed(1)} GB free
+                                </span>
+                              </div>
+                              <div className="progress-container">
+                                <div 
+                                  className="progress-bar" 
+                                  style={{
+                                    width: `${metric.disk.used_percent}%`,
+                                    background: metric.disk.used_percent > 80 ? '#dc3545' : 
+                                               metric.disk.used_percent > 60 ? '#ffc107' : '#17a2b8'
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            paddingTop: '12px',
+                            borderTop: '1px solid #e9ecef'
+                          }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '13px',
+                              color: status.statusColor === 'danger' ? '#dc3545' :
+                                     status.statusColor === 'warning' ? '#ffc107' : '#28a745'
+                            }}>
+                              {getStatusIcon(status.status)}
+                              {status.status}
+                            </div>
+                            <button className="btn btn-link" style={{ fontSize: '12px' }}>
+                              Open Monitoring
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <button className="btn btn-link" style={{ fontSize: '12px' }}>
-                        Open Monitoring
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
 
           {/* Right Sidebar */}
@@ -819,15 +766,25 @@ const SelectServer = () => {
                 </h5>
 
                 {(() => {
-                  const filteredServers = servers.filter(server => {
+                  const filteredMetrics = serverMetrics.filter(metric => {
                     if (selectedGroup === 'all') return true;
-                    return server.environment === selectedGroup;
+                    const status = getServerStatus(metric);
+                    return status.status === selectedGroup;
                   });
                   
-                  const totalServers = filteredServers.length;
-                  const healthyCount = filteredServers.filter(s => s.status === 'Healthy' || s.status === 'Active').length;
-                  const warningCount = filteredServers.filter(s => s.status === 'Warning').length;
-                  const criticalCount = filteredServers.filter(s => s.status === 'Critical').length;
+                  const totalServers = filteredMetrics.length;
+                  const healthyCount = filteredMetrics.filter(m => {
+                    const status = getServerStatus(m);
+                    return status.status === 'Healthy';
+                  }).length;
+                  const warningCount = filteredMetrics.filter(m => {
+                    const status = getServerStatus(m);
+                    return status.status === 'Warning';
+                  }).length;
+                  const criticalCount = filteredMetrics.filter(m => {
+                    const status = getServerStatus(m);
+                    return status.status === 'Critical';
+                  }).length;
                   const offlineCount = 0; // No offline servers in current data
                   
                   return (
@@ -957,55 +914,88 @@ const SelectServer = () => {
                 </h5>
 
                 <div>
-                  {alerts.map((alert, idx) => (
-                    <div 
-                      key={idx}
-                      style={{
-                        padding: '12px 0',
-                        borderBottom: idx < alerts.length - 1 ? '1px solid #e9ecef' : 'none'
-                      }}
-                    >
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start'
-                      }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            marginBottom: '4px'
-                          }}>
-                            {alert.color === 'warning' ? 
-                              <AlertTriangle size={14} color="#ffc107" /> : 
-                              <XCircle size={14} color="#dc3545" />
-                            }
-                            <span style={{
-                              fontSize: '14px',
-                              fontWeight: '500',
-                              color: '#1a1a1a'
-                            }}>
-                              {alert.name}
-                            </span>
-                          </div>
-                          <div style={{
-                            fontSize: '12px',
-                            color: '#6c757d',
-                            paddingLeft: '20px'
-                          }}>
-                            {alert.ip}
-                          </div>
+                  {(() => {
+                    // Generate alerts from metrics with issues
+                    const alerts = serverMetrics
+                      .filter((metric: SystemMetric) => {
+                        const status = getServerStatus(metric);
+                        return status.status === 'Warning' || status.status === 'Critical' || metric.failed_services.length > 0;
+                      })
+                      .slice(0, 5) // Show top 5 alerts
+                      .map((metric: SystemMetric) => {
+                        const status = getServerStatus(metric);
+                        const serverIp = getServerIp(metric);
+                        return {
+                          name: metric.hostname,
+                          ip: serverIp,
+                          status: status.status,
+                          color: status.statusColor
+                        };
+                      });
+
+                    if (alerts.length === 0) {
+                      return (
+                        <div style={{ 
+                          padding: '20px', 
+                          textAlign: 'center', 
+                          color: '#6c757d',
+                          fontSize: '14px'
+                        }}>
+                          No alerts at this time
                         </div>
-                        <span 
-                          className={`badge badge-${alert.color}`}
-                          style={{ fontSize: '11px' }}
-                        >
-                          {alert.status}
-                        </span>
+                      );
+                    }
+
+                    return alerts.map((alert: any, idx: number) => (
+                      <div 
+                        key={idx}
+                        style={{
+                          padding: '12px 0',
+                          borderBottom: idx < alerts.length - 1 ? '1px solid #e9ecef' : 'none'
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start'
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              marginBottom: '4px'
+                            }}>
+                              {alert.color === 'warning' ? 
+                                <AlertTriangle size={14} color="#ffc107" /> : 
+                                <XCircle size={14} color="#dc3545" />
+                              }
+                              <span style={{
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                color: '#1a1a1a'
+                              }}>
+                                {alert.name}
+                              </span>
+                            </div>
+                            <div style={{
+                              fontSize: '12px',
+                              color: '#6c757d',
+                              paddingLeft: '20px'
+                            }}>
+                              {alert.ip}
+                            </div>
+                          </div>
+                          <span 
+                            className={`badge badge-${alert.color}`}
+                            style={{ fontSize: '11px' }}
+                          >
+                            {alert.status}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ));
+                  })()}
                 </div>
               </div>
             </div>
