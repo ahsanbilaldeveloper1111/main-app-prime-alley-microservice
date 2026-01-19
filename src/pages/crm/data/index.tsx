@@ -83,6 +83,7 @@ import {
   Target,
 } from "lucide-react";
 import { Column } from "@components/CustomDataTable";
+import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 
 import {
   getCrmData,
@@ -2093,7 +2094,215 @@ const CrmProspectsManagement = () => {
     setSelectedItems(selected.map((item) => item.id));
   }, []);
 
-  // Define columns for GenericListPage
+  // Define columns for GenericTable - Clean declarative definitions
+  const prospectsColumns: TableColumn<any>[] = useMemo(
+    () => [
+      {
+        key: 'name',
+        label: 'Name',
+        sortable: true,
+        type: 'avatar',
+        avatar: {
+          getInitials: (row) => getInitials(row.name),
+          getColor: (row) => getRandomColor(row.name)
+        },
+        emptyValue: 'N/A'
+      },
+      {
+        key: 'phone',
+        label: 'Phone',
+        sortable: true,
+        type: 'custom',
+        align: 'center',
+        render: (row) => (
+          <PhoneContainer phone={row?.phone} onClick={() => handleCallClick(row)} />
+        )
+      },
+      {
+        key: 'source_file',
+        label: 'Source',
+        sortable: true,
+        type: 'badge',
+        badge: {
+          getVariant: () => 'secondary'
+        },
+        emptyValue: 'N/A'
+      },
+      {
+        key: 'user_extension',
+        label: 'Assigned To',
+        sortable: true,
+        type: 'custom',
+        render: (row) => {
+          if (row.user_extension) {
+            const extension = extensions.find(
+              (ext: any) => ext.id.toString() === row.user_extension?.toString()
+            );
+            return (
+              <Badge bg="success" className="bg-opacity-10 text-dark d-flex align-items-center gap-1">
+                <span style={{ backgroundColor: '#1de9b6', width: '5px', height: '5px', borderRadius: '50%' }}></span>
+                {extension?.display_name || row.user_extension}
+              </Badge>
+            );
+          }
+          return <Badge bg="secondary" className="bg-opacity-10 text-dark">Unassigned</Badge>;
+        }
+      },
+      {
+        key: 'campaign',
+        label: 'Campaign',
+        sortable: true,
+        type: 'custom',
+        accessor: (row) => row.campaign?.name || null,
+        render: (row) => {
+          if (row.campaign) {
+            return <Badge bg="primary" className="bg-opacity-10 text-dark">{row.campaign.name}</Badge>;
+          }
+          return <Badge bg="info" className="bg-opacity-10 text-dark">No Campaign</Badge>;
+        }
+      },
+      {
+        key: 'last_called_at',
+        label: 'Last Called',
+        sortable: true,
+        type: 'text',
+        accessor: (row) => row.last_called_at ? moment(row.last_called_at).format("MMM DD, HH:mm") : '-'
+      },
+      {
+        key: 'last_call_end_reason',
+        label: 'Last Call Status',
+        sortable: true,
+        type: 'custom',
+        render: (row) => {
+          if (!row.last_call_end_reason) return '-';
+          const endReason = callEndReasons.find(r => r.value === row.last_call_end_reason) || callEndReasons[0];
+          return <Badge bg={endReason.color as any} className="bg-opacity-10 text-dark">{endReason.label}</Badge>;
+        }
+      },
+      {
+        key: 'disposition',
+        label: 'Disposition',
+        sortable: true,
+        type: 'custom',
+        render: (row) => {
+          if (!row.disposition) return '-';
+          const dispositions = [
+            { value: 'interested', label: 'Interested', color: 'success' },
+            { value: 'not_interested', label: 'Not Interested', color: 'danger' },
+            { value: 'callback_requested', label: 'Callback Requested', color: 'warning' },
+            { value: 'no_answer', label: 'No Answer', color: 'warning' },
+            { value: 'busy', label: 'Busy', color: 'info' },
+            { value: 'do_not_call', label: 'Do Not Call', color: 'danger' },
+            { value: 'wrong_number', label: 'Wrong Number', color: 'info' },
+            { value: 'follow_up', label: 'Follow Up', color: 'primary' }
+          ];
+          const randomDisposition = dispositions[Math.floor(Math.random() * dispositions.length)];
+          return <Badge bg={randomDisposition.color as any} className="bg-opacity-10 text-dark">{randomDisposition.label}</Badge>;
+        }
+      },
+      {
+        key: 'scheduled_call_at',
+        label: 'Next Call',
+        sortable: true,
+        type: 'custom',
+        render: (row) => {
+          if (!row.scheduled_call_at) {
+            return <Badge bg="info" className="bg-opacity-10 text-dark">Not scheduled</Badge>;
+          }
+          const isOverdue = moment(row.scheduled_call_at).isBefore(moment());
+          const isNextHour = moment(row.scheduled_call_at).isBefore(moment().add(1, 'hour'));
+          return (
+            <Badge bg={isOverdue ? 'danger' : isNextHour ? 'warning' : 'info'} className="bg-opacity-10 text-dark">
+              {moment(row.scheduled_call_at).format("MMM DD, HH:mm")}
+              {isOverdue && <span className="ms-1 fw-bold">(Overdue)</span>}
+              {isNextHour && !isOverdue && <span className="ms-1 fw-bold">(Soon)</span>}
+            </Badge>
+          );
+        }
+      },
+      {
+        key: 'tags',
+        label: 'Tags',
+        sortable: false,
+        type: 'custom',
+        render: (row) => (
+          <div className="d-flex gap-1 flex-wrap">
+            {(row.tags || []).map((tag: any, idx: number) => (
+              <Badge key={idx} bg="secondary" className="bg-opacity-10 text-dark">
+                {tag.name || tag}
+              </Badge>
+            ))}
+          </div>
+        )
+      }
+    ],
+    [extensions, callEndReasons, handleCallClick]
+  );
+
+  // Define table actions
+  const prospectsActions: TableAction<any>[] = useMemo(
+    () => [
+      ...(session?.user?.permissions?.includes('view-crm-data-management') ? [{
+        label: 'View',
+        icon: <Eye size={16} />,
+        onClick: (row: any) => handleViewData(row)
+      }] : []),
+      ...(session?.user?.permissions?.includes('call-service-crm-data-management') ? [{
+        label: 'Call',
+        icon: <PhoneIcon size={16} />,
+        onClick: (row: any) => handleCallClick(row)
+      }] : []),
+      ...(activeFilter !== 'has_leads' ? [{
+        label: 'More Actions',
+        icon: <MoreVertical size={16} />,
+        onClick: () => {},
+        render: (row: any) => (
+          <Dropdown className="d-inline">
+            <Dropdown.Toggle as={Button} variant="link" size="sm" className="p-1" title="More Actions">
+              <MoreVertical size={16} />
+            </Dropdown.Toggle>
+            <Dropdown.Menu align="end">
+              {session?.user?.permissions?.includes('call-service-crm-data-management') && (
+                <>
+                  {row.scheduled_call_at ? (
+                    <>
+                      <Dropdown.Item onClick={() => handleScheduleCall(row)}>
+                        <FiCalendar size={14} className="me-2" />
+                        Edit Scheduled Call
+                      </Dropdown.Item>
+                      <Dropdown.Item onClick={() => handleUnscheduleCallClick(row)} className="text-danger">
+                        <FiX size={14} className="me-2" />
+                        Unschedule Call
+                      </Dropdown.Item>
+                    </>
+                  ) : (
+                    <Dropdown.Item onClick={() => handleScheduleCall(row)}>
+                      <FiCalendar size={14} className="me-2" />
+                      Schedule Call
+                    </Dropdown.Item>
+                  )}
+                  <Dropdown.Divider />
+                </>
+              )}
+              <Dropdown.Item onClick={() => { window.location.href = `/crm/leads/create?crm_data_id=${row.id}`; }}>
+                <FiTarget size={14} className="me-2" />
+                Convert to Lead
+              </Dropdown.Item>
+              {row.email && (
+                <Dropdown.Item onClick={() => { window.location.href = `mailto:${row.email}`; }}>
+                  <Mail size={14} className="me-2" />
+                  Send Email
+                </Dropdown.Item>
+              )}
+            </Dropdown.Menu>
+          </Dropdown>
+        )
+      }] : [])
+    ],
+    [session, activeFilter, handleViewData, handleCallClick, handleScheduleCall, handleUnscheduleCallClick]
+  );
+
+  // Define old columns for GenericListPage (keep for backward compatibility if needed)
   const columns: Column[] = useMemo(
     () => [
       {
@@ -3121,605 +3330,41 @@ const CrmProspectsManagement = () => {
 
         {/* Prospects Table */}
         {session?.user?.permissions?.includes("list-crm-data-management") && (
-          <Card
-            className="border-0 shadow-sm prospects-table-wrapper"
-            style={{ width: "100%" }}
-          >
-            <Card.Body className="p-0" style={{ width: "100%" }}>
-              {loading ? (
-                <div className="text-center py-5">
-                  <Spinner animation="border" variant="primary" />
-                  <p className="mt-3 text-muted">Loading prospects...</p>
-                </div>
-              ) : (
-                <>
-                  <div className="table-responsive">
-                    <Table
-                      hover
-                      className="mb-0"
-                      style={{ width: "100%", margin: 0, tableLayout: "auto" }}
-                    >
-                      <thead className="bg-light">
-                        <tr>
-                          {session?.user?.permissions?.includes(
-                            "delete-crm-data-management"
-                          ) && (
-                            <th
-                              style={{
-                                width: "20px",
-                                minWidth: "unset",
-                                paddingRight: "2px",
-                              }}
-                            >
-                              <Form.Check
-                                type="checkbox"
-                                checked={
-                                  selectedItems.length > 0 &&
-                                  selectedItems.length === dataList.length
-                                }
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedItems(
-                                      dataList.map((item) => item.id)
-                                    );
-                                  } else {
-                                    setSelectedItems([]);
-                                  }
-                                }}
-                              />
-                            </th>
-                          )}
-                          {selectedColumns.includes("name") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("name")}
-                            >
-                              Name {renderSortIcon("name")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("phone") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("phone")}
-                            >
-                              Phone {renderSortIcon("phone")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("source") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("source_file")}
-                            >
-                              Source {renderSortIcon("source_file")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("user_extension") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("user_extension")}
-                            >
-                              Assigned To {renderSortIcon("user_extension")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("campaign") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("campaign_id")}
-                            >
-                              Campaign {renderSortIcon("campaign_id")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("last_called_at") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("last_called_at")}
-                            >
-                              Last Called {renderSortIcon("last_called_at")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("last_call_end_reason") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("last_call_end_reason")}
-                            >
-                              Last Call Status{" "}
-                              {renderSortIcon("last_call_end_reason")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("disposition") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("disposition")}
-                            >
-                              Disposition {renderSortIcon("disposition")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("scheduled_call_at") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("scheduled_call_at")}
-                            >
-                              Next Call Scheduled{" "}
-                              {renderSortIcon("scheduled_call_at")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("tags") && <th>Tags</th>}
-                          <th style={{ width: "120px", minWidth: "120px" }}>
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const sorted = sortData(
-                            dataList,
-                            pagination.sortColumn,
-                            pagination.sortDirection
-                          );
-
-                          if (sorted.length === 0) {
-                            return (
-                              <tr>
-                                <td
-                                  colSpan={
-                                    selectedColumns.length +
-                                    (session?.user?.permissions?.includes(
-                                      "delete-crm-data-management"
-                                    )
-                                      ? 2
-                                      : 1)
-                                  }
-                                  className="text-center py-4 text-muted"
-                                >
-                                  No prospects found matching your criteria
-                                </td>
-                              </tr>
-                            );
-                          }
-
-                          return sorted.map((item: any) => {
-                            const endReason =
-                              callEndReasons.find(
-                                (r) =>
-                                  r.value ===
-                                  ((item as any).last_call_end_reason ||
-                                    "answered")
-                              ) || callEndReasons[0];
-                            const dispositions = [
-                              {
-                                value: "interested",
-                                label: "Interested",
-                                color: "success",
-                              },
-                              {
-                                value: "not_interested",
-                                label: "Not Interested",
-                                color: "danger",
-                              },
-                              {
-                                value: "callback_requested",
-                                label: "Callback Requested",
-                                color: "warning",
-                              },
-                              {
-                                value: "no_answer",
-                                label: "No Answer",
-                                color: "warning",
-                              },
-                              { value: "busy", label: "Busy", color: "info" },
-                              {
-                                value: "do_not_call",
-                                label: "Do Not Call",
-                                color: "danger",
-                              },
-                              {
-                                value: "wrong_number",
-                                label: "Wrong Number",
-                                color: "info",
-                              },
-                              {
-                                value: "follow_up",
-                                label: "Follow Up",
-                                color: "primary",
-                              },
-                            ];
-                            const randomDisposition =
-                              dispositions[
-                                Math.floor(Math.random() * dispositions.length)
-                              ];
-
-                            return (
-                              <tr 
-                                key={item.id}
-                                onDoubleClick={() => {
-                                  if (session?.user?.permissions?.includes("view-crm-data-management")) {
-                                    handleViewData(item);
-                                  }
-                                }}
-                                style={{
-                                  cursor: session?.user?.permissions?.includes("view-crm-data-management") 
-                                    ? "pointer" 
-                                    : "default"
-                                }}
-                              >
-                                {session?.user?.permissions?.includes(
-                                  "delete-crm-data-management"
-                                ) && (
-                                  <td
-                                    style={{
-                                      width: "20px",
-                                      minWidth: "unset",
-                                      paddingRight: "2px",
-                                    }}
-                                  >
-                                    <Form.Check
-                                      type="checkbox"
-                                      checked={selectedItems.includes(item.id)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setSelectedItems([
-                                            ...selectedItems,
-                                            item.id,
-                                          ]);
-                                        } else {
-                                          setSelectedItems(
-                                            selectedItems.filter(
-                                              (id) => id !== item.id
-                                            )
-                                          );
-                                        }
-                                      }}
-                                    />
-                                  </td>
-                                )}
-                                {selectedColumns.includes("name") && (
-                                  <td className="fw-semibold">
-                                    <div className="d-flex align-items-center gap-2">
-                                      {item.name ? (
-                                        <>
-                                          <div
-                                            style={{
-                                              width: "30px",
-                                              height: "30px",
-                                              borderRadius: "50%",
-                                              backgroundColor: getRandomColor(
-                                                item.name
-                                              ),
-                                              color: "#fff",
-                                              display: "flex",
-                                              alignItems: "center",
-                                              justifyContent: "center",
-                                              fontSize: "10px",
-                                              fontWeight: "600",
-                                              flexShrink: 0,
-                                            }}
-                                          >
-                                            {getInitials(item.name)}
-                                          </div>
-                                          <span>{item.name}</span>
-                                        </>
-                                      ) : (
-                                        "N/A"
-                                      )}
-                                    </div>
-                                  </td>
-                                )}
-                                {selectedColumns.includes("phone") && (
-                                  <td>
-                                    <PhoneContainer 
-                                      phone={item?.phone} 
-                                      onClick={() => handleCallClick(item)}
-                                    />
-                                  </td>
-                                )}
-                                {selectedColumns.includes("source") && (
-                                  <td>
-                                    {(item as any).source_file ? (
-                                      <Badge
-                                        bg="secondary"
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        {(item as any).source_file}
-                                      </Badge>
-                                    ) : (
-                                      <span className="text-muted">N/A</span>
-                                    )}
-                                  </td>
-                                )}
-                                {selectedColumns.includes("user_extension") && (
-                                  <td>
-                                    {item.user_extension ? (
-                                      <Badge
-                                        bg="success"
-                                        className="bg-opacity-10 text-dark d-flex align-items-center gap-1"
-                                        style={{
-                                        }}
-                                      >
-                                        <span style={{
-                                          backgroundColor: '#1de9b6',
-                                          width: '5px',
-                                          height: '5px',
-                                          borderRadius: '50%',
-                                        }}>
-                                        </span>
-                                        {extensions.find(
-                                          (ext: any) =>
-                                            ext.id.toString() ===
-                                            item.user_extension?.toString()
-                                        )?.display_name || item.user_extension}
-                                      </Badge>
-                                    ) : (
-                                      <Badge
-                                        bg="secondary"
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        Unassigned
-                                      </Badge>
-                                    )}
-                                  </td>
-                                )}
-                                {selectedColumns.includes("campaign") && (
-                                  <td>
-                                    {(item as any).campaign ? (
-                                      <Badge
-                                        bg="primary"
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        {(item as any).campaign.name}
-                                      </Badge>
-                                    ) : (
-                                      <Badge
-                                        bg="info"
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        No Campaign
-                                      </Badge>
-                                    )}
-                                  </td>
-                                )}
-                                {selectedColumns.includes("last_called_at") && (
-                                  <td>
-                                    {(item as any).last_called_at
-                                      ? moment(
-                                          (item as any).last_called_at
-                                        ).format("MMM DD, HH:mm")
-                                      : "-"}
-                                  </td>
-                                )}
-                                {selectedColumns.includes(
-                                  "last_call_end_reason"
-                                ) && (
-                                  <td>
-                                    {(item as any).last_call_end_reason ? (
-                                      <Badge
-                                        bg={endReason.color as any}
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        {endReason.label}
-                                      </Badge>
-                                    ) : (
-                                      "-"
-                                    )}
-                                  </td>
-                                )}
-                                {selectedColumns.includes("disposition") && (
-                                  <td>
-                                    {(item as any).disposition ? (
-                                      <Badge
-                                        bg={randomDisposition.color as any}
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        {randomDisposition.label}
-                                      </Badge>
-                                    ) : (
-                                      "-"
-                                    )}
-                                  </td>
-                                )}
-                                {selectedColumns.includes(
-                                  "scheduled_call_at"
-                                ) && (
-                                  <td>
-                                    {(item as any).scheduled_call_at ? (
-                                      (() => {
-                                        const scheduledAt = (item as any)
-                                          .scheduled_call_at;
-                                        const isOverdue = moment(
-                                          scheduledAt
-                                        ).isBefore(moment());
-                                        const isNextHour = moment(
-                                          scheduledAt
-                                        ).isBefore(moment().add(1, "hour"));
-                                        return (
-                                          <Badge
-                                            bg={
-                                              isOverdue
-                                                ? "danger"
-                                                : isNextHour
-                                                ? "warning"
-                                                : "info"
-                                            }
-                                            className="bg-opacity-10 text-dark"
-                                          >
-                                            {moment(scheduledAt).format(
-                                              "MMM DD, HH:mm"
-                                            )}
-                                            {isOverdue && (
-                                              <span className="ms-1 fw-bold">
-                                                (Overdue)
-                                              </span>
-                                            )}
-                                            {isNextHour && !isOverdue && (
-                                              <span className="ms-1 fw-bold">
-                                                (Soon)
-                                              </span>
-                                            )}
-                                          </Badge>
-                                        );
-                                      })()
-                                    ) : (
-                                      <Badge
-                                        bg="info"
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        Not scheduled
-                                      </Badge>
-                                    )}
-                                  </td>
-                                )}
-                                {selectedColumns.includes("tags") && (
-                                  <td>
-                                    <div className="d-flex gap-1 flex-wrap">
-                                      {((item as any).tags || []).map(
-                                        (tag: any, idx: number) => (
-                                          <Badge
-                                            key={idx}
-                                            bg="secondary"
-                                            className="bg-opacity-10 text-dark"
-                                          >
-                                            {tag.name || tag}
-                                          </Badge>
-                                        )
-                                      )}
-                                    </div>
-                                  </td>
-                                )}
-                                <td
-                                  style={{ width: "120px", minWidth: "120px" }}
-                                >
-                                  <div className="d-flex gap-1">
-                                    {session?.user?.permissions?.includes(
-                                      "view-crm-data-management"
-                                    ) && (
-                                      <Button
-                                        variant="link"
-                                        size="sm"
-                                        className="p-1"
-                                        title="View Details"
-                                        onClick={() => handleViewData(item)}
-                                      >
-                                        <Eye size={16} />
-                                      </Button>
-                                    )}
-                                    {session?.user?.permissions?.includes(
-                                      "call-service-crm-data-management"
-                                    ) && (
-                                      <Button
-                                        variant="link"
-                                        size="sm"
-                                        className="p-1 text-success"
-                                        title="Call Now"
-                                        onClick={() => handleCallClick(item)}
-                                      >
-                                        <PhoneIcon size={16} />
-                                      </Button>
-                                    )}
-                                  {
-                                    activeFilter !== 'has_leads' && (
-                                      <Dropdown className="d-inline">
-                                      <Dropdown.Toggle
-                                        as={Button}
-                                        variant="link"
-                                        size="sm"
-                                        className="p-1"
-                                        title="More Actions"
-                                      >
-                                        <MoreVertical size={16} />
-                                      </Dropdown.Toggle>
-                                      <Dropdown.Menu align="end">
-                                        {session?.user?.permissions?.includes(
-                                          "call-service-crm-data-management"
-                                        ) && (
-                                          <>
-                                            {(item as any).scheduled_call_at ? (
-                                              <>
-                                                <Dropdown.Item
-                                                  onClick={() =>
-                                                    handleScheduleCall(item)
-                                                  }
-                                                >
-                                                  <FiCalendar
-                                                    size={14}
-                                                    className="me-2"
-                                                  />
-                                                  Edit Scheduled Call
-                                                </Dropdown.Item>
-                                                <Dropdown.Item
-                                                  onClick={() =>
-                                                    handleUnscheduleCallClick(item)
-                                                  }
-                                                  className="text-danger"
-                                                >
-                                                  <FiX
-                                                    size={14}
-                                                    className="me-2"
-                                                  />
-                                                  Unschedule Call
-                                                </Dropdown.Item>
-                                              </>
-                                            ) : (
-                                              <Dropdown.Item
-                                                onClick={() =>
-                                                  handleScheduleCall(item)
-                                                }
-                                              >
-                                                <FiCalendar
-                                                  size={14}
-                                                  className="me-2"
-                                                />
-                                                Schedule Call
-                                              </Dropdown.Item>
-                                            )}
-                                            <Dropdown.Divider />
-                                          </>
-                                        )}
-                                        <Dropdown.Item
-                                          onClick={() => {
-                                            window.location.href = `/crm/leads/create?crm_data_id=${item.id}`;
-                                          }}
-                                        >
-                                          <FiTarget
-                                            size={14}
-                                            className="me-2"
-                                          />
-                                          Convert to Lead
-                                        </Dropdown.Item>
-                                        {/* <Dropdown.Item onClick={() => {
-                                          window.location.href = `tel:${item.phone}`;
-                                        }}>
-                                          <PhoneIcon size={14} className="me-2" />
-                                          Call Prospect
-                                        </Dropdown.Item> */}
-                                        {(item as any).email && (
-                                          <Dropdown.Item
-                                            onClick={() => {
-                                              window.location.href = `mailto:${
-                                                (item as any).email
-                                              }`;
-                                            }}
-                                          >
-                                            <Mail size={14} className="me-2" />
-                                            Send Email
-                                          </Dropdown.Item>
-                                        )}
-                                      </Dropdown.Menu>
-                                    </Dropdown>
-                                    )
-                                  }
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          });
-                        })()}
-                      </tbody>
-                    </Table>
-                  </div>
-                  <div className="p-3">{renderPaginationControls()}</div>
-                </>
-              )}
-            </Card.Body>
-          </Card>
+          <GenericTable
+            data={dataList}
+            columns={prospectsColumns.filter(col => selectedColumns.includes(col.key))}
+            actions={prospectsActions}
+            selectable={session?.user?.permissions?.includes("delete-crm-data-management")}
+            selectedRows={dataList.filter(item => selectedItems.includes(item.id))}
+            onSelectionChange={(selected) => setSelectedItems(selected.map(item => item.id))}
+            selectKey="id"
+            pagination={{
+              currentPage: pagination.currentPage,
+              rowsPerPage: pagination.rowsPerPage,
+              totalRows: totalRecords,
+              pageSizeOptions: [10, 25, 50, 100]
+            }}
+            onPaginationChange={(page, rowsPerPage) => {
+              setPagination({
+                ...pagination,
+                currentPage: page,
+                rowsPerPage
+              });
+            }}
+            sortable={true}
+            defaultSortColumn={pagination.sortColumn}
+            defaultSortDirection={pagination.sortDirection}
+            onRowDoubleClick={(row) => {
+              if (session?.user?.permissions?.includes("view-crm-data-management")) {
+                handleViewData(row);
+              }
+            }}
+            loading={loading}
+            emptyMessage="No prospects found matching your criteria"
+            loadingMessage="Loading prospects..."
+            hover={true}
+            uniqueKey="id"
+          />
         )}
       </div>
 

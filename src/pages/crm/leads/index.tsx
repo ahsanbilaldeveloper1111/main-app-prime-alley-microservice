@@ -10,6 +10,7 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import {
   getLeads,
   getLead,
@@ -125,6 +126,31 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import { useCti } from "../../../contexts/CtiContext";
+
+// Type definition for transformed lead data
+interface LeadData {
+  id: any;
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  industry: string;
+  stage: string;
+  stageColor: string;
+  leadPotential: string;
+  lead_score: number;
+  assignedUser: string;
+  created: string;
+  lastActivity: string;
+  followUps: any[];
+  meetings: any[];
+  source: string;
+  campaign: string;
+  isLost: boolean;
+  rawData: any;
+  [key: string]: any; // Index signature
+}
+
 const ignoredKeys = ["stage_id", "contact_persons"];
 // Phone Container Component (with Badge for tables)
 const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => void }) => {
@@ -1214,7 +1240,7 @@ const CrmLeads = () => {
     );
   };
   // Transform API lead data to UI format
-  const transformLeadData = (lead: any) => {
+  const transformLeadData = (lead: any): LeadData => {
     // Parse contact_persons - it can be a JSON string or an array
     let contactPersonsArray: any[] = [];
     if (lead.contact_persons) {
@@ -2052,89 +2078,199 @@ const CrmLeads = () => {
     return counts;
   }, [leadsData, extensions, stages, summaryTiles, totalLeads]);
 
+  // Define table columns - Clean data definitions only
+  const leadsColumns: TableColumn<LeadData>[] = useMemo(() => [
+    {
+      key: 'name',
+      label: 'Name',
+      sortable: true,
+      type: 'avatar',
+      avatar: {
+        getInitials: (lead) => getInitials(lead.name),
+        getColor: (lead) => getRandomColor(lead.name)
+      },
+      emptyValue: 'N/A'
+    },
+    {
+      key: 'company',
+      label: 'Individual/Company',
+      sortable: true,
+      type: 'multi-field',
+      fields: {
+        primary: 'company',
+        secondary: 'industry',
+        secondaryClass: 'gt-company-industry'
+      },
+      emptyValue: 'No Company'
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      sortable: true,
+      type: 'text'
+    },
+    {
+      key: 'phone',
+      label: 'Phone',
+      sortable: true,
+      align: 'left',
+      type: 'custom',
+      render: (lead: LeadData) => lead.phone ? (
+        <PhoneContainer phone={lead.phone} onClick={() => handleCallClick(lead)} />
+      ) : <span className="gt-empty-cell">-</span>
+    },
+    {
+      key: 'stage',
+      label: 'Stage',
+      sortable: true,
+      type: 'badge',
+      badge: {
+        getColor: (lead) => lead.stageColor || '#6c757d'
+      }
+    },
+    {
+      key: 'leadPotential',
+      label: 'Lead Potential',
+      sortable: true,
+      type: 'badge',
+      badge: {
+        getVariant: (lead) => 
+          lead.leadPotential === 'Hot' ? 'danger' :
+          lead.leadPotential === 'Warm' ? 'warning' : 'secondary'
+      }
+    },
+    {
+      key: 'followUps',
+      label: 'Follow-up Date',
+      sortable: false,
+      align: 'center',
+      type: 'text',
+      accessor: (lead: LeadData) => {
+        const followUps = lead.followUps || [];
+        if (followUps.length === 0) return null;
+        const sortedFollowUps = [...followUps].sort((a, b) => {
+          const dateA = a.follow_up_date ? new Date(a.follow_up_date).getTime() : Infinity;
+          const dateB = b.follow_up_date ? new Date(b.follow_up_date).getTime() : Infinity;
+          return dateA - dateB;
+        });
+        const earliestFollowUp = sortedFollowUps[0];
+        return earliestFollowUp?.follow_up_date
+          ? moment(earliestFollowUp.follow_up_date).format(GlobalDateFormat)
+          : null;
+      }
+    },
+    {
+      key: 'assignedUser',
+      label: 'Assigned To',
+      sortable: true,
+      type: 'text'
+    },
+    {
+      key: 'created',
+      label: 'Created',
+      sortable: true,
+      type: 'text'
+    }
+  ], []);
+
+  // Define table actions
+ 
+const leadsActions: TableAction<LeadData>[] = useMemo(() => {
+  if (activeFilter === "deleted") {
+    return [
+      {
+        label: 'View',
+        icon: <Eye size={16} />,
+        onClick: (lead: LeadData) => handleViewLead(lead.rawData?.id || lead.id),
+      },
+      {
+        label: 'Restore',
+        icon: <RotateCcw size={16} />,
+        onClick: (lead: LeadData) => handleRestoreLead(lead.rawData?.id || lead.id),
+      }
+    ];
+  }
+
+  const actions: TableAction<LeadData>[] = [
+    {
+      label: 'View',
+      icon: <Eye size={16} />,
+      onClick: (lead: LeadData) => handleViewLead(lead.rawData?.id || lead.id),
+    }
+  ];
+
+  if (session?.user?.permissions?.includes('edit-crm-leads')) {
+    actions.push({
+      label: 'Edit',
+      icon: <Edit size={16} />,
+      onClick: (lead: LeadData) => window.location.href = `/crm/leads/${lead.rawData?.id || lead.id}/edit`,
+      show: () => activeFilter !== 'lost'
+    });
+  }
+
+  if (session?.user?.permissions?.includes('add-crm-deals')) {
+    actions.push({
+      label: 'Convert to Deal',
+      icon: <Handshake size={16} />,
+      onClick: (lead: LeadData) => handleConvertLead(lead.rawData || lead),
+    });
+  }
+
+  if (session?.user?.permissions?.includes('delete-crm-leads')) {
+    actions.push({
+      label: 'Delete',
+      icon: <Trash2 size={16} />,
+      onClick: (lead: LeadData) => handleDeleteLead(lead.rawData?.id || lead.id, lead.name),
+    });
+  }
+
+  if (activeFilter !== 'lost') {
+    actions.push({
+      label: 'More Actions',
+      icon: <MoreVertical size={16} />,
+      onClick: () => {},
+      render: (lead: LeadData) => (
+        <Dropdown className="d-inline">
+          <Dropdown.Toggle
+            as={Button}
+            variant="link"
+            size="sm"
+            className="p-1"
+            title="More Actions"
+          >
+            <MoreVertical size={16} />
+          </Dropdown.Toggle>
+          <Dropdown.Menu align="end">
+            {session?.user?.permissions?.includes('edit-crm-leads') && (
+              <Dropdown.Item onClick={() => handleChangeStage(lead.rawData || lead)}>
+                <GitBranch size={14} className="me-2" />
+                Change Stage
+              </Dropdown.Item>
+            )}
+            {session?.user?.permissions?.includes('mark-as-lost-crm-leads') && (
+              <Dropdown.Item
+                className="text-danger"
+                onClick={() => handleMarkLost(lead.rawData || lead)}
+              >
+                <X size={14} className="me-2" />
+                Lost
+              </Dropdown.Item>
+            )}
+          </Dropdown.Menu>
+        </Dropdown>
+      )
+    });
+  }
+
+  return actions;
+}, [session, activeFilter, handleViewLead, handleConvertLead, handleDeleteLead, handleRestoreLead, handleChangeStage, handleMarkLost]);
+
   if (!session?.user?.permissions?.includes("list-crm-leads")) {
     return null;
   }
 
   return (
     <React.Fragment>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        .leads-table-wrapper {
-          width: 100%;
-          overflow: hidden;
-        }
-        .leads-table-wrapper .table-responsive {
-          width: 100%;
-          overflow-x: auto;
-          overflow-y: visible;
-          -webkit-overflow-scrolling: touch;
-        }
-        .leads-table-wrapper .table-responsive table {
-          width: 100%;
-          table-layout: auto;
-          margin-bottom: 0;
-        }
-        .leads-table-wrapper .table-responsive table th,
-        .leads-table-wrapper .table-responsive table td {
-          padding: 12px 16px;
-          vertical-align: middle;
-        }
-        .leads-table-wrapper .table-responsive table th.col-name,
-        .leads-table-wrapper .table-responsive table td.col-name {
-          min-width: 150px;
-          white-space: nowrap;
-        }
-        .leads-table-wrapper .table-responsive table th.col-company,
-        .leads-table-wrapper .table-responsive table td.col-company {
-          min-width: 180px;
-        }
-        .leads-table-wrapper .table-responsive table th.col-email,
-        .leads-table-wrapper .table-responsive table td.col-email {
-          min-width: 200px;
-          white-space: nowrap;
-        }
-        .leads-table-wrapper .table-responsive table th.col-phone,
-        .leads-table-wrapper .table-responsive table td.col-phone {
-          min-width: 150px;
-          white-space: nowrap;
-        }
-        .leads-table-wrapper .table-responsive table th.col-stage,
-        .leads-table-wrapper .table-responsive table td.col-stage {
-          min-width: 120px;
-          white-space: nowrap;
-        }
-        .leads-table-wrapper .table-responsive table th.col-leadPotential,
-        .leads-table-wrapper .table-responsive table td.col-leadPotential {
-          min-width: 130px;
-          white-space: nowrap;
-        }
-        .leads-table-wrapper .table-responsive table th.col-followUps,
-        .leads-table-wrapper .table-responsive table td.col-followUps {
-          min-width: 100px;
-          white-space: nowrap;
-          text-align: center;
-        }
-        .leads-table-wrapper .table-responsive table th.col-assignedUser,
-        .leads-table-wrapper .table-responsive table td.col-assignedUser {
-          min-width: 150px;
-          white-space: nowrap;
-        }
-        .leads-table-wrapper .table-responsive table th.col-created,
-        .leads-table-wrapper .table-responsive table td.col-created {
-          min-width: 120px;
-          white-space: nowrap;
-        }
-        .leads-table-wrapper .table-responsive table th.col-actions,
-        .leads-table-wrapper .table-responsive table td.col-actions {
-          min-width: 120px;
-          width: 120px;
-          white-space: nowrap;
-        }
-      `,
-        }}
-      />
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
@@ -2746,592 +2882,46 @@ const CrmLeads = () => {
           </Card>
         )}
 
-        {/* Column Customization */}
-        <div className="d-flex justify-content-end gap-2 mb-3">
-          <Dropdown>
-            <Dropdown.Toggle variant="outline-secondary" size="sm">
-              <Layers size={16} className="me-2" />
-              Customize Table
-            </Dropdown.Toggle>
-            <Dropdown.Menu
-              align="end"
-              style={{ maxHeight: "300px", overflowY: "auto" }}
-            >
-              {[
-                { key: "name", label: "Name" },
-                { key: "company", label: "Company" },
-                { key: "email", label: "Email" },
-                { key: "phone", label: "Phone" },
-                { key: "stage", label: "Stage" },
-                { key: "leadPotential", label: "Lead Potential" },
-                { key: "followUps", label: "Follow-ups" },
-                { key: "assignedUser", label: "Assigned To" },
-                { key: "created", label: "Created" },
-              ].map((col) => (
-                <Dropdown.Item key={col.key} as="div">
-                  <Form.Check
-                    type="checkbox"
-                    label={col.label}
-                    checked={selectedLeadsColumns.includes(col.key)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedLeadsColumns([
-                          ...selectedLeadsColumns,
-                          col.key,
-                        ]);
-                        localStorage.setItem(
-                          "leadsSelectedColumns",
-                          JSON.stringify([...selectedLeadsColumns, col.key])
-                        );
-                      } else {
-                        const newCols = selectedLeadsColumns.filter(
-                          (c) => c !== col.key
-                        );
-                        setSelectedLeadsColumns(newCols);
-                        localStorage.setItem(
-                          "leadsSelectedColumns",
-                          JSON.stringify(newCols)
-                        );
-                      }
-                    }}
-                  />
-                </Dropdown.Item>
-              ))}
-              <Dropdown.Divider />
-              <Dropdown.Item
-                onClick={() => {
-                  const allCols = [
-                    "name",
-                    "company",
-                    "email",
-                    "phone",
-                    "stage",
-                    "leadPotential",
-                    "followUps",
-                    "assignedUser",
-                    "created",
-                  ];
-                  setSelectedLeadsColumns(allCols);
-                  localStorage.setItem(
-                    "leadsSelectedColumns",
-                    JSON.stringify(allCols)
-                  );
-                }}
-              >
-                Select All
-              </Dropdown.Item>
-              <Dropdown.Item
-                onClick={() => {
-                  const defaultCols = [
-                    "name",
-                    "company",
-                    "email",
-                    "phone",
-                    "stage",
-                    "leadPotential",
-                    "followUps",
-                    "assignedUser",
-                    "created",
-                  ];
-                  setSelectedLeadsColumns(defaultCols);
-                  localStorage.setItem(
-                    "leadsSelectedColumns",
-                    JSON.stringify(defaultCols)
-                  );
-                }}
-              >
-                Reset to Default
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
-        </div>
-
-        {/* Leads Table */}
-        <Card
-          className="border-0 shadow-sm leads-table-wrapper"
-          style={{ width: "100%" }}
-        >
-          <Card.Body className="p-0" style={{ width: "100%" }}>
-            <div className="table-responsive">
-              <Table
-                hover
-                className="mb-0 w-100"
-                style={{ width: "100%", margin: 0 }}
-              >
-                <thead className="bg-light">
-                  <tr>
-                    {selectedLeadsColumns.includes("name") && (
-                      <th
-                        className="col-name"
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "name",
-                            leadsPagination,
-                            setLeadsPagination
-                          )
-                        }
-                      >
-                        Name {renderSortIcon("name", leadsPagination)}
-                      </th>
-                    )}
-                    {selectedLeadsColumns.includes("company") && (
-                      <th
-                        className="col-company"
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "company",
-                            leadsPagination,
-                            setLeadsPagination
-                          )
-                        }
-                      >
-                        Individual/Company {renderSortIcon("company", leadsPagination)}
-                      </th>
-                    )}
-                    {selectedLeadsColumns.includes("email") && (
-                      <th
-                        className="col-email"
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "email",
-                            leadsPagination,
-                            setLeadsPagination
-                          )
-                        }
-                      >
-                        Email {renderSortIcon("email", leadsPagination)}
-                      </th>
-                    )}
-                    {selectedLeadsColumns.includes("phone") && (
-                      <th
-                        className="col-phone"
-                        style={{
-                          cursor: "pointer",
-                          userSelect: "none",
-                          textAlign: "center",
-                        }}
-                        onClick={() =>
-                          handleSort(
-                            "phone",
-                            leadsPagination,
-                            setLeadsPagination
-                          )
-                        }
-                      >
-                        Phone {renderSortIcon("phone", leadsPagination)}
-                      </th>
-                    )}
-                    {selectedLeadsColumns.includes("stage") && (
-                      <th
-                        className="col-stage"
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "stage",
-                            leadsPagination,
-                            setLeadsPagination
-                          )
-                        }
-                      >
-                        Stage {renderSortIcon("stage", leadsPagination)}
-                      </th>
-                    )}
-                    {selectedLeadsColumns.includes("leadPotential") && (
-                      <th
-                        className="col-leadPotential"
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "leadPotential",
-                            leadsPagination,
-                            setLeadsPagination
-                          )
-                        }
-                      >
-                        Lead Potential{" "}
-                        {renderSortIcon("leadPotential", leadsPagination)}
-                      </th>
-                    )}
-                    {selectedLeadsColumns.includes("followUps") && (
-                      <th className="col-followUps">Follow-up Date</th>
-                    )}
-                    {selectedLeadsColumns.includes("assignedUser") && (
-                      <th
-                        className="col-assignedUser"
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "assignedUser",
-                            leadsPagination,
-                            setLeadsPagination
-                          )
-                        }
-                      >
-                        Assigned To{" "}
-                        {renderSortIcon("assignedUser", leadsPagination)}
-                      </th>
-                    )}
-                    {selectedLeadsColumns.includes("created") && (
-                      <th
-                        className="col-created"
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "created",
-                            leadsPagination,
-                            setLeadsPagination
-                          )
-                        }
-                      >
-                        Created {renderSortIcon("created", leadsPagination)}
-                      </th>
-                    )}
-                    <th
-                      className="col-actions"
-                      style={{ width: "120px", minWidth: "120px" }}
-                    >
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td
-                        colSpan={selectedLeadsColumns.length + 1}
-                        className="text-center py-4"
-                      >
-                        Loading...
-                      </td>
-                    </tr>
-                  ) : filteredLeads.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={selectedLeadsColumns.length + 1}
-                        className="text-center py-4 text-muted"
-                      >
-                        No leads found matching your criteria
-                      </td>
-                    </tr>
-                  ) : (
-                    sortData(
-                      filteredLeads,
-                      leadsPagination.sortColumn,
-                      leadsPagination.sortDirection
-                    ).map((lead) => (
-                      <tr 
-                        key={lead.id}
-                        onDoubleClick={() => {
-                          if (session?.user?.permissions?.includes("list-crm-leads")) {
-                            handleViewLead(lead.rawData?.id || lead.id);
-                          }
-                        }}
-                        style={{
-                          cursor: session?.user?.permissions?.includes("list-crm-leads") 
-                            ? "pointer" 
-                            : "default"
-                        }}
-                      >
-                        {selectedLeadsColumns.includes("name") && (
-                          <td className="col-name fw-semibold">
-                            <div className="d-flex align-items-center gap-2">
-                              {lead.name ? (
-                                <>
-                                  <div
-                                    style={{
-                                      width: "30px",
-                                      height: "30px",
-                                      borderRadius: "50%",
-                                      backgroundColor: getRandomColor(
-                                        lead.name
-                                      ),
-                                      color: "#fff",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                      fontWeight: "600",
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    {getInitials(lead.name)}
-                                  </div>
-                                  <p
-                                    className="overflow-hidden whitespace-nowrap mb-0"
-                                    style={{
-                                      textOverflow: "ellipsis",
-                                    }}
-                                  >
-                                    {lead.name}
-                                  </p>
-                                </>
-                              ) : (
-                                "N/A"
-                              )}
-                            </div>
-                          </td>
-                        )}
-                        {selectedLeadsColumns.includes("company") && (
-                          <td className="col-company">
-                            <div>
-                              <div className="fw-medium">
-                                {lead.company || "No Company"}
-                              </div>
-                              {lead.industry && (
-                                <small className="text-muted">
-                                  {lead.industry}
-                                </small>
-                              )}
-                            </div>
-                          </td>
-                        )}
-                        {selectedLeadsColumns.includes("email") && (
-                          <td className="col-email">{lead.email || "-"}</td>
-                        )}
-                        {selectedLeadsColumns.includes("phone") && (
-                          <td
-                            className="col-phone"
-                            style={{ textAlign: "center" }}
-                          >
-                            {lead.phone ? (
-                              <PhoneContainer 
-                                phone={lead.phone} 
-                                onClick={() => handleCallClick(lead)}
-                              />
-                            ) : (
-                              "-"
-                            )}
-                          </td>
-                        )}
-                        {selectedLeadsColumns.includes("stage") && (
-                          <td className="col-stage">
-                            <span
-                              style={{
-                                backgroundColor: lead?.stageColor || "grey",
-                              }}
-                              className="badge"
-                            >
-                              {lead.stage}
-                            </span>
-                          </td>
-                        )}
-                        {selectedLeadsColumns.includes("leadPotential") && (
-                          <td className="col-leadPotential">
-                            <Badge
-                              bg={
-                                lead.leadPotential === "Hot"
-                                  ? "danger"
-                                  : lead.leadPotential === "Warm"
-                                  ? "warning"
-                                  : "secondary"
-                              }
-                            >
-                              {lead.leadPotential}
-                            </Badge>
-                          </td>
-                        )}
-                        {selectedLeadsColumns.includes("followUps") && (
-                          <td className="col-followUps text-center text-uppercase">
-                            {(() => {
-                              const followUps = lead.followUps || [];
-                              if (followUps.length === 0) {
-                                return "-";
-                              }
-                              // Sort by follow_up_date and get the earliest one
-                              const sortedFollowUps = [...followUps].sort(
-                                (a, b) => {
-                                  const dateA = a.follow_up_date
-                                    ? new Date(a.follow_up_date).getTime()
-                                    : Infinity;
-                                  const dateB = b.follow_up_date
-                                    ? new Date(b.follow_up_date).getTime()
-                                    : Infinity;
-                                  return dateA - dateB;
-                                }
-                              );
-                              const earliestFollowUp = sortedFollowUps[0];
-                              if (earliestFollowUp?.follow_up_date) {
-                                // return formatDateForTable(
-                                //   earliestFollowUp.follow_up_date
-                                // );
-                                return moment(earliestFollowUp.follow_up_date).format(GlobalDateFormat);
-                              }
-                              return "-";
-                            })()}
-                          </td>
-                        )}
-                        {selectedLeadsColumns.includes("assignedUser") && (
-                          <td className="col-assignedUser">
-                            {lead.assignedUser || "-"}
-                          </td>
-                        )}
-                        {selectedLeadsColumns.includes("created") && (
-                          <td className="col-created">{lead.created || "-"}</td>
-                        )}
-                        <td
-                          className="col-actions"
-                          style={{ width: "120px", minWidth: "120px" }}
-                        >
-                          <div className="d-flex gap-1">
-                            {activeFilter === "deleted" ? (
-                              <>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1"
-                                  title="View"
-                                  onClick={() =>
-                                    handleViewLead(lead.rawData?.id || lead.id)
-                                  }
-                                >
-                                  <Eye size={16} />
-                                </Button>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1 text-success"
-                                  title="Restore"
-                                  onClick={() =>
-                                    handleRestoreLead(
-                                      lead.rawData?.id || lead.id
-                                    )
-                                  }
-                                >
-                                  <RotateCcw size={16} />
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1"
-                                  title="View"
-                                  onClick={() =>
-                                    handleViewLead(lead.rawData?.id || lead.id)
-                                  }
-                                >
-                                  <Eye size={16} />
-                                </Button>
-                                {session?.user?.permissions?.includes(
-                                  "edit-crm-leads"
-                                ) && (
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="p-1"
-                                    title="Edit"
-                                    disabled={activeFilter === "lost"}
-                                    onClick={() =>
-                                      (window.location.href = `/crm/leads/${
-                                        lead.rawData?.id || lead.id
-                                      }/edit`)
-                                    }
-                                  >
-                                    <Edit size={16} />
-                                  </Button>
-                                )}
-                                {session?.user?.permissions?.includes(
-                                  "add-crm-deals"
-                                ) && (
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="p-1 text-success"
-                                    title="Convert to Deal"
-                                    onClick={() =>
-                                      handleConvertLead(lead.rawData || lead)
-                                    }
-                                  >
-                                    <Handshake size={16} />
-                                  </Button>
-                                )}
-                                {session?.user?.permissions?.includes(
-                                  "delete-crm-leads"
-                                ) && (
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="p-1 text-danger"
-                                    title="Delete"
-                                    onClick={() =>
-                                      handleDeleteLead(
-                                        lead.rawData?.id || lead.id,
-                                        lead.name
-                                      )
-                                    }
-                                  >
-                                    <Trash2 size={16} />
-                                  </Button>
-                                )}
-                                {activeFilter !== "lost" && (
-                                  <Dropdown className="d-inline">
-                                    <Dropdown.Toggle
-                                      as={Button}
-                                      variant="link"
-                                      size="sm"
-                                      className="p-1"
-                                      title="More Actions"
-                                    >
-                                      <MoreVertical size={16} />
-                                    </Dropdown.Toggle>
-                                    <Dropdown.Menu align="end">
-                                      {session?.user?.permissions?.includes(
-                                        "edit-crm-leads"
-                                      ) && (
-                                        <Dropdown.Item
-                                          onClick={() =>
-                                            handleChangeStage(
-                                              lead.rawData || lead
-                                            )
-                                          }
-                                        >
-                                          <GitBranch
-                                            size={14}
-                                            className="me-2"
-                                          />
-                                          Change Stage
-                                        </Dropdown.Item>
-                                      )}
-                                      {session?.user?.permissions?.includes(
-                                        "mark-as-lost-crm-leads"
-                                      ) && (
-                                        <Dropdown.Item
-                                          className="text-danger"
-                                          onClick={() =>
-                                            handleMarkLost(lead.rawData || lead)
-                                          }
-                                        >
-                                          <X size={14} className="me-2" />
-                                          Lost
-                                        </Dropdown.Item>
-                                      )}
-                                    </Dropdown.Menu>
-                                  </Dropdown>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </Table>
-            </div>
-            <div className="p-3">
-              {renderPaginationControls(
-                totalLeads,
-                leadsPagination,
-                setLeadsPagination,
-                "leads"
-              )}
-            </div>
-          </Card.Body>
-        </Card>
+        {/* Leads Table with GenericTable Component */}
+         
+        <GenericTable
+          data={filteredLeads}
+          columns={leadsColumns}
+          actions={leadsActions}
+          pagination={{
+            currentPage: leadsPagination.currentPage,
+            rowsPerPage: leadsPagination.rowsPerPage,
+            totalRows: totalLeads,
+            pageSizeOptions: [10, 25, 50, 100]
+          }}
+          onPaginationChange={(page, rowsPerPage) => {
+            setLeadsPagination({
+              ...leadsPagination,
+              currentPage: page,
+              rowsPerPage
+            });
+          }}
+          sortable={true}
+          defaultSortColumn={leadsPagination.sortColumn}
+          defaultSortDirection={leadsPagination.sortDirection}
+          customizableColumns={true}
+          defaultSelectedColumns={[
+            'name', 'company', 'email', 'phone', 'stage',
+            'leadPotential', 'followUps', 'assignedUser', 'created'
+          ]}
+          columnStorageKey="leadsSelectedColumns"
+          onColumnChange={(cols) => setSelectedLeadsColumns(cols)}
+          onRowDoubleClick={(lead) => {
+            if (session?.user?.permissions?.includes("list-crm-leads")) {
+              handleViewLead(lead.rawData?.id || lead.id);
+            }
+          }}
+          loading={loading}
+          emptyMessage="No leads found matching your criteria"
+          loadingMessage="Loading..."
+          hover={true}
+          uniqueKey="id"
+        />
       </div>
 
       {/* Delete Lead Modal */}
