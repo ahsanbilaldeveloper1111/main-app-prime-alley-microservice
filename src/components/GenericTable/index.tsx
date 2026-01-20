@@ -20,7 +20,7 @@ export interface TableColumn<T = any> {
   align?: 'left' | 'center' | 'right';
   
   // Data rendering types
-  type?: 'text' | 'badge' | 'avatar' | 'multi-field' | 'date' | 'custom';
+  type?: 'text' | 'badge' | 'avatar' | 'multi-field' | 'date' | 'phone' | 'custom';
   
   // For custom rendering (fallback)
   render?: (row: T, index: number) => React.ReactNode;
@@ -33,15 +33,15 @@ export interface TableColumn<T = any> {
   
   // For badge type
   badge?: {
-    getVariant?: (row: T) => 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'info' | 'light' | 'dark';
-    getColor?: (row: T) => string; // For custom color (overrides variant)
+    getVariant?: (row: T) => 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'info';
+    getColor?: (row: T) => string; // For custom color
   };
   
   // For multi-field type
   fields?: {
-    primary: string;
-    secondary?: string;
-    secondaryClass?: string;
+    primary: string; // Key for primary field
+    secondary?: string; // Key for secondary field
+    secondaryClass?: string; // CSS class for secondary
   };
   
   // For date formatting
@@ -54,13 +54,31 @@ export interface TableColumn<T = any> {
   accessor?: (row: T) => any;
 }
 
-export interface TableAction<T = any> {
+export interface DropdownOption<T = any> {
   label: string;
   icon?: React.ReactNode;
   onClick: (row: T) => void;
-  variant?: string;
   show?: (row: T) => boolean;
-  render?: (row: T) => React.ReactNode;
+  className?: string;
+  divider?: boolean; // Add divider after this option
+}
+
+export interface TableAction<T = any> {
+  label: string;
+  icon?: React.ReactNode;
+  onClick?: (row: T) => void;
+  variant?: string;
+  className?: string;
+  show?: (row: T) => boolean;
+  render?: (row: T) => React.ReactNode; // For custom action rendering like dropdowns
+  
+  // Dropdown configuration
+  dropdown?: {
+    options: DropdownOption<T>[];
+    align?: 'start' | 'end';
+    toggleVariant?: string;
+    toggleClassName?: string;
+  };
 }
 
 export interface PaginationConfig {
@@ -74,12 +92,6 @@ export interface GenericTableProps<T = any> {
   // Data
   data: T[];
   columns: TableColumn<T>[];
-  
-  // Selection
-  selectable?: boolean;
-  selectedRows?: any[];
-  onSelectionChange?: (selectedRows: any[]) => void;
-  selectKey?: string; // Key to use for selection (default: 'id')
   
   // Pagination
   pagination?: PaginationConfig;
@@ -95,6 +107,11 @@ export interface GenericTableProps<T = any> {
   actions?: TableAction<T>[];
   showActions?: boolean;
   actionsLabel?: string;
+  
+  // Selection
+  selectable?: boolean;
+  selectedRows?: T[];
+  onSelectionChange?: (selected: T[]) => void;
   
   // Column customization
   customizableColumns?: boolean;
@@ -119,16 +136,12 @@ export interface GenericTableProps<T = any> {
   loadingMessage?: string | React.ReactNode;
   
   // Misc
-  uniqueKey?: string;
+  uniqueKey?: string; // Key to use for row key (default: 'id')
 }
 
 const GenericTable = <T extends Record<string, any>>({
   data,
   columns,
-  selectable = false,
-  selectedRows = [],
-  onSelectionChange,
-  selectKey = 'id',
   pagination,
   onPaginationChange,
   sortable = true,
@@ -138,6 +151,9 @@ const GenericTable = <T extends Record<string, any>>({
   actions = [],
   showActions = true,
   actionsLabel = 'Actions',
+  selectable = false,
+  selectedRows = [],
+  onSelectionChange,
   customizableColumns = false,
   defaultSelectedColumns,
   onColumnChange,
@@ -162,22 +178,33 @@ const GenericTable = <T extends Record<string, any>>({
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
     if (columnStorageKey && typeof window !== 'undefined') {
       const saved = localStorage.getItem(columnStorageKey);
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch {
-          return defaultSelectedColumns || columns.map(c => c.key);
-        }
-      }
+      if (saved) return JSON.parse(saved);
     }
     return defaultSelectedColumns || columns.map(c => c.key);
   });
 
-  // Selection state
-  const [internalSelectedRows, setInternalSelectedRows] = useState<any[]>(selectedRows);
+  // Check if a row is selected
+  const isSelected = (row: T) => {
+    return selectedRows.some(selectedRow => selectedRow[uniqueKey] === row[uniqueKey]);
+  };
 
-  // Use controlled or uncontrolled selection
-  const currentSelectedRows = onSelectionChange ? selectedRows : internalSelectedRows;
+  // Handle select all
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      onSelectionChange?.(sortedData);
+    } else {
+      onSelectionChange?.([]);
+    }
+  };
+
+  // Handle individual row selection
+  const handleRowSelection = (row: T, checked: boolean) => {
+    if (checked) {
+      onSelectionChange?.([...selectedRows, row]);
+    } else {
+      onSelectionChange?.(selectedRows.filter(r => r[uniqueKey] !== row[uniqueKey]));
+    }
+  };
 
   // Filter visible columns
   const visibleColumns = useMemo(() => {
@@ -198,59 +225,6 @@ const GenericTable = <T extends Record<string, any>>({
     }
   };
 
-  // Handle row selection
-  const handleSelectRow = (row: T) => {
-    if (!selectable) return;
-    
-    const rowId = row[selectKey];
-    const isSelected = currentSelectedRows.some((r: any) => r[selectKey] === rowId);
-    
-    let newSelection: any[];
-    if (isSelected) {
-      newSelection = currentSelectedRows.filter((r: any) => r[selectKey] !== rowId);
-    } else {
-      newSelection = [...currentSelectedRows, row];
-    }
-    
-    if (onSelectionChange) {
-      onSelectionChange(newSelection);
-    } else {
-      setInternalSelectedRows(newSelection);
-    }
-  };
-
-  // Handle select all
-  const handleSelectAll = () => {
-    if (!selectable) return;
-    
-    const allSelected = sortedData.every(row => 
-      currentSelectedRows.some((r: any) => r[selectKey] === row[selectKey])
-    );
-    
-    let newSelection: any[];
-    if (allSelected) {
-      newSelection = [];
-    } else {
-      newSelection = [...sortedData];
-    }
-    
-    if (onSelectionChange) {
-      onSelectionChange(newSelection);
-    } else {
-      setInternalSelectedRows(newSelection);
-    }
-  };
-
-  // Check if row is selected
-  const isRowSelected = (row: T) => {
-    return currentSelectedRows.some((r: any) => r[selectKey] === row[selectKey]);
-  };
-
-  // Check if all rows are selected
-  const areAllRowsSelected = () => {
-    return sortedData.length > 0 && sortedData.every(row => isRowSelected(row));
-  };
-
   // Render cell content based on column type
   const renderCellContent = (column: TableColumn<T>, row: T, index: number) => {
     // Custom render function takes precedence
@@ -260,14 +234,7 @@ const GenericTable = <T extends Record<string, any>>({
 
     // Get value using accessor or key
     const getValue = () => {
-      if (column.accessor) {
-        try {
-          return column.accessor(row);
-        } catch (error) {
-          console.warn(`Error in accessor for column ${column.key}:`, error);
-          return null;
-        }
-      }
+      if (column.accessor) return column.accessor(row);
       return row[column.key];
     };
 
@@ -280,28 +247,10 @@ const GenericTable = <T extends Record<string, any>>({
 
     // Render based on type
     switch (column.type) {
-      case 'avatar': {
+      case 'avatar':
         const name = String(value);
-        let initials = name.substring(0, 2).toUpperCase();
-        let bgColor = '#6c757d';
-        
-        // Safely get initials if avatar config exists
-        if (column.avatar?.getInitials) {
-          try {
-            initials = column.avatar.getInitials(row);
-          } catch (error) {
-            console.warn(`Error getting initials for ${column.key}:`, error);
-          }
-        }
-        
-        // Safely get color if avatar config exists
-        if (column.avatar?.getColor) {
-          try {
-            bgColor = column.avatar.getColor(row);
-          } catch (error) {
-            console.warn(`Error getting color for ${column.key}:`, error);
-          }
-        }
+        const initials = column.avatar?.getInitials?.(row) || name.substring(0, 2).toUpperCase();
+        const bgColor = column.avatar?.getColor?.(row) || '#6c757d';
         
         return (
           <div className="gt-name-cell">
@@ -311,47 +260,30 @@ const GenericTable = <T extends Record<string, any>>({
             <span className="gt-name-text">{name}</span>
           </div>
         );
-      }
 
-      case 'badge': {
-        let badgeClass = 'gt-badge gt-badge-secondary';
-        let customStyle: React.CSSProperties | undefined = undefined;
-        
-        // Get variant or color
-        if (column.badge?.getColor) {
-          try {
-            const color = column.badge.getColor(row);
-            if (color) {
-              customStyle = { backgroundColor: color };
-            }
-          } catch (error) {
-            console.warn(`Error getting badge color for ${column.key}:`, error);
-          }
-        } else if (column.badge?.getVariant) {
-          try {
-            const variant = column.badge.getVariant(row);
-            badgeClass = `gt-badge gt-badge-${variant}`;
-          } catch (error) {
-            console.warn(`Error getting badge variant for ${column.key}:`, error);
-          }
-        }
+      case 'badge':
+        const badgeVariant = column.badge?.getVariant?.(row) || 'secondary';
+        const badgeColor = column.badge?.getColor?.(row);
+        const badgeClass = `gt-badge gt-badge-${badgeVariant}`;
         
         return (
-          <span className={badgeClass} style={customStyle}>
+          <span 
+            className={badgeClass} 
+            style={badgeColor ? { backgroundColor: badgeColor } : undefined}
+          >
             {value}
           </span>
         );
-      }
 
-      case 'multi-field': {
+      case 'multi-field':
         if (!column.fields) return value;
         
-        const primaryValue = row[column.fields.primary] || column.emptyValue || '-';
+        const primaryValue = row[column.fields.primary];
         const secondaryValue = column.fields.secondary ? row[column.fields.secondary] : null;
         
         return (
           <div className="gt-company-cell">
-            <div className="gt-company-name">{primaryValue}</div>
+            <div className="gt-company-name">{primaryValue || column.emptyValue || '-'}</div>
             {secondaryValue && (
               <div className={column.fields.secondaryClass || 'gt-company-industry'}>
                 {secondaryValue}
@@ -359,11 +291,16 @@ const GenericTable = <T extends Record<string, any>>({
             )}
           </div>
         );
-      }
+
+      case 'phone':
+        // Phone component should be passed via render function
+        return value;
 
       case 'date':
+        // Date formatting handled by accessor function
+        return value;
+
       case 'text':
-      case 'custom':
       default:
         return value;
     }
@@ -507,8 +444,6 @@ const GenericTable = <T extends Record<string, any>>({
     );
   };
 
-  const hasActions = showActions && actions && actions.length > 0;
-
   return (
     <div className="generic-table-container">
       {/* Column Customization */}
@@ -565,17 +500,15 @@ const GenericTable = <T extends Record<string, any>>({
             >
               <thead className="generic-table-header">
                 <tr>
-                  {/* Selection checkbox column */}
                   {selectable && (
-                    <th className="generic-table-th" style={{ width: 'auto' }}>
+                    <th className="generic-table-th" style={{ width: '40px' }}>
                       <Form.Check
                         type="checkbox"
-                        checked={areAllRowsSelected()}
+                        checked={sortedData.length > 0 && sortedData.every(row => isSelected(row))}
                         onChange={handleSelectAll}
                       />
                     </th>
                   )}
-                  
                   {visibleColumns.map((col) => (
                     <th
                       key={col.key}
@@ -589,8 +522,7 @@ const GenericTable = <T extends Record<string, any>>({
                       </div>
                     </th>
                   ))}
-                  
-                  {hasActions && (
+                  {showActions && actions.length > 0 && (
                     <th className="generic-table-th generic-table-actions-header">
                       {actionsLabel}
                     </th>
@@ -600,7 +532,7 @@ const GenericTable = <T extends Record<string, any>>({
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={visibleColumns.length + (selectable ? 1 : 0) + (hasActions ? 1 : 0)} className="text-center py-4">
+                    <td colSpan={(selectable ? 1 : 0) + visibleColumns.length + (showActions && actions.length > 0 ? 1 : 0)} className="text-center py-4">
                       <div className="generic-table-loading">
                         {loadingMessage}
                       </div>
@@ -608,7 +540,7 @@ const GenericTable = <T extends Record<string, any>>({
                   </tr>
                 ) : sortedData.length === 0 ? (
                   <tr>
-                    <td colSpan={visibleColumns.length + (selectable ? 1 : 0) + (hasActions ? 1 : 0)} className="text-center py-4">
+                    <td colSpan={(selectable ? 1 : 0) + visibleColumns.length + (showActions && actions.length > 0 ? 1 : 0)} className="text-center py-4">
                       <div className="generic-table-empty">
                         {emptyMessage}
                       </div>
@@ -620,19 +552,20 @@ const GenericTable = <T extends Record<string, any>>({
                       key={row[uniqueKey] || index}
                       onClick={() => onRowClick?.(row, index)}
                       onDoubleClick={() => onRowDoubleClick?.(row, index)}
-                      className={`generic-table-row ${rowClassName?.(row, index) || ''} ${onRowClick || onRowDoubleClick ? 'clickable' : ''} ${isRowSelected(row) ? 'selected' : ''}`}
+                      className={`generic-table-row ${rowClassName?.(row, index) || ''} ${onRowClick || onRowDoubleClick ? 'clickable' : ''}`}
                     >
-                      {/* Selection checkbox cell */}
                       {selectable && (
-                        <td className="generic-table-td" onClick={(e) => e.stopPropagation()}>
+                        <td className="generic-table-td" style={{ width: '40px' }}>
                           <Form.Check
                             type="checkbox"
-                            checked={isRowSelected(row)}
-                            onChange={() => handleSelectRow(row)}
+                            checked={isSelected(row)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleRowSelection(row, e.target.checked);
+                            }}
                           />
                         </td>
                       )}
-                      
                       {visibleColumns.map((col) => (
                         <td
                           key={col.key}
@@ -642,17 +575,65 @@ const GenericTable = <T extends Record<string, any>>({
                           {renderCellContent(col, row, index)}
                         </td>
                       ))}
-                      
-                      {hasActions && (
+                      {showActions && actions.length > 0 && (
                         <td className="generic-table-td generic-table-actions-cell">
                           <div className="generic-table-actions">
                             {actions.map((action, actionIndex) => {
-                              // Check if action should be shown
                               if (action.show && !action.show(row)) return null;
                               
                               // If action has custom render (for dropdowns, etc.)
                               if (action.render) {
                                 return <div key={actionIndex}>{action.render(row)}</div>;
+                              }
+                              
+                              // If action has dropdown configuration
+                              if (action.dropdown) {
+                                const visibleOptions = action.dropdown.options.filter(
+                                  option => !option.show || option.show(row)
+                                );
+                                
+                                if (visibleOptions.length === 0) return null;
+                                
+                                return (
+                                  <Dropdown key={actionIndex} drop="down" align="end">
+                                    <Dropdown.Toggle
+                                      variant={action.variant || 'link'}
+                                      size="sm"
+                                      className={action.className || ''}
+                                      id={`dropdown-${row[uniqueKey]}-${actionIndex}`}
+                                    >
+                                      {action.icon}
+                                    </Dropdown.Toggle>
+                                    <Dropdown.Menu>
+                                      {visibleOptions.map((option, optionIndex) => {
+                                        const menuItem = (
+                                          <Dropdown.Item
+                                            key={optionIndex}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              option.onClick(row);
+                                            }}
+                                            className={option.className}
+                                          >
+                                            {option.icon && <span className="me-2">{option.icon}</span>}
+                                            {option.label}
+                                          </Dropdown.Item>
+                                        );
+                                        
+                                        if (option.divider) {
+                                          return (
+                                            <React.Fragment key={optionIndex}>
+                                              {menuItem}
+                                              <Dropdown.Divider />
+                                            </React.Fragment>
+                                          );
+                                        }
+                                        
+                                        return menuItem;
+                                      })}
+                                    </Dropdown.Menu>
+                                  </Dropdown>
+                                );
                               }
                               
                               return (
@@ -662,9 +643,9 @@ const GenericTable = <T extends Record<string, any>>({
                                   size="sm"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    action.onClick(row);
+                                    action.onClick?.(row);
                                   }}
-                                  className="p-1"
+                                  className={`p-1 ${action.className || ''}`}
                                   title={action.label}
                                 >
                                   {action.icon || action.label}

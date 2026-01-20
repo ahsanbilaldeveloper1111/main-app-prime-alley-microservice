@@ -64,7 +64,6 @@ import {
   ArrowDown,
   Download,
   CheckSquare,
-  Layers,
   ArrowUpDown,
   ChevronsLeft,
   ChevronsRight,
@@ -643,23 +642,19 @@ const CrmProspectsManagement = () => {
   });
 
   // Column customization and pagination states
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem("crmDataSelectedColumns");
-    return saved
-      ? JSON.parse(saved)
-      : [
-          "name",
-          "phone",
-          "source",
-          "user_extension",
-          "campaign",
-          "last_called_at",
-          "last_call_end_reason",
-          "disposition",
-          "scheduled_call_at",
-          "tags",
-        ];
-  });
+  const defaultSelectedColumns = [
+    "name",
+    "phone",
+    "source_file",
+    "user_extension",
+    "campaign",
+    "last_called_at",
+    "last_call_end_reason",
+    "disposition",
+    "scheduled_call_at",
+    "tags",
+  ];
+
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
@@ -1310,14 +1305,6 @@ const CrmProspectsManagement = () => {
   useEffect(() => {
     fetchCrmData();
   }, [fetchCrmData, refreshKey]);
-
-  // Save selected columns to localStorage
-  useEffect(() => {
-    localStorage.setItem(
-      "crmDataSelectedColumns",
-      JSON.stringify(selectedColumns)
-    );
-  }, [selectedColumns]);
 
   // CSV validation function
   const validateCsvFile = (
@@ -2245,58 +2232,62 @@ const CrmProspectsManagement = () => {
       ...(session?.user?.permissions?.includes('view-crm-data-management') ? [{
         label: 'View',
         icon: <Eye size={16} />,
-        onClick: (row: any) => handleViewData(row)
+        onClick: (row: any) => handleViewData(row),
+        variant: 'link' as const
       }] : []),
       ...(session?.user?.permissions?.includes('call-service-crm-data-management') ? [{
         label: 'Call',
         icon: <PhoneIcon size={16} />,
-        onClick: (row: any) => handleCallClick(row)
+        onClick: (row: any) => handleCallClick(row),
+        variant: 'link' as const,
+        className: 'text-success'
       }] : []),
       ...(activeFilter !== 'has_leads' ? [{
         label: 'More Actions',
         icon: <MoreVertical size={16} />,
-        onClick: () => {},
-        render: (row: any) => (
-          <Dropdown className="d-inline">
-            <Dropdown.Toggle as={Button} variant="link" size="sm" className="p-1" title="More Actions">
-              <MoreVertical size={16} />
-            </Dropdown.Toggle>
-            <Dropdown.Menu align="end">
-              {session?.user?.permissions?.includes('call-service-crm-data-management') && (
-                <>
-                  {row.scheduled_call_at ? (
-                    <>
-                      <Dropdown.Item onClick={() => handleScheduleCall(row)}>
-                        <FiCalendar size={14} className="me-2" />
-                        Edit Scheduled Call
-                      </Dropdown.Item>
-                      <Dropdown.Item onClick={() => handleUnscheduleCallClick(row)} className="text-danger">
-                        <FiX size={14} className="me-2" />
-                        Unschedule Call
-                      </Dropdown.Item>
-                    </>
-                  ) : (
-                    <Dropdown.Item onClick={() => handleScheduleCall(row)}>
-                      <FiCalendar size={14} className="me-2" />
-                      Schedule Call
-                    </Dropdown.Item>
-                  )}
-                  <Dropdown.Divider />
-                </>
-              )}
-              <Dropdown.Item onClick={() => { window.location.href = `/crm/leads/create?crm_data_id=${row.id}`; }}>
-                <FiTarget size={14} className="me-2" />
-                Convert to Lead
-              </Dropdown.Item>
-              {row.email && (
-                <Dropdown.Item onClick={() => { window.location.href = `mailto:${row.email}`; }}>
-                  <Mail size={14} className="me-2" />
-                  Send Email
-                </Dropdown.Item>
-              )}
-            </Dropdown.Menu>
-          </Dropdown>
-        )
+        variant: 'link' as const,
+        dropdown: {
+          align: 'end' as const,
+          options: [
+            ...(session?.user?.permissions?.includes('call-service-crm-data-management') ? [
+              {
+                label: 'Schedule Call',
+                icon: <FiCalendar size={14} />,
+                onClick: (row: any) => handleScheduleCall(row),
+                show: (row: any) => !row.scheduled_call_at
+              },
+              {
+                label: 'Edit Scheduled Call',
+                icon: <FiCalendar size={14} />,
+                onClick: (row: any) => handleScheduleCall(row),
+                show: (row: any) => !!row.scheduled_call_at
+              },
+              {
+                label: 'Unschedule Call',
+                icon: <FiX size={14} />,
+                onClick: (row: any) => handleUnscheduleCallClick(row),
+                className: 'text-danger',
+                show: (row: any) => !!row.scheduled_call_at,
+                divider: true
+              }
+            ] : []),
+            {
+              label: 'Convert to Lead',
+              icon: <FiTarget size={14} />,
+              onClick: (row: any) => {
+                window.location.href = `/crm/leads/create?crm_data_id=${row.id}`;
+              }
+            },
+            {
+              label: 'Send Email',
+              icon: <Mail size={14} />,
+              onClick: (row: any) => {
+                window.location.href = `mailto:${row.email}`;
+              },
+              show: (row: any) => !!row.email
+            }
+          ]
+        }
       }] : [])
     ],
     [session, activeFilter, handleViewData, handleCallClick, handleScheduleCall, handleUnscheduleCallClick]
@@ -3224,13 +3215,12 @@ const CrmProspectsManagement = () => {
             </Card>
           )}
 
-        {/* Bulk Actions and Column Customization */}
-        <div className="d-flex justify-content-end gap-2 mb-3">
-          {/* Bulk Actions Dropdown - Only show when items are selected and user has delete permission */}
-          {selectedItems.length > 0 &&
-            session?.user?.permissions?.includes(
-              "delete-crm-data-management"
-            ) && (
+        {/* Bulk Actions */}
+        {selectedItems.length > 0 &&
+          session?.user?.permissions?.includes(
+            "delete-crm-data-management"
+          ) && (
+            <div className="d-flex justify-content-end gap-2 mb-3">
               <Dropdown>
                 <Dropdown.Toggle variant="outline-primary" size="sm">
                   <CheckSquare size={16} className="me-2" />
@@ -3246,98 +3236,21 @@ const CrmProspectsManagement = () => {
                   </Dropdown.Item>
                 </Dropdown.Menu>
               </Dropdown>
-            )}
-
-          {/* Column Customization */}
-          <Dropdown>
-            <Dropdown.Toggle variant="outline-secondary" size="sm">
-              <Layers size={16} className="me-2" />
-              Customize Table
-            </Dropdown.Toggle>
-            <Dropdown.Menu
-              align="end"
-              style={{ maxHeight: "300px", overflowY: "auto" }}
-            >
-              {[
-                { key: "name", label: "Name" },
-                { key: "phone", label: "Phone" },
-                { key: "source", label: "Source" },
-                { key: "user_extension", label: "Assigned To" },
-                { key: "campaign", label: "Campaign" },
-                { key: "last_called_at", label: "Last Called" },
-                { key: "last_call_end_reason", label: "Last Call Status" },
-                { key: "disposition", label: "Disposition" },
-                { key: "scheduled_call_at", label: "Next Call Scheduled" },
-                { key: "tags", label: "Tags" },
-              ].map((col) => (
-                <Dropdown.Item key={col.key} as="div">
-                  <Form.Check
-                    type="checkbox"
-                    label={col.label}
-                    checked={selectedColumns.includes(col.key)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedColumns([...selectedColumns, col.key]);
-                      } else {
-                        setSelectedColumns(
-                          selectedColumns.filter((c) => c !== col.key)
-                        );
-                      }
-                    }}
-                  />
-                </Dropdown.Item>
-              ))}
-              <Dropdown.Divider />
-              <Dropdown.Item
-                onClick={() =>
-                  setSelectedColumns([
-                    "name",
-                    "phone",
-                    "source",
-                    "user_extension",
-                    "campaign",
-                    "last_called_at",
-                    "last_call_end_reason",
-                    "disposition",
-                    "scheduled_call_at",
-                    "tags",
-                  ])
-                }
-              >
-                Select All
-              </Dropdown.Item>
-              <Dropdown.Item
-                onClick={() =>
-                  setSelectedColumns([
-                    "name",
-                    "phone",
-                    "source",
-                    "user_extension",
-                    "campaign",
-                    "last_called_at",
-                    "last_call_end_reason",
-                    "disposition",
-                    "scheduled_call_at",
-                    "tags",
-                  ])
-                }
-              >
-                Reset to Default
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
-        </div>
+            </div>
+          )}
 
         {/* Prospects Table */}
         {session?.user?.permissions?.includes("list-crm-data-management") && (
           <GenericTable
             data={dataList}
-            columns={prospectsColumns.filter(col => selectedColumns.includes(col.key))}
+            columns={prospectsColumns}
             actions={prospectsActions}
             selectable={session?.user?.permissions?.includes("delete-crm-data-management")}
             selectedRows={dataList.filter(item => selectedItems.includes(item.id))}
             onSelectionChange={(selected) => setSelectedItems(selected.map(item => item.id))}
-            selectKey="id"
+            customizableColumns={true}
+            defaultSelectedColumns={defaultSelectedColumns}
+            columnStorageKey="crmDataSelectedColumns"
             pagination={{
               currentPage: pagination.currentPage,
               rowsPerPage: pagination.rowsPerPage,
