@@ -44,6 +44,7 @@ import {
   deleteMeeting,
   markDealLost,
   getLead,
+  createApproval,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -106,6 +107,7 @@ import {
   Download as DownloadIcon,
   AlertCircle,
   RotateCcw,
+  ClipboardCheck,
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -1203,6 +1205,20 @@ const CrmDeals = () => {
     } catch (error) {
       console.error("Failed to restore deal:", error);
       toast.error("Failed to restore deal");
+    }
+  }, []);
+
+  // Create Approval Handler
+  const handleCreateApproval = useCallback(async (dealId: number) => {
+    try {
+      await createApproval({
+        item_id: dealId,
+        type: 'deal'
+      });
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to create approval:", error);
+      toast.error("Failed to create approval request");
     }
   }, []);
 
@@ -2365,6 +2381,12 @@ const CrmDeals = () => {
                                       <MoreVertical size={16} />
                                     </Dropdown.Toggle>
                                     <Dropdown.Menu align="end">
+                                        <Dropdown.Item 
+                                          onClick={() => handleCreateApproval(deal.rawData?.id || deal.id)}
+                                        >
+                                          <ClipboardCheck size={14} className="me-2" />
+                                          Create Approval
+                                        </Dropdown.Item>
                                         <Dropdown.Item 
                                           className="text-danger"
                                           onClick={() => handleMarkLost(deal.rawData || deal)}

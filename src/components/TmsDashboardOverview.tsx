@@ -206,7 +206,7 @@ const TmsDashboardOverview = React.memo(() => {
             const data = await GetListCompanies();
            
             if (Array.isArray(data) && data.length > 0) {
-                console.log("Setting companies:", data);
+               
                 setListCompanies(data);
             } else {
                 console.warn("No companies data received or empty array");

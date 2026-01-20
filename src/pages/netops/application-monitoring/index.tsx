@@ -10,7 +10,9 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { getSystemMetrics, getSystemMetricsServers, SystemMetric, ServerMetricsListResponse } from "@utils/netops";
 import { Container, Row, Col, Card, Badge, Dropdown, Form, Table } from 'react-bootstrap';
 import { 
   Server, 
@@ -30,48 +32,217 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 
 const ApplicationMonitoring = () => {
+      const router = useRouter();
+      const { server } = router.query;
 
       const [autoRefresh, setAutoRefresh] = useState(true);
-      const [selectedServer, setSelectedServer] = useState({
-        name: 'unifiedops-proxy',
-        ip: '10.80.50.245'
-      });
-      const [selectedEnvironment, setSelectedEnvironment] = useState('Production');
       const [showPackages, setShowPackages] = useState(false);
+      const [systemMetrics, setSystemMetrics] = useState<SystemMetric | null>(null);
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState<string | null>(null);
+      const [servers, setServers] = useState<Array<{ name: string; ip: string }>>([]);
+      const [loadingServers, setLoadingServers] = useState(false);
+      const [showDropdown, setShowDropdown] = useState(false);
+      
+      // Helper function to format uptime
+      const formatUptime = (seconds: number): string => {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        return `${days} days, ${hours}h ${minutes}m`;
+      };
+      
+      // Helper function to get network IP
+      const getNetworkIp = (): string => {
+        if (!systemMetrics?.network) return 'N/A';
+        const mainInterface = systemMetrics.network.find(n => n.interface !== 'lo' && n.is_up);
+        return mainInterface?.ip || systemMetrics.network[0]?.ip || 'N/A';
+      };
+      
+      // Helper function to get system alerts based on metrics
+      const getSystemAlerts = (): Array<{ type: 'warning' | 'danger' | 'info'; message: string; icon: React.ReactNode }> => {
+        if (!systemMetrics) return [];
+        
+        const alerts: Array<{ type: 'warning' | 'danger' | 'info'; message: string; icon: React.ReactNode }> = [];
+        
+        // Check CPU usage
+        if (systemMetrics.cpu.used_percent > 90) {
+          alerts.push({
+            type: 'danger',
+            message: `Critical CPU usage: ${systemMetrics.cpu.used_percent.toFixed(1)}%`,
+            icon: <Cpu size={20} />
+          });
+        } else if (systemMetrics.cpu.used_percent > 80) {
+          alerts.push({
+            type: 'warning',
+            message: `High CPU usage: ${systemMetrics.cpu.used_percent.toFixed(1)}%`,
+            icon: <Cpu size={20} />
+          });
+        }
+        
+        // Check Memory usage
+        if (systemMetrics.memory.used_percent > 90) {
+          alerts.push({
+            type: 'danger',
+            message: `Critical memory usage: ${systemMetrics.memory.used_percent.toFixed(1)}%`,
+            icon: <Activity size={20} />
+          });
+        } else if (systemMetrics.memory.used_percent > 80) {
+          alerts.push({
+            type: 'warning',
+            message: `High memory usage: ${systemMetrics.memory.used_percent.toFixed(1)}%`,
+            icon: <Activity size={20} />
+          });
+        }
+        
+        // Check Disk usage
+        if (systemMetrics.disk.used_percent > 90) {
+          alerts.push({
+            type: 'danger',
+            message: `Critical disk usage: ${systemMetrics.disk.used_percent.toFixed(1)}%`,
+            icon: <HardDrive size={20} />
+          });
+        } else if (systemMetrics.disk.used_percent > 80) {
+          alerts.push({
+            type: 'warning',
+            message: `High disk usage: ${systemMetrics.disk.used_percent.toFixed(1)}%`,
+            icon: <HardDrive size={20} />
+          });
+        }
+        
+        // Check failed services
+        if (systemMetrics.failed_services && systemMetrics.failed_services.length > 0) {
+          alerts.push({
+            type: 'danger',
+            message: `${systemMetrics.failed_services.length} service(s) failed: ${systemMetrics.failed_services.join(', ')}`,
+            icon: <XCircle size={20} />
+          });
+        }
+        
+        // Check journal errors
+        if (systemMetrics.journal_errors && systemMetrics.journal_errors.length > 0) {
+          alerts.push({
+            type: 'warning',
+            message: `${systemMetrics.journal_errors.length} journal error(s) detected`,
+            icon: <AlertCircle size={20} />
+          });
+        }
+        
+        // Check swap usage if high
+        if (systemMetrics.swap && systemMetrics.swap.used_percent > 50) {
+          alerts.push({
+            type: 'warning',
+            message: `High swap usage: ${systemMetrics.swap.used_percent.toFixed(1)}%`,
+            icon: <Activity size={20} />
+          });
+        }
+        
+        return alerts;
+      };
+      
+      const [selectedServer, setSelectedServer] = useState<{ name: string; ip: string }>({
+        name: (server as string) || '',
+        ip: 'N/A'
+      });
+      
+      // Update selectedServer when server query param changes
+      useEffect(() => {
+        if (server && typeof server === 'string') {
+          setSelectedServer(prev => ({
+            ...prev,
+            name: server
+          }));
+        }
+      }, [server]);
+      
+      // Update IP when metrics are loaded
+      useEffect(() => {
+        if (systemMetrics) {
+          const ip = getNetworkIp();
+          setSelectedServer(prev => ({
+            ...prev,
+            ip: ip !== 'N/A' ? ip : prev.ip
+          }));
+        }
+      }, [systemMetrics]);
+      
+      // Fetch system metrics when server name is available (from query param or selectedServer)
+      useEffect(() => {
+        const serverName = (server as string) || selectedServer.name;
+        const fetchSystemMetrics = async () => {
+          if (serverName) {
+            setLoading(true);
+            setError(null);
+            try {
+              const response = await getSystemMetrics(serverName);
+              console.log('System Metrics Response:', response);
+              // The response is already extracted by extractData, so it should be SystemMetric
+              setSystemMetrics(response as any);
+            } catch (error: any) {
+              console.error('Error fetching system metrics:', error);
+              setError(error?.message || 'Failed to fetch system metrics');
+            } finally {
+              setLoading(false);
+            }
+          }
+        };
+        
+        if (serverName) {
+          fetchSystemMetrics();
+          
+          // Auto-refresh if enabled
+          if (autoRefresh) {
+            const interval = setInterval(() => {
+              fetchSystemMetrics();
+            }, 30000); // Refresh every 30 seconds
+            
+            return () => clearInterval(interval);
+          }
+        }
+      }, [server, selectedServer.name, autoRefresh]);
     
-      // Server options
-      const servers = [
-        { name: 'unifiedops-proxy', ip: '10.80.50.245' },
-        { name: 'unifiedops-web-01', ip: '10.80.50.246' },
-        { name: 'unifiedops-api-01', ip: '10.80.50.247' },
-        { name: 'unifiedops-db-01', ip: '10.80.50.248' },
-        { name: 'unifiedops-cache-01', ip: '10.80.50.249' },
-      ];
+      // Fetch servers list on component mount
+      useEffect(() => {
+        const fetchServers = async () => {
+          setLoadingServers(true);
+          try {
+            const response: ServerMetricsListResponse = await getSystemMetricsServers();
+            
+            // Transform the response to match the expected format
+            // The extractData function already extracts response.data.data, so response should have servers and count at top level
+            if (response?.servers && Array.isArray(response.servers)) {
+              const serverList = response.servers.map(server => ({
+                name: server.hostname,
+                ip: server.ip_address || 'N/A'
+              }));
+              setServers(serverList);
+            } else {
+              console.warn('No servers found in response or invalid format:', response);
+              setServers([]);
+            }
+          } catch (error: any) {
+            console.error('Error fetching servers list:', error);
+            // Fallback to empty array on error
+            setServers([]);
+          } finally {
+            setLoadingServers(false);
+          }
+        };
+        
+        fetchServers();
+      }, []);
+
+      // Set default server when servers list is loaded and no server is selected
+      useEffect(() => {
+        if (servers.length > 0 && !selectedServer.name && !server) {
+          // If no query param and no selected server, set first server as default
+          setSelectedServer({
+            name: servers[0].name,
+            ip: servers[0].ip
+          });
+        }
+      }, [servers, server, selectedServer.name]);
     
-      // Environment options
-      const environments = ['Production', 'Staging', 'Development', 'Testing', 'UAT'];
-    
-      // Sample data for charts
-      const cpuMemoryData = [
-        { time: '00:00', cpu: 8, memory: 75 },
-        { time: '00:05', cpu: 12, memory: 78 },
-        { time: '00:10', cpu: 7, memory: 82 },
-        { time: '00:15', cpu: 10, memory: 85 },
-        { time: '00:20', cpu: 9, memory: 87 },
-        { time: '00:25', cpu: 11, memory: 88 },
-      ];
-    
-      const cpuSparklineData = [
-        { value: 8 }, { value: 9 }, { value: 12 }, { value: 10 }, { value: 8 }, { value: 10 }, { value: 9 }
-      ];
-    
-      const diskSparklineData = [
-        { value: 7.5 }, { value: 7.8 }, { value: 7.9 }, { value: 8.1 }, { value: 8.0 }, { value: 7.9 }, { value: 8.0 }
-      ];
-    
-      const systemLoadData = [
-        { value: 0.10 }, { value: 0.12 }, { value: 0.14 }, { value: 0.13 }, { value: 0.15 }, { value: 0.14 }, { value: 0.15 }
-      ];
     
       const customStyles = `
       .table-responsive .table th:last-child, .table-responsive .table td:last-child {
@@ -276,7 +447,38 @@ const ApplicationMonitoring = () => {
 <>
       <style>{customStyles}</style>
       
-        {/* Header */}
+        {/* Error State */}
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            <AlertCircle size={20} className="me-2" />
+            {error}
+          </div>
+        )}
+      
+        {/* Loading Overlay - When switching servers */}
+        {loading && systemMetrics && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
+          }}>
+            <div className="text-center">
+              <div className="spinner-border text-primary" role="status" style={{ width: '3rem', height: '3rem' }}>
+                <span className="visually-hidden">Loading...</span>
+              </div>
+              <p className="mt-3 text-muted" style={{ fontSize: '1rem' }}>Loading system metrics...</p>
+            </div>
+          </div>
+        )}
+      
+        {/* Header - Always visible */}
         <div className="header-section">
           <div className="d-flex justify-content-between align-items-center mb-3">
             <div>
@@ -286,8 +488,27 @@ const ApplicationMonitoring = () => {
               </p>
             </div>
             <div className="d-flex gap-2 align-items-center">
-              <button className="btn btn-sm btn-outline-primary d-flex align-items-center gap-2">
-                <RefreshCw size={16} />
+              <button 
+                className="btn btn-sm btn-outline-primary d-flex align-items-center gap-2"
+                onClick={async () => {
+                  if (selectedServer.name) {
+                    setLoading(true);
+                    setError(null);
+                    try {
+                      const response = await getSystemMetrics(selectedServer.name);
+                      console.log('System Metrics Response:', response);
+                      setSystemMetrics(response as any);
+                    } catch (error: any) {
+                      console.error('Error fetching system metrics:', error);
+                      setError(error?.message || 'Failed to fetch system metrics');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }
+                }}
+                disabled={loading || !selectedServer.name}
+              >
+                <RefreshCw size={16} className={loading ? 'spinning' : ''} />
                 Refresh
               </button>
               <div className="d-flex align-items-center gap-2">
@@ -304,17 +525,74 @@ const ApplicationMonitoring = () => {
 
          <Row className="g-3">
             <Col md={3}>
-              <Dropdown>
-                <Dropdown.Toggle variant="light" className="w-100 text-start d-flex align-items-center gap-2" style={{ background: '#f1f5f9' }}>
+              <Dropdown show={showDropdown} onToggle={(isOpen) => setShowDropdown(isOpen)}>
+                <Dropdown.Toggle 
+                  variant="light" 
+                  className="w-100 text-start d-flex align-items-center gap-2" 
+                  style={{ background: '#f1f5f9' }}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <div className="spinner-border spinner-border-sm text-primary" role="status" style={{ width: '14px', height: '14px', borderWidth: '2px' }}>
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
+                      <span>Loading...</span>
+                    </>
+                  ) : (
+                    <>
                   <Server size={16} className="text-primary" />
-                  {selectedServer.name} - {selectedServer.ip}
+                      {selectedServer.name ? `${selectedServer.name} - ${selectedServer.ip}` : 'Select a server'}
+                    </>
+                  )}
                 </Dropdown.Toggle>
                 <Dropdown.Menu className="w-100">
-                  {servers.map((server, index) => (
-                    <Dropdown.Item 
-                      key={index}
-                      active={selectedServer.name === server.name}
-                      onClick={() => setSelectedServer(server)}
+                  {loadingServers ? (
+                    <Dropdown.Item disabled>
+                      <div className="d-flex align-items-center gap-2">
+                        <div className="spinner-border spinner-border-sm text-primary" role="status" style={{ width: '14px', height: '14px', borderWidth: '2px' }}>
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                        <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Loading servers...</span>
+                      </div>
+                    </Dropdown.Item>
+                  ) : servers.length > 0 ? (
+                    servers.map((server, index) => (
+                      <Dropdown.Item 
+                        key={index}
+                        active={selectedServer.name === server.name}
+                        onClick={async (e: React.MouseEvent<HTMLElement>) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // Close dropdown
+                        setShowDropdown(false);
+                        
+                        // Don't fetch if already selected
+                        if (selectedServer.name === server.name) {
+                          return;
+                        }
+                        
+                        // Update selected server immediately
+                        setSelectedServer({
+                          name: server.name,
+                          ip: server.ip
+                        });
+                        
+                        // Fetch metrics for the selected server
+                        setLoading(true);
+                        setError(null);
+                        try {
+                          const response = await getSystemMetrics(server.name);
+                          console.log('System Metrics Response for', server.name, ':', response);
+                          setSystemMetrics(response as any);
+                        } catch (error: any) {
+                          console.error('Error fetching system metrics:', error);
+                          setError(error?.message || 'Failed to fetch system metrics');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
                     >
                       <div className="d-flex align-items-center gap-2">
                         {/* <Server size={14} /> */}
@@ -324,48 +602,28 @@ const ApplicationMonitoring = () => {
                         </div>
                       </div>
                     </Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown>
-            </Col>
-            <Col md={2}>
-              <Dropdown>
-                <Dropdown.Toggle variant="light" className="w-100 text-start d-flex align-items-center gap-2" style={{ background: '#f1f5f9' }}>
-                  <Database size={16} className="text-primary" />
-                  {selectedEnvironment}
-                </Dropdown.Toggle>
-                <Dropdown.Menu className="w-100">
-                  {environments.map((env, index) => (
-                    <Dropdown.Item 
-                      key={index}
-                      active={selectedEnvironment === env}
-                      onClick={() => setSelectedEnvironment(env)}
-                    >
-                      <div className="d-flex align-items-center gap-2">
-                        {/* <Database size={14} /> */}
-                        <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>{env}</span>
-                      </div>
+                    ))
+                  ) : (
+                    <Dropdown.Item disabled>
+                      <div style={{ fontSize: '0.875rem', color: '#64748b' }}>No servers available</div>
                     </Dropdown.Item>
-                  ))}
+                  )}
                 </Dropdown.Menu>
               </Dropdown>
             </Col>
-            {/* <Col md={4}>
-              <Dropdown>
-                <Dropdown.Toggle variant="light" className="w-100 text-start" style={{ background: '#f1f5f9' }}>
-                  🕐 Last 24h
-                </Dropdown.Toggle>
-              </Dropdown>
-            </Col> */}
           </Row>
+        </div>
 
+        {/* Metrics Content - Only show when systemMetrics exists */}
+        {!loading && systemMetrics && (
+        <>
           <Row className="mt-3 g-3">
             <Col md={3}>
               <div className="info-item">
                 <Server size={16} className="text-primary" />
                 <div className="flex-grow-1">
                   <div className="info-label">Hostname</div>
-                  <div className="info-value">prod-server-01.domain.local</div>
+                  <div className="info-value">{systemMetrics?.host?.hostname || systemMetrics?.hostname || 'Loading...'}</div>
                 </div>
               </div>
             </Col>
@@ -374,7 +632,7 @@ const ApplicationMonitoring = () => {
                 <HardDrive size={16} className="text-success" />
                 <div className="flex-grow-1">
                   <div className="info-label">OS</div>
-                  <div className="info-value">Ubuntu 22.04.3 LTS x86_64</div>
+                  <div className="info-value">{systemMetrics?.host?.os || 'Loading...'}</div>
                 </div>
               </div>
             </Col>
@@ -383,7 +641,7 @@ const ApplicationMonitoring = () => {
                 <Cpu size={16} className="text-warning" />
                 <div className="flex-grow-1">
                   <div className="info-label">Kernel</div>
-                  <div className="info-value">Linux 5.15.0-89-generic</div>
+                  <div className="info-value">{systemMetrics?.host?.kernel || 'Loading...'}</div>
                 </div>
               </div>
             </Col>
@@ -392,12 +650,11 @@ const ApplicationMonitoring = () => {
                 <Activity size={16} className="text-info" />
                 <div className="flex-grow-1">
                   <div className="info-label">Uptime</div>
-                  <div className="info-value">15 days, 7h 32m</div>
+                  <div className="info-value">{systemMetrics?.uptime ? formatUptime(systemMetrics.uptime.seconds) : 'Loading...'}</div>
                 </div>
               </div>
             </Col>
           </Row>
-        </div>
 
         {/* Metrics Cards */}
         <Row className="g-3 mb-4">
@@ -407,8 +664,10 @@ const ApplicationMonitoring = () => {
                 <div className="d-flex justify-content-between align-items-start mb-3">
                   <div>
                     <div className="metric-label">CPU USAGE</div>
-                    <h1 className="metric-value" style={{ color: '#4c6ef5' }}>10<span style={{ fontSize: '1.5rem' }}>%</span></h1>
-                    <div className="metric-subtitle">4 Cores @ 2.5GHz</div>
+                    <h1 className="metric-value" style={{ color: '#4c6ef5' }}>
+                      {systemMetrics ? systemMetrics.cpu.used_percent.toFixed(1) : '0'}<span style={{ fontSize: '1.5rem' }}>%</span>
+                    </h1>
+                    <div className="metric-subtitle">{systemMetrics ? `${systemMetrics.cpu.cores} Cores` : 'Loading...'}</div>
                   </div>
                   <svg width="60" height="60">
                     <circle cx="30" cy="30" r="25" fill="none" stroke="#e0e7ff" strokeWidth="5"/>
@@ -417,7 +676,7 @@ const ApplicationMonitoring = () => {
                       fill="none" 
                       stroke="#4c6ef5" 
                       strokeWidth="5"
-                      strokeDasharray={`${10 * 1.57} ${100 * 1.57}`}
+                      strokeDasharray={systemMetrics ? `${systemMetrics.cpu.used_percent * 1.57} ${100 * 1.57}` : '0 157'}
                       className="progress-ring-circle"
                       style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
                     />
@@ -426,9 +685,11 @@ const ApplicationMonitoring = () => {
                 <div className="d-flex justify-content-between align-items-center">
                   <div className="d-flex align-items-center gap-1" style={{ color: '#4c6ef5', fontSize: '0.875rem' }}>
                     <Activity size={14} />
-                    <span>Avg Load: 0.15</span>
+                    <span>Avg Load: {systemMetrics ? systemMetrics.load['15m'].toFixed(2) : '0.00'}</span>
                   </div>
-                  <Badge bg="success" style={{ fontSize: '0.7rem' }}>Normal</Badge>
+                  <Badge bg={systemMetrics && systemMetrics.cpu.used_percent > 80 ? 'danger' : systemMetrics && systemMetrics.cpu.used_percent > 60 ? 'warning' : 'success'} style={{ fontSize: '0.7rem' }}>
+                    {systemMetrics && systemMetrics.cpu.used_percent > 80 ? 'High' : systemMetrics && systemMetrics.cpu.used_percent > 60 ? 'Warning' : 'Normal'}
+                  </Badge>
                 </div>
               </Card.Body>
             </Card>
@@ -440,8 +701,12 @@ const ApplicationMonitoring = () => {
                 <div className="d-flex justify-content-between align-items-start mb-3">
                   <div>
                     <div className="metric-label">MEMORY USAGE</div>
-                    <h1 className="metric-value" style={{ color: '#f03e3e' }}>88<span style={{ fontSize: '1.5rem' }}>%</span></h1>
-                    <div className="metric-subtitle">14.1 / 16.0 GB</div>
+                    <h1 className="metric-value" style={{ color: '#f03e3e' }}>
+                      {systemMetrics ? systemMetrics.memory.used_percent.toFixed(1) : '0'}<span style={{ fontSize: '1.5rem' }}>%</span>
+                    </h1>
+                    <div className="metric-subtitle">
+                      {systemMetrics ? `${systemMetrics.memory.used_gb.toFixed(1)} / ${systemMetrics.memory.total_gb.toFixed(1)} GB` : 'Loading...'}
+                    </div>
                   </div>
                   <svg width="60" height="60">
                     <circle cx="30" cy="30" r="25" fill="none" stroke="#ffe8e8" strokeWidth="5"/>
@@ -450,7 +715,7 @@ const ApplicationMonitoring = () => {
                       fill="none" 
                       stroke="#f03e3e" 
                       strokeWidth="5"
-                      strokeDasharray={`${88 * 1.57} ${100 * 1.57}`}
+                      strokeDasharray={systemMetrics ? `${systemMetrics.memory.used_percent * 1.57} ${100 * 1.57}` : '0 157'}
                       className="progress-ring-circle"
                       style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
                     />
@@ -458,10 +723,14 @@ const ApplicationMonitoring = () => {
                 </div>
                 <div className="d-flex justify-content-between align-items-center">
                   <div className="d-flex align-items-center gap-1">
-                    <AlertTriangle size={14} style={{ color: '#f03e3e' }} />
-                    <span style={{ color: '#f03e3e', fontSize: '0.875rem', fontWeight: 600 }}>High Usage</span>
+                    <AlertTriangle size={14} style={{ color: systemMetrics && systemMetrics.memory.used_percent > 80 ? '#f03e3e' : '#64748b' }} />
+                    <span style={{ color: systemMetrics && systemMetrics.memory.used_percent > 80 ? '#f03e3e' : '#64748b', fontSize: '0.875rem', fontWeight: 600 }}>
+                      {systemMetrics && systemMetrics.memory.used_percent > 80 ? 'High Usage' : 'Normal'}
+                    </span>
                   </div>
-                  <Badge bg="warning" style={{ fontSize: '0.7rem' }}>Warning</Badge>
+                  <Badge bg={systemMetrics && systemMetrics.memory.used_percent > 80 ? 'danger' : systemMetrics && systemMetrics.memory.used_percent > 60 ? 'warning' : 'success'} style={{ fontSize: '0.7rem' }}>
+                    {systemMetrics && systemMetrics.memory.used_percent > 80 ? 'Warning' : systemMetrics && systemMetrics.memory.used_percent > 60 ? 'Moderate' : 'Normal'}
+                  </Badge>
                 </div>
               </Card.Body>
             </Card>
@@ -473,8 +742,12 @@ const ApplicationMonitoring = () => {
                 <div className="d-flex justify-content-between align-items-start mb-3">
                   <div>
                     <div className="metric-label">DISK USAGE</div>
-                    <h1 className="metric-value" style={{ color: '#3b82f6' }}>45<span style={{ fontSize: '1.5rem' }}>%</span></h1>
-                    <div className="metric-subtitle">225 / 500 GB</div>
+                    <h1 className="metric-value" style={{ color: '#3b82f6' }}>
+                      {systemMetrics ? systemMetrics.disk.used_percent.toFixed(1) : '0'}<span style={{ fontSize: '1.5rem' }}>%</span>
+                    </h1>
+                    <div className="metric-subtitle">
+                      {systemMetrics ? `${systemMetrics.disk.used_gb.toFixed(1)} / ${systemMetrics.disk.total_gb.toFixed(1)} GB` : 'Loading...'}
+                    </div>
                   </div>
                   <svg width="60" height="60">
                     <circle cx="30" cy="30" r="25" fill="none" stroke="#e0f2fe" strokeWidth="5"/>
@@ -483,7 +756,7 @@ const ApplicationMonitoring = () => {
                       fill="none" 
                       stroke="#3b82f6" 
                       strokeWidth="5"
-                      strokeDasharray={`${45 * 1.57} ${100 * 1.57}`}
+                      strokeDasharray={systemMetrics ? `${systemMetrics.disk.used_percent * 1.57} ${100 * 1.57}` : '0 157'}
                       className="progress-ring-circle"
                       style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
                     />
@@ -492,9 +765,11 @@ const ApplicationMonitoring = () => {
                 <div className="d-flex justify-content-between align-items-center">
                   <div className="d-flex align-items-center gap-1" style={{ color: '#3b82f6', fontSize: '0.875rem' }}>
                     <HardDrive size={14} />
-                    <span>I/O: 125 MB/s</span>
+                    <span>Free: {systemMetrics ? systemMetrics.disk.free_gb.toFixed(1) : '0'} GB</span>
                   </div>
-                  <Badge bg="success" style={{ fontSize: '0.7rem' }}>Healthy</Badge>
+                  <Badge bg={systemMetrics && systemMetrics.disk.used_percent > 80 ? 'danger' : systemMetrics && systemMetrics.disk.used_percent > 60 ? 'warning' : 'success'} style={{ fontSize: '0.7rem' }}>
+                    {systemMetrics && systemMetrics.disk.used_percent > 80 ? 'Warning' : systemMetrics && systemMetrics.disk.used_percent > 60 ? 'Moderate' : 'Healthy'}
+                  </Badge>
                 </div>
               </Card.Body>
             </Card>
@@ -505,9 +780,13 @@ const ApplicationMonitoring = () => {
               <Card.Body>
                 <div className="d-flex justify-content-between align-items-start mb-3">
                   <div>
-                    <div className="metric-label">NETWORK I/O</div>
-                    <h1 className="metric-value" style={{ color: '#22c55e' }}>23<span style={{ fontSize: '1.5rem' }}>%</span></h1>
-                    <div className="metric-subtitle">↓ 45 Mbps ↑ 12 Mbps</div>
+                    <div className="metric-label">SYSTEM LOAD</div>
+                    <h1 className="metric-value" style={{ color: '#22c55e' }}>
+                      {systemMetrics ? systemMetrics.load['15m'].toFixed(2) : '0.00'}
+                    </h1>
+                    <div className="metric-subtitle">
+                      {systemMetrics ? `1m: ${systemMetrics.load['1m'].toFixed(2)} | 5m: ${systemMetrics.load['5m'].toFixed(2)}` : 'Loading...'}
+                    </div>
                   </div>
                   <svg width="60" height="60">
                     <circle cx="30" cy="30" r="25" fill="none" stroke="#dcfce7" strokeWidth="5"/>
@@ -516,7 +795,7 @@ const ApplicationMonitoring = () => {
                       fill="none" 
                       stroke="#22c55e" 
                       strokeWidth="5"
-                      strokeDasharray={`${23 * 1.57} ${100 * 1.57}`}
+                      strokeDasharray={systemMetrics ? `${(systemMetrics.load['15m'] / systemMetrics.cpu.cores) * 100 * 1.57} ${100 * 1.57}` : '0 157'}
                       className="progress-ring-circle"
                       style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
                     />
@@ -525,9 +804,11 @@ const ApplicationMonitoring = () => {
                 <div className="d-flex justify-content-between align-items-center">
                   <div className="d-flex align-items-center gap-1" style={{ color: '#22c55e', fontSize: '0.875rem' }}>
                     <Activity size={14} />
-                    <span>Bandwidth Used</span>
+                    <span>15m Average</span>
                   </div>
-                  <Badge bg="success" style={{ fontSize: '0.7rem' }}>Active</Badge>
+                  <Badge bg={systemMetrics && (systemMetrics.load['15m'] / systemMetrics.cpu.cores) > 1 ? 'warning' : 'success'} style={{ fontSize: '0.7rem' }}>
+                    {systemMetrics && (systemMetrics.load['15m'] / systemMetrics.cpu.cores) > 1 ? 'High' : 'Normal'}
+                  </Badge>
                 </div>
               </Card.Body>
             </Card>
@@ -545,116 +826,87 @@ const ApplicationMonitoring = () => {
                   Services Status
                 </div>
                 
-                <div className="service-item">
+                {systemMetrics?.services && systemMetrics.services.length > 0 ? (
+                  systemMetrics.services.map((service, index) => (
+                    <div key={index} className="service-item">
                   <div className="d-flex align-items-center gap-2">
+                        {service.running ? (
                     <CheckCircle size={18} className="text-success" />
-                    <span style={{ fontWeight: 600 }}>UnifiedOps-API</span>
+                        ) : (
+                          <XCircle size={18} className="text-danger" />
+                        )}
+                        <span style={{ fontWeight: 600 }}>{service.name}</span>
                   </div>
                   <div className="d-flex align-items-center gap-3">
-                    <Badge bg="success" className="status-badge">Running</Badge>
-                    <span style={{ fontSize: '0.875rem', color: '#64748b' }}>55 ms</span>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Latency</span>
+                        <Badge bg={service.running ? 'success' : 'danger'} className="status-badge">
+                          {service.status}
+                        </Badge>
+                        <span style={{ fontSize: '0.875rem', color: '#64748b' }}>{service.status}</span>
                   </div>
                 </div>
-
-                <div className="service-item">
-                  <div className="d-flex align-items-center gap-2">
-                    <CheckCircle size={18} className="text-success" />
-                    <span style={{ fontWeight: 600 }}>UnifiedOps-Web</span>
+                  ))
+                ) : (
+                  <div className="text-muted text-center py-3">No services data available</div>
+                )}
+                
+                {systemMetrics?.failed_services && systemMetrics.failed_services.length > 0 && (
+                  <div className="mt-3">
+                    <div className="section-title" style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+                      <AlertCircle className="text-danger" size={16} />
+                      Failed Services
                   </div>
-                  <div className="d-flex align-items-center gap-3">
-                    <Badge bg="success" className="status-badge">Running</Badge>
-                    <span style={{ fontSize: '0.875rem', color: '#64748b' }}>7h 5m</span>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Latency</span>
+                    {systemMetrics.failed_services.map((failedService, index) => (
+                      <div key={index} className="failed-service-item">
+                        <span style={{ fontWeight: 600 }}>{failedService}</span>
+                        <Badge bg="danger">Failed</Badge>
                   </div>
+                    ))}
                 </div>
-
-                <div className="service-item">
-                  <div className="d-flex align-items-center gap-2">
-                    <CheckCircle size={18} className="text-success" />
-                    <span style={{ fontWeight: 600 }}>mssql-server</span>
-                  </div>
-                  <div className="d-flex align-items-center gap-3">
-                    <Badge bg="success" className="status-badge">Running</Badge>
-                    <span style={{ fontSize: '0.875rem', color: '#64748b' }}>45 ms</span>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Latency</span>
-                  </div>
-                </div>
+                )}
               </Card.Body>
             </Card>
 
             {/* SQL Server Databases */}
+            {systemMetrics?.sql && systemMetrics.sql.databases && systemMetrics.sql.databases.length > 0 && (
             <Card className="mb-3" style={{ border: 'none', borderRadius: '12px' }}>
               <Card.Body>
                 <div className="section-title">
                   <Database className="text-primary" size={20} />
                   SQL Server Databases
                 </div>
+                  <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '1rem' }}>
+                    Driver: {systemMetrics.sql.driver_used} | Version: {systemMetrics.sql.version.split('\n')[0]}
+                </div>
 
-                <div className="database-card">
+                  {systemMetrics.sql.databases.map((db, index) => (
+                    <div 
+                      key={index} 
+                      className="database-card"
+                      style={db.used_percent > 80 ? { background: '#fef2f2', border: '1px solid #fecaca' } : {}}
+                    >
                   <div className="d-flex justify-content-between align-items-start mb-2">
                     <div className="d-flex align-items-center gap-2">
-                      <div style={{ width: 32, height: 32, background: '#4c6ef5', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>
-                        A
+                          <div style={{ width: 32, height: 32, background: db.used_percent > 80 ? '#f59e0b' : '#4c6ef5', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>
+                            {db.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div style={{ fontWeight: 600, color: '#1e293b' }}>AppDB</div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>0 Tables</div>
+                            <div style={{ fontWeight: 600, color: '#1e293b' }}>{db.name}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{db.tables} Tables</div>
                       </div>
                     </div>
-                    <Badge bg="success" className="status-badge">
-                      <CheckCircle size={14} />
-                      Healthy
+                        <Badge bg={db.used_percent > 80 ? 'warning' : 'success'} className="status-badge">
+                          {db.used_percent > 80 ? <AlertTriangle size={14} /> : <CheckCircle size={14} />}
+                          {db.used_percent > 80 ? 'Warning' : 'Healthy'}
                     </Badge>
                   </div>
                   <div style={{ fontSize: '0.875rem', color: '#64748b' }}>
-                    Storage: 0 GB / 13.4 GB. 0% used
+                        Storage: {db.used_gb.toFixed(2)} GB / {db.size_gb.toFixed(2)} GB • {db.used_percent.toFixed(1)}% used
                   </div>
                 </div>
-
-                <div className="database-card">
-                  <div className="d-flex justify-content-between align-items-start mb-2">
-                    <div className="d-flex align-items-center gap-2">
-                      <div style={{ width: 32, height: 32, background: '#3b82f6', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>
-                        C
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 600, color: '#1e293b' }}>CiscoDB</div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>1 Table</div>
-                      </div>
-                    </div>
-                    <Badge bg="success" className="status-badge">
-                      <CheckCircle size={14} />
-                      Healthy
-                    </Badge>
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: '#64748b' }}>
-                    Storage: 0.1 / 1 GB 1% used
-                  </div>
-                </div>
-
-                <div className="database-card" style={{ background: '#fef2f2', border: '1px solid #fecaca' }}>
-                  <div className="d-flex justify-content-between align-items-start mb-2">
-                    <div className="d-flex align-items-center gap-2">
-                      <div style={{ width: 32, height: 32, background: '#f59e0b', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>
-                        ⚠
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 600, color: '#1e293b' }}>TransactionLog</div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>High growth rate</div>
-                      </div>
-                    </div>
-                    <Badge bg="warning" className="status-badge">
-                      <AlertTriangle size={14} />
-                      Warning
-                    </Badge>
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: '#64748b' }}>
-                    Storage: 2.8 / 5 GB • 56% used
-                  </div>
-                </div>
+                  ))}
               </Card.Body>
             </Card>
+            )}
 
             {/* Filesystems */}
             <Card className="mb-3" style={{ border: 'none', borderRadius: '12px' }}>
@@ -665,164 +917,141 @@ const ApplicationMonitoring = () => {
                 </div>
 
                 <Row className="g-3">
-                  <Col md={4}>
+                  {systemMetrics?.filesystems && systemMetrics.filesystems.length > 0 ? (
+                    systemMetrics.filesystems.slice(0, 6).map((fs, index) => {
+                      const usedPercent = parseFloat(fs.used_percent.replace('%', ''));
+                      return (
+                        <Col md={4} key={index}>
                     <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px' }}>
                       <div className="d-flex align-items-center gap-2 mb-2">
-                        <HardDrive size={18} className="text-primary" />
-                        <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>/dev/sda1</span>
+                              <HardDrive size={18} className={usedPercent > 80 ? 'text-danger' : usedPercent > 60 ? 'text-warning' : 'text-primary'} />
+                              <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{fs.filesystem}</span>
                       </div>
                       <Badge bg="success" className="status-badge mb-2">
                         <CheckCircle size={12} />
                         Mounted
                       </Badge>
                       <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        Root: 225 / 500 GB • 45% used
+                              {fs.mount}: {fs.used_gb.toFixed(1)} / {fs.total_gb.toFixed(1)} GB • {fs.used_percent} used
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                        Type: ext4
+                              Type: {fs.type}
                       </div>
                     </div>
                   </Col>
-
-                  <Col md={4}>
-                    <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px' }}>
-                      <div className="d-flex align-items-center gap-2 mb-2">
-                        <HardDrive size={18} className="text-success" />
-                        <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>/dev/sdb1</span>
-                      </div>
-                      <Badge bg="success" className="status-badge mb-2">
-                        <CheckCircle size={12} />
-                        Mounted
-                      </Badge>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        Data: 820 / 2000 GB • 41% used
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                        Type: ext4
-                      </div>
-                    </div>
+                      );
+                    })
+                  ) : (
+                    <Col md={12}>
+                      <div className="text-muted text-center py-3">No filesystem data available</div>
                   </Col>
-
-                  <Col md={4}>
-                    <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px' }}>
-                      <div className="d-flex align-items-center gap-2 mb-2">
-                        <HardDrive size={18} className="text-info" />
-                        <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>/dev/sdc1</span>
-                      </div>
-                      <Badge bg="success" className="status-badge mb-2">
-                        <CheckCircle size={12} />
-                        Mounted
-                      </Badge>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        Backup: 145 / 1000 GB • 14% used
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                        Type: xfs
-                      </div>
-                    </div>
-                  </Col>
+                  )}
                 </Row>
               </Card.Body>
             </Card>
 
             {/* Listening Ports */}
+            {systemMetrics?.listening_ports && systemMetrics.listening_ports.length > 0 && (
             <Card className="mb-3" style={{ border: 'none', borderRadius: '12px' }}>
               <Card.Body>
                 <div className="section-title">
                   <Activity className="text-primary" size={20} />
                   Listening Ports
-                  <Badge bg="secondary" style={{ fontSize: '0.75rem' }}>32</Badge>
+                    <Badge bg="secondary" style={{ fontSize: '0.75rem' }}>{systemMetrics.listening_ports.length}</Badge>
                 </div>
 
                 <Table className="process-table" hover>
                   <thead>
                     <tr>
-                      <th>Protocol</th>
-                      <th>Port</th>
-                      <th>State</th>
+                        <th>Port Info</th>
                       <th>Process</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>TCP</td>
-                      <td>3308 3306</td>
-                      <td><Badge bg="info" className="port-badge">Open</Badge></td>
-                      <td>mysql</td>
+                      {systemMetrics.listening_ports.slice(0, 20).map((portInfo, index) => {
+                        // Parse port information from the string format
+                        const parts = portInfo.split(/\s+/);
+                        const protocol = parts[0]?.toUpperCase() || 'UNKNOWN';
+                        const address = parts[3] || '';
+                        const processRegex = /users:\(\(["']?([^"',]+)/;
+                        const processMatch = processRegex.exec(portInfo);
+                        const process = processMatch ? processMatch[1] : 'N/A';
+                        const portRegex = /:(\d+)/;
+                        const portMatch = portRegex.exec(address);
+                        const port = portMatch ? portMatch[1] : 'N/A';
+                        
+                        // Determine if port is risky (common risky ports)
+                        const riskyPorts = ['22', '23', '21', '3306', '1433', '5432', '27017'];
+                        const isRisky = riskyPorts.includes(port);
+                        
+                        return (
+                          <tr key={index}>
+                            <td>
+                              <div className="d-flex align-items-center gap-2">
+                                <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>{protocol}</span>
+                                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>{address}</span>
+                                {isRisky && <Badge bg="danger" className="port-badge" style={{ fontSize: '0.7rem' }}>Risky</Badge>}
+                              </div>
+                            </td>
+                            <td>
+                              <span style={{ fontSize: '0.875rem' }}>{process}</span>
+                            </td>
                     </tr>
-                    <tr>
-                      <td>TCP</td>
-                      <td>1453 <Badge bg="danger" className="port-badge ms-2">Risky</Badge></td>
-                      <td><Badge bg="info" className="port-badge">Open</Badge></td>
-                      <td>node</td>
-                    </tr>
-                    <tr>
-                      <td>22</td>
-                      <td>22 <Badge bg="danger" className="port-badge ms-2">Risky</Badge></td>
-                      <td><Badge bg="info" className="port-badge">Open</Badge></td>
-                      <td>sshd</td>
-                    </tr>
-                    <tr>
-                      <td>123</td>
-                      <td>123 <Badge bg="danger" className="port-badge ms-2">Risky</Badge></td>
-                      <td><Badge bg="info" className="port-badge">Open</Badge></td>
-                      <td>2023.6</td>
-                    </tr>
+                        );
+                      })}
                   </tbody>
                 </Table>
               </Card.Body>
             </Card>
+            )}
 
-            {/* Failed Services */}
-            <Card className="mb-3" style={{ border: 'none', borderRadius: '12px' }}>
-              <Card.Body>
-                <div className="section-title">
-                  <XCircle className="text-danger" size={20} />
-                  Failed Services
-                  <Badge bg="danger" style={{ fontSize: '0.75rem', marginLeft: '0.5rem' }}>2</Badge>
-                </div>
-
-                <div className="failed-service-item">
-                  <div className="d-flex align-items-center gap-2">
-                    <XCircle size={18} className="text-danger" />
-                    <div>
-                      <div style={{ fontWeight: 600, color: '#1e293b' }}>auditd.rules</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Failed to load.</div>
-                    </div>
-                  </div>
-                  <button className="btn btn-sm btn-outline-danger d-flex align-items-center gap-1">
-                    <RefreshCw size={14} />
-                    Restart
-                  </button>
-                </div>
-
-                <div className="failed-service-item">
-                  <div className="d-flex align-items-center gap-2">
-                    <XCircle size={18} className="text-danger" />
-                    <div>
-                      <div style={{ fontWeight: 600, color: '#1e293b' }}>dnfas-makecache</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Failed to sync cache.</div>
-                    </div>
-                  </div>
-                  <Badge bg="danger" className="status-badge">Critical</Badge>
-                </div>
-              </Card.Body>
-            </Card>
           </Col>
 
           {/* Right Column */}
           <Col lg={6}>
-            {/* Alert */}
-            <div className="alert-card">
+            {/* Alerts */}
+            {systemMetrics && getSystemAlerts().length > 0 ? (
+              getSystemAlerts().map((alert, index) => (
+                <div 
+                  key={index} 
+                  className="alert-card"
+                  style={{
+                    background: alert.type === 'danger' ? '#fef2f2' : alert.type === 'warning' ? '#fef3c7' : '#eff6ff',
+                    borderLeft: `4px solid ${alert.type === 'danger' ? '#ef4444' : alert.type === 'warning' ? '#f59e0b' : '#3b82f6'}`,
+                    marginBottom: '1rem'
+                  }}
+                >
+                  <div className="d-flex align-items-start gap-2">
+                    <div style={{ 
+                      color: alert.type === 'danger' ? '#ef4444' : alert.type === 'warning' ? '#f59e0b' : '#3b82f6',
+                      marginTop: '2px'
+                    }}>
+                      {alert.icon}
+                    </div>
+                    <div>
+                      <div style={{ 
+                        fontWeight: 600, 
+                        color: alert.type === 'danger' ? '#991b1b' : alert.type === 'warning' ? '#92400e' : '#1e40af',
+                        marginBottom: '0.25rem' 
+                      }}>
+                        {alert.message}
+                    </div>
+                  </div>
+                </div>
+                </div>
+              ))
+            ) : systemMetrics ? (
+              <div className="alert-card" style={{ background: '#f0fdf4', borderLeft: '4px solid #22c55e' }}>
               <div className="d-flex align-items-start gap-2">
-                <AlertTriangle size={20} className="text-warning mt-1" />
+                  <CheckCircle size={20} className="text-success mt-1" />
                 <div>
-                  <div style={{ fontWeight: 600, color: '#92400e', marginBottom: '0.25rem' }}>
-                    High memory usage detected.
+                    <div style={{ fontWeight: 600, color: '#166534', marginBottom: '0.25rem' }}>
+                      System health: All metrics within normal range
                   </div>
                 </div>
               </div>
             </div>
+            ) : null}
 
             {/* CPU & Memory Chart */}
             <Card className="mb-3" style={{ border: 'none', borderRadius: '12px' }}>
@@ -838,11 +1067,18 @@ const ApplicationMonitoring = () => {
                       <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Memory Usage</span>
                     </div>
                   </div>
-                  <Badge bg="success" className="status-badge">Running</Badge>
+                  <Badge bg="success" className="status-badge">Current</Badge>
                 </div>
 
+                {systemMetrics ? (
                 <ResponsiveContainer width="100%" height={200}>
-                  <AreaChart data={cpuMemoryData}>
+                    <AreaChart data={[
+                      { 
+                        time: new Date(systemMetrics.timestamp || Date.now()).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                        cpu: systemMetrics.cpu.used_percent,
+                        memory: systemMetrics.memory.used_percent
+                      }
+                    ]}>
                     <defs>
                       <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
@@ -860,14 +1096,24 @@ const ApplicationMonitoring = () => {
                       tick={{ fontSize: '0.75rem', fill: '#94a3b8' }}
                     />
                     <YAxis 
+                        domain={[0, 100]}
                       stroke="#94a3b8" 
                       tick={{ fontSize: '0.75rem', fill: '#94a3b8' }}
+                        label={{ value: 'Usage %', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#94a3b8', fontSize: '0.75rem' } }}
                     />
-                    <Tooltip />
+                      <Tooltip 
+                        formatter={(value: number) => [`${value.toFixed(1)}%`, '']}
+                        labelFormatter={(label) => `Time: ${label}`}
+                      />
                     <Area type="monotone" dataKey="cpu" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorCpu)" />
                     <Area type="monotone" dataKey="memory" stroke="#f43f5e" strokeWidth={2} fillOpacity={1} fill="url(#colorMemory)" />
                   </AreaChart>
                 </ResponsiveContainer>
+                ) : (
+                  <div className="text-center text-muted py-5">
+                    <p style={{ margin: 0 }}>No data available</p>
+                  </div>
+                )}
               </Card.Body>
             </Card>
 
@@ -890,107 +1136,62 @@ const ApplicationMonitoring = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
+                    {systemMetrics?.top_processes && systemMetrics.top_processes.length > 0 ? (
+                      systemMetrics.top_processes.map((process, index) => {
+                        const cpuPercent = parseFloat(process.cpu_percent);
+                        const memPercent = parseFloat(process.mem_percent);
+                        return (
+                          <tr key={index}>
                       <td>
                         <div className="d-flex align-items-center gap-2">
+                                {process.process.toLowerCase().includes('sql') ? (
+                                  <Database size={14} className="text-success" />
+                                ) : (
                           <Server size={14} className="text-primary" />
-                          <span style={{ fontWeight: 500 }}>node (UnifiedOps-API)</span>
+                                )}
+                                <span style={{ fontWeight: 500 }}>{process.process}</span>
                         </div>
                       </td>
-                      <td>1842</td>
-                      <td><span style={{ fontWeight: 600, color: '#f59e0b' }}>8.2%</span></td>
+                            <td>{process.pid}</td>
+                            <td>
+                              <span style={{ fontWeight: 600, color: cpuPercent > 10 ? '#f59e0b' : '#64748b' }}>
+                                {process.cpu_percent}%
+                              </span>
+                      </td>
                       <td>
                         <div className="d-flex align-items-center">
-                          <span style={{ fontSize: '0.875rem', minWidth: '60px' }}>2.1 GB</span>
+                                <span style={{ fontSize: '0.875rem', minWidth: '60px' }}>
+                                  {((memPercent / 100) * (systemMetrics.memory.total_gb || 1)).toFixed(1)} GB
+                                </span>
                           <div className="memory-bar">
-                            <div className="memory-bar-fill" style={{ width: '13%', background: '#3b82f6' }}></div>
+                                  <div 
+                                    className="memory-bar-fill" 
+                                    style={{ 
+                                      width: `${memPercent}%`, 
+                                      background: memPercent > 50 ? '#f59e0b' : '#3b82f6' 
+                                    }}
+                                  ></div>
                           </div>
-                          <span className="ms-2" style={{ fontSize: '0.875rem', color: '#64748b' }}>13%</span>
+                                <span className="ms-2" style={{ fontSize: '0.875rem', color: '#64748b' }}>
+                                  {process.mem_percent}%
+                                </span>
                         </div>
                       </td>
                     </tr>
-                    <tr>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <Database size={14} className="text-success" />
-                          <span style={{ fontWeight: 500 }}>sqlservr</span>
-                        </div>
-                      </td>
-                      <td>1256</td>
-                      <td><span style={{ fontWeight: 600, color: '#f59e0b' }}>5.8%</span></td>
-                      <td>
-                        <div className="d-flex align-items-center">
-                          <span style={{ fontSize: '0.875rem', minWidth: '60px' }}>4.8 GB</span>
-                          <div className="memory-bar">
-                            <div className="memory-bar-fill" style={{ width: '30%', background: '#f59e0b' }}></div>
-                          </div>
-                          <span className="ms-2" style={{ fontSize: '0.875rem', color: '#64748b' }}>30%</span>
-                        </div>
-                      </td>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="text-center text-muted py-3">No process data available</td>
                     </tr>
-                    <tr>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <Activity size={14} className="text-info" />
-                          <span style={{ fontWeight: 500 }}>node (UnifiedOps-Web)</span>
-                        </div>
-                      </td>
-                      <td>2145</td>
-                      <td><span style={{ fontWeight: 600, color: '#3b82f6' }}>3.5%</span></td>
-                      <td>
-                        <div className="d-flex align-items-center">
-                          <span style={{ fontSize: '0.875rem', minWidth: '60px' }}>1.8 GB</span>
-                          <div className="memory-bar">
-                            <div className="memory-bar-fill" style={{ width: '11%', background: '#3b82f6' }}></div>
-                          </div>
-                          <span className="ms-2" style={{ fontSize: '0.875rem', color: '#64748b' }}>11%</span>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <Activity size={14} className="text-secondary" />
-                          <span style={{ fontWeight: 500 }}>dockerd</span>
-                        </div>
-                      </td>
-                      <td>892</td>
-                      <td><span style={{ fontWeight: 600, color: '#3b82f6' }}>2.1%</span></td>
-                      <td>
-                        <div className="d-flex align-items-center">
-                          <span style={{ fontSize: '0.875rem', minWidth: '60px' }}>856 MB</span>
-                          <div className="memory-bar">
-                            <div className="memory-bar-fill" style={{ width: '5%', background: '#22c55e' }}></div>
-                          </div>
-                          <span className="ms-2" style={{ fontSize: '0.875rem', color: '#64748b' }}>5%</span>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <Server size={14} className="text-warning" />
-                          <span style={{ fontWeight: 500 }}>nginx</span>
-                        </div>
-                      </td>
-                      <td>1034</td>
-                      <td><span style={{ fontWeight: 600, color: '#22c55e' }}>1.2%</span></td>
-                      <td>
-                        <div className="d-flex align-items-center">
-                          <span style={{ fontSize: '0.875rem', minWidth: '60px' }}>245 MB</span>
-                          <div className="memory-bar">
-                            <div className="memory-bar-fill" style={{ width: '2%', background: '#22c55e' }}></div>
-                          </div>
-                          <span className="ms-2" style={{ fontSize: '0.875rem', color: '#64748b' }}>2%</span>
-                        </div>
-                      </td>
-                    </tr>
+                    )}
                   </tbody>
                 </Table>
               </Card.Body>
             </Card>
 
             {/* Python Environment */}
+            {systemMetrics?.python ? (
             <Card className="mb-3" style={{ border: 'none', borderRadius: '12px' }}>
               <Card.Body>
                 <div className="section-title">
@@ -1009,7 +1210,7 @@ const ApplicationMonitoring = () => {
                       Version:
                     </span>
                     <span style={{ fontSize: '0.875rem', color: '#111827' }}>
-                      3.10.12 (main, Jun 21 16:53) [GCC 14.2.1 20240110 (Red Hat 14.2.1-7)]
+                        {systemMetrics.python.version || 'N/A'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', gap: '12px' }}>
@@ -1022,20 +1223,7 @@ const ApplicationMonitoring = () => {
                       Executable:
                     </span>
                     <span style={{ fontSize: '0.875rem', color: '#111827' }}>
-                      /usr/bin/python3.10
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <span style={{ 
-                      fontSize: '0.875rem', 
-                      color: '#6b7280', 
-                      fontWeight: '600',
-                      minWidth: '180px'
-                    }}>
-                      Virtual Environment:
-                    </span>
-                    <span style={{ fontSize: '0.875rem', color: '#ef4444', fontWeight: '500' }}>
-                      Not Active
+                        {systemMetrics.python.executable || 'N/A'}
                     </span>
                   </div>
                   <div style={{ display: 'flex', gap: '12px' }}>
@@ -1048,11 +1236,13 @@ const ApplicationMonitoring = () => {
                       Packages:
                     </span>
                     <span style={{ fontSize: '0.875rem', color: '#111827' }}>
-                      5 installed
+                        {systemMetrics.python.packages?.length || 0} installed
                     </span>
                   </div>
                 </div>
 
+                  {systemMetrics.python.packages && systemMetrics.python.packages.length > 0 && (
+                    <>
                 <button 
                   onClick={() => setShowPackages(!showPackages)}
                   className="btn btn-sm"
@@ -1080,178 +1270,115 @@ const ApplicationMonitoring = () => {
                       <tr>
                         <th>Package</th>
                         <th>Version</th>
-                        <th>Location</th>
-                        <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td style={{ fontWeight: 500 }}>django</td>
-                        <td>4.2.7</td>
-                        <td style={{ fontSize: '0.75rem', color: '#64748b' }}>/usr/lib/python3.10</td>
-                        <td><Badge bg="success" style={{ fontSize: '0.75rem' }}>Up to date</Badge></td>
+                            {systemMetrics.python.packages.map((pkg, index) => (
+                              <tr key={index}>
+                                <td style={{ fontWeight: 500 }}>{pkg.name}</td>
+                                <td>{pkg.version}</td>
                       </tr>
-                      <tr>
-                        <td style={{ fontWeight: 500 }}>requests</td>
-                        <td>2.31.0</td>
-                        <td style={{ fontSize: '0.75rem', color: '#64748b' }}>/usr/lib/python3.10</td>
-                        <td><Badge bg="success" style={{ fontSize: '0.75rem' }}>Up to date</Badge></td>
-                      </tr>
-                      <tr>
-                        <td style={{ fontWeight: 500 }}>numpy</td>
-                        <td>1.24.3</td>
-                        <td style={{ fontSize: '0.75rem', color: '#64748b' }}>/usr/lib/python3.10</td>
-                        <td><Badge bg="warning" style={{ fontSize: '0.75rem' }}>Update available</Badge></td>
-                      </tr>
-                      <tr>
-                        <td style={{ fontWeight: 500 }}>pandas</td>
-                        <td>2.0.3</td>
-                        <td style={{ fontSize: '0.75rem', color: '#64748b' }}>/usr/lib/python3.10</td>
-                        <td><Badge bg="success" style={{ fontSize: '0.75rem' }}>Up to date</Badge></td>
-                      </tr>
-                      <tr>
-                        <td style={{ fontWeight: 500 }}>sqlalchemy</td>
-                        <td>2.0.21</td>
-                        <td style={{ fontSize: '0.75rem', color: '#64748b' }}>/usr/lib/python3.10</td>
-                        <td><Badge bg="success" style={{ fontSize: '0.75rem' }}>Up to date</Badge></td>
-                      </tr>
+                            ))}
                     </tbody>
                   </Table>
+                      )}
+                    </>
                 )}
               </Card.Body>
             </Card>
+            ) : (
+              systemMetrics && (
+                <Card className="mb-3" style={{ border: 'none', borderRadius: '12px' }}>
+                  <Card.Body>
+                    <div className="section-title">
+                      <Activity className="text-primary" size={20} />
+                      Python Environment
+                    </div>
+                    <div className="text-center text-muted py-4">
+                      <p style={{ margin: 0 }}>Python environment information not available</p>
+                    </div>
+                  </Card.Body>
+                </Card>
+              )
+            )}
 
             {/* Scheduled Tasks (Cron Jobs) */}
+            {systemMetrics?.cron && (
             <Card className="mb-3" style={{ border: 'none', borderRadius: '12px' }}>
               <Card.Body>
                 <div className="section-title">
                   <Clock className="text-primary" size={20} />
                   Scheduled Tasks (Cron Jobs)
-                  <Badge bg="secondary" style={{ fontSize: '0.75rem', marginLeft: '0.5rem' }}>5 Active</Badge>
+                    <Badge bg="secondary" style={{ fontSize: '0.75rem', marginLeft: '0.5rem' }}>
+                      {systemMetrics.cron.users ? Object.values(systemMetrics.cron.users).flatMap((jobs: any) => 
+                        Array.isArray(jobs) ? jobs.filter((job: any) => typeof job === 'string' && job.trim() && !job.startsWith('#')) : []
+                      ).length : 0} Active
+                    </Badge>
                 </div>
 
+                  {systemMetrics.cron.users && Object.keys(systemMetrics.cron.users).length > 0 ? (
                 <Table className="process-table" hover responsive>
                   <thead>
                     <tr>
+                          <th>User</th>
                       <th>Task</th>
                       <th>Schedule</th>
-                      <th>Last Run</th>
-                      <th>Status</th>
-                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
+                        {Object.entries(systemMetrics.cron.users).flatMap(([user, jobs]: [string, any]) => {
+                          // Filter out comments and empty lines
+                          const activeJobs = Array.isArray(jobs) 
+                            ? jobs.filter((job: any) => typeof job === 'string' && job.trim() && !job.startsWith('#') && !job.startsWith('SHELL') && !job.startsWith('PATH') && !job.startsWith('MAILTO'))
+                            : [];
+                          
+                          return activeJobs.map((job: string, index: number) => {
+                            // Parse cron job - format: "* * * * * command"
+                            const parts = job.trim().split(/\s+/);
+                            if (parts.length < 6) return null;
+                            
+                            const schedule = parts.slice(0, 5).join(' ');
+                            const command = parts.slice(5).join(' ');
+                            
+                            return (
+                              <tr key={`${user}-${index}`}>
+                                <td>
+                                  <Badge bg="info" style={{ fontSize: '0.75rem' }}>{user}</Badge>
+                      </td>
                       <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <Database size={14} className="text-primary" />
                           <div>
-                            <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>Database Backup</div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>/scripts/backup-db.sh</div>
+                                    <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>
+                                      {command.split(' ')[0] || 'N/A'}
+                          </div>
+                                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                      {command.length > 50 ? command.substring(0, 50) + '...' : command}
                           </div>
                         </div>
                       </td>
                       <td>
-                        <div style={{ fontSize: '0.75rem', color: '#475569', fontFamily: 'monospace' }}>0 2 * * *</div>
-                        <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Daily 2AM</div>
-                      </td>
-                      <td style={{ fontSize: '0.75rem', color: '#64748b' }}>2h ago</td>
-                      <td><Badge bg="success" style={{ fontSize: '0.75rem' }}>Success</Badge></td>
-                      <td>
-                        <button className="btn btn-link btn-sm p-0" style={{ fontSize: '0.75rem' }}>View Log</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <RefreshCw size={14} className="text-success" />
-                          <div>
-                            <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>Log Rotation</div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>/usr/sbin/logrotate</div>
-                          </div>
+                                  <div style={{ fontSize: '0.75rem', color: '#475569', fontFamily: 'monospace' }}>
+                                    {schedule}
                         </div>
                       </td>
-                      <td>
-                        <div style={{ fontSize: '0.75rem', color: '#475569', fontFamily: 'monospace' }}>0 0 * * *</div>
-                        <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Daily midnight</div>
-                      </td>
-                      <td style={{ fontSize: '0.75rem', color: '#64748b' }}>7h ago</td>
-                      <td><Badge bg="success" style={{ fontSize: '0.75rem' }}>Success</Badge></td>
-                      <td>
-                        <button className="btn btn-link btn-sm p-0" style={{ fontSize: '0.75rem' }}>View Log</button>
-                      </td>
                     </tr>
-                    <tr>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <Activity size={14} className="text-info" />
-                          <div>
-                            <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>Cache Clear</div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>/scripts/clear-cache.sh</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: '0.75rem', color: '#475569', fontFamily: 'monospace' }}>*/30 * * * *</div>
-                        <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Every 30min</div>
-                      </td>
-                      <td style={{ fontSize: '0.75rem', color: '#64748b' }}>12m ago</td>
-                      <td><Badge bg="success" style={{ fontSize: '0.75rem' }}>Success</Badge></td>
-                      <td>
-                        <button className="btn btn-link btn-sm p-0" style={{ fontSize: '0.75rem' }}>View Log</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <Server size={14} className="text-warning" />
-                          <div>
-                            <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>System Updates</div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>/usr/bin/apt-get update</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: '0.75rem', color: '#475569', fontFamily: 'monospace' }}>0 3 * * 0</div>
-                        <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Sun 3AM</div>
-                      </td>
-                      <td style={{ fontSize: '0.75rem', color: '#f59e0b' }}>Running (2m)</td>
-                      <td><Badge bg="warning" style={{ fontSize: '0.75rem' }}>Running</Badge></td>
-                      <td>
-                        <button className="btn btn-link btn-sm p-0" style={{ fontSize: '0.75rem' }}>Monitor</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <AlertCircle size={14} className="text-danger" />
-                          <div>
-                            <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>Report Generation</div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>/scripts/generate-report.py</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: '0.75rem', color: '#475569', fontFamily: 'monospace' }}>0 8 * * 1</div>
-                        <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Mon 8AM</div>
-                      </td>
-                      <td style={{ fontSize: '0.75rem', color: '#dc3545' }}>1d ago (failed)</td>
-                      <td><Badge bg="danger" style={{ fontSize: '0.75rem' }}>Failed</Badge></td>
-                      <td>
-                        <button className="btn btn-sm btn-outline-danger" style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem' }}>
-                          Retry
-                        </button>
-                      </td>
-                    </tr>
+                            );
+                          }).filter(Boolean);
+                        })}
                   </tbody>
                 </Table>
+                  ) : (
+                    <div className="text-center text-muted py-3">
+                      <p style={{ margin: 0 }}>No cron jobs configured</p>
+                    </div>
+                  )}
               </Card.Body>
             </Card>
+            )}
           </Col>
         </Row>
-      
     </>
-
+        )}
+      </>
     </React.Fragment>
   );
 };

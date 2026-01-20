@@ -2326,36 +2326,7 @@ const CrmLeads = () => {
           ]}
           activeFilter={activeFilter}
           onFilterChange={handleFilterChange}
-          // searchValue={leadsSearch}
-          // onSearchChange={(value) => setLeadsSearch(value)}
-          // onSearch={() => {
-          //   if (leadsSearch.trim()) {
-          //     handleFiltersChange({ search: leadsSearch.trim() });
-          //   } else {
-          //     handleFiltersChange({ search: null });
-          //   }
-          //   setLeadsPagination({ ...leadsPagination, currentPage: 1 });
-          // }}
-          // searchPlaceholder="Search leads by name, company, email..."
-          // showAdvancedFilters={showAdvancedFilters}
-          // onToggleAdvancedFilters={() =>
-          //   setShowAdvancedFilters(!showAdvancedFilters)
-          // }
-          // advancedFilterCount={
-          //   (leadsFilters.assignedTo !== null ? 1 : 0) +
-          //   (leadsFilters.stage !== null ? 1 : 0) +
-          //   (leadsFilters.industry !== null ? 1 : 0) +
-          //   (leadsFilters.source !== null ? 1 : 0) +
-          //   (leadsFilters.leadPotential !== null ? 1 : 0) +
-          //   (leadsFilters.campaign !== null ? 1 : 0) +
-          //   (leadsFilters.leadScoreMin !== null ||
-          //   leadsFilters.leadScoreMax !== null
-          //     ? 1
-          //     : 0) +
-          //   (leadsFilters.dateFrom !== null || leadsFilters.dateTo !== null
-          //     ? 1
-          //     : 0)
-          // }
+          
         />
 
         {/* Advanced Filters */}

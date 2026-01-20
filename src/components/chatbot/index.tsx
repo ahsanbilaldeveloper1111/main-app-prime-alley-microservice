@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Form, Button, Spinner } from 'react-bootstrap';
 import { Send, Paperclip, Mic, Smile, X, MessageCircle, Minimize2, Maximize2, Star, Image as ImageIcon, Play, Pause, Bot } from 'lucide-react';
-import axiosInstance from '@utils/axios';
+import { sendChatMessage, submitChatSurvey } from '@utils/chat';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import '@assets/scss/chat.scss';
@@ -242,22 +242,15 @@ export default function ChatbotWidget() {
     setLoading(true);
 
     try {
-      const payload = {
+      const response = await sendChatMessage({
         message: messageText,
         tenant_id: getTenantId(),
         thread_id: threadId || '',
-      };
-
-      const response = await axiosInstance.post('/chat', payload);
-
-      // Check if response contains an error
-      if (response.data?.error) {
-        throw new Error(response.data.error || 'An error occurred');
-      }
+      });
 
       // Extract AI response and thread_id from response
-      const aiResponseText = response.data?.response || response.data?.message || 'No response received';
-      const newThreadId = response.data?.thread_id || threadId;
+      const aiResponseText = response?.response || response?.message || 'No response received';
+      const newThreadId = response?.thread_id || threadId;
 
       // Update thread_id if we got a new one
       if (newThreadId && newThreadId !== threadId) {
@@ -277,15 +270,7 @@ export default function ChatbotWidget() {
     } catch (error: any) {
       console.error('Chat API error:', error);
       
-      // Extract error message from various possible locations
-      const errorMsg = 
-        error.response?.data?.error || 
-        error.response?.data?.message || 
-        error.message || 
-        'An error occurred while processing your request. Please try again.';
-      
-      toast.error(errorMsg);
-      
+      // Error toast is already shown in sendChatMessage function
       // Add error message to chat
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -323,20 +308,14 @@ export default function ChatbotWidget() {
     setIsSubmittingSurvey(true);
     try {
       // Submit survey to API
-      const surveyPayload = {
+      await submitChatSurvey({
         rating,
         feedback: feedback.trim() || null,
         thread_id: threadId || '',
         tenant_id: getTenantId(),
-      };
-
-      // You can uncomment this when the API endpoint is ready
-      // await axiosInstance.post('/chat/survey', surveyPayload);
+      });
       
-      // For now, just log it
-      console.log('Survey submitted:', surveyPayload);
-      
-      //toast.success('Thank you for your feedback!');
+      toast.success('Thank you for your feedback!');
       setShowSurveyModal(false);
       clearChat();
     } catch (error: any) {

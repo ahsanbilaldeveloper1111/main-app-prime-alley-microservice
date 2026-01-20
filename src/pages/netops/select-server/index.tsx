@@ -11,6 +11,7 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 
 import  { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { getSystemMetrics, SystemMetric, SystemMetricsResponse } from "@utils/netops";
 import { 
   Search, 
@@ -33,6 +34,7 @@ import {
 } from 'lucide-react';
 
 const SelectServer = () => {
+      const router = useRouter();
       const [viewMode, setViewMode] = useState('cards');
       const [selectedGroup, setSelectedGroup] = useState('all');
       const [selectedEnvironment, setSelectedEnvironment] = useState('All Environments');
@@ -102,30 +104,7 @@ const SelectServer = () => {
           try {
             setLoading(true);
             console.log("=== Fetching System Metrics ===");
-            const response: SystemMetricsResponse = await getSystemMetrics();
-            console.log("=== System Metrics Response ===", response);
-            console.log("=== Status ===", response.status);
-            console.log("=== Count ===", response.count);
-            console.log("=== Metrics Data ===", response.metrics);
-            
-            // Log each server individually
-            response.metrics.forEach((metric, index) => {
-              console.log(`=== Server ${index + 1}: ${metric.hostname} ===`, {
-                hostname: metric.hostname,
-                timestamp: metric.timestamp,
-                os: metric.host.os,
-                kernel: metric.host.kernel,
-                architecture: metric.host.architecture,
-                cpu_used_percent: metric.cpu.used_percent,
-                memory_used_percent: metric.memory.used_percent,
-                disk_used_percent: metric.disk.used_percent,
-                uptime_seconds: metric.uptime.seconds,
-                services_count: metric.services.length,
-                failed_services_count: metric.failed_services.length,
-                has_sql: !!metric.sql
-              });
-            });
-            
+            const response: SystemMetricsResponse = await getSystemMetrics("all");
             setServerMetrics(response.metrics);
           } catch (error: any) {
             console.error("=== Failed to fetch system metrics ===", error);
@@ -509,6 +488,7 @@ const SelectServer = () => {
 
           {/* Main Content */}
           <div style={{ flex: 1, minWidth: 0 }}>
+            
             {/* Filter Dropdowns */}
             <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
               {/* Environment Dropdown */}
@@ -604,7 +584,12 @@ const SelectServer = () => {
                     const status = getServerStatus(metric);
                     const serverIp = getServerIp(metric);
                     return (
-                      <div key={idx} className="card" style={{ cursor: 'pointer' }}>
+                      <div 
+                        key={idx} 
+                        className="card" 
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => router.push(`/netops/application-monitoring?server=${encodeURIComponent(metric.hostname)}`)}
+                      >
                         <div style={{ padding: '16px' }}>
                           <div style={{ marginBottom: '12px' }}>
                             <h6 style={{

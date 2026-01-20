@@ -44,6 +44,7 @@ import {
   getLead,
   getDealAttachments,
   downloadDealAttachment,
+  createApproval,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -108,6 +109,7 @@ import {
   AlertCircle,
   Handshake,
   Info,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   PieChart,
@@ -1111,6 +1113,20 @@ const CrmOrders = () => {
   }, []);
 
   // Mark Order Lost Modal
+  // Create Approval Handler
+  const handleCreateApproval = useCallback(async (orderId: number) => {
+    try {
+      await createApproval({
+        item_id: orderId,
+        type: 'order'
+      });
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to create approval:", error);
+      toast.error("Failed to create approval request");
+    }
+  }, []);
+
   const handleMarkLost = useCallback((order: any) => {
     setOrderToMarkLost(order);
     setShowMarkLostModal(true);
@@ -2700,6 +2716,12 @@ const CrmOrders = () => {
                                       <MoreVertical size={16} />
                                     </Dropdown.Toggle>
                                     <Dropdown.Menu align="end">
+                                      <Dropdown.Item
+                                        onClick={() => handleCreateApproval(order.rawData?.id || order.id)}
+                                      >
+                                        <ClipboardCheck size={14} className="me-2" />
+                                        Create Approval
+                                      </Dropdown.Item>
                                       <Dropdown.Item
                                         className="text-danger"
                                         onClick={() =>

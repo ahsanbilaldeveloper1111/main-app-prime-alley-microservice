@@ -43,7 +43,7 @@ import {
   PaymentIntentResponse,
   getCompanies
 } from "@utils/accountingOld";
-import { GetPaymentMethods } from "@utils/accounting";
+import { GetPaymentMethods,CompletePayment } from "@utils/accounting";
 import { formatNumber } from "@utils/Helper";
 
 import { Column } from "@components/CustomDataTable";
@@ -375,11 +375,10 @@ const DirectCardPaymentForm: React.FC<{
               console.log('Has next_action:', hasNextAction);
               console.log('Next action:', gatewayResponse?.next_action);
               
-              // For requires_action status, we should use handleCardAction to handle 3D Secure
-              // This is especially true when confirmation_method is manual
-              // Use handleCardAction if confirmation_method is manual OR if next_action exists
-              // Default to handleCardAction for requires_action to be safe
-              if (confirmationMethod === 'manual' || hasNextAction || paymentStatus === 'requires_action') {
+              // For requires_action status:
+              // - Use handleCardAction ONLY when confirmation_method is 'manual' (requires server-side confirmation)
+              // - Use confirmCardPayment for automatic confirmation (handles 3D Secure automatically)
+              if (confirmationMethod === 'manual') {
                 // For manual confirmation or when next_action exists, use handleCardAction to show 3D Secure modal
                 // After customer completes 3D Secure, backend will confirm the payment
                 console.log('Using handleCardAction for 3D Secure authentication...');
@@ -415,6 +414,13 @@ const DirectCardPaymentForm: React.FC<{
                   // After 3D Secure, check the payment intent status
                   if (finalPaymentIntent?.status === 'succeeded') {
                     toast.success('Payment successful!');
+                    console.log('Payment Result :', paymentResult);
+                    if(paymentResult?.payment?.id){
+                    await CompletePayment({
+                        payment_id: paymentResult?.payment?.id,
+                        payment_method:"stripe",
+                      });
+                    }
                     onPaymentSuccess();
                   } else if (finalPaymentIntent?.status === 'requires_confirmation') {
                     // 3D Secure completed successfully, but payment needs backend confirmation
@@ -438,6 +444,13 @@ const DirectCardPaymentForm: React.FC<{
                         if (updatedInvoice.status === STATUS_PAID || updatedInvoice.status === STATUS_PARTIALLY_PAID) {
                           clearInterval(pollInterval);
                           toast.success('Payment confirmed successfully!');
+                          console.log('Payment Result :', paymentResult);
+                          if(paymentResult?.payment?.id){
+                          await CompletePayment({
+                              payment_id: paymentResult?.payment?.id,
+                              payment_method:"stripe",
+                            });
+                          }
                           onPaymentSuccess();
                         } else if (pollCount >= maxPolls) {
                           clearInterval(pollInterval);
@@ -496,6 +509,13 @@ const DirectCardPaymentForm: React.FC<{
 
                 if (paymentIntent?.status === 'succeeded') {
                   toast.success('Payment successful!');
+                  console.log('Payment Result :', paymentResult);
+                  if(paymentResult?.payment?.id){
+                  await CompletePayment({
+                      payment_id: paymentResult?.payment?.id,
+                      payment_method:"stripe",
+                    });
+                  }
                   onPaymentSuccess();
                 } else if (paymentIntent?.status === 'requires_action') {
                   setCardError('Payment requires additional verification. Please try again.');
@@ -515,6 +535,13 @@ const DirectCardPaymentForm: React.FC<{
             // Payment succeeded immediately (no confirmation needed)
             console.log('Payment succeeded immediately');
             toast.success('Payment successful!');
+            console.log('Payment Result :', paymentResult);
+            if(paymentResult?.payment?.id){
+            await CompletePayment({
+                payment_id: paymentResult?.payment?.id,
+                payment_method:"stripe",
+              });
+            }
             onPaymentSuccess();
             setIsProcessing(false);
           } else if (paymentStatus === 'requires_payment_method') {
@@ -885,11 +912,11 @@ const InvoiceList = () => {
       return;
     }
 
-    console.log("Loading company products for company ID:", companyId);
+   
     setIsLoadingCompanyProducts(true);
     try {
       const response = await getProductsWithCompanyPricing(companyId);
-      console.log("Company products loaded:", response);
+      
       setCompanyProducts((response as any) || []);
     } catch (error) {
       console.error("Error loading company products:", error);
@@ -997,11 +1024,9 @@ const InvoiceList = () => {
 
   // Load exchange rates directly from free API
   const loadExchangeRates = useCallback(async (invoiceCurrency: string) => {
-    console.log('Loading exchange rates for:', invoiceCurrency, 'Loaded currencies:', Array.from(loadedCurrencies));
     
     // If we already have rates loaded for this currency, don't reload
     if (exchangeRates.length > 0 && baseCurrency === invoiceCurrency && !isInitialLoad) {
-      console.log('Rates already loaded for currency:', invoiceCurrency);
       return;
     }
 
@@ -1021,7 +1046,6 @@ const InvoiceList = () => {
       }
       
       const data = await response.json();
-      console.log('Exchange rate API response data:', data);
       
       // Process all currency pairs from the API response
       if (data.rates) {
@@ -1112,7 +1136,6 @@ const InvoiceList = () => {
         }
       }
       
-      console.log('All rates loaded for base currency:', invoiceCurrency, rates);
       
       // Update state with all rates
       setExchangeRates(rates);
@@ -1213,7 +1236,6 @@ const InvoiceList = () => {
           load_profile: true,
         });
         setCompanies(companiesData.data || []);
-        console.log("Companies:", companiesData);
         
         // Load products for the first company if available
         if (companiesData.data && companiesData.data.length > 0) {
@@ -1240,7 +1262,6 @@ const InvoiceList = () => {
     const response = await GetPaymentMethods() as any;
     const methods = response?.payment_methods || [];
     setPaymentMethods(methods);
-    console.log("Payment methods:", methods);
   };
 
   // Refresh payment methods when payment modal opens
@@ -1500,7 +1521,7 @@ const InvoiceList = () => {
 
   // Direct payment handlers
   const handleDirectPaymentSuccess = useCallback(() => {
-    toast.success("Payment processed successfully");
+    //toast.success("Payment processed successfully");
     
     // Close modal and reset state
     setShowPaymentModal(false);
@@ -1537,15 +1558,10 @@ const InvoiceList = () => {
         const clientSecret = paymentResult?.client_secret || paymentResult?.data?.client_secret || gatewayResponse?.client_secret;
         const paymentStatus = gatewayResponse?.status || paymentResult?.status;
         
-        console.log('Saved Card Payment Result:', paymentResult);
-        console.log('Saved Card Payment Status:', paymentStatus);
-        console.log('Saved Card Client Secret:', clientSecret);
-        console.log('Saved Card Gateway Response:', gatewayResponse);
-        
         // Check if payment requires customer confirmation (3D Secure, etc.)
         if (paymentStatus === 'requires_action' && clientSecret) {
           try {
-            console.log('Saved card payment requires action, handling 3D Secure with Stripe...');
+
             // Load Stripe to confirm payment
             if (!stripePublishableKey) {
               handleDirectPaymentError('Stripe is not initialized');
@@ -1564,15 +1580,13 @@ const InvoiceList = () => {
             // confirmation_method can be in gateway_response or we can check next_action
             const confirmationMethod = gatewayResponse?.confirmation_method;
             const hasNextAction = gatewayResponse?.next_action?.type === 'use_stripe_sdk';
-            console.log('Confirmation method:', confirmationMethod);
-            console.log('Has next_action:', hasNextAction);
+            
             console.log('Next action:', gatewayResponse?.next_action);
 
-            // For requires_action status, we should use handleCardAction to handle 3D Secure
-            // This is especially true when confirmation_method is manual
-            // Use handleCardAction if confirmation_method is manual OR if next_action exists
-            // Default to handleCardAction for requires_action to be safe
-            if (confirmationMethod === 'manual' || hasNextAction || paymentStatus === 'requires_action') {
+            // For requires_action status:
+            // - Use handleCardAction ONLY when confirmation_method is 'manual' (requires server-side confirmation)
+            // - Use confirmCardPayment for automatic confirmation (handles 3D Secure automatically)
+            if (confirmationMethod === 'manual') {
               // For manual confirmation or when next_action exists, use handleCardAction to show 3D Secure modal
               // After customer completes 3D Secure, backend will confirm the payment
               console.log('Using handleCardAction for 3D Secure authentication...');
@@ -1604,15 +1618,19 @@ const InvoiceList = () => {
                 // After 3D Secure, check the payment intent status
                 if (paymentIntent?.status === 'succeeded') {
                   toast.success('Payment successful!');
+                  console.log('Payment Result :', paymentResult);
+                  if(paymentResult?.payment?.id){
+                  await CompletePayment({
+                      payment_id: paymentResult?.payment?.id,
+                      payment_method:"stripe",
+                    });
+                  }
                   handleDirectPaymentSuccess();
                 } else if (paymentIntent?.status === 'requires_confirmation') {
-                  // 3D Secure completed successfully, but payment needs backend confirmation
-                  // This is expected for manual confirmation_method
+                  
                   console.log('Payment requires backend confirmation after 3D Secure');
-                  toast.success('3D Secure authentication completed successfully! Payment is being processed by the server...');
-                  // The backend should confirm the payment intent after 3D Secure
-                  // For now, we'll refresh the invoice list to check status
-                  // In production, you might want to poll or wait for webhook
+                  //toast.success('3D Secure authentication completed successfully! Payment is being processed by the server...');
+                 
                   setTimeout(() => {
                     handleDirectPaymentSuccess(); // Refresh to see updated status
                   }, 2000); // Give backend time to confirm
@@ -1649,6 +1667,13 @@ const InvoiceList = () => {
 
               if (paymentIntent?.status === 'succeeded') {
                 toast.success('Payment successful!');
+                console.log('Payment Result :', paymentResult);
+                if(paymentResult?.payment?.id){
+                await CompletePayment({
+                    payment_id: paymentResult?.payment?.id,
+                    payment_method:"stripe",
+                  });
+                }
                 handleDirectPaymentSuccess();
               } else if (paymentIntent?.status === 'requires_action') {
                 console.log("Require actions");
@@ -1667,6 +1692,13 @@ const InvoiceList = () => {
           // Payment succeeded immediately (no confirmation needed)
           console.log('Saved card payment succeeded immediately');
           toast.success('Payment successful!');
+          console.log('Payment Result :', paymentResult);
+          if(paymentResult?.data?.payment?.id){
+            await CompletePayment({
+              payment_id: paymentResult?.data?.payment?.id,
+              payment_method:"stripe",
+            });
+          }
           handleDirectPaymentSuccess();
           setIsProcessingPayment(false);
         } else if (paymentStatus === 'requires_payment_method') {

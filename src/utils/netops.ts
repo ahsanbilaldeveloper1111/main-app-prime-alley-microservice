@@ -158,8 +158,7 @@ export interface DeviceMonitoringStatusResponse {
 
 // Helper function to extract data from controlhub response
 function extractData<T>(response: NetOpsApiResponse<T>): T {
-  console.log("Extracting data from response:", response);
-
+  
   // Handle successful response with nested data structure
   if (response?.code === 200 && response?.data?.success) {
     console.log("Extracting from nested data structure:", response.data.data);
@@ -467,6 +466,13 @@ export interface SystemMetricSql {
   version: string;
 }
 
+export interface SystemMetricCron {
+  system: string[];
+  users: {
+    [key: string]: string[];
+  };
+}
+
 export interface SystemMetric {
   hostname: string;
   timestamp: string;
@@ -488,6 +494,7 @@ export interface SystemMetric {
   journal_errors: string[];
   python: SystemMetricPython;
   sql?: SystemMetricSql;
+  cron?: SystemMetricCron;
   received_at: string;
   file_mtime: string;
 }
@@ -600,9 +607,9 @@ export const getSystemMetricsServers = async (params: Record<string, any> = {}):
   }
 };
 
-export const getSystemMetrics = async (params: Record<string, any> = {}): Promise<SystemMetricsResponse> => {
+export const getSystemMetrics = async (server: string | number, params: Record<string, any> = {}): Promise<SystemMetricsResponse> => {
   try {
-    const response = await axiosInstance.get<NetOpsApiResponse<SystemMetricsResponse>>("/netops/system-metrics/all", { params });
+    const response = await axiosInstance.get<NetOpsApiResponse<SystemMetricsResponse>>("/netops/system-metrics/"+server);
     console.log("System metrics API response:", response.data);
     return extractData<SystemMetricsResponse>(response.data);
   } catch (error: any) {
