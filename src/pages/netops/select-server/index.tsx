@@ -10,9 +10,9 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 
-import  { useState, useEffect } from 'react';
+import  { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { getSystemMetrics, SystemMetric, SystemMetricsResponse } from "@utils/netops";
+import { getSystemMetrics, getAlerts, SystemMetric, SystemMetricsResponse, Alert } from "@utils/netops";
 import { 
   Search, 
   Server, 
@@ -30,8 +30,10 @@ import {
   List,
   Cpu,
   HardDrive,
-  Activity
+  Activity,
+  RefreshCw
 } from 'lucide-react';
+import { Form } from 'react-bootstrap';
 
 const SelectServer = () => {
       const router = useRouter();
@@ -43,6 +45,10 @@ const SelectServer = () => {
       const [showRegionDropdown, setShowRegionDropdown] = useState(false);
       const [serverMetrics, setServerMetrics] = useState<SystemMetric[]>([]);
       const [loading, setLoading] = useState(false);
+      const [autoRefresh, setAutoRefresh] = useState(true);
+      const [refreshingServer, setRefreshingServer] = useState<string | null>(null);
+      const [alerts, setAlerts] = useState<Alert[]>([]);
+      const [loadingAlerts, setLoadingAlerts] = useState(false);
     
       // Environment options
       const environments = ['All Environments', 'Production', 'Staging', 'Development', 'Testing', 'UAT'];
@@ -99,22 +105,81 @@ const SelectServer = () => {
       };
 
       // Fetch server metrics on component mount
-      useEffect(() => {
-        const fetchServerMetrics = async () => {
-          try {
-            setLoading(true);
-            console.log("=== Fetching System Metrics ===");
-            const response: SystemMetricsResponse = await getSystemMetrics("all");
-            setServerMetrics(response.metrics);
-          } catch (error: any) {
-            console.error("=== Failed to fetch system metrics ===", error);
-          } finally {
-            setLoading(false);
-          }
-        };
-
-        fetchServerMetrics();
+      const fetchServerMetrics = useCallback(async () => {
+        try {
+          setLoading(true);
+          console.log("=== Fetching System Metrics ===");
+          const response: SystemMetricsResponse = await getSystemMetrics("all");
+          setServerMetrics(response.metrics);
+        } catch (error: any) {
+          console.error("=== Failed to fetch system metrics ===", error);
+        } finally {
+          setLoading(false);
+        }
       }, []);
+
+      // Fetch alerts
+      const fetchAlerts = useCallback(async () => {
+        try {
+          setLoadingAlerts(true);
+          console.log("=== Fetching Alerts ===");
+          const alertsData = await getAlerts({ 
+            is_resolved: false,  // Only get unresolved alerts
+            limit: 5  // Limit to 5 most recent alerts
+          });
+          setAlerts(alertsData);
+        } catch (error: any) {
+          console.error("=== Failed to fetch alerts ===", error);
+        } finally {
+          setLoadingAlerts(false);
+        }
+      }, []);
+
+      // Function to refresh a specific server's metrics
+      const refreshServerMetrics = useCallback(async (hostname: string) => {
+        try {
+          setRefreshingServer(hostname);
+          console.log(`=== Refreshing metrics for server: ${hostname} ===`);
+          const response: SystemMetricsResponse = await getSystemMetrics(hostname);
+          
+          // Update the specific server's metrics in the state
+          if (response.metrics && response.metrics.length > 0) {
+            setServerMetrics(prevMetrics => {
+              const updatedMetrics = [...prevMetrics];
+              const serverIndex = updatedMetrics.findIndex(m => m.hostname === hostname);
+              
+              if (serverIndex !== -1) {
+                // Replace the existing server's metrics
+                updatedMetrics[serverIndex] = response.metrics[0];
+              } else {
+                // If server not found, add it to the list
+                updatedMetrics.push(response.metrics[0]);
+              }
+              
+              return updatedMetrics;
+            });
+          }
+        } catch (error: any) {
+          console.error(`=== Failed to refresh metrics for server ${hostname} ===`, error);
+        } finally {
+          setRefreshingServer(null);
+        }
+      }, []);
+
+      useEffect(() => {
+        fetchServerMetrics();
+        fetchAlerts();
+
+        // Auto-refresh if enabled (15 minutes = 900000 ms)
+        if (autoRefresh) {
+          const interval = setInterval(() => {
+            fetchServerMetrics();
+            fetchAlerts();
+          }, 900000); // Refresh every 15 minutes
+          
+          return () => clearInterval(interval);
+        }
+      }, [autoRefresh, fetchServerMetrics, fetchAlerts]);
     
 
   return (
@@ -172,6 +237,23 @@ const SelectServer = () => {
         .btn-outline:hover {
           background: #f8f9fa;
           border-color: #adb5bd;
+        }
+
+        .btn-outline-primary {
+          background: white;
+          color: #4da6ff;
+          border-color: #4da6ff;
+        }
+
+        .btn-outline-primary:hover {
+          background: #f0f8ff;
+          border-color: #3d96ef;
+          color: #3d96ef;
+        }
+
+        .btn-outline-primary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
         .btn-link {
@@ -429,6 +511,19 @@ const SelectServer = () => {
           }
         }
 
+        .spinning {
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
         @media (max-width: 768px) {
           .grid-3 {
             grid-template-columns: 1fr;
@@ -463,6 +558,30 @@ const SelectServer = () => {
           }}>
             Select a Server
           </h2>
+
+          <div className="d-flex gap-2 align-items-center">
+            <button 
+              className="btn btn-sm btn-outline-primary d-flex align-items-center gap-2"
+              onClick={async () => {
+                await fetchServerMetrics();
+                await fetchAlerts();
+              }}
+              disabled={loading || loadingAlerts}
+            >
+              <RefreshCw size={16} className={(loading || loadingAlerts) ? 'spinning' : ''} />
+              Refresh
+            </button>
+            <div className="d-flex align-items-center gap-2">
+              <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Auto</span>
+              <Form.Check 
+                type="switch"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                style={{ fontSize: '1.25rem' }}
+              />
+            </div>
+          </div>
+
           {/* <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <button 
               className={`btn ${viewMode === 'cards' ? 'btn-primary' : 'btn-outline'}`}
@@ -587,10 +706,48 @@ const SelectServer = () => {
                       <div 
                         key={idx} 
                         className="card" 
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => router.push(`/netops/application-monitoring?server=${encodeURIComponent(metric.hostname)}`)}
-                      >
-                        <div style={{ padding: '16px' }}>
+                       
+                        >
+                        <div style={{ padding: '16px', position: 'relative' }}>
+                          {/* Refresh Button - Top Right Corner */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              refreshServerMetrics(metric.hostname);
+                            }}
+                            disabled={refreshingServer === metric.hostname}
+                            style={{
+                              position: 'absolute',
+                              top: '12px',
+                              right: '12px',
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: refreshingServer === metric.hostname ? 'not-allowed' : 'pointer',
+                              padding: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: '4px',
+                              transition: 'background-color 0.2s',
+                              opacity: refreshingServer === metric.hostname ? 0.6 : 1
+                            }}
+                            onMouseEnter={(e) => {
+                              if (refreshingServer !== metric.hostname) {
+                                e.currentTarget.style.backgroundColor = '#f0f0f0';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                            title="Refresh server metrics"
+                          >
+                            <RefreshCw 
+                              size={16} 
+                              className={refreshingServer === metric.hostname ? 'spinning' : ''}
+                              color="#6c757d"
+                            />
+                          </button>
+
                           <div style={{ marginBottom: '12px' }}>
                             <h6 style={{
                               fontSize: '15px',
@@ -725,7 +882,10 @@ const SelectServer = () => {
                               {getStatusIcon(status.status)}
                               {status.status}
                             </div>
-                            <button className="btn btn-link" style={{ fontSize: '12px' }}>
+                            <button className="btn btn-link"
+                            onClick={() => router.push(`/netops/application-monitoring?server=${encodeURIComponent(metric.hostname)}`)}
+                      
+                             style={{ fontSize: '12px' }}>
                               Open Monitoring
                             </button>
                           </div>
@@ -899,88 +1059,105 @@ const SelectServer = () => {
                 </h5>
 
                 <div>
-                  {(() => {
-                    // Generate alerts from metrics with issues
-                    const alerts = serverMetrics
-                      .filter((metric: SystemMetric) => {
-                        const status = getServerStatus(metric);
-                        return status.status === 'Warning' || status.status === 'Critical' || metric.failed_services.length > 0;
-                      })
-                      .slice(0, 5) // Show top 5 alerts
-                      .map((metric: SystemMetric) => {
-                        const status = getServerStatus(metric);
-                        const serverIp = getServerIp(metric);
-                        return {
-                          name: metric.hostname,
-                          ip: serverIp,
-                          status: status.status,
-                          color: status.statusColor
-                        };
-                      });
+                  {loadingAlerts ? (
+                    <div style={{ 
+                      padding: '20px', 
+                      textAlign: 'center', 
+                      color: '#6c757d',
+                      fontSize: '14px'
+                    }}>
+                      Loading alerts...
+                    </div>
+                  ) : alerts.length === 0 ? (
+                    <div style={{ 
+                      padding: '20px', 
+                      textAlign: 'center', 
+                      color: '#6c757d',
+                      fontSize: '14px'
+                    }}>
+                      No alerts at this time
+                    </div>
+                  ) : (
+                    alerts.map((alert: Alert, idx: number) => {
+                      // Map severity to color
+                      const getSeverityColor = (severity: string): string => {
+                        switch (severity) {
+                          case 'CRITICAL':
+                            return 'danger';
+                          case 'HIGH':
+                            return 'danger';
+                          case 'MEDIUM':
+                            return 'warning';
+                          case 'LOW':
+                            return 'info';
+                          default:
+                            return 'secondary';
+                        }
+                      };
 
-                    if (alerts.length === 0) {
+                      // Map severity to icon
+                      const getSeverityIcon = (severity: string) => {
+                        if (severity === 'CRITICAL' || severity === 'HIGH') {
+                          return <XCircle size={14} color="#dc3545" />;
+                        } else if (severity === 'MEDIUM') {
+                          return <AlertTriangle size={14} color="#ffc107" />;
+                        } else {
+                          return <AlertCircle size={14} color="#17a2b8" />;
+                        }
+                      };
+
+                      const severityColor = getSeverityColor(alert.severity);
+                      const displayName = alert.hostname || alert.customer_name || `Device ${alert.device_id}`;
+                      const displayInfo = alert.service_name || alert.message || alert.alert_type;
+
                       return (
-                        <div style={{ 
-                          padding: '20px', 
-                          textAlign: 'center', 
-                          color: '#6c757d',
-                          fontSize: '14px'
-                        }}>
-                          No alerts at this time
+                        <div 
+                          key={alert.id}
+                          style={{
+                            padding: '12px 0',
+                            borderBottom: idx < alerts.length - 1 ? '1px solid #e9ecef' : 'none'
+                          }}
+                        >
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start'
+                          }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                marginBottom: '4px'
+                              }}>
+                                {getSeverityIcon(alert.severity)}
+                                <span style={{
+                                  fontSize: '14px',
+                                  fontWeight: '500',
+                                  color: '#1a1a1a'
+                                }}>
+                                  {displayName}
+                                </span>
+                              </div>
+                              <div style={{
+                                fontSize: '12px',
+                                color: '#6c757d',
+                                paddingLeft: '20px'
+                              }}>
+                                {displayInfo}
+                              </div>
+                            </div>
+                            <span 
+                              className={`badge badge-${severityColor}`}
+                              style={{ fontSize: '11px' }}
+                            >
+                              {alert.severity}
+                            </span>
+                          </div>
                         </div>
                       );
-                    }
-
-                    return alerts.map((alert: any, idx: number) => (
-                      <div 
-                        key={idx}
-                        style={{
-                          padding: '12px 0',
-                          borderBottom: idx < alerts.length - 1 ? '1px solid #e9ecef' : 'none'
-                        }}
-                      >
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start'
-                        }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              marginBottom: '4px'
-                            }}>
-                              {alert.color === 'warning' ? 
-                                <AlertTriangle size={14} color="#ffc107" /> : 
-                                <XCircle size={14} color="#dc3545" />
-                              }
-                              <span style={{
-                                fontSize: '14px',
-                                fontWeight: '500',
-                                color: '#1a1a1a'
-                              }}>
-                                {alert.name}
-                              </span>
-                            </div>
-                            <div style={{
-                              fontSize: '12px',
-                              color: '#6c757d',
-                              paddingLeft: '20px'
-                            }}>
-                              {alert.ip}
-                            </div>
-                          </div>
-                          <span 
-                            className={`badge badge-${alert.color}`}
-                            style={{ fontSize: '11px' }}
-                          >
-                            {alert.status}
-                          </span>
-                        </div>
-                      </div>
-                    ));
-                  })()}
+                    })
+                  )}
                 </div>
               </div>
             </div>
@@ -994,6 +1171,7 @@ const SelectServer = () => {
                 justifyContent: 'center',
                 fontSize: '15px'
               }}
+              onClick={() => router.push(`/netops/application-monitoring`)}
             >
               Open Monitoring <ChevronRight size={20} />
             </button>

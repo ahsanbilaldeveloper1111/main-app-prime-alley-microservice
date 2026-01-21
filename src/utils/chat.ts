@@ -277,7 +277,7 @@ export const deleteTenantFAQ = async (params: DeleteTenantFAQParams): Promise<vo
  */
 export const getGlobalFAQs = async (): Promise<FAQData[]> => {
   try {
-    const response = await axiosInstance.get<FAQListResponse>('/chat/global-faqs');
+    const response = await axiosInstance.get<FAQListResponse>('/chat/global-faqs/');
     
     // Check if response contains an error
     if (response.data?.error) {
@@ -289,6 +289,8 @@ export const getGlobalFAQs = async (): Promise<FAQData[]> => {
       return response.data;
     } else if (response.data?.data && Array.isArray(response.data.data)) {
       return response.data.data;
+    } else if (response.data?.faqs && Array.isArray(response.data.faqs)) {
+      return response.data.faqs;
     }
     
     return [];
@@ -305,29 +307,49 @@ export const getGlobalFAQs = async (): Promise<FAQData[]> => {
 };
 
 /**
- * Create a global FAQ
- * @param payload - FAQ data containing question and answer
- * @returns Promise with created FAQ data
+ * Create or update global FAQs
+ * @param payload - FAQ payload containing faqs (JSON string), have_files, and files
+ * @returns Promise with created FAQ response
  */
 export const createGlobalFAQ = async (
-  payload: Omit<FAQData, 'id' | 'created_at' | 'updated_at' | 'tenant_id'>
-): Promise<FAQData> => {
+  payload: Omit<CreateTenantFAQPayload, 'tenant_id'>
+): Promise<any> => {
   try {
-    const response = await axiosInstance.post<FAQResponse>('/chat/global-faqs', payload);
+    // Create FormData for file uploads
+    const formData = new FormData();
+    formData.append('faqs', payload.faqs);
+    
+    if (payload.have_files) {
+      formData.append('have_files', payload.have_files);
+    }
+    
+    // Append files if provided
+    if (payload.files && payload.files.length > 0) {
+      payload.files.forEach((file) => {
+        // FormData.append handles both File objects and strings
+        formData.append('files[]', file as any);
+      });
+    }
+    
+    const response = await axiosInstance.post('/chat/global-faqs/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     
     // Check if response contains an error
     if (response.data?.error) {
-      throw new Error(response.data.error || 'Failed to create global FAQ');
+      throw new Error(response.data.error || 'Failed to create global FAQs');
     }
     
-    toast.success('Global FAQ created successfully');
-    return response.data as FAQData;
+    toast.success('Global FAQs created successfully');
+    return response.data;
   } catch (error: any) {
     const errorMsg = 
       error.response?.data?.error || 
       error.response?.data?.message || 
       error.message || 
-      'Failed to create global FAQ. Please try again.';
+      'Failed to create global FAQs. Please try again.';
     
     toast.error(errorMsg);
     throw error;
@@ -336,12 +358,16 @@ export const createGlobalFAQ = async (
 
 /**
  * Delete a global FAQ
- * @param id - FAQ ID to delete
+ * @param faq_id - FAQ ID to delete
  * @returns Promise with deletion response
  */
-export const deleteGlobalFAQ = async (id: number): Promise<void> => {
+export const deleteGlobalFAQ = async (faq_id: number): Promise<void> => {
   try {
-    const response = await axiosInstance.delete(`/chat/global-faqs/${id}`);
+    const response = await axiosInstance.delete('/chat/global-faqs/', {
+      params: {
+        faq_id: faq_id,
+      },
+    });
     
     // Check if response contains an error
     if (response.data?.error) {

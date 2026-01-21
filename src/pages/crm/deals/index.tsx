@@ -2381,12 +2381,12 @@ const CrmDeals = () => {
                                       <MoreVertical size={16} />
                                     </Dropdown.Toggle>
                                     <Dropdown.Menu align="end">
-                                        <Dropdown.Item 
+                                        {/* <Dropdown.Item 
                                           onClick={() => handleCreateApproval(deal.rawData?.id || deal.id)}
                                         >
                                           <ClipboardCheck size={14} className="me-2" />
                                           Create Approval
-                                        </Dropdown.Item>
+                                        </Dropdown.Item> */}
                                         <Dropdown.Item 
                                           className="text-danger"
                                           onClick={() => handleMarkLost(deal.rawData || deal)}

@@ -1575,7 +1575,7 @@ const CrmOrders = () => {
         {/* Page Header */}
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
           <div className="mb-3 mb-md-0">
-            <h2 className="mb-1 fw-bold">Orders Management</h2>
+            <h2 className="mb-1 fw-bold">Orders</h2>
             <p className="text-muted mb-0">Track and fulfill customer orders</p>
           </div>
           <div className="d-flex flex-wrap gap-2">
@@ -2716,12 +2716,12 @@ const CrmOrders = () => {
                                       <MoreVertical size={16} />
                                     </Dropdown.Toggle>
                                     <Dropdown.Menu align="end">
-                                      <Dropdown.Item
+                                      {/* <Dropdown.Item
                                         onClick={() => handleCreateApproval(order.rawData?.id || order.id)}
                                       >
                                         <ClipboardCheck size={14} className="me-2" />
                                         Create Approval
-                                      </Dropdown.Item>
+                                      </Dropdown.Item> */}
                                       <Dropdown.Item
                                         className="text-danger"
                                         onClick={() =>

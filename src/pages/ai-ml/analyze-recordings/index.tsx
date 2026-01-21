@@ -33,6 +33,7 @@ interface TranscriptionSummary {
     transcribed_transcriptions:number;
     completed_transcriptions: number;
     failed_transcriptions: number;
+    queued_transcriptions: number;
 }
 
 
@@ -91,6 +92,7 @@ const AnalyzeRecordings = () => {
         transcribed_transcriptions: 0,
         completed_transcriptions: 0,
         failed_transcriptions: 0,
+        queued_transcriptions: 0,
     });
 
     // Base card configuration to avoid duplication
@@ -105,73 +107,81 @@ const AnalyzeRecordings = () => {
         {
             id: 'total-transcriptions',
             title: 'Total Transcriptions',
-            value: transcriptionSummary.total_transcriptions,
+            value: transcriptionSummary?.total_transcriptions || 0,
             description: 'Total transcriptions in the system',
             delay: 0.1,
             ...baseCardConfig
         },
         {
+            id: 'queued-transcriptions',
+            title: 'Queued Transcriptions',
+            value: transcriptionSummary?.queued_transcriptions || 0,
+            description: 'Queued transcriptions in the system',
+            delay: 0.2,
+            ...baseCardConfig
+        },
+        {
             id: 'incomplete-transcriptions',
             title: 'Incomplete Transcriptions',
-            value: transcriptionSummary.incomplete_transcriptions,
+            value: transcriptionSummary?.incomplete_transcriptions || 0,
             description: 'Incomplete transcriptions in the system',
-            delay: 0.2,
+            delay: 0.3,
             ...baseCardConfig
         },
         {
             id: 'in-progress-transcriptions',
             title: 'In Progress Transcriptions',
-            value: transcriptionSummary.in_progress_transcriptions,
+            value: transcriptionSummary?.in_progress_transcriptions || 0,
             description: 'In progress transcriptions in the system',
-            delay: 0.3,
+            delay: 0.4,
             ...baseCardConfig
         },
         {
             id: 'analyzing-transcriptions',
             title: 'Analyzing Transcriptions',
-            value: transcriptionSummary.analyzing_transcriptions,
+            value: transcriptionSummary?.analyzing_transcriptions || 0,
             description: 'Analyzing transcriptions in the system',
-            delay: 0.4,
+            delay: 0.5,
             ...baseCardConfig
         },
         {
             id: 'analyzed-transcriptions',
             title: 'Analyzed Transcriptions',
-            value: transcriptionSummary.analyzed_transcriptions,
+            value: transcriptionSummary?.analyzed_transcriptions || 0,
             description: 'Analyzed transcriptions in the system',
-            delay: 0.5,
+            delay: 0.6,
             ...baseCardConfig
         },
         {
             id: 'transribing-transcriptions',
             title: 'Transribing Transcriptions',
-            value: transcriptionSummary.transribing_transcriptions,
+            value: transcriptionSummary?.transribing_transcriptions || 0,
             description: 'Transribing transcriptions in the system',
-            delay: 0.6,
+            delay: 0.7,
             ...baseCardConfig
         },
         {
             id: 'transcribed-transcriptions',
             title: 'Transcribed Transcriptions',
-            value: transcriptionSummary.transcribed_transcriptions,
+            value: transcriptionSummary?.transcribed_transcriptions || 0,
             description: 'Transcribed transcriptions in the system',
-            delay: 0.7,
+            delay: 0.8,
             ...baseCardConfig
         },
         {
             id: 'completed-transcriptions',
             title: 'Completed Transcriptions',
-            value: transcriptionSummary.completed_transcriptions,
+            value: transcriptionSummary?.completed_transcriptions || 0,
             description: 'Completed transcriptions in the system',
-            delay: 0.8,
+            delay: 0.9,
             ...baseCardConfig
         },
         {
             id: 'failed-transcriptions',
             title: 'Failed Transcriptions',
-            value: transcriptionSummary.failed_transcriptions,
+            value: transcriptionSummary?.failed_transcriptions || 0,
             description: 'Failed transcriptions in the system',
-            delay: 0.9,
+            delay: 1,
             ...baseCardConfig
         }
       
@@ -507,14 +517,15 @@ const AnalyzeRecordings = () => {
                     if (response?.summary) {
                         setTranscriptionSummary({
                             total_transcriptions: response.summary.total_transcriptions || 0,
-                            incomplete_transcriptions: response.summary.incomplete_transcriptions || 0,
-                            in_progress_transcriptions: response.summary.in_progress_transcriptions || 0,
-                            analyzing_transcriptions: response.summary.analyzing_transcriptions || 0,
-                            analyzed_transcriptions: response.summary.analyzed_transcriptions || 0,
-                            transribing_transcriptions: response.summary.transribing_transcriptions || 0,
-                            transcribed_transcriptions: response.summary.transcribed_transcriptions || 0,
-                            completed_transcriptions: response.summary.completed_transcriptions || 0,
-                            failed_transcriptions: response.summary.failed_transcriptions || 0,
+                            incomplete_transcriptions: response.summary?.incomplete_transcriptions || 0,
+                            in_progress_transcriptions: response.summary?.in_progress_transcriptions || 0,
+                            analyzing_transcriptions: response.summary?.analyzing_transcriptions || 0,
+                            analyzed_transcriptions: response.summary?.analyzed_transcriptions || 0,
+                            transribing_transcriptions: response.summary?.transribing_transcriptions || 0,
+                            transcribed_transcriptions: response.summary?.transcribed_transcriptions || 0,
+                            completed_transcriptions: response.summary?.completed_transcriptions || 0,
+                            failed_transcriptions: response.summary?.failed_transcriptions || 0,
+                            queued_transcriptions: response.summary?.queued_transcriptions || 0,
                         });
                     }
 

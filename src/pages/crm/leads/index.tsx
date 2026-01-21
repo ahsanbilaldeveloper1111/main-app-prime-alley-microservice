@@ -2145,7 +2145,7 @@ const CrmLeads = () => {
         {/* Page Header */}
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
           <div className="mb-3 mb-md-0">
-            <h2 className="mb-1 fw-bold">Leads Management</h2>
+            <h2 className="mb-1 fw-bold">Leads</h2>
             <p className="text-muted mb-0">
               Track and manage your qualified leads with scoring
             </p>

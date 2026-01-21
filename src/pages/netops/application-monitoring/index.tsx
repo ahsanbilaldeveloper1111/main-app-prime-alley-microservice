@@ -838,10 +838,10 @@ const ApplicationMonitoring = () => {
                         <span style={{ fontWeight: 600 }}>{service.name}</span>
                   </div>
                   <div className="d-flex align-items-center gap-3">
-                        <Badge bg={service.running ? 'success' : 'danger'} className="status-badge">
+                        <Badge bg={service.running ? 'success' : 'danger'} className="status-badge text-capitalize">
                           {service.status}
                         </Badge>
-                        <span style={{ fontSize: '0.875rem', color: '#64748b' }}>{service.status}</span>
+                        
                   </div>
                 </div>
                   ))

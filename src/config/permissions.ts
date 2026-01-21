@@ -41,6 +41,10 @@ export const routePermissions: RoutePermission[] = [
     
     {path:'/ai-ml/tenant-faqs',permissions: ['']},
     {path:'/ai-ml/global-faqs',permissions: ['']},
+    {path:'/chat/ai-faqs',permissions: [PERMISSIONS.TMS_SERVICES]},
+    {path:'/chat/ai-bot-faqs',permissions: [PERMISSIONS.TMS_SERVICES]},
+    {path:'/chat/ai-faqs/tenant',permissions: [PERMISSIONS.TMS_SERVICES]},
+    {path:'/chat/ai-faqs/global',permissions: [PERMISSIONS.TMS_SERVICES]},
     
     {
         path: '/help-center',

@@ -184,6 +184,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_CRM_HISTORY,
           url: '/crm/history'
         },
+        // {
+        //   id:'crm-approvals',
+        //   title: 'Quotes & Approvals',
+        //   icon: <FileText size={16} />,
+        //   permission: PERMISSIONS.VIEW_CRM_HISTORY,
+        //   url: '/crm/approvals'
+        // }
        
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
@@ -445,6 +452,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <FileText size={16} />,
           permission: PERMISSIONS.TMS_SERVICES,
           url: '/live-calls/management/agents'
+        },
+        {
+          id: 'ai-chat-faqs-management',
+          title: 'AI Chat FAQs',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/chat/ai-faqs'
+        },
+        {
+          id: 'ai-bot-faqs-management',
+          title: 'AI Bot FAQs',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/chat/ai-bot-faqs'
         }
       ]
       .filter(item => !item.permission || hasPermission(item.permission))

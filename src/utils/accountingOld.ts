@@ -1719,7 +1719,7 @@ export const createDirectPayment = async (data: CreateDirectPaymentData): Promis
     );
     
     // Handle the actual API response structure
-    console.log(response, "RARARA");
+    
     if (response.data?.code === 200 && response.data?.data?.success) {
       // The actual payment intent data should be in response.data.data.data
       // If it's an empty array, we might need to handle this case
@@ -1741,4 +1741,3 @@ export const createDirectPayment = async (data: CreateDirectPaymentData): Promis
     throw error;
   }
 };
-

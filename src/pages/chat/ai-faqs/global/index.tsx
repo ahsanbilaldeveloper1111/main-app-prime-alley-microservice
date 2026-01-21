@@ -4,13 +4,14 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useEffect,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
-  getTenantFAQs,
-  createTenantFAQ,
-  deleteTenantFAQ,
+  getGlobalFAQs,
+  createGlobalFAQ,
+  deleteGlobalFAQ,
   FAQData,
   FAQItem,
   CreateTenantFAQPayload,
@@ -25,14 +26,16 @@ import {
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import { Edit, Trash2, Plus, X } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { Edit, Trash2, Plus, X, Eye, ArrowLeft } from "lucide-react";
 import { toast } from "react-toastify";
 import GenericListPage from "@components/GenericListPage";
+import ConfirmModal from "@pages/partial/ConfirmModal";
+import { useRouter } from 'next/router'
 
-const TenantFAQs = () => {
-  const { data: session } = useSession();
+const AIChatFAQsGlobal = () => {
+    const router = useRouter();
   const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [cachedFAQs, setCachedFAQs] = useState<FAQData[]>([]);
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -47,15 +50,6 @@ const TenantFAQs = () => {
   const [haveFiles, setHaveFiles] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileInputKey, setFileInputKey] = useState(0);
-
-  // Get tenant_id from session
-  const getTenantId = (): string => {
-    if (session?.user) {
-      return (session.user as any).tenant_id || "tenant_123";
-    }
-    return "tenant_123"; // Fallback
-  };
-
 
   // Columns for table
   const columns: Column[] = useMemo(
@@ -77,10 +71,10 @@ const TenantFAQs = () => {
         selector: (row: FAQData) => row.answer,
         sortable: true,
         cell: (props: FAQData) => (
-          <div style={{ maxWidth: "500px" }}>
-            {props.answer.length > 100 ? (
+          <div>
+            {props.answer.length > 50 ? (
               <span>
-                {props.answer.substring(0, 100)}...
+                {props.answer.substring(0, 50)}...
               </span>
             ) : (
               <span>{props.answer}</span>
@@ -88,19 +82,17 @@ const TenantFAQs = () => {
           </div>
         ),
       },
-      {
-        key: "created_at",
-        name: "Created At",
-        selector: (row: FAQData) => row.created_at || "",
-        sortable: true,
-        cell: (props: FAQData) => (
-          <span>
-            {props.created_at
-              ? new Date(props.created_at).toLocaleDateString()
-              : "N/A"}
-          </span>
-        ),
-      },
+    //   {
+    //     key: "created_at",
+    //     name: "Created At",
+    //     selector: (row: FAQData) => row.created_at,
+    //     sortable: true,
+    //     cell: (props: FAQData) => (
+    //       <span>
+    //         {props.created_at ? formatDateTimeToLocal(props.created_at, undefined, GlobalDateFormat) : "-"}
+    //       </span>
+    //     ),
+    //   },
       {
         key: "Action",
         name: "Actions",
@@ -108,6 +100,14 @@ const TenantFAQs = () => {
         sortable: false,
         cell: (props: FAQData) => (
           <div className="d-flex gap-2">
+            <Button
+              variant="light"
+              className="btn-action-style-2 p-1 text-primary"
+              title="View"
+              onClick={() => handleViewFAQ(props)}
+            >
+              <Eye size={16} />
+            </Button>
             <Button
               variant="light"
               className="btn-action-style-2 p-1 text-primary"
@@ -182,6 +182,15 @@ const TenantFAQs = () => {
     }
   };
 
+  // Modal states
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewFAQ, setViewFAQ] = useState<FAQData | null>(null);
+  // Handle view FAQ
+  const handleViewFAQ = (faq: FAQData) => {
+    setViewFAQ(faq);
+    setShowViewModal(true);
+  };
+
   // Submit create/update
   const handleSubmit = async (isEdit: boolean = false) => {
     // Validate FAQ items
@@ -195,8 +204,6 @@ const TenantFAQs = () => {
     }
 
     try {
-      const tenantId = getTenantId();
-      
       // Convert FAQ items to JSON string
       const faqsJson = JSON.stringify(validFAQs);
 
@@ -204,14 +211,13 @@ const TenantFAQs = () => {
       // In a real implementation, you might need to upload files first and get their paths
       const filePaths: string[] = selectedFiles.map((file) => file.name);
 
-      const payload: CreateTenantFAQPayload = {
-        tenant_id: tenantId,
+      const payload: Omit<CreateTenantFAQPayload, 'tenant_id'> = {
         faqs: faqsJson,
         have_files: haveFiles && selectedFiles.length > 0 ? "true" : "false",
         files: filePaths.length > 0 ? filePaths : undefined,
       };
 
-      await createTenantFAQ(payload);
+      await createGlobalFAQ(payload);
 
       // Reset form
       setFaqItems([{ question: "", answer: "" }]);
@@ -235,10 +241,7 @@ const TenantFAQs = () => {
     if (!selectedFAQ?.id) return;
 
     try {
-      await deleteTenantFAQ({
-        tenant_id: getTenantId(),
-        faq_id: selectedFAQ.id,
-      });
+      await deleteGlobalFAQ(selectedFAQ.id);
 
       setShowDeleteModal(false);
       setSelectedFAQ(null);
@@ -249,65 +252,74 @@ const TenantFAQs = () => {
     }
   };
 
-  // Fetch data for GenericListPage
+  // Fetch FAQs from API (only called on mount and when refreshKey changes)
+  const fetchFAQsFromAPI = useCallback(async () => {
+    try {
+      const allFAQs = await getGlobalFAQs();
+      setCachedFAQs(allFAQs);
+    } catch (error) {
+      console.error("Error fetching FAQs:", error);
+      setCachedFAQs([]);
+    }
+  }, []);
+
+  // Fetch FAQs on mount and when refreshKey changes
+  useEffect(() => {
+    fetchFAQsFromAPI();
+  }, [refreshKey, fetchFAQsFromAPI]);
+
+  // Fetch data for GenericListPage (uses cached data, no API call on search)
   const fetchData = useCallback(
     async (page = 1, perPage = 15, search = "") => {
-      try {
-        const allFAQs = await getTenantFAQs();
-        
-        // Client-side filtering and pagination
-        let filtered = allFAQs;
-        
-        if (search) {
-          filtered = allFAQs.filter(
-            (faq) =>
-              faq.question.toLowerCase().includes(search.toLowerCase()) ||
-              faq.answer.toLowerCase().includes(search.toLowerCase())
-          );
-        }
-
-        const start = (page - 1) * perPage;
-        const end = start + perPage;
-        const paginated = filtered.slice(start, end);
-
-        return {
-          data: paginated,
-          total: filtered.length,
-          page,
-          per_page: perPage,
-          last_page: Math.ceil(filtered.length / perPage),
-        };
-      } catch (error) {
-        console.error("Error fetching FAQs:", error);
-        return {
-          data: [],
-          total: 0,
-          page: 1,
-          per_page: perPage,
-          last_page: 1,
-        };
+      // Use cached FAQs instead of calling API
+      let filtered = cachedFAQs;
+      
+      // Client-side filtering
+      if (search) {
+        filtered = cachedFAQs.filter(
+          (faq) =>
+            faq.question.toLowerCase().includes(search.toLowerCase()) ||
+            faq.answer.toLowerCase().includes(search.toLowerCase())
+        );
       }
+
+      // Client-side pagination
+      const start = (page - 1) * perPage;
+      const end = start + perPage;
+      const paginated = filtered.slice(start, end);
+
+      return {
+        data: paginated,
+        total: filtered.length,
+        page,
+        per_page: perPage,
+        last_page: Math.ceil(filtered.length / perPage),
+      };
     },
-    []
+    [cachedFAQs]
   );
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Tenant FAQs" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Global FAQs" />
 
-      <PageHeader title="Tenant FAQs" showSearch={false} />
-
-      <div className="d-flex justify-content-end mb-3">
+      <PageHeader title="Global FAQs" showSearch={false} buttons={
+        <>
         <Button variant="primary" onClick={() => setShowAddModal(true)}>
           <Plus size={16} className="me-2" />
           Add FAQs
         </Button>
-      </div>
+        <Button variant="outline-secondary" onClick={() => router.back()}>
+          <ArrowLeft size={16} className="me-2" />
+          Back
+        </Button>
+        </>
+      }/>
 
       <GenericListPage
         columns={columns}
         fetchData={fetchData}
-        title="Tenant FAQs"
+        title="Global FAQs"
         searchPlaceholder="Search FAQs..."
         defaultPageSize={15}
         filters={{}}
@@ -330,7 +342,7 @@ const TenantFAQs = () => {
         centered
       >
         <Modal.Header closeButton>
-          <Modal.Title>Add Tenant FAQs</Modal.Title>
+          <Modal.Title>Add Global FAQs</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form>
@@ -397,7 +409,7 @@ const TenantFAQs = () => {
             </div>
 
             {/* Files Section */}
-            <div className="mb-3">
+            {/* <div className="mb-3">
               <Form.Check
                 type="checkbox"
                 label="Have Files"
@@ -410,7 +422,7 @@ const TenantFAQs = () => {
                   }
                 }}
               />
-            </div>
+            </div> */}
 
             {haveFiles && (
               <div className="mb-3">
@@ -420,7 +432,7 @@ const TenantFAQs = () => {
                   type="file"
                   multiple
                   onChange={handleFileChange}
-                  accept=".pdf,.txt,.doc,.docx"
+                  accept=".jpg,.jpeg,.png,.gif,.pdf,.txt,.doc,.docx"
                 />
                 {selectedFiles.length > 0 && (
                   <div className="mt-2">
@@ -480,7 +492,7 @@ const TenantFAQs = () => {
         centered
       >
         <Modal.Header closeButton>
-          <Modal.Title>Edit Tenant FAQ</Modal.Title>
+          <Modal.Title>Edit Global FAQ</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form>
@@ -526,7 +538,7 @@ const TenantFAQs = () => {
             </div>
 
             {/* Files Section */}
-            <div className="mb-3">
+            {/* <div className="mb-3">
               <Form.Check
                 type="checkbox"
                 label="Have Files"
@@ -539,7 +551,7 @@ const TenantFAQs = () => {
                   }
                 }}
               />
-            </div>
+            </div> */}
 
             {haveFiles && (
               <div className="mb-3">
@@ -549,7 +561,7 @@ const TenantFAQs = () => {
                   type="file"
                   multiple
                   onChange={handleFileChange}
-                  accept=".pdf,.txt,.doc,.docx"
+                  accept=".jpg,.jpeg,.png,.gif,.pdf,.txt,.doc,.docx"
                 />
                 {selectedFiles.length > 0 && (
                   <div className="mt-2">
@@ -596,36 +608,47 @@ const TenantFAQs = () => {
       </Modal>
 
       {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <ConfirmModal
+          show={showDeleteModal}
+          onHide={() => {
+            setShowDeleteModal(false);
+            setSelectedFAQ(null);
+          }}
+          title="Delete FAQ?"
+          description="Are you sure you want to delete this FAQ? This action cannot be undone."
+          targetName={selectedFAQ?.question || ""}
+          confirmButtonText="Delete"
+          cancelButtonText="Cancel"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => {
+            setShowDeleteModal(false);
+            setSelectedFAQ(null);
+          }}
+        />
+      )}
+
+
+      {/* View FAQ Modal */}
       <Modal
-        show={showDeleteModal}
-        onHide={() => {
-          setShowDeleteModal(false);
-          setSelectedFAQ(null);
-        }}
+        show={showViewModal}
+        onHide={() => setShowViewModal(false)}
+        size="lg"
         centered
       >
         <Modal.Header closeButton>
-          <Modal.Title>Delete FAQ</Modal.Title>
+          <Modal.Title>View FAQ</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <p>
-            Are you sure you want to delete this FAQ?
+            <strong>Question:</strong> {viewFAQ?.question}
             <br />
-            <strong>Question:</strong> {selectedFAQ?.question}
+            <strong>Answer:</strong> {viewFAQ?.answer}
           </p>
         </Modal.Body>
         <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowDeleteModal(false);
-              setSelectedFAQ(null);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={handleConfirmDelete}>
-            Delete
+          <Button variant="secondary" onClick={() => setShowViewModal(false)}>
+            Close
           </Button>
         </Modal.Footer>
       </Modal>
@@ -633,8 +656,8 @@ const TenantFAQs = () => {
   );
 };
 
-TenantFAQs.getLayout = (page: ReactElement) => {
+AIChatFAQsGlobal.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default TenantFAQs;
+export default AIChatFAQsGlobal;
