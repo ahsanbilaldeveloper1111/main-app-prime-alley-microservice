@@ -1102,7 +1102,11 @@ const ApplicationMonitoring = () => {
                         label={{ value: 'Usage %', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#94a3b8', fontSize: '0.75rem' } }}
                     />
                       <Tooltip 
-                        formatter={(value: number) => [`${value.toFixed(1)}%`, '']}
+                        formatter={(value: string | number | (string | number)[]) => {
+                          const numValue = Array.isArray(value) ? value[0] : value;
+                          const numericValue = typeof numValue === 'string' ? parseFloat(numValue) : numValue;
+                          return [`${numericValue.toFixed(1)}%`, ''];
+                        }}
                         labelFormatter={(label) => `Time: ${label}`}
                       />
                     <Area type="monotone" dataKey="cpu" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorCpu)" />
