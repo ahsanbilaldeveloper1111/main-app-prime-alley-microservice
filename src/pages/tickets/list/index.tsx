@@ -471,13 +471,38 @@ const TicketList = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const data = await DashboardData(currentFilters);
+        // Convert priority from string to integer for API
+        const apiFilters = {
+          ...currentFilters,
+          priority: currentFilters.priority && currentFilters.priority !== "" 
+            ? Number.parseInt(currentFilters.priority, 10) 
+            : undefined
+        };
         
-        if (data && data.total_tickets !== undefined) {
-          setTotalTickets(data.total_tickets || 0);
-        }
-        if (data && data.statuses !== undefined) {
-          setStatusSummary(data.statuses);
+        const data = await DashboardData(apiFilters);
+
+        // Handle the new response structure
+        if (data) {
+          // Set total tickets
+          if (data.total !== undefined) {
+            setTotalTickets(data.total || 0);
+          }
+          
+          // Set status summary from by_status array
+          if (data.by_status && Array.isArray(data.by_status)) {
+            setStatusSummary(data.by_status);
+          }
+          
+          // Log other available data for potential future use
+          console.log('Dashboard Data:', {
+            total: data.total,
+            by_category: data.by_category,
+            by_status: data.by_status,
+            by_priority: data.by_priority,
+            by_type: data.by_type,
+            by_module: data.by_module,
+            by_approval: data.by_approval,
+          });
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -493,11 +518,19 @@ const TicketList = () => {
 
   const fetchTickets = useCallback(
     async (page = 1, perPage = 15) => {
+      // Convert priority from string to integer for API
+      const apiFilters = {
+        ...memoizedFilters,
+        priority: memoizedFilters.priority && memoizedFilters.priority !== "" 
+          ? Number.parseInt(memoizedFilters.priority, 10) 
+          : undefined
+      };
+      
       return await ListTickets({
         page,
         perPage,
         search: currentFilters.search,
-        filters: memoizedFilters,
+        filters: apiFilters,
         moduleSlug: ModuleSlug.TICKET,
       });
     },
@@ -536,7 +569,7 @@ const TicketList = () => {
   }
 
   useEffect(() => {
-    console.log("ZE RAN");
+   
     if (viewTicketData?.image) {
       // Handle both array and single image
       const images = Array.isArray(viewTicketData.image)
@@ -575,8 +608,7 @@ const TicketList = () => {
         GetAssigneeComments(ticketId),
       ]);
 
-      console.log("Raw comments data:", commentsData);
-      console.log("Raw assignee comments data:", assigneeCommentsData);
+      
 
       let processedComments: any[] = [];
       let processedAssigneeComments: any[] = [];
@@ -1905,11 +1937,25 @@ const TicketList = () => {
                 <ThemeSelect
                   placeholder="Select Priority"
                   value={(() => {
-                    const priorityOptions = [{value: "", label: "All"}, {value: "critical", label: "Critical"}, {value: "high", label: "High"}, {value: "medium", label: "Medium"}, {value: "low", label: "Low"}];
+                    const priorityOptions = [
+                      {value: "", label: "All"}, 
+                      {value: "0", label: "Low"}, 
+                      {value: "1", label: "Medium"}, 
+                      {value: "2", label: "High"}, 
+                      {value: "3", label: "Critical"},
+                      {value: "4", label: "Urgent"}
+                    ];
                     return priorityOptions.find((opt: any) => opt.value === currentFilters.priority) || null;
                   })()}
                   onChange={(option: any) => handleFiltersChange({...currentFilters, priority: option?.value})}
-                  options={[{value: "", label: "All"}, {value: "critical", label: "Critical"}, {value: "high", label: "High"}, {value: "medium", label: "Medium"}, {value: "low", label: "Low"}]}
+                  options={[
+                    {value: "", label: "All"}, 
+                    {value: "0", label: "Low"}, 
+                    {value: "1", label: "Medium"}, 
+                    {value: "2", label: "High"}, 
+                    {value: "3", label: "Critical"},
+                    {value: "4", label: "Urgent"}
+                  ]}
                 />
               </Col>
               <Col md={3}>
