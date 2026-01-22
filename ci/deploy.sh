@@ -75,16 +75,16 @@ fi
 # ---- Deploy standalone runtime (stable copy) ----
 STAGE_DIR="$(mktemp -d /tmp/next-standalone-XXXXXX)"
 
-# Copy build output into a stable temp dir first (avoids "vanished" during transfer)
 cp -a .next/standalone/. "$STAGE_DIR/standalone"
 mkdir -p "$STAGE_DIR/.next"
-cp -a .next/static "$STAGE_DIR/.next/static"
+cp -a .next/static "$STAGE_DIR/.next/"
 
-# Now sync from the stable temp dir into app root
-# Ignore rsync code 24 (vanished files) just in case
-rsync -a --delete "$STAGE_DIR/standalone/" ./ || [[ $? -eq 24 ]]
+rsync -a --delete "$STAGE_DIR/standalone/" ./
+rc=$?; if [[ $rc -ne 0 && $rc -ne 24 ]]; then exit $rc; fi
+
 mkdir -p .next
-rsync -a --delete "$STAGE_DIR/.next/static/" .next/static/ || [[ $? -eq 24 ]]
+rsync -a --delete "$STAGE_DIR/.next/static/" .next/static/
+rc=$?; if [[ $rc -ne 0 && $rc -ne 24 ]]; then exit $rc; fi
 
 rm -rf "$STAGE_DIR"
 
