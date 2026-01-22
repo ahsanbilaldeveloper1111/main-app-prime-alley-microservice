@@ -6,11 +6,9 @@ ENV_NAME="${1:?env required (dev|stage)}"
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
 
-# CI key
 echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ci
 chmod 600 ~/.ssh/id_ci
 
-# known_hosts
 echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 chmod 600 ~/.ssh/known_hosts
 
@@ -35,27 +33,28 @@ fi
 
 echo "Deploying Next.js $ENV_NAME to $SSH_USER@$SSH_HOST:$APP_DIR (branch=$BRANCH, service=$SERVICE_NAME)"
 
-ssh -o StrictHostKeyChecking=yes -i ~/.ssh/id_ci "$SSH_USER@$SSH_HOST" "bash -l -s" <<EOF
+ssh -o StrictHostKeyChecking=yes -i ~/.ssh/id_ci \
+  "$SSH_USER@$SSH_HOST" \
+  "ENV_NAME='$ENV_NAME' APP_DIR='$APP_DIR' BRANCH='$BRANCH' SERVICE_NAME='$SERVICE_NAME' DOTENV_CONTENT=\$'${DOTENV_CONTENT//$'\n'/\\n}' bash -l -s" <<'EOF'
 set -euo pipefail
+
 cd "$APP_DIR"
 
 git fetch origin
 git checkout "$BRANCH"
 git pull origin "$BRANCH"
 
-# Write .env.local BEFORE install/build
-cat > .env.local <<'ENVEOF'
-$DOTENV_CONTENT
-ENVEOF
+# Write .env.local
+printf "%b" "$DOTENV_CONTENT" > .env.local
 chmod 600 .env.local
 
-# Stop FIRST to free memory
+# Stop FIRST (frees memory; avoids npm killed)
 sudo systemctl stop "$SERVICE_NAME"
 
 if [[ "$ENV_NAME" == "stage" ]]; then
   echo "Stage has no internet: skipping npm ci/install"
 else
-  # Only install when lockfile changed
+  # Only run npm ci when package-lock.json changed
   LOCK_HASH_FILE=".last_package_lock_sha"
   CURRENT_LOCK_SHA="$(sha256sum package-lock.json | awk '{print $1}')"
   LAST_LOCK_SHA="$(cat "$LOCK_HASH_FILE" 2>/dev/null || true)"
