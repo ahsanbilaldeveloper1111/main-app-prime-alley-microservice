@@ -38,7 +38,7 @@ export const HEADER_CONSTANTS = {
     AI_INSIGHTS: 'AI Insights',
     LIVE_CALLS: 'Live Calls',
     TICKETS: 'Tickets',
-    AUTOMATION: 'Automation',
+    AUTOMATION: 'Campaign Manager',
     CRM: 'CRM',
     DNCR: 'DNCR',
     COMPLIANCES: 'Compliance',

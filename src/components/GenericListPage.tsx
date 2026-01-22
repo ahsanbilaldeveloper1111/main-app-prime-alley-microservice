@@ -93,12 +93,7 @@ const GenericListPage: React.FC<GenericListPageProps> = ({
                     currentPage: response.current_page || 1,
                     perPage: response.per_page || defaultPageSize,
                 });
-                console.log('paginationInfo updated:', {
-                    totalRows: response.total || 0,
-                    totalPages: response.last_page || 0,
-                    currentPage: response.current_page || 1,
-                    perPage: response.per_page || defaultPageSize,
-                });
+                
             } else {
                 // Fallback for other response structures
                 setData(response?.dataList || response?.data || []);

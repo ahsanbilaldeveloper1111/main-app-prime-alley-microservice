@@ -184,6 +184,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_CRM_HISTORY,
           url: '/crm/history'
         },
+        // {
+        //   id:'crm-approvals',
+        //   title: 'Quotes & Approvals',
+        //   icon: <FileText size={16} />,
+        //   permission: PERMISSIONS.VIEW_CRM_HISTORY,
+        //   url: '/crm/approvals'
+        // }
        
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
@@ -328,14 +335,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
           url: '/ai-ml/campaign-reports'
-        },
-        {
-          id: 'ai-bot-live-chat',
-          title: 'Live Chat',
-          icon: <MessageCircle size={16} />,
-          permission: PERMISSIONS.LIVE_CHAT_AIML,
-          url: '/chat'
         }
+        
       ]
     },
 
@@ -410,34 +411,34 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: MENU_LABELS.AUTOMATION,
       url: '',
       subItems: [
-        {
-          id: 'tms-dashboard',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.TMS_DASHBOARD,
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/tms/dashboard'
-        },
-        {
-          id: 'tms-user-management',
-          title: 'Users',
-          icon: <Users size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/tms/management/users'
-        },
-        {
-          id: 'tms-user-create',
-          title: 'Create User',
-          icon: <Users size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/tms/profiling/user/create'
-        },
-        {
-          id: 'tms-audit-logs',
-          title: 'Audit Logs',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/tms/audit-logs'
-        },
+        // {
+        //   id: 'tms-dashboard',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.TMS_DASHBOARD,
+        //   icon: <LayoutDashboard size={16} />,
+        //   permission: PERMISSIONS.TMS_SERVICES,
+        //   url: '/tms/dashboard'
+        // },
+        // {
+        //   id: 'tms-user-management',
+        //   title: 'Users',
+        //   icon: <Users size={16} />,
+        //   permission: PERMISSIONS.TMS_SERVICES,
+        //   url: '/tms/management/users'
+        // },
+        // {
+        //   id: 'tms-user-create',
+        //   title: 'Create User',
+        //   icon: <Users size={16} />,
+        //   permission: PERMISSIONS.TMS_SERVICES,
+        //   url: '/tms/profiling/user/create'
+        // },
+        // {
+        //   id: 'tms-audit-logs',
+        //   title: 'Audit Logs',
+        //   icon: <FileText size={16} />,
+        //   permission: PERMISSIONS.TMS_SERVICES,
+        //   url: '/tms/audit-logs'
+        // },
         {
           id: 'live-calls-campaigns-management',
           title: 'Campaigns Management',
@@ -451,6 +452,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <FileText size={16} />,
           permission: PERMISSIONS.TMS_SERVICES,
           url: '/live-calls/management/agents'
+        },
+        {
+          id: 'ai-chat-faqs-management',
+          title: 'AI Chat FAQs',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/chat/ai-faqs'
+        },
+        {
+          id: 'ai-bot-faqs-management',
+          title: 'AI Bot FAQs',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/chat/ai-bot-faqs'
         }
       ]
       .filter(item => !item.permission || hasPermission(item.permission))

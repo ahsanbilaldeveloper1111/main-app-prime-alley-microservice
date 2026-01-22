@@ -279,3 +279,13 @@ export const UpdateCompanyDetails = async (payload: any) => {
     throw error;
   }
 };
+
+export const CompletePayment = async (payload: any) => {
+  try {
+    const response = await axiosInstance.post('accounting/stripe/complete-payment', payload);
+    return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to update company details");
+    throw error;
+  }
+};

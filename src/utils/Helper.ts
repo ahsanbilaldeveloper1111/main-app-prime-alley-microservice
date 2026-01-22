@@ -543,7 +543,7 @@ export const formatDateForTable = (
     const month = monthNames[dateObj.getMonth()];
     const year = dateObj.getFullYear();
 
-    return `${day} ${month}, ${year}`;
+    return `${day} ${month} ${year}`;
   } catch (error) {
     console.error("Error formatting date:", error);
     return "";

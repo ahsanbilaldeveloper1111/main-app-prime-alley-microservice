@@ -53,7 +53,7 @@ const UsersHeader: React.FC<UsersHeaderProps> = ({
                                
                                 {session?.user?.permissions?.includes('add-users') && (
                                     <Button variant="primary" 
-                                    onClick={() => router.push('/tms/profiling/user/create')}>
+                                    onClick={() => router.push('/controlhub/users/create')}>
                                         <FiPlus size={16} className="me-2" /> Add User
                                     </Button>
                                 )}

@@ -190,8 +190,7 @@ export interface PaginationParams extends Record<string, any> {
 
 // Helper function to extract data from controlhub response
 function extractData<T>(response: any): T {
-  console.log("Extracting data from response:", response);
-
+  
   // Handle successful response with nested data structure
   if (response?.code === 200 && response?.data?.success) {
     console.log("Extracting from nested data structure:", response.data.data);

@@ -43,7 +43,7 @@ import {
   PaymentIntentResponse,
   getCompanies
 } from "@utils/accountingOld";
-import { GetPaymentMethods } from "@utils/accounting";
+import { GetPaymentMethods,CompletePayment } from "@utils/accounting";
 import { formatNumber } from "@utils/Helper";
 
 import { Column } from "@components/CustomDataTable";
@@ -316,6 +316,29 @@ const DirectCardPaymentForm: React.FC<{
     hidePostalCode: true,
   };
 
+  // Helper function to extract payment ID from payment result (handles both response structures)
+  const getPaymentId = (paymentResult: any): string | number | undefined => {
+    return paymentResult?.payment?.id || paymentResult?.data?.payment?.id;
+  };
+
+  // Helper function to mark payment as complete
+  const markPaymentComplete = async (paymentResult: any): Promise<void> => {
+    console.log('Marking payment as complete:', paymentResult);
+    const paymentId = getPaymentId(paymentResult);
+    if (paymentId) {
+      try {
+        await CompletePayment({
+          payment_id: paymentId,
+          payment_method: "stripe",
+        });
+      } catch (error: any) {
+        console.error('Error marking payment as complete:', error);
+        // Don't throw - payment succeeded on Stripe, just failed to update our DB
+        // The webhook or polling will eventually update the status
+      }
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -352,185 +375,320 @@ const DirectCardPaymentForm: React.FC<{
           // Handle payment result based on status
           console.log(paymentResult, "Payment Intent Response");
           
+          // Check if payment was already completed
+          if (paymentResult?.already_completed) {
+            setIsProcessing(false);
+            onPaymentSuccess();
+            toast.success("Payment was already completed successfully!");
+            return;
+          }
+          
           // Extract payment intent from nested structure
           // Response structure: { success: true, data: { payment: { gateway_response: {...} } }, client_secret: "..." }
           const gatewayResponse = paymentResult?.payment?.gateway_response || paymentResult?.data?.payment?.gateway_response;
-          const clientSecret = paymentResult?.client_secret || paymentResult?.data?.client_secret || gatewayResponse?.client_secret;
+          const clientSecret = paymentResult?.client_secret || paymentResult?.data?.client_secret || gatewayResponse?.client_secret || paymentResult?.payment_data?.client_secret;
           const paymentStatus = gatewayResponse?.status || paymentResult?.status;
           
           console.log('Payment Status:', paymentStatus);
           console.log('Client Secret:', clientSecret);
           console.log('Gateway Response:', gatewayResponse);
           
-          // Check if payment requires customer confirmation (3D Secure, etc.)
-          if (paymentStatus === 'requires_action' && clientSecret) {
-            try {
-              console.log('Payment requires action, handling 3D Secure with Stripe...');
-              
-              // Check if confirmation_method is manual - if so, use handleCardAction instead
-              // confirmation_method can be in gateway_response or we can check next_action
+          // Check if this is a duplicate/reused payment
+          if (paymentResult?.duplicate) {
+            // This is a reused existing payment - extract client_secret and handle 3D Secure
+            if (clientSecret && stripe) {
+              // Check if confirmation_method is manual AND status is requires_action
+              // handleCardAction can only be used when payment is in requires_action state
               const confirmationMethod = gatewayResponse?.confirmation_method;
-              const hasNextAction = gatewayResponse?.next_action?.type === 'use_stripe_sdk';
-              console.log('Confirmation method:', confirmationMethod);
-              console.log('Has next_action:', hasNextAction);
-              console.log('Next action:', gatewayResponse?.next_action);
+              const requiresAction = paymentStatus === 'requires_action';
               
-              // For requires_action status, we should use handleCardAction to handle 3D Secure
-              // This is especially true when confirmation_method is manual
-              // Use handleCardAction if confirmation_method is manual OR if next_action exists
-              // Default to handleCardAction for requires_action to be safe
-              if (confirmationMethod === 'manual' || hasNextAction || paymentStatus === 'requires_action') {
-                // For manual confirmation or when next_action exists, use handleCardAction to show 3D Secure modal
-                // After customer completes 3D Secure, backend will confirm the payment
-                console.log('Using handleCardAction for 3D Secure authentication...');
-                console.log('Client secret for handleCardAction:', clientSecret);
+              // Handle 3D Secure for the reused payment
+              try {
+                let paymentIntent;
+                let confirmError;
                 
-                // Show a message to user that 3D Secure modal will appear
-                // The modal can appear as: 1) Popup window, 2) Iframe overlay, or 3) Redirect
-                toast.info('3D Secure authentication required. Please check for a popup window or complete authentication on the page...', {
-                  autoClose: 10000,
-                  closeOnClick: false
-                });
+                if (confirmationMethod === 'manual' && requiresAction) {
+                  // For manual confirmation with requires_action status, use handleCardAction
+                  console.log('Using handleCardAction for duplicate payment (manual confirmation, requires_action)...');
+                  const result = await stripe.handleCardAction(clientSecret);
+                  confirmError = result.error;
+                  paymentIntent = result.paymentIntent;
+                } else if (confirmationMethod === 'manual' && !requiresAction) {
+                  // Manual confirmation but not in requires_action state
+                  // Backend will handle confirmation, just wait and refresh
+                  console.log('Manual confirmation method for duplicate payment, not in requires_action state. Backend will handle confirmation.');
+                  setIsProcessing(false);
+                  onPaymentSuccess();
+                  toast.info('Payment is being processed by the backend. Please wait...', {
+                    autoClose: 3000
+                  });
+                  return;
+                } else {
+                  // For automatic confirmation, use confirmCardPayment
+                  const result = await stripe.confirmCardPayment(clientSecret);
+                  confirmError = result.error;
+                  paymentIntent = result.paymentIntent;
+                }
                 
-                // handleCardAction will automatically show the 3D Secure modal/popup
-                // The modal appears as a popup window or overlay that Stripe manages
-                // IMPORTANT: Make sure popup blockers are disabled for this site
-                try {
-                  const { error: handleError, paymentIntent } = await stripe.handleCardAction(clientSecret);
-
-                  if (handleError) {
-                    // 3D Secure handling failed
-                    console.error('3D Secure handling error:', handleError);
-                    setCardError(handleError.message || '3D Secure authentication failed');
-                    onPaymentError(handleError.message || '3D Secure authentication failed');
+                if (confirmError) {
+                  setIsProcessing(false);
+                  toast.error(
+                    confirmError.message || 
+                    'Authentication failed. Please try again or use a different card.'
+                  );
+                  return;
+                }
+                
+                // Check payment intent status
+                if (paymentIntent?.status === 'succeeded') {
+                  // Payment succeeded, update status
+                  const paymentId = paymentResult?.payment?.id || paymentResult?.payment_id || paymentResult?.data?.payment?.id || paymentResult?.data?.payment_id;
+                  if (paymentId) {
+                    try {
+                      await CompletePayment({
+                        payment_id: paymentId,
+                        payment_method: "stripe",
+                      });
+                      setIsProcessing(false);
+                      onPaymentSuccess();
+                      toast.success("Payment authenticated and processed successfully!");
+                    } catch (error: any) {
+                      console.error('Failed to update payment status:', error);
+                      setIsProcessing(false);
+                      onPaymentSuccess();
+                      toast.success("Payment authenticated successfully! Status update may be delayed.");
+                    }
+                  } else {
                     setIsProcessing(false);
-                    return;
-                  }
-                  
-                  // Store paymentIntent for status checking
-                  const finalPaymentIntent = paymentIntent;
-
-                  console.log('3D Secure completed, payment intent status:', finalPaymentIntent?.status);
-
-                  // After 3D Secure, check the payment intent status
-                  if (finalPaymentIntent?.status === 'succeeded') {
-                    toast.success('Payment successful!');
                     onPaymentSuccess();
-                  } else if (finalPaymentIntent?.status === 'requires_confirmation') {
-                    // 3D Secure completed successfully, but payment needs backend confirmation
-                    // This is expected for manual confirmation_method
-                    console.log('Payment requires backend confirmation after 3D Secure');
-                    toast.info('3D Secure authentication completed! Confirming payment...', {
+                    toast.success("Payment authenticated and processed successfully!");
+                  }
+                } else if (paymentIntent?.status === 'requires_confirmation') {
+                  // 3D Secure completed successfully, but payment needs backend confirmation
+                  // Challenge is complete, so we should call CompletePayment
+                  console.log('Payment requires backend confirmation after 3D Secure (duplicate payment)');
+                  
+                  const paymentId = paymentResult?.payment?.id || paymentResult?.payment_id || paymentResult?.data?.payment?.id || paymentResult?.data?.payment_id;
+                  
+                  if (paymentId) {
+                    try {
+                      await CompletePayment({
+                        payment_id: paymentId,
+                        payment_method: "stripe",
+                      });
+                      setIsProcessing(false);
+                      onPaymentSuccess();
+                      toast.success("3D Secure authentication completed! Payment is being processed...");
+                    } catch (error: any) {
+                      console.error('Failed to update payment status:', error);
+                      setIsProcessing(false);
+                      onPaymentSuccess();
+                      toast.info('3D Secure authentication completed! Payment is being processed...', {
+                        autoClose: 3000
+                      });
+                    }
+                  } else {
+                    setIsProcessing(false);
+                    onPaymentSuccess();
+                    toast.info('3D Secure authentication completed! Payment is being processed...', {
                       autoClose: 3000
                     });
-                    
-                    // Poll invoice status to check if payment is confirmed
-                    // The backend should automatically confirm the payment intent
-                    let pollCount = 0;
-                    const maxPolls = 10; // Poll for up to 10 seconds
-                    const pollInterval = setInterval(async () => {
-                      pollCount++;
-                      try {
-                        const updatedInvoice = await getInvoice(invoiceId);
-                        console.log(`Poll ${pollCount}: Invoice status:`, updatedInvoice.status);
-                        
-                        // Check if invoice is paid or payment is processing
-                        if (updatedInvoice.status === STATUS_PAID || updatedInvoice.status === STATUS_PARTIALLY_PAID) {
-                          clearInterval(pollInterval);
-                          toast.success('Payment confirmed successfully!');
-                          onPaymentSuccess();
-                        } else if (pollCount >= maxPolls) {
-                          clearInterval(pollInterval);
-                          // Payment might still be processing, refresh anyway
-                          toast.info('Payment is being processed. Please refresh to see the latest status.');
-                          onPaymentSuccess();
-                        }
-                      } catch (pollError) {
-                        console.error('Error polling invoice status:', pollError);
-                        if (pollCount >= maxPolls) {
-                          clearInterval(pollInterval);
-                          toast.info('Payment is being processed. Please refresh to see the latest status.');
-                          onPaymentSuccess();
-                        }
-                      }
-                    }, 1000); // Poll every second
-                    
-                    // Fallback: refresh after max polling time
-                    setTimeout(() => {
-                      clearInterval(pollInterval);
-                      onPaymentSuccess();
-                    }, maxPolls * 1000);
-                  } else if (finalPaymentIntent?.status === 'requires_action') {
-                    // Still requires action - might need another challenge
-                    console.log('Payment still requires action after 3D Secure');
-                    setCardError('Payment requires additional verification. Please try again.');
-                    onPaymentError('Payment requires additional verification. Please try again.');
-                  } else {
-                    onPaymentError(`Payment status after 3D Secure: ${finalPaymentIntent?.status}`);
                   }
+                } else {
                   setIsProcessing(false);
-                } catch (handleErr: any) {
-                  console.error('Error during handleCardAction:', handleErr);
-                  setCardError(handleErr.message || '3D Secure authentication failed');
-                  onPaymentError(handleErr.message || '3D Secure authentication failed');
-                  setIsProcessing(false);
+                  toast.error("Payment authentication incomplete. Please try again.");
                 }
-              } else {
-                // For automatic confirmation, use confirmCardPayment
-                const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
-                  clientSecret,
-                  {
-                    payment_method: paymentMethod.id
-                  }
+              } catch (authError: any) {
+                setIsProcessing(false);
+                toast.error(
+                  authError.message ||
+                  'Authentication process failed. Please try again.'
                 );
+              }
+            } else {
+              // No client_secret for duplicate payment, just refresh
+              setIsProcessing(false);
+              onPaymentSuccess();
+              toast.success("Payment processed successfully!");
+            }
+            return; // Exit early for duplicate payments
+          }
+          
+          // Check if payment requires 3D Secure authentication
+          if (clientSecret && stripe) {
+            try {
+              // Check if confirmation_method is manual AND status is requires_action
+              // handleCardAction can only be used when payment is in requires_action state
+              const confirmationMethod = gatewayResponse?.confirmation_method;
+              const requiresAction = paymentStatus === 'requires_action';
+              
+              if (confirmationMethod === 'manual' && requiresAction) {
+                // For manual confirmation with requires_action status, use handleCardAction to show 3D Secure modal
+                // After customer completes 3D Secure, backend will confirm the payment
+                console.log('Using handleCardAction for 3D Secure authentication (manual confirmation, requires_action)...');
+                
+                const { error: handleError, paymentIntent } = await stripe.handleCardAction(clientSecret);
 
-                if (confirmError) {
-                  console.error('Payment confirmation error:', confirmError);
-                  setCardError(confirmError.message || 'Payment confirmation failed');
-                  onPaymentError(confirmError.message || 'Payment confirmation failed');
+                if (handleError) {
                   setIsProcessing(false);
+                  toast.error(
+                    handleError.message || 
+                    '3D Secure authentication failed. Please try again.'
+                  );
                   return;
                 }
 
-                console.log('Payment confirmed, final status:', paymentIntent?.status);
+                console.log('3D Secure completed, payment intent status:', paymentIntent?.status);
 
+                // After 3D Secure, check the payment intent status
                 if (paymentIntent?.status === 'succeeded') {
-                  toast.success('Payment successful!');
-                  onPaymentSuccess();
+                  // Payment succeeded, update status
+                  const paymentId = paymentResult?.payment?.id || 
+                                   paymentResult?.payment_id || 
+                                   paymentResult?.data?.payment?.id ||
+                                   paymentResult?.data?.payment_id;
+                  
+                  if (paymentId) {
+                    try {
+                      await CompletePayment({
+                        payment_id: paymentId,
+                        payment_method: "stripe",
+                      });
+                      setIsProcessing(false);
+                      onPaymentSuccess();
+                      toast.success("Payment authenticated and processed successfully!");
+                    } catch (error: any) {
+                      console.error('Failed to update payment status:', error);
+                      setIsProcessing(false);
+                      onPaymentSuccess();
+                      toast.success("Payment authenticated successfully! Status update may be delayed.");
+                    }
+                  } else {
+                    setIsProcessing(false);
+                    onPaymentSuccess();
+                    toast.success("Payment authenticated and processed successfully!");
+                  }
+                } else if (paymentIntent?.status === 'requires_confirmation') {
+                  // 3D Secure completed successfully, but payment needs backend confirmation
+                  // Challenge is complete, so we should call CompletePayment
+                  console.log('Payment requires backend confirmation after 3D Secure');
+                  
+                  const paymentId = paymentResult?.payment?.id || 
+                                   paymentResult?.payment_id || 
+                                   paymentResult?.data?.payment?.id ||
+                                   paymentResult?.data?.payment_id;
+                  
+                  if (paymentId) {
+                    try {
+                      await CompletePayment({
+                        payment_id: paymentId,
+                        payment_method: "stripe",
+                      });
+                      setIsProcessing(false);
+                      onPaymentSuccess();
+                      toast.success("3D Secure authentication completed! Payment is being processed...");
+                    } catch (error: any) {
+                      console.error('Failed to update payment status:', error);
+                      setIsProcessing(false);
+                      onPaymentSuccess();
+                      toast.info('3D Secure authentication completed! Payment is being processed...', {
+                        autoClose: 3000
+                      });
+                    }
+                  } else {
+                    setIsProcessing(false);
+                    onPaymentSuccess();
+                    toast.info('3D Secure authentication completed! Payment is being processed...', {
+                      autoClose: 3000
+                    });
+                  }
                 } else if (paymentIntent?.status === 'requires_action') {
-                  setCardError('Payment requires additional verification. Please try again.');
-                  onPaymentError('Payment requires additional verification. Please try again.');
+                  // Still requires action - might need another challenge
+                  setIsProcessing(false);
+                  toast.error('Payment requires additional verification. Please try again.');
                 } else {
-                  onPaymentError(`Payment was not successful. Status: ${paymentIntent?.status}`);
+                  setIsProcessing(false);
+                  toast.error(`Payment status after 3D Secure: ${paymentIntent?.status}`);
                 }
+              } else if (confirmationMethod === 'manual' && !requiresAction) {
+                // Manual confirmation but not in requires_action state
+                // Backend will handle confirmation, just wait and refresh
+                console.log('Manual confirmation method, payment not in requires_action state. Backend will handle confirmation.');
                 setIsProcessing(false);
+                onPaymentSuccess();
+                toast.info('Payment is being processed by the backend. Please wait...', {
+                  autoClose: 3000
+                });
+              } else {
+                // For automatic confirmation or when not manual, use confirmCardPayment
+                const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(
+                  clientSecret
+                );
+                
+                if (confirmError) {
+                  setIsProcessing(false);
+                  toast.error(
+                    confirmError.message || 
+                    'Authentication failed. Please try again or use a different card.'
+                  );
+                  return;
+                }
+                
+                // Check payment intent status
+                if (paymentIntent?.status === 'succeeded') {
+                  // Payment succeeded on Stripe, now update our database
+                  // Extract payment ID from response (could be nested)
+                  const paymentId = paymentResult?.payment?.id || 
+                                   paymentResult?.payment_id || 
+                                   paymentResult?.data?.payment?.id ||
+                                   paymentResult?.data?.payment_id;
+                  
+                  if (paymentId) {
+                    try {
+                      await CompletePayment({
+                        payment_id: paymentId,
+                        payment_method: "stripe",
+                      });
+                      setIsProcessing(false);
+                      onPaymentSuccess();
+                      toast.success("Payment authenticated and processed successfully!");
+                    } catch (error: any) {
+                      // Even if completePayment fails, payment succeeded on Stripe
+                      // Log error but still show success to user
+                      console.error('Failed to update payment status:', error);
+                      setIsProcessing(false);
+                      onPaymentSuccess();
+                      toast.success("Payment authenticated successfully! Status update may be delayed.");
+                    }
+                  } else {
+                    // No payment ID found, just refresh and let webhook handle it
+                    console.warn('Payment ID not found in response, webhook will update status');
+                    setIsProcessing(false);
+                    onPaymentSuccess();
+                    toast.success("Payment authenticated successfully! Status will be updated shortly.");
+                  }
+                } else if (paymentIntent?.status === 'requires_action') {
+                  // Should not happen after confirmCardPayment, but handle just in case
+                  setIsProcessing(false);
+                  toast.error("Payment requires additional authentication. Please try again.");
+                } else {
+                  setIsProcessing(false);
+                  onPaymentSuccess();
+                  toast.success("Payment processed successfully!");
+                }
               }
-            } catch (confirmErr: any) {
-              console.error('Payment confirmation error:', confirmErr);
-              setCardError(confirmErr.message || 'Payment confirmation failed');
-              onPaymentError(confirmErr.message || 'Payment confirmation failed');
+            } catch (authError: any) {
               setIsProcessing(false);
+              toast.error(
+                authError.message ||
+                'Authentication process failed. Please try again.'
+              );
             }
-          } else if (paymentStatus === 'succeeded' || paymentResult?.success) {
-            // Payment succeeded immediately (no confirmation needed)
-            console.log('Payment succeeded immediately');
-            toast.success('Payment successful!');
-            onPaymentSuccess();
-            setIsProcessing(false);
-          } else if (paymentStatus === 'requires_payment_method') {
-            // Payment method was declined
-            setCardError('Your card was declined. Please try a different payment method.');
-            onPaymentError('Your card was declined. Please try a different payment method.');
-            setIsProcessing(false);
           } else {
-            // Other statuses or missing data
-            console.warn('Unexpected payment status or missing data:', { paymentStatus, clientSecret, paymentResult });
-            if (!clientSecret) {
-              onPaymentError('Payment confirmation data is missing. Please try again.');
-            } else {
-              onPaymentError(`Payment was not successful. Status: ${paymentStatus || 'unknown'}`);
-            }
+            // No 3D Secure required, payment completed
             setIsProcessing(false);
+            onPaymentSuccess();
+            toast.success("Payment processed successfully!");
           }
         },
         onError: (error) => {
@@ -885,11 +1043,11 @@ const InvoiceList = () => {
       return;
     }
 
-    console.log("Loading company products for company ID:", companyId);
+   
     setIsLoadingCompanyProducts(true);
     try {
       const response = await getProductsWithCompanyPricing(companyId);
-      console.log("Company products loaded:", response);
+      
       setCompanyProducts((response as any) || []);
     } catch (error) {
       console.error("Error loading company products:", error);
@@ -997,11 +1155,9 @@ const InvoiceList = () => {
 
   // Load exchange rates directly from free API
   const loadExchangeRates = useCallback(async (invoiceCurrency: string) => {
-    console.log('Loading exchange rates for:', invoiceCurrency, 'Loaded currencies:', Array.from(loadedCurrencies));
     
     // If we already have rates loaded for this currency, don't reload
     if (exchangeRates.length > 0 && baseCurrency === invoiceCurrency && !isInitialLoad) {
-      console.log('Rates already loaded for currency:', invoiceCurrency);
       return;
     }
 
@@ -1021,7 +1177,6 @@ const InvoiceList = () => {
       }
       
       const data = await response.json();
-      console.log('Exchange rate API response data:', data);
       
       // Process all currency pairs from the API response
       if (data.rates) {
@@ -1112,7 +1267,6 @@ const InvoiceList = () => {
         }
       }
       
-      console.log('All rates loaded for base currency:', invoiceCurrency, rates);
       
       // Update state with all rates
       setExchangeRates(rates);
@@ -1213,7 +1367,6 @@ const InvoiceList = () => {
           load_profile: true,
         });
         setCompanies(companiesData.data || []);
-        console.log("Companies:", companiesData);
         
         // Load products for the first company if available
         if (companiesData.data && companiesData.data.length > 0) {
@@ -1240,7 +1393,6 @@ const InvoiceList = () => {
     const response = await GetPaymentMethods() as any;
     const methods = response?.payment_methods || [];
     setPaymentMethods(methods);
-    console.log("Payment methods:", methods);
   };
 
   // Refresh payment methods when payment modal opens
@@ -1500,7 +1652,7 @@ const InvoiceList = () => {
 
   // Direct payment handlers
   const handleDirectPaymentSuccess = useCallback(() => {
-    toast.success("Payment processed successfully");
+    //toast.success("Payment processed successfully");
     
     // Close modal and reset state
     setShowPaymentModal(false);
@@ -1531,21 +1683,47 @@ const InvoiceList = () => {
       customer_id: parseInt(selectedInvoiceForPayment.company_id || '0'),
     }, {
       onSuccess: async (paymentResult: any) => {
+        // Check if payment was already completed
+        if (paymentResult?.already_completed) {
+          setIsProcessingPayment(false);
+          handleDirectPaymentSuccess();
+          toast.success("Payment was already completed successfully!");
+          return;
+        }
+
+        // Helper function to extract payment ID from payment result (handles both response structures)
+        const getPaymentId = (result: any): string | number | undefined => {
+          return result?.payment?.id || result?.data?.payment?.id || result?.payment_id || result?.data?.payment_id;
+        };
+
+        // Helper function to mark payment as complete
+        const markPaymentComplete = async (result: any): Promise<void> => {
+          console.log('Marking payment as complete:', result);
+          const paymentId = getPaymentId(result);
+          if (paymentId) {
+            try {
+              await CompletePayment({
+                payment_id: paymentId,
+                payment_method: "stripe",
+              });
+            } catch (error: any) {
+              console.error('Error marking payment as complete:', error);
+              // Don't throw - payment succeeded on Stripe, just failed to update our DB
+              // The webhook or polling will eventually update the status
+            }
+          }
+        };
+
         // Extract payment intent from nested structure
         // Response structure: { success: true, data: { payment: { gateway_response: {...} } }, client_secret: "..." }
         const gatewayResponse = paymentResult?.payment?.gateway_response || paymentResult?.data?.payment?.gateway_response;
-        const clientSecret = paymentResult?.client_secret || paymentResult?.data?.client_secret || gatewayResponse?.client_secret;
+        const clientSecret = paymentResult?.client_secret || paymentResult?.data?.client_secret || gatewayResponse?.client_secret || paymentResult?.payment_data?.client_secret;
         const paymentStatus = gatewayResponse?.status || paymentResult?.status;
         
-        console.log('Saved Card Payment Result:', paymentResult);
-        console.log('Saved Card Payment Status:', paymentStatus);
-        console.log('Saved Card Client Secret:', clientSecret);
-        console.log('Saved Card Gateway Response:', gatewayResponse);
-        
-        // Check if payment requires customer confirmation (3D Secure, etc.)
-        if (paymentStatus === 'requires_action' && clientSecret) {
-          try {
-            console.log('Saved card payment requires action, handling 3D Secure with Stripe...');
+        // Check if this is a duplicate/reused payment
+        if (paymentResult?.duplicate) {
+          // This is a reused existing payment - extract client_secret and handle 3D Secure
+          if (clientSecret) {
             // Load Stripe to confirm payment
             if (!stripePublishableKey) {
               handleDirectPaymentError('Stripe is not initialized');
@@ -1560,128 +1738,268 @@ const InvoiceList = () => {
               return;
             }
 
-            // Check if confirmation_method is manual - if so, use handleCardAction instead
-            // confirmation_method can be in gateway_response or we can check next_action
+            // Check if confirmation_method is manual AND status is requires_action
+            // handleCardAction can only be used when payment is in requires_action state
             const confirmationMethod = gatewayResponse?.confirmation_method;
-            const hasNextAction = gatewayResponse?.next_action?.type === 'use_stripe_sdk';
-            console.log('Confirmation method:', confirmationMethod);
-            console.log('Has next_action:', hasNextAction);
-            console.log('Next action:', gatewayResponse?.next_action);
-
-            // For requires_action status, we should use handleCardAction to handle 3D Secure
-            // This is especially true when confirmation_method is manual
-            // Use handleCardAction if confirmation_method is manual OR if next_action exists
-            // Default to handleCardAction for requires_action to be safe
-            if (confirmationMethod === 'manual' || hasNextAction || paymentStatus === 'requires_action') {
-              // For manual confirmation or when next_action exists, use handleCardAction to show 3D Secure modal
-              // After customer completes 3D Secure, backend will confirm the payment
-              console.log('Using handleCardAction for 3D Secure authentication...');
-              console.log('Client secret for handleCardAction:', clientSecret);
+            const requiresAction = paymentStatus === 'requires_action';
+            
+            // Handle 3D Secure for the reused payment
+            try {
+              let paymentIntent;
+              let confirmError;
               
-              // Show a message to user that 3D Secure modal will appear
-              // The modal can appear as: 1) Popup window, 2) Iframe overlay, or 3) Redirect
-              toast.info('3D Secure authentication required. Please check for a popup window or complete authentication on the page...', {
-                autoClose: 10000,
-                closeOnClick: false
-              });
-              
-              // handleCardAction will automatically show the 3D Secure modal/popup
-              // The modal appears as a popup window or overlay that Stripe manages
-              // IMPORTANT: Make sure popup blockers are disabled for this site
-              try {
-                const { error: handleError, paymentIntent } = await stripeInstance.handleCardAction(clientSecret);
-
-                if (handleError) {
-                  // 3D Secure handling failed
-                  console.error('3D Secure handling error:', handleError);
-                  handleDirectPaymentError(handleError.message || '3D Secure authentication failed');
-                  setIsProcessingPayment(false);
-                  return;
-                }
-
-                console.log('3D Secure completed, payment intent status:', paymentIntent?.status);
-
-                // After 3D Secure, check the payment intent status
-                if (paymentIntent?.status === 'succeeded') {
-                  toast.success('Payment successful!');
-                  handleDirectPaymentSuccess();
-                } else if (paymentIntent?.status === 'requires_confirmation') {
-                  // 3D Secure completed successfully, but payment needs backend confirmation
-                  // This is expected for manual confirmation_method
-                  console.log('Payment requires backend confirmation after 3D Secure');
-                  toast.success('3D Secure authentication completed successfully! Payment is being processed by the server...');
-                  // The backend should confirm the payment intent after 3D Secure
-                  // For now, we'll refresh the invoice list to check status
-                  // In production, you might want to poll or wait for webhook
-                  setTimeout(() => {
-                    handleDirectPaymentSuccess(); // Refresh to see updated status
-                  }, 2000); // Give backend time to confirm
-                } else if (paymentIntent?.status === 'requires_action') {
-                  // Still requires action - might need another challenge
-                  console.log('Payment still requires action after 3D Secure');
-                  handleDirectPaymentError('Payment requires additional verification. Please try again.');
-                } else {
-                  handleDirectPaymentError(`Payment status after 3D Secure: ${paymentIntent?.status}`);
-                }
+              if (confirmationMethod === 'manual' && requiresAction) {
+                // For manual confirmation with requires_action status, use handleCardAction
+                console.log('Using handleCardAction for duplicate payment (manual confirmation, requires_action)...');
+                const result = await stripeInstance.handleCardAction(clientSecret);
+                confirmError = result.error;
+                paymentIntent = result.paymentIntent;
+              } else if (confirmationMethod === 'manual' && !requiresAction) {
+                // Manual confirmation but not in requires_action state
+                // Backend will handle confirmation, just wait and refresh
+                console.log('Manual confirmation method for duplicate payment, not in requires_action state. Backend will handle confirmation.');
                 setIsProcessingPayment(false);
-              } catch (handleErr: any) {
-                console.error('Error during handleCardAction:', handleErr);
-                handleDirectPaymentError(handleErr.message || '3D Secure authentication failed');
-                setIsProcessingPayment(false);
+                handleDirectPaymentSuccess();
+                toast.info('Payment is being processed by the backend. Please wait...', {
+                  autoClose: 3000
+                });
+                return;
+              } else {
+                // For automatic confirmation, use confirmCardPayment
+                const result = await stripeInstance.confirmCardPayment(clientSecret);
+                confirmError = result.error;
+                paymentIntent = result.paymentIntent;
               }
+              
+              if (confirmError) {
+                setIsProcessingPayment(false);
+                toast.error(
+                  confirmError.message || 
+                  'Authentication failed. Please try again or use a different card.'
+                );
+                return;
+              }
+              
+              // Check payment intent status
+              if (paymentIntent?.status === 'succeeded') {
+                // Payment succeeded, update status
+                const paymentId = getPaymentId(paymentResult);
+                if (paymentId) {
+                  try {
+                    await CompletePayment({
+                      payment_id: paymentId,
+                      payment_method: "stripe",
+                    });
+                    setIsProcessingPayment(false);
+                    handleDirectPaymentSuccess();
+                    toast.success("Payment authenticated and processed successfully!");
+                  } catch (error: any) {
+                    console.error('Failed to update payment status:', error);
+                    setIsProcessingPayment(false);
+                    handleDirectPaymentSuccess();
+                    toast.success("Payment authenticated successfully! Status update may be delayed.");
+                  }
+                } else {
+                  setIsProcessingPayment(false);
+                  handleDirectPaymentSuccess();
+                  toast.success("Payment authenticated and processed successfully!");
+                }
+              } else if (paymentIntent?.status === 'requires_confirmation') {
+                // 3D Secure completed successfully, but payment needs backend confirmation
+                // Challenge is complete, so we should call CompletePayment
+                console.log('Payment requires backend confirmation after 3D Secure (duplicate payment - saved card)');
+                
+                const paymentId = getPaymentId(paymentResult);
+                
+                if (paymentId) {
+                  try {
+                    await CompletePayment({
+                      payment_id: paymentId,
+                      payment_method: "stripe",
+                    });
+                    setIsProcessingPayment(false);
+                    handleDirectPaymentSuccess();
+                    toast.success("3D Secure authentication completed! Payment is being processed...");
+                  } catch (error: any) {
+                    console.error('Failed to update payment status:', error);
+                    setIsProcessingPayment(false);
+                    handleDirectPaymentSuccess();
+                    toast.info('3D Secure authentication completed! Payment is being processed...', {
+                      autoClose: 3000
+                    });
+                  }
+                } else {
+                  setIsProcessingPayment(false);
+                  handleDirectPaymentSuccess();
+                  toast.info('3D Secure authentication completed! Payment is being processed...', {
+                    autoClose: 3000
+                  });
+                }
+              } else {
+                setIsProcessingPayment(false);
+                toast.error("Payment authentication incomplete. Please try again.");
+              }
+            } catch (authError: any) {
+              setIsProcessingPayment(false);
+              toast.error(
+                authError.message ||
+                'Authentication process failed. Please try again.'
+              );
+            }
+          } else {
+            // No client_secret for duplicate payment, just refresh
+            setIsProcessingPayment(false);
+            handleDirectPaymentSuccess();
+            toast.success("Payment processed successfully!");
+          }
+          return; // Exit early for duplicate payments
+        }
+        
+        // Check if payment requires 3D Secure authentication
+        if (clientSecret) {
+          // Load Stripe to confirm payment
+          if (!stripePublishableKey) {
+            handleDirectPaymentError('Stripe is not initialized');
+            setIsProcessingPayment(false);
+            return;
+          }
+
+          const stripeInstance = await loadStripe(stripePublishableKey);
+          if (!stripeInstance) {
+            handleDirectPaymentError('Failed to load Stripe');
+            setIsProcessingPayment(false);
+            return;
+          }
+
+          try {
+            // Check if confirmation_method is manual AND status is requires_action
+            // handleCardAction can only be used when payment is in requires_action state
+            const confirmationMethod = gatewayResponse?.confirmation_method;
+            const requiresAction = paymentStatus === 'requires_action';
+            
+            let paymentIntent;
+            let confirmError;
+            
+            if (confirmationMethod === 'manual' && requiresAction) {
+              // For manual confirmation with requires_action status, use handleCardAction to show 3D Secure modal
+              console.log('Using handleCardAction for 3D Secure authentication (manual confirmation, requires_action)...');
+              
+              const result = await stripeInstance.handleCardAction(clientSecret);
+              confirmError = result.error;
+              paymentIntent = result.paymentIntent;
+            } else if (confirmationMethod === 'manual' && !requiresAction) {
+              // Manual confirmation but not in requires_action state
+              // Backend will handle confirmation, just wait and refresh
+              console.log('Manual confirmation method, payment not in requires_action state. Backend will handle confirmation.');
+              setIsProcessingPayment(false);
+              handleDirectPaymentSuccess();
+              toast.info('Payment is being processed by the backend. Please wait...', {
+                autoClose: 3000
+              });
+              return;
             } else {
-              // For automatic confirmation, use confirmCardPayment
-              const { error: confirmError, paymentIntent } = await stripeInstance.confirmCardPayment(
+              // For automatic confirmation or when not manual, use confirmCardPayment
+              const result = await stripeInstance.confirmCardPayment(
                 clientSecret,
                 {
                   payment_method: selectedCardId
                 }
               );
-
-              if (confirmError) {
-                console.error('Payment confirmation error:', confirmError);
-                handleDirectPaymentError(confirmError.message || 'Payment confirmation failed');
-                setIsProcessingPayment(false);
-                return;
-              }
-
-              console.log('Saved card payment confirmed, final status:', paymentIntent?.status);
-
-              if (paymentIntent?.status === 'succeeded') {
-                toast.success('Payment successful!');
-                handleDirectPaymentSuccess();
-              } else if (paymentIntent?.status === 'requires_action') {
-                console.log("Require actions");
-                handleDirectPaymentError('Payment requires additional verification. Please try again.');
-              } else {
-                handleDirectPaymentError(`Payment was not successful. Status: ${paymentIntent?.status}`);
-              }
-              setIsProcessingPayment(false);
+              confirmError = result.error;
+              paymentIntent = result.paymentIntent;
             }
-          } catch (confirmErr: any) {
-            console.error('Payment confirmation error:', confirmErr);
-            handleDirectPaymentError(confirmErr.message || 'Payment confirmation failed');
+            
+            if (confirmError) {
+              setIsProcessingPayment(false);
+              toast.error(
+                confirmError.message || 
+                'Authentication failed. Please try again or use a different card.'
+              );
+              return;
+            }
+            
+            // Check payment intent status
+            if (paymentIntent?.status === 'succeeded') {
+              // Payment succeeded on Stripe, now update our database
+              // Extract payment ID from response (could be nested)
+              const paymentId = getPaymentId(paymentResult);
+              
+              if (paymentId) {
+                try {
+                  await CompletePayment({
+                    payment_id: paymentId,
+                    payment_method: "stripe",
+                  });
+                  setIsProcessingPayment(false);
+                  handleDirectPaymentSuccess();
+                  toast.success("Payment authenticated and processed successfully!");
+                } catch (error: any) {
+                  // Even if completePayment fails, payment succeeded on Stripe
+                  // Log error but still show success to user
+                  console.error('Failed to update payment status:', error);
+                  setIsProcessingPayment(false);
+                  handleDirectPaymentSuccess();
+                  toast.success("Payment authenticated successfully! Status update may be delayed.");
+                }
+              } else {
+                // No payment ID found, just refresh and let webhook handle it
+                console.warn('Payment ID not found in response, webhook will update status');
+                setIsProcessingPayment(false);
+                handleDirectPaymentSuccess();
+                toast.success("Payment authenticated successfully! Status will be updated shortly.");
+              }
+            } else if (paymentIntent?.status === 'requires_confirmation') {
+              // 3D Secure completed successfully, but payment needs backend confirmation
+              // Challenge is complete, so we should call CompletePayment
+              console.log('Payment requires backend confirmation after 3D Secure (saved card)');
+              
+              const paymentId = getPaymentId(paymentResult);
+              
+              if (paymentId) {
+                try {
+                  await CompletePayment({
+                    payment_id: paymentId,
+                    payment_method: "stripe",
+                  });
+                  setIsProcessingPayment(false);
+                  handleDirectPaymentSuccess();
+                  toast.success("3D Secure authentication completed! Payment is being processed...");
+                } catch (error: any) {
+                  console.error('Failed to update payment status:', error);
+                  setIsProcessingPayment(false);
+                  handleDirectPaymentSuccess();
+                  toast.info('3D Secure authentication completed! Payment is being processed...', {
+                    autoClose: 3000
+                  });
+                }
+              } else {
+                setIsProcessingPayment(false);
+                handleDirectPaymentSuccess();
+                toast.info('3D Secure authentication completed! Payment is being processed...', {
+                  autoClose: 3000
+                });
+              }
+            } else if (paymentIntent?.status === 'requires_action') {
+              // Should not happen after confirmCardPayment/handleCardAction, but handle just in case
+              setIsProcessingPayment(false);
+              toast.error("Payment requires additional authentication. Please try again.");
+            } else {
+              setIsProcessingPayment(false);
+              handleDirectPaymentSuccess();
+              toast.success("Payment processed successfully!");
+            }
+          } catch (authError: any) {
             setIsProcessingPayment(false);
+            toast.error(
+              authError.message ||
+              'Authentication process failed. Please try again.'
+            );
           }
-        } else if (paymentStatus === 'succeeded' || paymentResult?.success) {
-          // Payment succeeded immediately (no confirmation needed)
-          console.log('Saved card payment succeeded immediately');
-          toast.success('Payment successful!');
-          handleDirectPaymentSuccess();
-          setIsProcessingPayment(false);
-        } else if (paymentStatus === 'requires_payment_method') {
-          // Payment method was declined
-          handleDirectPaymentError('Your card was declined. Please try a different payment method.');
-          setIsProcessingPayment(false);
         } else {
-          // Other statuses or missing data
-          console.warn('Unexpected payment status or missing data:', { paymentStatus, clientSecret, paymentResult });
-          if (!clientSecret) {
-            handleDirectPaymentError('Payment confirmation data is missing. Please try again.');
-          } else {
-            handleDirectPaymentError(`Payment was not successful. Status: ${paymentStatus || 'unknown'}`);
-          }
+          // No 3D Secure required, payment completed
           setIsProcessingPayment(false);
+          handleDirectPaymentSuccess();
+          toast.success("Payment processed successfully!");
         }
       },
       onError: (error) => {
