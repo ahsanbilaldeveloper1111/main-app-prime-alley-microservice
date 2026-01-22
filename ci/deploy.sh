@@ -56,6 +56,16 @@ else
   npm install
 fi
 
+if [[ "$ENV_NAME" == "stage" ]]; then
+  echo "Stage has no internet: skipping npm ci/install"
+else
+  if [[ -f package-lock.json ]]; then
+    npm ci
+  else
+    npm install
+  fi
+fi
+
 # Stop -> build -> start (as per dev steps)
 sudo systemctl stop "$SERVICE_NAME"
 npm run build
