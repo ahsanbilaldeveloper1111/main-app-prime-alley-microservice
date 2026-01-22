@@ -52,23 +52,31 @@ chmod 600 .env.local
 sudo systemctl stop "$SERVICE_NAME"
 
 if [[ "$ENV_NAME" == "stage" ]]; then
-  echo "Stage has no internet: skipping npm ci/install"
+  echo "Stage: skipping npm ci/install"
 else
-  # Only run npm ci when package-lock.json changed
-  LOCK_HASH_FILE=".last_package_lock_sha"
-  CURRENT_LOCK_SHA="$(sha256sum package-lock.json | awk '{print $1}')"
-  LAST_LOCK_SHA="$(cat "$LOCK_HASH_FILE" 2>/dev/null || true)"
-
-  if [[ "$CURRENT_LOCK_SHA" != "$LAST_LOCK_SHA" ]]; then
-    echo "package-lock changed: running npm ci"
+  # Dev: install only if needed (optional — keep simple for now)
+  if [[ -f package-lock.json ]]; then
     npm ci --no-audit --no-fund
-    echo "$CURRENT_LOCK_SHA" > "$LOCK_HASH_FILE"
   else
-    echo "package-lock unchanged: skipping npm ci"
+    npm install --no-audit --no-fund
   fi
 fi
 
-npm run build
+# Build (needs deps; stage can skip once artifacts are present)
+if [[ "$ENV_NAME" == "stage" ]]; then
+  echo "Stage: skipping next build (expects standalone artifacts already present)"
+else
+  npm run build
+fi
+
+# ---- Deploy standalone runtime ----
+# 1) Copy standalone server + minimal node_modules to app root
+rsync -a --delete .next/standalone/ ./
+
+# 2) Ensure static assets are in the right place
+mkdir -p .next
+rsync -a --delete .next/static/ .next/static/
+
 sudo systemctl start "$SERVICE_NAME"
 sudo systemctl --no-pager status "$SERVICE_NAME" || true
 EOF
