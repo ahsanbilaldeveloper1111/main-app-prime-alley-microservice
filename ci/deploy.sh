@@ -49,13 +49,6 @@ $DOTENV_CONTENT
 ENVEOF
 chmod 600 .env.local
 
-# Install deps (prefer npm ci when package-lock.json exists)
-if [[ -f package-lock.json ]]; then
-  npm ci
-else
-  npm install
-fi
-
 if [[ "$ENV_NAME" == "stage" ]]; then
   echo "Stage has no internet: skipping npm ci/install"
 else
