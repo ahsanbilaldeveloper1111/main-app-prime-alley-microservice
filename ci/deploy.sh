@@ -3,6 +3,7 @@ set -euo pipefail
 
 ENV_NAME="${1:?env required (dev|stage)}"
 
+# ---------- SSH setup ----------
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
 
@@ -12,6 +13,7 @@ chmod 600 ~/.ssh/id_ci
 echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 chmod 600 ~/.ssh/known_hosts
 
+# ---------- Environment selection ----------
 if [[ "$ENV_NAME" == "dev" ]]; then
   SSH_HOST="${DEV_SSH_HOST}"
   SSH_USER="${DEV_SSH_USER}"
@@ -31,8 +33,9 @@ else
   exit 2
 fi
 
-echo "Deploying Next.js $ENV_NAME to $SSH_USER@$SSH_HOST:$APP_DIR (branch=$BRANCH, service=$SERVICE_NAME)"
+echo "Deploying Next.js [$ENV_NAME] → $SSH_USER@$SSH_HOST:$APP_DIR (branch=$BRANCH)"
 
+# ---------- Remote deploy ----------
 ssh -o StrictHostKeyChecking=yes -i ~/.ssh/id_ci \
   "$SSH_USER@$SSH_HOST" \
   "ENV_NAME='$ENV_NAME' APP_DIR='$APP_DIR' BRANCH='$BRANCH' SERVICE_NAME='$SERVICE_NAME' DOTENV_CONTENT=\$'${DOTENV_CONTENT//$'\n'/\\n}' bash -l -s" <<'EOF'
@@ -40,35 +43,36 @@ set -euo pipefail
 
 cd "$APP_DIR"
 
+echo "→ Fetching code"
 git fetch origin
 git checkout "$BRANCH"
 git pull origin "$BRANCH"
 
-# Write .env.local
+echo "→ Writing .env.local"
 printf "%b" "$DOTENV_CONTENT" > .env.local
 chmod 600 .env.local
 
-# Stop FIRST (frees memory; avoids npm killed)
-sudo systemctl stop "$SERVICE_NAME"
+echo "→ Stopping service"
+sudo systemctl stop "$SERVICE_NAME" || true
 
+# ---------- npm handling ----------
 if [[ "$ENV_NAME" == "stage" ]]; then
-  echo "Stage has no internet: skipping npm ci/install"
+  echo "→ Stage: skipping npm install / npm ci (no internet)"
 else
-  # Only run npm ci when package-lock.json changed
-  LOCK_HASH_FILE=".last_package_lock_sha"
-  CURRENT_LOCK_SHA="$(sha256sum package-lock.json | awk '{print $1}')"
-  LAST_LOCK_SHA="$(cat "$LOCK_HASH_FILE" 2>/dev/null || true)"
-
-  if [[ "$CURRENT_LOCK_SHA" != "$LAST_LOCK_SHA" ]]; then
-    echo "package-lock changed: running npm ci"
+  echo "→ Dev: installing dependencies"
+  if [[ -f package-lock.json ]]; then
     npm ci --no-audit --no-fund
-    echo "$CURRENT_LOCK_SHA" > "$LOCK_HASH_FILE"
   else
-    echo "package-lock unchanged: skipping npm ci"
+    npm install --no-audit --no-fund
   fi
 fi
 
+echo "→ Building app"
 npm run build
+
+echo "→ Starting service"
 sudo systemctl start "$SERVICE_NAME"
+
+echo "→ Service status"
 sudo systemctl --no-pager status "$SERVICE_NAME" || true
 EOF
