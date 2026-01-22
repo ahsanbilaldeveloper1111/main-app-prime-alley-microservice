@@ -3,6 +3,7 @@ set -euo pipefail
 
 ENV_NAME="${1:?env required (dev|stage)}"
 
+# ---------- SSH setup ----------
 mkdir -p ~/.ssh
 chmod 700 ~/.ssh
 
@@ -12,6 +13,7 @@ chmod 600 ~/.ssh/id_ci
 echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 chmod 600 ~/.ssh/known_hosts
 
+# ---------- Environment selection ----------
 if [[ "$ENV_NAME" == "dev" ]]; then
   SSH_HOST="${DEV_SSH_HOST}"
   SSH_USER="${DEV_SSH_USER}"
@@ -31,8 +33,9 @@ else
   exit 2
 fi
 
-echo "Deploying Next.js $ENV_NAME to $SSH_USER@$SSH_HOST:$APP_DIR (branch=$BRANCH, service=$SERVICE_NAME)"
+echo "Deploying Next.js [$ENV_NAME] → $SSH_USER@$SSH_HOST:$APP_DIR (branch=$BRANCH)"
 
+# ---------- Remote deploy ----------
 ssh -o StrictHostKeyChecking=yes -i ~/.ssh/id_ci \
   "$SSH_USER@$SSH_HOST" \
   "ENV_NAME='$ENV_NAME' APP_DIR='$APP_DIR' BRANCH='$BRANCH' SERVICE_NAME='$SERVICE_NAME' DOTENV_CONTENT=\$'${DOTENV_CONTENT//$'\n'/\\n}' bash -l -s" <<'EOF'
@@ -40,21 +43,23 @@ set -euo pipefail
 
 cd "$APP_DIR"
 
+echo "→ Fetching code"
 git fetch origin
 git checkout "$BRANCH"
 git pull origin "$BRANCH"
 
-# Write .env.local
+echo "→ Writing .env.local"
 printf "%b" "$DOTENV_CONTENT" > .env.local
 chmod 600 .env.local
 
-# Stop FIRST (frees memory; avoids npm killed)
-sudo systemctl stop "$SERVICE_NAME"
+echo "→ Stopping service"
+sudo systemctl stop "$SERVICE_NAME" || true
 
+# ---------- npm handling ----------
 if [[ "$ENV_NAME" == "stage" ]]; then
-  echo "Stage: skipping npm ci/install"
+  echo "→ Stage: skipping npm install / npm ci (no internet)"
 else
-  # Dev: install only if needed (optional — keep simple for now)
+  echo "→ Dev: installing dependencies"
   if [[ -f package-lock.json ]]; then
     npm ci --no-audit --no-fund
   else
@@ -62,32 +67,12 @@ else
   fi
 fi
 
-# Build (needs deps; stage can skip once artifacts are present)
-if [[ "$ENV_NAME" == "stage" ]]; then
-  echo "Stage: skipping next build (expects standalone artifacts already present)"
-else
-  npm run build
-fi
+echo "→ Building app"
+npm run build
 
-# ---- Deploy standalone runtime ----
-# 1) Copy standalone server + minimal node_modules to app root
-
-# ---- Deploy standalone runtime (stable copy) ----
-STAGE_DIR="$(mktemp -d /tmp/next-standalone-XXXXXX)"
-
-cp -a .next/standalone/. "$STAGE_DIR/standalone"
-mkdir -p "$STAGE_DIR/.next"
-cp -a .next/static "$STAGE_DIR/.next/"
-
-rsync -a --delete "$STAGE_DIR/standalone/" ./
-rc=$?; if [[ $rc -ne 0 && $rc -ne 24 ]]; then exit $rc; fi
-
-mkdir -p .next
-rsync -a --delete "$STAGE_DIR/.next/static/" .next/static/
-rc=$?; if [[ $rc -ne 0 && $rc -ne 24 ]]; then exit $rc; fi
-
-rm -rf "$STAGE_DIR"
-
+echo "→ Starting service"
 sudo systemctl start "$SERVICE_NAME"
+
+echo "→ Service status"
 sudo systemctl --no-pager status "$SERVICE_NAME" || true
 EOF
