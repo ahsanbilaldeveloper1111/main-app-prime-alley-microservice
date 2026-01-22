@@ -71,11 +71,22 @@ fi
 
 # ---- Deploy standalone runtime ----
 # 1) Copy standalone server + minimal node_modules to app root
-rsync -a --delete .next/standalone/ ./
 
-# 2) Ensure static assets are in the right place
+# ---- Deploy standalone runtime (stable copy) ----
+STAGE_DIR="$(mktemp -d /tmp/next-standalone-XXXXXX)"
+
+# Copy build output into a stable temp dir first (avoids "vanished" during transfer)
+cp -a .next/standalone/. "$STAGE_DIR/standalone"
+mkdir -p "$STAGE_DIR/.next"
+cp -a .next/static "$STAGE_DIR/.next/static"
+
+# Now sync from the stable temp dir into app root
+# Ignore rsync code 24 (vanished files) just in case
+rsync -a --delete "$STAGE_DIR/standalone/" ./ || [[ $? -eq 24 ]]
 mkdir -p .next
-rsync -a --delete .next/static/ .next/static/
+rsync -a --delete "$STAGE_DIR/.next/static/" .next/static/ || [[ $? -eq 24 ]]
+
+rm -rf "$STAGE_DIR"
 
 sudo systemctl start "$SERVICE_NAME"
 sudo systemctl --no-pager status "$SERVICE_NAME" || true
