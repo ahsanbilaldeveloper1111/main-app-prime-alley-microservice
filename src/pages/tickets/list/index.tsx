@@ -30,6 +30,7 @@ import { Button, Modal, Row, Col, Card, InputGroup, Form,Alert, Badge } from "re
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import moment from "moment";
+import { GlobalDateTimeFormat } from "@utils/Helper";
 import {
   GetAllModules,
   GetAllSubmodules,
@@ -375,7 +376,7 @@ const TicketList = () => {
         sortable: true,
         cell: (props: any) => (
           <small className="text-muted">
-            {moment(props.created_at).format("DD/MM/YYYY")}
+            {moment(props.created_at).format(GlobalDateTimeFormat)}
           </small>
         ),
       },

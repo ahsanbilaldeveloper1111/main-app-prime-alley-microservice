@@ -7,7 +7,7 @@ import { toast } from 'react-toastify';
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-import { CheckNumber, BulkCheckNumber } from '@utils/dncr';
+import { CheckNumber, BulkCheckNumber,CheckNumbers } from '@utils/dncr';
 import { Edit3, Upload, HelpCircle, Download, X } from 'lucide-react';
 
 interface PhoneResult {
@@ -371,18 +371,82 @@ const APINumberCheck = () => {
 
       // Transform API response to PhoneResult
       const transformCheckResult = (phoneNumber: string, response: any): PhoneResult => {
-        if (response && Array.isArray(response) && response.length > 0) {
-          const item = response[0];
+        console.log('transformCheckResult called with:', { phoneNumber, response });
+        
+        // Handle null, undefined, or false response
+        if (!response || response === false) {
+          console.log('Response is null, undefined, or false');
           return {
             input: phoneNumber,
             normalized: phoneNumber,
-            status: item?.status === "TRUE" ? "Valid" : "Invalid",
-            accountNumber: item?.accountNumber || '',
-            dncrStatus: item?.dncrStatus === "TRUE" ? "Active" : "Inactive",
-            transactionStatus: item?.transactionStatus || "N/A",
-            notes: item?.status === "TRUE" ? "Registered" : "Not Registered"
+            status: "Invalid",
+            notes: "No results found"
           } as PhoneResult;
         }
+        
+        // Handle array response - take first element if it's an array
+        if (Array.isArray(response)) {
+          console.log('Response is an array, using first element');
+          if (response.length > 0) {
+            return transformCheckResult(phoneNumber, response[0]);
+          }
+          return {
+            input: phoneNumber,
+            normalized: phoneNumber,
+            status: "Invalid",
+            notes: "No results found"
+          } as PhoneResult;
+        }
+        
+        // Handle single number response format (object with number, status, details, etc.)
+        if (typeof response === 'object') {
+          console.log('Response is an object, processing...');
+          const details = response.details || {};
+          
+          // Determine status: "TRUE" or "VALID" = Valid, "FALSE" or "INVALID" = Invalid
+          let status = "Unknown";
+          if (response.status === "TRUE" || response.status === "VALID") {
+            status = "Valid";
+          } else if (response.status === "FALSE" || response.status === "INVALID") {
+            status = "Invalid";
+          } else if (response.status) {
+            status = response.status;
+          }
+          
+          // Determine DNCR Status: "TRUE" = Active, "FALSE" = Inactive, null/undefined = "N/A"
+          let dncrStatus = "N/A";
+          if (details.dncrStatus === "TRUE" || details.dncrStatus === true) {
+            dncrStatus = "Active";
+          } else if (details.dncrStatus === "FALSE" || details.dncrStatus === false) {
+            dncrStatus = "Inactive";
+          } else if (details.dncrStatus !== null && details.dncrStatus !== undefined) {
+            dncrStatus = String(details.dncrStatus);
+          }
+          
+          // Transaction Status: use details.transactionStatus, or "N/A" if null/undefined
+          const transactionStatus = details.transactionStatus !== null && details.transactionStatus !== undefined 
+            ? String(details.transactionStatus) 
+            : "N/A";
+          
+          // Notes: use message, or derive from status
+          const notes = response.message || (response.status === "TRUE" || response.status === "VALID" ? "Registered" : "Not Registered");
+          
+          const result = {
+            input: phoneNumber,
+            normalized: phoneNumber,
+            status: status,
+            accountNumber: details.accountNumber || response.number || phoneNumber,
+            dncrStatus: dncrStatus,
+            transactionStatus: transactionStatus,
+            notes: notes
+          } as PhoneResult;
+          
+          console.log('Transformed result:', result);
+          return result;
+        }
+        
+        // Fallback for any other response type
+        console.log('Response format not recognized, using fallback');
         return {
           input: phoneNumber,
           normalized: phoneNumber,
@@ -395,7 +459,13 @@ const APINumberCheck = () => {
       const checkSingleNumber = async (phoneNumber: string): Promise<PhoneResult> => {
         try {
           const response = await CheckNumber(phoneNumber);
-          return transformCheckResult(phoneNumber, response);
+          console.log('CheckNumber API response for', phoneNumber, ':', response);
+          console.log('Response type:', typeof response);
+          console.log('Is object?', response && typeof response === 'object');
+          console.log('Is array?', Array.isArray(response));
+          const result = transformCheckResult(phoneNumber, response);
+          console.log('Transformed result:', result);
+          return result;
         } catch (error) {
           console.error(`Error checking ${phoneNumber}:`, error);
           return {
@@ -430,9 +500,67 @@ const APINumberCheck = () => {
         setBulkResults(null);
 
         try {
-          const checkPromises = phoneNumbers.map(checkSingleNumber);
-          const checkResults = await Promise.all(checkPromises);
-          setResults(checkResults);
+          // If single number, use checkSingleNumber
+          if (phoneNumbers.length === 1) {
+            const result = await checkSingleNumber(phoneNumbers[0]);
+            setResults([result]);
+          } else {
+            // If multiple numbers, use CheckNumbers API
+            const apiResponse = await CheckNumbers(phoneNumbers);
+            console.log('CheckNumbers API raw response:', apiResponse);
+            console.log('Response type:', typeof apiResponse);
+            console.log('Is object?', apiResponse && typeof apiResponse === 'object');
+            console.log('Has results?', apiResponse && typeof apiResponse === 'object' && 'results' in apiResponse);
+            
+            // The API function returns response.data.data, which should be the object with results
+            // Response format: { request_id, user, timestamp, results: { "phoneNumber": { status, details, ... }, ... } }
+            // Handle case where API returns false or null
+            if (!apiResponse || apiResponse === false) {
+              console.error('API returned false or null');
+              const checkResults = phoneNumbers.map((phoneNumber) => {
+                return {
+                  input: phoneNumber,
+                  normalized: phoneNumber,
+                  status: "Error",
+                  notes: "API request failed"
+                } as PhoneResult;
+              });
+              setResults(checkResults);
+            } else if (apiResponse && typeof apiResponse === 'object' && apiResponse.results && typeof apiResponse.results === 'object') {
+              // Transform batch response to PhoneResult array
+              console.log('Processing results:', apiResponse.results);
+              const checkResults = phoneNumbers.map((phoneNumber) => {
+                const result = apiResponse.results[phoneNumber];
+                console.log(`Result for ${phoneNumber}:`, result);
+                if (result && typeof result === 'object') {
+                  // Transform the result object to PhoneResult format
+                  const transformed = transformCheckResult(phoneNumber, result);
+                  console.log(`Transformed for ${phoneNumber}:`, transformed);
+                  return transformed;
+                }
+                return {
+                  input: phoneNumber,
+                  normalized: phoneNumber,
+                  status: "Error",
+                  notes: "No result found for this number"
+                } as PhoneResult;
+              });
+              setResults(checkResults);
+            } else {
+              // Fallback: if response format is different
+              console.error('Unexpected response format:', apiResponse);
+              console.error('Response keys:', apiResponse && typeof apiResponse === 'object' ? Object.keys(apiResponse) : 'not an object');
+              const checkResults = phoneNumbers.map((phoneNumber) => {
+                return {
+                  input: phoneNumber,
+                  normalized: phoneNumber,
+                  status: "Error",
+                  notes: "Unexpected response format"
+                } as PhoneResult;
+              });
+              setResults(checkResults);
+            }
+          }
         } catch (error) {
           console.error('Error checking numbers:', error);
           toast.error('Error checking numbers');
@@ -528,7 +656,7 @@ const APINumberCheck = () => {
           const response = await BulkCheckNumber(formData);
           
           if (response) {
-            setBulkResults(response);
+            setBulkResults(response?.results);
             toast.success('Numbers checked successfully');
           } else {
             toast.error('Failed to check numbers');
@@ -847,7 +975,7 @@ const APINumberCheck = () => {
                   <tr>
                       <th style={styles.th}>Phone Number</th>
                     <th style={styles.th}>Status</th>
-                      <th style={styles.th}>Account Number</th>
+                      
                       <th style={styles.th}>DNCR Status</th>
                       <th style={styles.th}>Transaction Status</th>
                     <th style={styles.th}>Notes</th>
@@ -858,7 +986,7 @@ const APINumberCheck = () => {
                       // Display bulk results
                       Object.entries(bulkResults).map(([phoneNumber, data]: [string, any]) => (
                         <tr key={phoneNumber} style={styles.tr}>
-                          <td style={styles.td}><strong>{phoneNumber}</strong></td>
+                          <td style={styles.td}><strong>{data?.accountNumber || phoneNumber}</strong></td>
                           <td style={styles.td}>
                             <span style={{
                               ...styles.badgeValid,
@@ -869,7 +997,7 @@ const APINumberCheck = () => {
                               {data.status === "TRUE" ? "Registered" : "Not Registered"}
                             </span>
                           </td>
-                          <td style={styles.td}>{data.accountNumber || "N/A"}</td>
+                         
                           <td style={styles.td}>
                             <span style={{
                               ...styles.badgeValid,
@@ -899,7 +1027,7 @@ const APINumberCheck = () => {
                               {result.status || "N/A"}
                             </span>
                       </td>
-                          <td style={styles.td}>{result.accountNumber || "N/A"}</td>
+                          
                       <td style={styles.td}>
                             {result.dncrStatus ? (
                               <span style={{

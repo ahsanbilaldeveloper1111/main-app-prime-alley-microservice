@@ -507,7 +507,7 @@ export const debugTimezoneConversion = (date: string, time: string) => {
   };
 };
 
-export const GlobalDateFormat = "D MMM YYYY";
+export const GlobalDateFormat = "DD MMM YYYY";
 export const GlobalTimeFormat = "hh:mm:ss A";
 export const GlobalDateTimeFormat = "DD MMM YYYY hh:mm:ss A";
 
