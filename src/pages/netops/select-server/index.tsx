@@ -197,11 +197,6 @@ const SelectServer = () => {
           box-sizing: border-box;
         }
         
-        .container-fluid {
-          width: 100%;
-          max-width: 1600px;
-          margin: 0 auto;
-        }
 
         .btn {
           padding: 8px 16px;
@@ -401,29 +396,7 @@ const SelectServer = () => {
           height: 0;
         }
 
-        .slider {
-          position: absolute;
-          cursor: pointer;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: #ccc;
-          transition: .4s;
-          border-radius: 24px;
-        }
-
-        .slider:before {
-          position: absolute;
-          content: "";
-          height: 18px;
-          width: 18px;
-          left: 3px;
-          bottom: 3px;
-          background-color: white;
-          transition: .4s;
-          border-radius: 50%;
-        }
+       
 
         input:checked + .slider {
           background-color: #4da6ff;
@@ -533,10 +506,7 @@ const SelectServer = () => {
             flex-direction: column;
           }
           
-          .sidebar {
-            width: 100% !important;
-            margin-bottom: 20px;
-          }
+         
         }
       `}</style>
 
@@ -952,11 +922,11 @@ const SelectServer = () => {
                           </span>
                           <div>
                             <strong style={{ fontSize: '18px' }}>{healthyCount}</strong>
-                            <span style={{
+                            {/* <span style={{
                               fontSize: '13px',
                               color: '#6c757d',
                               marginLeft: '4px'
-                            }}>{totalServers > 0 ? Math.round((healthyCount / totalServers) * 100) : 0}%</span>
+                            }}>{totalServers > 0 ? Math.round((healthyCount / totalServers) * 100) : 0}%</span> */}
                           </div>
                         </div>
                       </div>
@@ -979,11 +949,11 @@ const SelectServer = () => {
                           </span>
                           <div>
                             <strong style={{ fontSize: '18px' }}>{warningCount}</strong>
-                            <span style={{
+                            {/* <span style={{
                               fontSize: '13px',
                               color: '#6c757d',
                               marginLeft: '4px'
-                            }}>{totalServers > 0 ? Math.round((warningCount / totalServers) * 100) : 0}%</span>
+                            }}>{totalServers > 0 ? Math.round((warningCount / totalServers) * 100) : 0}%</span> */}
                           </div>
                         </div>
                       </div>
@@ -1006,11 +976,11 @@ const SelectServer = () => {
                           </span>
                           <div>
                             <strong style={{ fontSize: '18px' }}>{criticalCount}</strong>
-                            <span style={{
+                            {/* <span style={{
                               fontSize: '13px',
                               color: '#6c757d',
                               marginLeft: '4px'
-                            }}>{totalServers > 0 ? Math.round((criticalCount / totalServers) * 100) : 0}%</span>
+                            }}>{totalServers > 0 ? Math.round((criticalCount / totalServers) * 100) : 0}%</span> */}
                           </div>
                         </div>
                       </div>
@@ -1033,11 +1003,11 @@ const SelectServer = () => {
                           </span>
                           <div>
                             <strong style={{ fontSize: '18px' }}>{offlineCount}</strong>
-                            <span style={{
+                            {/* <span style={{
                               fontSize: '13px',
                               color: '#6c757d',
                               marginLeft: '4px'
-                            }}>{totalServers > 0 ? Math.round((offlineCount / totalServers) * 100) : 0}%</span>
+                            }}>{totalServers > 0 ? Math.round((offlineCount / totalServers) * 100) : 0}%</span> */}
                           </div>
                         </div>
                       </div>

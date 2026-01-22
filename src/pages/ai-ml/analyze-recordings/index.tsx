@@ -229,7 +229,7 @@ const AnalyzeRecordings = () => {
     // Table columns configuration for call recordings
     const columns = [
         {
-            key: 'datetime',
+            key: 'date',
             name: 'Date',
             selector: (row: any) => row.DateTime,
             sortable: true,
@@ -242,7 +242,7 @@ const AnalyzeRecordings = () => {
             }
         },
         {
-            key: 'datetime',
+            key: 'time',
             name: 'Time',
             selector: (row: any) => row.DateTime,
             sortable: true,
@@ -304,7 +304,7 @@ const AnalyzeRecordings = () => {
         },
        
          {
-            key:'status',
+            key:'qualification',
             name: 'Qualification',
             selector: (row: any) => row.status,
             sortable: true,
@@ -320,7 +320,7 @@ const AnalyzeRecordings = () => {
             }
         },
         {
-            key:'status',
+            key:'follow_up',
             name: 'Follow Up',
             selector: (row: any) => row.follow_up,
             sortable: true,
@@ -335,7 +335,7 @@ const AnalyzeRecordings = () => {
             }
         },
         {
-            key:'status',
+            key:'sentiment',
             name: 'Sentiment',
             selector: (row: any) => row.sentiment,
             sortable: true,
@@ -344,7 +344,7 @@ const AnalyzeRecordings = () => {
             }
         },
         {
-            key:'status',
+            key:'main_topic',
             name: 'Main Intent',
             selector: (row: any) => row.main_intent,
             sortable: true,
