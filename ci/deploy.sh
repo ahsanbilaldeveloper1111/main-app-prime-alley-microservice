@@ -49,20 +49,27 @@ $DOTENV_CONTENT
 ENVEOF
 chmod 600 .env.local
 
+# Stop FIRST to free memory
+sudo systemctl stop "$SERVICE_NAME"
+
 if [[ "$ENV_NAME" == "stage" ]]; then
   echo "Stage has no internet: skipping npm ci/install"
 else
-  if [[ -f package-lock.json ]]; then
-    npm ci
+  # Only install when lockfile changed
+  LOCK_HASH_FILE=".last_package_lock_sha"
+  CURRENT_LOCK_SHA="$(sha256sum package-lock.json | awk '{print $1}')"
+  LAST_LOCK_SHA="$(cat "$LOCK_HASH_FILE" 2>/dev/null || true)"
+
+  if [[ "$CURRENT_LOCK_SHA" != "$LAST_LOCK_SHA" ]]; then
+    echo "package-lock changed: running npm ci"
+    npm ci --no-audit --no-fund
+    echo "$CURRENT_LOCK_SHA" > "$LOCK_HASH_FILE"
   else
-    npm install
+    echo "package-lock unchanged: skipping npm ci"
   fi
 fi
 
-# Stop -> build -> start (as per dev steps)
-sudo systemctl stop "$SERVICE_NAME"
 npm run build
 sudo systemctl start "$SERVICE_NAME"
-
 sudo systemctl --no-pager status "$SERVICE_NAME" || true
 EOF
