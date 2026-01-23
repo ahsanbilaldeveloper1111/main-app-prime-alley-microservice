@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import { useSession } from "next-auth/react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -84,6 +85,7 @@ interface ApiRecurringTask {
 }
 
 const RecurringReminders = () => {
+  const { data: session } = useSession();
     const [activeTab, setActiveTab] = useState<'active' | 'dueToday' | 'enabled'>('active');
     const [selectedTask, setSelectedTask] = useState<string | null>(null);
     const [todoSearchQuery, setTodoSearchQuery] = useState('');
@@ -830,6 +832,7 @@ const RecurringReminders = () => {
           marginBottom: '16px',
           flexWrap: 'wrap'
         }}>
+          {/* {session?.user?.permissions?.includes('add-recurring-tasks') && ( */}
           <button
             onClick={() => {
               setEditingTask(null);
@@ -863,6 +866,7 @@ const RecurringReminders = () => {
           >
             <Plus size={16} /> Add Recurring
           </button>
+          {/* )} */}
 
           <button
             onClick={() => setActiveTab('active')}
