@@ -158,8 +158,7 @@ export interface DeviceMonitoringStatusResponse {
 
 // Helper function to extract data from controlhub response
 function extractData<T>(response: NetOpsApiResponse<T>): T {
-  console.log("Extracting data from response:", response);
-
+  
   // Handle successful response with nested data structure
   if (response?.code === 200 && response?.data?.success) {
     console.log("Extracting from nested data structure:", response.data.data);
@@ -339,6 +338,173 @@ export const getDeviceMonitoringStatus = async (deviceId: string | number, param
   }
 };
 
+// System Metrics Types
+export interface ServerMetrics {
+  hostname: string;
+  ip_address: string;
+  filename: string;
+  last_update: string;
+  received_at: string;
+  os: string;
+  has_sql: boolean;
+  cpu_usage: number;
+  memory_usage: number;
+  disk_usage: number;
+}
+
+export interface ServerMetricsListResponse {
+  servers: ServerMetrics[];
+  count: number;
+}
+
+// New System Metrics Types
+export interface SystemMetricHost {
+  hostname: string;
+  os: string;
+  kernel: string;
+  architecture: string;
+}
+
+export interface SystemMetricCpu {
+  cores: number;
+  used_percent: number;
+  free_percent: number;
+  max_possible_percent: number;
+}
+
+export interface SystemMetricLoad {
+  "1m": number;
+  "5m": number;
+  "15m": number;
+}
+
+export interface SystemMetricMemory {
+  total_gb: number;
+  used_gb: number;
+  free_gb: number;
+  used_percent: number;
+}
+
+export interface SystemMetricSwap {
+  total_gb: number;
+  used_gb: number;
+  free_gb: number;
+  used_percent: number;
+}
+
+export interface SystemMetricDisk {
+  total_gb: number;
+  used_gb: number;
+  free_gb: number;
+  used_percent: number;
+}
+
+export interface SystemMetricFilesystem {
+  filesystem: string;
+  type: string;
+  mount: string;
+  total_gb: number;
+  used_gb: number;
+  free_gb: number;
+  used_percent: string;
+}
+
+export interface SystemMetricUptime {
+  seconds: number;
+}
+
+export interface SystemMetricNetwork {
+  interface: string;
+  ip: string;
+  is_up: boolean;
+}
+
+export interface SystemMetricService {
+  name: string;
+  status: string;
+  running: boolean;
+}
+
+export interface SystemMetricTopProcess {
+  pid: string;
+  process: string;
+  cpu_percent: string;
+  mem_percent: string;
+}
+
+export interface SystemMetricSelinux {
+  status: string;
+}
+
+export interface SystemMetricTimeSync {
+  ntp_synchronized: boolean;
+}
+
+export interface SystemMetricPythonPackage {
+  name: string;
+  version: string;
+}
+
+export interface SystemMetricPython {
+  version: string;
+  executable: string;
+  packages: SystemMetricPythonPackage[];
+}
+
+export interface SystemMetricDatabase {
+  name: string;
+  tables: number;
+  size_gb: number;
+  used_gb: number;
+  free_gb: number;
+  used_percent: number;
+}
+
+export interface SystemMetricSql {
+  databases: SystemMetricDatabase[];
+  driver_used: string;
+  version: string;
+}
+
+export interface SystemMetricCron {
+  system: string[];
+  users: {
+    [key: string]: string[];
+  };
+}
+
+export interface SystemMetric {
+  hostname: string;
+  timestamp: string;
+  host: SystemMetricHost;
+  cpu: SystemMetricCpu;
+  load: SystemMetricLoad;
+  memory: SystemMetricMemory;
+  swap: SystemMetricSwap;
+  disk: SystemMetricDisk;
+  filesystems: SystemMetricFilesystem[];
+  uptime: SystemMetricUptime;
+  network: SystemMetricNetwork[];
+  listening_ports: string[];
+  services: SystemMetricService[];
+  failed_services: string[];
+  top_processes: SystemMetricTopProcess[];
+  selinux: SystemMetricSelinux;
+  time_sync: SystemMetricTimeSync;
+  journal_errors: string[];
+  python: SystemMetricPython;
+  sql?: SystemMetricSql;
+  cron?: SystemMetricCron;
+  received_at: string;
+  file_mtime: string;
+}
+
+export interface SystemMetricsResponse {
+  status: string;
+  count: number;
+  metrics: SystemMetric[];
+}
+
 // Test result types
 export interface TestResult {
   success: boolean;
@@ -424,6 +590,31 @@ export const resolveAlert = async (alertId: string | number): Promise<void> => {
   } catch (error: any) {
     console.error("Failed to resolve alert:", error);
     toast.error(error?.message || "Failed to resolve alert");
+    throw error;
+  }
+};
+
+// System Metrics APIs
+export const getSystemMetricsServers = async (params: Record<string, any> = {}): Promise<ServerMetricsListResponse> => {
+  try {
+    const response = await axiosInstance.get<NetOpsApiResponse<ServerMetricsListResponse>>("/netops/system-metrics/servers", { params });
+    console.log("System metrics servers API response:", response.data);
+    return extractData<ServerMetricsListResponse>(response.data);
+  } catch (error: any) {
+    console.error("Failed to fetch system metrics servers:", error);
+    toast.error(error?.message || "Failed to fetch system metrics servers");
+    throw error;
+  }
+};
+
+export const getSystemMetrics = async (server: string | number, params: Record<string, any> = {}): Promise<SystemMetricsResponse> => {
+  try {
+    const response = await axiosInstance.get<NetOpsApiResponse<SystemMetricsResponse>>("/netops/system-metrics/"+server);
+    console.log("System metrics API response:", response.data);
+    return extractData<SystemMetricsResponse>(response.data);
+  } catch (error: any) {
+    console.error("Failed to fetch system metrics:", error);
+    toast.error(error?.message || "Failed to fetch system metrics");
     throw error;
   }
 };

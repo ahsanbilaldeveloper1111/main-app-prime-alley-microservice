@@ -173,8 +173,7 @@ export interface DashboardData {
 
 // Helper function to extract data from controlhub response
 function extractData<T>(response: any): T {
-  //console.log("Extracting data from response:", response);
-
+  
   // Handle successful response with nested data structure
   if (response?.code === 200 && response?.data?.success) {
     console.log("Extracting from nested data structure:", response.data.data);
@@ -3566,6 +3565,223 @@ export const deleteBusinessType = async (id: number): Promise<void> => {
     toast.success("Business type deleted successfully");
   } catch (error: any) {
     toast.error(error?.response?.data?.message || error?.message || "Failed to delete business type");
+    throw error;
+  }
+};
+
+// Approval Management Interfaces
+export interface ApprovalData {
+  id: number;
+  item_id?: string | number | null;
+  type?: string;
+  deal_id?: string | number | null;
+  order_id?: string | number | null;
+  approval_type?: string;
+  status: "pending" | "approved" | "rejected";
+  requested_by?: string;
+  requested_at?: string;
+  created_by?: string;
+  created_at: string;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  rejected_by?: string | null;
+  rejected_at?: string | null;
+  decided_at?: string | null;
+  rejection_reason?: string | null;
+  notes?: string | null;
+  updated_at: string;
+  estimate_snapshot?: any;
+  deal?: DealData;
+  order?: OrderData;
+}
+
+export interface CreateApprovalPayload {
+  item_id?: number;
+  type?: 'deal' | 'order';
+  deal_id?: string | number;
+  order_id?: string | number;
+  approval_type?: string;
+  notes?: string;
+}
+
+export interface ApproveRejectPayload {
+  rejection_reason?: string;
+  notes?: string;
+}
+
+// Approval Management API
+export const getApprovals = async (
+  params: PaginationParams = {}
+): Promise<PaginationWrapper<ApprovalData>> => {
+  try {
+    const response = await axiosInstance.get("/crm/approvals", { params });
+    const extracted = extractData<any>(response.data);
+    
+    // Handle nested response structure: data.success.data contains the pagination wrapper
+    if (extracted?.success && extracted?.data) {
+      return {
+        data: extracted.data.data || [],
+        total: extracted.data.total || 0,
+        current_page: extracted.data.current_page || 1,
+        per_page: extracted.data.per_page || 15,
+        last_page: extracted.data.last_page || 1,
+      };
+    }
+    
+    // Fallback to direct structure
+    return extracted as PaginationWrapper<ApprovalData>;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch approvals");
+    throw error;
+  }
+};
+
+export const createApproval = async (
+  data: CreateApprovalPayload
+): Promise<ApprovalData> => {
+  try {
+    // Transform payload to match API expectations
+    const payload: any = {};
+    if (data.item_id && data.type) {
+      // New format: item_id + type
+      payload.item_id = data.item_id;
+      payload.type = data.type;
+    } else {
+      // Legacy format: deal_id/order_id + approval_type
+      if ('deal_id' in data && data.deal_id) payload.deal_id = data.deal_id;
+      if ('order_id' in data && data.order_id) payload.order_id = data.order_id;
+      if ('approval_type' in data && data.approval_type) payload.approval_type = data.approval_type;
+    }
+    if ('notes' in data && data.notes) payload.notes = data.notes;
+    
+    const response = await axiosInstance.post("/crm/approvals", payload);
+    toast.success("Approval request created successfully");
+    return extractData<ApprovalData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to create approval request");
+    throw error;
+  }
+};
+
+export const getApproval = async (id: number): Promise<ApprovalData> => {
+  try {
+    const response = await axiosInstance.get(`/crm/approvals/${id}`);
+    return extractData<ApprovalData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch approval");
+    throw error;
+  }
+};
+
+export const deleteApproval = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/approvals/${id}`);
+    toast.success("Approval deleted successfully");
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete approval");
+    throw error;
+  }
+};
+
+export const approveApproval = async (
+  id: number,
+  data?: ApproveRejectPayload
+): Promise<ApprovalData> => {
+  try {
+    const response = await axiosInstance.post(`/crm/approvals/${id}/approve`, data || {});
+    toast.success("Approval approved successfully");
+    return extractData<ApprovalData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to approve");
+    throw error;
+  }
+};
+
+export const rejectApproval = async (
+  id: number,
+  data: ApproveRejectPayload
+): Promise<ApprovalData> => {
+  try {
+    const response = await axiosInstance.post(`/crm/approvals/${id}/reject`, data);
+    toast.success("Approval rejected successfully");
+    return extractData<ApprovalData>(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to reject approval");
+    throw error;
+  }
+};
+
+export const downloadApprovalPdf = async (
+  id: number
+): Promise<void> => {
+  try {
+    const response = await axiosInstance.get(
+      `/crm/approvals/${id}/download-pdf`,
+      {
+        responseType: "blob",
+        headers: {
+          Accept: "application/pdf",
+        },
+      }
+    );
+
+    // Check if response is valid
+    if (!response.data || response.data.size === 0) {
+      throw new Error("Empty PDF response received");
+    }
+
+    // Extract filename from content-disposition header if available
+    let filename = `approval-${id}.pdf`;
+    const contentDisposition = response.headers["content-disposition"];
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(
+        /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
+      );
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, "");
+      }
+    }
+
+    // response.data is already a blob when responseType is "blob"
+    const blob = response.data;
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    toast.success("PDF downloaded successfully");
+  } catch (error: any) {
+    console.error("Approval PDF download error:", error);
+    toast.error(error?.message || "Failed to download PDF");
+    throw error;
+  }
+};
+
+export const getApprovalsByDealOrOrder = async (
+  params: {
+    item_id?: number;
+    type?: 'deal' | 'order';
+  }
+): Promise<ApprovalData[]> => {
+  try {
+    // Transform params: if item_id and type are provided, use them; otherwise use deal_id/order_id
+    const requestParams: any = {};
+    if (params.item_id && params.type) {
+      requestParams.item_id = params.item_id;
+      requestParams.type = params.type;
+    } 
+    
+    const response = await axiosInstance.get("/crm/approvals/get-by-deal-or-order", { params: requestParams });
+    const data = extractData<ApprovalData[]>(response.data);
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch approvals");
     throw error;
   }
 };

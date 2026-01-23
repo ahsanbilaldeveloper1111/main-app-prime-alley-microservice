@@ -25,14 +25,16 @@ import CircularProgressCircle from '@components/CircularProgressCircle';
 
 interface TranscriptionSummary {
     total_transcriptions: number;
-    inbound_transcriptions: number;
-    outbound_transcriptions: number;
-    pending_transcriptions: number;
-    processing_transcriptions: number;
+    incomplete_transcriptions:number;
+    in_progress_transcriptions:number;
+    analyzing_transcriptions:number;
+    analyzed_transcriptions:number;
+    transribing_transcriptions:number;
+    transcribed_transcriptions:number;
     completed_transcriptions: number;
     failed_transcriptions: number;
-    with_transcription: number;
-    with_analysis: number;
+    queued_transcriptions: number;
+    reanalysis_calls: number;
 }
 
 
@@ -83,14 +85,16 @@ const AnalyzeRecordings = () => {
 
     const [transcriptionSummary, setTranscriptionSummary] = useState<TranscriptionSummary>({
         total_transcriptions: 0,
-        inbound_transcriptions: 0,
-        outbound_transcriptions: 0,
-        pending_transcriptions: 0,
-        processing_transcriptions: 0,
+        incomplete_transcriptions: 0,
+        in_progress_transcriptions: 0,
+        analyzing_transcriptions: 0,
+        reanalysis_calls: 0,
+        analyzed_transcriptions: 0,
+        transribing_transcriptions: 0,
+        transcribed_transcriptions: 0,
         completed_transcriptions: 0,
         failed_transcriptions: 0,
-        with_transcription: 0,
-        with_analysis: 0,
+        queued_transcriptions: 0,
     });
 
     // Base card configuration to avoid duplication
@@ -104,68 +108,101 @@ const AnalyzeRecordings = () => {
     const summaryCards: SummaryCard[] = useMemo(() => [
         {
             id: 'total-transcriptions',
-            title: 'Total Transcriptions',
-            value: transcriptionSummary.total_transcriptions,
-            description: 'Total transcriptions in the system',
+            title: 'Total Calls',
+            value: transcriptionSummary?.total_transcriptions || 0,
+            description: 'Total calls in the system',
             delay: 0.1,
             ...baseCardConfig
         },
         {
-            id: 'inbound-transcriptions',
-            title: 'Inbound',
-            value: transcriptionSummary.inbound_transcriptions,
-            description: 'Inbound transcriptions',
+            id: 'queued-transcriptions',
+            title: 'Calls In Queue',
+            value: transcriptionSummary?.queued_transcriptions || 0,
+            description: 'Queued calls in the system',
             delay: 0.2,
             ...baseCardConfig
         },
         {
-            id: 'outbound-transcriptions',
-            title: 'Outbound',
-            value: transcriptionSummary.outbound_transcriptions,
-            description: 'Outbound transcriptions',
-            delay: 0.3,
+            id: 'transribing-transcriptions',
+            title: 'Transribing',
+            value: transcriptionSummary?.transribing_transcriptions || 0,
+            description: 'Transribing calls in the system',
+            delay: 0.7,
+            ...baseCardConfig
+        },
+        {
+            id: 'analyzed-transcriptions',
+            title: 'Analyzing',
+            value: transcriptionSummary?.analyzing_transcriptions || 0,
+            description: 'Analyzing calls in the system',
+            delay: 0.6,
             ...baseCardConfig
         },
         {
             id: 'completed-transcriptions',
             title: 'Completed',
-            value: transcriptionSummary.completed_transcriptions,
-            description: 'Completed transcriptions',
-            delay: 0.4,
+            value: transcriptionSummary?.completed_transcriptions || 0,
+            description: 'Completed calls in the system',
+            delay: 0.9,
             ...baseCardConfig
         },
         {
-            id: 'pending-transcriptions',
-            title: 'Pending',
-            value: transcriptionSummary.pending_transcriptions,
-            description: 'Pending transcriptions',
-            delay: 0.5,
+            id: 'failed-transcriptions',
+            title: 'Failed',
+            value: transcriptionSummary?.failed_transcriptions || 0,
+            description: 'Failed calls in the system',
+            delay: 1,
             ...baseCardConfig
         },
         {
-            id: 'processing-transcriptions',
-            title: 'Processing',
-            value: transcriptionSummary.processing_transcriptions,
-            description: 'Processing transcriptions',
-            delay: 0.6,
+            id: 'incomplete-transcriptions',
+            title: 'Incomplete',
+            value: transcriptionSummary?.incomplete_transcriptions || 0,
+            description: 'Incomplete calls in the system',
+            delay: 0.3,
             ...baseCardConfig
         },
         {
-            id: 'with-analysis',
-            title: 'With Analysis',
-            value: transcriptionSummary.with_analysis,
-            description: 'Transcriptions with analysis',
-            delay: 0.7,
+            id: 'reanalysis-calls',
+            title: 'Reanalysis',
+            value: transcriptionSummary?.reanalysis_calls || 0,
+            description: 'Reanalysis calls in the system',
+            delay: 0.3,
             ...baseCardConfig
         },
-        {
-            id: 'with-transcription',
-            title: 'With Transcription',
-            value: transcriptionSummary.with_transcription,
-            description: 'Transcriptions available',
-            delay: 0.8,
-            ...baseCardConfig
-        },
+
+
+
+        
+        // {
+        //     id: 'analyzed-transcriptions',
+        //     title: 'Analyzed Transcriptions',
+        //     value: transcriptionSummary?.analyzed_transcriptions || 0,
+        //     description: 'Analyzed transcriptions in the system',
+        //     delay: 0.6,
+        //     ...baseCardConfig
+        // },
+        
+        // {
+        //     id: 'in-progress-transcriptions',
+        //     title: 'In Progress Transcriptions',
+        //     value: transcriptionSummary?.in_progress_transcriptions || 0,
+        //     description: 'In progress transcriptions in the system',
+        //     delay: 0.4,
+        //     ...baseCardConfig
+        // },    
+        // {
+        //     id: 'transcribed-transcriptions',
+        //     title: 'Transcribed Transcriptions',
+        //     value: transcriptionSummary?.transcribed_transcriptions || 0,
+        //     description: 'Transcribed transcriptions in the system',
+        //     delay: 0.8,
+        //     ...baseCardConfig
+        // },
+        
+        
+      
+        
     ], [transcriptionSummary]);
 
     const [searchValue, setSearchValue] = useState<string>('');
@@ -192,7 +229,7 @@ const AnalyzeRecordings = () => {
     // Table columns configuration for call recordings
     const columns = [
         {
-            key: 'datetime',
+            key: 'date',
             name: 'Date',
             selector: (row: any) => row.DateTime,
             sortable: true,
@@ -205,7 +242,7 @@ const AnalyzeRecordings = () => {
             }
         },
         {
-            key: 'datetime',
+            key: 'time',
             name: 'Time',
             selector: (row: any) => row.DateTime,
             sortable: true,
@@ -265,25 +302,57 @@ const AnalyzeRecordings = () => {
                 );
             }
         },
-        {
-            key:'status',
-            name: 'Qualified',
+       
+         {
+            key:'qualification',
+            name: 'Qualification',
             selector: (row: any) => row.status,
             sortable: true,
             cell: (props: any) => {
                 return (
                     <div>
-                        {props?.status === 'completed' ?
                         <Badge bg={props?.analysis?.qualified === true ? 'success' : 'warning'}>
                             {props?.analysis?.qualified === true ? 'Qualified' : 'Unqualified'}
                         </Badge>
-                        :
-                            <span className='text-muted'>N/A</span>
-                        }
+                       
                     </div>
                 )
             }
         },
+        {
+            key:'follow_up',
+            name: 'Follow Up',
+            selector: (row: any) => row.follow_up,
+            sortable: true,
+            cell: (props: any) => {
+                const followUpRequired = props?.analysis?.analysis?.follow_up_required;
+                if (followUpRequired === true) {
+                    return 'Required';
+                } else if (followUpRequired === false) {
+                    return 'Not Required';
+                }
+                return 'N/A';
+            }
+        },
+        {
+            key:'sentiment',
+            name: 'Sentiment',
+            selector: (row: any) => row.sentiment,
+            sortable: true,
+            cell: (props: any) => {
+                return props?.analysis?.analysis?.sentiment || 'N/A';
+            }
+        },
+        {
+            key:'main_topic',
+            name: 'Main Intent',
+            selector: (row: any) => row.main_intent,
+            sortable: true,
+            cell: (props: any) => {
+                return props?.analysis?.classification?.main_topic || 'N/A';
+            }
+        },
+       
         {
             key:'status',
             name: 'Status',
@@ -497,14 +566,16 @@ const AnalyzeRecordings = () => {
                     if (response?.summary) {
                         setTranscriptionSummary({
                             total_transcriptions: response.summary.total_transcriptions || 0,
-                            inbound_transcriptions: response.summary.inbound_transcriptions || 0,
-                            outbound_transcriptions: response.summary.outbound_transcriptions || 0,
-                            pending_transcriptions: response.summary.pending_transcriptions || 0,
-                            processing_transcriptions: response.summary.processing_transcriptions || 0,
-                            completed_transcriptions: response.summary.completed_transcriptions || 0,
-                            failed_transcriptions: response.summary.failed_transcriptions || 0,
-                            with_transcription: response.summary.with_transcription || 0,
-                            with_analysis: response.summary.with_analysis || 0,
+                            incomplete_transcriptions: response.summary?.incomplete_transcriptions || 0,
+                            in_progress_transcriptions: response.summary?.in_progress_transcriptions || 0,
+                            analyzing_transcriptions: response.summary?.analyzing_transcriptions || 0,
+                            reanalysis_calls: response.summary?.reanalysis_calls || 0,
+                            analyzed_transcriptions: response.summary?.analyzed_transcriptions || 0,
+                            transribing_transcriptions: response.summary?.transribing_transcriptions || 0,
+                            transcribed_transcriptions: response.summary?.transcribed_transcriptions || 0,
+                            completed_transcriptions: response.summary?.completed_transcriptions || 0,
+                            failed_transcriptions: response.summary?.failed_transcriptions || 0,
+                            queued_transcriptions: response.summary?.queued_transcriptions || 0,
                         });
                     }
 
@@ -611,6 +682,18 @@ const AnalyzeRecordings = () => {
             }
             if (filters.status !== undefined) {
                 apiFilters.status = filters.status || '';
+            }
+            if (filters.qualification !== undefined) {
+                apiFilters.qualified = filters.qualification || '';
+            }
+            if (filters.follow_up !== undefined) {
+                apiFilters.follow_up_required = filters.follow_up || '';
+            }
+            if (filters.sentiment !== undefined) {
+                apiFilters.sentiment = filters.sentiment || '';
+            }
+            if (filters.main_intent !== undefined) {
+                apiFilters.main_intent = filters.main_intent || '';
             }
 
             setCurrentFilters(apiFilters);
@@ -970,13 +1053,113 @@ const AnalyzeRecordings = () => {
                                     }}
                                     options={[
                                         { value: '', label: 'All' },
-                                        { value: 'in_progress', label: 'IN_PROGRESS' },
+                                        //{ value: 'in_progress', label: 'IN_PROGRESS' },
                                         { value: 'queued', label: 'QUEUED' },
+                                        { value: 'transribing', label: 'TRANSCRIBING' },
+                                        { value: 'analyzing', label: 'ANALYZING' },
+
+
                                         { value: 'completed', label: 'COMPLETED' },
+                                        { value: 'failed', label: 'FAILED' },
                                         { value: 'incomplete', label: 'IN_COMPLETE' },
+                                        
+                                        // { value: 'analyzed', label: 'ANALYZED' },
+                                        
+                                        // { value: 'transcribed', label: 'TRANSCRIBED' },
+
+                                        { value: 'reanalysis', label: 'REANALYSIS' },
+                                        
                                         
                                     ]}
                                     placeholder="Select analysis status"
+                                />
+                            </Form.Group>
+                        </Col>
+
+
+                        {/* qualification */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Qualification</Form.Label>
+                                <SelectBox
+                                    isSearchable={false}
+                                    value={(appliedFilters as any)?.qualification || null}
+                                    onChange={(value) => {
+                                        setAppliedFilters({ ...appliedFilters, qualification: value as string || '' });
+                                    }}
+                                    options={[
+                                        { value: 'qualified', label: 'Qualified' },
+                                        { value: 'unqualified', label: 'Unqualified' },
+                                        { value: '', label: 'N/A' }
+                                    ]}
+                                    placeholder="Select qualification"
+                                />
+                            </Form.Group>
+                        </Col>
+
+
+                        {/* follow-up */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Follow Up</Form.Label>
+                                <SelectBox
+                                    isSearchable={false}
+                                    value={(appliedFilters as any)?.follow_up || null}
+                                    onChange={(value) => {
+                                        setAppliedFilters({ ...appliedFilters, follow_up: value as string || '' });
+                                    }}
+                                    options={[
+                                        { value: 'true', label: 'Required' },
+                                        { value: 'false', label: 'Not Required' },
+                                        { value: '', label: 'N/A' }
+                                    ]}
+                                    placeholder="Select follow up"
+                                />
+                            </Form.Group>
+                        </Col>
+
+
+                         {/* Sentiment */}
+                         <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Sentiment</Form.Label>
+                                <SelectBox
+                                    isSearchable={false}
+                                    value={(appliedFilters as any)?.sentiment || null}
+                                    onChange={(value) => {
+                                        setAppliedFilters({ ...appliedFilters, sentiment: value as string || '' });
+                                    }}
+                                    options={[
+                                        { value: 'positive', label: 'Positive' },
+                                        { value: 'neutral', label: 'Neutral' },
+                                        { value: 'negative', label: 'Negative' },
+                                        { value: '', label: 'N/A' }
+                                    ]}
+                                    placeholder="Select sentiment"
+                                />
+                            </Form.Group>
+                        </Col>
+
+
+                        {/* Main intent */}
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Main Intent</Form.Label>
+                                <SelectBox
+                                    isSearchable={false}
+                                    value={(appliedFilters as any)?.main_intent || null}
+                                    onChange={(value) => {
+                                        setAppliedFilters({ ...appliedFilters, main_intent: value as string || '' });
+                                    }}
+                                    options={[
+                                        { value: 'required', label: 'Purchase' },
+                                        { value: 'inquiry', label: 'Inquiry' },
+                                        { value: 'support', label: 'Support' },
+                                        { value: 'complaint', label: 'Complaint' },
+                                        { value: 'follow-up', label: 'Follow-up' },
+                                        { value: '', label: 'N/A' }
+                                    ]}
+                                    placeholder="Select main intent"
                                 />
                             </Form.Group>
                         </Col>

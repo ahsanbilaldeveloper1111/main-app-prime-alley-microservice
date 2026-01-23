@@ -39,7 +39,8 @@ import {
   Clock,
   Pin,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Check
 } from 'lucide-react';
 import ConvertToTaskModal from '@components/converttotask';
 
@@ -52,6 +53,7 @@ interface Task {
   labelColor: string;
   icon: React.ReactNode;
   completed: boolean;
+  priority: string;
   category: 'scheduled' | 'anytime' | 'overdue';
   rawData?: any; // Store raw API data
 }
@@ -93,8 +95,8 @@ interface LinkedRecord {
 }
 
 const DialTodo = () => {
-    const [activeTab, setActiveTab] = useState<'today' | 'completed' | 'overdue' | 'upcoming'>('today');
-    const [filterDate, setFilterDate] = useState('today');
+    const [activeTab, setActiveTab] = useState<'all' | 'today' | 'completed' | 'overdue' | 'upcoming'>('all');
+    const [filterDate, setFilterDate] = useState('all');
     const [filterLabel, setFilterLabel] = useState('labels');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [showAddTask, setShowAddTask] = useState(false);
@@ -111,6 +113,7 @@ const DialTodo = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deletingTask, setDeletingTask] = useState(false);
     const [editingTask, setEditingTask] = useState<any>(null);
+    const [isDuplicating, setIsDuplicating] = useState(false);
     const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
     const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
     
@@ -172,7 +175,20 @@ const DialTodo = () => {
             return 'overdue';
           }
           
-          if (dueDate.getTime() === today.getTime() || apiTask.due_time) {
+          // Scheduled: tasks with due_time OR tasks with future due_date
+          // Anytime: tasks with today's date but no due_time
+          if (apiTask.due_time) {
+            // Has a specific time, so it's scheduled
+            return 'scheduled';
+          }
+          
+          if (dueDate.getTime() === today.getTime()) {
+            // Today's date but no time → anytime
+            return 'anytime';
+          }
+          
+          // Future date → scheduled
+          if (dueDate.getTime() > today.getTime()) {
             return 'scheduled';
           }
           
@@ -195,6 +211,7 @@ const DialTodo = () => {
         labelColor: firstLabel.color || '#6c757d',
         icon: getLabelIcon(firstLabel.name),
         completed: apiTask.is_completed || false,
+        priority: apiTask.priority || 'medium',
         category: getCategory(),
         rawData: apiTask
       };
@@ -208,7 +225,7 @@ const DialTodo = () => {
         const params: any = {
           page: pagination.page,
           limit: pagination.limit,
-          type: 'to_do', // Key difference: type is 'todo'
+          type: 'todo', // Key difference: type is 'todo'
           search: searchTerm,
           order: {
             column: 'created_at',
@@ -228,6 +245,9 @@ const DialTodo = () => {
         } else if (activeTab === 'overdue') {
           params.is_completed = false;
           // Filter for overdue will be handled client-side based on due_date
+        } else if (activeTab === 'all') {
+          // No filter - show all tasks (both completed and incomplete)
+          // Don't set is_completed parameter
         }
 
         const response = await listTasks(params);
@@ -341,9 +361,18 @@ const DialTodo = () => {
     // Handle create/update task
     const handleCreateTask = async (formData: any) => {
       try {
-        await fetchTasks();
+        // Close modal first
         setShowCreateTaskModal(false);
         setEditingTask(null);
+        
+        // Reset pagination to page 1 to show the newly created task
+        setPagination(prev => ({ ...prev, page: 1 }));
+        
+        // Small delay to ensure the API has processed the new task
+        // The useEffect will automatically trigger fetchTasks when pagination.page changes
+        setTimeout(() => {
+          fetchTasks();
+        }, 500);
       } catch (error) {
         console.error('Error creating/updating task:', error);
       }
@@ -357,54 +386,108 @@ const DialTodo = () => {
       setShowCreateTaskModal(true);
     };
   
-    
-  
-    // Hardcoded linked records for fallback (when API doesn't provide linked_records)
-    const linkedRecords: LinkedRecord[] = [
-      {
-        id: '1',
-        type: 'call',
-        title: 'Call with Ahmad',
-        subtitle: 'Today, 9:00 AM',
-        icon: <Phone size={18} />
-      },
-      {
-        id: '2',
-        type: 'contact',
-        title: 'Ahmad Hasan',
-        subtitle: 'Lead',
-        icon: <User size={18} />
-      },
-      {
-        id: '3',
-        type: 'ticket',
-        title: 'Support Ticket #2145',
-        subtitle: 'Website Redesign',
-        icon: <Pencil size={18} />
-      }
-    ];
   
     const getTaskCounts = () => {
+      const all = tasks.length;
       const today = tasks.filter(t => t.category === 'scheduled' || t.category === 'anytime').length;
       const completed = tasks.filter(t => t.completed).length;
       const overdue = tasks.filter(t => t.category === 'overdue' && !t.completed).length;
       const upcoming = tasks.filter(t => !t.completed && t.category !== 'overdue').length;
-      return { today, completed, overdue, upcoming };
+      return { all, today, completed, overdue, upcoming };
     };
   
     const counts = getTaskCounts();
   
+    // Helper function to check if a date matches the filter
+    const matchesDateFilter = (dueDate: string | undefined, filter: string): boolean => {
+      // If filter is 'all', show all tasks (no date filtering)
+      if (filter === 'all') {
+        return true;
+      }
+      
+      // If filter is 'today', show all tasks (no date filtering)
+      if (filter === 'today') {
+        return true;
+      }
+      
+      // For other filters, require a due_date
+      if (!dueDate) {
+        return false;
+      }
+      
+      try {
+        const taskDate = new Date(dueDate);
+        taskDate.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (filter === 'tomorrow') {
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          return taskDate.getTime() === tomorrow.getTime();
+        } else if (filter === 'this-week') {
+          const dayOfWeek = today.getDay();
+          const startOfWeek = new Date(today);
+          startOfWeek.setDate(today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)); // Monday
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setDate(startOfWeek.getDate() + 6); // Sunday
+          endOfWeek.setHours(23, 59, 59, 999);
+          return taskDate >= startOfWeek && taskDate <= endOfWeek;
+        } else if (filter === 'next-week') {
+          const dayOfWeek = today.getDay();
+          const startOfWeek = new Date(today);
+          startOfWeek.setDate(today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)); // Monday
+          const startOfNextWeek = new Date(startOfWeek);
+          startOfNextWeek.setDate(startOfWeek.getDate() + 7);
+          const endOfNextWeek = new Date(startOfNextWeek);
+          endOfNextWeek.setDate(startOfNextWeek.getDate() + 6); // Sunday
+          endOfNextWeek.setHours(23, 59, 59, 999);
+          return taskDate >= startOfNextWeek && taskDate <= endOfNextWeek;
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    };
+  
     const filteredTasks = tasks.filter(task => {
-      if (activeTab === 'completed') return task.completed;
-      if (activeTab === 'overdue') return task.category === 'overdue' && !task.completed;
-      if (activeTab === 'today') return task.category === 'scheduled' || task.category === 'anytime' || task.category === 'overdue';
-      if (activeTab === 'upcoming') return !task.completed && task.category !== 'overdue';
+      // First apply tab filter
+      if (activeTab === 'all') {
+        // Show all tasks - no filtering by status
+      } else if (activeTab === 'completed') {
+        if (!task.completed) return false;
+      } else if (activeTab === 'overdue') {
+        if (task.category !== 'overdue' || task.completed) return false;
+      } else if (activeTab === 'today') {
+        // Today tab should only show scheduled and anytime tasks, not overdue
+        if (!(task.category === 'scheduled' || task.category === 'anytime') || task.completed) return false;
+      } else if (activeTab === 'upcoming') {
+        if (task.completed || task.category === 'overdue') return false;
+      }
+      
+      // Apply date filter
+      if (!matchesDateFilter(task.rawData?.due_date, filterDate)) {
+        return false;
+      }
+      
+      // Apply search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch = 
+          task.title.toLowerCase().includes(searchLower) ||
+          task.rawData?.description?.toLowerCase().includes(searchLower) ||
+          task.rawData?.project?.name?.toLowerCase().includes(searchLower) ||
+          task.rawData?.labels?.some((label: any) => label.name?.toLowerCase().includes(searchLower));
+        if (!matchesSearch) return false;
+      }
+      
       return true;
     });
   
     const scheduledTasks = filteredTasks.filter(t => t.category === 'scheduled' && !t.completed);
     const anytimeTasks = filteredTasks.filter(t => t.category === 'anytime' && !t.completed);
     const overdueTasks = filteredTasks.filter(t => t.category === 'overdue' && !t.completed);
+    const completedTasks = filteredTasks.filter(t => t.completed);
   
 
   return (
@@ -458,6 +541,39 @@ const DialTodo = () => {
                 }}
               >
                 <Plus size={16} /> Add To-Do
+              </button>
+              <button
+                onClick={() => setActiveTab('all')}
+                style={{
+                  backgroundColor: activeTab === 'all' ? '#5b8fd8' : 'white',
+                  color: activeTab === 'all' ? 'white' : '#4a5568',
+                  border: activeTab === 'all' ? 'none' : '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: '8px 14px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <span style={{
+                  display: 'inline-block',
+                  backgroundColor: activeTab === 'all' ? 'rgba(255,255,255,0.9)' : '#4a5568',
+                  color: activeTab === 'all' ? '#4a5568' : 'white',
+                  borderRadius: '50%',
+                  width: '22px',
+                  height: '22px',
+                  lineHeight: '22px',
+                  textAlign: 'center',
+                  fontSize: '11px',
+                  fontWeight: '700'
+                }}>
+                  {counts.all}
+                </span>
+                All
               </button>
               <button
                 onClick={() => setActiveTab('today')}
@@ -589,7 +705,7 @@ const DialTodo = () => {
                 }}>
                   {counts.upcoming}
                 </span>
-                Upcoming
+                Scheduled
                 <ChevronDown size={14} />
               </button>
             </div>
@@ -627,6 +743,8 @@ const DialTodo = () => {
                       color: '#4a5568'
                     }}
                   >
+                    
+                    <option value="all">All Dates</option>
                     <option value="today">Today</option>
                     <option value="tomorrow">Tomorrow</option>
                     <option value="this-week">This Week</option>
@@ -634,7 +752,7 @@ const DialTodo = () => {
                   </select>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {/* <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Tag size={16} color="#6c757d" />
                   <select
                     value={filterLabel}
@@ -655,17 +773,32 @@ const DialTodo = () => {
                     <option value="work">Work</option>
                     <option value="meeting">Meeting</option>
                   </select>
-                </div>
+                </div> */}
 
-                <button style={{
-                  padding: '7px',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}>
+                <button 
+                  onClick={() => {
+                    setFilterDate('all');
+                    setSearchTerm('');
+                  }}
+                  style={{
+                    padding: '7px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    backgroundColor: 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#cbd5e0';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                >
                   <X size={16} color="#6c757d" />
                 </button>
               </div>
@@ -677,7 +810,7 @@ const DialTodo = () => {
                 </div>
                 <input
                   type="text"
-                  placeholder="Search tasks..."
+                  placeholder="Search todo..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   style={{
@@ -707,8 +840,51 @@ const DialTodo = () => {
                 </div>
               )}
 
-              {/* Scheduled Tasks */}
-              {scheduledTasks.length > 0 && (
+              {/* Completed Tasks - Show when activeTab is 'completed' or 'all' */}
+              {(activeTab === 'completed' || activeTab === 'all') && (
+                <>
+                  {completedTasks.length > 0 ? (
+                    <div>
+                      <h4 style={{ 
+                        fontSize: '12px', 
+                        fontWeight: '700',
+                        color: '#28a745',
+                        marginBottom: '10px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <Check size={14} color="#28a745" /> Completed Todo
+                      </h4>
+                      {completedTasks.map(task => (
+                        <TaskItem
+                          key={task.id}
+                          task={task}
+                          onToggle={handleTaskToggle}
+                          onClick={handleTaskClick}
+                          isSelected={selectedTask?.id === task.id}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    activeTab === 'completed' && (
+                      <div style={{ 
+                        textAlign: 'center', 
+                        padding: '3rem 1rem',
+                        color: '#718096',
+                        fontSize: '14px'
+                      }}>
+                        No completed todo found
+                      </div>
+                    )
+                  )}
+                </>
+              )}
+
+              {/* Scheduled Tasks - Show when activeTab is not 'completed' (or 'all' to show all) */}
+              {activeTab !== 'completed' && scheduledTasks.length > 0 && (
                 <div style={{ marginBottom: '18px' }}>
                   <h4 style={{ 
                     fontSize: '12px', 
@@ -735,8 +911,8 @@ const DialTodo = () => {
                 </div>
               )}
 
-              {/* Anytime Tasks */}
-              {anytimeTasks.length > 0 && (
+              {/* Anytime Tasks - Show when activeTab is not 'completed' (or 'all' to show all) */}
+              {activeTab !== 'completed' && anytimeTasks.length > 0 && (
                 <div style={{ marginBottom: '18px' }}>
                   <h4 style={{ 
                     fontSize: '12px', 
@@ -763,8 +939,8 @@ const DialTodo = () => {
                 </div>
               )}
 
-              {/* Overdue Tasks */}
-              {overdueTasks.length > 0 && (
+              {/* Overdue Tasks - Show when activeTab is not 'completed' (or 'all' to show all) */}
+              {activeTab !== 'completed' && overdueTasks.length > 0 && (
                 <div>
                   <h4 style={{ 
                     fontSize: '12px', 
@@ -788,6 +964,30 @@ const DialTodo = () => {
                       isSelected={selectedTask?.id === task.id}
                     />
                   ))}
+                </div>
+              )}
+
+              {/* Empty state for non-completed tabs (excluding 'all' which has its own check) */}
+              {activeTab !== 'completed' && activeTab !== 'all' && scheduledTasks.length === 0 && anytimeTasks.length === 0 && overdueTasks.length === 0 && !loading && (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '3rem 1rem',
+                  color: '#718096',
+                  fontSize: '14px'
+                }}>
+                  No todo found
+                </div>
+              )}
+              
+              {/* Empty state for 'all' tab when no tasks at all (including completed) */}
+              {activeTab === 'all' && completedTasks.length === 0 && scheduledTasks.length === 0 && anytimeTasks.length === 0 && overdueTasks.length === 0 && !loading && (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '3rem 1rem',
+                  color: '#718096',
+                  fontSize: '14px'
+                }}>
+                  No todo found
                 </div>
               )}
             </div>
@@ -819,7 +1019,7 @@ const DialTodo = () => {
                     gap: '8px'
                   }}>
                     <FileText size={20} color="#4e6fa5" />
-                    Task Overview
+                    Todo Overview
                   </h2>
                   <p style={{ 
                     color: '#718096', 
@@ -842,7 +1042,7 @@ const DialTodo = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ fontSize: '11px', color: '#718096', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          Total Tasks
+                          Total Todo
                         </div>
                         <div style={{ fontSize: '28px', fontWeight: '700', color: '#2d3748', marginTop: '4px' }}>
                           {tasks.length}
@@ -909,7 +1109,7 @@ const DialTodo = () => {
                 </div>
 
                 {/* Progress Bar */}
-                <div style={{ marginBottom: '20px' }}>
+                {/* <div style={{ marginBottom: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <span style={{ fontSize: '12px', fontWeight: '600', color: '#2d3748' }}>Progress</span>
                     <span style={{ fontSize: '12px', fontWeight: '600', color: '#4e6fa5' }}>
@@ -931,7 +1131,7 @@ const DialTodo = () => {
                       transition: 'width 0.3s ease'
                     }} />
                   </div>
-                </div>
+                </div> */}
 
                 {/* Category Breakdown */}
                 <div>
@@ -1022,14 +1222,7 @@ const DialTodo = () => {
                     >
                       <X size={18} />
                     </button>
-                    <button style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '4px'
-                    }}>
-                      <MoreVertical size={18} color="#718096" />
-                    </button>
+                    
                   </div>
                 </div>
 
@@ -1054,17 +1247,7 @@ const DialTodo = () => {
                     backgroundColor: '#f8fafc',
                     borderRadius: '6px'
                   }}>
-                    {selectedTask?.time && (
-                      <div style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between',
-                        marginBottom: '8px',
-                        fontSize: '13px'
-                      }}>
-                        <span style={{ color: '#718096', fontWeight: '500' }}>Due Time:</span>
-                        <span style={{ fontWeight: '600', color: '#2d3748' }}>{selectedTask.time}</span>
-                      </div>
-                    )}
+                    
                     {selectedTask?.rawData?.due_date && (
                       <div style={{ 
                         display: 'flex', 
@@ -1076,7 +1259,20 @@ const DialTodo = () => {
                         <span style={{ fontWeight: '600', color: '#2d3748' }}>{formatDateForTable(selectedTask.rawData.due_date)}</span>
                       </div>
                     )}
-                    <div style={{ 
+
+{selectedTask?.rawData?.created_at && (
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        marginBottom: '8px',
+                        fontSize: '13px'
+                      }}>
+                        <span style={{ color: '#718096', fontWeight: '500' }}>Created On:</span>
+                        <span style={{ fontWeight: '600', color: '#2d3748' }}>{formatDateForTable(selectedTask.rawData.created_at)}</span>
+                      </div>
+                    )}
+
+                    {/* <div style={{ 
                       display: 'flex', 
                       justifyContent: 'space-between',
                       alignItems: 'center',
@@ -1093,155 +1289,12 @@ const DialTodo = () => {
                       }}>
                         {selectedTask?.label?.toUpperCase() || 'GENERAL'}
                       </span>
-                    </div>
+                    </div> */}
                   </div>
                 </>
               )}
 
-              <div style={{ 
-                marginTop: '20px',
-                marginBottom: '20px'
-              }}>
-                <h3 style={{ 
-                  fontSize: '13px', 
-                  fontWeight: '700',
-                  marginBottom: '12px',
-                  color: '#2d3748',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
-                  <LinkIcon size={14} /> Linked Records
-                </h3>
-                {selectedTask?.rawData?.linked_records && selectedTask.rawData.linked_records.length > 0 ? (
-                  selectedTask.rawData.linked_records.map((record: any, idx: number) => (
-                    <div
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '10px',
-                        backgroundColor: '#f8fafc',
-                        borderRadius: '6px',
-                        marginBottom: '6px',
-                        cursor: 'pointer',
-                        border: '1px solid #e8eef5',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#edf2f7';
-                        e.currentTarget.style.borderColor = '#cbd5e0';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f8fafc';
-                        e.currentTarget.style.borderColor = '#e8eef5';
-                      }}
-                    >
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        backgroundColor: '#4e6fa5',
-                        borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white'
-                      }}>
-                        <LinkIcon size={18} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ 
-                          fontWeight: '600', 
-                          fontSize: '13px',
-                          color: '#2d3748'
-                        }}>
-                          {record.title || record.name || 'Linked Record'}
-                        </div>
-                        <div style={{ 
-                          fontSize: '11px', 
-                          color: '#718096'
-                        }}>
-                          {record.type || 'Record'}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div style={{ 
-                    padding: '10px',
-                    color: '#718096',
-                    fontSize: '13px',
-                    textAlign: 'center'
-                  }}>
-                    No linked records
-                  </div>
-                )}
-                {/* Fallback to hardcoded records if no API data */}
-                {(!selectedTask?.rawData?.linked_records || selectedTask.rawData.linked_records.length === 0) && linkedRecords.map(record => (
-                  <div
-                    key={record.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '10px',
-                      backgroundColor: '#f8fafc',
-                      borderRadius: '6px',
-                      marginBottom: '6px',
-                      cursor: 'pointer',
-                      border: '1px solid #e8eef5',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#edf2f7';
-                      e.currentTarget.style.borderColor = '#cbd5e0';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f8fafc';
-                      e.currentTarget.style.borderColor = '#e8eef5';
-                    }}
-                  >
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      backgroundColor: '#4e6fa5',
-                      borderRadius: '6px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white'
-                    }}>
-                      {record.icon}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ 
-                        fontWeight: '600', 
-                        fontSize: '13px',
-                        color: '#2d3748'
-                      }}>
-                        {record.title}
-                      </div>
-                      <div style={{ 
-                        fontSize: '11px', 
-                        color: '#718096'
-                      }}>
-                        {record.subtitle}
-                      </div>
-                    </div>
-                    <button style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '4px'
-                    }}>
-                      <MoreVertical size={16} color="#718096" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              
 
               <div style={{ 
                 display: 'grid',
@@ -1270,66 +1323,9 @@ const DialTodo = () => {
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4e6fa5'}
                 >
                   <Pencil size={14} />
-                  Edit Task
+                  Edit Todo
                 </button>
-                <button 
-                  onClick={() => setShowConvertModal(true)}
-                  style={{
-                    padding: '10px',
-                    backgroundColor: 'white',
-                    color: '#4a5568',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                >
-                  <LinkIcon size={14} />
-                  Link Record
-                </button>
-              </div>
 
-              <div style={{ 
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '8px'
-              }}>
-                <button 
-                  onClick={() => {
-                    if (selectedTask?.rawData) {
-                      setEditingTask({ ...selectedTask.rawData, title: `${selectedTask.rawData.title} (Copy)` });
-                      setShowCreateTaskModal(true);
-                    }
-                  }}
-                  style={{
-                    padding: '10px',
-                    backgroundColor: 'white',
-                    color: '#4a5568',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                >
-                  <Copy size={14} />
-                  Duplicate
-                </button>
                 <button 
                   onClick={() => {
                     if (selectedTask) {
@@ -1363,6 +1359,51 @@ const DialTodo = () => {
                   <Trash2 size={14} />
                   Delete
                 </button>
+                
+              </div>
+
+              
+
+              <div style={{ 
+                display: 'grid',
+                
+                gap: '8px'
+              }}>
+                <button 
+                  onClick={() => {
+                    if (selectedTask?.rawData) {
+                      // Remove id and task_id to ensure it's treated as a new task, not an update
+                      const { id, task_id, ...taskDataWithoutId } = selectedTask.rawData;
+                      setEditingTask({ 
+                        ...taskDataWithoutId, 
+                        title: `${selectedTask.rawData.title} (Copy)`
+                      });
+                      setIsDuplicating(true); // Mark as duplicating, not editing
+                      setShowCreateTaskModal(true);
+                    }
+                  }}
+                  style={{
+                    padding: '10px',
+                    backgroundColor: 'white',
+                    color: '#4a5568',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                >
+                  <Copy size={14} />
+                  Duplicate
+                </button>
+                
               </div>
             </>
             )}
@@ -1376,13 +1417,15 @@ const DialTodo = () => {
         onHide={() => {
           setShowCreateTaskModal(false);
           setEditingTask(null);
+          setIsDuplicating(false);
         }}
         onCreate={handleCreateTask}
         onCreateAndOpen={handleCreateTask}
         extensions={hierarchyDataExtensions as any}
         task={editingTask}
-        isEdit={!!editingTask}
+        isEdit={!!editingTask} // Set to true so form gets pre-filled, but id is removed so it creates instead of updates
         taskType="todo"
+        
       />
 
       {/* Delete Confirmation Modal */}
@@ -1469,7 +1512,7 @@ interface TaskItemProps {
             accentColor: '#5b8fd8'
           }}
         />
-        {task.time && (
+        {/* {task.time && (
           <span style={{ 
             fontWeight: '700',
             fontSize: '13px',
@@ -1479,7 +1522,7 @@ interface TaskItemProps {
           }}>
             {task.time}
           </span>
-        )}
+        )} */}
         <span style={{ 
           flex: 1,
           fontSize: '13px',
@@ -1489,7 +1532,7 @@ interface TaskItemProps {
         }}>
           {task.title}
         </span>
-        <span style={{
+        {/* <span style={{
           padding: '3px 8px',
           backgroundColor: task.completed ? '#e2e8f0' : task.labelColor,
           color: task.completed ? '#718096' : 'white',
@@ -1502,10 +1545,10 @@ interface TaskItemProps {
           textTransform: 'uppercase',
           letterSpacing: '0.3px'
         }}>
-          {task.icon}
-          {task.label}
-        </span>
-        <button
+          {task.priority}
+          
+        </span> */}
+        {/* <button
           onClick={(e) => {
             e.stopPropagation();
           }}
@@ -1523,7 +1566,7 @@ interface TaskItemProps {
           onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
         >
           <MoreVertical size={16} color="#718096" />
-        </button>
+        </button> */}
       </div>
     );
   };

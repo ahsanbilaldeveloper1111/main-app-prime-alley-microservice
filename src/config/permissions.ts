@@ -37,7 +37,15 @@ export const routePermissions: RoutePermission[] = [
     {path:'/faqs/items',permissions: ['']},
     {path:'/faqs/topics',permissions: ['']},
     {path:'/faqs/types',permissions: ['']},
-    {path:'/chat',permissions: [PERMISSIONS.LIVE_CHAT_AIML]},
+    {path:'/crm/approvals',permissions: ['']},
+    
+    {path:'/ai-ml/tenant-faqs',permissions: ['']},
+    {path:'/ai-ml/global-faqs',permissions: ['']},
+    {path:'/chat/ai-faqs',permissions: [PERMISSIONS.TMS_SERVICES]},
+    {path:'/chat/ai-bot-faqs',permissions: [PERMISSIONS.TMS_SERVICES]},
+    {path:'/chat/ai-faqs/tenant',permissions: [PERMISSIONS.TMS_SERVICES]},
+    {path:'/chat/ai-faqs/global',permissions: [PERMISSIONS.TMS_SERVICES]},
+    
     {
         path: '/help-center',
         permissions: [''],
@@ -135,7 +143,11 @@ export const routePermissions: RoutePermission[] = [
                 children: [
                     {
                         path: '/',
-                        permissions: ['edit-users']
+                        permissions: ['edit-users'],
+                    },
+                    {
+                        path: '/create',
+                        permissions: ['add-users']
                     }
                 ]
             },
@@ -390,6 +402,7 @@ export const routePermissions: RoutePermission[] = [
             { path: '/industries',permissions: [PERMISSIONS.VIEW_CRM_INDUSTRIES]},
             { path: '/deal-templates',permissions: [PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES]},
             { path: '/business-types',permissions: [PERMISSIONS.VIEW_CRM_BUSINESS_TYPES]},
+            // { path: '/approvals',permissions: [PERMISSIONS.VIEW_CRM_APPROVALS]},
         ]
     },
     

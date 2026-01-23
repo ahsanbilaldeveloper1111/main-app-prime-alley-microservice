@@ -43,6 +43,7 @@ import {
 import { ModuleSlug } from "@utils/Helper";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import { GlobalDateFormat } from "@utils/Helper";
 import {
   User,
   Info,
@@ -1057,7 +1058,7 @@ const TicketDetail = () => {
               <div className="d-flex align-items-center gap-2">
                 <Clock size={14} className="text-muted" />
                 <span style={{ fontSize: "0.875rem" }}>
-                  {moment(ticketData?.created_at).format("DD-MMM-YYYY")}
+                  {moment(ticketData?.created_at).format(GlobalDateFormat)}
                 </span>
               </div>
             </Col>
@@ -1078,7 +1079,7 @@ const TicketDetail = () => {
                   }
                   style={{ fontSize: "0.875rem" }}
                 >
-                  {moment(ticketData?.due_date).format("DD-MMM-YYYY")}
+                  {ticketData?.due_date ? moment(ticketData?.due_date).format(GlobalDateFormat) : "N/A"}
                 </span>
               </div>
             </Col>

@@ -47,6 +47,7 @@ import {
   getLead,
   getDealAttachments,
   downloadDealAttachment,
+  createApproval,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -111,6 +112,7 @@ import {
   AlertCircle,
   Handshake,
   Info,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   PieChart,
@@ -1135,6 +1137,20 @@ const CrmOrders = () => {
   }, []);
 
   // Mark Order Lost Modal
+  // Create Approval Handler
+  const handleCreateApproval = useCallback(async (orderId: number) => {
+    try {
+      await createApproval({
+        item_id: orderId,
+        type: 'order'
+      });
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to create approval:", error);
+      toast.error("Failed to create approval request");
+    }
+  }, []);
+
   const handleMarkLost = useCallback((order: any) => {
     setOrderToMarkLost(order);
     setShowMarkLostModal(true);
@@ -1838,7 +1854,7 @@ const CrmOrders = () => {
         {/* Page Header */}
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
           <div className="mb-3 mb-md-0">
-            <h2 className="mb-1 fw-bold">Orders Management</h2>
+            <h2 className="mb-1 fw-bold">Orders</h2>
             <p className="text-muted mb-0">Track and fulfill customer orders</p>
           </div>
           <div className="d-flex flex-wrap gap-2">

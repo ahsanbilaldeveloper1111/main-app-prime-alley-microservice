@@ -8,11 +8,35 @@ import axiosInstance from "./axios";
       const response = await axiosInstance.post(
         `dncr/checkNumber`,
         {
-          numbers: phoneNumber
+          number: phoneNumber
         }
       );
       if(response?.data){
-        const responseData = response?.data?.data;
+        // Try response.data.data first, fallback to response.data
+        const responseData = response?.data?.data || response?.data;
+        return responseData;
+      }else{
+        toast.error('Failed to check number');
+        return false;
+      }
+      
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  export const CheckNumbers = async (phoneNumbers: string[]) => {
+    try {
+        
+      const response = await axiosInstance.post(
+        `dncr/check/batch`,
+        {
+          numbers: phoneNumbers
+        }
+      );
+      if(response?.data){
+        // Try response.data.data first, fallback to response.data
+        const responseData = response?.data?.data || response?.data;
         return responseData;
       }else{
         toast.error('Failed to check number');
@@ -39,7 +63,7 @@ import axiosInstance from "./axios";
           formData
         );
         if(response?.data){
-          const responseData = response?.data?.data;
+          const responseData = response?.data?.data || response?.data;
           return responseData;
         }else{
           toast.error('Failed to check number');

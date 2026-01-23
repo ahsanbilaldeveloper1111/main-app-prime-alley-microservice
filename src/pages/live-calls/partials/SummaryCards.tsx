@@ -233,76 +233,7 @@ const SummaryCards: React.FC<SummaryCardsProps> = ({
           </Card>
         </Col>
 
-        {/* Oldest Idle Time Card */}
-        <Col xs={6} sm={6} md={4} lg={3} xl>
-          <Card 
-            className="border-0 shadow-sm h-100" 
-            style={{ 
-              backgroundColor: '#ffffff',
-              borderLeft: '4px solid #f59e0b'
-            }}
-          >
-            <Card.Body className="p-3 d-flex align-items-center justify-content-between">
-              <div 
-                className="rounded d-flex align-items-center justify-content-center"
-                style={{ 
-                  width: '48px', 
-                  height: '48px',
-                  minWidth: '48px',
-                  backgroundColor: '#fef3c7',
-                  color: '#f59e0b'
-                }}
-              >
-                <Hourglass size={22} />
-              </div>
-              <div className="text-end ms-3">
-                <div className="fw-bold mb-1" style={{ fontSize: '1.75rem', lineHeight: '1', color: '#1f2937' }}>
-                  {(() => {
-                    if (!oldestIdleInfo) return '--:--'
-                    
-                    // Calculate duration from "when" timestamp to now
-                    const whenDate = new Date(oldestIdleInfo.when)
-                    const now = new Date()
-                    const diffMs = now.getTime() - whenDate.getTime()
-                    const diffMinutes = Math.floor(diffMs / 60000)
-                    const diffHours = Math.floor(diffMinutes / 60)
-                    const diffDays = Math.floor(diffHours / 24)
-                    
-                    // Format as HH:MM or DD:HH if more than 24 hours
-                    let timeStr = ''
-                    if (diffDays > 0) {
-                      const hours = diffHours % 24
-                      timeStr = `${diffDays}d ${hours}h`
-                    } else if (diffHours > 0) {
-                      const minutes = diffMinutes % 60
-                      timeStr = `${String(diffHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
-                    } else {
-                      timeStr = `00:${String(diffMinutes).padStart(2, '0')}`
-                    }
-                    
-                    // Show time with DN: "02:30 (590)" (${oldestIdleInfo.dn})
-                    return `${timeStr} `
-                  })()}
-                </div>
-                <div className="text-muted fw-semibold" style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
-                  {oldestIdleInfo ? (() => {
-                    // Get user name from extension data
-                    try {
-                      const userDataExtensions = getUserDataExtensions?.() || {}
-                      const dnString = String(oldestIdleInfo.dn)
-                      const dnNumber = Number(oldestIdleInfo.dn)
-                      const userData = userDataExtensions[oldestIdleInfo.dn] || userDataExtensions[dnString] || userDataExtensions[dnNumber]
-                      const userName = userData?.name || userData?.user_name || `DN ${oldestIdleInfo.dn}`
-                      return userName
-                    } catch {
-                      return `DN ${oldestIdleInfo.dn}`
-                    }
-                  })() : 'Oldest Idle'}
-                </div>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
+        
       </Row>
     </div>
   )

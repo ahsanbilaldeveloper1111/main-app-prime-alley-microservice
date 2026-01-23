@@ -507,7 +507,7 @@ export const debugTimezoneConversion = (date: string, time: string) => {
   };
 };
 
-export const GlobalDateFormat = "D MMM YYYY";
+export const GlobalDateFormat = "DD MMM YYYY";
 export const GlobalTimeFormat = "hh:mm:ss A";
 export const GlobalDateTimeFormat = "DD MMM YYYY hh:mm:ss A";
 
@@ -543,7 +543,7 @@ export const formatDateForTable = (
     const month = monthNames[dateObj.getMonth()];
     const year = dateObj.getFullYear();
 
-    return `${day} ${month}, ${year}`;
+    return `${day} ${month} ${year}`;
   } catch (error) {
     console.error("Error formatting date:", error);
     return "";

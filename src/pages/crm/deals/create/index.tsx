@@ -395,11 +395,7 @@ const CreateDeal = () => {
       { field: 'decision_maker_phone' as const, name: 'Decision Maker Phone' },
     ];
     
-    // Validate industry_ids separately since it's an array
-    if (!formData.industry_ids || formData.industry_ids.length === 0) {
-      toast.error('Industry is required');
-      return false;
-    }
+   
     
     return checkRequiredFields(formData, requiredFields);
   };
@@ -673,10 +669,17 @@ const CreateDeal = () => {
                   top: '20px', 
                   height: '2px', 
                   width: `${(() => {
-                    // Calculate progress: if no template, step 2 is skipped, so max steps is 4 instead of 5
-                    const maxSteps = dealTemplate ? 4 : 3;
-                    const currentStep = dealTemplate ? formStep : (formStep > 2 ? formStep - 1 : formStep);
-                    return (currentStep / maxSteps) * 100;
+                    // Calculate progress: if no template, step 2 is skipped
+                    // Map formStep to visual position (accounting for hidden step 2)
+                    const totalVisibleSteps = dealTemplate ? 5 : 4;
+                    let visualPosition = formStep;
+                    // If no template and we're past step 2, adjust visual position
+                    // formStep 0→0, formStep 1→1, formStep 3→2, formStep 4→3
+                    if (!dealTemplate && formStep > 2) {
+                      visualPosition = formStep - 1;
+                    }
+                    // Progress = (current visual position + 1) / total visible steps
+                    return ((visualPosition + 1) / totalVisibleSteps) * 100;
                   })()}%`,
                   zIndex: 0,
                   transition: 'width 0.3s ease'
@@ -689,25 +692,25 @@ const CreateDeal = () => {
                 if (step === 2 && !dealTemplate) {
                   return null;
                 }
+                
+                // Calculate display number: if step 2 is hidden, adjust numbering for steps after it
+                const displayNumber = (!dealTemplate && step > 2) ? step : step + 1;
+                
                 return (
                   <div 
                     key={step}
                     className="text-center position-relative" 
                     style={{ cursor: 'pointer', flex: 1 }}
                     onClick={() => {
-                      let targetStep = step;
-                      // Skip step 2 if no template and trying to go to step 2 or beyond
-                      if (step >= 2 && !dealTemplate) {
-                        targetStep = step + 1;
-                      }
-                      setFormStep(targetStep);
+                      // Step 2 is already hidden (returns null above), so we can directly set the step
+                      setFormStep(step);
                     }}
                   >
                     <div 
                       className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${formStep >= step ? 'bg-primary text-white' : 'bg-light text-muted'}`}
                       style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
                     >
-                      {formStep > step ? <CheckCircle size={20} /> : step + 1}
+                      {formStep > step ? <CheckCircle size={20} /> : displayNumber}
                     </div>
                     <small className={`d-block mt-2 ${formStep === step ? 'fw-bold text-primary' : 'text-muted'}`}>
                       {step === 0 ? 'Deal Info' : step === 1 ? 'Company Info' : step === 2 ? 'Characteristics' : step === 3 ? 'Progress & Notes' : 'Estimation'}
@@ -1603,7 +1606,7 @@ const CreateDeal = () => {
                               placeholder="Select product group..."
                               isSearchable
                               isLoading={loadingIndustries || loadingAllIndustries}
-                              isDisabled={loadingIndustries || loadingAllIndustries || (availableIndustries.length === 1 && !showAllIndustries)}
+                              isDisabled={loadingIndustries || loadingAllIndustries}
                               required
                             />
                           );

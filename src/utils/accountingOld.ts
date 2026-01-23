@@ -542,8 +542,7 @@ export interface PaginationParams extends Record<string, any> {
 
 // Helper function to extract data from controlhub response
 function extractData<T>(response: any): T {
-  console.log("Extracting data from response:", response);
-
+  
   // Handle successful response with nested data structure
   if (response?.code === 200 && response?.data?.success) {
     return response.data.data;
@@ -1720,7 +1719,7 @@ export const createDirectPayment = async (data: CreateDirectPaymentData): Promis
     );
     
     // Handle the actual API response structure
-    console.log(response, "RARARA");
+    
     if (response.data?.code === 200 && response.data?.data?.success) {
       // The actual payment intent data should be in response.data.data.data
       // If it's an empty array, we might need to handle this case
@@ -1742,4 +1741,3 @@ export const createDirectPayment = async (data: CreateDirectPaymentData): Promis
     throw error;
   }
 };
-
