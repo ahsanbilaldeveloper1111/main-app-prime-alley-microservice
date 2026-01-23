@@ -95,7 +95,7 @@ interface Priority {
 
 interface LinkedRecord {
   id: number;
-  type: 'task';
+  type: 'task' | 'crm';
   title: string;
   reference: string;
 }
@@ -1053,11 +1053,15 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                       style={{
                         width: '36px',
                         height: '36px',
-                        backgroundColor: '#6B7280',
+                        backgroundColor: record.type === 'crm' ? '#4e6fa5' : '#6B7280',
                         flexShrink: 0
                       }}
                     >
-                      <ListTodo size={18} />
+                      {record.type === 'crm' ? (
+                        <FolderOpen size={18} />
+                      ) : (
+                        <ListTodo size={18} />
+                      )}
                     </div>
                     <div className="flex-grow-1 overflow-hidden">
                       <div className="fw-semibold text-truncate" style={{ fontSize: '0.9rem', color: '#2d3748' }}>
