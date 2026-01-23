@@ -197,7 +197,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       description: '',
       projectId: propProject?.id || null,
       statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
-      priorityId: 2, // Default to Medium priority
+      priorityId: 1, // Default to Low priority
       assigneeIds: [],
       dueDate: '',
       labelIds: [],
@@ -261,7 +261,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         description: '',
         projectId: propProject?.id || null,
         statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
-        priorityId: 2,
+        priorityId: 1,
         assigneeIds: [],
         dueDate: '',
         labelIds: [],
@@ -676,6 +676,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 placeholder="Select date"
                 value={formData.dueDate}
                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                min={new Date().toISOString().split('T')[0]}
                 className="py-2"
                 style={{ fontSize: '14px' }}
               />
