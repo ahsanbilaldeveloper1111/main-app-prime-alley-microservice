@@ -40,7 +40,8 @@ import {
   Pin,
   AlertCircle,
   Sparkles,
-  Check
+  Check,
+  Pause
 } from 'lucide-react';
 import ConvertToTaskModal from '@components/converttotask';
 
@@ -106,9 +107,11 @@ const DialTodo = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [pagination, setPagination] = useState({
       page: 1,
-      limit: 20,
+      limit: 25,
       total: 0,
-      last_page: 1
+      last_page: 1,
+      from: 0,
+      to: 0
     });
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deletingTask, setDeletingTask] = useState(false);
@@ -116,6 +119,16 @@ const DialTodo = () => {
     const [isDuplicating, setIsDuplicating] = useState(false);
     const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
     const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
+    const [summary, setSummary] = useState({
+      total: 0,
+      open: 0,
+      overdue: 0,
+      dueThisWeek: 0,
+      unassigned: 0,
+      highPriority: 0,
+      completed: 0,
+      pending: 0
+    });
     
     // Fetch extensions for assignees
     const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
@@ -220,6 +233,8 @@ const DialTodo = () => {
     // Fetch todo tasks from API
     const fetchTasks = useCallback(async () => {
       try {
+        // Clear old data immediately to prevent showing stale data
+        setTasks([]);
         setLoading(true);
         
         const params: any = {
@@ -278,8 +293,24 @@ const DialTodo = () => {
               page: response.pagination.page || 1,
               limit: response.pagination.limit || 20,
               total: response.pagination.total || 0,
-              last_page: response.pagination.last_page || 1
+              last_page: response.pagination.last_page || 1,
+              from: response.pagination.from || 0,
+              to: response.pagination.to || 0
             }));
+          }
+
+          // Update summary from API response - only update when on 'all' tab to preserve total counts
+          if (response.summary && activeTab === 'all') {
+            setSummary({
+              total: response.summary.total || 0,
+              open: response.summary.open || 0,
+              overdue: response.summary.overdue || 0,
+              dueThisWeek: response.summary.dueThisWeek || 0,
+              unassigned: response.summary.unassigned || 0,
+              highPriority: response.summary.highPriority || 0,
+              completed: response.summary.completed || 0,
+              pending: response.summary.pending || 0
+            });
           }
         }
       } catch (error) {
@@ -387,16 +418,14 @@ const DialTodo = () => {
     };
   
   
-    const getTaskCounts = () => {
-      const all = tasks.length;
-      const today = tasks.filter(t => t.category === 'scheduled' || t.category === 'anytime').length;
-      const completed = tasks.filter(t => t.completed).length;
-      const overdue = tasks.filter(t => t.category === 'overdue' && !t.completed).length;
-      const upcoming = tasks.filter(t => !t.completed && t.category !== 'overdue').length;
-      return { all, today, completed, overdue, upcoming };
+    // Use summary from API for counters (static, doesn't change with pagination)
+    const counts = {
+      all: summary.total,
+      today: summary.dueThisWeek,
+      completed: summary.completed,
+      overdue: summary.overdue,
+      upcoming: summary.open
     };
-  
-    const counts = getTaskCounts();
   
     // Helper function to check if a date matches the filter
     const matchesDateFilter = (dueDate: string | undefined, filter: string): boolean => {
@@ -543,7 +572,11 @@ const DialTodo = () => {
                 <Plus size={16} /> Add To-Do
               </button>
               <button
-                onClick={() => setActiveTab('all')}
+                onClick={() => {
+                  setActiveTab('all');
+                  setSelectedTask(null);
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                }}
                 style={{
                   backgroundColor: activeTab === 'all' ? '#5b8fd8' : 'white',
                   color: activeTab === 'all' ? 'white' : '#4a5568',
@@ -571,12 +604,15 @@ const DialTodo = () => {
                   fontSize: '11px',
                   fontWeight: '700'
                 }}>
-                  {counts.all}
+                  {summary.total}
                 </span>
                 All
               </button>
               <button
-                onClick={() => setActiveTab('today')}
+                onClick={() => {
+                  setActiveTab('today');
+                  setSelectedTask(null);
+                }}
                 style={{
                   backgroundColor: activeTab === 'today' ? '#5b8fd8' : 'white',
                   color: activeTab === 'today' ? 'white' : '#4a5568',
@@ -604,12 +640,16 @@ const DialTodo = () => {
                   fontSize: '11px',
                   fontWeight: '700'
                 }}>
-                  {counts.today}
+                  {summary.dueThisWeek}
                 </span>
                 Today
               </button>
               <button
-                onClick={() => setActiveTab('completed')}
+                onClick={() => {
+                  setActiveTab('completed');
+                  setSelectedTask(null);
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                }}
                 style={{
                   backgroundColor: activeTab === 'completed' ? '#5b8fd8' : 'white',
                   color: activeTab === 'completed' ? 'white' : '#4a5568',
@@ -637,12 +677,16 @@ const DialTodo = () => {
                   fontSize: '11px',
                   fontWeight: '700'
                 }}>
-                  {counts.completed}
+                  {summary.completed}
                 </span>
                 Completed
               </button>
               <button
-                onClick={() => setActiveTab('overdue')}
+                onClick={() => {
+                  setActiveTab('overdue');
+                  setSelectedTask(null);
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                }}
                 style={{
                   backgroundColor: activeTab === 'overdue' ? '#5b8fd8' : 'white',
                   color: activeTab === 'overdue' ? 'white' : '#4a5568',
@@ -670,12 +714,16 @@ const DialTodo = () => {
                   fontSize: '11px',
                   fontWeight: '700'
                 }}>
-                  {counts.overdue}
+                  {summary.overdue}
                 </span>
                 Overdue
               </button>
               <button
-                onClick={() => setActiveTab('upcoming')}
+                onClick={() => {
+                  setActiveTab('upcoming');
+                  setSelectedTask(null);
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                }}
                 style={{
                   backgroundColor: activeTab === 'upcoming' ? '#5b8fd8' : 'white',
                   color: activeTab === 'upcoming' ? 'white' : '#4a5568',
@@ -703,7 +751,7 @@ const DialTodo = () => {
                   fontSize: '11px',
                   fontWeight: '700'
                 }}>
-                  {counts.upcoming}
+                  {summary.dueThisWeek}
                 </span>
                 Scheduled
                 <ChevronDown size={14} />
@@ -990,6 +1038,145 @@ const DialTodo = () => {
                   No todo found
                 </div>
               )}
+
+              {/* Pagination Controls */}
+              {!loading && pagination.last_page > 1 && filteredTasks.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: '20px',
+                  paddingTop: '16px',
+                  borderTop: '1px solid #e8eef5'
+                }}>
+                  <div style={{ fontSize: '13px', color: '#718096' }}>
+                    Showing {pagination.from || 0} to {pagination.to || 0} of {pagination.total || 0} tasks
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      onClick={() => {
+                        if (pagination.page > 1 && !loading) {
+                          setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+                        }
+                      }}
+                      disabled={pagination.page === 1 || loading}
+                      style={{
+                        padding: '6px 12px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        backgroundColor: (pagination.page === 1 || loading) ? '#f8fafc' : 'white',
+                        color: (pagination.page === 1 || loading) ? '#cbd5e0' : '#4a5568',
+                        cursor: (pagination.page === 1 || loading) ? 'not-allowed' : 'pointer',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (pagination.page > 1 && !loading) {
+                          e.currentTarget.style.backgroundColor = '#f8fafc';
+                          e.currentTarget.style.borderColor = '#cbd5e0';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (pagination.page > 1 && !loading) {
+                          e.currentTarget.style.backgroundColor = 'white';
+                          e.currentTarget.style.borderColor = '#e2e8f0';
+                        }
+                      }}
+                    >
+                      Previous
+                    </button>
+                    
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {Array.from({ length: Math.min(5, pagination.last_page) }, (_, i) => {
+                        let pageNum;
+                        if (pagination.last_page <= 5) {
+                          pageNum = i + 1;
+                        } else if (pagination.page <= 3) {
+                          pageNum = i + 1;
+                        } else if (pagination.page >= pagination.last_page - 2) {
+                          pageNum = pagination.last_page - 4 + i;
+                        } else {
+                          pageNum = pagination.page - 2 + i;
+                        }
+                        
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => {
+                              if (!loading && pagination.page !== pageNum) {
+                                setPagination(prev => ({ ...prev, page: pageNum }));
+                              }
+                            }}
+                            disabled={loading}
+                            style={{
+                              minWidth: '32px',
+                              height: '32px',
+                              padding: '0 8px',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              backgroundColor: pagination.page === pageNum ? '#5b8fd8' : (loading ? '#f8fafc' : 'white'),
+                              color: pagination.page === pageNum ? 'white' : (loading ? '#cbd5e0' : '#4a5568'),
+                              cursor: loading ? 'not-allowed' : 'pointer',
+                              fontSize: '13px',
+                              fontWeight: pagination.page === pageNum ? '600' : '500',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (pagination.page !== pageNum && !loading) {
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#cbd5e0';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (pagination.page !== pageNum && !loading) {
+                                e.currentTarget.style.backgroundColor = 'white';
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                              }
+                            }}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        if (pagination.page < pagination.last_page && !loading) {
+                          setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+                        }
+                      }}
+                      disabled={pagination.page >= pagination.last_page || loading}
+                      style={{
+                        padding: '6px 12px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        backgroundColor: (pagination.page >= pagination.last_page || loading) ? '#f8fafc' : 'white',
+                        color: (pagination.page >= pagination.last_page || loading) ? '#cbd5e0' : '#4a5568',
+                        cursor: (pagination.page >= pagination.last_page || loading) ? 'not-allowed' : 'pointer',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (pagination.page < pagination.last_page && !loading) {
+                          e.currentTarget.style.backgroundColor = '#f8fafc';
+                          e.currentTarget.style.borderColor = '#cbd5e0';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (pagination.page < pagination.last_page && !loading) {
+                          e.currentTarget.style.backgroundColor = 'white';
+                          e.currentTarget.style.borderColor = '#e2e8f0';
+                        }
+                      }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1045,7 +1232,7 @@ const DialTodo = () => {
                           Total Todo
                         </div>
                         <div style={{ fontSize: '28px', fontWeight: '700', color: '#2d3748', marginTop: '4px' }}>
-                          {tasks.length}
+                          {summary.total}
                         </div>
                       </div>
                       <div style={{
@@ -1074,7 +1261,7 @@ const DialTodo = () => {
                         Completed
                       </div>
                       <div style={{ fontSize: '24px', fontWeight: '700', color: '#15803d' }}>
-                        {tasks.filter(t => t.completed).length}
+                        {summary.completed}
                       </div>
                     </div>
 
@@ -1088,7 +1275,7 @@ const DialTodo = () => {
                         Overdue
                       </div>
                       <div style={{ fontSize: '24px', fontWeight: '700', color: '#dc2626' }}>
-                        {tasks.filter(t => t.category === 'overdue' && !t.completed).length}
+                        {summary.overdue}
                       </div>
                     </div>
                   </div>
@@ -1100,10 +1287,10 @@ const DialTodo = () => {
                     border: '1px solid #bfdbfe'
                   }}>
                     <div style={{ fontSize: '10px', color: '#1e40af', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
-                      Pending Today
+                      Pending
                     </div>
                     <div style={{ fontSize: '24px', fontWeight: '700', color: '#2563eb' }}>
-                      {tasks.filter(t => !t.completed && (t.category === 'scheduled' || t.category === 'anytime')).length}
+                      {summary.open}
                     </div>
                   </div>
                 </div>
@@ -1152,16 +1339,17 @@ const DialTodo = () => {
                         <span style={{ fontSize: '13px', fontWeight: '600', color: '#2d3748' }}>Scheduled</span>
                       </div>
                       <span style={{ fontSize: '13px', fontWeight: '700', color: '#3182ce' }}>
-                        {tasks.filter(t => t.category === 'scheduled').length}
+                        {summary.dueThisWeek}
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e8eef5' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Pin size={16} color="#805ad5" />
-                        <span style={{ fontSize: '13px', fontWeight: '600', color: '#2d3748' }}>Anytime</span>
+                        <Pause size={16} color="#805ad5" />
+                        <span style={{ fontSize: '13px', fontWeight: '600', color: '#2d3748' }}>Pending
+                        </span>
                       </div>
                       <span style={{ fontSize: '13px', fontWeight: '700', color: '#805ad5' }}>
-                        {tasks.filter(t => t.category === 'anytime').length}
+                        {summary.open}
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e8eef5' }}>
@@ -1170,7 +1358,7 @@ const DialTodo = () => {
                         <span style={{ fontSize: '13px', fontWeight: '600', color: '#2d3748' }}>Overdue</span>
                       </div>
                       <span style={{ fontSize: '13px', fontWeight: '700', color: '#e53e3e' }}>
-                        {tasks.filter(t => t.category === 'overdue').length}
+                        {summary.overdue}
                       </span>
                     </div>
                   </div>

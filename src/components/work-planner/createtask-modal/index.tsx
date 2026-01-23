@@ -197,7 +197,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       description: '',
       projectId: propProject?.id || null,
       statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
-      priorityId: 2, // Default to Medium priority
+      priorityId: 0, // Default to "Select Priority" (empty value)
       assigneeIds: [],
       dueDate: '',
       labelIds: [],
@@ -261,7 +261,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         description: '',
         projectId: propProject?.id || null,
         statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
-        priorityId: 2,
+        priorityId: 0,
         assigneeIds: [],
         dueDate: '',
         labelIds: [],
@@ -330,6 +330,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const statuses: Status[] = getStatusesForSelectedProject();
 
   const priorities: Priority[] = [
+    { id: 0, name: "Select Priority", icon: "", color: "#6c757d" },
     { id: 1, name: "Low", icon: "🟢", color: "#10b981" },
     { id: 2, name: "Medium", icon: "🟡", color: "#eab308" },
     { id: 3, name: "High", icon: "🟠", color: "#f97316" },
@@ -362,14 +363,17 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   console.log('linkedRecords', linkedRecords);
 
   // Map priority ID to priority string
-  const mapPriorityIdToString = (priorityId: number | null): string => {
+  const mapPriorityIdToString = (priorityId: number | null): string | undefined => {
+    if (!priorityId || priorityId === 0) {
+      return ''; // Return empty for "Select Priority" (id: 0)
+    }
     const priorityMap: Record<number, string> = {
       1: 'low',
       2: 'normal',
       3: 'high',
       4: 'urgent'
     };
-    return priorityMap[priorityId || 2] || 'normal';
+    return priorityMap[priorityId] || undefined;
   };
 
   const handleCreate = async (e?: React.MouseEvent) => {
@@ -394,7 +398,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         title: formData.title,
         description: formData.description || '',
         status_id: formData.statusId || undefined,
-        priority: mapPriorityIdToString(formData.priorityId),
+        priority: mapPriorityIdToString(formData.priorityId) || undefined,
         due_date: formData.dueDate || '',
         extension_numbers: formData.assigneeIds?.map((id: number) => {
           // Find the extension by id from extensions prop
@@ -469,7 +473,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         title: formData.title,
         description: formData.description || '',
         status_id: formData.statusId || undefined,
-        priority: mapPriorityIdToString(formData.priorityId),
+        priority: mapPriorityIdToString(formData.priorityId) || undefined,
         due_date: formData.dueDate || '',
         extension_numbers: formData.assigneeIds?.map((id: number) => {
           // Find the extension by id from extensions prop
@@ -676,6 +680,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 placeholder="Select date"
                 value={formData.dueDate}
                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                min={new Date().toISOString().split('T')[0]}
                 className="py-2"
                 style={{ fontSize: '14px' }}
               />
@@ -721,7 +726,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 Priority
               </Form.Label>
               <Form.Select
-                value={formData.priorityId || ''}
+                value={formData.priorityId || 0}
                 onChange={(e) => setFormData({ ...formData, priorityId: Number(e.target.value) })}
                 className="py-2"
                 style={{ fontSize: '14px' }}

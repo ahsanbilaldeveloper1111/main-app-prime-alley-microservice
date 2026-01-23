@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Button } from 'react-bootstrap';
 import {
   Bold,
@@ -37,13 +37,163 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const colorPickerRef = useRef<HTMLInputElement>(null);
+  const [activeFormats, setActiveFormats] = useState<Record<string, boolean>>({});
+
+  // Check if a format command is currently active
+  const isFormatActive = (command: string): boolean => {
+    if (!editorRef.current) return false;
+    
+    try {
+      return document.queryCommandState(command);
+    } catch (e) {
+      return false;
+    }
+  };
+
+  // Check alignment by inspecting computed styles
+  const getCurrentAlignment = (): 'left' | 'center' | 'right' => {
+    if (!editorRef.current) return 'left';
+    
+    const selection = window.getSelection();
+    
+    // If there's a selection, check the alignment of the selected element
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      let element: Node | Element | null = range.commonAncestorContainer;
+      
+      // Get the element (not text node)
+      if (element && element.nodeType === Node.TEXT_NODE) {
+        const parent = element.parentElement;
+        if (parent) {
+          element = parent;
+        }
+      }
+      
+      if (element && element instanceof Element) {
+        // Walk up the DOM tree to find the element with text-align style
+        let current: Element | null = element;
+        while (current && current !== editorRef.current) {
+          const computedStyle = window.getComputedStyle(current);
+          const textAlign = computedStyle.textAlign;
+          
+          if (textAlign === 'center') {
+            return 'center';
+          } else if (textAlign === 'right' || textAlign === 'end') {
+            return 'right';
+          } else if (textAlign === 'left' || textAlign === 'start') {
+            return 'left';
+          }
+          
+          current = current.parentElement;
+        }
+      }
+    }
+    
+    // If no selection or no explicit alignment found, check the editor's default alignment
+    const editorStyle = window.getComputedStyle(editorRef.current);
+    const editorAlign = editorStyle.textAlign;
+    
+    if (editorAlign === 'center') {
+      return 'center';
+    } else if (editorAlign === 'right' || editorAlign === 'end') {
+      return 'right';
+    }
+    
+    // Default to left (either explicitly set or as fallback)
+    return 'left';
+  };
+
+  // Check if current selection is in a heading
+  const isHeadingActive = (level: 1 | 2): boolean => {
+    if (!editorRef.current) return false;
+    
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const node = selection.anchorNode;
+      if (node) {
+        let element = node.nodeType === Node.TEXT_NODE ? node.parentElement : node as Element;
+        while (element && element !== editorRef.current) {
+          const tagName = element.tagName?.toLowerCase();
+          if (tagName === `h${level}`) {
+            return true;
+          }
+          element = element.parentElement as Element;
+        }
+      }
+    }
+    return false;
+  };
+
+  // Update active formats based on current selection
+  const updateActiveFormats = () => {
+    if (!editorRef.current) return;
+    
+    // Get current alignment from computed styles
+    const currentAlignment = getCurrentAlignment();
+    
+    const formats: Record<string, boolean> = {
+      bold: isFormatActive('bold'),
+      italic: isFormatActive('italic'),
+      underline: isFormatActive('underline'),
+      strikeThrough: isFormatActive('strikeThrough'),
+      justifyLeft: currentAlignment === 'left',
+      justifyCenter: currentAlignment === 'center',
+      justifyRight: currentAlignment === 'right',
+      formatBlockH1: isHeadingActive(1),
+      formatBlockH2: isHeadingActive(2),
+      insertUnorderedList: isFormatActive('insertUnorderedList'),
+      insertOrderedList: isFormatActive('insertOrderedList'),
+    };
+
+    setActiveFormats(formats);
+  };
 
   // Initialize editor content
   useEffect(() => {
     if (editorRef.current && value !== editorRef.current.innerHTML) {
       editorRef.current.innerHTML = value;
     }
+    // Update active formats after content is initialized
+    setTimeout(updateActiveFormats, 100);
   }, [value]);
+
+  // Add event listeners to track selection changes
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const handleSelectionChange = () => {
+      updateActiveFormats();
+    };
+
+    const handleMouseUp = () => {
+      setTimeout(updateActiveFormats, 0);
+    };
+
+    const handleKeyUp = () => {
+      setTimeout(updateActiveFormats, 0);
+    };
+
+    const handleClick = () => {
+      setTimeout(updateActiveFormats, 0);
+    };
+
+    // Initial update when editor is ready
+    setTimeout(updateActiveFormats, 100);
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    editor.addEventListener('mouseup', handleMouseUp);
+    editor.addEventListener('keyup', handleKeyUp);
+    editor.addEventListener('click', handleClick);
+
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      editor.removeEventListener('mouseup', handleMouseUp);
+      editor.removeEventListener('keyup', handleKeyUp);
+      editor.removeEventListener('click', handleClick);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // updateActiveFormats is stable and doesn't need to be in deps
 
   // Rich text formatting functions
   const applyFormat = (command: string, value?: string) => {
@@ -52,6 +202,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     editorRef.current.focus();
     document.execCommand(command, false, value);
     updateEditorContent();
+    // Update active formats after applying
+    setTimeout(updateActiveFormats, 0);
   };
 
   const updateEditorContent = () => {
@@ -125,7 +277,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             style={{
               padding: '6px 8px',
-              color: '#495057',
+              color: activeFormats.bold ? '#0d6efd' : '#495057',
+              backgroundColor: activeFormats.bold ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
               border: 'none',
               borderRadius: '4px'
@@ -140,7 +293,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             style={{
               padding: '6px 8px',
-              color: '#495057',
+              color: activeFormats.italic ? '#0d6efd' : '#495057',
+              backgroundColor: activeFormats.italic ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
               border: 'none',
               borderRadius: '4px'
@@ -155,7 +309,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             style={{
               padding: '6px 8px',
-              color: '#495057',
+              color: activeFormats.underline ? '#0d6efd' : '#495057',
+              backgroundColor: activeFormats.underline ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
               border: 'none',
               borderRadius: '4px'
@@ -170,7 +325,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             style={{
               padding: '6px 8px',
-              color: '#495057',
+              color: activeFormats.strikeThrough ? '#0d6efd' : '#495057',
+              backgroundColor: activeFormats.strikeThrough ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
               border: 'none',
               borderRadius: '4px'
@@ -194,7 +350,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             style={{
               padding: '6px 8px',
-              color: '#495057',
+              color: activeFormats.formatBlockH1 ? '#0d6efd' : '#495057',
+              backgroundColor: activeFormats.formatBlockH1 ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
               border: 'none',
               borderRadius: '4px'
@@ -209,7 +366,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             style={{
               padding: '6px 8px',
-              color: '#495057',
+              color: activeFormats.formatBlockH2 ? '#0d6efd' : '#495057',
+              backgroundColor: activeFormats.formatBlockH2 ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
               border: 'none',
               borderRadius: '4px'
@@ -233,7 +391,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             style={{
               padding: '6px 8px',
-              color: '#495057',
+              color: activeFormats.insertUnorderedList ? '#0d6efd' : '#495057',
+              backgroundColor: activeFormats.insertUnorderedList ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
               border: 'none',
               borderRadius: '4px'
@@ -248,7 +407,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             style={{
               padding: '6px 8px',
-              color: '#495057',
+              color: activeFormats.insertOrderedList ? '#0d6efd' : '#495057',
+              backgroundColor: activeFormats.insertOrderedList ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
               border: 'none',
               borderRadius: '4px'
@@ -272,7 +432,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             style={{
               padding: '6px 8px',
-              color: '#495057',
+              color: activeFormats.justifyLeft ? '#0d6efd' : '#495057',
+              backgroundColor: activeFormats.justifyLeft ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
               border: 'none',
               borderRadius: '4px'
@@ -287,7 +448,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             style={{
               padding: '6px 8px',
-              color: '#495057',
+              color: activeFormats.justifyCenter ? '#0d6efd' : '#495057',
+              backgroundColor: activeFormats.justifyCenter ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
               border: 'none',
               borderRadius: '4px'
@@ -302,7 +464,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             style={{
               padding: '6px 8px',
-              color: '#495057',
+              color: activeFormats.justifyRight ? '#0d6efd' : '#495057',
+              backgroundColor: activeFormats.justifyRight ? '#e7f1ff' : 'transparent',
               minWidth: 'auto',
               border: 'none',
               borderRadius: '4px'
@@ -422,6 +585,10 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           contentEditable
           onInput={handleEditorInput}
           onPaste={handleEditorPaste}
+          onFocus={() => {
+            // Update active formats when editor is focused
+            setTimeout(updateActiveFormats, 0);
+          }}
           suppressContentEditableWarning
           style={{
             minHeight,
@@ -432,7 +599,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             color: '#495057',
             overflowY: 'auto',
             outline: 'none',
-            borderRadius: '0 0 6px 6px'
+            borderRadius: '0 0 6px 6px',
+            textAlign: 'left' // Ensure default alignment is left
           }}
           data-placeholder={placeholder}
         />
