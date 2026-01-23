@@ -451,73 +451,25 @@ const CallAnalysis = () => {
 
   const handleErrorStatus = (parsedData: any) => {
     console.error('Error status received from server:', parsedData);
+    const errorMessage = parsedData.msg || parsedData.message || 'Analysis error occurred';
+    setError(errorMessage);
+    setLoading(false);
+    setAnalysisComplete(true);
     
-    // Extract error message from nested structure
-    // Handle case where parsedData might be a stringified JSON
-    let dataToProcess = parsedData;
-    if (typeof parsedData === 'string') {
-      try {
-        dataToProcess = JSON.parse(parsedData);
-      } catch (e) {
-        // If parsing fails, use the string as the error message
-        setError(parsedData);
-        setLoading(false);
-        setAnalysisComplete(true);
-        disconnectSocket();
-        return;
-      }
-    }
-    
-    let errorMessage = 'Analysis error occurred';
-    
-    // Check various nested structures for the error message
-    if (dataToProcess.error && dataToProcess.error.message) {
-      errorMessage = dataToProcess.error.message;
-    } else if (dataToProcess.msg) {
-      if (typeof dataToProcess.msg === 'string') {
-        errorMessage = dataToProcess.msg;
-      } else if (dataToProcess.msg.error && dataToProcess.msg.error.message) {
-        errorMessage = dataToProcess.msg.error.message;
-      } else if (dataToProcess.msg.message) {
-        errorMessage = dataToProcess.msg.message;
-      }
-    } else if (dataToProcess.message) {
-      errorMessage = dataToProcess.message;
-    }
-    
-    // Ensure we never set the entire object as error - only the message string
-    if (typeof errorMessage !== 'string') {
-      errorMessage = 'Analysis error occurred';
-    }
-    
-    // Get step from parsedData or from msg object
-    const errorStep = dataToProcess.step || dataToProcess.msg?.step;
-    
-    // Check step_code - only show error message if step_code is "000"
-    const stepCode = dataToProcess.step_code || dataToProcess.msg?.step_code || dataToProcess.stepCode;
-    const shouldShowError = stepCode === '000' || stepCode === 0 || String(stepCode) === '000';
-    
-    // Only set error state and show error alert if step_code is "000"
-    if (shouldShowError) {
-      setError(errorMessage);
-      setLoading(false);
-      setAnalysisComplete(true);
-    }
-    
-    // Always update step error status (regardless of step_code)
+    // Update step error status
     if (currentStep) {
       setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => prev.map((s: { step: string; message: string; status: string; timestamp: number }) => 
         s.step === currentStep ? { ...s, status: 'error', message: errorMessage } : s
       ));
-    } else if (errorStep) {
+    } else if (parsedData.step) {
       const stepEntry = {
-        step: errorStep,
+        step: parsedData.step,
         message: errorMessage,
         status: 'error',
         timestamp: Date.now()
       };
       setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => {
-        const existingIndex = prev.findIndex((s: { step: string; message: string; status: string; timestamp: number }) => s.step === errorStep);
+        const existingIndex = prev.findIndex((s: { step: string; message: string; status: string; timestamp: number }) => s.step === parsedData.step);
         if (existingIndex >= 0) {
           const updated = [...prev];
           updated[existingIndex] = stepEntry;
@@ -525,7 +477,7 @@ const CallAnalysis = () => {
         }
         return [...prev, stepEntry];
       });
-      setCurrentStep(errorStep);
+      setCurrentStep(parsedData.step);
     } else {
       setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => {
         if (prev.length > 0) {
@@ -537,10 +489,7 @@ const CallAnalysis = () => {
       });
     }
     
-    // Only disconnect if we showed the error
-    if (shouldShowError) {
-      disconnectSocket();
-    }
+    disconnectSocket();
   };
 
   // Server-Sent Events connection to analysis server
@@ -587,35 +536,19 @@ const CallAnalysis = () => {
 
       // UNIVERSAL STEP TRACKING: Handle ALL events with a step field first
       // This ensures every event with a step is captured, regardless of type/status
-      // Check for step in parsedData or in nested msg object
-      const stepInfo = parsedData.step || parsedData.msg?.step;
-      const stepStatus = parsedData.status || parsedData.msg?.status || 'processing';
-      
-      // Extract step message - ensure it's always a string, never an object
-      let stepMessage = '';
-      if (parsedData.error && parsedData.error.message) {
-        stepMessage = String(parsedData.error.message);
-      } else if (parsedData.msg?.error?.message) {
-        stepMessage = String(parsedData.msg.error.message);
-      } else if (parsedData.msg?.message) {
-        stepMessage = String(parsedData.msg.message);
-      } else if (parsedData.message) {
-        stepMessage = String(parsedData.message);
-      }
-      
-      if (stepInfo) {
+      if (parsedData.step) {
         const stepEntry = {
-          step: stepInfo,
-          message: stepMessage,
-          status: stepStatus,
+          step: parsedData.step,
+          message: parsedData.message || '',
+          status: parsedData.status || 'processing',
           timestamp: Date.now()
         };
         
         setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => updateStepInList(prev, stepEntry));
         
         // Set current step if it's processing or connecting
-        if (stepStatus === 'processing' || stepStatus === 'connecting' || stepStatus === 'connected') {
-          setCurrentStep(stepInfo);
+        if (parsedData.status === 'processing' || parsedData.status === 'connecting' || parsedData.status === 'connected') {
+          setCurrentStep(parsedData.step);
         }
       }
 
@@ -647,83 +580,13 @@ const CallAnalysis = () => {
     },
     onError: (error) => {
       console.error('Analysis SSE error:', error);
-      
-      // Extract error message from nested structure
-      // Handle case where error might be a stringified JSON
-      let dataToProcess = error;
-      if (typeof error === 'string') {
-        try {
-          dataToProcess = JSON.parse(error);
-        } catch (e) {
-          // If parsing fails, use the string as the error message
-          setError(error);
-          setLoading(false);
-          setAnalysisComplete(true);
-          disconnectSocket();
-          toast.error(error);
-          return;
-        }
-      }
-      
-      let errorMessage = UNABLE_TO_ANALYZE_CALL;
-      
-      // Check various nested structures for the error message
-      if (dataToProcess.error && dataToProcess.error.message) {
-        errorMessage = dataToProcess.error.message;
-      } else if (dataToProcess.msg) {
-        if (typeof dataToProcess.msg === 'string') {
-          errorMessage = dataToProcess.msg;
-        } else if (dataToProcess.msg.error && dataToProcess.msg.error.message) {
-          errorMessage = dataToProcess.msg.error.message;
-        } else if (dataToProcess.msg.message) {
-          errorMessage = dataToProcess.msg.message;
-        }
-      } else if (dataToProcess.message) {
-        errorMessage = dataToProcess.message;
-      }
-      
-      // Ensure we never set the entire object as error - only the message string
-      if (typeof errorMessage !== 'string') {
-        errorMessage = UNABLE_TO_ANALYZE_CALL;
-      }
-      
-      // Check step_code - only show error message if step_code is "000"
-      const stepCode = dataToProcess?.step_code || dataToProcess?.msg?.step_code || dataToProcess?.stepCode;
-      const shouldShowError = stepCode === '000' || stepCode === 0 || String(stepCode) === '000';
-      
-      // Only set error state and show error alert if step_code is "000"
-      if (shouldShowError) {
-        setError(errorMessage);
-        setLoading(false);
-        setAnalysisComplete(true); // Prevent auto-reconnect
-        toast.error(errorMessage);
-        disconnectSocket();
-      }
-      
-      // Always update step error status (regardless of step_code)
-      const errorStep = dataToProcess?.step || dataToProcess?.msg?.step;
-      if (errorStep) {
-        const stepEntry = {
-          step: errorStep,
-          message: errorMessage,
-          status: 'error',
-          timestamp: Date.now()
-        };
-        setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => {
-          const existingIndex = prev.findIndex((s: { step: string; message: string; status: string; timestamp: number }) => s.step === errorStep);
-          if (existingIndex >= 0) {
-            const updated = [...prev];
-            updated[existingIndex] = stepEntry;
-            return updated;
-          }
-          return [...prev, stepEntry];
-        });
-        setCurrentStep(errorStep);
-      } else if (currentStep) {
-        setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => prev.map((s: { step: string; message: string; status: string; timestamp: number }) => 
-          s.step === currentStep ? { ...s, status: 'error', message: errorMessage } : s
-        ));
-      }
+      const errorMessage = error?.msg || error?.message || (typeof error === 'string' ? error : UNABLE_TO_ANALYZE_CALL);
+      setError(errorMessage);
+      setLoading(false);
+      setAnalysisComplete(true); // Prevent auto-reconnect
+      // Disconnect socket on error
+      disconnectSocket();
+      toast.error(errorMessage);
     },
     onOpen: () => {
       setError(null);
@@ -2380,7 +2243,7 @@ const CallAnalysis = () => {
           <Col md={12}>
             <Alert variant="danger">
               <Alert.Heading>Error</Alert.Heading>
-              <p>{typeof error === 'string' ? error : String(error)}</p>
+              <p>{error}</p>
             </Alert>
           </Col>
         </Row>
