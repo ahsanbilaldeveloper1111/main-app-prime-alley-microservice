@@ -85,13 +85,35 @@ export interface DeleteTenantFAQParams {
 
 // Training Interface
 export interface ChatTrainingPayload {
-  data: any; // Training data - structure depends on API requirements
-  tenant_id?: string;
+  tenant_id: string;
+  chunk_size: number;
+  chunk_overlap: number;
 }
 
 export interface ChatTrainingResponse {
-  success?: boolean;
   message?: string;
+  tenant_id?: string;
+  chunk_size?: number;
+  chunk_overlap?: number;
+  tenant_documents?: {
+    files: number;
+    chunks: number;
+  };
+  global_documents?: {
+    files: number;
+    chunks: number;
+  };
+  tenant_faqs?: {
+    count: number;
+    chunks: number;
+  };
+  global_faqs?: {
+    count: number;
+    chunks: number;
+  };
+  total_chunks?: number;
+  changes_detected?: boolean;
+  success?: boolean;
   error?: string;
 }
 
@@ -389,7 +411,7 @@ export const deleteGlobalFAQ = async (faq_id: number): Promise<void> => {
 
 /**
  * Submit training data for chat
- * @param payload - Training payload containing data and optional tenant_id
+ * @param payload - Training payload containing tenant_id, chunk_size, and chunk_overlap
  * @returns Promise with training response
  */
 export const submitChatTraining = async (
@@ -403,7 +425,6 @@ export const submitChatTraining = async (
       throw new Error(response.data.error || 'Failed to submit training data');
     }
     
-    toast.success('Training data submitted successfully');
     return response.data;
   } catch (error: any) {
     const errorMsg = 
