@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { listProjects, createTask, updateTask } from '@utils/tasks';
 import { getAutoTimezone } from '@utils/Helper';
+import RichTextEditor from '../../../pages/help-center/partials/RichTextEditor';
 
 interface Extension {
   id: string;
@@ -94,7 +95,7 @@ interface Priority {
 
 interface LinkedRecord {
   id: number;
-  type: 'crm' | 'call' | 'ticket' | 'invoice';
+  type: 'task';
   title: string;
   reference: string;
 }
@@ -356,28 +357,9 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
 
   const labels: Label[] = getLabelsForSelectedProject();
 
-  // Use current project as linked record if provided, otherwise use propLinkedRecords
-  const linkedRecords: LinkedRecord[] = propProject ? [
-    { id: propProject.id, type: 'crm', title: propProject.name, reference: `Project #${propProject.id}` }
-  ] : propLinkedRecords;
-
-  const activities: ActivityEntry[] = [
-    {
-      id: 1,
-      user: { id: 1, name: "Teddy", avatar: "/avatars/teddy.jpg", initials: "TD" },
-      action: "assigned John D.",
-      timestamp: new Date('2024-04-22'),
-      type: 'assignment'
-    },
-    {
-      id: 2,
-      user: { id: 2, name: "Sarah M.", avatar: "/avatars/sarah.jpg", initials: "SM" },
-      action: "",
-      timestamp: new Date('2024-04-22'),
-      type: 'comment',
-      content: "@John D. Can you take a look at this issue?"
-    }
-  ];
+  // Use propLinkedRecords directly (project linking removed since type is now only 'task')
+  const linkedRecords: LinkedRecord[] = propLinkedRecords;
+  console.log('linkedRecords', linkedRecords);
 
   // Map priority ID to priority string
   const mapPriorityIdToString = (priorityId: number | null): string => {
@@ -426,6 +408,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       // Add project_id if available (optional)
       if (formData.projectId) {
         payload.project_id = formData.projectId;
+      }
+
+      // Add parent_task_id if records are linked (use first linked record as parent)
+      if (formData.linkedRecordIds && formData.linkedRecordIds.length > 0) {
+        payload.parent_task_id = formData.linkedRecordIds[0];
       }
 
       // If edit mode, use updateTask API
@@ -496,6 +483,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       // Add project_id if available (optional)
       if (formData.projectId) {
         payload.project_id = formData.projectId;
+      }
+
+      // Add parent_task_id if records are linked (use first linked record as parent)
+      if (formData.linkedRecordIds && formData.linkedRecordIds.length > 0) {
+        payload.parent_task_id = formData.linkedRecordIds[0];
       }
 
       // If edit mode, use updateTask API
@@ -578,7 +570,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           gap: '8px'
         }}>
           <ListTodo size={20} color="#4e6fa5" />
-          {isEdit ? 'Edit Task' : 'Create Task'}
+          {taskType === 'todo' 
+            ? (isEdit ? 'Edit Todo' : 'Create Todo')
+            : taskType === 'recurring'
+            ? (isEdit ? 'Edit Recurring' : 'Create Recurring')
+            : (isEdit ? 'Edit Task' : 'Create Task')}
         </Modal.Title>
         <Button
           variant="link"
@@ -621,19 +617,22 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             <FileText size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
             Description
           </Form.Label>
-          <Form.Control
-            as="textarea"
-            rows={2}
+          <RichTextEditor
+            value={formData.description || ''}
+            onChange={(html: string, text: string) => {
+              // Store HTML to preserve formatting
+              setFormData({ ...formData, description: html });
+            }}
             placeholder="Describe the task..."
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            className="py-2"
-            style={{ fontSize: '14px', resize: 'vertical' }}
+            minHeight="100px"
+            maxHeight="200px"
+            maxLength={5000}
           />
         </Form.Group>
 
         {/* Project and Assignees Row */}
         <Row className="mb-3">
+        {taskType !== 'todo' && (
           <Col xs={12} md={6} className="mb-3 mb-md-0">
             <Form.Group>
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -664,6 +663,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               </Form.Select>
             </Form.Group>
           </Col>
+          )}
 
           <Col xs={12} md={6}>
             <Form.Group>
@@ -681,10 +681,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               />
             </Form.Group>
           </Col>
-        </Row>
+       
 
         {/* Status and Priority Row */}
-        <Row className="mb-3">
+        
+          {taskType !== 'todo' && (
           <Col xs={12} md={6} className="mb-3 mb-md-0">
             <Form.Group>
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -712,7 +713,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               </Form.Select>
             </Form.Group>
           </Col>
-
+          )}
           <Col xs={12} md={6}>
             <Form.Group>
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -736,6 +737,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         </Row>
 
         {/* Assignees Field */}
+        {taskType !== 'todo' && (
         <Form.Group className="mb-3">
           <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
             <Users size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
@@ -883,8 +885,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             </div>
           )}
         </Form.Group>
+        )}
 
         {/* Labels Field */}
+        {taskType !== 'todo' && (
+          <>
         <Form.Group className="mb-3">
           <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
             <Tag size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
@@ -975,7 +980,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             />
             <Form.Control
               type="text"
-              placeholder="Search CRM, call, ticket, invoice..."
+              placeholder="Search task..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="py-2"
@@ -987,7 +992,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           </div>
 
           {/* Linked Records Display */}
-          {searchQuery && (
+          {linkedRecords && linkedRecords.length > 0 && (
             <div 
               className="border rounded"
               style={{ 
@@ -996,12 +1001,25 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 backgroundColor: '#f8fafc'
               }}
             >
-              {linkedRecords
-                .filter(record => 
-                  record.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  record.reference.toLowerCase().includes(searchQuery.toLowerCase())
-                )
-                .map((record) => (
+              {(() => {
+                const filteredRecords = linkedRecords.filter(record => {
+                  // If there's a search query, filter by it; otherwise show all
+                  if (searchQuery) {
+                    return record.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           record.reference.toLowerCase().includes(searchQuery.toLowerCase());
+                  }
+                  return true;
+                });
+
+                if (filteredRecords.length === 0) {
+                  return (
+                    <div className="p-3 text-center text-muted" style={{ fontSize: '0.9rem' }}>
+                      {searchQuery ? 'No tasks found matching your search' : 'No tasks available'}
+                    </div>
+                  );
+                }
+
+                return filteredRecords.map((record) => (
                   <div
                     key={record.id}
                     className="d-flex align-items-center p-3 border-bottom cursor-pointer"
@@ -1013,9 +1031,10 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                     onClick={() => {
                       setFormData(prev => ({
                         ...prev,
+                        // Single selection: if clicking the same record, deselect it; otherwise select only this one
                         linkedRecordIds: prev.linkedRecordIds.includes(record.id)
-                          ? prev.linkedRecordIds.filter(id => id !== record.id)
-                          : [...prev.linkedRecordIds, record.id]
+                          ? []
+                          : [record.id]
                       }));
                     }}
                     onMouseEnter={(e) => {
@@ -1034,16 +1053,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                       style={{
                         width: '36px',
                         height: '36px',
-                        backgroundColor: record.type === 'crm' ? '#4A90E2' : 
-                                       record.type === 'ticket' ? '#5B7BA4' :
-                                       record.type === 'invoice' ? '#D4A853' : '#5B7BA4',
+                        backgroundColor: '#6B7280',
                         flexShrink: 0
                       }}
                     >
-                      {record.type === 'crm' ? <User size={18} /> :
-                       record.type === 'ticket' ? <Ticket size={18} /> :
-                       record.type === 'invoice' ? <FileSpreadsheet size={18} /> :
-                       <Phone size={18} />}
+                      <ListTodo size={18} />
                     </div>
                     <div className="flex-grow-1 overflow-hidden">
                       <div className="fw-semibold text-truncate" style={{ fontSize: '0.9rem', color: '#2d3748' }}>
@@ -1057,10 +1071,13 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                       <Check size={18} className="text-primary ms-2" style={{ flexShrink: 0 }} />
                     )}
                   </div>
-                ))}
+                ));
+              })()}
             </div>
           )}
         </Form.Group>
+        </>
+        )}
       </Modal.Body>
 
       <Modal.Footer style={{ 
@@ -1082,21 +1099,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         >
           Cancel
         </Button>
-        <Button 
-          variant="primary" 
-          type="button"
-          onClick={handleCreateAndOpen}
-          disabled={isSubmitting}
-          style={{
-            padding: '8px 20px',
-            fontSize: '14px',
-            fontWeight: '600',
-            backgroundColor: '#3b82f6',
-            borderColor: '#3b82f6'
-          }}
-        >
-          {isSubmitting ? 'Processing...' : (isEdit ? 'Update & Open' : 'Create & Open')}
-        </Button>
+        
         <Button 
           variant="primary" 
           type="button"

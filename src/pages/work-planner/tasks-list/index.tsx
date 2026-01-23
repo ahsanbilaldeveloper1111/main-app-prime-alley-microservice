@@ -3,7 +3,8 @@ import React, {
   ReactElement,
   useState,
   useEffect,
-  useCallback
+  useCallback,
+  useRef
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -12,7 +13,7 @@ import GenericListPage from "@components/GenericListPage";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import { listTasks, listProjects, getTask, updateTask, deleteTask } from "@utils/tasks";
+import { listTasks, listProjects, getTask, updateTask, deleteTask, getTaskActivities, getTaskComments, createTaskComment, updateTaskComment, deleteTaskComment } from "@utils/tasks";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { ModuleSlug } from "@utils/Helper";
 import { Spinner } from "react-bootstrap";
@@ -28,7 +29,8 @@ import {
   Dropdown,
   Nav,
   Offcanvas,
-  InputGroup
+  InputGroup,
+  Modal
 } from 'react-bootstrap';
 import { 
   CheckSquare, 
@@ -47,7 +49,9 @@ import {
   Grid3x3,
   Bell,
   Edit,
-  Trash2
+  Trash2,
+  MessageSquare,
+  Send
 } from 'lucide-react';
 import SelectBox from '@components/SelectBox';
 import CreateTaskModal from '@components/work-planner/createtask-modal';
@@ -115,10 +119,18 @@ const TasksList = () => {
   // Filter state variables - declared early so they can be used in fetchTasks callback
   const [searchTerm, setSearchTerm] = useState('');
   const [filterProject, setFilterProject] = useState('All Projects');
-  const [filterAssignee, setFilterAssignee] = useState('All Assignees');
+  const [filterAssignee, setFilterAssignee] = useState<string[]>([]); // Array of extension numbers
   const [filterStatus, setFilterStatus] = useState('All Status');
   const [filterPriority, setFilterPriority] = useState('All Priority');
   const [filterDueDate, setFilterDueDate] = useState('All Dates');
+  
+  // Use refs to store latest filter values to avoid recreating fetchTasks on filter changes
+  const filtersRef = useRef({ searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate });
+  
+  // Update refs when filters change
+  useEffect(() => {
+    filtersRef.current = { searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate };
+  }, [searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate]);
 
   // Fetch extensions for CreateTaskModal - MUST load first before other APIs
   const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
@@ -127,12 +139,10 @@ const TasksList = () => {
   const assigneesList = hierarchyDataExtensions && Array.isArray(hierarchyDataExtensions)
     ? (hierarchyDataExtensions as any[]).map((ext: any) => ({
         id: ext.id || ext.extension_number || '',
+        extension_number: ext.extension_number || ext.id || '',
         name: ext.name || ext.id || ext.extension_number || 'Unknown'
       }))
     : [];
-  
-  // Create assignees array for dropdown (includes "All Assignees" option)
-  const assignees = ['All Assignees', ...assigneesList.map(ext => ext.name)];
 
   // Map API task to UI Task
   const mapApiTaskToTask = (apiTask: ApiTask): Task => {
@@ -180,7 +190,7 @@ const TasksList = () => {
       const assigneeName = findExtensionName(extensionNumber);
       const initials = assigneeName !== extensionNumber 
         ? assigneeName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-        : extensionNumber.substring(0, 2).toUpperCase() || 'UN';
+        : extensionNumber.toUpperCase() || 'UN';
       
       const assigneesList = assignees.map((a: any) => {
         const extNum = a.extension_number || '';
@@ -189,7 +199,7 @@ const TasksList = () => {
           name: name,
           initials: name !== extNum
             ? name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-            : (extNum || 'UN').substring(0, 2).toUpperCase()
+            : (extNum || 'UN').toUpperCase()
         };
       });
 
@@ -223,10 +233,13 @@ const TasksList = () => {
     try {
       setLoading(true);
       
+      // Read current filter values from ref
+      const currentFilters = filtersRef.current;
+      
       const params: any = {
         page: pagination.page,
         limit: pagination.limit,
-        search: searchTerm,
+        search: currentFilters.searchTerm,
         order: {
           column: 'created_at',
           dir: 'desc'
@@ -248,24 +261,48 @@ const TasksList = () => {
         ]
       };
 
-      // Add filters
-      if (filterProject !== 'All Projects' && filterProject) {
-        // Find project ID from tasks or pass as string (will need project list API)
-        // For now, we'll filter client-side if project name is provided
+      // Add filters (reads from ref to get latest values)
+      if (currentFilters.filterProject !== 'All Projects' && currentFilters.filterProject) {
+        // Find project ID from allProjects list
+        const selectedProject = allProjects.find(p => p.name === currentFilters.filterProject);
+        if (selectedProject) {
+          params.project_id = selectedProject.id;
+        }
       }
       
-      if (filterStatus !== 'All Status' && filterStatus) {
-        // Map status name to status_id if needed
-        // For now, filter client-side
+      if (currentFilters.filterStatus !== 'All Status' && currentFilters.filterStatus) {
+        // Map status name to status_id
+        // First, try to find status_id from existing tasks
+        const statusMap: Record<string, number> = {};
+        tasks.forEach(task => {
+          if (task.rawData?.status && task.status === currentFilters.filterStatus) {
+            const statusId = task.rawData.status.id || task.rawData.status_id;
+            if (statusId) {
+              statusMap[currentFilters.filterStatus] = statusId;
+            }
+          }
+        });
+        
+        // If we found a status_id, use it; otherwise, we'll need to fetch statuses or filter client-side
+        if (statusMap[currentFilters.filterStatus]) {
+          params.status_id = statusMap[currentFilters.filterStatus];
+        }
+        // Note: If status_id not found, we'll filter client-side (handled in filteredTasks)
       }
 
-      if (filterPriority !== 'All Priority' && filterPriority) {
+      if (currentFilters.filterPriority !== 'All Priority' && currentFilters.filterPriority) {
         const priorityMap: Record<string, string> = {
           'Low': 'low',
           'Medium': 'normal',
           'High': 'high'
         };
-        params.priority = priorityMap[filterPriority] || filterPriority.toLowerCase();
+        params.priority = priorityMap[currentFilters.filterPriority] || currentFilters.filterPriority.toLowerCase();
+      }
+
+      // Add extension_numbers filter (array of extension numbers)
+      if (currentFilters.filterAssignee && currentFilters.filterAssignee.length > 0) {
+        params.extension_numbers = currentFilters.filterAssignee;
+        params.extension_numbers = currentFilters.filterAssignee;
       }
 
       const response = await listTasks(params);
@@ -311,7 +348,7 @@ const TasksList = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, searchTerm, filterProject, filterStatus, filterPriority]);
+  }, [pagination.page, pagination.limit, allProjects, tasks]); // Only depend on pagination and data needed for status mapping (not filters)
 
   // Fetch projects list
   // Wait for hierarchy data to load first, then fetch projects
@@ -337,16 +374,29 @@ const TasksList = () => {
     fetchProjectsList();
   }, [hierarchyLoading]);
 
-  // Wait for hierarchy data to load first, then fetch tasks
+  // Wait for hierarchy data to load first, then fetch tasks (initial load only)
   useEffect(() => {
     if (hierarchyLoading) return; // Wait for hierarchy data to load
     fetchTasks();
-  }, [fetchTasks, hierarchyLoading]);
+  }, [hierarchyLoading]); // Only trigger on initial load, not on filter changes
 
-  // Update pagination when filters change
-  useEffect(() => {
+  // Handler to apply filters (called when filter button is clicked)
+  const handleApplyFilters = useCallback(() => {
     setPagination(prev => ({ ...prev, page: 1 }));
-  }, [searchTerm, filterProject, filterStatus, filterPriority, filterAssignee, filterDueDate]);
+    // Call fetchTasks directly with current filter values
+    // The pagination useEffect will also trigger, but fetchTasks has loading state to prevent issues
+    fetchTasks();
+  }, [fetchTasks]);
+
+  // Fetch tasks when pagination changes (page navigation)
+  useEffect(() => {
+    if (hierarchyLoading) return; // Wait for hierarchy data to load
+    // Skip initial load (handled by hierarchyLoading useEffect)
+    // This handles pagination changes from Previous/Next buttons
+    // Only trigger on actual pagination changes, not on filter changes
+    fetchTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, pagination.limit, hierarchyLoading]); // fetchTasks reads from refs, so it doesn't need to be in deps
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
@@ -357,6 +407,18 @@ const TasksList = () => {
   const [deletingTask, setDeletingTask] = useState(false);
   const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
+  const [taskActivities, setTaskActivities] = useState<any[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [showAllActivitiesModal, setShowAllActivitiesModal] = useState(false);
+  const [allActivities, setAllActivities] = useState<any[]>([]);
+  const [loadingAllActivities, setLoadingAllActivities] = useState(false);
+  const [activeDetailTab, setActiveDetailTab] = useState<'activity' | 'comments'>('activity');
+  const [taskComments, setTaskComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
 
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -380,6 +442,9 @@ const TasksList = () => {
   const handleTaskClick = async (task: Task) => {
     setSelectedTask(task);
     setShowTaskDetail(true);
+    setTaskActivities([]); // Reset activities when selecting a new task
+    setTaskComments([]); // Reset comments when selecting a new task
+    setActiveDetailTab('activity'); // Reset to activity tab
     
     // Fetch full task data using getTask API with relations
     if (task.rawData?.id) {
@@ -403,6 +468,20 @@ const TasksList = () => {
             rawData: taskData
           });
         }
+        
+        // Fetch task activities
+        try {
+          setLoadingActivities(true);
+          const activitiesResponse = await getTaskActivities(task.rawData.id, 1, 5);
+          if (activitiesResponse) {
+            setTaskActivities(activitiesResponse);
+          }
+        } catch (error) {
+          console.error('Error fetching task activities:', error);
+          setTaskActivities([]);
+        } finally {
+          setLoadingActivities(false);
+        }
       } catch (error) {
         console.error('Error fetching task details:', error);
       } finally {
@@ -416,7 +495,7 @@ const TasksList = () => {
     
     try {
       setDeletingTask(true);
-      const result = await deleteTask(selectedTask.rawData.id);
+      const result = await deleteTask(selectedTask?.rawData?.id as string);
       if (result) {
         setShowDeleteModal(false);
         setShowTaskDetail(false);
@@ -460,7 +539,7 @@ const TasksList = () => {
 
   const clearFilters = () => {
     setFilterProject('All Projects');
-    setFilterAssignee('All Assignees');
+    setFilterAssignee([]);
     setFilterStatus('All Status');
     setFilterPriority('All Priority');
     setFilterDueDate('All Dates');
@@ -471,7 +550,10 @@ const TasksList = () => {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          task.id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesProject = filterProject === 'All Projects' || task.project === filterProject;
-    const matchesAssignee = filterAssignee === 'All Assignees' || task.assignee === filterAssignee;
+    // Assignee filtering is now done server-side via extension_numbers, so skip client-side filtering
+    const matchesAssignee = filterAssignee.length === 0 || filterAssignee.some(extNum => 
+      task.rawData?.assignees?.some((assignee: any) => assignee.extension_number === extNum)
+    );
     const matchesStatus = filterStatus === 'All Status' || task.status === filterStatus;
     const matchesPriority = filterPriority === 'All Priority' || task.priority === filterPriority;
     
@@ -483,7 +565,11 @@ const TasksList = () => {
   
   // Convert to SelectBox format (value should be the actual value, not the label)
   const projectOptions = projects.map(project => ({ value: project, label: project }));
-  const assigneeOptions = assignees.map(assignee => ({ value: assignee, label: assignee }));
+  // Assignee options: value is extension_number (or id), label is name
+  const assigneeOptions = assigneesList.map(assignee => ({ 
+    value: assignee.extension_number || assignee.id, 
+    label: assignee.name 
+  }));
   const statusOptions = statuses.map(status => ({ value: status, label: status }));
   const priorityOptions = priorities.map(priority => ({ value: priority, label: priority }));
   const dueDateOptions = [
@@ -958,14 +1044,20 @@ const TasksList = () => {
 
               <div style={{ flex: '1 1 130px' }}>
                 <SelectBox
-                  value={filterAssignee === 'All Assignees' ? null : filterAssignee}
+                  value={filterAssignee.length > 0 ? filterAssignee : null}
                   onChange={(value) => {
-                    const val = Array.isArray(value) ? value[0] : value;
-                    setFilterAssignee(val ? String(val) : 'All Assignees');
+                    if (Array.isArray(value)) {
+                      setFilterAssignee(value.map(v => String(v)));
+                    } else if (value) {
+                      setFilterAssignee([String(value)]);
+                    } else {
+                      setFilterAssignee([]);
+                    }
                   }}
                   options={assigneeOptions}
                   placeholder="Assignee"
                   isSearchable
+                  isMulti
                 />
               </div>
 
@@ -995,18 +1087,27 @@ const TasksList = () => {
                 />
               </div>
 
-              <div style={{ flex: '1 1 140px' }}>
-                <SelectBox
-                  value={filterDueDate === 'All Dates' ? null : filterDueDate}
-                  onChange={(value) => {
-                    const val = Array.isArray(value) ? value[0] : value;
-                    setFilterDueDate(val ? String(val) : 'All Dates');
-                  }}
-                  options={dueDateOptions}
-                  placeholder="Due Date"
-                  isSearchable={false}
-                />
-              </div>
+              <button
+                onClick={handleApplyFilters}
+                style={{
+                  flex: '0 1 auto',
+                  padding: '0.625rem 1rem',
+                  backgroundColor: '#4680FF',
+                  color: 'white',
+                  border: '1px solid #4680FF',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Search size={16} />
+                Filter
+              </button>
 
               <button
                 onClick={clearFilters}
@@ -1031,7 +1132,7 @@ const TasksList = () => {
                 onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
                 onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
               >
-                Clear Filters
+                Clear
                 <X size={16} />
               </button>
             </div>
@@ -1151,9 +1252,37 @@ const TasksList = () => {
                       </td>
                       <td onClick={() => handleTaskClick(task)}>{task.project}</td>
                       <td onClick={() => handleTaskClick(task)}>
-                        <div className="d-flex align-items-center">
-                          <span className="assignee-avatar">{task.assigneeInitials}</span>
-                          <span>{task.assignee}</span>
+                        <div className="d-flex align-items-center gap-2">
+                        
+                        {
+                          task.rawData?.assignees?.map((assignee: any, idx: number) => {
+                            const extNumber = assignee.extension_number || '';
+                            
+                            // Find name from hierarchyDataExtensions
+                            if (!hierarchyDataExtensions) {
+                              return (
+                                <div key={idx} className="assignee-badge" title={extNumber}>
+                                  {extNumber.toUpperCase() || 'UN'}
+                                </div>
+                              );
+                            }
+                            
+                            const extension = (hierarchyDataExtensions as any[]).find(
+                              (ext: any) => ext.id === extNumber || ext.extension_number === extNumber
+                            );
+                            
+                            const name = extension?.name || extNumber;
+                            const initials = name !== extNumber
+                              ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+                              : (extNumber || 'UN').toUpperCase();
+                            
+                            return (
+                              <div key={idx} className="assignee-badge" title={name}>
+                                {initials}
+                              </div>
+                            );
+                          })
+                        }
                         </div>
                       </td>
                       <td onClick={() => handleTaskClick(task)}>{task.dueDate}</td>
@@ -1174,7 +1303,10 @@ const TasksList = () => {
 
       <Offcanvas 
         show={showTaskDetail} 
-        onHide={() => setShowTaskDetail(false)} 
+        onHide={() => {
+          setShowTaskDetail(false);
+          setTaskActivities([]); // Reset activities when closing
+        }} 
         placement="end"
         className="task-detail-panel"
       >
@@ -1228,17 +1360,40 @@ const TasksList = () => {
               <div className="detail-section">
                 <div className="detail-label">Assignees</div>
                 <div className="assignee-group">
-                  {selectedTask.assignees?.map((assignee, idx) => (
-                    <div key={idx} className="assignee-badge" title={assignee.name}>
-                      {assignee.initials}
-                    </div>
-                  ))}
-                  <div className="add-assignee">
+                  {selectedTask.rawData?.assignees?.map((assignee: any, idx: number) => {
+                    const extNumber = assignee.extension_number || '';
+                    
+                    // Find name from hierarchyDataExtensions
+                    if (!hierarchyDataExtensions) {
+                      return (
+                        <div key={idx} className="assignee-badge" title={extNumber}>
+                          {extNumber.toUpperCase() || 'UN'}
+                        </div>
+                      );
+                    }
+                    
+                    const extension = (hierarchyDataExtensions as any[]).find(
+                      (ext: any) => ext.id === extNumber || ext.extension_number === extNumber
+                    );
+                    
+                    const name = extension?.name || extNumber;
+                    const initials = name !== extNumber
+                      ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+                      : (extNumber || 'UN').toUpperCase();
+                    
+                    return (
+                      <div key={idx} className="assignee-badge" title={name}>
+                        {initials}
+                      </div>
+                    );
+                  })}
+                  <div className="add-assignee" onClick={handleEditTask} >
                     <Plus size={16} />
                   </div>
                 </div>
               </div>
 
+{selectedTask.dueDate && (
               <div className="detail-section">
                 <div className="detail-label">Due Date</div>
                 <div className="d-flex align-items-center" style={{ fontSize: '0.9rem', fontWeight: '500' }}>
@@ -1246,12 +1401,11 @@ const TasksList = () => {
                   <span>{selectedTask.dueDate}</span>
                 </div>
               </div>
+              )}
 
               <div className="detail-section">
                 <div className="detail-label">Project</div>
-                <Badge bg="light" text="dark" className="px-3 py-2" style={{ fontSize: '0.85rem', fontWeight: '500' }}>
-                  {selectedTask.project}
-                </Badge>
+                {selectedTask.project}
               </div>
 
               <div className="detail-section">
@@ -1263,61 +1417,488 @@ const TasksList = () => {
 
               <Nav variant="tabs" className="detail-tabs">
                 <Nav.Item>
-                  <Nav.Link active>Activity</Nav.Link>
-                </Nav.Item>
-                <Nav.Item>
-                  <Nav.Link>
-                    Comments {selectedTask.comments && `(${selectedTask.comments})`}
+                  <Nav.Link 
+                    active={activeDetailTab === 'activity'}
+                    onClick={() => setActiveDetailTab('activity')}
+                  >
+                    Recent Activity
                   </Nav.Link>
                 </Nav.Item>
                 <Nav.Item>
-                  <Nav.Link>History</Nav.Link>
+                  <Nav.Link
+                    active={activeDetailTab === 'comments'}
+                    onClick={async () => {
+                      setActiveDetailTab('comments');
+                      // Fetch comments when switching to comments tab
+                      if (selectedTask?.rawData?.id && taskComments.length === 0) {
+                        try {
+                          setLoadingComments(true);
+                          const commentsResponse = await getTaskComments(selectedTask.rawData.id);
+                          // Response is a direct array
+                          if (commentsResponse && Array.isArray(commentsResponse)) {
+                            setTaskComments(commentsResponse);
+                          } else {
+                            setTaskComments([]);
+                          }
+                        } catch (error) {
+                          console.error('Error fetching comments:', error);
+                          setTaskComments([]);
+                        } finally {
+                          setLoadingComments(false);
+                        }
+                      }
+                    }}
+                  >
+                    Comments {taskComments.length > 0 && `(${taskComments.length})`}
+                  </Nav.Link>
                 </Nav.Item>
               </Nav>
 
+              {activeDetailTab === 'activity' && (
               <div className="activity-section">
-                <div className="activity-date" style={{ fontWeight: '600', marginBottom: '1rem' }}>Recent Activity</div>
                 
-                <div className="activity-item" style={{ marginBottom: '1rem' }}>
-                  <div className="assignee-avatar" style={{ width: '32px', height: '32px', fontSize: '0.7rem', flexShrink: 0 }}>
-                    JD
+                {loadingActivities ? (
+                  <div style={{ textAlign: 'center', padding: '2rem' }}>
+                    <Spinner animation="border" size="sm" />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.875rem', color: '#1e293b', marginBottom: '0.25rem' }}>
-                      <strong>John D.</strong> was assigned to this task
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Apr 22, 2024 at 10:30 AM</div>
+                ) : taskActivities.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '1rem', color: '#94a3b8', fontSize: '0.875rem' }}>
+                    No activities found
                   </div>
-                </div>
-
-                <div className="activity-item" style={{ marginBottom: '1rem' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <AlertCircle size={16} color="#64748b" />
+                ) : (
+                  taskActivities.map((activity: any, idx: number) => {
+                    // Find extension name from hierarchy data
+                    const extNumber = activity.extension_number || '';
+                    let extensionName = extNumber;
+                    let extensionInitials = extNumber.toUpperCase() || 'UN';
+                    
+                    if (hierarchyDataExtensions && extNumber && extNumber !== 'system') {
+                      const extension = (hierarchyDataExtensions as any[]).find(
+                        (ext: any) => ext.id === extNumber || ext.extension_number === extNumber
+                      );
+                      if (extension?.name) {
+                        extensionName = extension.name;
+                        extensionInitials = extensionName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+                      }
+                    }
+                    
+                    // Format date
+                    const formatActivityDate = (dateString: string) => {
+                      try {
+                        const date = new Date(dateString);
+                        return date.toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric', 
+                          year: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true
+                        });
+                      } catch {
+                        return dateString;
+                      }
+                    };
+                    
+                    const activityDate = formatActivityDate(activity.created_at || '');
+                    const actionText = activity.description || activity.action || 'Activity';
+                    
+                    return (
+                      <div key={activity.id || idx} className="activity-item" style={{ marginBottom: '1rem' }}>
+                        <div className="assignee-avatar" style={{ width: '32px', height: '32px', fontSize: '0.7rem', flexShrink: 0 }}>
+                          {extensionInitials}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.875rem', color: '#1e293b', marginBottom: '0.25rem' }}>
+                            {extNumber === 'system' ? (
+                              <>{actionText}</>
+                            ) : (
+                              <>
+                                <strong>{extensionName}</strong> {actionText}
+                              </>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{activityDate}</div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                
+                {taskActivities.length > 0 && (
+                  <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      onClick={async () => {
+                        if (selectedTask?.rawData?.id) {
+                          try {
+                            setLoadingAllActivities(true);
+                            setShowAllActivitiesModal(true);
+                            const activitiesResponse = await getTaskActivities(selectedTask.rawData.id, 1, 100);
+                            if (activitiesResponse && activitiesResponse) {
+                              setAllActivities(activitiesResponse);
+                            }
+                          } catch (error) {
+                            console.error('Error fetching all activities:', error);
+                            setAllActivities([]);
+                          } finally {
+                            setLoadingAllActivities(false);
+                          }
+                        }
+                      }}
+                      style={{
+                        color: '#4e6fa5',
+                        textDecoration: 'none',
+                        fontSize: '0.875rem',
+                        fontWeight: '500'
+                      }}
+                    >
+                      View All
+                    </Button>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.875rem', color: '#1e293b', marginBottom: '0.25rem' }}>
-                      Status changed to <strong>"In Progress"</strong>
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Apr 22, 2024 at 10:15 AM</div>
-                  </div>
-                </div>
-
-                <div className="activity-item">
-                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Plus size={16} color="#64748b" />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.875rem', color: '#1e293b', marginBottom: '0.25rem' }}>
-                      Task created
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Apr 20, 2024 at 9:00 AM</div>
-                  </div>
-                </div>
+                )}
               </div>
+              )}
+
+              {activeDetailTab === 'comments' && (
+              <div className="activity-section">
+                {loadingComments ? (
+                  <div style={{ textAlign: 'center', padding: '2rem' }}>
+                    <Spinner animation="border" size="sm" />
+                  </div>
+                ) : (
+                  <>
+                    {/* Comments List */}
+                    <div style={{ marginBottom: '1rem' }}>
+                      {taskComments.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '0.875rem' }}>
+                          No comments yet
+                        </div>
+                      ) : (
+                        taskComments.map((comment: any, idx: number) => {
+                          // Find extension name from hierarchy data
+                          const extNumber = comment.extension_number || comment.user?.extension_number || '';
+                          let extensionName = extNumber;
+                          let extensionInitials = extNumber.toUpperCase() || 'UN';
+                          
+                          if (hierarchyDataExtensions && extNumber) {
+                            const extension = (hierarchyDataExtensions as any[]).find(
+                              (ext: any) => ext.id === extNumber || ext.extension_number === extNumber
+                            );
+                            if (extension?.name) {
+                              extensionName = extension.name;
+                              extensionInitials = extensionName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+                            }
+                          }
+                          
+                          // Format date
+                          const formatCommentDate = (dateString: string) => {
+                            try {
+                              const date = new Date(dateString);
+                              return date.toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric', 
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true
+                              });
+                            } catch {
+                              return dateString;
+                            }
+                          };
+                          
+                          const commentDate = formatCommentDate(comment.created_at || '');
+                          const isEditing = editingCommentId === comment.id;
+                          
+                          return (
+                            <div key={comment.id || idx} style={{ 
+                              marginBottom: '1rem',
+                              padding: '0.75rem',
+                              backgroundColor: '#f8fafc',
+                              borderRadius: '6px'
+                            }}>
+                              {isEditing ? (
+                                <div>
+                                  <Form.Control
+                                    as="textarea"
+                                    rows={3}
+                                    value={editingCommentText}
+                                    onChange={(e) => setEditingCommentText(e.target.value)}
+                                    style={{ marginBottom: '0.5rem' }}
+                                  />
+                                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                    <Button
+                                      variant="light"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditingCommentId(null);
+                                        setEditingCommentText('');
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      variant="primary"
+                                      size="sm"
+                                      onClick={async () => {
+                                        if (selectedTask?.rawData?.id && editingCommentText.trim()) {
+                                          try {
+                                            setSubmittingComment(true);
+                                            await updateTaskComment(selectedTask.rawData.id, comment.id, editingCommentText.trim());
+                                            // Refresh comments
+                                            const commentsResponse = await getTaskComments(selectedTask.rawData.id);
+                                            if (commentsResponse && Array.isArray(commentsResponse)) {
+                                              setTaskComments(commentsResponse);
+                                            } else if (commentsResponse?.data && Array.isArray(commentsResponse.data)) {
+                                              setTaskComments(commentsResponse.data);
+                                            }
+                                            setEditingCommentId(null);
+                                            setEditingCommentText('');
+                                          } catch (error) {
+                                            console.error('Error updating comment:', error);
+                                          } finally {
+                                            setSubmittingComment(false);
+                                          }
+                                        }
+                                      }}
+                                      disabled={submittingComment || !editingCommentText.trim()}
+                                    >
+                                      Save
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                                    <div className="assignee-avatar" style={{ 
+                                      width: '32px', 
+                                      height: '32px', 
+                                      fontSize: '0.7rem', 
+                                      flexShrink: 0 
+                                    }}>
+                                      {extensionInitials}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                      <div style={{ fontSize: '0.875rem', color: '#1e293b', marginBottom: '0.25rem' }}>
+                                        <strong>{extensionName}</strong>
+                                      </div>
+                                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{commentDate}</div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                      <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="p-0"
+                                        onClick={() => {
+                                          setEditingCommentId(comment.id);
+                                          setEditingCommentText(comment.comment || '');
+                                        }}
+                                        style={{ padding: '0.25rem', minWidth: 'auto' }}
+                                      >
+                                        <Edit size={14} />
+                                      </Button>
+                                      <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="p-0"
+                                        onClick={async () => {
+                                          if (selectedTask?.rawData?.id ) {
+                                            try {
+                                              await deleteTaskComment(selectedTask.rawData.id, comment.id);
+                                              // Refresh comments
+                                              const commentsResponse = await getTaskComments(selectedTask.rawData.id);
+                                              if (commentsResponse && Array.isArray(commentsResponse)) {
+                                                setTaskComments(commentsResponse);
+                                              } else {
+                                                setTaskComments([]);
+                                              }
+                                            } catch (error) {
+                                              console.error('Error deleting comment:', error);
+                                            }
+                                          }
+                                        }}
+                                        style={{ padding: '0.25rem', minWidth: 'auto', color: '#dc3545' }}
+                                      >
+                                        <Trash2 size={14} />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize: '0.875rem', color: '#475569', lineHeight: '1.6',  }}>
+                                    {comment.comment}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                    
+                    {/* Add Comment Form */}
+                    <div style={{ 
+                      borderTop: '1px solid #e2e8f0',
+                      paddingTop: '1rem',
+                      marginTop: '1rem'
+                    }}>
+                      <Form.Group>
+                        <Form.Control
+                          as="textarea"
+                          rows={3}
+                          placeholder="Add a comment..."
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          style={{ marginBottom: '0.5rem' }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={async () => {
+                              if (selectedTask?.rawData?.id && newComment.trim()) {
+                                try {
+                                  setSubmittingComment(true);
+                                  await createTaskComment(selectedTask.rawData.id, newComment.trim());
+                                  setNewComment('');
+                                  // Refresh comments immediately after creating
+                                  try {
+                                    const commentsResponse = await getTaskComments(selectedTask.rawData.id);
+                                    if (commentsResponse && Array.isArray(commentsResponse)) {
+                                      setTaskComments(commentsResponse);
+                                    } else {
+                                      setTaskComments([]);
+                                    }
+                                  } catch (refreshError) {
+                                    console.error('Error refreshing comments:', refreshError);
+                                  }
+                                } catch (error) {
+                                  console.error('Error creating comment:', error);
+                                } finally {
+                                  setSubmittingComment(false);
+                                }
+                              }
+                            }}
+                            disabled={submittingComment || !newComment.trim()}
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                          >
+                            <Send size={14} />
+                            Post Comment
+                          </Button>
+                        </div>
+                      </Form.Group>
+                    </div>
+                  </>
+                )}
+              </div>
+              )}
             </>
           )}
         </Offcanvas.Body>
         </Offcanvas>
+
+        {/* All Activities Modal */}
+        <Modal
+          show={showAllActivitiesModal}
+          onHide={() => {
+            setShowAllActivitiesModal(false);
+            setAllActivities([]);
+          }}
+          size="lg"
+          centered
+        >
+          <Modal.Header closeButton>
+            <Modal.Title>All Activities</Modal.Title>
+          </Modal.Header>
+          <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+            {loadingAllActivities ? (
+              <div style={{ textAlign: 'center', padding: '3rem' }}>
+                <Spinner animation="border" />
+              </div>
+            ) : allActivities.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                No activities found
+              </div>
+            ) : (
+              allActivities.map((activity: any, idx: number) => {
+                // Find extension name from hierarchy data
+                const extNumber = activity.extension_number || '';
+                let extensionName = extNumber;
+                let extensionInitials = extNumber.toUpperCase() || 'UN';
+                
+                if (hierarchyDataExtensions && extNumber && extNumber !== 'system') {
+                  const extension = (hierarchyDataExtensions as any[]).find(
+                    (ext: any) => ext.id === extNumber || ext.extension_number === extNumber
+                  );
+                  if (extension?.name) {
+                    extensionName = extension.name;
+                    extensionInitials = extensionName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+                  }
+                }
+                
+                // Format date
+                const formatActivityDate = (dateString: string) => {
+                  try {
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric', 
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    });
+                  } catch {
+                    return dateString;
+                  }
+                };
+                
+                const activityDate = formatActivityDate(activity.created_at || '');
+                const actionText = activity.description || activity.action || 'Activity';
+                
+                return (
+                  <div key={activity.id || idx} style={{ 
+                    display: 'flex', 
+                    gap: '12px', 
+                    padding: '1rem 0',
+                    borderBottom: idx < allActivities.length - 1 ? '1px solid #e2e8f0' : 'none'
+                  }}>
+                    <div className="assignee-avatar" style={{ 
+                      width: '40px', 
+                      height: '40px', 
+                      fontSize: '0.8rem', 
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      {extensionInitials}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.9rem', color: '#1e293b', marginBottom: '0.25rem' }}>
+                        {extNumber === 'system' ? (
+                          <>{actionText}</>
+                        ) : (
+                          <>
+                            <strong>{extensionName}</strong> {actionText}
+                          </>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{activityDate}</div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => {
+              setShowAllActivitiesModal(false);
+              setAllActivities([]);
+            }}>
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
 
         {/* Delete Confirmation Modal */}
         <DeleteConfirmationModal
@@ -1353,6 +1934,20 @@ const TasksList = () => {
         labels={[]}
         task={editingTask}
         isEdit={!!editingTask}
+        linkedRecords={tasks
+          .filter(task => {
+            // Only include tasks that have a valid id and exclude the current task if editing
+            const taskId = task.rawData?.id;
+            const currentTaskId = editingTask?.id || selectedTask?.rawData?.id;
+            return taskId && taskId !== currentTaskId;
+          })
+         // .slice(0, 50) // Limit to 50 tasks for performance
+          .map(task => ({
+            id: Number(task.rawData?.id) || 0,
+            type: 'task' as const,
+            title: task.title || 'Untitled Task',
+            reference: `Task #${task.rawData?.id || task.id}`
+          }))}
       />
     </>
      

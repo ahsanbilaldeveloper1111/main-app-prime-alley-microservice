@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import { Plus, Trash2, Edit, Tag } from 'lucide-react';
-import { createLabel, updateLabel, deleteLabel } from '@utils/tasks';
+import { createProjectLabel, updateProjectLabel, deleteProjectLabel } from '@utils/tasks';
 
 interface LabelsTabProps {
   selectedProject: any;
@@ -30,7 +30,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     
     try {
       setProcessing(true);
-      await createLabel(selectedProject.id, {
+      await createProjectLabel(selectedProject.id, {
         name: formData.name,
         color: formData.color
       });
@@ -49,7 +49,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     
     try {
       setProcessing(true);
-      await updateLabel(selectedProject.id, selectedLabel.id, {
+      await updateProjectLabel(selectedProject.id, selectedLabel.id, {
         name: formData.name,
         color: formData.color
       });
@@ -69,7 +69,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     
     try {
       setProcessing(true);
-      await deleteLabel(selectedProject.id, selectedLabel.id);
+      await deleteProjectLabel(selectedProject.id, selectedLabel.id);
       setShowDeleteModal(false);
       setSelectedLabel(null);
       onRefresh();
