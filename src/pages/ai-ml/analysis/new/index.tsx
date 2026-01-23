@@ -451,25 +451,44 @@ const CallAnalysis = () => {
 
   const handleErrorStatus = (parsedData: any) => {
     console.error('Error status received from server:', parsedData);
-    const errorMessage = parsedData.msg || parsedData.message || 'Analysis error occurred';
+    
+    // Extract error message from nested structure
+    let errorMessage = 'Analysis error occurred';
+    if (parsedData.msg) {
+      if (typeof parsedData.msg === 'string') {
+        errorMessage = parsedData.msg;
+      } else if (parsedData.msg.error && parsedData.msg.error.message) {
+        errorMessage = parsedData.msg.error.message;
+      } else if (parsedData.msg.message) {
+        errorMessage = parsedData.msg.message;
+      }
+    } else if (parsedData.message) {
+      errorMessage = parsedData.message;
+    } else if (parsedData.error && parsedData.error.message) {
+      errorMessage = parsedData.error.message;
+    }
+    
     setError(errorMessage);
     setLoading(false);
     setAnalysisComplete(true);
+    
+    // Get step from parsedData or from msg object
+    const errorStep = parsedData.step || parsedData.msg?.step;
     
     // Update step error status
     if (currentStep) {
       setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => prev.map((s: { step: string; message: string; status: string; timestamp: number }) => 
         s.step === currentStep ? { ...s, status: 'error', message: errorMessage } : s
       ));
-    } else if (parsedData.step) {
+    } else if (errorStep) {
       const stepEntry = {
-        step: parsedData.step,
+        step: errorStep,
         message: errorMessage,
         status: 'error',
         timestamp: Date.now()
       };
       setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => {
-        const existingIndex = prev.findIndex((s: { step: string; message: string; status: string; timestamp: number }) => s.step === parsedData.step);
+        const existingIndex = prev.findIndex((s: { step: string; message: string; status: string; timestamp: number }) => s.step === errorStep);
         if (existingIndex >= 0) {
           const updated = [...prev];
           updated[existingIndex] = stepEntry;
@@ -477,7 +496,7 @@ const CallAnalysis = () => {
         }
         return [...prev, stepEntry];
       });
-      setCurrentStep(parsedData.step);
+      setCurrentStep(errorStep);
     } else {
       setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => {
         if (prev.length > 0) {
@@ -536,19 +555,24 @@ const CallAnalysis = () => {
 
       // UNIVERSAL STEP TRACKING: Handle ALL events with a step field first
       // This ensures every event with a step is captured, regardless of type/status
-      if (parsedData.step) {
+      // Check for step in parsedData or in nested msg object
+      const stepInfo = parsedData.step || parsedData.msg?.step;
+      const stepStatus = parsedData.status || parsedData.msg?.status || 'processing';
+      const stepMessage = parsedData.message || parsedData.msg?.error?.message || parsedData.msg?.message || '';
+      
+      if (stepInfo) {
         const stepEntry = {
-          step: parsedData.step,
-          message: parsedData.message || '',
-          status: parsedData.status || 'processing',
+          step: stepInfo,
+          message: stepMessage,
+          status: stepStatus,
           timestamp: Date.now()
         };
         
         setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => updateStepInList(prev, stepEntry));
         
         // Set current step if it's processing or connecting
-        if (parsedData.status === 'processing' || parsedData.status === 'connecting' || parsedData.status === 'connected') {
-          setCurrentStep(parsedData.step);
+        if (stepStatus === 'processing' || stepStatus === 'connecting' || stepStatus === 'connected') {
+          setCurrentStep(stepInfo);
         }
       }
 
@@ -580,10 +604,54 @@ const CallAnalysis = () => {
     },
     onError: (error) => {
       console.error('Analysis SSE error:', error);
-      const errorMessage = error?.msg || error?.message || (typeof error === 'string' ? error : UNABLE_TO_ANALYZE_CALL);
+      
+      // Extract error message from nested structure
+      let errorMessage = UNABLE_TO_ANALYZE_CALL;
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.msg) {
+        if (typeof error.msg === 'string') {
+          errorMessage = error.msg;
+        } else if (error.msg.error && error.msg.error.message) {
+          errorMessage = error.msg.error.message;
+        } else if (error.msg.message) {
+          errorMessage = error.msg.message;
+        }
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.error && error.error.message) {
+        errorMessage = error.error.message;
+      }
+      
       setError(errorMessage);
       setLoading(false);
       setAnalysisComplete(true); // Prevent auto-reconnect
+      
+      // Update step error status if step information is available
+      const errorStep = error?.step || error?.msg?.step;
+      if (errorStep) {
+        const stepEntry = {
+          step: errorStep,
+          message: errorMessage,
+          status: 'error',
+          timestamp: Date.now()
+        };
+        setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => {
+          const existingIndex = prev.findIndex((s: { step: string; message: string; status: string; timestamp: number }) => s.step === errorStep);
+          if (existingIndex >= 0) {
+            const updated = [...prev];
+            updated[existingIndex] = stepEntry;
+            return updated;
+          }
+          return [...prev, stepEntry];
+        });
+        setCurrentStep(errorStep);
+      } else if (currentStep) {
+        setSteps((prev: Array<{ step: string; message: string; status: string; timestamp: number }>) => prev.map((s: { step: string; message: string; status: string; timestamp: number }) => 
+          s.step === currentStep ? { ...s, status: 'error', message: errorMessage } : s
+        ));
+      }
+      
       // Disconnect socket on error
       disconnectSocket();
       toast.error(errorMessage);
