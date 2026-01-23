@@ -10,6 +10,9 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
+import GenericSidebar from "@components/GenericSidebar";
+import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import {
   FiUpload,
   FiDatabase,
@@ -458,6 +461,11 @@ const CrmOrders = () => {
   const [loadingDeal, setLoadingDeal] = useState(false);
   const [loadingLead, setLoadingLead] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("tab1");
+
+  // Sidebar states
+  const [showOrderSidebar, setShowOrderSidebar] = useState(false);
+  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -1010,7 +1018,7 @@ const CrmOrders = () => {
     }
   };
 
-  const handleViewOrder = useCallback(async (orderId: number) => {
+  const fetchOrderDetails = useCallback(async (orderId: number) => {
     setLoadingOrder(true);
     setLoadingDeal(true);
     setLoadingLead(true);
@@ -1052,12 +1060,28 @@ const CrmOrders = () => {
               // Don't show error toast as lead is optional
             }
           }
+          setLoadingDeal(false);
         } catch (error) {
           console.error("Failed to fetch deal:", error);
+          setLoadingDeal(false);
           // Don't show error toast as deal is optional
         }
+      } else {
+        setLoadingDeal(false);
       }
+      setLoadingLead(false);
+      setLoadingOrder(false);
+    } catch (error) {
+      console.error("Failed to fetch order:", error);
+      setLoadingOrder(false);
+      setLoadingDeal(false);
+      setLoadingLead(false);
+    }
+  }, []);
 
+  const handleViewOrder = useCallback(async (orderId: number) => {
+    await fetchOrderDetails(orderId);
+    try {
       setShowOrderViewModal(true);
     } catch (error) {
       console.error("Failed to fetch order:", error);
@@ -1518,6 +1542,261 @@ const CrmOrders = () => {
     }),
   };
 
+  // Define columns for GenericTable
+  const ordersColumns: TableColumn<any>[] = useMemo(
+    () => [
+      {
+        key: 'orderNumber',
+        label: 'Order Number',
+        sortable: true,
+        type: 'text',
+        emptyValue: '-'
+      },
+      {
+        key: 'customer',
+        label: 'Company',
+        sortable: true,
+        type: 'multi-field',
+        fields: {
+          primary: 'customer',
+          secondary: 'customerEmail',
+          secondaryClass: 'text-muted small'
+        },
+        render: (row) => (
+          <div className="d-flex align-items-center gap-2">
+            {row.customer ? (
+              <>
+                <div
+                  style={{
+                    width: "30px",
+                    height: "30px",
+                    borderRadius: "50%",
+                    backgroundColor: getRandomColor(row.customer),
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "10px",
+                    fontWeight: "600",
+                    flexShrink: 0,
+                  }}
+                >
+                  {getInitials(row.customer)}
+                </div>
+                <div>
+                  <div className="fw-medium">{row.customer}</div>
+                  {row.customerEmail && (
+                    <small className="text-muted">{row.customerEmail}</small>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div>No Company</div>
+            )}
+          </div>
+        ),
+        emptyValue: 'No Company'
+      },
+      {
+        key: 'deal',
+        label: 'Linked Deal',
+        sortable: true,
+        type: 'text',
+        accessor: (row) => row.deal || 'No Deal',
+        emptyValue: 'No Deal'
+      },
+      {
+        key: 'stage',
+        label: 'Stage',
+        sortable: true,
+        type: 'custom',
+        render: (row) => (
+          <span
+            style={{ backgroundColor: row?.stageColor || "grey" }}
+            className="badge"
+          >
+            {row.stage}
+          </span>
+        )
+      },
+      {
+        key: 'value',
+        label: 'Value',
+        sortable: true,
+        type: 'custom',
+        render: (row) => (
+          <span className="fw-semibold">
+            {row.currency} {parseFloat(String(row.value)).toLocaleString()}
+          </span>
+        )
+      },
+      {
+        key: 'approvalStatus',
+        label: 'Approval',
+        sortable: true,
+        type: 'custom',
+        render: (row) => (
+          <Badge
+            bg={
+              row.approvalStatus?.toLowerCase() === "approved"
+                ? "success"
+                : row.approvalStatus?.toLowerCase() === "rejected"
+                ? "danger"
+                : "warning"
+            }
+          >
+            {row.approvalStatus}
+          </Badge>
+        ),
+        emptyValue: '-'
+      },
+      {
+        key: 'fulfillmentStatus',
+        label: 'Fulfillment',
+        sortable: true,
+        type: 'custom',
+        render: (row) => (
+          <Badge
+            bg={
+              row.fulfillmentStatus?.toLowerCase().includes("completed") ||
+              row.fulfillmentStatus?.toLowerCase().includes("delivered")
+                ? "success"
+                : row.fulfillmentStatus?.toLowerCase().includes("progress")
+                ? "primary"
+                : "secondary"
+            }
+          >
+            {row.fulfillmentStatus}
+          </Badge>
+        ),
+        emptyValue: '-'
+      },
+      {
+        key: 'paymentStatus',
+        label: 'Payment',
+        sortable: true,
+        type: 'custom',
+        render: (row) => (
+          <Badge
+            bg={
+              row.paymentStatus?.toLowerCase() === "paid"
+                ? "success"
+                : row.paymentStatus?.toLowerCase() === "partial"
+                ? "warning"
+                : "danger"
+            }
+          >
+            {row.paymentStatus}
+          </Badge>
+        ),
+        emptyValue: '-'
+      },
+      {
+        key: 'assignedUser',
+        label: 'Assigned To',
+        sortable: true,
+        type: 'text',
+        emptyValue: '-'
+      },
+      {
+        key: 'orderDate',
+        label: 'Order Date',
+        sortable: true,
+        type: 'text',
+        emptyValue: '-'
+      },
+      {
+        key: 'owner',
+        label: 'Owner',
+        sortable: true,
+        type: 'text',
+        emptyValue: '-'
+      },
+      {
+        key: 'created',
+        label: 'Created',
+        sortable: true,
+        type: 'text',
+        emptyValue: '-'
+      }
+    ],
+    []
+  );
+
+  // Define actions for GenericTable
+  const ordersActions: TableAction<any>[] = useMemo(
+    () => {
+      if (activeFilter === 'deleted') {
+        return [
+          {
+            label: 'View',
+            icon: <Eye size={16} />,
+            onClick: (row: any) => handleViewOrder(row.rawData?.id || row.id),
+            variant: 'link' as const
+          },
+          {
+            label: 'Restore',
+            icon: <RotateCcw size={16} />,
+            onClick: (row: any) => handleRestoreOrder(row.rawData?.id || row.id),
+            variant: 'link' as const,
+            className: 'text-success'
+          }
+        ];
+      }
+
+      return [
+        {
+          label: 'View',
+          icon: <Eye size={16} />,
+          onClick: (row: any) => handleViewOrder(row.rawData?.id || row.id),
+          variant: 'link' as const
+        },
+        ...(session?.user?.permissions?.includes('edit-crm-orders') ? [{
+          label: 'Edit',
+          icon: <Edit size={16} />,
+          onClick: (row: any) => {
+            window.location.href = `/crm/orders/${row.rawData?.id || row.id}/edit`;
+          },
+          variant: 'link' as const
+        }] : []),
+        {
+          label: 'Attachments',
+          icon: <Paperclip size={16} />,
+          onClick: (row: any) => {
+            setSelectedOrderForAttachments(row.rawData || row);
+            setShowAttachmentModal(true);
+          },
+          variant: 'link' as const,
+          className: 'text-info'
+        },
+        ...(session?.user?.permissions?.includes('delete-crm-orders') ? [{
+          label: 'Delete',
+          icon: <Trash2 size={16} />,
+          onClick: (row: any) => handleDeleteOrder(row.rawData?.id || row.id, row.orderNumber),
+          variant: 'link' as const,
+          className: 'text-danger'
+        }] : []),
+        ...(activeFilter !== 'lost' ? [{
+          label: 'More Actions',
+          icon: <MoreVertical size={16} />,
+          variant: 'link' as const,
+          dropdown: {
+            align: 'end' as const,
+            options: [
+              {
+                label: 'Mark as Lost',
+                icon: <X size={14} />,
+                onClick: (row: any) => handleMarkLost(row.rawData || row),
+                className: 'text-danger'
+              }
+            ]
+          }
+        }] : [])
+      ];
+    },
+    [session, activeFilter, handleViewOrder, handleRestoreOrder, handleDeleteOrder, handleMarkLost, fetchOrderDetails]
+  );
+
   if (!session?.user?.permissions?.includes("list-crm-orders")) {
     return null;
   }
@@ -1571,11 +1850,11 @@ const CrmOrders = () => {
               {showOrdersAnalytics ? "Hide Analytics" : "Show Analytics"}
             </Button>
             <Button
-            variant={showAdvancedFilters ? "secondary" : "outline-secondary"}
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            variant={showFiltersSidebar ? "secondary" : "outline-secondary"}
+            onClick={() => setShowFiltersSidebar(!showFiltersSidebar)}
           >
             <FiFilter size={16} className="me-2" />
-            {showAdvancedFilters ? "Hide Filters" : "Show Filters"}
+            {showFiltersSidebar ? "Hide Filters" : "Show Filters"}
           </Button>
           </div>
         </div>
@@ -2111,627 +2390,42 @@ const CrmOrders = () => {
           </Card>
         )}
 
-        {/* Column Customization */}
-        <div className="d-flex justify-content-end gap-2 mb-3">
-          <Dropdown>
-            <Dropdown.Toggle variant="outline-secondary" size="sm">
-              <Layers size={16} className="me-2" />
-              Customize Table
-            </Dropdown.Toggle>
-            <Dropdown.Menu
-              align="end"
-              style={{ maxHeight: "300px", overflowY: "auto" }}
-            >
-              {[
-                { key: "orderNumber", label: "Order Number" },
-                { key: "customer", label: "Company" },
-                { key: "deal", label: "Linked Deal" },
-                { key: "stage", label: "Stage" },
-                { key: "value", label: "Value" },
-                { key: "approvalStatus", label: "Approval Status" },
-                { key: "fulfillmentStatus", label: "Fulfillment Status" },
-                { key: "paymentStatus", label: "Payment Status" },
-                { key: "assignedUser", label: "Assigned To" },
-                { key: "orderDate", label: "Order Date" },
-                { key: "owner", label: "Owner" },
-                { key: "created", label: "Created" },
-              ].map((col) => (
-                <Dropdown.Item key={col.key} as="div">
-                  <Form.Check
-                    type="checkbox"
-                    label={col.label}
-                    checked={selectedOrdersColumns.includes(col.key)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedOrdersColumns([
-                          ...selectedOrdersColumns,
-                          col.key,
-                        ]);
-                        localStorage.setItem(
-                          "ordersSelectedColumns",
-                          JSON.stringify([...selectedOrdersColumns, col.key])
-                        );
-                      } else {
-                        const newCols = selectedOrdersColumns.filter(
-                          (c) => c !== col.key
-                        );
-                        setSelectedOrdersColumns(newCols);
-                        localStorage.setItem(
-                          "ordersSelectedColumns",
-                          JSON.stringify(newCols)
-                        );
-                      }
-                    }}
-                  />
-                </Dropdown.Item>
-              ))}
-              <Dropdown.Divider />
-              <Dropdown.Item
-                onClick={() => {
-                  const allCols = [
-                    "orderNumber",
-                    "customer",
-                    "deal",
-                    "stage",
-                    "value",
-                    "approvalStatus",
-                    "fulfillmentStatus",
-                    "paymentStatus",
-                    "assignedUser",
-                    "orderDate",
-                    "owner",
-                    "created",
-                  ];
-                  setSelectedOrdersColumns(allCols);
-                  localStorage.setItem(
-                    "ordersSelectedColumns",
-                    JSON.stringify(allCols)
-                  );
-                }}
-              >
-                Select All
-              </Dropdown.Item>
-              <Dropdown.Item
-                onClick={() => {
-                  const defaultCols = [
-                    "orderNumber",
-                    "customer",
-                    "deal",
-                    "stage",
-                    "value",
-                    "approvalStatus",
-                    "fulfillmentStatus",
-                    "assignedUser",
-                    "orderDate",
-                    "owner",
-                  ];
-                  setSelectedOrdersColumns(defaultCols);
-                  localStorage.setItem(
-                    "ordersSelectedColumns",
-                    JSON.stringify(defaultCols)
-                  );
-                }}
-              >
-                Reset to Default
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
-        </div>
-
-        {/* Orders Table */}
-        <Card
-          className="border-0 shadow-sm orders-table-wrapper"
-          style={{ width: "100%" }}
-        >
-          <Card.Body className="p-0" style={{ width: "100%" }}>
-            <div className="table-responsive">
-              <Table
-                hover
-                className="mb-0 w-100"
-                style={{ width: "100%", margin: 0 }}
-              >
-                <thead className="bg-light">
-                  <tr>
-                    {selectedOrdersColumns.includes("orderNumber") && (
-                      <th
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "orderNumber",
-                            ordersPagination,
-                            setOrdersPagination
-                          )
-                        }
-                      >
-                        Order Number{" "}
-                        {renderSortIcon("orderNumber", ordersPagination)}
-                      </th>
-                    )}
-                    {selectedOrdersColumns.includes("customer") && (
-                      <th
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "customer",
-                            ordersPagination,
-                            setOrdersPagination
-                          )
-                        }
-                      >
-                        Company {renderSortIcon("customer", ordersPagination)}
-                      </th>
-                    )}
-                    {selectedOrdersColumns.includes("deal") && (
-                      <th
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "deal",
-                            ordersPagination,
-                            setOrdersPagination
-                          )
-                        }
-                      >
-                        Linked Deal {renderSortIcon("deal", ordersPagination)}
-                      </th>
-                    )}
-                    {selectedOrdersColumns.includes("stage") && (
-                      <th
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "stage",
-                            ordersPagination,
-                            setOrdersPagination
-                          )
-                        }
-                      >
-                        Stage {renderSortIcon("stage", ordersPagination)}
-                      </th>
-                    )}
-                    {selectedOrdersColumns.includes("value") && (
-                      <th
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "value",
-                            ordersPagination,
-                            setOrdersPagination
-                          )
-                        }
-                      >
-                        Value {renderSortIcon("value", ordersPagination)}
-                      </th>
-                    )}
-                    {selectedOrdersColumns.includes("approvalStatus") && (
-                      <th
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "approvalStatus",
-                            ordersPagination,
-                            setOrdersPagination
-                          )
-                        }
-                      >
-                        Approval{" "}
-                        {renderSortIcon("approvalStatus", ordersPagination)}
-                      </th>
-                    )}
-                    {selectedOrdersColumns.includes("fulfillmentStatus") && (
-                      <th
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "fulfillmentStatus",
-                            ordersPagination,
-                            setOrdersPagination
-                          )
-                        }
-                      >
-                        Fulfillment{" "}
-                        {renderSortIcon("fulfillmentStatus", ordersPagination)}
-                      </th>
-                    )}
-                    {selectedOrdersColumns.includes("paymentStatus") && (
-                      <th
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "paymentStatus",
-                            ordersPagination,
-                            setOrdersPagination
-                          )
-                        }
-                      >
-                        Payment{" "}
-                        {renderSortIcon("paymentStatus", ordersPagination)}
-                      </th>
-                    )}
-                    {selectedOrdersColumns.includes("assignedUser") && (
-                      <th
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "assignedUser",
-                            ordersPagination,
-                            setOrdersPagination
-                          )
-                        }
-                      >
-                        Assigned To{" "}
-                        {renderSortIcon("assignedUser", ordersPagination)}
-                      </th>
-                    )}
-                    {selectedOrdersColumns.includes("orderDate") && (
-                      <th
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "orderDate",
-                            ordersPagination,
-                            setOrdersPagination
-                          )
-                        }
-                      >
-                        Order Date{" "}
-                        {renderSortIcon("orderDate", ordersPagination)}
-                      </th>
-                    )}
-                    {selectedOrdersColumns.includes("owner") && (
-                      <th
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "owner",
-                            ordersPagination,
-                            setOrdersPagination
-                          )
-                        }
-                      >
-                        Owner {renderSortIcon("owner", ordersPagination)}
-                      </th>
-                    )}
-                    {selectedOrdersColumns.includes("created") && (
-                      <th
-                        style={{ cursor: "pointer", userSelect: "none" }}
-                        onClick={() =>
-                          handleSort(
-                            "created",
-                            ordersPagination,
-                            setOrdersPagination
-                          )
-                        }
-                      >
-                        Created {renderSortIcon("created", ordersPagination)}
-                      </th>
-                    )}
-                    <th style={{ width: "120px", minWidth: "120px" }}>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td
-                        colSpan={selectedOrdersColumns.length + 1}
-                        className="text-center py-4"
-                      >
-                        Loading...
-                      </td>
-                    </tr>
-                  ) : filteredOrders.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={selectedOrdersColumns.length + 1}
-                        className="text-center py-4 text-muted"
-                      >
-                        No orders found matching your criteria
-                      </td>
-                    </tr>
-                  ) : (
-                    paginateData(
-                      sortData(
-                        filteredOrders,
-                        ordersPagination.sortColumn,
-                        ordersPagination.sortDirection
-                      ),
-                      ordersPagination.currentPage,
-                      ordersPagination.rowsPerPage
-                    ).map((order) => (
-                      <tr 
-                        key={order.id}
-                        onDoubleClick={() => {
-                          if (session?.user?.permissions?.includes("list-crm-orders")) {
-                            handleViewOrder(order.rawData?.id || order.id);
-                          }
-                        }}
-                        style={{
-                          cursor: session?.user?.permissions?.includes("list-crm-orders") 
-                            ? "pointer" 
-                            : "default"
-                        }}
-                      >
-                        {selectedOrdersColumns.includes("orderNumber") && (
-                          <td className="fw-semibold">{order.orderNumber}</td>
-                        )}
-                        {selectedOrdersColumns.includes("customer") && (
-                          <td>
-                            <div className="d-flex align-items-center gap-2">
-                              {order.customer ? (
-                                <>
-                                  <div
-                                    style={{
-                                      width: "30px",
-                                      height: "30px",
-                                      borderRadius: "50%",
-                                      backgroundColor: getRandomColor(
-                                        order.customer
-                                      ),
-                                      color: "#fff",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                      fontWeight: "600",
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    {getInitials(order.customer)}
-                                  </div>
-                                  <div>
-                                    <div className="fw-medium">
-                                      {order.customer}
-                                    </div>
-                                    {order.customerEmail && (
-                                      <small className="text-muted">
-                                        {order.customerEmail}
-                                      </small>
-                                    )}
-                                  </div>
-                                </>
-                              ) : (
-                                <div>No Company</div>
-                              )}
-                            </div>
-                          </td>
-                        )}
-                        {selectedOrdersColumns.includes("deal") && (
-                          <td>
-                            <div>
-                              <div className="fw-medium">
-                                {order.deal || "No Deal"}
-                              </div>
-                            </div>
-                          </td>
-                        )}
-                        {selectedOrdersColumns.includes("stage") && (
-                          <td>
-                            <span
-                              style={{
-                                backgroundColor: order?.stageColor || "grey",
-                              }}
-                              className="badge"
-                            >
-                              {order.stage}
-                            </span>
-                          </td>
-                        )}
-                        {selectedOrdersColumns.includes("value") && (
-                          <td className="fw-semibold">
-                            {order.currency}{" "}
-                            {parseFloat(String(order.value)).toLocaleString()}
-                          </td>
-                        )}
-                        {selectedOrdersColumns.includes("approvalStatus") && (
-                          <td>
-                            <Badge
-                              bg={
-                                order.approvalStatus?.toLowerCase() ===
-                                "approved"
-                                  ? "success"
-                                  : order.approvalStatus?.toLowerCase() ===
-                                    "rejected"
-                                  ? "danger"
-                                  : "warning"
-                              }
-                            >
-                              {order.approvalStatus}
-                            </Badge>
-                          </td>
-                        )}
-                        {selectedOrdersColumns.includes(
-                          "fulfillmentStatus"
-                        ) && (
-                          <td>
-                            <Badge
-                              bg={
-                                order.fulfillmentStatus
-                                  ?.toLowerCase()
-                                  .includes("completed") ||
-                                order.fulfillmentStatus
-                                  ?.toLowerCase()
-                                  .includes("delivered")
-                                  ? "success"
-                                  : order.fulfillmentStatus
-                                      ?.toLowerCase()
-                                      .includes("progress")
-                                  ? "primary"
-                                  : "secondary"
-                              }
-                            >
-                              {order.fulfillmentStatus}
-                            </Badge>
-                          </td>
-                        )}
-                        {selectedOrdersColumns.includes("paymentStatus") && (
-                          <td>
-                            <Badge
-                              bg={
-                                order.paymentStatus?.toLowerCase() === "paid"
-                                  ? "success"
-                                  : order.paymentStatus?.toLowerCase() ===
-                                    "partial"
-                                  ? "warning"
-                                  : "danger"
-                              }
-                            >
-                              {order.paymentStatus}
-                            </Badge>
-                          </td>
-                        )}
-                        {selectedOrdersColumns.includes("assignedUser") && (
-                          <td>{order.assignedUser || "-"}</td>
-                        )}
-                        {selectedOrdersColumns.includes("orderDate") && (
-                          <td className="text-uppercase">{order.orderDate || "-"}</td>
-                        )}
-                        {selectedOrdersColumns.includes("owner") && (
-                          <td>{order.owner || "-"}</td>
-                        )}
-                        {selectedOrdersColumns.includes("created") && (
-                          <td>{order.created || "-"}</td>
-                        )}
-                        <td style={{ width: "120px", minWidth: "120px" }}>
-                          <div className="d-flex gap-1">
-                            {activeFilter === "deleted" ? (
-                              <>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1"
-                                  title="View"
-                                  onClick={() =>
-                                    handleViewOrder(
-                                      order.rawData?.id || order.id
-                                    )
-                                  }
-                                >
-                                  <Eye size={16} />
-                                </Button>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1 text-success"
-                                  title="Restore"
-                                  onClick={() =>
-                                    handleRestoreOrder(
-                                      order.rawData?.id || order.id
-                                    )
-                                  }
-                                >
-                                  <RotateCcw size={16} />
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1"
-                                  title="View"
-                                  onClick={() =>
-                                    handleViewOrder(
-                                      order.rawData?.id || order.id
-                                    )
-                                  }
-                                >
-                                  <Eye size={16} />
-                                </Button>
-                                {session?.user?.permissions?.includes(
-                                  "edit-crm-orders"
-                                ) && (
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="p-1"
-                                    title="Edit"
-                                    onClick={() =>
-                                      (window.location.href = `/crm/orders/${
-                                        order.rawData?.id || order.id
-                                      }/edit`)
-                                    }
-                                  >
-                                    <Edit size={16} />
-                                  </Button>
-                                )}
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1 text-info"
-                                  title="Manage Attachments"
-                                  onClick={() => {
-                                    setSelectedOrderForAttachments(
-                                      order.rawData || order
-                                    );
-                                    setShowAttachmentModal(true);
-                                  }}
-                                >
-                                  <Paperclip size={16} />
-                                </Button>
-                                {session?.user?.permissions?.includes(
-                                  "delete-crm-orders"
-                                ) && (
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="p-1 text-danger"
-                                    title="Delete"
-                                    onClick={() =>
-                                      handleDeleteOrder(
-                                        order.rawData?.id || order.id,
-                                        order.orderNumber
-                                      )
-                                    }
-                                  >
-                                    <Trash2 size={16} />
-                                  </Button>
-                                )}
-                                {activeFilter !== "lost" && (
-                                  <Dropdown className="d-inline">
-                                    <Dropdown.Toggle
-                                      as={Button}
-                                      variant="link"
-                                      size="sm"
-                                      className="p-1"
-                                      title="More Actions"
-                                    >
-                                      <MoreVertical size={16} />
-                                    </Dropdown.Toggle>
-                                    <Dropdown.Menu align="end">
-                                      <Dropdown.Item
-                                        className="text-danger"
-                                        onClick={() =>
-                                          handleMarkLost(order.rawData || order)
-                                        }
-                                      >
-                                        <X size={14} className="me-2" />
-                                        Lost
-                                      </Dropdown.Item>
-                                    </Dropdown.Menu>
-                                  </Dropdown>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </Table>
-            </div>
-            <div className="p-3">
-              {renderPaginationControls(
-                filteredOrders.length,
-                ordersPagination,
-                setOrdersPagination,
-                "orders"
-              )}
-            </div>
-          </Card.Body>
-        </Card>
+        {/* Orders Table with GenericTable */}
+        <GenericTable
+          data={filteredOrders}
+          columns={ordersColumns}
+          actions={ordersActions}
+          customizableColumns={true}
+          defaultSelectedColumns={['orderNumber', 'customer', 'deal', 'stage', 'value', 'approvalStatus', 'fulfillmentStatus', 'assignedUser', 'orderDate', 'owner']}
+          columnStorageKey="ordersSelectedColumns"
+          pagination={{
+            currentPage: ordersPagination.currentPage,
+            rowsPerPage: ordersPagination.rowsPerPage,
+            totalRows: totalOrders,
+            pageSizeOptions: [10, 15, 25, 50, 100]
+          }}
+          onPaginationChange={(page, rowsPerPage) => {
+            setOrdersPagination({
+              ...ordersPagination,
+              currentPage: page,
+              rowsPerPage
+            });
+          }}
+          sortable={true}
+          onRowClick={async (row) => {
+            if (session?.user?.permissions?.includes('list-crm-orders')) {
+              setSelectedOrder(row.rawData || row);
+              setShowOrderSidebar(true);
+              // Fetch full order details including related deal and lead
+              await fetchOrderDetails(row.rawData?.id || row.id);
+            }
+          }}
+          loading={loading}
+          emptyMessage="No orders found matching your criteria"
+          loadingMessage="Loading orders..."
+          hover={true}
+          uniqueKey="id"
+        />
       </div>
 
       {/* Delete Order Modal */}
@@ -2763,6 +2457,697 @@ const CrmOrders = () => {
         onConfirm={confirmDeleteAttachment}
         itemName={attachmentToDelete?.name}
         itemType="attachment"
+      />
+
+      {/* Order Sidebar */}
+      <GenericSidebar
+        isOpen={showOrderSidebar}
+        onClose={() => {
+          setShowOrderSidebar(false);
+          setSelectedOrder(null);
+          setViewingOrder(null);
+          setRelatedDeal(null);
+          setRelatedLead(null);
+        }}
+        title={viewingOrder?.order_number || `Order #${viewingOrder?.id}` || 'Order Details'}
+        subtitle={viewingOrder?.customer_name || ''}
+        metadata={viewingOrder?.id ? `Order ID: ${viewingOrder.id}` : ''}
+        email={viewingOrder?.customer_email || ''}
+        phone={viewingOrder?.customer_phone || ''}
+        avatar={{
+          name: viewingOrder?.customer_name || 'Order',
+          useIcon: true
+        }}
+        width="420px"
+        tabs={[
+          {
+            id: 'general',
+            label: 'General Information',
+            sections: [
+              {
+                id: 'order-info',
+                title: 'Order Information',
+                icon: ShoppingBag,
+                fields: [
+                  {
+                    label: 'Order Number',
+                    value: viewingOrder?.order_number || `ORD-${viewingOrder?.id}` || 'N/A',
+                    type: 'text' as const
+                  },
+                  {
+                    label: 'Stage',
+                    value: viewingOrder?.stage?.name || 'Not assigned',
+                    type: 'badge' as const,
+                    badgeVariant: 'secondary',
+                    show: !!viewingOrder?.stage
+                  },
+                  {
+                    label: 'Status',
+                    value: viewingOrder?.status || 'N/A',
+                    type: 'badge' as const,
+                    badgeVariant: viewingOrder?.status?.toLowerCase() === 'completed' ? 'success' : 
+                                 viewingOrder?.status?.toLowerCase() === 'pending' ? 'warning' : 'secondary'
+                  },
+                  {
+                    label: 'Final Amount',
+                    value: viewingOrder?.final_amount || viewingOrder?.total_amount
+                      ? `${viewingOrder?.currency || 'AED'} ${parseFloat(String(viewingOrder.final_amount || viewingOrder.total_amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : 'N/A',
+                    type: 'text' as const,
+                    icon: DollarSign
+                  },
+                  {
+                    label: 'Order Date',
+                    value: viewingOrder?.order_date,
+                    type: 'date' as const,
+                    icon: Calendar,
+                    show: !!viewingOrder?.order_date
+                  },
+                  {
+                    label: 'Expected Delivery',
+                    value: viewingOrder?.expected_delivery_date,
+                    type: 'date' as const,
+                    icon: Calendar,
+                    show: !!viewingOrder?.expected_delivery_date
+                  },
+                  {
+                    label: 'Industry',
+                    value: viewingOrder?.industry || 'N/A',
+                    type: 'text' as const,
+                    show: !!viewingOrder?.industry
+                  }
+                ]
+              },
+              {
+                id: 'customer-info',
+                title: 'Company Information',
+                icon: User,
+                fields: [
+                  {
+                    label: 'Company Name',
+                    value: viewingOrder?.customer_name || 'N/A',
+                    type: 'text' as const,
+                    icon: Building2
+                  },
+                  {
+                    label: 'Email',
+                    value: viewingOrder?.customer_email || 'N/A',
+                    type: 'text' as const,
+                    icon: Mail,
+                    show: !!viewingOrder?.customer_email
+                  },
+                  {
+                    label: 'Phone',
+                    value: viewingOrder?.customer_phone || 'N/A',
+                    type: 'text' as const,
+                    icon: Phone,
+                    show: !!viewingOrder?.customer_phone
+                  },
+                  {
+                    label: 'Address',
+                    value: viewingOrder?.customer_address || 'N/A',
+                    type: 'text' as const,
+                    show: !!viewingOrder?.customer_address
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            id: 'lead-deal',
+            label: 'Lead/Deal Information',
+            sections: [
+              // Deal Information Section
+              ...(relatedDeal ? [{
+                id: 'deal-info',
+                title: 'Deal Information',
+                icon: Link2,
+                fields: [
+                  {
+                    label: 'Deal Name',
+                    value: relatedDeal?.name || 'N/A',
+                    type: 'text' as const
+                  },
+                  {
+                    label: 'Stage',
+                    value: relatedDeal?.stage?.name || 'Not assigned',
+                    type: 'badge' as const,
+                    badgeVariant: 'primary',
+                    show: !!relatedDeal?.stage
+                  },
+                  {
+                    label: 'Deal Value',
+                    value: relatedDeal?.net_value || relatedDeal?.grand_total
+                      ? `${relatedDeal?.currency || 'AED'} ${parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total)).toLocaleString()}`
+                      : 'N/A',
+                    type: 'text' as const,
+                    icon: DollarSign,
+                    show: !!(relatedDeal?.net_value || relatedDeal?.grand_total)
+                  },
+                  {
+                    label: 'Assigned To',
+                    value: extensions.find((ext: any) => ext?.id == relatedDeal?.assigned_to || ext?.extension == relatedDeal?.assigned_to)?.display_name ||
+                           extensions.find((ext: any) => ext?.id == relatedDeal?.assigned_to || ext?.extension == relatedDeal?.assigned_to)?.name ||
+                           relatedDeal?.assigned_to || 'Not assigned',
+                    type: 'text' as const,
+                    icon: User,
+                    show: !!relatedDeal?.assigned_to
+                  },
+                  {
+                    label: 'Created Date',
+                    value: relatedDeal?.created_at,
+                    type: 'date' as const,
+                    icon: Calendar,
+                    show: !!relatedDeal?.created_at
+                  }
+                ]
+              }] : []),
+              // Deal Company Information Section
+              ...(relatedDeal?.company_name ? [{
+                id: 'deal-company-info',
+                title: 'Deal Company Information',
+                icon: Building2,
+                fields: [
+                  {
+                    label: 'Company Name',
+                    value: relatedDeal?.company_name || 'N/A',
+                    type: 'text' as const,
+                    icon: Building2
+                  },
+                  {
+                    label: 'Industry',
+                    value: relatedDeal?.industry || 'N/A',
+                    type: 'text' as const,
+                    show: !!relatedDeal?.industry
+                  }
+                ]
+              }] : []),
+              // Lead Information Section
+              ...(relatedLead ? [{
+                id: 'lead-info',
+                title: 'Lead Information',
+                icon: Target,
+                fields: [
+                  {
+                    label: 'Lead Name',
+                    value: relatedLead?.name || 'N/A',
+                    type: 'text' as const
+                  },
+                  {
+                    label: 'Stage',
+                    value: relatedLead?.stage?.name || 'Not assigned',
+                    type: 'badge' as const,
+                    badgeVariant: 'primary',
+                    show: !!relatedLead?.stage
+                  },
+                  {
+                    label: 'Lead Potential',
+                    value: relatedLead?.lead_potential || 'N/A',
+                    type: 'badge' as const,
+                    badgeVariant: relatedLead?.lead_potential === 'Hot' ? 'danger' :
+                                 relatedLead?.lead_potential === 'Warm' ? 'warning' : 'secondary',
+                    show: !!relatedLead?.lead_potential
+                  },
+                  {
+                    label: 'Status',
+                    value: relatedLead?.status || 'N/A',
+                    type: 'text' as const,
+                    show: !!relatedLead?.status
+                  },
+                  {
+                    label: 'Assigned To',
+                    value: extensions.find((ext: any) => ext?.id == relatedLead?.assigned_to || ext?.extension == relatedLead?.assigned_to)?.display_name ||
+                           extensions.find((ext: any) => ext?.id == relatedLead?.assigned_to || ext?.extension == relatedLead?.assigned_to)?.name ||
+                           relatedLead?.assigned_to || 'Not assigned',
+                    type: 'text' as const,
+                    icon: User,
+                    show: !!relatedLead?.assigned_to
+                  },
+                  {
+                    label: 'Created Date',
+                    value: relatedLead?.created_at,
+                    type: 'date' as const,
+                    icon: Calendar,
+                    show: !!relatedLead?.created_at
+                  }
+                ]
+              }] : []),
+              // Campaign Information Section - only if campaign exists
+              ...(relatedLead?.campaign ? [{
+                id: 'campaign-info',
+                title: 'Campaign Information',
+                icon: FileText,
+                fields: [
+                  {
+                    label: 'Campaign Name',
+                    value: relatedLead?.campaign?.name || 'N/A',
+                    type: 'text' as const
+                  }
+                ]
+              }] : []),
+              // Prospect Information Section - only if crm_data exists
+              ...(relatedLead?.crm_data ? [{
+                id: 'prospect-info',
+                title: 'Prospect Information',
+                icon: User,
+                fields: [
+                  {
+                    label: 'CRM Data ID',
+                    value: relatedLead?.crm_data?.id ? `#${relatedLead.crm_data.id}` : 'N/A',
+                    type: 'text' as const,
+                    show: !!relatedLead?.crm_data?.id
+                  },
+                  {
+                    label: 'Name',
+                    value: relatedLead?.crm_data?.name || relatedLead?.crm_data?.data?.name || 'N/A',
+                    type: 'text' as const
+                  },
+                  {
+                    label: 'Phone',
+                    value: relatedLead?.crm_data?.phone || relatedLead?.crm_data?.data?.phone || 'N/A',
+                    type: 'text' as const,
+                    icon: Phone
+                  },
+                  {
+                    label: 'Source File',
+                    value: relatedLead?.crm_data?.source_file || 'N/A',
+                    type: 'text' as const,
+                    show: !!relatedLead?.crm_data?.source_file
+                  },
+                  {
+                    label: 'Uploaded By',
+                    value: relatedLead?.crm_data?.uploaded_by || 'N/A',
+                    type: 'text' as const,
+                    icon: User,
+                    show: !!relatedLead?.crm_data?.uploaded_by
+                  },
+                  {
+                    label: 'Created At',
+                    value: relatedLead?.crm_data?.created_at,
+                    type: 'date' as const,
+                    icon: Calendar,
+                    show: !!relatedLead?.crm_data?.created_at
+                  }
+                ]
+              }] : []),
+              // Empty state if no deal or lead information at all
+              ...(!relatedDeal && !relatedLead ? [{
+                id: 'no-info',
+                title: 'No Information Available',
+                icon: AlertCircle,
+                emptyState: {
+                  icon: AlertCircle,
+                  message: 'No deal or lead information available for this order'
+                }
+              }] : [])
+            ]
+          },
+          {
+            id: 'additional-info',
+            label: 'Additional Information',
+            sections: [
+              {
+                id: 'additional-details',
+                title: 'Additional Information',
+                icon: FileText,
+                fields: [
+                  {
+                    label: 'Approval Status',
+                    value: viewingOrder?.order_approval_status || 'Not Set',
+                    type: 'badge' as const,
+                    badgeVariant: viewingOrder?.order_approval_status?.toLowerCase() === 'approved' ? 'success' :
+                                 viewingOrder?.order_approval_status?.toLowerCase() === 'rejected' ? 'danger' : 'warning'
+                  },
+                  {
+                    label: 'Fulfillment Status',
+                    value: viewingOrder?.fulfillment_status || 'Not Set',
+                    type: 'badge' as const,
+                    badgeVariant: viewingOrder?.fulfillment_status?.toLowerCase().includes('completed') ||
+                                 viewingOrder?.fulfillment_status?.toLowerCase().includes('delivered') ? 'success' :
+                                 viewingOrder?.fulfillment_status?.toLowerCase().includes('progress') ? 'primary' : 'secondary'
+                  },
+                  {
+                    label: 'Payment Status',
+                    value: viewingOrder?.payment_status || 'Not Set',
+                    type: 'badge' as const,
+                    badgeVariant: viewingOrder?.payment_status?.toLowerCase() === 'paid' ? 'success' :
+                                 viewingOrder?.payment_status?.toLowerCase() === 'partial' ? 'warning' : 'danger'
+                  },
+                  {
+                    label: 'Assigned To',
+                    value: extensions.find((ext: any) => ext?.id == viewingOrder?.assigned_to || ext?.extension == viewingOrder?.assigned_to)?.display_name ||
+                           extensions.find((ext: any) => ext?.id == viewingOrder?.assigned_to || ext?.extension == viewingOrder?.assigned_to)?.name ||
+                           viewingOrder?.assigned_to || 'Not assigned',
+                    type: 'text' as const,
+                    icon: User,
+                    show: !!viewingOrder?.assigned_to
+                  },
+                  {
+                    label: 'Contract Length',
+                    value: viewingOrder?.contract_length || 'N/A',
+                    type: 'text' as const,
+                    show: !!viewingOrder?.contract_length
+                  }
+                ]
+              },
+              {
+                id: 'notes',
+                title: 'Notes',
+                icon: FileText,
+                fields: viewingOrder?.notes ? [
+                  {
+                    label: 'Notes',
+                    value: viewingOrder?.notes,
+                    type: 'text' as const
+                  }
+                ] : [],
+                emptyState: !viewingOrder?.notes ? {
+                  icon: FileText,
+                  message: 'No notes available'
+                } : undefined
+              }
+            ]
+          },
+          {
+            id: 'history',
+            label: 'History',
+            sections: [
+              {
+                id: 'activity-history',
+                title: 'Activity History',
+                icon: History,
+                badge: {
+                  value: viewingOrder?.histories?.length || 0,
+                  variant: 'secondary'
+                },
+                emptyState: !viewingOrder?.histories || viewingOrder.histories.length === 0 ? {
+                  icon: History,
+                  message: 'No activity history yet'
+                } : undefined,
+                customContent: viewingOrder?.histories && viewingOrder.histories.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {viewingOrder.histories.map((history: any, idx: number) => (
+                      <div key={history.id || idx} style={{
+                        padding: '16px',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '10px',
+                        border: '1px solid #f3f4f6',
+                        position: 'relative'
+                      }}>
+                        <div style={{
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          color: '#111827',
+                          marginBottom: '6px'
+                        }}>
+                          {history.action || 'Activity'}
+                        </div>
+                        <div style={{
+                          fontSize: '12px',
+                          color: '#6b7280',
+                          marginBottom: '4px'
+                        }}>
+                          by {history.user?.name || history.created_by || 'System'}
+                        </div>
+                        <div style={{
+                          fontSize: '11px',
+                          color: '#9ca3af'
+                        }}>
+                          {history.created_at ? formatDateForTable(history.created_at) : 'N/A'}
+                        </div>
+                        {history.description && (
+                          <div style={{
+                            marginTop: '8px',
+                            fontSize: '12px',
+                            color: '#4b5563',
+                            fontStyle: 'italic'
+                          }}>
+                            {history.description}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : undefined
+              }
+            ]
+          }
+        ]}
+        actions={[
+          {
+            label: 'Edit Order',
+            icon: Edit,
+            onClick: () => {
+              router.push(`/crm/orders/${viewingOrder?.id}/edit`);
+            },
+            variant: 'primary',
+            show: session?.user?.permissions?.includes('edit-crm-orders') && activeFilter !== 'lost'
+          },
+          {
+            label: 'View Details',
+            icon: Eye,
+            onClick: () => {
+              setShowOrderSidebar(false);
+              handleViewOrder(viewingOrder?.id);
+            },
+            variant: 'outline-primary'
+          }
+        ]}
+      />
+
+      {/* Filters Sidebar */}
+      <GenericFilterSidebar
+        isOpen={showFiltersSidebar}
+        onClose={() => setShowFiltersSidebar(false)}
+        title="Filters"
+        subtitle="Filter and refine your orders"
+        width="400px"
+        filters={[
+          {
+            id: 'search',
+            label: 'Search',
+            type: 'text' as const,
+            value: ordersSearch,
+            onChange: (value) => setOrdersSearch(value),
+            placeholder: 'Search orders by number, customer, deal...'
+          },
+          {
+            id: 'assignedTo',
+            label: 'Assigned To',
+            type: 'select' as const,
+            value: ordersFilters.assignedTo
+              ? (() => {
+                  const assignedToId = ordersFilters.assignedTo;
+                  const ext = extensions.find((e: any) => (e.id || e.extension) === assignedToId);
+                  return ext ? { 
+                    value: assignedToId, 
+                    label: ext.display_name || ext.name || assignedToId 
+                  } : { value: assignedToId, label: assignedToId };
+                })()
+              : null,
+            onChange: (selected) => {
+              const assignedToValue = selected ? selected.value : null;
+              setOrdersFilters(prev => ({
+                ...prev,
+                assignedTo: assignedToValue
+              }));
+              setActiveFilter('all');
+            },
+            options: extensions.map((ext: any) => ({ 
+              value: ext.id || ext.extension, 
+              label: ext.display_name || ext.name || ext.id || ext.extension
+            })),
+            placeholder: 'Select user...',
+            isClearable: true,
+            styles: customSelectStyles
+          },
+          {
+            id: 'stage',
+            label: 'Order Stage',
+            type: 'select' as const,
+            value: ordersFilters.stage
+              ? (() => {
+                  const stageId = ordersFilters.stage;
+                  const stage = stages.find((st: any) => st.id.toString() === stageId);
+                  return stage ? { value: stageId, label: stage.name } : { value: stageId, label: stageId };
+                })()
+              : null,
+            onChange: (selected) => {
+              const stageValue = selected ? selected.value : null;
+              setOrdersFilters(prev => ({
+                ...prev,
+                stage: stageValue
+              }));
+              if (stageValue) {
+                setActiveFilter(stageValue);
+              } else {
+                setActiveFilter('all');
+              }
+            },
+            options: stages.map(s => ({ value: s.id.toString(), label: s.name })),
+            placeholder: 'Select stage...',
+            isClearable: true,
+            styles: customSelectStyles
+          },
+          {
+            id: 'industry',
+            label: 'Industry',
+            type: 'dropdown' as const,
+            value: ordersFilters.industry || '',
+            onChange: (value) => setOrdersFilters(prev => ({ ...prev, industry: value })),
+            options: [
+              { value: '', label: 'Select Industry' },
+              { value: 'Technology', label: 'Technology' },
+              { value: 'Healthcare', label: 'Healthcare' },
+              { value: 'Finance', label: 'Finance' },
+              { value: 'Banking & Financial Services', label: 'Banking & Financial Services' },
+              { value: 'Manufacturing', label: 'Manufacturing' },
+              { value: 'Retail', label: 'Retail' },
+              { value: 'Education', label: 'Education' },
+              { value: 'Real Estate', label: 'Real Estate' },
+              { value: 'Telecommunications', label: 'Telecommunications' },
+              { value: 'Construction', label: 'Construction' },
+              { value: 'Other', label: 'Other' }
+            ]
+          },
+          {
+            id: 'orderValueMin',
+            label: 'Order Value Min',
+            type: 'text' as const,
+            value: ordersFilters.orderValueMin || '',
+            onChange: (value) => setOrdersFilters(prev => ({ ...prev, orderValueMin: value })),
+            placeholder: '0.00'
+          },
+          {
+            id: 'orderValueMax',
+            label: 'Order Value Max',
+            type: 'text' as const,
+            value: ordersFilters.orderValueMax || '',
+            onChange: (value) => setOrdersFilters(prev => ({ ...prev, orderValueMax: value })),
+            placeholder: '0.00'
+          },
+          {
+            id: 'orderApprovalStatus',
+            label: 'Order Approval Status',
+            type: 'dropdown' as const,
+            value: ordersFilters.orderApprovalStatus || '',
+            onChange: (value) => setOrdersFilters(prev => ({ ...prev, orderApprovalStatus: value })),
+            options: [
+              { value: '', label: 'Select Status' },
+              { value: 'pending', label: 'Pending' },
+              { value: 'approved', label: 'Approved' },
+              { value: 'rejected', label: 'Rejected' }
+            ]
+          },
+          {
+            id: 'fulfillmentStatus',
+            label: 'Fulfillment Status',
+            type: 'dropdown' as const,
+            value: ordersFilters.fulfillmentStatus || '',
+            onChange: (value) => setOrdersFilters(prev => ({ ...prev, fulfillmentStatus: value })),
+            options: [
+              { value: '', label: 'Select Status' },
+              { value: 'pending', label: 'Pending' },
+              { value: 'in_progress', label: 'In Progress' },
+              { value: 'completed', label: 'Completed' },
+              { value: 'delivered', label: 'Delivered' },
+              { value: 'cancelled', label: 'Cancelled' }
+            ]
+          },
+          {
+            id: 'paymentStatus',
+            label: 'Payment Status',
+            type: 'dropdown' as const,
+            value: ordersFilters.paymentStatus || '',
+            onChange: (value) => setOrdersFilters(prev => ({ ...prev, paymentStatus: value })),
+            options: [
+              { value: '', label: 'Select Status' },
+              { value: 'unpaid', label: 'Unpaid' },
+              { value: 'partial', label: 'Partial' },
+              { value: 'paid', label: 'Paid' },
+              { value: 'refunded', label: 'Refunded' }
+            ]
+          },
+          {
+            id: 'dateFrom',
+            label: 'Date From',
+            type: 'date' as const,
+            value: ordersFilters.dateFrom || '',
+            onChange: (value) => setOrdersFilters(prev => ({ ...prev, dateFrom: value }))
+          },
+          {
+            id: 'dateTo',
+            label: 'Date To',
+            type: 'date' as const,
+            value: ordersFilters.dateTo || '',
+            onChange: (value) => setOrdersFilters(prev => ({ ...prev, dateTo: value }))
+          }
+        ]}
+        onApply={() => {
+          // Map ordersFilters to the format expected by handleFiltersChange
+          const filtersToApply: Record<string, any> = {};
+          
+          if (ordersSearch) {
+            filtersToApply.search = ordersSearch;
+          }
+          if (ordersFilters.assignedTo) {
+            filtersToApply.assigned_to = ordersFilters.assignedTo;
+          }
+          if (ordersFilters.stage) {
+            filtersToApply.order_stage_id = ordersFilters.stage;
+          }
+          if (ordersFilters.industry) {
+            filtersToApply.industry = ordersFilters.industry;
+          }
+          if (ordersFilters.orderValueMin) {
+            filtersToApply.order_value_min = ordersFilters.orderValueMin;
+          }
+          if (ordersFilters.orderValueMax) {
+            filtersToApply.order_value_max = ordersFilters.orderValueMax;
+          }
+          if (ordersFilters.orderApprovalStatus) {
+            filtersToApply.order_approval_status = ordersFilters.orderApprovalStatus;
+          }
+          if (ordersFilters.fulfillmentStatus) {
+            filtersToApply.fulfillment_status = ordersFilters.fulfillmentStatus;
+          }
+          if (ordersFilters.paymentStatus) {
+            filtersToApply.payment_status = ordersFilters.paymentStatus;
+          }
+          if (ordersFilters.dateFrom) {
+            filtersToApply.date_from = ordersFilters.dateFrom;
+          }
+          if (ordersFilters.dateTo) {
+            filtersToApply.date_to = ordersFilters.dateTo;
+          }
+          
+          handleFiltersChange(filtersToApply);
+          setOrdersPagination({ ...ordersPagination, currentPage: 1 });
+          setRefreshKey(prev => prev + 1);
+          setShowFiltersSidebar(false);
+        }}
+        onReset={() => {
+          setOrdersSearch("");
+          setOrdersFilters({
+            assignedTo: null,
+            stage: null,
+            industry: null,
+            orderValueMin: null,
+            orderValueMax: null,
+            orderApprovalStatus: null,
+            fulfillmentStatus: null,
+            paymentStatus: null,
+            dateFrom: null,
+            dateTo: null,
+          });
+          handleFiltersChange({});
+          setCurrentFilters({});
+          setActiveFilter('all');
+          setOrdersPagination({ ...ordersPagination, currentPage: 1 });
+          setRefreshKey(prev => prev + 1);
+        }}
+        showApplyButton={true}
+        showResetButton={true}
       />
 
       {/* Mark Order Lost Modal */}

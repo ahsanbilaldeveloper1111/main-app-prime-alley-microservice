@@ -10,6 +10,9 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
+import GenericSidebar from "@components/GenericSidebar";
+import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import {
   FiUpload,
   FiDatabase,
@@ -461,6 +464,11 @@ const CrmDeals = () => {
   const [relatedLead, setRelatedLead] = useState<any>(null);
   const [loadingLead, setLoadingLead] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("general-info");
+  
+  // Sidebar states
+  const [showDealSidebar, setShowDealSidebar] = useState(false);
+  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
+  const [selectedDeal, setSelectedDeal] = useState<any>(null);
   
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -1501,6 +1509,194 @@ const CrmDeals = () => {
       fontSize: '0.875rem'
     })
   };
+
+  // Define columns for GenericTable
+  const dealsColumns: TableColumn<any>[] = useMemo(
+    () => [
+      {
+        key: 'name',
+        label: 'Deal Name',
+        sortable: true,
+        type: 'avatar',
+        avatar: {
+          getInitials: (row) => getInitials(row.name),
+          getColor: (row) => getRandomColor(row.name)
+        },
+        emptyValue: 'N/A'
+      },
+      {
+        key: 'company',
+        label: 'Company',
+        sortable: true,
+        type: 'multi-field',
+        fields: {
+          primary: 'company',
+          secondary: 'industry',
+          secondaryClass: 'text-muted small'
+        },
+        emptyValue: 'No Company'
+      },
+      {
+        key: 'stage',
+        label: 'Stage',
+        sortable: true,
+        type: 'custom',
+        render: (row) => (
+          <span
+            style={{ backgroundColor: row?.stageColor || "grey" }}
+            className="badge"
+          >
+            {row?.stage}
+          </span>
+        )
+      },
+      {
+        key: 'dealType',
+        label: 'Deal Type',
+        sortable: true,
+        type: 'badge',
+        badge: {
+          getVariant: () => 'primary'
+        },
+        emptyValue: '-'
+      },
+      {
+        key: 'value',
+        label: 'Value',
+        sortable: true,
+        type: 'custom',
+        render: (row) => (
+          <span className="fw-semibold">
+            {row.currency} {parseFloat(String(row.value)).toLocaleString()}
+          </span>
+        )
+      },
+      {
+        key: 'closeDate',
+        label: 'Expected Close',
+        sortable: true,
+        type: 'text',
+        accessor: (row) => row.closeDate || '-',
+        emptyValue: '-'
+      },
+      {
+        key: 'followUpDate',
+        label: 'Follow-up Date',
+        sortable: true,
+        type: 'text',
+        accessor: (row) => row.followUpDate || '-',
+        emptyValue: '-'
+      },
+      {
+        key: 'owner',
+        label: 'Owner',
+        sortable: true,
+        type: 'text',
+        emptyValue: '-'
+      },
+      {
+        key: 'assignedUser',
+        label: 'Assigned To',
+        sortable: true,
+        type: 'text',
+        emptyValue: '-'
+      },
+      {
+        key: 'created',
+        label: 'Created',
+        sortable: true,
+        type: 'text',
+        emptyValue: '-'
+      }
+    ],
+    []
+  );
+
+  // Define actions for GenericTable
+  const dealsActions: TableAction<any>[] = useMemo(
+    () => {
+      if (activeFilter === 'deleted') {
+        return [
+          {
+            label: 'View',
+            icon: <Eye size={16} />,
+            onClick: (row: any) => handleViewDeal(row.rawData?.id || row.id),
+            variant: 'link' as const
+          },
+          {
+            label: 'Restore',
+            icon: <RotateCcw size={16} />,
+            onClick: (row: any) => handleRestoreDeal(row.rawData?.id || row.id),
+            variant: 'link' as const,
+            className: 'text-success'
+          }
+        ];
+      }
+
+      return [
+        {
+          label: 'View',
+          icon: <Eye size={16} />,
+          onClick: (row: any) => handleViewDeal(row.rawData?.id || row.id),
+          variant: 'link' as const
+        },
+        ...(session?.user?.permissions?.includes('edit-crm-deals') ? [{
+          label: 'Edit',
+          icon: <Edit size={16} />,
+          onClick: (row: any) => {
+            if (activeFilter !== "lost") {
+              window.location.href = `/crm/deals/${row.rawData?.id || row.id}/edit`;
+            }
+          },
+          variant: 'link' as const,
+          show: () => activeFilter !== "lost"
+        }] : []),
+        {
+          label: 'Attachments',
+          icon: <Paperclip size={16} />,
+          onClick: (row: any) => {
+            setSelectedDealForAttachments(row.rawData || row);
+            setShowAttachmentModal(true);
+          },
+          variant: 'link' as const,
+          className: 'text-info'
+        },
+        ...(session?.user?.permissions?.includes('add-crm-orders') ? [{
+          label: 'Convert to Order',
+          icon: <ShoppingBag size={16} />,
+          onClick: (row: any) => {
+            window.location.href = `/crm/orders/create?deal_id=${row.rawData?.id || row.id}`;
+          },
+          variant: 'link' as const,
+          className: 'text-success'
+        }] : []),
+        ...(session?.user?.permissions?.includes('delete-crm-deals') ? [{
+          label: 'Delete',
+          icon: <Trash2 size={16} />,
+          onClick: (row: any) => handleDeleteDeal(row.rawData?.id || row.id, row.name),
+          variant: 'link' as const,
+          className: 'text-danger'
+        }] : []),
+        ...(activeFilter !== 'lost' ? [{
+          label: 'More Actions',
+          icon: <MoreVertical size={16} />,
+          variant: 'link' as const,
+          dropdown: {
+            align: 'end' as const,
+            options: [
+              {
+                label: 'Mark as Lost',
+                icon: <X size={14} />,
+                onClick: (row: any) => handleMarkLost(row.rawData || row),
+                className: 'text-danger'
+              }
+            ]
+          }
+        }] : [])
+      ];
+    },
+    [session, activeFilter, handleViewDeal, handleRestoreDeal, handleDeleteDeal, handleMarkLost]
+  );
  
   if (!session?.user?.permissions?.includes('list-crm-deals')) {
     return null;
@@ -1560,11 +1756,11 @@ const CrmDeals = () => {
             )} */}
 
 <Button
-            variant={showAdvancedFilters ? "secondary" : "outline-secondary"}
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            variant={showFiltersSidebar ? "secondary" : "outline-secondary"}
+            onClick={() => setShowFiltersSidebar(!showFiltersSidebar)}
           >
             <FiFilter size={16} className="me-2" />
-            {showAdvancedFilters ? "Hide Filters" : "Show Filters"}
+            {showFiltersSidebar ? "Hide Filters" : "Show Filters"}
           </Button>
           </div>
         </div>
@@ -2007,389 +2203,40 @@ const CrmDeals = () => {
           </Card>
         )}
 
-        {/* Column Customization */}
-        <div className="d-flex justify-content-end gap-2 mb-3">
-          <Dropdown>
-            <Dropdown.Toggle variant="outline-secondary" size="sm">
-              <Layers size={16} className="me-2" />
-              Customize Table
-            </Dropdown.Toggle>
-            <Dropdown.Menu align="end" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-              {[
-                { key: 'name', label: 'Deal Name' },
-                { key: 'company', label: 'Company' },
-                { key: 'value', label: 'Value' },
-                { key: 'stage', label: 'Stage' },
-                { key: 'dealType', label: 'Deal Type' },
-                { key: 'owner', label: 'Owner' },
-                { key: 'industry', label: 'Industry' },
-                { key: 'assignedUser', label: 'Assigned To' },
-                { key: 'closeDate', label: 'Close Date' },
-                { key: 'followUpDate', label: 'Follow-up Date' },
-                { key: 'created', label: 'Created' }
-              ].map((col) => (
-                <Dropdown.Item key={col.key} as="div">
-                  <Form.Check
-                    type="checkbox"
-                    label={col.label}
-                    checked={selectedDealsColumns.includes(col.key)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedDealsColumns([...selectedDealsColumns, col.key]);
-                        localStorage.setItem('dealsSelectedColumns', JSON.stringify([...selectedDealsColumns, col.key]));
-                      } else {
-                        const newCols = selectedDealsColumns.filter(c => c !== col.key);
-                        setSelectedDealsColumns(newCols);
-                        localStorage.setItem('dealsSelectedColumns', JSON.stringify(newCols));
-                      }
-                    }}
-                  />
-                </Dropdown.Item>
-              ))}
-              <Dropdown.Divider />
-              <Dropdown.Item onClick={() => {
-                const allCols = ['name', 'company', 'value', 'stage', 'dealType', 'owner', 'industry', 'assignedUser', 'closeDate', 'followUpDate', 'created'];
-                setSelectedDealsColumns(allCols);
-                localStorage.setItem('dealsSelectedColumns', JSON.stringify(allCols));
-              }}>
-                Select All
-              </Dropdown.Item>
-              <Dropdown.Item onClick={() => {
-                const defaultCols = ['name', 'company', 'stage', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner'];
-                setSelectedDealsColumns(defaultCols);
-                localStorage.setItem('dealsSelectedColumns', JSON.stringify(defaultCols));
-              }}>
-                Reset to Default
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
-        </div>
-
-        {/* Deals Table */}
-        <Card className="border-0 shadow-sm deals-table-wrapper" style={{ width: '100%' }}>
-          <Card.Body className="p-0" style={{ width: '100%' }}>
-            <div className="table-responsive">
-              <Table hover className="mb-0 w-100" style={{ width: '100%', margin: 0 }}>
-                <thead className="bg-light">
-                  <tr>
-                    {selectedDealsColumns.includes('name') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('name', dealsPagination, setDealsPagination)}
-                      >
-                        Deal Name {renderSortIcon('name', dealsPagination)}
-                      </th>
-                    )}
-                    {selectedDealsColumns.includes('company') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('company', dealsPagination, setDealsPagination)}
-                      >
-                        Company {renderSortIcon('company', dealsPagination)}
-                      </th>
-                    )}
-                    {selectedDealsColumns.includes('stage') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('stage', dealsPagination, setDealsPagination)}
-                      >
-                        Stage {renderSortIcon('stage', dealsPagination)}
-                      </th>
-                    )}
-                    {selectedDealsColumns.includes('dealType') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('dealType', dealsPagination, setDealsPagination)}
-                      >
-                        Deal Type {renderSortIcon('dealType', dealsPagination)}
-                      </th>
-                    )}
-                    {selectedDealsColumns.includes('value') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('value', dealsPagination, setDealsPagination)}
-                      >
-                        Value {renderSortIcon('value', dealsPagination)}
-                      </th>
-                    )}
-                    {selectedDealsColumns.includes('closeDate') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('closeDate', dealsPagination, setDealsPagination)}
-                      >
-                        Expected Close {renderSortIcon('closeDate', dealsPagination)}
-                      </th>
-                    )}
-                    {selectedDealsColumns.includes('followUpDate') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('followUpDate', dealsPagination, setDealsPagination)}
-                      >
-                        Follow-up Date {renderSortIcon('followUpDate', dealsPagination)}
-                      </th>
-                    )}
-                    {selectedDealsColumns.includes('owner') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('owner', dealsPagination, setDealsPagination)}
-                      >
-                        Owner {renderSortIcon('owner', dealsPagination)}
-                      </th>
-                    )}
-                    {selectedDealsColumns.includes('assignedUser') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('assignedUser', dealsPagination, setDealsPagination)}
-                      >
-                        Assigned To {renderSortIcon('assignedUser', dealsPagination)}
-                      </th>
-                    )}
-                    {selectedDealsColumns.includes('created') && (
-                      <th 
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={() => handleSort('created', dealsPagination, setDealsPagination)}
-                      >
-                        Created {renderSortIcon('created', dealsPagination)}
-                      </th>
-                    )}
-                    <th style={{ width: '120px', minWidth: '120px' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td colSpan={selectedDealsColumns.length + 1} className="text-center py-4">
-                        Loading...
-                      </td>
-                    </tr>
-                  ) : filteredDeals.length === 0 ? (
-                    <tr>
-                      <td colSpan={selectedDealsColumns.length + 1} className="text-center py-4 text-muted">
-                        No deals found matching your criteria
-                      </td>
-                    </tr>
-                  ) : (
-                    paginateData(
-                      sortData(filteredDeals, dealsPagination.sortColumn, dealsPagination.sortDirection),
-                      dealsPagination.currentPage,
-                      dealsPagination.rowsPerPage
-                    ).map((deal) => (
-                      <tr 
-                        key={deal.id}
-                        onDoubleClick={() => {
-                          if (session?.user?.permissions?.includes('list-crm-deals')) {
-                            handleViewDeal(deal.rawData?.id || deal.id);
-                          }
-                        }}
-                        style={{
-                          cursor: session?.user?.permissions?.includes('list-crm-deals') 
-                            ? "pointer" 
-                            : "default"
-                        }}
-                      >
-                        {selectedDealsColumns.includes('name') && (
-                          <td className="fw-semibold">
-                            <div className="d-flex align-items-center gap-2">
-                              {deal.name ? (
-                                <>
-                                  <div
-                                    style={{
-                                      width: "30px",
-                                      height: "30px",
-                                      borderRadius: "50%",
-                                      backgroundColor: getRandomColor(deal.name),
-                                      color: "#fff",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "10px",
-                                      fontWeight: "600",
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    {getInitials(deal.name)}
-                                  </div>
-                                  <div
-                                    style={{
-                                      textOverflow: "ellipsis",
-                                      whiteSpace: "nowrap",
-                                      overflow: "hidden",
-                                    }}
-                                  >
-                                    {deal.name}
-                                  </div>
-                                </>
-                              ) : (
-                                "N/A"
-                              )}
-                            </div>
-                          </td>
-                        )}
-                        {selectedDealsColumns.includes('company') && (
-                          <td>
-                            <div>
-                              <div className="fw-medium">{deal.company || 'No Company'}</div>
-                              {deal.industry && <small className="text-muted">{deal.industry}</small>}
-                            </div>
-                          </td>
-                        )}
-                        {selectedDealsColumns.includes('stage') && (
-                          <td>
-                                  <span
-                              style={{
-                                backgroundColor: deal?.stageColor || "grey",
-                              }}
-                              className="badge"
-                            >
-                              {deal?.stage} 
-                            </span>
-                          </td>
-                        )}
-                        {selectedDealsColumns.includes('dealType') && (
-                          <td>
-                            <Badge bg="primary" className="bg-opacity-10 text-dark">
-                              {deal.dealType}
-                            </Badge>
-                          </td>
-                        )}
-                        {selectedDealsColumns.includes('value') && (
-                          <td className="fw-semibold">{deal.currency} {parseFloat(String(deal.value)).toLocaleString()}</td>
-                        )}
-                        {selectedDealsColumns.includes('closeDate') && (
-                          <td className="text-uppercase">{deal.closeDate || '-'}</td>
-                        )}
-                        {selectedDealsColumns.includes('followUpDate') && (
-                          <td className="text-uppercase">{deal.followUpDate || '-'}</td>
-                        )}
-                        {selectedDealsColumns.includes('owner') && (
-                          <td>{deal.owner || '-'}</td>
-                        )}
-                        {selectedDealsColumns.includes('assignedUser') && (
-                          <td>{deal.assignedUser || '-'}</td>
-                        )}
-                        {selectedDealsColumns.includes('created') && (
-                          <td>{deal.created || '-'}</td>
-                        )}
-                        <td style={{ width: '120px', minWidth: '120px' }}>
-                          <div className="d-flex gap-1">
-                            {activeFilter === 'deleted' ? (
-                              <>
-                                <Button 
-                                  variant="link" 
-                                  size="sm" 
-                                  className="p-1" 
-                                  title="View"
-                                  onClick={() => handleViewDeal(deal.rawData?.id || deal.id)}
-                                >
-                                  <Eye size={16} />
-                                </Button>
-                                <Button 
-                                  variant="link" 
-                                  size="sm" 
-                                  className="p-1 text-success" 
-                                  title="Restore"
-                                  onClick={() => handleRestoreDeal(deal.rawData?.id || deal.id)}
-                                >
-                                  <RotateCcw size={16} />
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <Button 
-                                  variant="link" 
-                                  size="sm" 
-                                  className="p-1" 
-                                  title="View"
-                                  onClick={() => handleViewDeal(deal.rawData?.id || deal.id)}
-                                >
-                                  <Eye size={16} />
-                                </Button>
-                                {session?.user?.permissions?.includes('edit-crm-deals') && (
-                                <Button 
-                                  variant="link" 
-                                  size="sm" 
-                                  className="p-1" 
-                                  title="Edit"
-                                  disabled={activeFilter === "lost"}
-                                  onClick={() => {
-                                    if (activeFilter === "lost") return;
-                                    window.location.href = `/crm/deals/${deal.rawData?.id || deal.id}/edit`;
-                                  }}
-                                >
-                                  <Edit size={16} />
-                                </Button>
-                                )}
-                                <Button 
-                                  variant="link" 
-                                  size="sm" 
-                                  className="p-1 text-info" 
-                                  title="Manage Attachments"
-                                  onClick={() => {
-                                    setSelectedDealForAttachments(deal.rawData || deal);
-                                    setShowAttachmentModal(true);
-                                  }}
-                                >
-                                  <Paperclip size={16} />
-                                </Button>
-                                {session?.user?.permissions?.includes('add-crm-orders') && (
-                                <Button 
-                                  variant="link" 
-                                  size="sm" 
-                                  className="p-1 text-success" 
-                                  title="Convert to Order"
-                                  onClick={() => window.location.href = `/crm/orders/create?deal_id=${deal.rawData?.id || deal.id}`}
-                                >
-                                  <ShoppingBag size={16} />
-                                </Button>
-                                )}
-                                {session?.user?.permissions?.includes('delete-crm-deals') && (
-                                <Button 
-                                  variant="link" 
-                                  size="sm" 
-                                  className="p-1 text-danger" 
-                                  title="Delete"
-                                  onClick={() => handleDeleteDeal(deal.rawData?.id || deal.id, deal.name)}
-                                >
-                                  <Trash2 size={16} />
-                                </Button>
-                                )}
-                                {activeFilter !== 'lost' && (
-                                  <Dropdown className="d-inline">
-                                    <Dropdown.Toggle 
-                                      as={Button}
-                                      variant="link" 
-                                      size="sm" 
-                                      className="p-1"
-                                      title="More Actions"
-                                    >
-                                      <MoreVertical size={16} />
-                                    </Dropdown.Toggle>
-                                    <Dropdown.Menu align="end">
-                                        <Dropdown.Item 
-                                          className="text-danger"
-                                          onClick={() => handleMarkLost(deal.rawData || deal)}
-                                        >
-                                          <X size={14} className="me-2" />
-                                          Lost
-                                        </Dropdown.Item>
-                                    </Dropdown.Menu>
-                                  </Dropdown>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </Table>
-            </div>
-            <div className="p-3">
-              {renderPaginationControls(filteredDeals.length, dealsPagination, setDealsPagination, 'deals')}
-            </div>
-          </Card.Body>
-        </Card>
+        {/* Deals Table with GenericTable */}
+        <GenericTable
+          data={filteredDeals}
+          columns={dealsColumns}
+          actions={dealsActions}
+          customizableColumns={true}
+          defaultSelectedColumns={['name', 'company', 'stage', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner']}
+          columnStorageKey="dealsSelectedColumns"
+          pagination={{
+            currentPage: dealsPagination.currentPage,
+            rowsPerPage: dealsPagination.rowsPerPage,
+            totalRows: totalDeals,
+            pageSizeOptions: [10, 15, 25, 50, 100]
+          }}
+          onPaginationChange={(page, rowsPerPage) => {
+            setDealsPagination({
+              ...dealsPagination,
+              currentPage: page,
+              rowsPerPage
+            });
+          }}
+          sortable={true}
+          onRowClick={(row) => {
+            if (session?.user?.permissions?.includes('list-crm-deals')) {
+              setSelectedDeal(row.rawData || row);
+              setShowDealSidebar(true);
+            }
+          }}
+          loading={loading}
+          emptyMessage="No deals found matching your criteria"
+          loadingMessage="Loading deals..."
+          hover={true}
+          uniqueKey="id"
+        />
       </div>
 
       {/* Delete Deal Modal */}
@@ -4317,6 +4164,425 @@ const CrmDeals = () => {
         onConfirm={confirmDeleteAttachment}
         itemName={attachmentToDelete?.name}
         itemType="attachment"
+      />
+
+      {/* Deal Sidebar */}
+      <GenericSidebar
+        isOpen={showDealSidebar}
+        onClose={() => {
+          setShowDealSidebar(false);
+          setSelectedDeal(null);
+        }}
+        title={selectedDeal?.name || 'Deal Details'}
+        subtitle={selectedDeal?.company || selectedDeal?.company_name || ''}
+        metadata={selectedDeal?.id ? `Deal ID: ${selectedDeal.id}` : ''}
+        avatar={{
+          name: selectedDeal?.name || 'Deal',
+          useIcon: true
+        }}
+        width="420px"
+        tabs={[
+          {
+            id: 'general',
+            label: 'General Information',
+            sections: [
+              {
+                id: 'deal-info',
+                title: 'Deal Information',
+                icon: Handshake,
+                fields: [
+                  {
+                    label: 'Deal Name',
+                    value: selectedDeal?.name || 'N/A',
+                    type: 'text' as const
+                  },
+                  {
+                    label: 'Stage',
+                    value: typeof selectedDeal?.stage === 'string' 
+                      ? selectedDeal.stage 
+                      : (selectedDeal?.stage?.name || selectedDeal?.rawData?.stage?.name || 'N/A'),
+                    type: 'badge' as const,
+                    badgeVariant: 'primary'
+                  },
+                  {
+                    label: 'Deal Value',
+                    value: selectedDeal?.value 
+                      ? `${selectedDeal?.currency || 'AED'} ${parseFloat(String(selectedDeal.value)).toLocaleString()}`
+                      : 'N/A',
+                    type: 'text' as const,
+                    icon: DollarSign
+                  },
+                  {
+                    label: 'Probability',
+                    value: selectedDeal?.probability ? `${selectedDeal.probability}%` : 'N/A',
+                    type: 'text' as const
+                  },
+                  {
+                    label: 'Deal Type',
+                    value: selectedDeal?.dealType || selectedDeal?.deal_type || 'N/A',
+                    type: 'badge' as const,
+                    badgeVariant: 'info',
+                    show: !!(selectedDeal?.dealType || selectedDeal?.deal_type)
+                  },
+                  {
+                    label: 'Assigned To',
+                    value: selectedDeal?.assignedUser || 'Unassigned',
+                    type: 'text' as const,
+                    icon: User
+                  },
+                  {
+                    label: 'Created Date',
+                    value: selectedDeal?.created || selectedDeal?.created_at,
+                    type: 'date' as const,
+                    icon: Calendar
+                  },
+                  {
+                    label: 'Expected Close Date',
+                    value: selectedDeal?.closeDate || selectedDeal?.expected_close_date,
+                    type: 'date' as const,
+                    show: !!(selectedDeal?.closeDate || selectedDeal?.expected_close_date)
+                  },
+                  {
+                    label: 'Risk Level',
+                    value: selectedDeal?.riskLevel || selectedDeal?.risk_level || 'N/A',
+                    type: 'badge' as const,
+                    badgeVariant: selectedDeal?.riskLevel === 'High' || selectedDeal?.risk_level === 'High' ? 'danger' : 
+                                 selectedDeal?.riskLevel === 'Medium' || selectedDeal?.risk_level === 'Medium' ? 'warning' : 'success',
+                    show: !!(selectedDeal?.riskLevel || selectedDeal?.risk_level)
+                  }
+                ]
+              },
+              {
+                id: 'client-info',
+                title: 'Client Information',
+                icon: Building2,
+                fields: [
+                  {
+                    label: 'Client Name',
+                    value: selectedDeal?.company || selectedDeal?.company_name || 'N/A',
+                    type: 'text' as const,
+                    icon: Building2
+                  },
+                  {
+                    label: 'Industry',
+                    value: selectedDeal?.industry || 'N/A',
+                    type: 'text' as const,
+                    show: !!selectedDeal?.industry
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            id: 'campaign-prospect',
+            label: 'Campaign & Prospect',
+            sections: [
+              {
+                id: 'campaign-info',
+                title: 'Campaign Information',
+                icon: Target,
+                emptyState: {
+                  icon: Target,
+                  message: 'No campaign information available'
+                }
+              },
+              {
+                id: 'prospect-info',
+                title: 'Prospect Information',
+                icon: User,
+                emptyState: {
+                  icon: User,
+                  message: 'No prospect information available'
+                }
+              },
+              {
+                id: 'prospect-fields',
+                title: 'Prospect Fields',
+                icon: FileText,
+                emptyState: {
+                  icon: FileText,
+                  message: 'No prospect fields available'
+                }
+              },
+              {
+                id: 'meetings',
+                title: 'Meetings',
+                icon: Calendar,
+                badge: {
+                  value: 0,
+                  variant: 'secondary'
+                },
+                emptyState: {
+                  icon: Calendar,
+                  message: 'No meetings scheduled yet',
+                  action: {
+                    label: 'Schedule Meeting',
+                    onClick: () => {
+                      const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                      if (dealId) {
+                        setMeetingData({
+                          dealId: dealId,
+                          dealName: selectedDeal?.name || '',
+                          meetingName: '',
+                          meetingType: 'Online',
+                          meetingDate: '',
+                          meetingTime: '',
+                          meetingOutcome: '',
+                          extensions: []
+                        });
+                        setMeetingAttendees([]);
+                        setShowAddMeetingModal(true);
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ]}
+        actions={[
+          {
+            label: 'Edit Deal',
+            icon: Edit,
+            onClick: () => {
+              setShowDealSidebar(false);
+              window.location.href = `/crm/deals/${selectedDeal?.id || selectedDeal?.rawData?.id}/edit`;
+            },
+            variant: 'primary',
+            show: session?.user?.permissions?.includes('edit-crm-deals') && activeFilter !== 'lost'
+          },
+          {
+            label: 'View History',
+            icon: History,
+            onClick: () => {
+              setShowDealSidebar(false);
+              handleViewDeal(selectedDeal?.id || selectedDeal?.rawData?.id);
+              setShowDealHistoryModal(true);
+            },
+            variant: 'outline-primary'
+          }
+        ]}
+      />
+
+      {/* Filters Sidebar */}
+      <GenericFilterSidebar
+        isOpen={showFiltersSidebar}
+        onClose={() => setShowFiltersSidebar(false)}
+        title="Filters"
+        subtitle="Filter and refine your deals"
+        width="400px"
+        filters={[
+          {
+            id: 'search',
+            label: 'Search',
+            type: 'text' as const,
+            value: dealsSearch,
+            onChange: (value) => setDealsSearch(value),
+            placeholder: 'Search deals by name, company, value...'
+          },
+          {
+            id: 'assignedTo',
+            label: 'Assigned To',
+            type: 'select' as const,
+            value: dealsFilters.assignedTo
+              ? (() => {
+                  const assignedToId = dealsFilters.assignedTo;
+                  const ext = extensions.find((e: any) => (e.id || e.extension) === assignedToId);
+                  return ext ? { 
+                    value: assignedToId, 
+                    label: ext.display_name || ext.name || assignedToId 
+                  } : { value: assignedToId, label: assignedToId };
+                })()
+              : null,
+            onChange: (selected) => {
+              const assignedToValue = selected ? selected.value : null;
+              setDealsFilters(prev => ({
+                ...prev,
+                assignedTo: assignedToValue
+              }));
+              setActiveFilter('all');
+            },
+            options: extensions.map((ext: any) => ({ 
+              value: ext.id || ext.extension, 
+              label: ext.display_name || ext.name || ext.id || ext.extension
+            })),
+            placeholder: 'Select user...',
+            isClearable: true,
+            styles: customSelectStyles
+          },
+          {
+            id: 'stage',
+            label: 'Stage',
+            type: 'select' as const,
+            value: dealsFilters.stage
+              ? (() => {
+                  const stageId = dealsFilters.stage;
+                  const stage = stages.find((st: any) => st.id.toString() === stageId);
+                  return stage ? { value: stageId, label: stage.name } : { value: stageId, label: stageId };
+                })()
+              : null,
+            onChange: (selected) => {
+              const stageValue = selected ? selected.value : null;
+              setDealsFilters(prev => ({
+                ...prev,
+                stage: stageValue
+              }));
+              if (stageValue) {
+                setActiveFilter(stageValue);
+              } else {
+                setActiveFilter('all');
+              }
+            },
+            options: stages.map(s => ({ value: s.id.toString(), label: s.name })),
+            placeholder: 'Select stage...',
+            isClearable: true,
+            styles: customSelectStyles
+          },
+          {
+            id: 'followUpDateFrom',
+            label: 'Follow-up Date From',
+            type: 'date' as const,
+            value: dealsFilters.followUpDateFrom || '',
+            onChange: (value) => setDealsFilters(prev => ({ ...prev, followUpDateFrom: value }))
+          },
+          {
+            id: 'followUpDateTo',
+            label: 'Follow-up Date To',
+            type: 'date' as const,
+            value: dealsFilters.followUpDateTo || '',
+            onChange: (value) => setDealsFilters(prev => ({ ...prev, followUpDateTo: value }))
+          },
+          {
+            id: 'probabilityMin',
+            label: 'Probability Min (%)',
+            type: 'text' as const,
+            value: dealsFilters.probabilityMin || '',
+            onChange: (value) => setDealsFilters(prev => ({ ...prev, probabilityMin: value })),
+            placeholder: '0'
+          },
+          {
+            id: 'probabilityMax',
+            label: 'Probability Max (%)',
+            type: 'text' as const,
+            value: dealsFilters.probabilityMax || '',
+            onChange: (value) => setDealsFilters(prev => ({ ...prev, probabilityMax: value })),
+            placeholder: '100'
+          },
+          {
+            id: 'dealType',
+            label: 'Deal Type',
+            type: 'dropdown' as const,
+            value: dealsFilters.dealType || '',
+            onChange: (value) => setDealsFilters(prev => ({ ...prev, dealType: value })),
+            options: [
+              { value: '', label: 'Select Deal Type' },
+              { value: 'new_sale', label: 'New Sale' },
+              { value: 'renewal', label: 'Renewal' },
+              { value: 'migration', label: 'Migration' },
+              { value: 'upsell', label: 'Upsell' }
+            ]
+          },
+          {
+            id: 'industry',
+            label: 'Industry',
+            type: 'dropdown' as const,
+            value: dealsFilters.industry || '',
+            onChange: (value) => setDealsFilters(prev => ({ ...prev, industry: value })),
+            options: [
+              { value: '', label: 'Select Industry' },
+              { value: 'Technology', label: 'Technology' },
+              { value: 'Healthcare', label: 'Healthcare' },
+              { value: 'Finance', label: 'Finance' },
+              { value: 'Banking & Financial Services', label: 'Banking & Financial Services' },
+              { value: 'Manufacturing', label: 'Manufacturing' },
+              { value: 'Retail', label: 'Retail' },
+              { value: 'Education', label: 'Education' },
+              { value: 'Real Estate', label: 'Real Estate' },
+              { value: 'Telecommunications', label: 'Telecommunications' },
+              { value: 'Construction', label: 'Construction' },
+              { value: 'Other', label: 'Other' }
+            ]
+          },
+          {
+            id: 'expectedCloseDateFrom',
+            label: 'Expected Close Date From',
+            type: 'date' as const,
+            value: dealsFilters.expectedCloseDateFrom || '',
+            onChange: (value) => setDealsFilters(prev => ({ ...prev, expectedCloseDateFrom: value }))
+          },
+          {
+            id: 'expectedCloseDateTo',
+            label: 'Expected Close Date To',
+            type: 'date' as const,
+            value: dealsFilters.expectedCloseDateTo || '',
+            onChange: (value) => setDealsFilters(prev => ({ ...prev, expectedCloseDateTo: value }))
+          }
+        ]}
+        onApply={() => {
+          // Map dealsFilters to the format expected by handleFiltersChange
+          const filtersToApply: Record<string, any> = {};
+          
+          if (dealsSearch) {
+            filtersToApply.search = dealsSearch;
+          }
+          if (dealsFilters.assignedTo) {
+            filtersToApply.assigned_to = dealsFilters.assignedTo;
+          }
+          if (dealsFilters.stage) {
+            filtersToApply.stage_id = dealsFilters.stage;
+          }
+          if (dealsFilters.followUpDateFrom) {
+            filtersToApply.follow_up_date_from = dealsFilters.followUpDateFrom;
+          }
+          if (dealsFilters.followUpDateTo) {
+            filtersToApply.follow_up_date_to = dealsFilters.followUpDateTo;
+          }
+          if (dealsFilters.probabilityMin) {
+            filtersToApply.probability_min = dealsFilters.probabilityMin;
+          }
+          if (dealsFilters.probabilityMax) {
+            filtersToApply.probability_max = dealsFilters.probabilityMax;
+          }
+          if (dealsFilters.dealType) {
+            filtersToApply.deal_type = dealsFilters.dealType;
+          }
+          if (dealsFilters.industry) {
+            filtersToApply.industry = dealsFilters.industry;
+          }
+          if (dealsFilters.expectedCloseDateFrom) {
+            filtersToApply.expected_close_date_from = dealsFilters.expectedCloseDateFrom;
+          }
+          if (dealsFilters.expectedCloseDateTo) {
+            filtersToApply.expected_close_date_to = dealsFilters.expectedCloseDateTo;
+          }
+          
+          handleFiltersChange(filtersToApply);
+          setDealsPagination({ ...dealsPagination, currentPage: 1 });
+          setRefreshKey(prev => prev + 1);
+          setShowFiltersSidebar(false);
+        }}
+        onReset={() => {
+          setDealsSearch("");
+          setDealsFilters({
+            assignedTo: null,
+            stage: null,
+            followUpDateFrom: null,
+            followUpDateTo: null,
+            probabilityMin: null,
+            probabilityMax: null,
+            dealType: null,
+            industry: null,
+            expectedCloseDateFrom: null,
+            expectedCloseDateTo: null,
+          });
+          handleFiltersChange({});
+          setCurrentFilters({});
+          setActiveFilter('all');
+          setDealsPagination({ ...dealsPagination, currentPage: 1 });
+          setRefreshKey(prev => prev + 1);
+        }}
+        showApplyButton={true}
+        showResetButton={true}
       />
 
     </React.Fragment>

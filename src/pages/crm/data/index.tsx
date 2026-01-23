@@ -83,6 +83,8 @@ import {
 } from "lucide-react";
 import { Column } from "@components/CustomDataTable";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
+import GenericSidebar from "@components/GenericSidebar";
+import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 
 import {
   getCrmData,
@@ -585,6 +587,11 @@ const CrmProspectsManagement = () => {
 
   // History modal state
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  // Sidebar states
+  const [showProspectSidebar, setShowProspectSidebar] = useState(false);
+  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
+  const [selectedProspect, setSelectedProspect] = useState<any>(null);
 
   // Call recordings state
   const [callRecordings, setCallRecordings] = useState<any[]>([]);
@@ -2081,8 +2088,30 @@ const CrmProspectsManagement = () => {
     setSelectedItems(selected.map((item) => item.id));
   }, []);
 
+  // Handle prospect row click
+  const handleProspectClick = useCallback((prospect: any) => {
+    setSelectedProspect(prospect);
+    setShowProspectSidebar(true);
+  }, []);
+
+  // Handle close prospect sidebar
+  const handleCloseProspectSidebar = useCallback(() => {
+    setShowProspectSidebar(false);
+    setSelectedProspect(null);
+  }, []);
+
+  // Handle open filters sidebar
+  const handleOpenFiltersSidebar = useCallback(() => {
+    setShowFiltersSidebar(true);
+  }, []);
+
+  // Handle close filters sidebar
+  const handleCloseFiltersSidebar = useCallback(() => {
+    setShowFiltersSidebar(false);
+  }, []);
+
   // Define columns for GenericTable - Clean declarative definitions
-  const prospectsColumns: TableColumn<any>[] = useMemo(
+ const prospectsColumns: TableColumn<any>[] = useMemo(
     () => [
       {
         key: 'name',
@@ -2100,7 +2129,7 @@ const CrmProspectsManagement = () => {
         label: 'Phone',
         sortable: true,
         type: 'custom',
-        align: 'center',
+        align: 'left',
         render: (row) => (
           <PhoneContainer phone={row?.phone} onClick={() => handleCallClick(row)} />
         )
@@ -2119,33 +2148,28 @@ const CrmProspectsManagement = () => {
         key: 'user_extension',
         label: 'Assigned To',
         sortable: true,
-        type: 'custom',
-        render: (row) => {
-          if (row.user_extension) {
-            const extension = extensions.find(
-              (ext: any) => ext.id.toString() === row.user_extension?.toString()
-            );
-            return (
-              <Badge bg="success" className="bg-opacity-10 text-dark d-flex align-items-center gap-1">
-                <span style={{ backgroundColor: '#1de9b6', width: '5px', height: '5px', borderRadius: '50%' }}></span>
-                {extension?.display_name || row.user_extension}
-              </Badge>
-            );
-          }
-          return <Badge bg="secondary" className="bg-opacity-10 text-dark">Unassigned</Badge>;
+        type: 'badge',
+        accessor: (row) => {
+          const extension = extensions.find(
+            (ext: any) => ext.id.toString() === row.user_extension?.toString()
+          );
+          return row.user_extension 
+            ? (extension?.display_name || row.user_extension)
+            : 'Unassigned';
+        },
+        badge: {
+          getVariant: (row) => row.user_extension ? 'success' : 'secondary',
+          showDot: () => true
         }
       },
       {
         key: 'campaign',
         label: 'Campaign',
         sortable: true,
-        type: 'custom',
-        accessor: (row) => row.campaign?.name || null,
-        render: (row) => {
-          if (row.campaign) {
-            return <Badge bg="primary" className="bg-opacity-10 text-dark">{row.campaign.name}</Badge>;
-          }
-          return <Badge bg="info" className="bg-opacity-10 text-dark">No Campaign</Badge>;
+        type: 'badge',
+        accessor: (row) => row.campaign?.name || 'No Campaign',
+        badge: {
+          getVariant: (row) => row.campaign ? 'primary' : 'info'
         }
       },
       {
@@ -2159,20 +2183,28 @@ const CrmProspectsManagement = () => {
         key: 'last_call_end_reason',
         label: 'Last Call Status',
         sortable: true,
-        type: 'custom',
-        render: (row) => {
-          if (!row.last_call_end_reason) return '-';
-          const endReason = callEndReasons.find(r => r.value === row.last_call_end_reason) || callEndReasons[0];
-          return <Badge bg={endReason.color as any} className="bg-opacity-10 text-dark">{endReason.label}</Badge>;
-        }
+        type: 'badge',
+        accessor: (row) => {
+          if (!row.last_call_end_reason) return null;
+          const endReason = callEndReasons.find(r => r.value === row.last_call_end_reason);
+          return endReason?.label || row.last_call_end_reason;
+        },
+        badge: {
+          getVariant: (row) => {
+            if (!row.last_call_end_reason) return 'secondary';
+            const endReason = callEndReasons.find(r => r.value === row.last_call_end_reason);
+            return (endReason?.color as any) || 'secondary';
+          }
+        },
+        emptyValue: '-'
       },
       {
         key: 'disposition',
         label: 'Disposition',
         sortable: true,
-        type: 'custom',
-        render: (row) => {
-          if (!row.disposition) return '-';
+        type: 'badge',
+        accessor: (row) => {
+          if (!row.disposition) return null;
           const dispositions = [
             { value: 'interested', label: 'Interested', color: 'success' },
             { value: 'not_interested', label: 'Not Interested', color: 'danger' },
@@ -2183,28 +2215,55 @@ const CrmProspectsManagement = () => {
             { value: 'wrong_number', label: 'Wrong Number', color: 'info' },
             { value: 'follow_up', label: 'Follow Up', color: 'primary' }
           ];
+          const disposition = dispositions.find(d => d.value === row.disposition);
+          if (disposition) return disposition.label;
+          // Fallback to random for demo
           const randomDisposition = dispositions[Math.floor(Math.random() * dispositions.length)];
-          return <Badge bg={randomDisposition.color as any} className="bg-opacity-10 text-dark">{randomDisposition.label}</Badge>;
-        }
+          return randomDisposition.label;
+        },
+        badge: {
+          getVariant: (row) => {
+            if (!row.disposition) return 'secondary';
+            const dispositions = [
+              { value: 'interested', color: 'success' },
+              { value: 'not_interested', color: 'danger' },
+              { value: 'callback_requested', color: 'warning' },
+              { value: 'no_answer', color: 'warning' },
+              { value: 'busy', color: 'info' },
+              { value: 'do_not_call', color: 'danger' },
+              { value: 'wrong_number', color: 'info' },
+              { value: 'follow_up', color: 'primary' }
+            ];
+            const disposition = dispositions.find(d => d.value === row.disposition);
+            if (disposition) return disposition.color as any;
+            // Fallback to random for demo
+            const randomColors = ['success', 'danger', 'warning', 'info', 'primary'];
+            return randomColors[Math.floor(Math.random() * randomColors.length)] as any;
+          }
+        },
+        emptyValue: '-'
       },
       {
         key: 'scheduled_call_at',
         label: 'Next Call',
         sortable: true,
-        type: 'custom',
-        render: (row) => {
-          if (!row.scheduled_call_at) {
-            return <Badge bg="info" className="bg-opacity-10 text-dark">Not scheduled</Badge>;
-          }
+        type: 'badge',
+        accessor: (row) => {
+          if (!row.scheduled_call_at) return 'Not scheduled';
           const isOverdue = moment(row.scheduled_call_at).isBefore(moment());
           const isNextHour = moment(row.scheduled_call_at).isBefore(moment().add(1, 'hour'));
-          return (
-            <Badge bg={isOverdue ? 'danger' : isNextHour ? 'warning' : 'info'} className="bg-opacity-10 text-dark">
-              {moment(row.scheduled_call_at).format("MMM DD, HH:mm")}
-              {isOverdue && <span className="ms-1 fw-bold">(Overdue)</span>}
-              {isNextHour && !isOverdue && <span className="ms-1 fw-bold">(Soon)</span>}
-            </Badge>
-          );
+          const formatted = moment(row.scheduled_call_at).format("MMM DD, HH:mm");
+          if (isOverdue) return `${formatted} (Overdue)`;
+          if (isNextHour) return `${formatted} (Soon)`;
+          return formatted;
+        },
+        badge: {
+          getVariant: (row) => {
+            if (!row.scheduled_call_at) return 'info';
+            const isOverdue = moment(row.scheduled_call_at).isBefore(moment());
+            const isNextHour = moment(row.scheduled_call_at).isBefore(moment().add(1, 'hour'));
+            return isOverdue ? 'danger' : isNextHour ? 'warning' : 'info';
+          }
         }
       },
       {
@@ -2215,9 +2274,9 @@ const CrmProspectsManagement = () => {
         render: (row) => (
           <div className="d-flex gap-1 flex-wrap">
             {(row.tags || []).map((tag: any, idx: number) => (
-              <Badge key={idx} bg="secondary" className="bg-opacity-10 text-dark">
+              <span key={idx} className="gt-badge gt-badge-secondary">
                 {tag.name || tag}
-              </Badge>
+              </span>
             ))}
           </div>
         )
@@ -2733,11 +2792,11 @@ const CrmProspectsManagement = () => {
             </Button>
           )}
           <Button
-            variant={showAdvancedFilters ? "secondary" : "outline-secondary"}
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            variant={showFiltersSidebar ? "secondary" : "outline-secondary"}
+            onClick={handleOpenFiltersSidebar}
           >
             <FiFilter size={16} className="me-2" />
-            {showAdvancedFilters ? "Hide Filters" : "Show Filters"}
+            Filters
           </Button>
         </div>
       </div>
@@ -3267,6 +3326,7 @@ const CrmProspectsManagement = () => {
             sortable={true}
             defaultSortColumn={pagination.sortColumn}
             defaultSortDirection={pagination.sortDirection}
+            onRowClick={(row) => handleProspectClick(row)}
             onRowDoubleClick={(row) => {
               if (session?.user?.permissions?.includes("view-crm-data-management")) {
                 handleViewData(row);
@@ -5249,6 +5309,325 @@ const CrmProspectsManagement = () => {
           setSelectedRecording(null);
         }}
         recording={selectedRecording}
+      />
+
+      {/* Prospect Detail Sidebar */}
+      <GenericSidebar
+        isOpen={showProspectSidebar}
+        onClose={handleCloseProspectSidebar}
+        title={selectedProspect?.name || 'Prospect Details'}
+        subtitle={selectedProspect?.phone || ''}
+        avatar={{
+          initials: getInitials(selectedProspect?.name || 'NA'),
+          name: selectedProspect?.name || 'NA',
+          gradient: getRandomColor(selectedProspect?.name || '')
+        }}
+        width="400px"
+        sections={[
+          {
+            id: 'prospect-info',
+            title: 'Prospect Information',
+            icon: Target,
+            fields: [
+              {
+                label: 'Name',
+                value: selectedProspect?.name || 'N/A'
+              },
+              {
+                label: 'Phone',
+                value: selectedProspect?.phone || 'N/A',
+                icon: Phone
+              },
+              {
+                label: 'Assigned To',
+                value: selectedProspect?.user_extension ? getNameByExtension(selectedProspect.user_extension) : 'Unassigned',
+                icon: User
+              },
+              {
+                label: 'Campaign',
+                value: selectedProspect?.campaign?.name || 'No Campaign',
+                show: !!selectedProspect?.campaign
+              },
+              {
+                label: 'Created Date',
+                value: selectedProspect?.created_at,
+                type: 'date',
+                icon: Calendar
+              }
+            ]
+          },
+          {
+            id: 'call-recordings',
+            title: 'Call Recordings',
+            icon: History,
+            badge: {
+              value: 0,
+              variant: 'secondary'
+            },
+            emptyState: {
+              icon: History,
+              message: 'No call recordings available yet'
+            }
+          }
+        ]}
+      />
+
+      {/* Filters Sidebar */}
+      <GenericFilterSidebar
+        isOpen={showFiltersSidebar}
+        onClose={handleCloseFiltersSidebar}
+        title="Filters"
+        subtitle="Filter prospects by various criteria"
+        width="400px"
+        filters={[
+          {
+            id: 'search',
+            label: 'Search',
+            type: 'text',
+            value: prospectsSearch,
+            onChange: (value) => setProspectsSearch(value),
+            placeholder: 'Search by name or phone...'
+          },
+          {
+            id: 'assignedTo',
+            label: 'Assigned To',
+            type: 'select',
+            value: prospectsFilters.assignedTo
+              ? (() => {
+                  const assignedToId = prospectsFilters.assignedTo;
+                  const ext = extensions.find(
+                    (e: any) => (e.id || e.extension) === assignedToId
+                  );
+                  return ext
+                    ? {
+                        value: assignedToId,
+                        label: ext.display_name || ext.name || assignedToId,
+                      }
+                    : { value: assignedToId, label: assignedToId };
+                })()
+              : null,
+            onChange: (selected) => {
+              const assignedToValue = selected ? selected.value : null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                assignedTo: assignedToValue,
+              }));
+              setActiveFilter("all");
+            },
+            options: extensions.map((ext: any) => ({
+              value: ext.id || ext.extension,
+              label: ext.display_name || ext.name || ext.id || ext.extension,
+            })),
+            placeholder: 'Select user...',
+            isClearable: true,
+            styles: customSelectStyles
+          },
+          {
+            id: 'campaigns',
+            label: 'Campaigns',
+            type: 'multi-select',
+            value: prospectsFilters.campaigns
+              ? prospectsFilters.campaigns.map((campaignId: string) => {
+                  const campaign = availableCampaigns.find((c: any) => c.value === campaignId);
+                  return campaign
+                    ? { value: campaignId, label: campaign.label }
+                    : { value: campaignId, label: campaignId };
+                })
+              : [],
+            onChange: (selected) => {
+              const campaignValues = selected ? selected.map((s: any) => s.value) : null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                campaigns: campaignValues,
+              }));
+              setActiveFilter("all");
+            },
+            options: availableCampaigns.map((c) => ({
+              value: c.value,
+              label: c.label,
+            })),
+            placeholder: 'Select campaigns...',
+            isClearable: true,
+            styles: customSelectStyles
+          },
+          {
+            id: 'nextCallScheduled',
+            label: 'Next Call Scheduled',
+            type: 'dropdown',
+            value: prospectsFilters.nextCallScheduled || '',
+            onChange: (value) => {
+              const selectedValue = value || null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                nextCallScheduled: selectedValue,
+                nextCallDateFrom: null,
+                nextCallDateTo: null,
+              }));
+              setActiveFilter("all");
+            },
+            options: [
+              { value: '', label: 'Select option...' },
+              { value: 'today', label: 'Today' },
+              { value: 'tomorrow', label: 'Tomorrow' },
+              { value: 'this_week', label: 'This Week' },
+              { value: 'next_week', label: 'Next Week' },
+              { value: 'overdue', label: 'Overdue Calls' },
+              { value: 'custom', label: 'Custom Date Range' }
+            ]
+          },
+          {
+            id: 'nextCallDateFrom',
+            label: 'Next Call Date (From)',
+            type: 'date',
+            value: prospectsFilters.nextCallDateFrom || '',
+            onChange: (value) => {
+              const dateValue = value || null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                nextCallDateFrom: dateValue,
+              }));
+            },
+            placeholder: 'From date'
+          },
+          {
+            id: 'nextCallDateTo',
+            label: 'Next Call Date (To)',
+            type: 'date',
+            value: prospectsFilters.nextCallDateTo || '',
+            onChange: (value) => {
+              const dateValue = value || null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                nextCallDateTo: dateValue,
+              }));
+            },
+            placeholder: 'To date'
+          },
+          {
+            id: 'sourceFile',
+            label: 'Source Name',
+            type: 'select',
+            value: prospectsFilters.sourceFile
+              ? { value: prospectsFilters.sourceFile, label: prospectsFilters.sourceFile }
+              : null,
+            onChange: (selected) => {
+              const sourceValue = selected ? selected.value : null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                sourceFile: sourceValue,
+              }));
+              setActiveFilter("all");
+            },
+            options: uniqueSources,
+            placeholder: 'Select source...',
+            isClearable: true,
+            styles: customSelectStyles
+          },
+          {
+            id: 'tags',
+            label: 'Tags',
+            type: 'multi-select',
+            value: prospectsFilters.tags
+              ? prospectsFilters.tags.map((tagValue: string) => {
+                  const tag = availableTags.find((t: any) => t.value === tagValue);
+                  return tag ? { value: tagValue, label: tag.label } : { value: tagValue, label: tagValue };
+                })
+              : [],
+            onChange: (selected) => {
+              const tagValues = selected ? selected.map((s: any) => s.value) : null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                tags: tagValues,
+              }));
+              setActiveFilter("all");
+            },
+            options: availableTags.map((tag) => ({
+              value: tag.value,
+              label: tag.label,
+            })),
+            placeholder: 'Select tags...',
+            isClearable: true,
+            styles: customSelectStyles
+          }
+        ]}
+        onApply={() => {
+          const filtersToApply: Record<string, any> = {};
+          
+          if (prospectsSearch) {
+            filtersToApply.search = prospectsSearch;
+          }
+          if (prospectsFilters.assignedTo) {
+            filtersToApply.user_extension = [prospectsFilters.assignedTo];
+          }
+          if (prospectsFilters.campaigns && prospectsFilters.campaigns.length > 0) {
+            filtersToApply.campaign_id = prospectsFilters.campaigns;
+          }
+          if (prospectsFilters.sourceFile) {
+            filtersToApply.source_file = prospectsFilters.sourceFile;
+          }
+          if (prospectsFilters.tags && prospectsFilters.tags.length > 0) {
+            filtersToApply.tags = prospectsFilters.tags;
+          }
+          
+          // Handle next call scheduled filters
+          const now = moment();
+          if (prospectsFilters.nextCallScheduled === 'today') {
+            const today = now.format('YYYY-MM-DD');
+            filtersToApply.scheduled_call_from = today;
+            filtersToApply.scheduled_call_to = today;
+          } else if (prospectsFilters.nextCallScheduled === 'tomorrow') {
+            const tomorrow = moment().add(1, 'day').format('YYYY-MM-DD');
+            filtersToApply.scheduled_call_from = tomorrow;
+            filtersToApply.scheduled_call_to = tomorrow;
+          } else if (prospectsFilters.nextCallScheduled === 'this_week') {
+            const startOfWeek = moment().startOf('week').format('YYYY-MM-DD');
+            const endOfWeek = moment().endOf('week').format('YYYY-MM-DD');
+            filtersToApply.scheduled_call_from = startOfWeek;
+            filtersToApply.scheduled_call_to = endOfWeek;
+          } else if (prospectsFilters.nextCallScheduled === 'next_week') {
+            const nextWeekStart = moment().add(1, 'week').startOf('week').format('YYYY-MM-DD');
+            const nextWeekEnd = moment().add(1, 'week').endOf('week').format('YYYY-MM-DD');
+            filtersToApply.scheduled_call_from = nextWeekStart;
+            filtersToApply.scheduled_call_to = nextWeekEnd;
+          } else if (prospectsFilters.nextCallScheduled === 'overdue') {
+            filtersToApply.scheduled_call_status = 'overdue';
+          } else if (prospectsFilters.nextCallScheduled === 'custom') {
+            if (prospectsFilters.nextCallDateFrom) {
+              filtersToApply.scheduled_call_from = prospectsFilters.nextCallDateFrom;
+            }
+            if (prospectsFilters.nextCallDateTo) {
+              filtersToApply.scheduled_call_to = prospectsFilters.nextCallDateTo;
+            }
+          }
+          
+          handleFiltersChange(filtersToApply);
+          setPagination((prev) => ({
+            ...prev,
+            currentPage: 1,
+          }));
+          setRefreshKey((prev) => prev + 1);
+          setShowFiltersSidebar(false);
+        }}
+        onReset={() => {
+          setProspectsSearch("");
+          setProspectsFilters({
+            assignedTo: null,
+            campaigns: null,
+            nextCallScheduled: null,
+            nextCallDateFrom: null,
+            nextCallDateTo: null,
+            sourceFile: null,
+            tags: null,
+          });
+          handleFiltersChange({});
+          setCurrentFilters({});
+          setActiveFilter("all");
+          setPagination((prev) => ({
+            ...prev,
+            currentPage: 1,
+          }));
+          setRefreshKey((prev) => prev + 1);
+        }}
       />
     </React.Fragment>
   );

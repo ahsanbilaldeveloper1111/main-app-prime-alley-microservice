@@ -33,8 +33,9 @@ export interface TableColumn<T = any> {
   
   // For badge type
   badge?: {
-    getVariant?: (row: T) => 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'info';
+    getVariant?: (row: T) => 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'info' | 'dark' | 'light';
     getColor?: (row: T) => string; // For custom color
+    showDot?: (row: T) => boolean; // For status badges with dot indicator
   };
   
   // For multi-field type
@@ -264,13 +265,17 @@ const GenericTable = <T extends Record<string, any>>({
       case 'badge':
         const badgeVariant = column.badge?.getVariant?.(row) || 'secondary';
         const badgeColor = column.badge?.getColor?.(row);
-        const badgeClass = `gt-badge gt-badge-${badgeVariant}`;
+        const showDot = column.badge?.showDot?.(row) ?? false;
+        const badgeClass = showDot 
+          ? `gt-status-badge gt-badge-${badgeVariant}` 
+          : `gt-badge gt-badge-${badgeVariant}`;
         
         return (
           <span 
             className={badgeClass} 
             style={badgeColor ? { backgroundColor: badgeColor } : undefined}
           >
+            {showDot && <span className="gt-status-dot"></span>}
             {value}
           </span>
         );
@@ -283,7 +288,7 @@ const GenericTable = <T extends Record<string, any>>({
         
         return (
           <div className="gt-company-cell">
-            <div className="gt-company-name">{primaryValue || column.emptyValue || '-'}</div>
+            <div className="gt-company-name gt-text">{primaryValue || column.emptyValue || '-'}</div>
             {secondaryValue && (
               <div className={column.fields.secondaryClass || 'gt-company-industry'}>
                 {secondaryValue}
@@ -298,11 +303,11 @@ const GenericTable = <T extends Record<string, any>>({
 
       case 'date':
         // Date formatting handled by accessor function
-        return value;
+        return <span className="gt-text">{value}</span>;
 
       case 'text':
       default:
-        return value;
+        return <span className="gt-text">{value}</span>;
     }
   };
 
@@ -555,7 +560,7 @@ const GenericTable = <T extends Record<string, any>>({
                       className={`generic-table-row ${rowClassName?.(row, index) || ''} ${onRowClick || onRowDoubleClick ? 'clickable' : ''}`}
                     >
                       {selectable && (
-                        <td className="generic-table-td" style={{ width: '40px' }}>
+                        <td className="generic-table-td" style={{ width: '40px' }} onClick={(e) => e.stopPropagation()}>
                           <Form.Check
                             type="checkbox"
                             checked={isSelected(row)}
@@ -595,16 +600,17 @@ const GenericTable = <T extends Record<string, any>>({
                                 if (visibleOptions.length === 0) return null;
                                 
                                 return (
-                                  <Dropdown key={actionIndex} drop="down" align="end">
-                                    <Dropdown.Toggle
-                                      variant={action.variant || 'link'}
-                                      size="sm"
-                                      className={action.className || ''}
-                                      id={`dropdown-${row[uniqueKey]}-${actionIndex}`}
-                                    >
-                                      {action.icon}
-                                    </Dropdown.Toggle>
-                                    <Dropdown.Menu>
+                                  <div key={actionIndex} onClick={(e) => e.stopPropagation()}>
+                                    <Dropdown drop="down" align="end">
+                                      <Dropdown.Toggle
+                                        variant={action.variant || 'link'}
+                                        size="sm"
+                                        className={action.className || ''}
+                                        id={`dropdown-${row[uniqueKey]}-${actionIndex}`}
+                                      >
+                                        {action.icon}
+                                      </Dropdown.Toggle>
+                                      <Dropdown.Menu>
                                       {visibleOptions.map((option, optionIndex) => {
                                         const menuItem = (
                                           <Dropdown.Item
@@ -633,6 +639,7 @@ const GenericTable = <T extends Record<string, any>>({
                                       })}
                                     </Dropdown.Menu>
                                   </Dropdown>
+                                  </div>
                                 );
                               }
                               

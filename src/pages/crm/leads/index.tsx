@@ -11,6 +11,8 @@ import React, {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
+import GenericSidebar from "@components/GenericSidebar";
+import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import {
   getLeads,
   getLead,
@@ -523,29 +525,23 @@ const FilterBar: React.FC<FilterBarProps> = ({
             })}
           </div>
 
-          {/* <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
-            <InputGroup
-              style={{ width: "300px", minWidth: "200px" }}
-              className="flex-shrink-0"
-            >
-              <Form.Control
-                style={{ height: "41px" }}
-                type="text"
-                placeholder={searchPlaceholder}
-                value={searchValue}
-                onChange={(e) => onSearchChange(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    onSearch();
-                  }
-                }}
-              />
-              <Button variant="outline-secondary" onClick={onSearch}>
-                <Search size={16} />
+          <div className="d-flex gap-2 align-items-center flex-shrink-0">
+            {onToggleAdvancedFilters && (
+              <Button
+                variant={advancedFilterCount > 0 ? "primary" : "outline-secondary"}
+                onClick={onToggleAdvancedFilters}
+                className="d-flex align-items-center gap-2"
+              >
+                <Filter size={16} />
+                Filters
+                {advancedFilterCount > 0 && (
+                  <Badge bg="light" text="dark" className="ms-1">
+                    {advancedFilterCount}
+                  </Badge>
+                )}
               </Button>
-            </InputGroup>
-            
-          </div> */}
+            )}
+          </div>
         </div>
       </Card.Body>
     </Card>
@@ -578,6 +574,11 @@ const CrmLeads = () => {
   const [activeTab, setActiveTab] = useState<string>("general-info");
   const [loadingLead, setLoadingLead] = useState(false);
   const [showLeadHistoryModal, setShowLeadHistoryModal] = useState(false);
+
+  // Sidebar states
+  const [showLeadSidebar, setShowLeadSidebar] = useState(false);
+  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<any>(null);
 
   // Follow-up Modal
   const [showAddFollowupModal, setShowAddFollowupModal] = useState(false);
@@ -2113,7 +2114,7 @@ const CrmLeads = () => {
       key: 'phone',
       label: 'Phone',
       sortable: true,
-      align: 'left',
+      align: 'center',
       type: 'custom',
       render: (lead: LeadData) => lead.phone ? (
         <PhoneContainer phone={lead.phone} onClick={() => handleCallClick(lead)} />
@@ -2302,9 +2303,12 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                 </Button>
               </Link>
             )}
-            <Button variant={`${showAdvancedFilters ? "secondary" : "outline-secondary"}`} onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}>
+            <Button
+              variant={showFiltersSidebar ? "secondary" : "outline-secondary"}
+              onClick={() => setShowFiltersSidebar(true)}
+            >
               <Filter size={16} className="me-2" />
-              {showAdvancedFilters ? "Hide Filters" : "Show Filters"}
+              Filters
             </Button>
           </div>
         </div>
@@ -2911,6 +2915,10 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           ]}
           columnStorageKey="leadsSelectedColumns"
           onColumnChange={(cols) => setSelectedLeadsColumns(cols)}
+          onRowClick={(lead) => {
+            setSelectedLead(lead.rawData || lead);
+            setShowLeadSidebar(true);
+          }}
           onRowDoubleClick={(lead) => {
             if (session?.user?.permissions?.includes("list-crm-leads")) {
               handleViewLead(lead.rawData?.id || lead.id);
@@ -6571,6 +6579,509 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Lead Details Sidebar */}
+      <GenericSidebar
+        isOpen={showLeadSidebar}
+        onClose={() => {
+          setShowLeadSidebar(false);
+          setSelectedLead(null);
+        }}
+        title={selectedLead?.name || 'Lead Details'}
+        subtitle={selectedLead?.company_name || selectedLead?.company || ''}
+        metadata={selectedLead?.id ? `Lead ID: ${selectedLead.id}` : ''}
+        email={selectedLead?.email || selectedLead?.rawData?.email || ''}
+        phone={selectedLead?.phone || selectedLead?.rawData?.phone || ''}
+        avatar={{
+          name: selectedLead?.name || 'Lead',
+          useIcon: true
+        }}
+        width="420px"
+        tabs={[
+          {
+            id: 'general',
+            label: 'General Information',
+            sections: [
+          {
+            id: 'lead-info',
+            title: 'Lead Information',
+            icon: Target,
+            fields: [
+              {
+                label: 'Lead Name',
+                value: selectedLead?.name || 'N/A'
+              },
+              {
+                label: 'Stage',
+                value: selectedLead?.stage?.name || selectedLead?.stage || 'N/A',
+                type: 'badge',
+                badgeVariant: 'primary'
+              },
+              {
+                label: 'Lead Potential',
+                value: selectedLead?.lead_potential || selectedLead?.leadPotential || 'N/A',
+                type: 'badge',
+                badgeVariant: selectedLead?.lead_potential === 'Hot' || selectedLead?.leadPotential === 'Hot' 
+                  ? 'danger' 
+                  : selectedLead?.lead_potential === 'Warm' || selectedLead?.leadPotential === 'Warm'
+                  ? 'warning'
+                  : 'secondary'
+              },
+              {
+                label: 'Assigned To',
+                value: selectedLead?.assigned_user?.display_name || selectedLead?.assigned_user?.name || selectedLead?.assignedUser || 'Unassigned',
+                icon: User
+              },
+              {
+                label: 'Created Date',
+                value: selectedLead?.created_at || selectedLead?.created,
+                type: 'date',
+                icon: Calendar
+              },
+              {
+                label: 'Lead Score (Based on Stage)',
+                value: selectedLead?.stage?.score ? `${selectedLead.stage.score}%` : selectedLead?.lead_score ? `${selectedLead.lead_score}%` : 'N/A',
+                show: !!(selectedLead?.stage?.score || selectedLead?.lead_score)
+              },
+              {
+                label: 'Source',
+                value: selectedLead?.source || 'N/A',
+                show: !!selectedLead?.source
+              },
+              {
+                label: 'Last Activity',
+                value: selectedLead?.last_activity_at || selectedLead?.updated_at,
+                type: 'datetime',
+                show: !!(selectedLead?.last_activity_at || selectedLead?.updated_at)
+              },
+              {
+                label: 'Follow-ups',
+                value: `${selectedLead?.follow_ups?.length || 0} follow-up(s)`,
+                icon: History,
+                show: true
+              },
+              {
+                label: 'Meetings',
+                value: `${selectedLead?.meetings?.length || 0} meeting(s)`,
+                icon: Calendar,
+                show: true
+              }
+            ]
+          },
+          {
+            id: 'company-info',
+            title: 'Company Information',
+            icon: Building2,
+            fields: [
+              {
+                label: 'Company Name',
+                value: selectedLead?.company_name || selectedLead?.company || 'N/A'
+              },
+              {
+                label: 'Company Size',
+                value: selectedLead?.company_size || 'N/A',
+                show: !!selectedLead?.company_size
+              },
+              {
+                label: 'Location',
+                value: selectedLead?.location || 'N/A',
+                show: !!selectedLead?.location
+              }
+            ]
+          }
+            ]
+          },
+          {
+            id: 'campaign-prospects',
+            label: 'Campaign and Prospects',
+            sections: [
+              {
+                id: 'campaign-info',
+                title: 'Campaign Information',
+                icon: Target,
+                emptyState: {
+                  icon: Target,
+                  message: 'No campaign information available'
+                }
+              },
+              {
+                id: 'prospect-info',
+                title: 'Prospect Information',
+                icon: User,
+                emptyState: {
+                  icon: User,
+                  message: 'No prospect information available'
+                }
+              },
+              {
+                id: 'prospect-fields',
+                title: 'Prospect Fields',
+                icon: FileText,
+                emptyState: {
+                  icon: FileText,
+                  message: 'No prospect fields available'
+                }
+              },
+              {
+                id: 'follow-ups',
+                title: 'Follow-ups',
+                icon: History,
+                badge: {
+                  value: selectedLead?.follow_ups?.length || 0,
+                  variant: 'secondary'
+                },
+                emptyState: {
+                  icon: History,
+                  message: 'No follow-ups yet',
+                  action: {
+                    label: 'Add Follow Up',
+                    onClick: () => {
+                      setFollowupData({
+                        leadId: selectedLead?.id || selectedLead?.rawData?.id || null,
+                        leadName: selectedLead?.name || '',
+                        followUpDate: '',
+                        followUpStatus: 'Pending',
+                        communicationChannel: 'Phone Call',
+                        communicationChannelOther: '',
+                        notes: '',
+                        userExtension: ''
+                      });
+                      setShowAddFollowupModal(true);
+                    }
+                  }
+                }
+              },
+              {
+                id: 'meetings',
+                title: 'Meetings',
+                icon: Calendar,
+                badge: {
+                  value: selectedLead?.meetings?.length || 0,
+                  variant: 'secondary'
+                },
+                emptyState: {
+                  icon: Calendar,
+                  message: 'No meetings scheduled yet',
+                  action: {
+                    label: 'Schedule Meeting',
+                    onClick: () => {
+                      setMeetingData({
+                        leadId: selectedLead?.id || selectedLead?.rawData?.id || null,
+                        leadName: selectedLead?.name || '',
+                        meetingName: '',
+                        meetingType: 'Online',
+                        meetingDate: '',
+                        meetingTime: '',
+                        meetingOutcome: '',
+                        extensions: []
+                      });
+                      setMeetingAttendees([]);
+                      setShowAddMeetingModal(true);
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ]}
+        actions={[
+          {
+            label: 'Edit Lead',
+            icon: Edit,
+            onClick: () => {
+              router.push(`/crm/leads/${selectedLead?.id || selectedLead?.rawData?.id}/edit`);
+            },
+            variant: 'primary',
+            show: session?.user?.permissions?.includes('edit-crm-leads') && activeFilter !== 'lost'
+          },
+          {
+            label: 'Convert to Deal',
+            icon: Handshake,
+            onClick: () => {
+              setShowLeadSidebar(false);
+              handleConvertLead(selectedLead?.rawData || selectedLead);
+            },
+            variant: 'success',
+            show: session?.user?.permissions?.includes('add-crm-deals')
+          },
+          {
+            label: 'View History',
+            icon: History,
+            onClick: () => {
+              setShowLeadSidebar(false);
+              handleViewLead(selectedLead?.id || selectedLead?.rawData?.id);
+              setShowLeadHistoryModal(true);
+            },
+            variant: 'outline-primary'
+          }
+        ]}
+      />
+
+      {/* Filters Sidebar */}
+      <GenericFilterSidebar
+        isOpen={showFiltersSidebar}
+        onClose={() => setShowFiltersSidebar(false)}
+        title="Filters"
+        subtitle="Filter and refine your leads"
+        width="400px"
+        filters={[
+          {
+            id: 'search',
+            label: 'Search',
+            type: 'text',
+            value: leadsSearch,
+            onChange: (value) => setLeadsSearch(value),
+            placeholder: 'Search leads by name, company, email...'
+          },
+          {
+            id: 'assignedTo',
+            label: 'Assigned To',
+            type: 'select',
+            value: leadsFilters.assignedTo
+              ? (() => {
+                  const assignedToId = leadsFilters.assignedTo;
+                  const ext = extensions.find((e: any) => (e.id || e.extension) === assignedToId);
+                  return ext
+                    ? { value: assignedToId, label: ext.display_name || ext.name || assignedToId }
+                    : { value: assignedToId, label: assignedToId };
+                })()
+              : null,
+            onChange: (selected) => {
+              const assignedToValue = selected ? selected.value : null;
+              setLeadsFilters((prev) => ({
+                ...prev,
+                assignedTo: assignedToValue
+              }));
+              setActiveFilter("all");
+            },
+            options: extensions.map((ext: any) => ({
+              value: ext.id || ext.extension,
+              label: ext.display_name || ext.name || ext.id || ext.extension,
+            })),
+            placeholder: 'Select user...',
+            isClearable: true
+          },
+          {
+            id: 'stage',
+            label: 'Stages',
+            type: 'select',
+            value: leadsFilters.stage
+              ? (() => {
+                  const stageId = leadsFilters.stage;
+                  const stage = stages.find((st: any) => st.id.toString() === stageId);
+                  return stage ? { value: stageId, label: stage.name } : { value: stageId, label: stageId };
+                })()
+              : null,
+            onChange: (selected) => {
+              const stageValue = selected ? selected.value : null;
+              setLeadsFilters((prev) => ({
+                ...prev,
+                stage: stageValue
+              }));
+              if (stageValue) {
+                setActiveFilter(stageValue);
+              } else {
+                setActiveFilter("all");
+              }
+            },
+            options: stages.map((s: any) => ({
+              value: s.id.toString(),
+              label: s.name,
+            })),
+            placeholder: 'Select stage...',
+            isClearable: true
+          },
+          {
+            id: 'industry',
+            label: 'Industry',
+            type: 'select',
+            value: leadsFilters.industry
+              ? { value: leadsFilters.industry, label: leadsFilters.industry }
+              : null,
+            onChange: (selected) => {
+              const industryValue = selected ? selected.value : null;
+              setLeadsFilters((prev) => ({
+                ...prev,
+                industry: industryValue
+              }));
+            },
+            options: [
+              { value: "Technology", label: "Technology" },
+              { value: "Healthcare", label: "Healthcare" },
+              { value: "Finance", label: "Finance" },
+              { value: "Banking & Financial Services", label: "Banking & Financial Services" },
+              { value: "Manufacturing", label: "Manufacturing" },
+              { value: "Retail", label: "Retail" },
+              { value: "Education", label: "Education" },
+              { value: "Real Estate", label: "Real Estate" },
+              { value: "Telecommunications", label: "Telecommunications" },
+              { value: "Construction", label: "Construction" },
+              { value: "Other", label: "Other" },
+            ],
+            placeholder: 'Select industry...',
+            isClearable: true
+          },
+          {
+            id: 'source',
+            label: 'Source',
+            type: 'select',
+            value: leadsFilters.source
+              ? { value: leadsFilters.source, label: leadsFilters.source }
+              : null,
+            onChange: (selected) => {
+              const sourceValue = selected ? selected.value : null;
+              setLeadsFilters((prev) => ({
+                ...prev,
+                source: sourceValue
+              }));
+            },
+            options: uniqueSources,
+            placeholder: 'Select source...',
+            isClearable: true
+          },
+          {
+            id: 'leadPotential',
+            label: 'Lead Potential',
+            type: 'select',
+            value: leadsFilters.leadPotential
+              ? { value: leadsFilters.leadPotential, label: leadsFilters.leadPotential }
+              : null,
+            onChange: (selected) => {
+              const leadPotentialValue = selected ? selected.value : null;
+              setLeadsFilters((prev) => ({
+                ...prev,
+                leadPotential: leadPotentialValue
+              }));
+            },
+            options: [
+              { value: "Hot", label: "Hot" },
+              { value: "Warm", label: "Warm" },
+              { value: "Cold", label: "Cold" },
+            ],
+            placeholder: 'Select lead potential...',
+            isClearable: true
+          },
+          {
+            id: 'campaign',
+            label: 'Campaign',
+            type: 'select',
+            value: leadsFilters.campaign
+              ? (() => {
+                  const campaignId = leadsFilters.campaign;
+                  const campaign = campaigns.find((c: any) => c.id.toString() === campaignId);
+                  return campaign ? { value: campaignId, label: campaign.name } : { value: campaignId, label: campaignId };
+                })()
+              : null,
+            onChange: (selected) => {
+              const campaignValue = selected ? selected.value : null;
+              setLeadsFilters((prev) => ({
+                ...prev,
+                campaign: campaignValue
+              }));
+            },
+            options: campaigns.map((campaign: any) => ({
+              value: campaign.id.toString(),
+              label: campaign.name,
+            })),
+            placeholder: 'Select campaign...',
+            isClearable: true
+          },
+          {
+            id: 'leadScoreMin',
+            label: 'Lead Score (Min)',
+            type: 'text',
+            value: leadsFilters.leadScoreMin || '',
+            onChange: (value) => {
+              const minValue = value || null;
+              setLeadsFilters((prev) => ({
+                ...prev,
+                leadScoreMin: minValue
+              }));
+            },
+            placeholder: 'Minimum score'
+          },
+          {
+            id: 'leadScoreMax',
+            label: 'Lead Score (Max)',
+            type: 'text',
+            value: leadsFilters.leadScoreMax || '',
+            onChange: (value) => {
+              const maxValue = value || null;
+              setLeadsFilters((prev) => ({
+                ...prev,
+                leadScoreMax: maxValue
+              }));
+            },
+            placeholder: 'Maximum score'
+          },
+          {
+            id: 'dateFrom',
+            label: 'Date (From)',
+            type: 'date',
+            value: leadsFilters.dateFrom || '',
+            onChange: (value) => {
+              const dateFromValue = value || null;
+              setLeadsFilters((prev) => ({
+                ...prev,
+                dateFrom: dateFromValue
+              }));
+            },
+            placeholder: 'From date'
+          },
+          {
+            id: 'dateTo',
+            label: 'Date (To)',
+            type: 'date',
+            value: leadsFilters.dateTo || '',
+            onChange: (value) => {
+              const dateToValue = value || null;
+              setLeadsFilters((prev) => ({
+                ...prev,
+                dateTo: dateToValue
+              }));
+            },
+            placeholder: 'To date'
+          }
+        ]}
+        onApply={() => {
+          const filtersToApply: Record<string, any> = {};
+          
+          if (leadsSearch) filtersToApply.search = leadsSearch;
+          if (leadsFilters.assignedTo) filtersToApply.assigned_to = leadsFilters.assignedTo;
+          if (leadsFilters.stage) filtersToApply.stage_id = leadsFilters.stage;
+          if (leadsFilters.industry) filtersToApply.industry = leadsFilters.industry;
+          if (leadsFilters.source) filtersToApply.source = leadsFilters.source;
+          if (leadsFilters.leadPotential) filtersToApply.lead_potential = leadsFilters.leadPotential;
+          if (leadsFilters.campaign) filtersToApply.campaign_id = leadsFilters.campaign;
+          if (leadsFilters.leadScoreMin) filtersToApply.lead_score_min = leadsFilters.leadScoreMin;
+          if (leadsFilters.leadScoreMax) filtersToApply.lead_score_max = leadsFilters.leadScoreMax;
+          if (leadsFilters.dateFrom) filtersToApply.date_from = leadsFilters.dateFrom;
+          if (leadsFilters.dateTo) filtersToApply.date_to = leadsFilters.dateTo;
+          
+          handleFiltersChange(filtersToApply);
+          setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+          setRefreshKey((prev) => prev + 1);
+          setShowFiltersSidebar(false);
+        }}
+        onReset={() => {
+          setLeadsSearch("");
+          setLeadsFilters({
+            assignedTo: null,
+            stage: null,
+            industry: null,
+            source: null,
+            leadPotential: null,
+            campaign: null,
+            leadScoreMin: null,
+            leadScoreMax: null,
+            dateFrom: null,
+            dateTo: null,
+          });
+          handleFiltersChange({});
+          setCurrentFilters({});
+          setActiveFilter("all");
+        }}
+      />
     </React.Fragment>
   );
 };
