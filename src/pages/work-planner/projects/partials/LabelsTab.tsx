@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import { Plus, Trash2, Edit, Tag } from 'lucide-react';
 import { createProjectLabel, updateProjectLabel, deleteProjectLabel } from '@utils/tasks';
-import { canManage } from '@pages/work-planner/helpers';
+import { canManage } from '@utils/work-planner';
 import { useSession } from 'next-auth/react';
 interface LabelsTabProps {
   selectedProject: any;

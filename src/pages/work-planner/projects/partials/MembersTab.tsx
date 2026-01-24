@@ -4,7 +4,7 @@ import Select from 'react-select';
 import { UserPlus, Trash2, Edit, Users } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { addMember, updateMemberRole, removeMember } from '@utils/tasks';
-import { canManage } from '@pages/work-planner/helpers';
+import { canManage } from '@utils/work-planner';
 
 interface MembersTabProps {
   selectedProject: any;
