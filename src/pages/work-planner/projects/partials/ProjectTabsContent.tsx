@@ -520,6 +520,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
         ) : activeTab === 'board' ? (
           <BoardTab
             selectedProject={selectedProject}
+            hierarchyDataExtensions={hierarchyDataExtensions}
             statuses={statuses}
             boardTasks={boardTasks}
             loadingBoardTasks={loadingBoardTasks}

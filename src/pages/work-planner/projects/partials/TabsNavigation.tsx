@@ -15,7 +15,7 @@ const TabsNavigation: React.FC<TabsNavigationProps> = ({ activeTab, onTabChange 
   return (
     <div style={styles.tabsContainer}>
       <div style={styles.tabsInner}>
-        {['Overview', 'Board', 'List', 'Members', 'Statuses', 'Labels', 'Reports'].map((tab) => (
+        {['Overview', 'Board', 'List', 'Members', 'Statuses', 'Labels'].map((tab) => (
           <button
             key={tab}
             onClick={() => onTabChange(tab.toLowerCase())}

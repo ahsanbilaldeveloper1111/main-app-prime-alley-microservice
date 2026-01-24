@@ -9,6 +9,8 @@ interface ListProjectsParams {
   page?: number;
   limit?: number;
   search?: string;
+  status?: string;
+  user_extensions?: string[];
 }
 
 interface CreateProjectData {
@@ -69,6 +71,8 @@ interface ListTasksParams {
   status_id?: number;
   priority?: string;
   is_completed?: boolean;
+  due_date_from?: string;
+  due_date_to?: string;
   frequency?: string;
   is_active?: boolean;
   withRelations?: string[];
@@ -218,20 +222,31 @@ const validateArrayResponse = (
  */
 export const listProjects = async (params: ListProjectsParams = {}) => {
   try {
-    const { page = 1, limit = 20, search = "" } = params;
-    
-    const queryParams: any = {
-      page,
-      limit,
-    };
-    
+    const { page = 1, limit = 20, search = "", status, user_extensions } = params;
+
+    // Ensure array params use `param[]` formatting
+    const formattedParams = new URLSearchParams();
+    formattedParams.append('page', String(page));
+    formattedParams.append('limit', String(limit));
+
     if (search) {
-      queryParams.search = search;
+      formattedParams.append('search', search);
     }
-    
-    const response = await axiosInstance.get(`${prefix}/projects`, {
-      params: queryParams
-    });
+
+    if (status) {
+      formattedParams.append('status', status);
+    }
+
+    if (Array.isArray(user_extensions) && user_extensions.length > 0) {
+      user_extensions.forEach((ext) => {
+        if (ext) formattedParams.append('user_extensions[]', String(ext));
+      });
+    }
+
+    const queryString = formattedParams.toString();
+    const url = queryString ? `${prefix}/projects?${queryString}` : `${prefix}/projects`;
+
+    const response = await axiosInstance.get(url);
     
     // For list operations, we need the full response (data, pagination, summary)
     if (response?.data) {
@@ -524,6 +539,8 @@ export const listTasks = async (params: ListTasksParams = {}) => {
       status_id,
       priority,
       is_completed,
+      due_date_from,
+      due_date_to,
       frequency,
       is_active,
       withRelations,
@@ -544,6 +561,8 @@ export const listTasks = async (params: ListTasksParams = {}) => {
     if (status_id) formattedParams.append('status_id', status_id.toString());
     if (priority) formattedParams.append('priority', priority);
     if (is_completed !== undefined) formattedParams.append('is_completed', is_completed.toString());
+    if (due_date_from) formattedParams.append('due_date_from', due_date_from);
+    if (due_date_to) formattedParams.append('due_date_to', due_date_to);
     if (frequency) formattedParams.append('frequency', frequency);
     if (is_active !== undefined) formattedParams.append('is_active', is_active.toString());
     

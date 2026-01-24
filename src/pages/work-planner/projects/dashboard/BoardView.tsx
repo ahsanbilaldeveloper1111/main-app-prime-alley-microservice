@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Search, Plus, MoreVertical, Calendar,
   X
@@ -10,6 +10,7 @@ import { toast } from 'react-toastify';
 
 interface BoardViewProps {
   selectedProject: any;
+  hierarchyDataExtensions?: any[];
   statuses: any[];
   boardTasks: any[];
   loadingBoardTasks: boolean;
@@ -35,6 +36,7 @@ interface BoardViewProps {
 
 const BoardView: React.FC<BoardViewProps> = ({
   selectedProject,
+  hierarchyDataExtensions = [],
   statuses,
   boardTasks,
   loadingBoardTasks,
@@ -62,6 +64,29 @@ const BoardView: React.FC<BoardViewProps> = ({
   const [activeDetailTab, setActiveDetailTab] = useState('activity');
   const [draggedTask, setDraggedTask] = useState<any>(null);
   const [dragOverStatus, setDragOverStatus] = useState<number | null>(null);
+
+  const extensionNameByNumber = useMemo(() => {
+    const map = new Map<string, string>();
+    (hierarchyDataExtensions || []).forEach((ext: any) => {
+      const extNumber = String(ext?.extension_number || ext?.id || '').trim();
+      const name = String(ext?.user?.name || ext?.name || '').trim();
+      if (extNumber && name) map.set(extNumber, name);
+    });
+    return map;
+  }, [hierarchyDataExtensions]);
+
+  const getUserNameFromExtension = (extensionNumber: any): string => {
+    const key = String(extensionNumber || '').trim();
+    if (!key) return '';
+    return extensionNameByNumber.get(key) || key;
+  };
+
+  const getAssigneeDisplayName = (assignee: any): string => {
+    if (!assignee) return '';
+    if (assignee.user?.name) return String(assignee.user.name);
+    const extNum = assignee.extension_number || assignee.extension || assignee.id;
+    return getUserNameFromExtension(extNum);
+  };
 
   const handleTaskClick = (task: any) => {
     setSelectedTask(task);
@@ -592,11 +617,6 @@ const BoardView: React.FC<BoardViewProps> = ({
                 </div>
               ) : (
                 statusTasks.map((task: any) => {
-                  const assigneeName = task.assignees?.[0]?.user?.name || task.assignees?.[0]?.extension_number || 'Unassigned';
-                  const initials = assigneeName !== 'Unassigned' 
-                    ? assigneeName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
-                    : 'UN';
-                  
                   return (
                     <div
                       key={task.id}
@@ -670,13 +690,13 @@ const BoardView: React.FC<BoardViewProps> = ({
                         {task.assignees && task.assignees.length > 0 && (
                           <div style={styles.assignees}>
                             {task.assignees.slice(0, 3).map((assignee: any, idx: number) => {
-                              const name = assignee.user?.name || assignee.extension_number || '';
+                              const name = getAssigneeDisplayName(assignee);
                               const assigneeInitials = name !== '' 
                                 ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
                                 : 'UN';
                               return (
-                                <div key={idx} style={styles.avatar} title={name}>
-                                  {assigneeInitials}
+                                  <div key={idx} style={styles.avatar} title={name}>
+                                    {assigneeInitials}
                                 </div>
                               );
                             })}
@@ -745,7 +765,7 @@ const BoardView: React.FC<BoardViewProps> = ({
                 <div className="assignee-group">
                   {selectedTask.assignees && selectedTask.assignees.length > 0 ? (
                     selectedTask.assignees.map((assignee: any, idx: number) => {
-                      const name = assignee.user?.name || assignee.extension_number || '';
+                      const name = getAssigneeDisplayName(assignee);
                       const initials = name !== '' 
                         ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
                         : 'UN';

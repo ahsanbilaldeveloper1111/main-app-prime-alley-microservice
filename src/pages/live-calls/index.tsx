@@ -281,6 +281,15 @@ const LiveCallDashboard = () => {
   // Track registered DNs with their timestamps for oldest idle calculation
   const [registeredDnsStore, setRegisteredDnsStore] = useState<Record<string, { deviceName: string; when: string }>>({})
 
+  // Idle tracking (Available & Idle only) - keyed by DN
+  // - initialized only for REGISTERED extensions
+  // - updated when an extension transitions into activeIdle (e.g. call ended)
+  // - initialized when an extension becomes REGISTERED from UNREGISTERED
+  // - cleared when extension goes offline / unregistered
+  const [idleSinceByDn, setIdleSinceByDn] = useState<Record<string, string>>({})
+  const prevSectionByDnRef = useRef<Record<string, string>>({})
+  const prevIsRegisteredByDnRef = useRef<Record<string, boolean>>({})
+
   // Process complete_state events to track registered devices
   useEffect(() => {
     if (!eventLog || eventLog.length === 0) return
@@ -443,6 +452,85 @@ const LiveCallDashboard = () => {
 
     return oldest
   }, [categorizedDns, registeredDnsStore])
+
+  // Maintain idle timestamps per DN (no localStorage; driven by existing CTI state updates)
+  useEffect(() => {
+    if (!isInitialized || !dnsMap) return
+
+    const dnsList = Object.values(dnsMap) as any[]
+    const nowIso = new Date().toISOString()
+
+    const getLatestRegisteredWhenIso = (dn: string): string | undefined => {
+      let latest: string | undefined = undefined
+      Object.entries(registeredDnsStore).forEach(([key, value]) => {
+        const [storeDn] = key.split('_')
+        if (storeDn !== String(dn)) return
+        if (!value?.when) return
+        if (!latest || new Date(value.when) > new Date(latest)) {
+          latest = value.when
+        }
+      })
+      return latest
+    }
+
+    const currentSectionByDn = categorizedDns as Record<string, string>
+
+    setIdleSinceByDn(prev => {
+      let next = prev
+
+      const seenDns = new Set<string>()
+
+      dnsList.forEach(({ dn, devices }: any) => {
+        const dnKey = String(dn)
+        seenDns.add(dnKey)
+
+        const deviceList = Object.values(devices || {}) as CtiDevice[]
+        const isRegistered = deviceList.some(d => d.terminalState === 'REGISTERED')
+        const currentSection = currentSectionByDn[dnKey]
+        const prevSection = prevSectionByDnRef.current[dnKey]
+        const prevIsRegistered = prevIsRegisteredByDnRef.current[dnKey] || false
+
+        const shouldClear = !isRegistered || currentSection === 'downOffline'
+        if (shouldClear) {
+          if (next[dnKey] !== undefined) {
+            if (next === prev) next = { ...prev }
+            delete next[dnKey]
+          }
+          prevIsRegisteredByDnRef.current[dnKey] = isRegistered
+          prevSectionByDnRef.current[dnKey] = currentSection
+          return
+        }
+
+        if (currentSection === 'activeIdle') {
+          const transitionedIntoIdle = !!prevSection && prevSection !== 'activeIdle'
+          const becameRegistered = !prevIsRegistered && isRegistered
+          const missingTimestamp = next[dnKey] === undefined
+
+          if (transitionedIntoIdle) {
+            if (next === prev) next = { ...prev }
+            next[dnKey] = nowIso
+          } else if (becameRegistered || missingTimestamp) {
+            const initialIso = getLatestRegisteredWhenIso(dnKey) || nowIso
+            if (next === prev) next = { ...prev }
+            next[dnKey] = initialIso
+          }
+        }
+
+        prevIsRegisteredByDnRef.current[dnKey] = isRegistered
+        prevSectionByDnRef.current[dnKey] = currentSection
+      })
+
+      // Drop stale keys for DNs no longer present
+      Object.keys(next).forEach(dnKey => {
+        if (!seenDns.has(dnKey)) {
+          if (next === prev) next = { ...prev }
+          delete next[dnKey]
+        }
+      })
+
+      return next
+    })
+  }, [categorizedDns, dnsMap, isInitialized, registeredDnsStore])
 
   // Helper function to clear monitoring state
   const clearMonitoringState = useCallback((monitoredDn: string, reason: string = 'call ended') => {
@@ -1007,6 +1095,7 @@ const LiveCallDashboard = () => {
         isDnInActiveCall={isDnInActiveCall}
         userAddress={userAddress}
         monitoringStartTime={monitoringStartTime}
+        idleSinceByDn={idleSinceByDn}
         loading={loading}
         selectedTeam={selectedTeam}
         selectedStatus={selectedStatus}
