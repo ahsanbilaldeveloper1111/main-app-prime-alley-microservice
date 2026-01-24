@@ -141,10 +141,38 @@ const BoardView: React.FC<BoardViewProps> = ({
     }
 
     try {
-      // Update task status via API
-      await updateTask(draggedTask.id, {
+      // Build complete payload with all task fields
+      const payload: any = {
         status_id: targetStatusId
-      } as any);
+      };
+
+      // Include all existing task fields
+      if (draggedTask.title) payload.title = draggedTask.title;
+      if (draggedTask.description) payload.description = draggedTask.description;
+      if (draggedTask.priority) payload.priority = draggedTask.priority;
+      if (draggedTask.due_date) payload.due_date = draggedTask.due_date;
+      if (draggedTask.project_id !== undefined && draggedTask.project_id !== null) {
+        payload.project_id = draggedTask.project_id;
+      }
+
+      // Map assignees to extension_numbers
+      if (draggedTask.assignees && Array.isArray(draggedTask.assignees) && draggedTask.assignees.length > 0) {
+        payload.extension_numbers = draggedTask.assignees.map((assignee: any) => 
+          assignee.extension_number || assignee.extension || assignee.id
+        ).filter(Boolean);
+      } else if (draggedTask.extension_numbers && Array.isArray(draggedTask.extension_numbers)) {
+        payload.extension_numbers = draggedTask.extension_numbers;
+      }
+
+      // Map labels to label_ids
+      if (draggedTask.labels && Array.isArray(draggedTask.labels) && draggedTask.labels.length > 0) {
+        payload.label_ids = draggedTask.labels.map((label: any) => label.id).filter((id: any) => id !== undefined && id !== null);
+      } else if (draggedTask.label_ids && Array.isArray(draggedTask.label_ids)) {
+        payload.label_ids = draggedTask.label_ids;
+      }
+
+      // Update task via API with complete payload
+      await updateTask(draggedTask.id, payload);
 
       // Refresh board data
       if (onTaskStatusChange) {

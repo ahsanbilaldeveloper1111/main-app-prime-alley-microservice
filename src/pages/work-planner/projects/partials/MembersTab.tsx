@@ -2,7 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import Select from 'react-select';
 import { UserPlus, Trash2, Edit, Users } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { addMember, updateMemberRole, removeMember } from '@utils/tasks';
+import { canManage } from '@pages/work-planner/helpers';
 
 interface MembersTabProps {
   selectedProject: any;
@@ -21,12 +23,18 @@ const MembersTab: React.FC<MembersTabProps> = ({
   styles,
   hierarchyDataExtensions
 }) => {
+  const { data: session } = useSession();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [formData, setFormData] = useState({ extension_number: '', role: 'member' });
   const [processing, setProcessing] = useState(false);
+
+  // Check if user can add members
+  const isAllow = useMemo(() => {
+    return canManage(members, selectedProject, session);
+  }, [members, selectedProject, session]);
 
   const handleAddMember = async () => {
     if (!selectedProject?.id || !formData.extension_number) return;
@@ -152,7 +160,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
         const name = String(ext?.user?.name || ext?.name || '').trim();
         return {
           value,
-          label: name ? `${name} (${value})` : value || 'Unknown'
+          label: name ? `${name}` : value || 'Unknown'
         };
       })
       .filter((opt: any) => opt.value)
@@ -190,15 +198,17 @@ const MembersTab: React.FC<MembersTabProps> = ({
       <div style={styles.card}>
         <div style={styles.cardHeader}>
           <h5 style={styles.cardTitle}>Project Members</h5>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setShowAddModal(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <UserPlus size={16} />
-            Add Member
-          </Button>
+          {isAllow && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowAddModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <UserPlus size={16} />
+              Add Member
+            </Button>
+          )}
         </div>
 
         {loading ? (
@@ -219,7 +229,9 @@ const MembersTab: React.FC<MembersTabProps> = ({
                   <th style={styles.th}>Member</th>
                   <th style={styles.th}>Extension</th>
                   <th style={styles.th}>Role</th>
-                  <th style={styles.th}>Actions</th>
+                  {isAllow && (
+                    <th style={styles.th}>Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -281,6 +293,9 @@ const MembersTab: React.FC<MembersTabProps> = ({
                           {member.role || 'Member'}
                         </span>
                       </td>
+
+
+                      {isAllow && (
                       <td style={styles.td}>
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                           <button
@@ -307,7 +322,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
                           >
                             <Edit size={16} />
                           </button>
-                          {member.role?.toLowerCase() !== 'owner' && (
+                          
                             <button
                               onClick={() => openDeleteModal(member)}
                               style={{
@@ -332,9 +347,12 @@ const MembersTab: React.FC<MembersTabProps> = ({
                             >
                               <Trash2 size={16} />
                             </button>
-                          )}
+                          
                         </div>
                       </td>
+                      )}
+
+
                     </tr>
                   );
                 })}
@@ -352,7 +370,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
         <Modal.Body>
           <Form>
             <Form.Group className="mb-3">
-              <Form.Label>Extension Number</Form.Label>
+              <Form.Label>Select Member</Form.Label>
               <Select
                 value={selectedExtensionOption}
                 onChange={(selectedOption: any) => {
@@ -362,7 +380,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
                   }));
                 }}
                 options={extensionOptions}
-                placeholder="Select Extension"
+                placeholder="Type to search"
                 isClearable
                 isSearchable
                 menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
@@ -407,7 +425,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
               >
                 <option value="member">Member</option>
                 <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
+                <option value="viewer">Viewer</option>
               </Form.Select>
             </Form.Group>
           </Form>
