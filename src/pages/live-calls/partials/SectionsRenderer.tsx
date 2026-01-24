@@ -28,6 +28,7 @@ interface SectionsRendererProps {
   isDnInActiveCall: (dn: string) => boolean
   userAddress?: string | null
   monitoringStartTime?: Record<string, Date>
+  idleSinceByDn?: Record<string, string>
   loading: boolean
   selectedTeam: string
   selectedStatus: string
@@ -61,6 +62,7 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
   isDnInActiveCall,
   userAddress,
   monitoringStartTime,
+  idleSinceByDn,
   loading,
   selectedTeam,
   selectedStatus,
@@ -304,6 +306,7 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
                 isDnInActiveCall={isDnInActiveCall}
                 userAddress={userAddress}
                 monitoringStartTime={monitoringStartTime}
+                idleSinceByDn={idleSinceByDn}
                 isCollapsed={collapsedSections[sectionKey] || false}
                 onToggle={() => toggleSection(sectionKey)}
               />

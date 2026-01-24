@@ -61,7 +61,7 @@ interface Task {
   id: string;
   title: string;
   status: 'To Do' | 'In Progress' | 'In Review' | 'Overdue' | string;
-  priority: 'Low' | 'Medium' | 'High' | string;
+  priority: 'Low' | 'Medium' | 'High' | 'Urgent' | string;
   project: string;
   assignee: string;
   assigneeInitials: string;
@@ -147,17 +147,18 @@ const TasksList = () => {
   // Map API task to UI Task
   const mapApiTaskToTask = (apiTask: ApiTask): Task => {
     const getStatusName = (status: any) => {
-      if (!status) return 'To Do';
-      return status.name || 'To Do';
+      if (!status) return 'N/A';
+      return status.name || 'N/A';
     };
 
     const getPriorityName = (priority: string) => {
       const priorityMap: Record<string, string> = {
         'low': 'Low',
         'normal': 'Medium',
-        'high': 'High'
+        'high': 'High',
+        'urgent': 'Urgent'
       };
-      return priorityMap[priority] || 'Medium';
+      return priorityMap[priority] || 'Low';
     };
 
     const formatDate = (dateStr: string | null | undefined) => {
@@ -294,7 +295,8 @@ const TasksList = () => {
         const priorityMap: Record<string, string> = {
           'Low': 'low',
           'Medium': 'normal',
-          'High': 'high'
+          'High': 'high',
+          'Urgent': 'urgent'
         };
         params.priority = priorityMap[currentFilters.filterPriority] || currentFilters.filterPriority.toLowerCase();
       }
@@ -433,9 +435,10 @@ const TasksList = () => {
   const getPriorityVariant = (priority: string) => {
     switch (priority) {
       case 'High': return 'danger';
+      case 'Urgent': return 'danger';
       case 'Medium': return 'warning';
       case 'Low': return 'success';
-      default: return 'secondary';
+      default: return 'info';
     }
   };
 
@@ -537,14 +540,27 @@ const TasksList = () => {
     }
   };
 
-  const clearFilters = () => {
-    setFilterProject('All Projects');
-    setFilterAssignee([]);
-    setFilterStatus('All Status');
-    setFilterPriority('All Priority');
-    setFilterDueDate('All Dates');
-    setSearchTerm('');
-  };
+  const clearFilters = useCallback(() => {
+    const cleared = {
+      searchTerm: '',
+      filterProject: 'All Projects',
+      filterAssignee: [] as string[],
+      filterStatus: 'All Status',
+      filterPriority: 'All Priority',
+      filterDueDate: 'All Dates'
+    };
+
+    setSearchTerm(cleared.searchTerm);
+    setFilterProject(cleared.filterProject);
+    setFilterAssignee(cleared.filterAssignee);
+    setFilterStatus(cleared.filterStatus);
+    setFilterPriority(cleared.filterPriority);
+    setFilterDueDate(cleared.filterDueDate);
+
+    // Keep pagination unchanged; just refresh with cleared filters
+    filtersRef.current = cleared;
+    fetchTasks();
+  }, [fetchTasks]);
 
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -560,8 +576,8 @@ const TasksList = () => {
     return matchesProject && matchesAssignee && matchesStatus && matchesPriority;
   });
 
-  const statuses = ['All Status', 'To Do', 'In Progress', 'In Review', 'Overdue'];
-  const priorities = ['All Priority', 'Low', 'Medium', 'High'];
+  const statuses = ['All Status', 'To Do', 'In Progress', 'In Review', 'Overdue', 'Completed'];
+  const priorities = ['All Priority', 'Low', 'Medium', 'High', 'Urgent'];
   
   // Convert to SelectBox format (value should be the actual value, not the label)
   const projectOptions = projects.map(project => ({ value: project, label: project }));
@@ -1138,35 +1154,7 @@ const TasksList = () => {
             </div>
           </div>
 
-          <div className="tabs-section">
-            <Nav variant="tabs">
-              <Nav.Item>
-                <Nav.Link 
-                  active={activeTab === 'My Work'}
-                  onClick={() => setActiveTab('My Work')}
-                >
-                  My Work
-                </Nav.Link>
-              </Nav.Item>
-              <Nav.Item>
-                <Nav.Link 
-                  active={activeTab === 'All Tasks'}
-                  onClick={() => setActiveTab('All Tasks')}
-                >
-                  All Tasks
-                </Nav.Link>
-              </Nav.Item>
-              <Nav.Item>
-                <Nav.Link 
-                  active={activeTab === 'Activity'}
-                  onClick={() => setActiveTab('Activity')}
-                >
-                  Activity
-                </Nav.Link>
-              </Nav.Item>
-            </Nav>
-          </div>
-
+          
           <div className="table-container">
             {pagination.last_page > 1 && (
               <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
@@ -1197,13 +1185,13 @@ const TasksList = () => {
               <Table className="tasks-table" hover>
                 <thead>
                   <tr>
-                    <th style={{ width: '50px' }}>
+                    {/* <th style={{ width: '50px' }}>
                       <Form.Check 
                         type="checkbox"
                         checked={selectedTasks.size === filteredTasks.length && filteredTasks.length > 0}
                         onChange={handleSelectAll}
                       />
-                    </th>
+                    </th> */}
                     <th>Task ID</th>
                     <th>Title</th>
                     <th>Status</th>

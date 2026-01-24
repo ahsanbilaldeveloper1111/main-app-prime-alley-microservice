@@ -402,6 +402,16 @@ const AnalyzeRecordings = () => {
                 )
             }
         },
+
+        {
+            key:'message',
+            name: 'Message',
+            selector: (row: any) => row?.message,
+            sortable: true,
+            cell: (props: any) => {
+                return props?.message || 'N/A';
+            }
+        },
         {
             key: 'Action',
             name: 'Action',

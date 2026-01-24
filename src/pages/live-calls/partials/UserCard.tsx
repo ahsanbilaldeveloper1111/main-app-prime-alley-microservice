@@ -5,6 +5,7 @@ import UserDummyImage from '@assets/images/user-dummy.jpg'
 import { getStorageImageUrl } from '@utils/imageUtils'
 import { CtiDevice, ActiveMonitoring, ShowPopup } from '@components/live-calls/utils/types'
 import CallTimer from './CallTimer'
+import IdleTimer from './IdleTimer'
 import { 
   getDeviceTypeLabel
 } from '@components/live-calls/utils/helpers'
@@ -33,6 +34,7 @@ interface UserCardProps {
   isDnInActiveCall: (dn: string) => boolean
   userAddress?: string | null
   monitoringStartTime?: Record<string, Date>
+  idleSinceByDn?: Record<string, string>
 }
 
 const UserCard: React.FC<UserCardProps> = ({
@@ -58,7 +60,8 @@ const UserCard: React.FC<UserCardProps> = ({
   selectedTone,
   isDnInActiveCall,
   userAddress,
-  monitoringStartTime
+  monitoringStartTime,
+  idleSinceByDn
 }) => {
 
   // State to force re-render when data becomes available
@@ -235,6 +238,11 @@ const UserCard: React.FC<UserCardProps> = ({
   const teamNames = useMemo(() => {
     return extensionData?.team_name || []
   }, [extensionData])
+
+  const idleStartTime = useMemo(() => {
+    if (sectionKey !== 'activeIdle') return null
+    return idleSinceByDn?.[String(dn)] || null
+  }, [dn, idleSinceByDn, sectionKey])
 
   const handleDeviceClick = (deviceName: string, deviceType: string, terminalState: string) => {
     const hasMonitoringPermissions = session?.user?.permissions?.some((permission: string) => 
@@ -753,10 +761,22 @@ const UserCard: React.FC<UserCardProps> = ({
               </>
             ) : (status === 'Available & Idle' || status === 'Offline') ? (
               <>
-                <div className="d-flex justify-content-between mb-0">
+                <div className="d-flex justify-content-between mb-1">
                   <span className="text-muted">EXT:</span>
                   <span className="fw-semibold text-dark">{dn}</span>
                 </div>
+                {status === 'Available & Idle' && (
+                  <div className="d-flex justify-content-between align-items-center mb-0" style={{ display: 'none' }}>
+                    <span className="text-muted" style={{ color: 'rgb(245, 158, 11)' }}>Idle Time:</span>
+                    <span className="fw-semibold text-dark ustify-content-end">
+                      {idleStartTime ? (
+                        <IdleTimer dn={String(dn)} isActive={true} startTime={idleStartTime} />
+                      ) : (
+                        <span style={{ fontSize: '0.55rem' }}>--:--:--</span>
+                      )}
+                    </span>
+                  </div>
+                )}
               </>
             ) : (
               <>

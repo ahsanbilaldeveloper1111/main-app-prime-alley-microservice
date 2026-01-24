@@ -28,6 +28,7 @@ interface SectionContainerProps {
   isDnInActiveCall: (dn: string) => boolean
   userAddress?: string | null
   monitoringStartTime?: Record<string, Date>
+  idleSinceByDn?: Record<string, string>
   isCollapsed: boolean
   onToggle: () => void
 }
@@ -54,6 +55,7 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
   isDnInActiveCall,
   userAddress,
   monitoringStartTime,
+  idleSinceByDn,
   isCollapsed,
   onToggle
 }) => {
@@ -172,6 +174,7 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
               isDnInActiveCall={isDnInActiveCall}
               userAddress={userAddress}
               monitoringStartTime={monitoringStartTime}
+              idleSinceByDn={idleSinceByDn}
             />
           ))}
         </div>

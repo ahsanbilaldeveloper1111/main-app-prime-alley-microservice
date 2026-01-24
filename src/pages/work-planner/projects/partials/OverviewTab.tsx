@@ -69,7 +69,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
       )}
 
       {/* Filters */}
-      <div style={styles.card}>
+      {/* <div style={styles.card}>
         <div style={styles.filterRow}>
           <div style={styles.inputGroup}>
             <Search size={16} color="#6B7280" style={styles.inputIcon} />
@@ -118,7 +118,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
             Clear Filters
           </button>
         </div>
-      </div>
+      </div> */}
 
       {/* Charts Row */}
       <div style={{...styles.grid, ...styles.gridTwo}}>
@@ -126,13 +126,13 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
         <div style={styles.card}>
           <div style={styles.cardHeader}>
             <h5 style={styles.cardTitle}>Tasks by Status</h5>
-            <button 
+            {/* <button 
               style={{...styles.buttonLight, padding: '0.5rem'}}
               onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#E5E9F2'}
               onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#F4F7FA'}
             >
               <MoreVertical size={18} />
-            </button>
+            </button> */}
           </div>
           
           {tasksByStatus.length === 0 || tasksByStatus.every(item => item.value === 0) ? (
@@ -185,13 +185,13 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
         <div style={styles.card}>
           <div style={styles.cardHeader}>
             <h5 style={styles.cardTitle}>Workload by Assignee</h5>
-            <button 
+            {/* <button 
               style={{...styles.buttonLight, padding: '0.5rem'}}
               onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#E5E9F2'}
               onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#F4F7FA'}
             >
               <MoreVertical size={18} />
-            </button>
+            </button> */}
           </div>
           
           {workloadData.length === 0 || workloadData.every(person => 

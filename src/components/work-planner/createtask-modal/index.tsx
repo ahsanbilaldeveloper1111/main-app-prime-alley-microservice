@@ -20,6 +20,7 @@ import {
   FileSpreadsheet,
   Phone
 } from 'lucide-react';
+import { toast } from 'react-toastify';
 import { listProjects, createTask, updateTask } from '@utils/tasks';
 import { getAutoTimezone } from '@utils/Helper';
 import RichTextEditor from '../../../pages/help-center/partials/RichTextEditor';
@@ -167,6 +168,9 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   // Initialize form data - populate from editTask if in edit mode
   const getInitialFormData = (): CreateTaskFormData => {
     if (isEdit && editTask) {
+      const projectIdRaw = editTask.project_id ?? editTask.project?.id;
+      const statusIdRaw = editTask.status_id ?? editTask.status?.id;
+
       // Map assignees from extension_numbers to assigneeIds
       const assigneeIds = editTask.assignees?.map((assignee: any) => {
         const extension = extensions.find((ext: any) => 
@@ -182,8 +186,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       return {
         title: editTask.title || '',
         description: editTask.description || '',
-        projectId: editTask.project_id || editTask.project?.id || null,
-        statusId: editTask.status_id || editTask.status?.id || null,
+        projectId: projectIdRaw ? Number(projectIdRaw) : null,
+        statusId: statusIdRaw ? Number(statusIdRaw) : null,
         priorityId: mapPriorityStringToId(editTask.priority),
         assigneeIds: assigneeIds,
         dueDate: formatDateForInput(editTask.due_date),
@@ -387,7 +391,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }
 
     if (!formData.title.trim()) {
-      alert('Please enter a task title');
+      toast.error('Please enter a task title');
       return;
     }
 
@@ -397,7 +401,6 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       const payload: any = {
         title: formData.title,
         description: formData.description || '',
-        status_id: formData.statusId || undefined,
         priority: mapPriorityIdToString(formData.priorityId) || undefined,
         due_date: formData.dueDate || '',
         extension_numbers: formData.assigneeIds?.map((id: number) => {
@@ -405,13 +408,15 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           const extension = extensions.find((ext: any) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
-        label_ids: formData.labelIds || [],
         type: taskType // Add task type (regular, recurring, or todo)
       };
 
       // Add project_id if available (optional)
       if (formData.projectId) {
         payload.project_id = formData.projectId;
+        // Only send project-scoped fields when a project is selected
+        payload.status_id = formData.statusId || undefined;
+        payload.label_ids = formData.labelIds || [];
       }
 
       // Add parent_task_id if records are linked (use first linked record as parent)
@@ -462,7 +467,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }
 
     if (!formData.title.trim()) {
-      alert('Please enter a task title');
+      toast.error('Please enter a task title');
       return;
     }
 
@@ -472,7 +477,6 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       const payload: any = {
         title: formData.title,
         description: formData.description || '',
-        status_id: formData.statusId || undefined,
         priority: mapPriorityIdToString(formData.priorityId) || undefined,
         due_date: formData.dueDate || '',
         extension_numbers: formData.assigneeIds?.map((id: number) => {
@@ -480,13 +484,15 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           const extension = extensions.find((ext: any) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
-        label_ids: formData.labelIds || [],
         type: taskType // Add task type (regular, recurring, or todo)
       };
 
       // Add project_id if available (optional)
       if (formData.projectId) {
         payload.project_id = formData.projectId;
+        // Only send project-scoped fields when a project is selected
+        payload.status_id = formData.statusId || undefined;
+        payload.label_ids = formData.labelIds || [];
       }
 
       // Add parent_task_id if records are linked (use first linked record as parent)
@@ -698,8 +704,13 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 Status
               </Form.Label>
               <Form.Select
-                value={formData.statusId || ''}
-                onChange={(e) => setFormData({ ...formData, statusId: Number(e.target.value) })}
+                value={formData.statusId ?? ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    statusId: e.target.value ? Number(e.target.value) : null
+                  })
+                }
                 className="py-2"
                 style={{ fontSize: '14px' }}
                 disabled={!formData.projectId || statuses.length === 0}
@@ -707,13 +718,28 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 {!formData.projectId ? (
                   <option value="">Select a project first</option>
                 ) : statuses.length === 0 ? (
-                  <option value="">No statuses available</option>
-                ) : (
-                  statuses.map(status => (
-                    <option key={status.id} value={status.id}>
-                      {status.name}
+                  isEdit && formData.statusId ? (
+                    <option value={formData.statusId}>
+                      {editTask?.status?.name || editTask?.status_name || `Status #${formData.statusId}`}
                     </option>
-                  ))
+                  ) : (
+                    <option value="">No statuses available</option>
+                  )
+                ) : (
+                  <>
+                    {isEdit &&
+                      formData.statusId &&
+                      !statuses.some(s => String(s.id) === String(formData.statusId)) && (
+                        <option value={formData.statusId}>
+                          {editTask?.status?.name || editTask?.status_name || `Status #${formData.statusId}`}
+                        </option>
+                      )}
+                    {statuses.map(status => (
+                      <option key={status.id} value={status.id}>
+                        {status.name}
+                      </option>
+                    ))}
+                  </>
                 )}
               </Form.Select>
             </Form.Group>
