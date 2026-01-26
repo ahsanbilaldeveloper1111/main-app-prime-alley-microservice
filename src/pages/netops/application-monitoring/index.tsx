@@ -27,7 +27,8 @@ import {
   Play,
   AlertCircle,
   XCircle,
-  Clock
+  Clock,
+  Network
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 
@@ -44,12 +45,12 @@ const ApplicationMonitoring = () => {
       const [loadingServers, setLoadingServers] = useState(false);
       const [showDropdown, setShowDropdown] = useState(false);
       
-      // Helper function to format uptime
+      // Helper function to format uptime in compact format (e.g., "15d 4h 55m")
       const formatUptime = (seconds: number): string => {
         const days = Math.floor(seconds / 86400);
         const hours = Math.floor((seconds % 86400) / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
-        return `${days} days, ${hours}h ${minutes}m`;
+        return `${days}d ${hours}h ${minutes}m`;
       };
       
       // Helper function to get network IP
@@ -194,7 +195,7 @@ const ApplicationMonitoring = () => {
           if (autoRefresh) {
             const interval = setInterval(() => {
               fetchSystemMetrics();
-            }, 30000); // Refresh every 30 seconds
+            }, 900000); // Refresh every 15 minutes
             
             return () => clearInterval(interval);
           }
@@ -685,7 +686,7 @@ const ApplicationMonitoring = () => {
                 <div className="d-flex justify-content-between align-items-center">
                   <div className="d-flex align-items-center gap-1" style={{ color: '#4c6ef5', fontSize: '0.875rem' }}>
                     <Activity size={14} />
-                    <span>Avg Load: {systemMetrics ? systemMetrics.load['15m'].toFixed(2) : '0.00'}</span>
+                    <span>Free CPU: {systemMetrics ? systemMetrics.cpu.free_percent.toFixed(2) : '0.00'}</span>
                   </div>
                   <Badge bg={systemMetrics && systemMetrics.cpu.used_percent > 80 ? 'danger' : systemMetrics && systemMetrics.cpu.used_percent > 60 ? 'warning' : 'success'} style={{ fontSize: '0.7rem' }}>
                     {systemMetrics && systemMetrics.cpu.used_percent > 80 ? 'High' : systemMetrics && systemMetrics.cpu.used_percent > 60 ? 'Warning' : 'Normal'}
@@ -779,13 +780,24 @@ const ApplicationMonitoring = () => {
             <Card className="metric-card system-load-card">
               <Card.Body>
                 <div className="d-flex justify-content-between align-items-start mb-3">
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div className="metric-label">SYSTEM LOAD</div>
                     <h1 className="metric-value" style={{ color: '#22c55e' }}>
-                      {systemMetrics ? systemMetrics.load['15m'].toFixed(2) : '0.00'}
+                      {systemMetrics ? systemMetrics.load['1m'].toFixed(2) : '0.00'}
                     </h1>
+                    <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                      1 min average
+                    </div>
+                    {/* Horizontal progress bar */}
+                    <div style={{ 
+                      width: '100%', 
+                      height: '2px', 
+                      backgroundColor: '#ffffff', 
+                      marginBottom: '0.5rem',
+                      borderRadius: '1px'
+                    }} />
                     <div className="metric-subtitle">
-                      {systemMetrics ? `1m: ${systemMetrics.load['1m'].toFixed(2)} | 5m: ${systemMetrics.load['5m'].toFixed(2)}` : 'Loading...'}
+                      {systemMetrics ? `5m: ${systemMetrics.load['5m'].toFixed(2)} | 15m: ${systemMetrics.load['15m'].toFixed(2)}` : 'Loading...'}
                     </div>
                   </div>
                   <svg width="60" height="60">
@@ -801,7 +813,7 @@ const ApplicationMonitoring = () => {
                     />
                   </svg>
                 </div>
-                <div className="d-flex justify-content-between align-items-center">
+                {/* <div className="d-flex justify-content-between align-items-center">
                   <div className="d-flex align-items-center gap-1" style={{ color: '#22c55e', fontSize: '0.875rem' }}>
                     <Activity size={14} />
                     <span>15m Average</span>
@@ -809,7 +821,7 @@ const ApplicationMonitoring = () => {
                   <Badge bg={systemMetrics && (systemMetrics.load['15m'] / systemMetrics.cpu.cores) > 1 ? 'warning' : 'success'} style={{ fontSize: '0.7rem' }}>
                     {systemMetrics && (systemMetrics.load['15m'] / systemMetrics.cpu.cores) > 1 ? 'High' : 'Normal'}
                   </Badge>
-                </div>
+                </div> */}
               </Card.Body>
             </Card>
           </Col>
@@ -865,6 +877,95 @@ const ApplicationMonitoring = () => {
                 )}
               </Card.Body>
             </Card>
+
+            {/* Network Interfaces */}
+            {systemMetrics?.network && systemMetrics.network.length > 0 && (
+            <Card className="mb-3" style={{ border: 'none', borderRadius: '12px' }}>
+              <Card.Body>
+                <div className="section-title mb-3">
+                  <Network className="text-primary" size={20} style={{ marginRight: '8px' }} />
+                  Network Interfaces
+                </div>
+                <div className="d-flex flex-wrap gap-2">
+                  {systemMetrics.network.map((net, index) => (
+                    <div
+                      key={index}
+                      className="d-flex align-items-center gap-2 px-3 py-2"
+                      style={{
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: '20px',
+                        border: '1px solid #e2e8f0',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      {net.is_up && (
+                        <span
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            backgroundColor: '#22c55e',
+                            display: 'inline-block'
+                          }}
+                        />
+                      )}
+                      <span style={{ color: '#1e293b', fontWeight: 500 }}>
+                        {net.interface}: {net.ip}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </Card.Body>
+            </Card>
+            )}
+
+            {/* System Information */}
+            {systemMetrics && (
+            <Card className="mb-3" style={{ border: 'none', borderRadius: '12px' }}>
+              <Card.Body>
+                <div className="section-title mb-3">
+                  <AlertCircle className="text-primary" size={20} style={{ marginRight: '8px' }} />
+                  System Information
+                </div>
+                <Row className="g-3">
+                  <Col md={6} >
+                    <div className="d-flex justify-content-between align-items-center p-2" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Uptime</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b' }}>
+                        {systemMetrics.uptime ? formatUptime(systemMetrics.uptime.seconds) : 'N/A'}
+                      </span>
+                    </div>
+                  </Col>
+                  <Col md={6}>
+                    <div className="d-flex justify-content-between align-items-center p-2" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '0.875rem', color: '#64748b' }}>SELinux</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b' }}>
+                        {systemMetrics.selinux?.status || 'N/A'}
+                      </span>
+                    </div>
+                  </Col>
+                  <Col md={6} >
+                    <div className="d-flex justify-content-between align-items-center p-2" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '0.875rem', color: '#64748b' }}>NTP Sync</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b' }}>
+                        {systemMetrics.time_sync?.ntp_synchronized ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                  </Col>
+                  <Col md={6} >
+                    <div className="d-flex justify-content-between align-items-center p-2" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '0.875rem', color: '#64748b' }}>Swap Usage</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b' }}>
+                        {systemMetrics.swap ? 
+                          `${systemMetrics.swap.used_gb.toFixed(1)} / ${systemMetrics.swap.total_gb.toFixed(1)} GB (${systemMetrics.swap.used_percent.toFixed(1)}%)` 
+                          : 'N/A'}
+                      </span>
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+            )}
 
             {/* SQL Server Databases */}
             {systemMetrics?.sql && systemMetrics.sql.databases && systemMetrics.sql.databases.length > 0 && (

@@ -766,7 +766,7 @@ const UserCard: React.FC<UserCardProps> = ({
                   <span className="fw-semibold text-dark">{dn}</span>
                 </div>
                 {status === 'Available & Idle' && (
-                  <div className="d-flex justify-content-between align-items-center mb-0" style={{ display: 'none' }}>
+                  <div className="d-flex justify-content-between align-items-center mb-0" >
                     <span className="text-muted" style={{ color: 'rgb(245, 158, 11)' }}>Idle Time:</span>
                     <span className="fw-semibold text-dark ustify-content-end">
                       {idleStartTime ? (

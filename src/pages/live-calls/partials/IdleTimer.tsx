@@ -7,11 +7,43 @@ interface IdleTimerProps {
 }
 
 const IdleTimer: React.FC<IdleTimerProps> = ({ dn: _dn, isActive, startTime }) => {
-  const [elapsedTime, setElapsedTime] = useState('00:00:00')
+  const [relativeTime, setRelativeTime] = useState('')
+
+  // Format time difference as human-readable relative time
+  const formatRelativeTime = (startMs: number): string => {
+    const now = Date.now()
+    const diffMs = now - startMs
+    
+    if (diffMs < 0) return 'just now'
+    
+    const diffSeconds = Math.floor(diffMs / 1000)
+    const diffMinutes = Math.floor(diffSeconds / 60)
+    const diffHours = Math.floor(diffMinutes / 60)
+    const diffDays = Math.floor(diffHours / 24)
+    const diffMonths = Math.floor(diffDays / 30)
+    const diffYears = Math.floor(diffDays / 365)
+
+    if (diffYears > 0) {
+      return `${diffYears} ${diffYears === 1 ? 'year' : 'years'} ago`
+    }
+    if (diffMonths > 0) {
+      return `${diffMonths} ${diffMonths === 1 ? 'month' : 'months'} ago`
+    }
+    if (diffDays > 0) {
+      return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`
+    }
+    if (diffHours > 0) {
+      return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`
+    }
+    if (diffMinutes > 0) {
+      return `${diffMinutes} ${diffMinutes === 1 ? 'minute' : 'minutes'} ago`
+    }
+    return 'just now'
+  }
 
   useEffect(() => {
     if (!isActive) {
-      setElapsedTime('00:00:00')
+      setRelativeTime('')
       return
     }
 
@@ -22,33 +54,24 @@ const IdleTimer: React.FC<IdleTimerProps> = ({ dn: _dn, isActive, startTime }) =
       return Number.isFinite(parsed) ? parsed : Date.now()
     })()
 
-    const format = (diffMs: number) => {
-      const totalSeconds = Math.max(0, Math.floor(diffMs / 1000))
-      const hours = Math.floor(totalSeconds / 3600)
-      const minutes = Math.floor((totalSeconds % 3600) / 60)
-      const seconds = totalSeconds % 60
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds
-        .toString()
-        .padStart(2, '0')}`
-    }
-
     const tick = () => {
-      setElapsedTime(format(Date.now() - startMs))
+      setRelativeTime(formatRelativeTime(startMs))
     }
 
     tick()
-    const id = setInterval(tick, 1000)
+    // Update every 30 seconds for accurate relative time display
+    const id = setInterval(tick, 30000)
     return () => clearInterval(id)
   }, [isActive, startTime])
 
-  if (!isActive) return null
+  if (!isActive || !relativeTime) return null
 
   return (
     <p
       style={{ margin: '0px', fontSize: '0.55rem', lineHeight: 'normal', color: 'rgb(245, 158, 11)' }}
       className="idle-timer running"
     >
-      {elapsedTime}
+      {relativeTime}
     </p>
   )
 }
