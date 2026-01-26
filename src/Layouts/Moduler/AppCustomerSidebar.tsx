@@ -743,6 +743,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               url: '/work-planner/roles-settings',
               permission: PERMISSIONS.WORK_PLANNER_SERVICES 
             }
+            
       ]
       .filter(item => !item.permission || hasPermission(item.permission))
     }, 

@@ -33,6 +33,10 @@ else
   exit 2
 fi
 
+# Flag from GitLab CI/CD Variables (set it there)
+# Expected: 0 or 1
+STAGE_RUN_NPM="${STAGE_RUN_NPM:-0}"
+
 echo "Deploying Next.js [$ENV_NAME] → $SSH_USER@$SSH_HOST:$APP_DIR (branch=$BRANCH)"
 
 # ---------- Remote deploy ----------
@@ -57,7 +61,16 @@ sudo systemctl stop "$SERVICE_NAME" || true
 
 # ---------- npm handling ----------
 if [[ "$ENV_NAME" == "stage" ]]; then
-  echo "→ Stage: skipping npm install / npm ci (no internet)"
+  if [[ "${STAGE_RUN_NPM:-0}" == "1" ]]; then
+    echo "→ Stage: STAGE_RUN_NPM=1, installing dependencies (internet must be enabled)"
+    if [[ -f package-lock.json ]]; then
+      npm ci --no-audit --no-fund
+    else
+      npm install --no-audit --no-fund
+    fi
+  else
+    echo "→ Stage: STAGE_RUN_NPM=0, skipping npm install/ci"
+  fi
 else
   echo "→ Dev: installing dependencies"
   if [[ -f package-lock.json ]]; then

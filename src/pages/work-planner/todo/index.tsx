@@ -39,7 +39,9 @@ import {
   Clock,
   Pin,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Check,
+  Pause
 } from 'lucide-react';
 import ConvertToTaskModal from '@components/converttotask';
 
@@ -52,6 +54,7 @@ interface Task {
   labelColor: string;
   icon: React.ReactNode;
   completed: boolean;
+  priority: string;
   category: 'scheduled' | 'anytime' | 'overdue';
   rawData?: any; // Store raw API data
 }
@@ -93,8 +96,8 @@ interface LinkedRecord {
 }
 
 const DialTodo = () => {
-    const [activeTab, setActiveTab] = useState<'today' | 'completed' | 'overdue' | 'upcoming'>('today');
-    const [filterDate, setFilterDate] = useState('today');
+    const [activeTab, setActiveTab] = useState<'all' | 'today' | 'anytime' | 'completed' | 'overdue' | 'upcoming'>('all');
+    const [filterDate, setFilterDate] = useState('all');
     const [filterLabel, setFilterLabel] = useState('labels');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [showAddTask, setShowAddTask] = useState(false);
@@ -104,15 +107,31 @@ const DialTodo = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [pagination, setPagination] = useState({
       page: 1,
-      limit: 20,
+      limit: 25,
       total: 0,
-      last_page: 1
+      last_page: 1,
+      from: 0,
+      to: 0
     });
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deletingTask, setDeletingTask] = useState(false);
     const [editingTask, setEditingTask] = useState<any>(null);
+    const [isDuplicating, setIsDuplicating] = useState(false);
     const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
     const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
+    const [summary, setSummary] = useState({
+      total: 0,
+      open: 0,
+      overdue: 0,
+      dueThisWeek: 0,
+      todayDue: 0,
+      unassigned: 0,
+      highPriority: 0,
+      scheduled: 0,
+      completed: 0,
+      pending: 0,
+      anytime: 0
+    });
     
     // Fetch extensions for assignees
     const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
@@ -138,7 +157,23 @@ const DialTodo = () => {
       return <FileText size={16} />;
     };
 
-    // Map API task to Todo Task format
+    const getPriorityBadgeStyle = (priority?: string) => {
+      const p = String(priority || 'low').toLowerCase();
+      switch (p) {
+        case 'urgent':
+          return { backgroundColor: '#fee2e2', color: '#991b1b' }; // red
+        case 'high':
+          return { backgroundColor: '#ffedd5', color: '#9a3412' }; // orange
+        case 'medium':
+        case 'normal':
+          return { backgroundColor: '#dbeafe', color: '#1e40af' }; // blue
+        case 'low':
+        default:
+          return { backgroundColor: '#dcfce7', color: '#166534' }; // green
+      }
+    };
+
+    // Map API task to Todo Task format (no client-side date categorization)
     const mapApiTaskToTodoTask = (apiTask: ApiTodoTask): Task => {
       // Format time from due_time or due_date
       const formatTime = () => {
@@ -156,30 +191,14 @@ const DialTodo = () => {
         return undefined;
       };
 
-      // Determine category based on due_date and completion status
+      // Determine category without date math:
+      // - no due_date => anytime
+      // - has due_date (and optionally due_time) => scheduled
+      // Overdue is handled by the API/tab query, not client-side comparisons.
       const getCategory = (): 'scheduled' | 'anytime' | 'overdue' => {
-        if (apiTask.is_completed) return 'scheduled'; // Completed tasks go to scheduled
-        
+        if (apiTask.is_completed) return 'scheduled';
         if (!apiTask.due_date) return 'anytime';
-        
-        try {
-          const dueDate = new Date(apiTask.due_date);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          dueDate.setHours(0, 0, 0, 0);
-          
-          if (dueDate.getTime() < today.getTime()) {
-            return 'overdue';
-          }
-          
-          if (dueDate.getTime() === today.getTime() || apiTask.due_time) {
-            return 'scheduled';
-          }
-          
-          return 'anytime';
-        } catch {
-          return 'anytime';
-        }
+        return 'scheduled';
       };
 
       // Get first label or default
@@ -195,6 +214,7 @@ const DialTodo = () => {
         labelColor: firstLabel.color || '#6c757d',
         icon: getLabelIcon(firstLabel.name),
         completed: apiTask.is_completed || false,
+        priority: apiTask.priority || 'medium',
         category: getCategory(),
         rawData: apiTask
       };
@@ -203,6 +223,8 @@ const DialTodo = () => {
     // Fetch todo tasks from API
     const fetchTasks = useCallback(async () => {
       try {
+        // Clear old data immediately to prevent showing stale data
+        setTasks([]);
         setLoading(true);
         
         const params: any = {
@@ -222,34 +244,80 @@ const DialTodo = () => {
           ]
         };
 
-        // Add filters based on activeTab
+        // Add filters based on activeTab (server-driven)
         if (activeTab === 'completed') {
           params.is_completed = true;
         } else if (activeTab === 'overdue') {
           params.is_completed = false;
-          // Filter for overdue will be handled client-side based on due_date
+          // Server should return overdue tasks for this query
+        } else if (activeTab === 'today') {
+          params.is_completed = false;
+        } else if (activeTab === 'upcoming') {
+          params.is_completed = false;
+          // Server should return scheduled tasks for this query
+        }
+
+        // Date range filtering (server-driven) via due_date_from / due_date_to
+        const toYmd = (d: Date) => {
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          return `${yyyy}-${mm}-${dd}`;
+        };
+        const today = new Date();
+        const startOfToday = new Date(today);
+        startOfToday.setHours(0, 0, 0, 0);
+
+        const setRange = (from: Date, to: Date) => {
+          params.due_date_from = toYmd(from);
+          params.due_date_to = toYmd(to);
+        };
+
+        if (filterDate === 'today') {
+          setRange(startOfToday, startOfToday);
+        } else if (filterDate === 'tomorrow') {
+          const tomorrow = new Date(startOfToday);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          setRange(tomorrow, tomorrow);
+        } else if (filterDate === 'this-week') {
+          const dayOfWeek = startOfToday.getDay();
+          const startOfWeek = new Date(startOfToday);
+          // Monday as start of week
+          startOfWeek.setDate(startOfToday.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setDate(startOfWeek.getDate() + 6);
+          setRange(startOfWeek, endOfWeek);
+        } else if (filterDate === 'next-week') {
+          const dayOfWeek = startOfToday.getDay();
+          const startOfWeek = new Date(startOfToday);
+          startOfWeek.setDate(startOfToday.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
+          const startOfNextWeek = new Date(startOfWeek);
+          startOfNextWeek.setDate(startOfWeek.getDate() + 7);
+          const endOfNextWeek = new Date(startOfNextWeek);
+          endOfNextWeek.setDate(startOfNextWeek.getDate() + 6);
+          setRange(startOfNextWeek, endOfNextWeek);
+        }
+
+        // Overdue tab should only show items due before today (exclude "today" and no due_date items)
+        // If user chose an explicit date filter, keep it. Otherwise, limit to yesterday.
+        if (activeTab === 'overdue' && filterDate === 'all' && !params.due_date_to) {
+          const yesterday = new Date(startOfToday);
+          yesterday.setDate(yesterday.getDate() - 1);
+          params.due_date_to = toYmd(yesterday);
+        }
+
+        // Scheduled tab should exclude today's due items by default
+        // If user chose an explicit date filter, keep it. Otherwise, start from tomorrow.
+        if (activeTab === 'upcoming' && filterDate === 'all' && !params.due_date_from) {
+          const tomorrow = new Date(startOfToday);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          params.due_date_from = toYmd(tomorrow);
         }
 
         const response = await listTasks(params);
         
         if (response && response.data) {
           let mappedTasks = response.data.map(mapApiTaskToTodoTask);
-          
-          // Client-side filtering for overdue
-          if (activeTab === 'overdue') {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            mappedTasks = mappedTasks.filter((task: Task) => {
-              if (task.completed || !task.rawData?.due_date) return false;
-              try {
-                const dueDate = new Date(task.rawData.due_date);
-                dueDate.setHours(0, 0, 0, 0);
-                return dueDate.getTime() < today.getTime();
-              } catch {
-                return false;
-              }
-            });
-          }
           
           setTasks(mappedTasks);
           
@@ -258,8 +326,27 @@ const DialTodo = () => {
               page: response.pagination.page || 1,
               limit: response.pagination.limit || 20,
               total: response.pagination.total || 0,
-              last_page: response.pagination.last_page || 1
+              last_page: response.pagination.last_page || 1,
+              from: response.pagination.from || 0,
+              to: response.pagination.to || 0
             }));
+          }
+
+          // Update summary from API response (server-driven counters)
+          if (response.summary) {
+            setSummary({
+              total: response.summary.total || 0,
+              open: response.summary.open || 0,
+              overdue: response.summary.overdue || 0,
+              dueThisWeek: response.summary.dueThisWeek || 0,
+              todayDue: response.summary.todayDue || 0,
+              unassigned: response.summary.unassigned || 0,
+              highPriority: response.summary.highPriority || 0,
+              scheduled: response.summary.scheduled || 0,
+              completed: response.summary.completed || 0,
+              pending: response.summary.pending || 0,
+              anytime: response.summary.anytime || 0
+            });
           }
         }
       } catch (error) {
@@ -267,7 +354,7 @@ const DialTodo = () => {
       } finally {
         setLoading(false);
       }
-    }, [pagination.page, pagination.limit, searchTerm, activeTab, hierarchyDataExtensions]);
+    }, [pagination.page, pagination.limit, searchTerm, activeTab, filterDate, hierarchyDataExtensions]);
 
     // Fetch tasks when dependencies change
     useEffect(() => {
@@ -341,9 +428,18 @@ const DialTodo = () => {
     // Handle create/update task
     const handleCreateTask = async (formData: any) => {
       try {
-        await fetchTasks();
+        // Close modal first
         setShowCreateTaskModal(false);
         setEditingTask(null);
+        
+        // Reset pagination to page 1 to show the newly created task
+        setPagination(prev => ({ ...prev, page: 1 }));
+        
+        // Small delay to ensure the API has processed the new task
+        // The useEffect will automatically trigger fetchTasks when pagination.page changes
+        setTimeout(() => {
+          fetchTasks();
+        }, 500);
       } catch (error) {
         console.error('Error creating/updating task:', error);
       }
@@ -357,54 +453,99 @@ const DialTodo = () => {
       setShowCreateTaskModal(true);
     };
   
-    
   
-    // Hardcoded linked records for fallback (when API doesn't provide linked_records)
-    const linkedRecords: LinkedRecord[] = [
-      {
-        id: '1',
-        type: 'call',
-        title: 'Call with Ahmad',
-        subtitle: 'Today, 9:00 AM',
-        icon: <Phone size={18} />
-      },
-      {
-        id: '2',
-        type: 'contact',
-        title: 'Ahmad Hasan',
-        subtitle: 'Lead',
-        icon: <User size={18} />
-      },
-      {
-        id: '3',
-        type: 'ticket',
-        title: 'Support Ticket #2145',
-        subtitle: 'Website Redesign',
-        icon: <Pencil size={18} />
-      }
-    ];
-  
-    const getTaskCounts = () => {
-      const today = tasks.filter(t => t.category === 'scheduled' || t.category === 'anytime').length;
-      const completed = tasks.filter(t => t.completed).length;
-      const overdue = tasks.filter(t => t.category === 'overdue' && !t.completed).length;
-      const upcoming = tasks.filter(t => !t.completed && t.category !== 'overdue').length;
-      return { today, completed, overdue, upcoming };
+    // Use summary from API for counters
+    const counts = {
+      all: summary.total,
+      today: summary.todayDue,
+      completed: summary.completed,
+      overdue: summary.overdue,
+      upcoming: summary.scheduled
     };
   
-    const counts = getTaskCounts();
-  
     const filteredTasks = tasks.filter(task => {
-      if (activeTab === 'completed') return task.completed;
-      if (activeTab === 'overdue') return task.category === 'overdue' && !task.completed;
-      if (activeTab === 'today') return task.category === 'scheduled' || task.category === 'anytime' || task.category === 'overdue';
-      if (activeTab === 'upcoming') return !task.completed && task.category !== 'overdue';
+      // First apply tab filter
+      if (activeTab === 'all') {
+        // Show all tasks - no filtering by status
+      } else if (activeTab === 'anytime') {
+        // Only tasks with no due_date
+        if (task.completed) return false;
+        if (task.rawData?.due_date) return false;
+      } else if (activeTab === 'completed') {
+        if (!task.completed) return false;
+      } else if (activeTab === 'overdue') {
+        if (task.completed) return false;
+      } else if (activeTab === 'today') {
+        if (task.completed) return false;
+      } else if (activeTab === 'upcoming') {
+        if (task.completed) return false;
+      }
+      
+      // Apply search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch = 
+          task.title.toLowerCase().includes(searchLower) ||
+          task.rawData?.description?.toLowerCase().includes(searchLower) ||
+          task.rawData?.project?.name?.toLowerCase().includes(searchLower) ||
+          task.rawData?.labels?.some((label: any) => label.name?.toLowerCase().includes(searchLower));
+        if (!matchesSearch) return false;
+      }
+      
       return true;
     });
   
-    const scheduledTasks = filteredTasks.filter(t => t.category === 'scheduled' && !t.completed);
+    // For the All tab UI grouping, mark overdue items based on due_date < today.
+    // (We keep the Overdue tab itself server-filtered via due_date_to=yesterday.)
+    const isOverdueByDueDate = (task: Task) => {
+      const due = task.rawData?.due_date;
+      if (!due) return false;
+      try {
+        const dueDate = new Date(due);
+        if (Number.isNaN(dueDate.getTime())) return false;
+        dueDate.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return dueDate.getTime() < today.getTime();
+      } catch {
+        return false;
+      }
+    };
+
+    const isTodayByDueDate = (task: Task) => {
+      const due = task.rawData?.due_date;
+      if (!due) return false;
+      try {
+        const dueDate = new Date(due);
+        if (Number.isNaN(dueDate.getTime())) return false;
+        dueDate.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return dueDate.getTime() === today.getTime();
+      } catch {
+        return false;
+      }
+    };
+
+    const overdueTasks =
+      activeTab === 'overdue'
+        ? filteredTasks.filter(t => !t.completed)
+        : activeTab === 'all'
+          ? filteredTasks.filter(t => !t.completed && isOverdueByDueDate(t))
+          : filteredTasks.filter(t => t.category === 'overdue' && !t.completed);
+
+    const todayTasksForAll = activeTab === 'all'
+      ? filteredTasks.filter(t => !t.completed && isTodayByDueDate(t))
+      : [];
+
+    const scheduledTasks = filteredTasks.filter(t =>
+      t.category === 'scheduled' &&
+      !t.completed &&
+      !isOverdueByDueDate(t) &&
+      !(activeTab === 'all' && isTodayByDueDate(t))
+    );
     const anytimeTasks = filteredTasks.filter(t => t.category === 'anytime' && !t.completed);
-    const overdueTasks = filteredTasks.filter(t => t.category === 'overdue' && !t.completed);
+    const completedTasks = filteredTasks.filter(t => t.completed);
   
 
   return (
@@ -422,7 +563,7 @@ const DialTodo = () => {
             {/* Action Buttons */}
             <div style={{ 
               display: 'flex', 
-              gap: '10px', 
+              gap: '5px', 
               marginBottom: '16px',
               flexWrap: 'wrap'
             }}>
@@ -460,7 +601,52 @@ const DialTodo = () => {
                 <Plus size={16} /> Add To-Do
               </button>
               <button
-                onClick={() => setActiveTab('today')}
+                onClick={() => {
+                  setActiveTab('all');
+                  setSelectedTask(null);
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                  // Reset filters when going back to All
+                  setFilterDate('all');
+                  setSearchTerm('');
+                }}
+                style={{
+                  backgroundColor: activeTab === 'all' ? '#5b8fd8' : 'white',
+                  color: activeTab === 'all' ? 'white' : '#4a5568',
+                  border: activeTab === 'all' ? 'none' : '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: '8px 14px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <span style={{
+                  display: 'inline-block',
+                  backgroundColor: activeTab === 'all' ? 'rgba(255,255,255,0.9)' : '#4a5568',
+                  color: activeTab === 'all' ? '#4a5568' : 'white',
+                  borderRadius: '50%',
+                  width: '22px',
+                  height: '22px',
+                  lineHeight: '22px',
+                  textAlign: 'center',
+                  fontSize: '11px',
+                  fontWeight: '700'
+                }}>
+                  {summary.total}
+                </span>
+                All
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('today');
+                  setSelectedTask(null);
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                  setFilterDate('today');
+                }}
                 style={{
                   backgroundColor: activeTab === 'today' ? '#5b8fd8' : 'white',
                   color: activeTab === 'today' ? 'white' : '#4a5568',
@@ -488,12 +674,54 @@ const DialTodo = () => {
                   fontSize: '11px',
                   fontWeight: '700'
                 }}>
-                  {counts.today}
+                  {summary.todayDue}
                 </span>
                 Today
               </button>
               <button
-                onClick={() => setActiveTab('completed')}
+                onClick={() => {
+                  setActiveTab('anytime');
+                  setSelectedTask(null);
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                  setFilterDate('all'); // anytime ignores due_date_from/to filters
+                }}
+                style={{
+                  backgroundColor: activeTab === 'anytime' ? '#5b8fd8' : 'white',
+                  color: activeTab === 'anytime' ? 'white' : '#4a5568',
+                  border: activeTab === 'anytime' ? 'none' : '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: '8px 14px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <span style={{
+                  display: 'inline-block',
+                  backgroundColor: activeTab === 'anytime' ? 'rgba(255,255,255,0.9)' : '#805ad5',
+                  color: activeTab === 'anytime' ? '#805ad5' : 'white',
+                  borderRadius: '50%',
+                  width: '22px',
+                  height: '22px',
+                  lineHeight: '22px',
+                  textAlign: 'center',
+                  fontSize: '11px',
+                  fontWeight: '700'
+                }}>
+                  {summary.anytime}
+                </span>
+                Anytime
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('completed');
+                  setSelectedTask(null);
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                }}
                 style={{
                   backgroundColor: activeTab === 'completed' ? '#5b8fd8' : 'white',
                   color: activeTab === 'completed' ? 'white' : '#4a5568',
@@ -521,12 +749,17 @@ const DialTodo = () => {
                   fontSize: '11px',
                   fontWeight: '700'
                 }}>
-                  {counts.completed}
+                  {summary.completed}
                 </span>
                 Completed
               </button>
               <button
-                onClick={() => setActiveTab('overdue')}
+                onClick={() => {
+                  setActiveTab('overdue');
+                  setSelectedTask(null);
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                  setFilterDate('all'); // ensure Overdue isn't constrained by Today filter
+                }}
                 style={{
                   backgroundColor: activeTab === 'overdue' ? '#5b8fd8' : 'white',
                   color: activeTab === 'overdue' ? 'white' : '#4a5568',
@@ -554,12 +787,17 @@ const DialTodo = () => {
                   fontSize: '11px',
                   fontWeight: '700'
                 }}>
-                  {counts.overdue}
+                  {summary.overdue}
                 </span>
                 Overdue
               </button>
               <button
-                onClick={() => setActiveTab('upcoming')}
+                onClick={() => {
+                  setActiveTab('upcoming');
+                  setSelectedTask(null);
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                  setFilterDate('all'); // ensure Scheduled isn't constrained to Today filter
+                }}
                 style={{
                   backgroundColor: activeTab === 'upcoming' ? '#5b8fd8' : 'white',
                   color: activeTab === 'upcoming' ? 'white' : '#4a5568',
@@ -587,9 +825,9 @@ const DialTodo = () => {
                   fontSize: '11px',
                   fontWeight: '700'
                 }}>
-                  {counts.upcoming}
+                  {summary.scheduled}
                 </span>
-                Upcoming
+                Scheduled
                 <ChevronDown size={14} />
               </button>
             </div>
@@ -627,6 +865,8 @@ const DialTodo = () => {
                       color: '#4a5568'
                     }}
                   >
+                    
+                    <option value="all">All Dates</option>
                     <option value="today">Today</option>
                     <option value="tomorrow">Tomorrow</option>
                     <option value="this-week">This Week</option>
@@ -634,7 +874,7 @@ const DialTodo = () => {
                   </select>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {/* <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Tag size={16} color="#6c757d" />
                   <select
                     value={filterLabel}
@@ -655,17 +895,32 @@ const DialTodo = () => {
                     <option value="work">Work</option>
                     <option value="meeting">Meeting</option>
                   </select>
-                </div>
+                </div> */}
 
-                <button style={{
-                  padding: '7px',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}>
+                <button 
+                  onClick={() => {
+                    setFilterDate('all');
+                    setSearchTerm('');
+                  }}
+                  style={{
+                    padding: '7px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    backgroundColor: 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#cbd5e0';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                >
                   <X size={16} color="#6c757d" />
                 </button>
               </div>
@@ -677,7 +932,7 @@ const DialTodo = () => {
                 </div>
                 <input
                   type="text"
-                  placeholder="Search tasks..."
+                  placeholder="Search todo..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   style={{
@@ -707,8 +962,107 @@ const DialTodo = () => {
                 </div>
               )}
 
+              {/* Completed Tasks - Show when activeTab is 'completed' or 'all' */}
+              {(activeTab === 'completed' || activeTab === 'all') && (
+                <>
+                  {completedTasks.length > 0 ? (
+                    <div>
+                      <h4 style={{ 
+                        fontSize: '12px', 
+                        fontWeight: '700',
+                        color: '#28a745',
+                        marginBottom: '10px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <Check size={14} color="#28a745" /> Completed
+                      </h4>
+                      {completedTasks.map(task => (
+                        <TaskItem
+                          key={task.id}
+                          task={task}
+                          onToggle={handleTaskToggle}
+                          onClick={handleTaskClick}
+                          isSelected={selectedTask?.id === task.id}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    activeTab === 'completed' && !loading && (
+                      <div style={{ 
+                        textAlign: 'center', 
+                        padding: '3rem 1rem',
+                        color: '#718096',
+                        fontSize: '14px'
+                      }}>
+                        No completed todo found
+                      </div>
+                    )
+                  )}
+                </>
+              )}
+
+              {/* Today Tasks (All tab grouping) */}
+              {activeTab === 'all' && !loading && todayTasksForAll.length > 0 && (
+                <div style={{ marginBottom: '18px' }}>
+                  <h4 style={{ 
+                    fontSize: '12px', 
+                    fontWeight: '700',
+                    color: '#5b8fd8',
+                    marginBottom: '10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <Calendar size={14} color="#5b8fd8" /> Today
+                  </h4>
+                  {todayTasksForAll.map(task => (
+                    <TaskItem
+                      key={task.id}
+                      task={task}
+                      onToggle={handleTaskToggle}
+                      onClick={handleTaskClick}
+                      isSelected={selectedTask?.id === task.id}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Today Tasks (single section label) */}
+              {activeTab === 'today' && !loading && (scheduledTasks.length > 0 || anytimeTasks.length > 0) && (
+                <div style={{ marginBottom: '18px' }}>
+                  <h4 style={{ 
+                    fontSize: '12px', 
+                    fontWeight: '700',
+                    color: '#5b8fd8',
+                    marginBottom: '10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <Calendar size={14} color="#5b8fd8" /> Today
+                  </h4>
+                  {[...scheduledTasks, ...anytimeTasks].map(task => (
+                    <TaskItem
+                      key={task.id}
+                      task={task}
+                      onToggle={handleTaskToggle}
+                      onClick={handleTaskClick}
+                      isSelected={selectedTask?.id === task.id}
+                    />
+                  ))}
+                </div>
+              )}
+
               {/* Scheduled Tasks */}
-              {scheduledTasks.length > 0 && (
+              {(activeTab === 'all' || activeTab === 'upcoming') && scheduledTasks.length > 0 && (
                 <div style={{ marginBottom: '18px' }}>
                   <h4 style={{ 
                     fontSize: '12px', 
@@ -736,7 +1090,7 @@ const DialTodo = () => {
               )}
 
               {/* Anytime Tasks */}
-              {anytimeTasks.length > 0 && (
+              {(activeTab === 'all' || activeTab === 'anytime') && anytimeTasks.length > 0 && (
                 <div style={{ marginBottom: '18px' }}>
                   <h4 style={{ 
                     fontSize: '12px', 
@@ -764,7 +1118,7 @@ const DialTodo = () => {
               )}
 
               {/* Overdue Tasks */}
-              {overdueTasks.length > 0 && (
+              {(activeTab === 'all' || activeTab === 'overdue') && overdueTasks.length > 0 && (
                 <div>
                   <h4 style={{ 
                     fontSize: '12px', 
@@ -788,6 +1142,169 @@ const DialTodo = () => {
                       isSelected={selectedTask?.id === task.id}
                     />
                   ))}
+                </div>
+              )}
+
+              {/* Empty state for non-completed tabs (excluding 'all' which has its own check) */}
+              {activeTab !== 'completed' && activeTab !== 'all' && scheduledTasks.length === 0 && anytimeTasks.length === 0 && overdueTasks.length === 0 && !loading && (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '3rem 1rem',
+                  color: '#718096',
+                  fontSize: '14px'
+                }}>
+                  No todo found
+                </div>
+              )}
+              
+              {/* Empty state for 'all' tab when no tasks at all (including completed) */}
+              {activeTab === 'all' && completedTasks.length === 0 && scheduledTasks.length === 0 && anytimeTasks.length === 0 && overdueTasks.length === 0 && !loading && (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '3rem 1rem',
+                  color: '#718096',
+                  fontSize: '14px'
+                }}>
+                  No todo found
+                </div>
+              )}
+
+              {/* Pagination Controls */}
+              {!loading && pagination.last_page > 1 && filteredTasks.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: '20px',
+                  paddingTop: '16px',
+                  borderTop: '1px solid #e8eef5'
+                }}>
+                  <div style={{ fontSize: '13px', color: '#718096' }}>
+                    Showing {pagination.from || 0} to {pagination.to || 0} of {pagination.total || 0} tasks
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      onClick={() => {
+                        if (pagination.page > 1 && !loading) {
+                          setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+                        }
+                      }}
+                      disabled={pagination.page === 1 || loading}
+                      style={{
+                        padding: '6px 12px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        backgroundColor: (pagination.page === 1 || loading) ? '#f8fafc' : 'white',
+                        color: (pagination.page === 1 || loading) ? '#cbd5e0' : '#4a5568',
+                        cursor: (pagination.page === 1 || loading) ? 'not-allowed' : 'pointer',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (pagination.page > 1 && !loading) {
+                          e.currentTarget.style.backgroundColor = '#f8fafc';
+                          e.currentTarget.style.borderColor = '#cbd5e0';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (pagination.page > 1 && !loading) {
+                          e.currentTarget.style.backgroundColor = 'white';
+                          e.currentTarget.style.borderColor = '#e2e8f0';
+                        }
+                      }}
+                    >
+                      Previous
+                    </button>
+                    
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {Array.from({ length: Math.min(5, pagination.last_page) }, (_, i) => {
+                        let pageNum;
+                        if (pagination.last_page <= 5) {
+                          pageNum = i + 1;
+                        } else if (pagination.page <= 3) {
+                          pageNum = i + 1;
+                        } else if (pagination.page >= pagination.last_page - 2) {
+                          pageNum = pagination.last_page - 4 + i;
+                        } else {
+                          pageNum = pagination.page - 2 + i;
+                        }
+                        
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => {
+                              if (!loading && pagination.page !== pageNum) {
+                                setPagination(prev => ({ ...prev, page: pageNum }));
+                              }
+                            }}
+                            disabled={loading}
+                            style={{
+                              minWidth: '32px',
+                              height: '32px',
+                              padding: '0 8px',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              backgroundColor: pagination.page === pageNum ? '#5b8fd8' : (loading ? '#f8fafc' : 'white'),
+                              color: pagination.page === pageNum ? 'white' : (loading ? '#cbd5e0' : '#4a5568'),
+                              cursor: loading ? 'not-allowed' : 'pointer',
+                              fontSize: '13px',
+                              fontWeight: pagination.page === pageNum ? '600' : '500',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (pagination.page !== pageNum && !loading) {
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#cbd5e0';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (pagination.page !== pageNum && !loading) {
+                                e.currentTarget.style.backgroundColor = 'white';
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                              }
+                            }}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        if (pagination.page < pagination.last_page && !loading) {
+                          setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+                        }
+                      }}
+                      disabled={pagination.page >= pagination.last_page || loading}
+                      style={{
+                        padding: '6px 12px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        backgroundColor: (pagination.page >= pagination.last_page || loading) ? '#f8fafc' : 'white',
+                        color: (pagination.page >= pagination.last_page || loading) ? '#cbd5e0' : '#4a5568',
+                        cursor: (pagination.page >= pagination.last_page || loading) ? 'not-allowed' : 'pointer',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (pagination.page < pagination.last_page && !loading) {
+                          e.currentTarget.style.backgroundColor = '#f8fafc';
+                          e.currentTarget.style.borderColor = '#cbd5e0';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (pagination.page < pagination.last_page && !loading) {
+                          e.currentTarget.style.backgroundColor = 'white';
+                          e.currentTarget.style.borderColor = '#e2e8f0';
+                        }
+                      }}
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -819,7 +1336,7 @@ const DialTodo = () => {
                     gap: '8px'
                   }}>
                     <FileText size={20} color="#4e6fa5" />
-                    Task Overview
+                    Todo Overview
                   </h2>
                   <p style={{ 
                     color: '#718096', 
@@ -842,10 +1359,10 @@ const DialTodo = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ fontSize: '11px', color: '#718096', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          Total Tasks
+                          Total Todo
                         </div>
                         <div style={{ fontSize: '28px', fontWeight: '700', color: '#2d3748', marginTop: '4px' }}>
-                          {tasks.length}
+                          {summary.total}
                         </div>
                       </div>
                       <div style={{
@@ -874,7 +1391,7 @@ const DialTodo = () => {
                         Completed
                       </div>
                       <div style={{ fontSize: '24px', fontWeight: '700', color: '#15803d' }}>
-                        {tasks.filter(t => t.completed).length}
+                        {summary.completed}
                       </div>
                     </div>
 
@@ -888,7 +1405,7 @@ const DialTodo = () => {
                         Overdue
                       </div>
                       <div style={{ fontSize: '24px', fontWeight: '700', color: '#dc2626' }}>
-                        {tasks.filter(t => t.category === 'overdue' && !t.completed).length}
+                        {summary.overdue}
                       </div>
                     </div>
                   </div>
@@ -900,16 +1417,16 @@ const DialTodo = () => {
                     border: '1px solid #bfdbfe'
                   }}>
                     <div style={{ fontSize: '10px', color: '#1e40af', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
-                      Pending Today
+                      Pending
                     </div>
                     <div style={{ fontSize: '24px', fontWeight: '700', color: '#2563eb' }}>
-                      {tasks.filter(t => !t.completed && (t.category === 'scheduled' || t.category === 'anytime')).length}
+                      {summary.pending}
                     </div>
                   </div>
                 </div>
 
                 {/* Progress Bar */}
-                <div style={{ marginBottom: '20px' }}>
+                {/* <div style={{ marginBottom: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <span style={{ fontSize: '12px', fontWeight: '600', color: '#2d3748' }}>Progress</span>
                     <span style={{ fontSize: '12px', fontWeight: '600', color: '#4e6fa5' }}>
@@ -931,7 +1448,7 @@ const DialTodo = () => {
                       transition: 'width 0.3s ease'
                     }} />
                   </div>
-                </div>
+                </div> */}
 
                 {/* Category Breakdown */}
                 <div>
@@ -952,16 +1469,18 @@ const DialTodo = () => {
                         <span style={{ fontSize: '13px', fontWeight: '600', color: '#2d3748' }}>Scheduled</span>
                       </div>
                       <span style={{ fontSize: '13px', fontWeight: '700', color: '#3182ce' }}>
-                        {tasks.filter(t => t.category === 'scheduled').length}
+                        {summary.scheduled}
                       </span>
                     </div>
+                    
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e8eef5' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Pin size={16} color="#805ad5" />
-                        <span style={{ fontSize: '13px', fontWeight: '600', color: '#2d3748' }}>Anytime</span>
+                        <Pause size={16} color="#805ad5" />
+                        <span style={{ fontSize: '13px', fontWeight: '600', color: '#2d3748' }}>Pending
+                        </span>
                       </div>
                       <span style={{ fontSize: '13px', fontWeight: '700', color: '#805ad5' }}>
-                        {tasks.filter(t => t.category === 'anytime').length}
+                        {summary.pending}
                       </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e8eef5' }}>
@@ -970,7 +1489,7 @@ const DialTodo = () => {
                         <span style={{ fontSize: '13px', fontWeight: '600', color: '#2d3748' }}>Overdue</span>
                       </div>
                       <span style={{ fontSize: '13px', fontWeight: '700', color: '#e53e3e' }}>
-                        {tasks.filter(t => t.category === 'overdue').length}
+                        {summary.overdue}
                       </span>
                     </div>
                   </div>
@@ -1006,6 +1525,18 @@ const DialTodo = () => {
                     }}>
                       {selectedTask.completed ? 'COMPLETED' : 'OPEN'}
                     </span>
+
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '4px 10px',
+                      ...getPriorityBadgeStyle(selectedTask.priority),
+                      borderRadius: '5px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      marginLeft: '10px'
+                    }}>
+                      {selectedTask.priority ? selectedTask.priority.toUpperCase() : 'LOW'}
+                    </span>
                   </div>
                   <div style={{ display: 'flex', gap: '4px' }}>
                     <button 
@@ -1022,14 +1553,7 @@ const DialTodo = () => {
                     >
                       <X size={18} />
                     </button>
-                    <button style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '4px'
-                    }}>
-                      <MoreVertical size={18} color="#718096" />
-                    </button>
+                    
                   </div>
                 </div>
 
@@ -1054,17 +1578,7 @@ const DialTodo = () => {
                     backgroundColor: '#f8fafc',
                     borderRadius: '6px'
                   }}>
-                    {selectedTask?.time && (
-                      <div style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between',
-                        marginBottom: '8px',
-                        fontSize: '13px'
-                      }}>
-                        <span style={{ color: '#718096', fontWeight: '500' }}>Due Time:</span>
-                        <span style={{ fontWeight: '600', color: '#2d3748' }}>{selectedTask.time}</span>
-                      </div>
-                    )}
+                    
                     {selectedTask?.rawData?.due_date && (
                       <div style={{ 
                         display: 'flex', 
@@ -1076,7 +1590,20 @@ const DialTodo = () => {
                         <span style={{ fontWeight: '600', color: '#2d3748' }}>{formatDateForTable(selectedTask.rawData.due_date)}</span>
                       </div>
                     )}
-                    <div style={{ 
+
+{selectedTask?.rawData?.created_at && (
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        marginBottom: '8px',
+                        fontSize: '13px'
+                      }}>
+                        <span style={{ color: '#718096', fontWeight: '500' }}>Created On:</span>
+                        <span style={{ fontWeight: '600', color: '#2d3748' }}>{formatDateForTable(selectedTask.rawData.created_at)}</span>
+                      </div>
+                    )}
+
+                    {/* <div style={{ 
                       display: 'flex', 
                       justifyContent: 'space-between',
                       alignItems: 'center',
@@ -1093,155 +1620,12 @@ const DialTodo = () => {
                       }}>
                         {selectedTask?.label?.toUpperCase() || 'GENERAL'}
                       </span>
-                    </div>
+                    </div> */}
                   </div>
                 </>
               )}
 
-              <div style={{ 
-                marginTop: '20px',
-                marginBottom: '20px'
-              }}>
-                <h3 style={{ 
-                  fontSize: '13px', 
-                  fontWeight: '700',
-                  marginBottom: '12px',
-                  color: '#2d3748',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
-                  <LinkIcon size={14} /> Linked Records
-                </h3>
-                {selectedTask?.rawData?.linked_records && selectedTask.rawData.linked_records.length > 0 ? (
-                  selectedTask.rawData.linked_records.map((record: any, idx: number) => (
-                    <div
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '10px',
-                        backgroundColor: '#f8fafc',
-                        borderRadius: '6px',
-                        marginBottom: '6px',
-                        cursor: 'pointer',
-                        border: '1px solid #e8eef5',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#edf2f7';
-                        e.currentTarget.style.borderColor = '#cbd5e0';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f8fafc';
-                        e.currentTarget.style.borderColor = '#e8eef5';
-                      }}
-                    >
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        backgroundColor: '#4e6fa5',
-                        borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white'
-                      }}>
-                        <LinkIcon size={18} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ 
-                          fontWeight: '600', 
-                          fontSize: '13px',
-                          color: '#2d3748'
-                        }}>
-                          {record.title || record.name || 'Linked Record'}
-                        </div>
-                        <div style={{ 
-                          fontSize: '11px', 
-                          color: '#718096'
-                        }}>
-                          {record.type || 'Record'}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div style={{ 
-                    padding: '10px',
-                    color: '#718096',
-                    fontSize: '13px',
-                    textAlign: 'center'
-                  }}>
-                    No linked records
-                  </div>
-                )}
-                {/* Fallback to hardcoded records if no API data */}
-                {(!selectedTask?.rawData?.linked_records || selectedTask.rawData.linked_records.length === 0) && linkedRecords.map(record => (
-                  <div
-                    key={record.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '10px',
-                      backgroundColor: '#f8fafc',
-                      borderRadius: '6px',
-                      marginBottom: '6px',
-                      cursor: 'pointer',
-                      border: '1px solid #e8eef5',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#edf2f7';
-                      e.currentTarget.style.borderColor = '#cbd5e0';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f8fafc';
-                      e.currentTarget.style.borderColor = '#e8eef5';
-                    }}
-                  >
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      backgroundColor: '#4e6fa5',
-                      borderRadius: '6px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white'
-                    }}>
-                      {record.icon}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ 
-                        fontWeight: '600', 
-                        fontSize: '13px',
-                        color: '#2d3748'
-                      }}>
-                        {record.title}
-                      </div>
-                      <div style={{ 
-                        fontSize: '11px', 
-                        color: '#718096'
-                      }}>
-                        {record.subtitle}
-                      </div>
-                    </div>
-                    <button style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '4px'
-                    }}>
-                      <MoreVertical size={16} color="#718096" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              
 
               <div style={{ 
                 display: 'grid',
@@ -1270,66 +1654,9 @@ const DialTodo = () => {
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4e6fa5'}
                 >
                   <Pencil size={14} />
-                  Edit Task
+                  Edit Todo
                 </button>
-                <button 
-                  onClick={() => setShowConvertModal(true)}
-                  style={{
-                    padding: '10px',
-                    backgroundColor: 'white',
-                    color: '#4a5568',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                >
-                  <LinkIcon size={14} />
-                  Link Record
-                </button>
-              </div>
 
-              <div style={{ 
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '8px'
-              }}>
-                <button 
-                  onClick={() => {
-                    if (selectedTask?.rawData) {
-                      setEditingTask({ ...selectedTask.rawData, title: `${selectedTask.rawData.title} (Copy)` });
-                      setShowCreateTaskModal(true);
-                    }
-                  }}
-                  style={{
-                    padding: '10px',
-                    backgroundColor: 'white',
-                    color: '#4a5568',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                >
-                  <Copy size={14} />
-                  Duplicate
-                </button>
                 <button 
                   onClick={() => {
                     if (selectedTask) {
@@ -1363,6 +1690,51 @@ const DialTodo = () => {
                   <Trash2 size={14} />
                   Delete
                 </button>
+                
+              </div>
+
+              
+
+              <div style={{ 
+                display: 'grid',
+                
+                gap: '8px'
+              }}>
+                <button 
+                  onClick={() => {
+                    if (selectedTask?.rawData) {
+                      // Remove id and task_id to ensure it's treated as a new task, not an update
+                      const { id, task_id, ...taskDataWithoutId } = selectedTask.rawData;
+                      setEditingTask({ 
+                        ...taskDataWithoutId, 
+                        title: `${selectedTask.rawData.title} (Copy)`
+                      });
+                      setIsDuplicating(true); // Mark as duplicating, not editing
+                      setShowCreateTaskModal(true);
+                    }
+                  }}
+                  style={{
+                    padding: '10px',
+                    backgroundColor: 'white',
+                    color: '#4a5568',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                >
+                  <Copy size={14} />
+                  Duplicate
+                </button>
+                
               </div>
             </>
             )}
@@ -1376,13 +1748,15 @@ const DialTodo = () => {
         onHide={() => {
           setShowCreateTaskModal(false);
           setEditingTask(null);
+          setIsDuplicating(false);
         }}
         onCreate={handleCreateTask}
         onCreateAndOpen={handleCreateTask}
         extensions={hierarchyDataExtensions as any}
         task={editingTask}
-        isEdit={!!editingTask}
+        isEdit={!!editingTask} // Set to true so form gets pre-filled, but id is removed so it creates instead of updates
         taskType="todo"
+        
       />
 
       {/* Delete Confirmation Modal */}
@@ -1469,7 +1843,7 @@ interface TaskItemProps {
             accentColor: '#5b8fd8'
           }}
         />
-        {task.time && (
+        {/* {task.time && (
           <span style={{ 
             fontWeight: '700',
             fontSize: '13px',
@@ -1479,7 +1853,7 @@ interface TaskItemProps {
           }}>
             {task.time}
           </span>
-        )}
+        )} */}
         <span style={{ 
           flex: 1,
           fontSize: '13px',
@@ -1489,7 +1863,46 @@ interface TaskItemProps {
         }}>
           {task.title}
         </span>
-        <span style={{
+        {task.completed ? (
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '4px 10px',
+              backgroundColor: '#e2e8f0',
+              color: '#4a5568',
+              borderRadius: '5px',
+              fontSize: '11px',
+              fontWeight: '600',
+              flexShrink: 0
+            }}
+          >
+            Completed
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(task.id);
+            }}
+            style={{
+              display: 'inline-block',
+              padding: '4px 10px',
+              backgroundColor: '#5b8fd8',
+              color: 'white',
+              borderRadius: '5px',
+              fontSize: '11px',
+              fontWeight: '600',
+              border: 'none',
+              cursor: 'pointer',
+              flexShrink: 0
+            }}
+            title="Mark as completed"
+          >
+            Mark complete
+          </button>
+        )}
+        {/* <span style={{
           padding: '3px 8px',
           backgroundColor: task.completed ? '#e2e8f0' : task.labelColor,
           color: task.completed ? '#718096' : 'white',
@@ -1502,10 +1915,10 @@ interface TaskItemProps {
           textTransform: 'uppercase',
           letterSpacing: '0.3px'
         }}>
-          {task.icon}
-          {task.label}
-        </span>
-        <button
+          {task.priority}
+          
+        </span> */}
+        {/* <button
           onClick={(e) => {
             e.stopPropagation();
           }}
@@ -1523,7 +1936,7 @@ interface TaskItemProps {
           onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
         >
           <MoreVertical size={16} color="#718096" />
-        </button>
+        </button> */}
       </div>
     );
   };

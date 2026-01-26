@@ -1117,6 +1117,20 @@ const TicketList = () => {
     setCreatingTicket(true);
     let response = null;
     try {
+      // Preserve existing tags/images when only toggling approval
+      const existingTags: string[] = Array.isArray(selectedTicketForApprove.tags)
+        ? selectedTicketForApprove.tags
+        : selectedTicketForApprove.tags
+          ? [selectedTicketForApprove.tags]
+          : [];
+
+      const existingImages: string[] = (() => {
+        const img = selectedTicketForApprove.image ?? selectedTicketForApprove.images;
+        if (!img) return [];
+        if (Array.isArray(img)) return img.filter(Boolean);
+        return [img].filter(Boolean);
+      })();
+
       // Only include user_extension if user has assign-user permission
       let userExtensionArray = undefined;
       if (session?.user?.permissions?.includes("assign-user-tickets")) {
@@ -1140,8 +1154,8 @@ const TicketList = () => {
         userExtensionArray,
         selectedTicketForApprove.priority,
         selectedTicketForApprove.due_date,
-        undefined,
-        undefined,
+        existingImages.length > 0 ? existingImages : undefined,
+        existingTags.length > 0 ? existingTags : undefined,
         newApprovalStatus
       );
     } catch (error) {

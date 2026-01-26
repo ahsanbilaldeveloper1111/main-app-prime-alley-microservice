@@ -20,8 +20,10 @@ import {
   FileSpreadsheet,
   Phone
 } from 'lucide-react';
+import { toast } from 'react-toastify';
 import { listProjects, createTask, updateTask } from '@utils/tasks';
 import { getAutoTimezone } from '@utils/Helper';
+import RichTextEditor from '../../../pages/help-center/partials/RichTextEditor';
 
 interface Extension {
   id: string;
@@ -94,7 +96,7 @@ interface Priority {
 
 interface LinkedRecord {
   id: number;
-  type: 'crm' | 'call' | 'ticket' | 'invoice';
+  type: 'task' | 'crm';
   title: string;
   reference: string;
 }
@@ -166,6 +168,9 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   // Initialize form data - populate from editTask if in edit mode
   const getInitialFormData = (): CreateTaskFormData => {
     if (isEdit && editTask) {
+      const projectIdRaw = editTask.project_id ?? editTask.project?.id;
+      const statusIdRaw = editTask.status_id ?? editTask.status?.id;
+
       // Map assignees from extension_numbers to assigneeIds
       const assigneeIds = editTask.assignees?.map((assignee: any) => {
         const extension = extensions.find((ext: any) => 
@@ -181,8 +186,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       return {
         title: editTask.title || '',
         description: editTask.description || '',
-        projectId: editTask.project_id || editTask.project?.id || null,
-        statusId: editTask.status_id || editTask.status?.id || null,
+        projectId: projectIdRaw ? Number(projectIdRaw) : null,
+        statusId: statusIdRaw ? Number(statusIdRaw) : null,
         priorityId: mapPriorityStringToId(editTask.priority),
         assigneeIds: assigneeIds,
         dueDate: formatDateForInput(editTask.due_date),
@@ -196,7 +201,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       description: '',
       projectId: propProject?.id || null,
       statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
-      priorityId: 2, // Default to Medium priority
+      priorityId: 0, // Default to "Select Priority" (empty value)
       assigneeIds: [],
       dueDate: '',
       labelIds: [],
@@ -260,7 +265,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         description: '',
         projectId: propProject?.id || null,
         statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
-        priorityId: 2,
+        priorityId: 0,
         assigneeIds: [],
         dueDate: '',
         labelIds: [],
@@ -329,6 +334,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const statuses: Status[] = getStatusesForSelectedProject();
 
   const priorities: Priority[] = [
+    { id: 0, name: "Select Priority", icon: "", color: "#6c757d" },
     { id: 1, name: "Low", icon: "🟢", color: "#10b981" },
     { id: 2, name: "Medium", icon: "🟡", color: "#eab308" },
     { id: 3, name: "High", icon: "🟠", color: "#f97316" },
@@ -356,38 +362,22 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
 
   const labels: Label[] = getLabelsForSelectedProject();
 
-  // Use current project as linked record if provided, otherwise use propLinkedRecords
-  const linkedRecords: LinkedRecord[] = propProject ? [
-    { id: propProject.id, type: 'crm', title: propProject.name, reference: `Project #${propProject.id}` }
-  ] : propLinkedRecords;
-
-  const activities: ActivityEntry[] = [
-    {
-      id: 1,
-      user: { id: 1, name: "Teddy", avatar: "/avatars/teddy.jpg", initials: "TD" },
-      action: "assigned John D.",
-      timestamp: new Date('2024-04-22'),
-      type: 'assignment'
-    },
-    {
-      id: 2,
-      user: { id: 2, name: "Sarah M.", avatar: "/avatars/sarah.jpg", initials: "SM" },
-      action: "",
-      timestamp: new Date('2024-04-22'),
-      type: 'comment',
-      content: "@John D. Can you take a look at this issue?"
-    }
-  ];
+  // Use propLinkedRecords directly (project linking removed since type is now only 'task')
+  const linkedRecords: LinkedRecord[] = propLinkedRecords;
+  console.log('linkedRecords', linkedRecords);
 
   // Map priority ID to priority string
-  const mapPriorityIdToString = (priorityId: number | null): string => {
+  const mapPriorityIdToString = (priorityId: number | null): string | undefined => {
+    if (!priorityId || priorityId === 0) {
+      return ''; // Return empty for "Select Priority" (id: 0)
+    }
     const priorityMap: Record<number, string> = {
       1: 'low',
       2: 'normal',
       3: 'high',
       4: 'urgent'
     };
-    return priorityMap[priorityId || 2] || 'normal';
+    return priorityMap[priorityId] || undefined;
   };
 
   const handleCreate = async (e?: React.MouseEvent) => {
@@ -401,7 +391,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }
 
     if (!formData.title.trim()) {
-      alert('Please enter a task title');
+      toast.error('Please enter a task title');
       return;
     }
 
@@ -411,21 +401,27 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       const payload: any = {
         title: formData.title,
         description: formData.description || '',
-        status_id: formData.statusId || undefined,
-        priority: mapPriorityIdToString(formData.priorityId),
+        priority: mapPriorityIdToString(formData.priorityId) || undefined,
         due_date: formData.dueDate || '',
         extension_numbers: formData.assigneeIds?.map((id: number) => {
           // Find the extension by id from extensions prop
           const extension = extensions.find((ext: any) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
-        label_ids: formData.labelIds || [],
         type: taskType // Add task type (regular, recurring, or todo)
       };
 
       // Add project_id if available (optional)
       if (formData.projectId) {
         payload.project_id = formData.projectId;
+        // Only send project-scoped fields when a project is selected
+        payload.status_id = formData.statusId || undefined;
+        payload.label_ids = formData.labelIds || [];
+      }
+
+      // Add parent_task_id if records are linked (use first linked record as parent)
+      if (formData.linkedRecordIds && formData.linkedRecordIds.length > 0) {
+        payload.parent_task_id = formData.linkedRecordIds[0];
       }
 
       // If edit mode, use updateTask API
@@ -471,7 +467,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }
 
     if (!formData.title.trim()) {
-      alert('Please enter a task title');
+      toast.error('Please enter a task title');
       return;
     }
 
@@ -481,21 +477,27 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       const payload: any = {
         title: formData.title,
         description: formData.description || '',
-        status_id: formData.statusId || undefined,
-        priority: mapPriorityIdToString(formData.priorityId),
+        priority: mapPriorityIdToString(formData.priorityId) || undefined,
         due_date: formData.dueDate || '',
         extension_numbers: formData.assigneeIds?.map((id: number) => {
           // Find the extension by id from extensions prop
           const extension = extensions.find((ext: any) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
-        label_ids: formData.labelIds || [],
         type: taskType // Add task type (regular, recurring, or todo)
       };
 
       // Add project_id if available (optional)
       if (formData.projectId) {
         payload.project_id = formData.projectId;
+        // Only send project-scoped fields when a project is selected
+        payload.status_id = formData.statusId || undefined;
+        payload.label_ids = formData.labelIds || [];
+      }
+
+      // Add parent_task_id if records are linked (use first linked record as parent)
+      if (formData.linkedRecordIds && formData.linkedRecordIds.length > 0) {
+        payload.parent_task_id = formData.linkedRecordIds[0];
       }
 
       // If edit mode, use updateTask API
@@ -578,7 +580,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           gap: '8px'
         }}>
           <ListTodo size={20} color="#4e6fa5" />
-          {isEdit ? 'Edit Task' : 'Create Task'}
+          {taskType === 'todo' 
+            ? (isEdit ? 'Edit Todo' : 'Create Todo')
+            : taskType === 'recurring'
+            ? (isEdit ? 'Edit Recurring' : 'Create Recurring')
+            : (isEdit ? 'Edit Task' : 'Create Task')}
         </Modal.Title>
         <Button
           variant="link"
@@ -621,19 +627,22 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             <FileText size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
             Description
           </Form.Label>
-          <Form.Control
-            as="textarea"
-            rows={2}
+          <RichTextEditor
+            value={formData.description || ''}
+            onChange={(html: string, text: string) => {
+              // Store HTML to preserve formatting
+              setFormData({ ...formData, description: html });
+            }}
             placeholder="Describe the task..."
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            className="py-2"
-            style={{ fontSize: '14px', resize: 'vertical' }}
+            minHeight="100px"
+            maxHeight="200px"
+            maxLength={5000}
           />
         </Form.Group>
 
         {/* Project and Assignees Row */}
         <Row className="mb-3">
+        {taskType !== 'todo' && (
           <Col xs={12} md={6} className="mb-3 mb-md-0">
             <Form.Group>
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -664,6 +673,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               </Form.Select>
             </Form.Group>
           </Col>
+          )}
 
           <Col xs={12} md={6}>
             <Form.Group>
@@ -676,15 +686,17 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 placeholder="Select date"
                 value={formData.dueDate}
                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                min={new Date().toISOString().split('T')[0]}
                 className="py-2"
                 style={{ fontSize: '14px' }}
               />
             </Form.Group>
           </Col>
-        </Row>
+       
 
         {/* Status and Priority Row */}
-        <Row className="mb-3">
+        
+          {taskType !== 'todo' && (
           <Col xs={12} md={6} className="mb-3 mb-md-0">
             <Form.Group>
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -692,8 +704,13 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 Status
               </Form.Label>
               <Form.Select
-                value={formData.statusId || ''}
-                onChange={(e) => setFormData({ ...formData, statusId: Number(e.target.value) })}
+                value={formData.statusId ?? ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    statusId: e.target.value ? Number(e.target.value) : null
+                  })
+                }
                 className="py-2"
                 style={{ fontSize: '14px' }}
                 disabled={!formData.projectId || statuses.length === 0}
@@ -701,18 +718,33 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 {!formData.projectId ? (
                   <option value="">Select a project first</option>
                 ) : statuses.length === 0 ? (
-                  <option value="">No statuses available</option>
-                ) : (
-                  statuses.map(status => (
-                    <option key={status.id} value={status.id}>
-                      {status.name}
+                  isEdit && formData.statusId ? (
+                    <option value={formData.statusId}>
+                      {editTask?.status?.name || editTask?.status_name || `Status #${formData.statusId}`}
                     </option>
-                  ))
+                  ) : (
+                    <option value="">No statuses available</option>
+                  )
+                ) : (
+                  <>
+                    {isEdit &&
+                      formData.statusId &&
+                      !statuses.some(s => String(s.id) === String(formData.statusId)) && (
+                        <option value={formData.statusId}>
+                          {editTask?.status?.name || editTask?.status_name || `Status #${formData.statusId}`}
+                        </option>
+                      )}
+                    {statuses.map(status => (
+                      <option key={status.id} value={status.id}>
+                        {status.name}
+                      </option>
+                    ))}
+                  </>
                 )}
               </Form.Select>
             </Form.Group>
           </Col>
-
+          )}
           <Col xs={12} md={6}>
             <Form.Group>
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -720,7 +752,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 Priority
               </Form.Label>
               <Form.Select
-                value={formData.priorityId || ''}
+                value={formData.priorityId || 0}
                 onChange={(e) => setFormData({ ...formData, priorityId: Number(e.target.value) })}
                 className="py-2"
                 style={{ fontSize: '14px' }}
@@ -736,6 +768,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         </Row>
 
         {/* Assignees Field */}
+        {taskType !== 'todo' && (
         <Form.Group className="mb-3">
           <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
             <Users size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
@@ -883,8 +916,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             </div>
           )}
         </Form.Group>
+        )}
 
         {/* Labels Field */}
+        {taskType !== 'todo' && (
+          <>
         <Form.Group className="mb-3">
           <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
             <Tag size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
@@ -975,7 +1011,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             />
             <Form.Control
               type="text"
-              placeholder="Search CRM, call, ticket, invoice..."
+              placeholder="Search task..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="py-2"
@@ -987,7 +1023,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           </div>
 
           {/* Linked Records Display */}
-          {searchQuery && (
+          {linkedRecords && linkedRecords.length > 0 && (
             <div 
               className="border rounded"
               style={{ 
@@ -996,12 +1032,25 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 backgroundColor: '#f8fafc'
               }}
             >
-              {linkedRecords
-                .filter(record => 
-                  record.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  record.reference.toLowerCase().includes(searchQuery.toLowerCase())
-                )
-                .map((record) => (
+              {(() => {
+                const filteredRecords = linkedRecords.filter(record => {
+                  // If there's a search query, filter by it; otherwise show all
+                  if (searchQuery) {
+                    return record.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           record.reference.toLowerCase().includes(searchQuery.toLowerCase());
+                  }
+                  return true;
+                });
+
+                if (filteredRecords.length === 0) {
+                  return (
+                    <div className="p-3 text-center text-muted" style={{ fontSize: '0.9rem' }}>
+                      {searchQuery ? 'No tasks found matching your search' : 'No tasks available'}
+                    </div>
+                  );
+                }
+
+                return filteredRecords.map((record) => (
                   <div
                     key={record.id}
                     className="d-flex align-items-center p-3 border-bottom cursor-pointer"
@@ -1013,9 +1062,10 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                     onClick={() => {
                       setFormData(prev => ({
                         ...prev,
+                        // Single selection: if clicking the same record, deselect it; otherwise select only this one
                         linkedRecordIds: prev.linkedRecordIds.includes(record.id)
-                          ? prev.linkedRecordIds.filter(id => id !== record.id)
-                          : [...prev.linkedRecordIds, record.id]
+                          ? []
+                          : [record.id]
                       }));
                     }}
                     onMouseEnter={(e) => {
@@ -1034,16 +1084,15 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                       style={{
                         width: '36px',
                         height: '36px',
-                        backgroundColor: record.type === 'crm' ? '#4A90E2' : 
-                                       record.type === 'ticket' ? '#5B7BA4' :
-                                       record.type === 'invoice' ? '#D4A853' : '#5B7BA4',
+                        backgroundColor: record.type === 'crm' ? '#4e6fa5' : '#6B7280',
                         flexShrink: 0
                       }}
                     >
-                      {record.type === 'crm' ? <User size={18} /> :
-                       record.type === 'ticket' ? <Ticket size={18} /> :
-                       record.type === 'invoice' ? <FileSpreadsheet size={18} /> :
-                       <Phone size={18} />}
+                      {record.type === 'crm' ? (
+                        <FolderOpen size={18} />
+                      ) : (
+                        <ListTodo size={18} />
+                      )}
                     </div>
                     <div className="flex-grow-1 overflow-hidden">
                       <div className="fw-semibold text-truncate" style={{ fontSize: '0.9rem', color: '#2d3748' }}>
@@ -1057,10 +1106,13 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                       <Check size={18} className="text-primary ms-2" style={{ flexShrink: 0 }} />
                     )}
                   </div>
-                ))}
+                ));
+              })()}
             </div>
           )}
         </Form.Group>
+        </>
+        )}
       </Modal.Body>
 
       <Modal.Footer style={{ 
@@ -1082,21 +1134,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         >
           Cancel
         </Button>
-        <Button 
-          variant="primary" 
-          type="button"
-          onClick={handleCreateAndOpen}
-          disabled={isSubmitting}
-          style={{
-            padding: '8px 20px',
-            fontSize: '14px',
-            fontWeight: '600',
-            backgroundColor: '#3b82f6',
-            borderColor: '#3b82f6'
-          }}
-        >
-          {isSubmitting ? 'Processing...' : (isEdit ? 'Update & Open' : 'Create & Open')}
-        </Button>
+        
         <Button 
           variant="primary" 
           type="button"

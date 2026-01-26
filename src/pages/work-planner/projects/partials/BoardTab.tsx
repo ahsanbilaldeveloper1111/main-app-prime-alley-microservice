@@ -5,6 +5,7 @@ import OverdueTasksSection from './OverdueTasksSection';
 
 interface BoardTabProps {
   selectedProject: any;
+  hierarchyDataExtensions?: any[];
   statuses: any[];
   boardTasks: any[];
   loadingBoardTasks: boolean;
@@ -35,6 +36,7 @@ interface BoardTabProps {
 
 const BoardTab: React.FC<BoardTabProps> = ({
   selectedProject,
+  hierarchyDataExtensions,
   statuses,
   boardTasks,
   loadingBoardTasks,
@@ -66,6 +68,7 @@ const BoardTab: React.FC<BoardTabProps> = ({
     <>
       <BoardView
         selectedProject={selectedProject}
+        hierarchyDataExtensions={hierarchyDataExtensions}
         statuses={statuses}
         boardTasks={boardTasks}
         loadingBoardTasks={loadingBoardTasks}

@@ -9,6 +9,8 @@ interface ListProjectsParams {
   page?: number;
   limit?: number;
   search?: string;
+  status?: string;
+  user_extensions?: string[];
 }
 
 interface CreateProjectData {
@@ -25,7 +27,7 @@ interface UpdateProjectData {
 
 interface CreateLabelData {
   name: string;
-  color: string;
+  color?: string;
 }
 
 interface UpdateLabelData {
@@ -69,9 +71,12 @@ interface ListTasksParams {
   status_id?: number;
   priority?: string;
   is_completed?: boolean;
+  due_date_from?: string;
+  due_date_to?: string;
   frequency?: string;
   is_active?: boolean;
   withRelations?: string[];
+  extension_numbers?: string[];
   order?: {
     column?: string;
     dir?: 'asc' | 'desc';
@@ -217,20 +222,31 @@ const validateArrayResponse = (
  */
 export const listProjects = async (params: ListProjectsParams = {}) => {
   try {
-    const { page = 1, limit = 20, search = "" } = params;
-    
-    const queryParams: any = {
-      page,
-      limit,
-    };
-    
+    const { page = 1, limit = 20, search = "", status, user_extensions } = params;
+
+    // Ensure array params use `param[]` formatting
+    const formattedParams = new URLSearchParams();
+    formattedParams.append('page', String(page));
+    formattedParams.append('limit', String(limit));
+
     if (search) {
-      queryParams.search = search;
+      formattedParams.append('search', search);
     }
-    
-    const response = await axiosInstance.get(`${prefix}/projects`, {
-      params: queryParams
-    });
+
+    if (status) {
+      formattedParams.append('status', status);
+    }
+
+    if (Array.isArray(user_extensions) && user_extensions.length > 0) {
+      user_extensions.forEach((ext) => {
+        if (ext) formattedParams.append('user_extensions[]', String(ext));
+      });
+    }
+
+    const queryString = formattedParams.toString();
+    const url = queryString ? `${prefix}/projects?${queryString}` : `${prefix}/projects`;
+
+    const response = await axiosInstance.get(url);
     
     // For list operations, we need the full response (data, pagination, summary)
     if (response?.data) {
@@ -354,7 +370,7 @@ export const getProjectLabels = async (projectId: string | number) => {
 /**
  * Create a new label for a project
  */
-export const createLabel = async (projectId: string | number, data: CreateLabelData) => {
+export const createProjectLabel = async (projectId: string | number, data: CreateLabelData) => {
   try {
     const response = await axiosInstance.post(`${prefix}/projects/${projectId}/labels`, data);
     return validateResponse(response, 'Failed to create label', 'Label created successfully');
@@ -368,7 +384,7 @@ export const createLabel = async (projectId: string | number, data: CreateLabelD
 /**
  * Update a label
  */
-export const updateLabel = async (
+export const updateProjectLabel = async (
   projectId: string | number,
   labelId: string | number,
   data: UpdateLabelData
@@ -386,7 +402,7 @@ export const updateLabel = async (
 /**
  * Delete a label
  */
-export const deleteLabel = async (projectId: string | number, labelId: string | number) => {
+export const deleteProjectLabel = async (projectId: string | number, labelId: string | number) => {
   try {
     const response = await axiosInstance.delete(`${prefix}/projects/${projectId}/labels/${labelId}`);
     return validateResponse(response, 'Failed to delete label', 'Label deleted successfully', false);
@@ -523,9 +539,12 @@ export const listTasks = async (params: ListTasksParams = {}) => {
       status_id,
       priority,
       is_completed,
+      due_date_from,
+      due_date_to,
       frequency,
       is_active,
       withRelations,
+      extension_numbers,
       order
     } = params;
     
@@ -542,6 +561,8 @@ export const listTasks = async (params: ListTasksParams = {}) => {
     if (status_id) formattedParams.append('status_id', status_id.toString());
     if (priority) formattedParams.append('priority', priority);
     if (is_completed !== undefined) formattedParams.append('is_completed', is_completed.toString());
+    if (due_date_from) formattedParams.append('due_date_from', due_date_from);
+    if (due_date_to) formattedParams.append('due_date_to', due_date_to);
     if (frequency) formattedParams.append('frequency', frequency);
     if (is_active !== undefined) formattedParams.append('is_active', is_active.toString());
     
@@ -558,6 +579,14 @@ export const listTasks = async (params: ListTasksParams = {}) => {
       withRelations.forEach((relation) => {
         formattedParams.append('with[]', relation);
       });
+    }
+    
+    // Add extension_numbers as JSON array string
+    if (extension_numbers && extension_numbers.length > 0) {
+      extension_numbers.forEach((relation) => {
+        formattedParams.append('extension_numbers[]', relation);
+      });
+      
     }
     
     const queryString = formattedParams.toString();
@@ -697,14 +726,73 @@ export const getRecentActivity = async (projectId?: number) => {
 /**
  * Get activities for a specific task
  */
-export const getTaskActivities = async (taskId: string | number) => {
+export const getTaskActivities = async (taskId: string | number, page: number = 1, limit: number = 20) => {
   try {
-    const response = await axiosInstance.get(`${prefix}/activities`, {
-      params: { task_id: taskId }
-    });
+    const response = await axiosInstance.get(`${prefix}/tasks/activities`
+      , {
+        params: { page: page, limit: limit, task_id: taskId }
+      }
+    );
     return validateResponse(response, 'Failed to fetch task activities');
   } catch (error) {
     console.error('API Error:', error);
+    throw error;
+  }
+};
+
+// ==================== Task Comments API ====================
+
+/**
+ * Get comments for a specific task
+ */
+export const getTaskComments = async (taskId: string | number) => {
+  try {
+    const response = await axiosInstance.get(`${prefix}/tasks/${taskId}/comments`);
+    return validateResponse(response, 'Failed to fetch task comments');
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Create a comment for a task
+ */
+export const createTaskComment = async (taskId: string | number, comment: string) => {
+  try {
+    const response = await axiosInstance.post(`${prefix}/tasks/${taskId}/comments`, { comment });
+    return validateResponse(response, 'Failed to create comment', 'Comment created successfully');
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to create comment');
+    throw error;
+  }
+};
+
+/**
+ * Update a comment
+ */
+export const updateTaskComment = async (taskId: string | number, commentId: string | number, comment: string) => {
+  try {
+    const response = await axiosInstance.put(`${prefix}/tasks/${taskId}/comments/${commentId}`, { comment });
+    return validateResponse(response, 'Failed to update comment', 'Comment updated successfully');
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to update comment');
+    throw error;
+  }
+};
+
+/**
+ * Delete a comment
+ */
+export const deleteTaskComment = async (taskId: string | number, commentId: string | number) => {
+  try {
+    const response = await axiosInstance.delete(`${prefix}/tasks/${taskId}/comments/${commentId}`);
+    return validateResponse(response, 'Failed to delete comment', 'Comment deleted successfully', false);
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to delete comment');
     throw error;
   }
 };
@@ -844,6 +932,62 @@ export const getDashboard = async () => {
     return validateResponse(response, 'Failed to fetch dashboard data');
   } catch (error) {
     console.error('API Error:', error);
+    throw error;
+  }
+};
+
+
+export const getLabels = async () => {
+  try {
+    const response = await axiosInstance.get(`${prefix}/labels`);
+    return validateArrayResponse(response, 'Failed to fetch project labels');
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Create a new label for a project
+ */
+export const createLabel = async (data: CreateLabelData) => {
+  try {
+    const response = await axiosInstance.post(`${prefix}/labels`, data);
+    return validateResponse(response, 'Failed to create label', 'Label created successfully');
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to create label');
+    throw error;
+  }
+};
+
+/**
+ * Update a label
+ */
+export const updateLabel = async (
+  labelId: string | number,
+  data: UpdateLabelData
+) => {
+  try {
+    const response = await axiosInstance.put(`${prefix}/labels/${labelId}`, data);
+    return validateResponse(response, 'Failed to update label', 'Label updated successfully');
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to update label');
+    throw error;
+  }
+};
+
+/**
+ * Delete a label
+ */
+export const deleteLabel = async (labelId: string | number) => {
+  try {
+    const response = await axiosInstance.delete(`${prefix}/labels/${labelId}`);
+    return validateResponse(response, 'Failed to delete label', 'Label deleted successfully', false);
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to delete label');
     throw error;
   }
 };

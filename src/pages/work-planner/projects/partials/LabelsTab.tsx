@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import { Plus, Trash2, Edit, Tag } from 'lucide-react';
-import { createLabel, updateLabel, deleteLabel } from '@utils/tasks';
-
+import { createProjectLabel, updateProjectLabel, deleteProjectLabel } from '@utils/tasks';
+import { canManage } from '@utils/work-planner';
+import { useSession } from 'next-auth/react';
 interface LabelsTabProps {
   selectedProject: any;
   labels: any[];
@@ -18,6 +19,10 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   onRefresh,
   styles
 }) => {
+  const { data: session } = useSession();
+  const isAllow = useMemo(() => {
+    return canManage(labels, selectedProject, session);
+  }, [labels, selectedProject, session]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -30,7 +35,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     
     try {
       setProcessing(true);
-      await createLabel(selectedProject.id, {
+      await createProjectLabel(selectedProject.id, {
         name: formData.name,
         color: formData.color
       });
@@ -49,7 +54,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     
     try {
       setProcessing(true);
-      await updateLabel(selectedProject.id, selectedLabel.id, {
+      await updateProjectLabel(selectedProject.id, selectedLabel.id, {
         name: formData.name,
         color: formData.color
       });
@@ -69,7 +74,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     
     try {
       setProcessing(true);
-      await deleteLabel(selectedProject.id, selectedLabel.id);
+      await deleteProjectLabel(selectedProject.id, selectedLabel.id);
       setShowDeleteModal(false);
       setSelectedLabel(null);
       onRefresh();
@@ -102,6 +107,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
       <div style={styles.card}>
         <div style={styles.cardHeader}>
           <h5 style={styles.cardTitle}>Project Labels</h5>
+          {isAllow && (
           <Button
             variant="primary"
             size="sm"
@@ -111,6 +117,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
             <Plus size={16} />
             Add Label
           </Button>
+          )}
         </div>
 
         {loading ? (
@@ -166,6 +173,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
                     )}
                   </div>
                 </div>
+                {isAllow && (
                 <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
                   <button
                     onClick={() => openEditModal(label)}
@@ -216,6 +224,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
                     <Trash2 size={14} />
                   </button>
                 </div>
+                )}
               </div>
             ))}
           </div>

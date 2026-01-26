@@ -13,6 +13,7 @@ import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import { ModuleSlug } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import { Spinner, Modal } from 'react-bootstrap';
+import Select, { SingleValue, StylesConfig } from 'react-select';
 import { 
   Container, 
   Row, 
@@ -57,7 +58,8 @@ import {
   Edit3,
   Trash2,
   Link,
-  ExternalLink
+  ExternalLink,
+  Archive
 } from 'lucide-react';
 // API Response Types
 interface ApiProject {
@@ -91,11 +93,19 @@ interface Project {
   open: number;
   overdue: number;
   lastUpdate: string;
-  status: 'Active' | 'Completed' | 'On Hold';
+  status: 'Active' | 'Completed' | 'Archived';
   owner: string;
   team: string;
   apiData?: ApiProject; // Store original API data
 }
+
+type SelectOption = { value: string; label: string };
+type AppliedProjectFilters = {
+  search: string;
+  status: string; // status key: active|completed|archived|all
+  owner: string; // extension number or "All Owners"
+  team: string; // extension number or "All Teams"
+};
 
 const WorkPlannerProjects = () => {
     const router = useRouter();
@@ -124,13 +134,21 @@ const WorkPlannerProjects = () => {
     
     // Fetch projects on mount
     useEffect(() => {
-      fetchProjects();
+      fetchProjects({ search: '', status: 'active', owner: 'All Owners' });
     }, []);
     
-    const fetchProjects = async () => {
+    const fetchProjects = async (filters?: Partial<AppliedProjectFilters>) => {
       try {
         setLoading(true);
-        const response = await listProjects({ page: 1, limit: 100 });
+        const statusParam = filters?.status && filters.status !== 'all' ? filters.status : undefined;
+        const ownerParam = filters?.owner && filters.owner !== 'All Owners' ? [filters.owner] : undefined;
+        const response = await listProjects({
+          page: 1,
+          limit: 100,
+          search: filters?.search || '',
+          status: statusParam,
+          user_extensions: ownerParam
+        });
         
         // Response structure: { success, message, data: [...], pagination, summary }
         if (response && response.success === true && response.data && Array.isArray(response.data)) {
@@ -142,8 +160,8 @@ const WorkPlannerProjects = () => {
             setStats({
               activeProjects: response.summary.active || 0,
               totalProjects: response.summary.total || 0,
-              tasksDueThisWeek: 0, // Calculate from tasks if needed
-              overdueAcrossProjects: 0 // Calculate from tasks if needed
+              tasksDueThisWeek: response.summary.task_due_this_week || 0,
+              overdueAcrossProjects: response.summary.overdue_tasks || 0
             });
           }
         } else if (response && response.success === false) {
@@ -216,7 +234,7 @@ const WorkPlannerProjects = () => {
         open: openTasks,
         overdue: overdueTasks,
         lastUpdate,
-        status: apiProject.status === 'active' ? 'Active' : apiProject.status === 'completed' ? 'Completed' : 'On Hold',
+        status: apiProject.status === 'active' ? 'Active' : apiProject.status === 'completed' ? 'Completed' : 'Archived',
         owner: members[0]?.name || 'N/A',
         team: 'Team', // You may want to add team to API response
         apiData: apiProject
@@ -255,7 +273,7 @@ const WorkPlannerProjects = () => {
         setDeleting(true);
         const result = await deleteProject(projectToDelete.id);
         if (result) {
-          await fetchProjects();
+          await fetchProjects(appliedFilters);
           setShowDeleteModal(false);
           setProjectToDelete(null);
         }
@@ -285,7 +303,7 @@ const WorkPlannerProjects = () => {
         }
         
         if (result) {
-          await fetchProjects();
+          await fetchProjects(appliedFilters);
           setShowProjectModal(false);
           setEditingProject(null);
           setProjectFormData({
@@ -303,9 +321,15 @@ const WorkPlannerProjects = () => {
     
     const [activeTab, setActiveTab] = useState('All Tasks');
       const [searchTerm, setSearchTerm] = useState('');
-      const [filterStatus, setFilterStatus] = useState('Active');
+      const [filterStatus, setFilterStatus] = useState<'active' | 'completed' | 'archived' | 'all'>('active');
       const [filterOwner, setFilterOwner] = useState('All Owners');
       const [filterTeam, setFilterTeam] = useState('All Teams');
+      const [appliedFilters, setAppliedFilters] = useState<AppliedProjectFilters>({
+        search: '',
+        status: 'active',
+        owner: 'All Owners',
+        team: 'All Teams'
+      });
     const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [selectedProjectDetails, setSelectedProjectDetails] = useState<ApiProject | null>(null);
@@ -468,10 +492,24 @@ const WorkPlannerProjects = () => {
       };
     
       const clearFilters = () => {
-        setFilterStatus('Active');
+        setSearchTerm('');
+        setFilterStatus('active');
         setFilterOwner('All Owners');
         setFilterTeam('All Teams');
-        setSearchTerm('');
+        const cleared: AppliedProjectFilters = { search: '', status: 'active', owner: 'All Owners', team: 'All Teams' };
+        setAppliedFilters(cleared);
+        fetchProjects(cleared);
+      };
+
+      const handleApplyFilters = () => {
+        const next: AppliedProjectFilters = {
+          search: searchTerm,
+          status: filterStatus,
+          owner: filterOwner,
+          team: filterTeam
+        };
+        setAppliedFilters(next);
+        fetchProjects(next);
       };
     
       // Current user (from header avatar)
@@ -501,18 +539,89 @@ const WorkPlannerProjects = () => {
       };
     
       const filteredProjects = getTabFilteredProjects().filter(project => {
-        const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             project.id.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = filterStatus === 'All Status' || project.status === filterStatus;
-        const matchesOwner = filterOwner === 'All Owners' || project.owner === filterOwner;
-        const matchesTeam = filterTeam === 'All Teams' || project.team === filterTeam;
+        const matchesSearch =
+          project.name.toLowerCase().includes(appliedFilters.search.toLowerCase()) ||
+          project.id.toLowerCase().includes(appliedFilters.search.toLowerCase());
+        const projectStatusKey = String(project.apiData?.status || project.status || '').toLowerCase();
+        const matchesStatus = appliedFilters.status === 'all' || projectStatusKey === appliedFilters.status;
+        const projectOwnerExt = project.apiData?.owner_extension_number || project.owner;
+        const matchesOwner = appliedFilters.owner === 'All Owners' || String(projectOwnerExt || '') === String(appliedFilters.owner);
+
+        const projectMembers = (project.apiData?.members || project.members || []) as any[];
+        const matchesTeam =
+          appliedFilters.team === 'All Teams' ||
+          projectMembers.some((m: any) => String(m?.extension_number || m?.name || '') === String(appliedFilters.team));
         
         return matchesSearch && matchesStatus && matchesOwner && matchesTeam;
       });
-    
-      const owners = ['All Owners', ...Array.from(new Set(projects.map(p => p.owner)))];
-      const teams = ['All Teams', ...Array.from(new Set(projects.map(p => p.team)))];
-      const statuses = ['All Status', 'Active', 'Completed', 'On Hold'];
+
+      const userOptions = (() => {
+        const list = (hierarchyDataExtensions as any[]) || [];
+        const seen = new Set<string>();
+        return list
+          .map((ext: any) => {
+            const value = String(ext?.extension_number || ext?.id || '').trim();
+            const label = String(ext?.user?.name || ext?.name || value).trim();
+            return { value, label };
+          })
+          .filter(o => o.value)
+          .filter(o => {
+            if (seen.has(o.value)) return false;
+            seen.add(o.value);
+            return true;
+          })
+          .sort((a, b) => a.label.localeCompare(b.label));
+      })();
+
+      const ownerSelectOptions: SelectOption[] = [{ value: 'All Owners', label: 'All Owners' }, ...userOptions];
+      const teamSelectOptions: SelectOption[] = [{ value: 'All Teams', label: 'All Teams' }, ...userOptions];
+
+      const selectStyles: StylesConfig<SelectOption, false> = {
+        control: (base, state) => ({
+          ...base,
+          width: '100%',
+          minHeight: '44px',
+          border: '1px solid #E5E9F2',
+          borderRadius: '6px',
+          boxShadow: 'none',
+          backgroundColor: 'white',
+          cursor: 'pointer',
+          ':hover': {
+            borderColor: '#E5E9F2',
+          },
+        }),
+        valueContainer: (base) => ({
+          ...base,
+          padding: '0 10px',
+        }),
+        input: (base) => ({
+          ...base,
+          margin: 0,
+          padding: 0,
+        }),
+        placeholder: (base) => ({
+          ...base,
+          color: '#6B7280',
+          fontSize: '0.9rem',
+        }),
+        singleValue: (base) => ({
+          ...base,
+          color: '#1F2937',
+          fontSize: '0.9rem',
+        }),
+        indicatorSeparator: () => ({ display: 'none' }),
+        dropdownIndicator: (base) => ({ ...base, padding: '0 8px' }),
+        menu: (base) => ({
+          ...base,
+          zIndex: 20,
+        }),
+      };
+      const statuses: Array<{ value: 'active' | 'completed' | 'archived' | 'all'; label: string }> = [
+        { value: 'all', label: 'All Status' },
+        { value: 'active', label: 'Active' },
+        { value: 'completed', label: 'Completed' },
+        { value: 'archived', label: 'Archived' }
+      ];
     
       const styles = {
         container: { backgroundColor: '#F4F7FA', minHeight: '100vh', paddingBottom: '2rem' },
@@ -975,7 +1084,7 @@ const WorkPlannerProjects = () => {
 
               <select
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
+                onChange={(e) => setFilterStatus(e.target.value as any)}
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -988,59 +1097,50 @@ const WorkPlannerProjects = () => {
                   backgroundColor: 'white'
                 }}
               >
-                <option value="">Status</option>
                 {statuses.map(status => (
-                  <option key={status} value={status}>
-                    {status}
+                  <option key={status.value} value={status.value}>
+                    {status.label}
                   </option>
                 ))}
               </select>
 
-              <select
-                value={filterOwner}
-                onChange={(e) => setFilterOwner(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #E5E9F2',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  backgroundColor: 'white'
-                }}
-              >
-                <option value="">Owner / PM</option>
-                {owners.map(owner => (
-                  <option key={owner} value={owner}>
-                    {owner}
-                  </option>
-                ))}
-              </select>
+              <Select<SelectOption, false>
+                options={ownerSelectOptions}
+                value={ownerSelectOptions.find(o => o.value === filterOwner) || ownerSelectOptions[0]}
+                onChange={(opt: SingleValue<SelectOption>) => setFilterOwner(opt?.value || 'All Owners')}
+                styles={selectStyles}
+                isSearchable
+                placeholder="Owner / PM"
+              />
 
-              <select
-                value={filterTeam}
-                onChange={(e) => setFilterTeam(e.target.value)}
+              {/* <Select<SelectOption, false>
+                options={teamSelectOptions}
+                value={teamSelectOptions.find(o => o.value === filterTeam) || teamSelectOptions[0]}
+                onChange={(opt: SingleValue<SelectOption>) => setFilterTeam(opt?.value || 'All Teams')}
+                styles={selectStyles}
+                isSearchable
+                placeholder="Team"
+              /> */}
+
+              <button
+                onClick={handleApplyFilters}
                 style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #E5E9F2',
+                  padding: '0.625rem 1.25rem',
+                  backgroundColor: '#4680FF',
+                  color: 'white',
+                  border: '1px solid #4680FF',
                   borderRadius: '6px',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  fontFamily: 'inherit',
+                  fontWeight: '600',
                   cursor: 'pointer',
-                  backgroundColor: 'white'
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.9rem'
                 }}
               >
-                <option value="">Team</option>
-                {teams.map(team => (
-                  <option key={team} value={team}>
-                    {team}
-                  </option>
-                ))}
-              </select>
+                Filters
+              </button>
 
               <button
                 onClick={clearFilters}
@@ -1069,7 +1169,7 @@ const WorkPlannerProjects = () => {
             </div>
           </div>
 
-          <div className="tabs-section">
+          {/* <div className="tabs-section">
             <Nav variant="tabs">
               <Nav.Item>
                 <Nav.Link 
@@ -1096,7 +1196,7 @@ const WorkPlannerProjects = () => {
                 </Nav.Link>
               </Nav.Item>
             </Nav>
-          </div>
+          </div> */}
 
           <div className="table-container">
             <div className="table-responsive">
@@ -1260,7 +1360,7 @@ const WorkPlannerProjects = () => {
                   <div>
                     <div className="fw-bold" style={{ fontSize: '1.125rem', marginBottom: '0.25rem' }}>{selectedProject.name}</div>
                     <Badge 
-                      bg={selectedProject.status === 'Active' ? 'success' : selectedProject.status === 'On Hold' ? 'warning' : 'secondary'}
+                      bg={selectedProject.status === 'Active' ? 'success' : selectedProject.status === 'Archived' ? 'warning' : 'secondary'}
                       style={{ fontSize: '0.7rem', fontWeight: '600', letterSpacing: '0.5px' }}
                     >
                       {selectedProject.status.toUpperCase()}
@@ -1437,7 +1537,7 @@ const WorkPlannerProjects = () => {
                   <div className="detail-section">
                     <div className="detail-label">Status</div>
                     <Badge 
-                      bg={selectedProjectDetails?.status === 'active' ? 'success' : selectedProjectDetails?.status === 'completed' ? 'secondary' : 'warning'}
+                      bg={selectedProjectDetails?.status === 'active' ? 'success' : selectedProjectDetails?.status === 'completed' ? 'secondary' : selectedProjectDetails?.status === 'archived' ? 'warning' : 'info'}
                       style={{ 
                         fontSize: '0.75rem', 
                         fontWeight: '600',
@@ -1635,6 +1735,7 @@ const WorkPlannerProjects = () => {
                                 {activity.action === 'updated' && <Edit3 size={16} style={{ color: actionColor }} />}
                                 {activity.action === 'created' && <Plus size={16} style={{ color: actionColor }} />}
                                 {activity.action === 'completed' && <CheckCircle2 size={16} style={{ color: actionColor }} />}
+                                {activity.action === 'archived' && <Archive size={16} style={{ color: actionColor }} />}
                                 {!['status_changed', 'updated', 'created', 'completed'].includes(activity.action) && (
                                   <AlertCircle size={16} style={{ color: actionColor }} />
                                 )}
