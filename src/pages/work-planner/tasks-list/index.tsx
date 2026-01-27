@@ -15,7 +15,7 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import { listTasks, listProjects, getTask, updateTask, deleteTask, getTaskActivities, getTaskComments, createTaskComment, updateTaskComment, deleteTaskComment } from "@utils/tasks";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
-import { ModuleSlug } from "@utils/Helper";
+import { GlobalDateTimeFormat, ModuleSlug } from "@utils/Helper";
 import { Spinner } from "react-bootstrap";
 import { 
   Container, 
@@ -56,6 +56,7 @@ import {
 import SelectBox from '@components/SelectBox';
 import CreateTaskModal from '@components/work-planner/createtask-modal';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
+import moment from 'moment';
 
 interface Task {
   id: string;
@@ -69,6 +70,7 @@ interface Task {
   assignees?: Array<{ name: string; initials: string }>;
   description?: string;
   comments?: number;
+  completed_by_extension_number?: string;
   rawData?: any; // Store raw API data for detail view
 }
 
@@ -102,9 +104,11 @@ const TasksList = () => {
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 20,
+    limit: 15,
     total: 0,
-    last_page: 1
+    last_page: 1,
+    from: 0,
+    to: 0
   });
   const [summary, setSummary] = useState({
     openTasks: 0,
@@ -126,11 +130,17 @@ const TasksList = () => {
   
   // Use refs to store latest filter values to avoid recreating fetchTasks on filter changes
   const filtersRef = useRef({ searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate });
+  const tasksRef = useRef<Task[]>([]);
   
   // Update refs when filters change
   useEffect(() => {
     filtersRef.current = { searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate };
   }, [searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate]);
+  
+  // Update tasks ref when tasks change
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
 
   // Fetch extensions for CreateTaskModal - MUST load first before other APIs
   const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
@@ -273,9 +283,9 @@ const TasksList = () => {
       
       if (currentFilters.filterStatus !== 'All Status' && currentFilters.filterStatus) {
         // Map status name to status_id
-        // First, try to find status_id from existing tasks
+        // First, try to find status_id from existing tasks (use ref to get latest tasks)
         const statusMap: Record<string, number> = {};
-        tasks.forEach(task => {
+        tasksRef.current.forEach(task => {
           if (task.rawData?.status && task.status === currentFilters.filterStatus) {
             const statusId = task.rawData.status.id || task.rawData.status_id;
             if (statusId) {
@@ -312,21 +322,25 @@ const TasksList = () => {
       if (response && response.data) {
         const mappedTasks = response.data.map(mapApiTaskToTask);
         setTasks(mappedTasks);
-        
+        console.log('response.pagination', response.pagination);
         if (response.pagination) {
           setPagination(prev => {
-            // Only update if values actually changed to prevent infinite loop
             const newPagination = {
               page: response.pagination.page || 1,
-              limit: response.pagination.limit || 20,
+              limit: response.pagination.limit || 15,
               total: response.pagination.total || 0,
-              last_page: response.pagination.last_page || 1
+              last_page: response.pagination.last_page || 1,
+              from: response.pagination.from || 0,
+              to: response.pagination.to || 0
             };
-            // Only update if something actually changed
+            // Always update to sync with server response, but only if values are different
+            // This ensures pagination state matches server state
             if (prev.page !== newPagination.page || 
                 prev.limit !== newPagination.limit || 
                 prev.total !== newPagination.total || 
-                prev.last_page !== newPagination.last_page) {
+                prev.last_page !== newPagination.last_page ||
+                prev.from !== newPagination.from ||
+                prev.to !== newPagination.to) {
               return newPagination;
             }
             return prev;
@@ -350,7 +364,7 @@ const TasksList = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, allProjects, tasks]); // Only depend on pagination and data needed for status mapping (not filters)
+  }, [pagination.page, pagination.limit, allProjects]); // Only depend on pagination and data needed for status mapping (not filters)
 
   // Fetch projects list
   // Wait for hierarchy data to load first, then fetch projects
@@ -396,9 +410,10 @@ const TasksList = () => {
     // Skip initial load (handled by hierarchyLoading useEffect)
     // This handles pagination changes from Previous/Next buttons
     // Only trigger on actual pagination changes, not on filter changes
+    // fetchTasks is recreated when pagination.page or pagination.limit changes, so it will have latest values
     fetchTasks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, pagination.limit, hierarchyLoading]); // fetchTasks reads from refs, so it doesn't need to be in deps
+  }, [pagination.page, pagination.limit, hierarchyLoading, fetchTasks]); // Include fetchTasks in deps to ensure it has latest pagination values
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
@@ -1154,33 +1169,6 @@ const TasksList = () => {
             </div>
           </div>
 
-          
-          <div className="table-container">
-            {pagination.last_page > 1 && (
-              <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
-                <div>
-                  Showing {pagination.page === 1 ? 1 : ((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} tasks
-                </div>
-                <div className="d-flex gap-2">
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    disabled={pagination.page === 1}
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    disabled={pagination.page >= pagination.last_page}
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            )}
             <div className="table-responsive">
               <Table className="tasks-table" hover>
                 <thead>
@@ -1199,6 +1187,9 @@ const TasksList = () => {
                     <th>Project</th>
                     <th>Assignee</th>
                     <th>Due</th>
+                   
+                    <th>Created By</th>
+                    <th>DateTime</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -1219,13 +1210,14 @@ const TasksList = () => {
                   ) : (
                     filteredTasks.map(task => (
                     <tr key={task.id}>
-                      <td onClick={(e) => e.stopPropagation()}>
+                      {/*<td onClick={(e) => e.stopPropagation()}>
                         <Form.Check 
                           type="checkbox"
                           checked={selectedTasks.has(task.id)}
                           onChange={() => handleSelectTask(task.id)}
                         />
                       </td>
+                      */}
                       <td className="task-id" onClick={() => handleTaskClick(task)}>{task.id}</td>
                       <td onClick={() => handleTaskClick(task)}>{task.title}</td>
                       <td onClick={() => handleTaskClick(task)}>
@@ -1242,8 +1234,10 @@ const TasksList = () => {
                       <td onClick={() => handleTaskClick(task)}>
                         <div className="d-flex align-items-center gap-2">
                         
-                        {
-                          task.rawData?.assignees?.map((assignee: any, idx: number) => {
+                        {!task.rawData?.assignees || task.rawData.assignees.length === 0 ? (
+                          <span className="text-muted">Not assigned</span>
+                        ) : (
+                         task.rawData.assignees.map((assignee: any, idx: number) => {
                             const extNumber = assignee.extension_number || '';
                             
                             // Find name from hierarchyDataExtensions
@@ -1270,10 +1264,29 @@ const TasksList = () => {
                               </div>
                             );
                           })
-                        }
+                        )}
                         </div>
                       </td>
+
                       <td onClick={() => handleTaskClick(task)}>{task.dueDate}</td>
+                      
+                      <td onClick={() => handleTaskClick(task)}>
+                        {(() => {
+                          const extNumber = task.rawData?.created_by_extension_number || '';
+                          if (!extNumber) return '';
+                          
+                          if (!hierarchyDataExtensions) {
+                            return extNumber;
+                          }
+                          
+                          const extension = (hierarchyDataExtensions as any[]).find(
+                            (ext: any) => ext.id === extNumber || ext.extension_number === extNumber
+                          );
+                          
+                          return extension?.name || extNumber;
+                        })()}
+                        </td>
+                        <td onClick={() => handleTaskClick(task)}>{task.rawData?.created_at ? moment(task.rawData?.created_at).format(GlobalDateTimeFormat) : ''}</td>
                       <td>
                         <Button variant="link" className="text-secondary p-0" onClick={() => handleTaskClick(task)}>
                           <MoreVertical size={20} />
@@ -1285,7 +1298,146 @@ const TasksList = () => {
                 </tbody>
               </Table>
             </div>
-          </div>
+            
+            {/* Pagination Controls */}
+            {!loading && pagination.last_page > 1 && filteredTasks.length > 0 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '20px',
+                paddingTop: '16px',
+                borderTop: '1px solid #e8eef5'
+              }}>
+                <div style={{ fontSize: '13px', color: '#718096' }}>
+                  Showing {pagination.from || 0} to {pagination.to || 0} of {pagination.total || 0} tasks
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => {
+                      if (pagination.page > 1 && !loading) {
+                        setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+                      }
+                    }}
+                    disabled={pagination.page === 1 || loading}
+                    style={{
+                      padding: '6px 12px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      backgroundColor: (pagination.page === 1 || loading) ? '#f8fafc' : 'white',
+                      color: (pagination.page === 1 || loading) ? '#cbd5e0' : '#4a5568',
+                      cursor: (pagination.page === 1 || loading) ? 'not-allowed' : 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (pagination.page > 1 && !loading) {
+                        e.currentTarget.style.backgroundColor = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#cbd5e0';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (pagination.page > 1 && !loading) {
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                      }
+                    }}
+                  >
+                    Previous
+                  </button>
+                  
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {Array.from({ length: Math.min(5, pagination.last_page) }, (_, i) => {
+                      let pageNum;
+                      if (pagination.last_page <= 5) {
+                        pageNum = i + 1;
+                      } else if (pagination.page <= 3) {
+                        pageNum = i + 1;
+                      } else if (pagination.page >= pagination.last_page - 2) {
+                        pageNum = pagination.last_page - 4 + i;
+                      } else {
+                        pageNum = pagination.page - 2 + i;
+                      }
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => {
+                            if (!loading && pagination.page !== pageNum) {
+                              setPagination(prev => ({ ...prev, page: pageNum }));
+                            }
+                          }}
+                          disabled={loading}
+                          style={{
+                            minWidth: '32px',
+                            height: '32px',
+                            padding: '0 8px',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '6px',
+                            backgroundColor: pagination.page === pageNum ? '#5b8fd8' : (loading ? '#f8fafc' : 'white'),
+                            color: pagination.page === pageNum ? 'white' : (loading ? '#cbd5e0' : '#4a5568'),
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            fontSize: '13px',
+                            fontWeight: pagination.page === pageNum ? '600' : '500',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (pagination.page !== pageNum && !loading) {
+                              e.currentTarget.style.backgroundColor = '#f8fafc';
+                              e.currentTarget.style.borderColor = '#cbd5e0';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (pagination.page !== pageNum && !loading) {
+                              e.currentTarget.style.backgroundColor = 'white';
+                              e.currentTarget.style.borderColor = '#e2e8f0';
+                            }
+                          }}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <button
+                    onClick={() => {
+                      if (pagination.page < pagination.last_page && !loading) {
+                        setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+                      }
+                    }}
+                    disabled={pagination.page >= pagination.last_page || loading}
+                    style={{
+                      padding: '6px 12px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      backgroundColor: (pagination.page >= pagination.last_page || loading) ? '#f8fafc' : 'white',
+                      color: (pagination.page >= pagination.last_page || loading) ? '#cbd5e0' : '#4a5568',
+                      cursor: (pagination.page >= pagination.last_page || loading) ? 'not-allowed' : 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (pagination.page < pagination.last_page && !loading) {
+                        e.currentTarget.style.backgroundColor = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#cbd5e0';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (pagination.page < pagination.last_page && !loading) {
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                      }
+                    }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          
         </Container>
       </div>
 

@@ -41,9 +41,9 @@ import {
   AlertCircle,
   Sparkles,
   Check,
-  Pause
+  Pause,
+  ListTodo
 } from 'lucide-react';
-import ConvertToTaskModal from '@components/converttotask';
 
 // Types
 interface Task {
@@ -101,13 +101,12 @@ const DialTodo = () => {
     const [filterLabel, setFilterLabel] = useState('labels');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [showAddTask, setShowAddTask] = useState(false);
-    const [showConvertModal, setShowConvertModal] = useState(false);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [pagination, setPagination] = useState({
       page: 1,
-      limit: 25,
+      limit: 15,
       total: 0,
       last_page: 1,
       from: 0,
@@ -117,6 +116,7 @@ const DialTodo = () => {
     const [deletingTask, setDeletingTask] = useState(false);
     const [editingTask, setEditingTask] = useState<any>(null);
     const [isDuplicating, setIsDuplicating] = useState(false);
+    const [isConverting, setIsConverting] = useState(false);
     const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
     const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
     const [summary, setSummary] = useState({
@@ -431,6 +431,8 @@ const DialTodo = () => {
         // Close modal first
         setShowCreateTaskModal(false);
         setEditingTask(null);
+        setIsDuplicating(false);
+        setIsConverting(false);
         
         // Reset pagination to page 1 to show the newly created task
         setPagination(prev => ({ ...prev, page: 1 }));
@@ -452,8 +454,8 @@ const DialTodo = () => {
       setSelectedTask(null);
       setShowCreateTaskModal(true);
     };
-  
-  
+
+
     // Use summary from API for counters
     const counts = {
       all: summary.total,
@@ -1697,8 +1699,9 @@ const DialTodo = () => {
 
               <div style={{ 
                 display: 'grid',
-                
-                gap: '8px'
+                gridTemplateColumns: '1fr 1fr',
+                gap: '8px',
+                marginBottom: '8px'
               }}>
                 <button 
                   onClick={() => {
@@ -1734,7 +1737,40 @@ const DialTodo = () => {
                   <Copy size={14} />
                   Duplicate
                 </button>
-                
+
+                <button 
+                  onClick={() => {
+                    if (selectedTask?.rawData) {
+                      // Remove id to create new task instead of updating
+                      const taskDataWithoutId = { ...selectedTask.rawData };
+                      delete taskDataWithoutId.id;
+                      delete taskDataWithoutId.task_id;
+                      setEditingTask(taskDataWithoutId);
+                      setIsConverting(true);
+                      setShowCreateTaskModal(true);
+                    }
+                  }}
+                  style={{
+                    padding: '10px',
+                    backgroundColor: '#4e6fa5',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#3d5a87'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#4e6fa5'}
+                >
+                  <ListTodo size={14} />
+                  Convert to Task
+                </button>
               </div>
             </>
             )}
@@ -1744,7 +1780,7 @@ const DialTodo = () => {
 
       {/* Create/Edit Task Modal */}
       <CreateTaskModal
-        show={showCreateTaskModal}
+        show={showCreateTaskModal && !isConverting}
         onHide={() => {
           setShowCreateTaskModal(false);
           setEditingTask(null);
@@ -1770,17 +1806,19 @@ const DialTodo = () => {
       />
 
       {/* Convert to Task Modal */}
-      <ConvertToTaskModal
-        show={showConvertModal}
-        onHide={() => setShowConvertModal(false)}
-        onConvert={(data) => {
-          console.log('Task converted:', data);
-          // Handle task conversion logic here
+      <CreateTaskModal
+        show={showCreateTaskModal && isConverting}
+        onHide={() => {
+          setShowCreateTaskModal(false);
+          setEditingTask(null);
+          setIsConverting(false);
         }}
-        onConvertAndOpen={(data) => {
-          console.log('Task converted and opening:', data);
-          // Handle task conversion and open logic here
-        }}
+        onCreate={handleCreateTask}
+        onCreateAndOpen={handleCreateTask}
+        extensions={hierarchyDataExtensions as any}
+        task={editingTask}
+        isEdit={true} // Set to true to pre-fill form, but ID is removed so it will create new task
+        taskType="regular"
       />
 
     </React.Fragment>

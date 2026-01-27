@@ -509,6 +509,7 @@ export const routePermissions: RoutePermission[] = [
             { path: '/projects/dashboard',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
             { path: '/saved-views',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
             { path: '/roles-settings',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
+            { path: '/statuses',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
         ]
     },
     // management services start
