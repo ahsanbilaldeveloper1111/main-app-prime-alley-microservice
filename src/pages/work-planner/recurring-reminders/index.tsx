@@ -109,11 +109,20 @@ const RecurringReminders = () => {
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [recurringTasks, setRecurringTasks] = useState<RecurringTask[]>([]);
     const [loading, setLoading] = useState(true);
-    const [pagination, setPagination] = useState({
+    const [pagination, setPagination] = useState<{
+      page: number;
+      limit: number;
+      total: number;
+      last_page: number;
+      from: number;
+      to: number;
+    }>({
       page: 1,
-      limit: 20,
+      limit: 15,
       total: 0,
-      last_page: 1
+      last_page: 1,
+      from: 0,
+      to: 0
     });
     const [showTaskDetail, setShowTaskDetail] = useState(false);
     const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
@@ -374,7 +383,9 @@ const RecurringReminders = () => {
               page: response.pagination.page || 1,
               limit: response.pagination.limit || 20,
               total: response.pagination.total || 0,
-              last_page: response.pagination.last_page || 1
+              last_page: response.pagination.last_page || 1,
+              from: response.pagination.from || 0,
+              to: response.pagination.to || 0
             }));
           }
         }
@@ -1398,6 +1409,145 @@ const RecurringReminders = () => {
                       </tbody>
                     </Table>
                     </div>
+                    
+                    {/* Pagination Controls */}
+                    {!loading && pagination.last_page > 1 && filteredTasks.length > 0 && (
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginTop: '20px',
+                        paddingTop: '16px',
+                        borderTop: '1px solid #e8eef5'
+                      }}>
+                        <div style={{ fontSize: '13px', color: '#718096' }}>
+                          Showing {pagination.from || 0} to {pagination.to || 0} of {pagination.total || 0} tasks
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <button
+                            onClick={() => {
+                              if (pagination.page > 1 && !loading) {
+                                setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+                              }
+                            }}
+                            disabled={pagination.page === 1 || loading}
+                            style={{
+                              padding: '6px 12px',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              backgroundColor: (pagination.page === 1 || loading) ? '#f8fafc' : 'white',
+                              color: (pagination.page === 1 || loading) ? '#cbd5e0' : '#4a5568',
+                              cursor: (pagination.page === 1 || loading) ? 'not-allowed' : 'pointer',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (pagination.page > 1 && !loading) {
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#cbd5e0';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (pagination.page > 1 && !loading) {
+                                e.currentTarget.style.backgroundColor = 'white';
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                              }
+                            }}
+                          >
+                            Previous
+                          </button>
+                          
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            {Array.from({ length: Math.min(5, pagination.last_page) }, (_, i) => {
+                              let pageNum;
+                              if (pagination.last_page <= 5) {
+                                pageNum = i + 1;
+                              } else if (pagination.page <= 3) {
+                                pageNum = i + 1;
+                              } else if (pagination.page >= pagination.last_page - 2) {
+                                pageNum = pagination.last_page - 4 + i;
+                              } else {
+                                pageNum = pagination.page - 2 + i;
+                              }
+                              
+                              return (
+                                <button
+                                  key={pageNum}
+                                  onClick={() => {
+                                    if (!loading && pagination.page !== pageNum) {
+                                      setPagination(prev => ({ ...prev, page: pageNum }));
+                                    }
+                                  }}
+                                  disabled={loading}
+                                  style={{
+                                    minWidth: '32px',
+                                    height: '32px',
+                                    padding: '0 8px',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '6px',
+                                    backgroundColor: pagination.page === pageNum ? '#5b8fd8' : (loading ? '#f8fafc' : 'white'),
+                                    color: pagination.page === pageNum ? 'white' : (loading ? '#cbd5e0' : '#4a5568'),
+                                    cursor: loading ? 'not-allowed' : 'pointer',
+                                    fontSize: '13px',
+                                    fontWeight: pagination.page === pageNum ? '600' : '500',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (pagination.page !== pageNum && !loading) {
+                                      e.currentTarget.style.backgroundColor = '#f8fafc';
+                                      e.currentTarget.style.borderColor = '#cbd5e0';
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (pagination.page !== pageNum && !loading) {
+                                      e.currentTarget.style.backgroundColor = 'white';
+                                      e.currentTarget.style.borderColor = '#e2e8f0';
+                                    }
+                                  }}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              if (pagination.page < pagination.last_page && !loading) {
+                                setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+                              }
+                            }}
+                            disabled={pagination.page >= pagination.last_page || loading}
+                            style={{
+                              padding: '6px 12px',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              backgroundColor: (pagination.page >= pagination.last_page || loading) ? '#f8fafc' : 'white',
+                              color: (pagination.page >= pagination.last_page || loading) ? '#cbd5e0' : '#4a5568',
+                              cursor: (pagination.page >= pagination.last_page || loading) ? 'not-allowed' : 'pointer',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (pagination.page < pagination.last_page && !loading) {
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#cbd5e0';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (pagination.page < pagination.last_page && !loading) {
+                                e.currentTarget.style.backgroundColor = 'white';
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                              }
+                            }}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   
               </div>
           </div>

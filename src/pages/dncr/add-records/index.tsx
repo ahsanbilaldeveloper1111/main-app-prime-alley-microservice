@@ -26,7 +26,6 @@ import { Upload, RefreshCw, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, Che
 
 const AddRecords = () => {
     const [calledNumber, setCalledNumber] = useState('');
-    const [companyName, setCompanyName] = useState('');
     const [comments, setComments] = useState('');
     const [selectedItems, setSelectedItems] = useState<number[]>([]);
     const [searchNumber, setSearchNumber] = useState('');
@@ -111,6 +110,17 @@ const AddRecords = () => {
         return;
       }
 
+      const trimmedNumber = calledNumber.trim();
+      if (!trimmedNumber.startsWith('05')) {
+        toast.error('Called number must start with 05');
+        return;
+      }
+      
+      if (trimmedNumber.length !== 10) {
+        toast.error('Called number must be exactly 10 digits');
+        return;
+      }
+
       setSubmitting(true);
       try {
         const response = await addLocalDNDBlock({
@@ -121,11 +131,13 @@ const AddRecords = () => {
         if (response?.status === 'success') {
           toast.success(response.message || 'Record added successfully');
         setCalledNumber('');
-        setCompanyName('');
         setComments('');
           // Refresh the data
           fetchData();
-        } else {
+        }else if (response?.status === 'error') {
+          toast.error(response?.error || 'Failed to add record');
+        }
+         else {
           toast.error('Failed to add record');
         }
       } catch (err: any) {
@@ -163,9 +175,8 @@ const AddRecords = () => {
     const downloadSampleCSV = () => {
       const sampleData = [
         ['called_number', 'comments'],
-        ['10101010', 'Bulk upload - Campaign 2026'],
-        ['10101010', 'DND List Import'],
-        ['100101001', 'Customer requested block']
+        ['0511111111', 'Comments for the record'],
+        ['0511111112', 'Comments for the record']
       ];
 
       const csvContent = sampleData.map(row => row.join(',')).join('\n');
@@ -194,6 +205,11 @@ const AddRecords = () => {
         if (lines.length < 2) {
           toast.error('CSV file must contain at least a header row and one data row');
           setBulkSubmitting(false);
+          setCsvFile(null);
+          setCsvPreview('');
+          // Reset file input
+          const fileInput = document.getElementById('csvFileInput') as HTMLInputElement;
+          if (fileInput) fileInput.value = '';
           return;
         }
 
@@ -204,8 +220,31 @@ const AddRecords = () => {
             // Handle CSV parsing (simple comma split, can be enhanced for quoted values)
             const values = line.split(',').map(v => v.trim());
             if (values.length >= 2 && values[0]) {
+              console.log(values);
+              const trimmedNumber = values[0].trim();
+              if (!trimmedNumber.startsWith('05')) {
+                toast.error('Called number must start with 05');
+                setBulkSubmitting(false);
+                setCsvFile(null);
+                setCsvPreview('');
+                // Reset file input
+                const fileInput = document.getElementById('csvFileInput') as HTMLInputElement;
+                if (fileInput) fileInput.value = '';
+                return;
+              }
+              
+              if (trimmedNumber.length !== 10) {
+                toast.error('Called number must be exactly 10 digits');
+                setBulkSubmitting(false);
+                setCsvFile(null);
+                setCsvPreview('');
+                // Reset file input
+                const fileInput = document.getElementById('csvFileInput') as HTMLInputElement;
+                if (fileInput) fileInput.value = '';
+                return;
+              }
               return {
-                called_number: values[0],
+                called_number: trimmedNumber,
                 comments: values[1] || ''
               };
             }
@@ -216,7 +255,7 @@ const AddRecords = () => {
           );
 
         if (records.length === 0) {
-          toast.error('No valid records found in CSV file');
+          //toast.error('No valid records found in CSV file');
           setBulkSubmitting(false);
           return;
         }
@@ -430,25 +469,6 @@ const AddRecords = () => {
 
                   <Form.Group className="mb-3">
                     <Form.Label style={{ fontWeight: '500', color: '#6c757d', fontSize: '0.875rem' }}>
-                      Company Name <span style={{ color: '#dc3545' }}>*</span>
-                    </Form.Label>
-                    <Form.Control
-                      type="text"
-                      placeholder="e.g. Acme Corporation"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      required
-                      style={{ 
-                        padding: '0.5rem 0.75rem',
-                        fontSize: '0.875rem',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '8px'
-                      }}
-                    />
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label style={{ fontWeight: '500', color: '#6c757d', fontSize: '0.875rem' }}>
                       Comments (Optional)
                     </Form.Label>
                     <Form.Control
@@ -527,9 +547,8 @@ const AddRecords = () => {
                   }}>
                     <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
 {`called_number,comments
-10101010,Bulk upload - Campaign 2026
-10101010,DND List Import
-100101001,Customer requested block`}
+0511111111,Comments for the record
+0511111112,Comments for the record`}
                     </pre>
                   </div>
                 </div>
@@ -625,7 +644,7 @@ const AddRecords = () => {
             {/* Search and Filter */}
             <div className="p-3">
             <Row className="g-2 mb-3">
-              <Col md={4}>
+              <Col md={3}>
                 <Form.Control
                   type="text"
                   placeholder="Search by number..."
@@ -640,22 +659,8 @@ const AddRecords = () => {
                   }}
                 />
               </Col>
-              <Col md={4}>
-                <Form.Control
-                  type="text"
-                  placeholder="Filter by company..."
-                  value={filterCompany}
-                  onChange={(e) => setFilterCompany(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
-                  style={{ 
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '8px'
-                  }}
-                />
-              </Col>
-              <Col md={4}>
+              
+              <Col md={3}>
                 <div className="d-flex gap-2">
                 <Form.Select
                   value={itemsPerPage}
@@ -672,6 +677,10 @@ const AddRecords = () => {
                   <option value={50}>50 per page</option>
                   <option value={100}>100 per page</option>
                 </Form.Select>
+                </div>
+              </Col>
+              <Col md={3}>
+              <div className="d-flex gap-2">
                   <Button
                     variant="primary"
                     size="sm"
@@ -696,7 +705,7 @@ const AddRecords = () => {
                     Reset
                   </Button>
                 </div>
-              </Col>
+                </Col>
             </Row>
             </div>
 

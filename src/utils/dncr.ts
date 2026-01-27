@@ -93,6 +93,7 @@ import axiosInstance from "./axios";
 
   export interface LocalDNDResponse {
     status: string;
+    error: string;
     total: number;
     records: LocalDNDBlockRecord[];
     limit: number;
@@ -103,6 +104,7 @@ import axiosInstance from "./axios";
     status: string;
     message: string;
     record_id: number;
+    error: string;
   }
 
   export interface BulkAddLocalDNDResponse {

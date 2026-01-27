@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { listProjects, createTask, updateTask } from '@utils/tasks';
+import { listStatuses } from '@utils/work-planner';
 import { getAutoTimezone } from '@utils/Helper';
 import RichTextEditor from '../../../pages/help-center/partials/RichTextEditor';
 
@@ -215,6 +216,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
   const [fetchedProjects, setFetchedProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [genericStatuses, setGenericStatuses] = useState<Status[]>([]);
+  const [loadingGenericStatuses, setLoadingGenericStatuses] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch projects from API
@@ -245,6 +248,44 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     };
 
     fetchProjects();
+  }, [show]);
+
+  // Fetch generic statuses from API
+  useEffect(() => {
+    const fetchGenericStatuses = async () => {
+      if (!show) return; // Only fetch when modal is open
+      
+      try {
+        setLoadingGenericStatuses(true);
+        const response = await listStatuses();
+        if (response && Array.isArray(response)) {
+          const statusesList = response.map((status: any) => ({
+            id: status.id,
+            name: status.name,
+            icon: '',
+            color: status.color || '#3b82f6'
+          }));
+          setGenericStatuses(statusesList);
+        } else if (response?.data && Array.isArray(response.data)) {
+          const statusesList = response.data.map((status: any) => ({
+            id: status.id,
+            name: status.name,
+            icon: '',
+            color: status.color || '#3b82f6'
+          }));
+          setGenericStatuses(statusesList);
+        } else {
+          setGenericStatuses([]);
+        }
+      } catch (error) {
+        console.error('Error fetching generic statuses:', error);
+        setGenericStatuses([]);
+      } finally {
+        setLoadingGenericStatuses(false);
+      }
+    };
+
+    fetchGenericStatuses();
   }, [show]);
 
   // Reset form data when modal opens/closes or editTask changes (after projects are loaded)
@@ -283,55 +324,68 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     initials: ext.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
   }));
 
-  // Get statuses and labels from selected project (no API call needed - data already in fetchedProjects)
-  useEffect(() => {
-    if (!formData.projectId || fetchedProjects.length === 0) {
-      return;
-    }
-
-    // Find the selected project from fetchedProjects
-    const selectedProject = fetchedProjects.find(p => p.id === formData.projectId);
-    
-    if (selectedProject && selectedProject.statuses && Array.isArray(selectedProject.statuses)) {
-      const statusesList = selectedProject.statuses.map((status: any) => ({
-        id: status.id,
-        name: status.name,
-        icon: '',
-        color: status.color || '#3b82f6'
-      }));
-      
-      // Auto-select first status if none selected (only in create mode, not edit mode)
-      if (!isEdit && !formData.statusId && statusesList.length > 0) {
-        setFormData(prev => ({ ...prev, statusId: selectedStatusForTask || statusesList[0].id }));
-      }
-    }
-  }, [formData.projectId, fetchedProjects, isEdit, selectedStatusForTask]);
-
   // Use API-fetched projects, or fallback to propProject if provided
   const projects: Project[] = fetchedProjects.length > 0 
     ? fetchedProjects 
     : (propProject ? [propProject] : []);
 
-  // Get statuses from selected project (from fetchedProjects), otherwise use propStatuses
+  // Get statuses: if project is selected, use project statuses; otherwise use generic statuses
   const getStatusesForSelectedProject = (): Status[] => {
-    if (!formData.projectId) {
-      return propStatuses;
+    // If project is selected, use project statuses
+    if (formData.projectId) {
+      const selectedProject = fetchedProjects.find(p => p.id === formData.projectId);
+      if (selectedProject && selectedProject.statuses && Array.isArray(selectedProject.statuses)) {
+        return selectedProject.statuses.map((status: any) => ({
+          id: status.id,
+          name: status.name,
+          icon: '',
+          color: status.color || '#3b82f6'
+        }));
+      }
+      // If project selected but no statuses found, return empty array
+      return [];
     }
     
-    const selectedProject = fetchedProjects.find(p => p.id === formData.projectId);
-    if (selectedProject && selectedProject.statuses && Array.isArray(selectedProject.statuses)) {
-      return selectedProject.statuses.map((status: any) => ({
-        id: status.id,
-        name: status.name,
-        icon: '',
-        color: status.color || '#3b82f6'
-      }));
+    // If no project selected, use generic statuses from API
+    if (genericStatuses.length > 0) {
+      return genericStatuses;
     }
     
+    // Fallback to propStatuses if provided
     return propStatuses;
   };
 
   const statuses: Status[] = getStatusesForSelectedProject();
+
+  // Auto-select first status when project changes or generic statuses load
+  useEffect(() => {
+    // Only auto-select in create mode, not edit mode
+    if (isEdit) {
+      return;
+    }
+
+    // If project is selected, wait for projects to load
+    if (formData.projectId && fetchedProjects.length === 0) {
+      return;
+    }
+
+    // If no project selected, wait for generic statuses to load
+    if (!formData.projectId && loadingGenericStatuses) {
+      return;
+    }
+
+    // Get available statuses
+    const availableStatuses = getStatusesForSelectedProject();
+    
+    // Auto-select first status if none selected and statuses are available
+    if (!formData.statusId && availableStatuses.length > 0) {
+      setFormData(prev => ({ 
+        ...prev, 
+        statusId: selectedStatusForTask || availableStatuses[0].id 
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.projectId, fetchedProjects, genericStatuses, loadingGenericStatuses, isEdit, selectedStatusForTask]);
 
   const priorities: Priority[] = [
     { id: 0, name: "Select Priority", icon: "", color: "#6c757d" },
@@ -414,9 +468,12 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       // Add project_id if available (optional)
       if (formData.projectId) {
         payload.project_id = formData.projectId;
-        // Only send project-scoped fields when a project is selected
-        payload.status_id = formData.statusId || undefined;
         payload.label_ids = formData.labelIds || [];
+      }
+
+      // Add status_id if available (works for both project-based and generic statuses)
+      if (formData.statusId) {
+        payload.status_id = formData.statusId;
       }
 
       // Add parent_task_id if records are linked (use first linked record as parent)
@@ -490,9 +547,12 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       // Add project_id if available (optional)
       if (formData.projectId) {
         payload.project_id = formData.projectId;
-        // Only send project-scoped fields when a project is selected
-        payload.status_id = formData.statusId || undefined;
         payload.label_ids = formData.labelIds || [];
+      }
+
+      // Add status_id if available (works for both project-based and generic statuses)
+      if (formData.statusId) {
+        payload.status_id = formData.statusId;
       }
 
       // Add parent_task_id if records are linked (use first linked record as parent)
@@ -651,7 +711,15 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               </Form.Label>
               <Form.Select
                 value={formData.projectId || ''}
-                onChange={(e) => setFormData({ ...formData, projectId: Number(e.target.value) })}
+                onChange={(e) => {
+                  const newProjectId = e.target.value ? Number(e.target.value) : null;
+                  // When project changes, clear status (project statuses are different from generic)
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    projectId: newProjectId,
+                    statusId: null // Clear status when project changes
+                  }));
+                }}
                 className="py-2"
                 style={{ fontSize: '14px' }}
                 disabled={loadingProjects || projects.length === 0}
@@ -713,10 +781,14 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 }
                 className="py-2"
                 style={{ fontSize: '14px' }}
-                disabled={!formData.projectId || statuses.length === 0}
+                disabled={
+                  (formData.projectId && loadingProjects) || 
+                  (!formData.projectId && loadingGenericStatuses) || 
+                  statuses.length === 0
+                }
               >
-                {!formData.projectId ? (
-                  <option value="">Select a project first</option>
+                {(formData.projectId && loadingProjects) || (!formData.projectId && loadingGenericStatuses) ? (
+                  <option value="">Loading statuses...</option>
                 ) : statuses.length === 0 ? (
                   isEdit && formData.statusId ? (
                     <option value={formData.statusId}>
@@ -727,6 +799,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                   )
                 ) : (
                   <>
+                    <option value="">Select status</option>
                     {isEdit &&
                       formData.statusId &&
                       !statuses.some(s => String(s.id) === String(formData.statusId)) && (
