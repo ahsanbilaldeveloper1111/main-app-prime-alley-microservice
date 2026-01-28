@@ -293,7 +293,7 @@ const LiveCallsCampaignsManagement = () => {
         const finesseData = getFinesseUserData();
         const username = finesseData?.loginId ?? finesseData?.loginName;
         if (!username) {
-          toast.error('Finesse user not found.');
+          toast.error('user not found.');
           return;
         }
         const newEnabled = !campaign.enabled;
@@ -404,7 +404,7 @@ const LiveCallsCampaignsManagement = () => {
         const finesseData = getFinesseUserData();
         const username = finesseData?.loginId ?? finesseData?.loginName;
         if (!username) {
-          toast.error('Finesse user not found.');
+          toast.error('user not found.');
           return;
         }
         try {
@@ -450,7 +450,7 @@ const LiveCallsCampaignsManagement = () => {
       const handleFinesseAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!session?.user || !finessePassword.trim()) {
-          setFinesseError('Please enter your Finesse password.');
+          setFinesseError('Please enter your password.');
           return;
         }
         const userId =session.user.id != null ? String(session.user.id) : '';
@@ -476,20 +476,20 @@ const LiveCallsCampaignsManagement = () => {
             setAgentStatus(data.state ?? 'READY');
             setIsFinesseAuthenticated(true);
           } else {
-            setFinesseError(response?.message || response?.statusCode || 'Finesse authentication failed.');
+            setFinesseError(response?.message || response?.statusCode || 'authentication failed.');
           }
         } catch (err: any) {
-          setFinesseError(err?.response?.data?.message || err?.message || 'Finesse authentication failed.');
+          setFinesseError(err?.response?.data?.message || err?.message || 'authentication failed.');
         } finally {
           setIsFinesseLoading(false);
         }
-      };
+      };  
 
       const handleAgentStatusChange = async (newState: string) => {
         const finesseData = getFinesseUserData();
         const username = finesseData?.loginId ?? finesseData?.loginName;
         if (!username) {
-          toast.error('Finesse user not found.');
+          toast.error('user not found.');
           return;
         }
         const state = newState === 'READY' || newState === 'NOT_READY' ? newState : 'READY';
@@ -538,13 +538,13 @@ const LiveCallsCampaignsManagement = () => {
               <div className="card" style={{ maxWidth: '420px', width: '100%', padding: '32px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
                   <Lock size={28} color="#667eea" />
-                  <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>Finesse Authentication</h2>
+                  <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>Authentication Required</h2>
                 </div>
                 <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '24px' }}>
-                  Enter your Finesse password to access Live Calls Campaigns.
+                  Enter your password to access Live Calls Campaigns.
                 </p>
                 <form onSubmit={handleFinesseAuth}>
-                  <div style={{ marginBottom: '16px' }}>
+                  {/* <div style={{ marginBottom: '16px' }}>
                     <label htmlFor="finesse-user-id" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>User ID</label>
                     <input
                       id="finesse-user-id"
@@ -563,15 +563,15 @@ const LiveCallsCampaignsManagement = () => {
                       readOnly
                       style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', background: '#f8fafc', color: '#64748b' }}
                     />
-                  </div>
+                  </div> */}
                   <div style={{ marginBottom: '20px' }}>
-                    <label htmlFor="finesse-password" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Finesse Password</label>
+                    <label htmlFor="finesse-password" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Password</label>
                     <input
                       id="finesse-password"
                       type="password"
                       value={finessePassword}
                       onChange={(e) => setFinessePassword(e.target.value)}
-                      placeholder="Enter your Finesse password"
+                      placeholder="Enter your password"
                       autoComplete="current-password"
                       style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px' }}
                     />
