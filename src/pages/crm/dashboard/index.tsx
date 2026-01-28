@@ -456,7 +456,7 @@ const CrmDashboard = () => {
                     <Users size={20} color="#0EA5E9" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.crm_data || 0)}</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.crm_data || 0, true)}</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Prospects</p>
                   </div>
                 </div>
@@ -471,7 +471,7 @@ const CrmDashboard = () => {
                     <UserPlus size={20} color="#3B82F6" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.leads || 0)}</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.leads || 0, true)}</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Leads</p>
                   </div>
                 </div>
@@ -486,7 +486,7 @@ const CrmDashboard = () => {
                     <DollarSign size={20} color="#F59E0B" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.deals || 0)}</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.deals || 0, true)}</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Deals</p>
                   </div>
                 </div>
@@ -501,7 +501,7 @@ const CrmDashboard = () => {
                     <ShoppingCart size={20} color="#F97316" />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.orders || 0)}</h3>
+                    <h3 style={{ fontSize: '28px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{formatNumber(dashboardData?.counts?.orders || 0, true)}</h3>
                     <p style={{ fontSize: '14px', color: '#64748B', margin: 0 }}>Orders</p>
                   </div>
                 </div>
@@ -554,7 +554,7 @@ const CrmDashboard = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>Prospects</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(prospectsCount)}</span>
+                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(prospectsCount, true)}</span>
                     </div>
                     <div style={{ flex: 1, marginLeft: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                       <div style={{ width: '100%', maxWidth: '260px', height: '32px', backgroundColor: '#E6EEF9', borderRadius: '8px' }}>
@@ -568,7 +568,7 @@ const CrmDashboard = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>Leads</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(leadsCount)}</span>
+                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(leadsCount, true)}</span>
                     </div>
                     <div style={{ flex: 1, marginLeft: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                       <div style={{ width: '100%', maxWidth: '260px', height: '32px', backgroundColor: '#ECFDF5', borderRadius: '8px' }}>
@@ -582,7 +582,7 @@ const CrmDashboard = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>Deals</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(dealsCount)}</span>
+                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(dealsCount, true)}</span>
                     </div>
                     <div style={{ flex: 1, marginLeft: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                       <div style={{ width: '100%', maxWidth: '260px', height: '32px', backgroundColor: '#FFFAEB', borderRadius: '8px' }}>
@@ -596,7 +596,7 @@ const CrmDashboard = () => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '14px', color: '#1E293B', fontWeight: 500 }}>Orders</span>
-                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(ordersCount)}</span>
+                      <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{formatNumber(ordersCount, true)}</span>
                     </div>
                     <div style={{ flex: 1, marginLeft: '12px', display: 'flex', justifyContent: 'flex-end' }}>
                       <div style={{ width: '100%', maxWidth: '260px', height: '32px', backgroundColor: '#FFF7ED', borderRadius: '8px' }}>

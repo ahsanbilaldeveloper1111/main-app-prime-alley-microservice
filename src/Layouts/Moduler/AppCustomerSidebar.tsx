@@ -728,21 +728,28 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               url: '/work-planner/projects',
               permission: PERMISSIONS.WORK_PLANNER_SERVICES 
             },
-           
             {
-              id: 'work-planner-saved-views',
-              title: 'Saved Views',
-              icon: <Folder size={16} />,
-              url: '/work-planner/saved-views',
+              id: 'work-planner-statuses',
+              title: 'Statuses',
+              icon: <List size={16} />,
+              url: '/work-planner/statuses',
               permission: PERMISSIONS.WORK_PLANNER_SERVICES 
             },
-            {
-              id: 'work-planner-roles-settings',
-              title: 'Roles Settings',
-              icon: <Shield size={16} />,
-              url: '/work-planner/roles-settings',
-              permission: PERMISSIONS.WORK_PLANNER_SERVICES 
-            }
+           
+            // {
+            //   id: 'work-planner-saved-views',
+            //   title: 'Saved Views',
+            //   icon: <Folder size={16} />,
+            //   url: '/work-planner/saved-views',
+            //   permission: PERMISSIONS.WORK_PLANNER_SERVICES 
+            // },
+            // {
+            //   id: 'work-planner-roles-settings',
+            //   title: 'Roles Settings',
+            //   icon: <Shield size={16} />,
+            //   url: '/work-planner/roles-settings',
+            //   permission: PERMISSIONS.WORK_PLANNER_SERVICES 
+            // }
             
       ]
       .filter(item => !item.permission || hasPermission(item.permission))

@@ -1637,13 +1637,14 @@ const DialTodo = () => {
               }}>
                 <button 
                   onClick={handleEditTask}
+                  disabled={selectedTask?.rawData?.is_completed === true}
                   style={{
                     padding: '10px',
                     backgroundColor: '#4e6fa5',
                     color: 'white',
                     border: 'none',
                     borderRadius: '6px',
-                    cursor: 'pointer',
+                   
                     fontSize: '12px',
                     fontWeight: '600',
                     display: 'flex',
@@ -1657,85 +1658,6 @@ const DialTodo = () => {
                 >
                   <Pencil size={14} />
                   Edit Todo
-                </button>
-
-                <button 
-                  onClick={() => {
-                    if (selectedTask) {
-                      setShowDeleteModal(true);
-                    }
-                  }}
-                  style={{
-                    padding: '10px',
-                    backgroundColor: 'white',
-                    color: '#e53e3e',
-                    border: '1px solid #feb2b2',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#fff5f5';
-                    e.currentTarget.style.borderColor = '#fc8181';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white';
-                    e.currentTarget.style.borderColor = '#feb2b2';
-                  }}
-                >
-                  <Trash2 size={14} />
-                  Delete
-                </button>
-                
-              </div>
-
-              
-
-              <div style={{ 
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '8px',
-                marginBottom: '8px'
-              }}>
-                <button 
-                  onClick={() => {
-                    if (selectedTask?.rawData) {
-                      // Remove id and task_id to ensure it's treated as a new task, not an update
-                      const { id, task_id, ...taskDataWithoutId } = selectedTask.rawData;
-                      setEditingTask({ 
-                        ...taskDataWithoutId, 
-                        title: `${selectedTask.rawData.title} (Copy)`
-                      });
-                      setIsDuplicating(true); // Mark as duplicating, not editing
-                      setShowCreateTaskModal(true);
-                    }
-                  }}
-                  style={{
-                    padding: '10px',
-                    backgroundColor: 'white',
-                    color: '#4a5568',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                >
-                  <Copy size={14} />
-                  Duplicate
                 </button>
 
                 <button 
@@ -1771,6 +1693,86 @@ const DialTodo = () => {
                   <ListTodo size={14} />
                   Convert to Task
                 </button>
+                
+              </div>
+
+              
+
+              <div style={{ 
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '8px',
+                marginBottom: '8px'
+              }}>
+                 <button 
+                  onClick={() => {
+                    if (selectedTask) {
+                      setShowDeleteModal(true);
+                    }
+                  }}
+                  style={{
+                    padding: '10px',
+                    backgroundColor: 'white',
+                    color: '#e53e3e',
+                    border: '1px solid #feb2b2',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#fff5f5';
+                    e.currentTarget.style.borderColor = '#fc8181';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white';
+                    e.currentTarget.style.borderColor = '#feb2b2';
+                  }}
+                >
+                  <Trash2 size={14} />
+                  Delete
+                </button>
+                <button 
+                  onClick={() => {
+                    if (selectedTask?.rawData) {
+                      // Remove id and task_id to ensure it's treated as a new task, not an update
+                      const { id, task_id, ...taskDataWithoutId } = selectedTask.rawData;
+                      setEditingTask({ 
+                        ...taskDataWithoutId, 
+                        title: `${selectedTask.rawData.title} (Copy)`
+                      });
+                      setIsDuplicating(true); // Mark as duplicating, not editing
+                      setShowCreateTaskModal(true);
+                    }
+                  }}
+                  style={{
+                    padding: '10px',
+                    backgroundColor: 'white',
+                    color: '#4a5568',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                >
+                  <Copy size={14} />
+                  Duplicate
+                </button>
+
+               
               </div>
             </>
             )}

@@ -641,11 +641,14 @@ export const formatCurrency = (amount: number | null): string => {
 };
 
 export const formatNumber = (
-  amount: number | string | null | undefined
+  amount: number | string | null | undefined,
+  withoutDecimals?: boolean
 ): string => {
+  const defaultZero = withoutDecimals ? "0" : "0.00";
+
   // Handle null, undefined, or empty string
   if (amount === null || amount === undefined || amount === "") {
-    return "0.00";
+    return defaultZero;
   }
 
   // Convert string to number if needed
@@ -654,17 +657,17 @@ export const formatNumber = (
 
   // Check if the conversion resulted in a valid number
   if (Number.isNaN(numAmount) || !Number.isFinite(numAmount)) {
-    return "0.00";
+    return defaultZero;
   }
 
   // Handle zero case
   if (numAmount === 0) {
-    return "0.00";
+    return defaultZero;
   }
 
   return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: withoutDecimals ? 0 : 2,
+    maximumFractionDigits: withoutDecimals ? 0 : 2,
   }).format(numAmount);
 };
 

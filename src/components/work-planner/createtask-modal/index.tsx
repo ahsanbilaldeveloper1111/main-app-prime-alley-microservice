@@ -119,6 +119,7 @@ interface CreateTaskFormData {
   priorityId: number | null;
   assigneeIds: number[];
   dueDate: string;
+  startDate: string;
   labelIds: number[];
   linkedRecordIds: number[];
 }
@@ -192,6 +193,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         priorityId: mapPriorityStringToId(editTask.priority),
         assigneeIds: assigneeIds,
         dueDate: formatDateForInput(editTask.due_date),
+        startDate: formatDateForInput(editTask.start_date),
         labelIds: editTask.label_ids || editTask.labels?.map((l: any) => l.id) || [],
         linkedRecordIds: []
       };
@@ -205,6 +207,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       priorityId: 0, // Default to "Select Priority" (empty value)
       assigneeIds: [],
       dueDate: '',
+      startDate: '',
       labelIds: [],
       linkedRecordIds: []
     };
@@ -309,6 +312,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         priorityId: 0,
         assigneeIds: [],
         dueDate: '',
+        startDate: '',
         labelIds: [],
         linkedRecordIds: []
       });
@@ -457,6 +461,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         description: formData.description || '',
         priority: mapPriorityIdToString(formData.priorityId) || undefined,
         due_date: formData.dueDate || '',
+        start_date: formData.startDate || '',
         extension_numbers: formData.assigneeIds?.map((id: number) => {
           // Find the extension by id from extensions prop
           const extension = extensions.find((ext: any) => Number(ext.id) === id);
@@ -536,6 +541,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         description: formData.description || '',
         priority: mapPriorityIdToString(formData.priorityId) || undefined,
         due_date: formData.dueDate || '',
+        start_date: formData.startDate || '',
         extension_numbers: formData.assigneeIds?.map((id: number) => {
           // Find the extension by id from extensions prop
           const extension = extensions.find((ext: any) => Number(ext.id) === id);
@@ -704,7 +710,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         <Row className="mb-3">
         {taskType !== 'todo' && (
           <Col xs={12} md={6} className="mb-3 mb-md-0">
-            <Form.Group>
+            <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
                 <FolderOpen size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
                 Project
@@ -743,30 +749,14 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           </Col>
           )}
 
-          <Col xs={12} md={6}>
-            <Form.Group>
-              <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
-                <Calendar size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
-                Due Date
-              </Form.Label>
-              <Form.Control
-                type="date"
-                placeholder="Select date"
-                value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                min={new Date().toISOString().split('T')[0]}
-                className="py-2"
-                style={{ fontSize: '14px' }}
-              />
-            </Form.Group>
-          </Col>
+
        
 
         {/* Status and Priority Row */}
         
           {taskType !== 'todo' && (
           <Col xs={12} md={6} className="mb-3 mb-md-0">
-            <Form.Group>
+            <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
                 <ListTodo size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
                 Status
@@ -818,8 +808,45 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             </Form.Group>
           </Col>
           )}
+          
           <Col xs={12} md={6}>
-            <Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
+                <Calendar size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
+                Start Date
+              </Form.Label>
+              <Form.Control
+                type="date"
+                placeholder="Select date"
+                value={formData.startDate}
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                min={new Date().toISOString().split('T')[0]}
+                className="py-2"
+                style={{ fontSize: '14px' }}
+              />
+            </Form.Group>
+          </Col>
+
+          <Col xs={12} md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
+                <Calendar size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
+                End Date
+              </Form.Label>
+              <Form.Control
+                type="date"
+                placeholder="Select date"
+                value={formData.dueDate}
+                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                min={new Date().toISOString().split('T')[0]}
+                className="py-2"
+                style={{ fontSize: '14px' }}
+              />
+            </Form.Group>
+          </Col>
+
+          <Col xs={12} md={6}>
+            <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
                 <Flag size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
                 Priority
