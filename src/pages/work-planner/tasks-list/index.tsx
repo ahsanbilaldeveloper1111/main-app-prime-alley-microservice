@@ -1186,7 +1186,8 @@ const TasksList = () => {
                     <th>Priority</th>
                     <th>Project</th>
                     <th>Assignee</th>
-                    <th>Due</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
                    
                     <th>Created By</th>
                     <th>DateTime</th>
@@ -1268,6 +1269,7 @@ const TasksList = () => {
                         </div>
                       </td>
 
+                      <td onClick={() => handleTaskClick(task)}>{task.rawData?.start_date ? moment(task.rawData?.start_date).format(GlobalDateTimeFormat) : ''}</td>
                       <td onClick={() => handleTaskClick(task)}>{task.dueDate}</td>
                       
                       <td onClick={() => handleTaskClick(task)}>
@@ -1450,30 +1452,30 @@ const TasksList = () => {
         placement="end"
         className="task-detail-panel"
       >
-        <Offcanvas.Header closeButton className="task-detail-header">
-          <Offcanvas.Title>
-            <div className="d-flex align-items-center justify-content-between w-100">
-              <span className="fw-bold">{selectedTask?.id} {selectedTask?.title}</span>
-              <div className="d-flex align-items-center gap-2">
-                <Button 
-                  variant="link" 
-                  className="text-primary p-0" 
-                  onClick={handleEditTask}
-                  title="Edit Task"
-                >
-                  <Edit size={20} />
-                </Button>
-                <Button 
-                  variant="link" 
-                  className="text-danger p-0" 
-                  onClick={() => setShowDeleteModal(true)}
-                  title="Delete Task"
-                >
-                  <Trash2 size={20} />
-                </Button>
-              </div>
-            </div>
+        <Offcanvas.Header closeButton className="task-detail-header d-flex align-items-center">
+          <Offcanvas.Title className="d-flex align-items-center flex-grow-1 min-w-0 me-2">
+            <span className="fw-bold text-truncate">{selectedTask?.title}</span>
           </Offcanvas.Title>
+          <div className="d-flex align-items-center gap-1 flex-shrink-0">
+            {/* {selectedTask?.rawData?.is_completed === false && ( */}
+              <Button 
+                variant="link" 
+                className="text-primary p-0" 
+                onClick={handleEditTask}
+                title="Edit Task"
+              >
+                <Edit size={20} />
+              </Button>
+            {/* )} */}
+            <Button 
+              variant="link" 
+              className="text-danger p-0" 
+              onClick={() => setShowDeleteModal(true)}
+              title="Delete Task"
+            >
+              <Trash2 size={20} />
+            </Button>
+          </div>
         </Offcanvas.Header>
         <Offcanvas.Body className="task-detail-body">
           {selectedTask && (

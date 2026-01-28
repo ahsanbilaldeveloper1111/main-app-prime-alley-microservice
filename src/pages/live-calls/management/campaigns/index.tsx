@@ -12,6 +12,7 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import {
   Users,
   User,
@@ -64,15 +65,69 @@ import {
   SkipForward,
   PhoneIncoming,
   PhoneOutgoing,
-  Loader
+  Loader,
+  Lock
 } from 'lucide-react';
 
 import CallWidget from '../CallWidget';
 import WrapUpModal from '../WrapUp';
 
 import TopBar from '../TopBarAgent';
+import { toast } from 'react-toastify';
+import {
+  finesseLink,
+  setFinesseUserData,
+  getFinesseUserData,
+  getFinesseUser,
+  finesseSetState,
+  getFinesseCampaigns,
+  setFinesseCampaignEnabled,
+  importFinesseCampaignContacts,
+} from '@utils/finesse';
+
+export interface CampaignRow {
+  id: number;
+  name: string;
+  type: string;
+  dialerType: string;
+  timeFrom: string;
+  timeTo: string;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+  contactsRemaining: number;
+  pendingContacts: number;
+  enabled: boolean;
+}
+
+const mapApiCampaignToRow = (item: any, index: number): CampaignRow => {
+  const timeFrom = item.startTime ?? item.timeFrom ?? '09:00';
+  const timeTo = item.endTime ?? item.timeTo ?? '17:00';
+  return {
+    id: item.id ?? item.campaignId ?? index + 1,
+    name: item.name ?? item.campaignName ?? '',
+    type: item.type ?? 'Agent',
+    dialerType: item.dialerType ?? 'Direct Preview',
+    timeFrom,
+    timeTo,
+    startTime: timeFrom,
+    endTime: timeTo,
+    timezone: item.timezone ?? 'Server Time Zone-Gulf Standard Time',
+    contactsRemaining: item.contactsRemaining ?? item.contactCount ?? 0,
+    pendingContacts: item.pendingContacts ?? item.contactsRemaining ?? item.contactCount ?? 0,
+    enabled: item.enabled ?? true,
+  };
+};
+
 const LiveCallsCampaignsManagement = () => {
-      const [selectedTeam, setSelectedTeam] = useState('PRIMEALLEY-SALES');
+      const { data: session, status: sessionStatus } = useSession();
+      const [isFinesseAuthenticated, setIsFinesseAuthenticated] = useState(false);
+      const [finessePassword, setFinessePassword] = useState('');
+      const [finesseError, setFinesseError] = useState<string | null>(null);
+      const [isFinesseLoading, setIsFinesseLoading] = useState(false);
+
+      const [teams, setTeams] = useState<string[]>([]);
+      const [selectedTeam, setSelectedTeam] = useState('');
       const [agentStatus, setAgentStatus] = useState('READY');
       const [isRefreshing, setIsRefreshing] = useState(false);
       const [showStatusDropdown, setShowStatusDropdown] = useState(false);
@@ -97,13 +152,6 @@ const LiveCallsCampaignsManagement = () => {
       const userMenuRef = useRef<HTMLDivElement>(null);
       const fileInputRef = useRef<HTMLInputElement>(null);
     
-      const teams = [
-        'PRIMEALLEY-SALES',
-        'CUSTOMER-SUPPORT',
-        'TECHNICAL-TEAM',
-        'MARKETING-DEPT'
-      ];
-    
       // Close dropdowns when clicking outside
       useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -114,62 +162,73 @@ const LiveCallsCampaignsManagement = () => {
             setShowUserMenu(false);
           }
         };
-    
+
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
       }, []);
-    
+
+      // Fetch Finesse user and map to TopBar (teams, selectedTeam, agentStatus) when authenticated
+      useEffect(() => {
+        if (!isFinesseAuthenticated) return;
+        const finesseData = getFinesseUserData();
+        const username = finesseData?.loginId ?? finesseData?.loginName;
+        if (!username) return;
+
+        const loadUser = async () => {
+          try {
+            const response = await getFinesseUser(username);
+            const data = response?.responseData ?? response;
+            if (!data) return;
+            const teamNames = data.teams?.map((t: { name: string }) => t.name) ?? [];
+            setTeams(teamNames);
+            setSelectedTeam(data.teamName ?? teamNames[0] ?? '');
+            setAgentStatus(data.state ?? 'READY');
+            setFinesseUserData(data);
+          } catch {
+            // Fallback to storage if GET fails
+            const stored = getFinesseUserData();
+            if (stored) {
+              const teamNames = stored.teams?.map((t) => t.name) ?? [];
+              if (teamNames.length > 0) setTeams(teamNames);
+              if (stored.teamName) setSelectedTeam(stored.teamName);
+              if (stored.state) setAgentStatus(stored.state);
+            }
+          }
+        };
+        loadUser();
+      }, [isFinesseAuthenticated]);
+
+      // Fetch campaigns from Finesse when authenticated
+      useEffect(() => {
+        if (!isFinesseAuthenticated) return;
+        const finesseData = getFinesseUserData();
+        const username = finesseData?.loginId ?? finesseData?.loginName;
+        if (!username) return;
+
+        const loadCampaigns = async () => {
+          setCampaignsLoading(true);
+          try {
+            const response = await getFinesseCampaigns(username);
+            const list = response?.data ?? response?.responseData ?? response;
+            const arr = Array.isArray(list) ? list : list?.campaigns ?? list?.items ?? [];
+            setCampaigns((arr as any[]).map((item, index) => mapApiCampaignToRow(item, index)));
+          } catch (err) {
+            toast.error((err as any)?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to load campaigns.');
+            setCampaigns([]);
+          } finally {
+            setCampaignsLoading(false);
+          }
+        };
+        loadCampaigns();
+      }, [isFinesseAuthenticated]);
+
       const statusOptions = [
         { value: 'READY', label: 'Ready', color: '#10b981', icon: CheckCircle },
         { value: 'NOT_READY', label: 'Not Ready', color: '#ef4444', icon: XCircle }
       ];
-    
-      const [campaigns, setCampaigns] = useState([
-        {
-          id: 1,
-          name: 'DP-PrimeAlley-SALES',
-          type: 'Agent',
-          dialerType: 'Direct Preview',
-          timeFrom: '09:00',
-          timeTo: '17:00',
-          timezone: 'Server Time Zone-Gulf Standard Time',
-          contactsRemaining: 25,
-          enabled: true
-        },
-        {
-          id: 2,
-          name: 'Q4-Promotion-Campaign',
-          type: 'Predictive',
-          dialerType: 'Power Dialer',
-          timeFrom: '10:00',
-          timeTo: '18:00',
-          timezone: 'Server Time Zone-Gulf Standard Time',
-          contactsRemaining: 156,
-          enabled: true
-        },
-        {
-          id: 3,
-          name: 'Customer-Retention-Fall',
-          type: 'Agent',
-          dialerType: 'Progressive',
-          timeFrom: '08:00',
-          timeTo: '16:00',
-          timezone: 'Server Time Zone-Gulf Standard Time',
-          contactsRemaining: 89,
-          enabled: false
-        },
-        {
-          id: 4,
-          name: 'New-Product-Launch',
-          type: 'Preview',
-          dialerType: 'Direct Preview',
-          timeFrom: '09:30',
-          timeTo: '17:30',
-          timezone: 'Server Time Zone-Gulf Standard Time',
-          contactsRemaining: 234,
-          enabled: true
-        }
-      ]);
+
+      const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
+      const [campaignsLoading, setCampaignsLoading] = useState(false);
     
       // Simulate call timer
       useEffect(() => {
@@ -192,7 +251,7 @@ const LiveCallsCampaignsManagement = () => {
     
       const filteredCampaigns = campaigns.filter(campaign =>
         campaign.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        campaign.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (campaign.type ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         campaign.dialerType.toLowerCase().includes(searchQuery.toLowerCase())
       );
     
@@ -228,13 +287,26 @@ const LiveCallsCampaignsManagement = () => {
         setShowStatusDropdown(false);
       };
     
-      const handleToggleCampaign = (id: number) => {
-        // When enabling a campaign, show the call widget
+      const handleToggleCampaign = async (id: number) => {
         const campaign = campaigns.find(c => c.id === id);
-        if (campaign && !campaign.enabled) {
-          setShowCallWidget(true);
-          setCallTimer(0);
-          setCallStatus('Ringing');
+        if (!campaign) return;
+        const finesseData = getFinesseUserData();
+        const username = finesseData?.loginId ?? finesseData?.loginName;
+        if (!username) {
+          toast.error('user not found.');
+          return;
+        }
+        const newEnabled = !campaign.enabled;
+        try {
+          await setFinesseCampaignEnabled(username, id, newEnabled);
+          setCampaigns(prev => prev.map(c => (c.id === id ? { ...c, enabled: newEnabled } : c)));
+          // if (newEnabled) {
+          //   setShowCallWidget(true);
+          //   setCallTimer(0);
+          //   setCallStatus('Ringing');
+          // }
+        } catch (err: any) {
+          toast.error(err?.response?.data?.message ?? err?.message ?? 'Failed to update campaign.');
         }
       };
     
@@ -324,21 +396,41 @@ const LiveCallsCampaignsManagement = () => {
         setColumnMapping(newMapping);
       };
     
-      const handleUploadContacts = () => {
-        if (!uploadedFile) {
-          alert('Please select a file to upload');
+      const handleUploadContacts = async () => {
+        if (!uploadedFile || selectedCampaignId == null) {
+          toast.error('Please select a file to upload.');
           return;
         }
-        
-        const campaign = campaigns.find(c => c.id === selectedCampaignId);
-        alert(`Uploading ${uploadedFile.name} to campaign "${campaign?.name}" with ${columnMapping.length} columns mapped.`);
-        handleCloseUploadModal();
+        const finesseData = getFinesseUserData();
+        const username = finesseData?.loginId ?? finesseData?.loginName;
+        if (!username) {
+          toast.error('user not found.');
+          return;
+        }
+        try {
+          await importFinesseCampaignContacts(username, selectedCampaignId, uploadedFile);
+          toast.success('Contacts imported successfully.');
+          handleCloseUploadModal();
+          // Optionally refetch campaigns to update contacts count
+          const response = await getFinesseCampaigns(username);
+          const list = response?.data ?? response?.responseData ?? response;
+          const arr = Array.isArray(list) ? list : list?.campaigns ?? list?.items ?? [];
+          setCampaigns((arr as any[]).map((item, index) => mapApiCampaignToRow(item, index)));
+        } catch (err: any) {
+          toast.error(err?.response?.data?.message ?? err?.message ?? 'Failed to import contacts.');
+        }
       };
     
-      const handleTimeChange = (campaignId: number, field: 'timeFrom' | 'timeTo', value: string) => {
-        setCampaigns(campaigns.map(campaign => 
-          campaign.id === campaignId ? { ...campaign, [field]: value } : campaign
-        ));
+      const handleTimeChange = (campaignId: number, field: 'timeFrom' | 'timeTo' | 'startTime' | 'endTime', value: string) => {
+        setCampaigns(campaigns.map(campaign => {
+          if (campaign.id !== campaignId) return campaign;
+          const updates: Partial<CampaignRow> = { [field]: value };
+          if (field === 'startTime') updates.timeFrom = value;
+          if (field === 'endTime') updates.timeTo = value;
+          if (field === 'timeFrom') updates.startTime = value;
+          if (field === 'timeTo') updates.endTime = value;
+          return { ...campaign, ...updates };
+        }));
       };
     
       const handleWrapUpSubmit = (data: { wrapUp: string; variables: Record<string, string> }) => {
@@ -354,8 +446,165 @@ const LiveCallsCampaignsManagement = () => {
         setIsWrapUpMinimized(true);
         setIsWrapUpOpen(false);
       };
+
+      const handleFinesseAuth = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!session?.user || !finessePassword.trim()) {
+          setFinesseError('Please enter your password.');
+          return;
+        }
+        const userId =session.user.id != null ? String(session.user.id) : '';
+        const extension =  session.user.phone != null ? String(session.user.phone) : '';
+        if (!userId || !extension) {
+          setFinesseError('User ID or extension is missing from your session.');
+          return;
+        }
+        setFinesseError(null);
+        setIsFinesseLoading(true);
+        try {
+          const response = await finesseLink({
+            finesseUserId: userId,
+            finessePassword: finessePassword.trim(),
+            extension,
+          });
+          if (response?.status === 'success' && response?.responseData) {
+            const data = response.responseData;
+            setFinesseUserData(data);
+            const teamNames = data.teams?.map((t: { name: string }) => t.name) ?? [];
+            setTeams(teamNames);
+            setSelectedTeam(data.teamName ?? (teamNames[0] ?? ''));
+            setAgentStatus(data.state ?? 'READY');
+            setIsFinesseAuthenticated(true);
+          } else {
+            setFinesseError(response?.message || response?.statusCode || 'authentication failed.');
+          }
+        } catch (err: any) {
+          setFinesseError(err?.response?.data?.message || err?.message || 'authentication failed.');
+        } finally {
+          setIsFinesseLoading(false);
+        }
+      };  
+
+      const handleAgentStatusChange = async (newState: string) => {
+        const finesseData = getFinesseUserData();
+        const username = finesseData?.loginId ?? finesseData?.loginName;
+        if (!username) {
+          toast.error('user not found.');
+          return;
+        }
+        const state = newState === 'READY' || newState === 'NOT_READY' ? newState : 'READY';
+        try {
+          await finesseSetState(username, state);
+          setAgentStatus(state);
+        } catch (err: any) {
+          toast.error(err?.response?.data?.message || err?.message || 'Failed to update agent state.');
+        }
+      };
     
       const currentStatus = statusOptions.find(s => s.value === agentStatus) || statusOptions[0];
+
+      // Session loading
+      if (sessionStatus === 'loading') {
+        return (
+          <React.Fragment>
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Calls Campaigns Management" />
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+              <Loader size={40} className="text-primary" style={{ animation: 'spin 1s linear infinite' }} />
+            </div>
+          </React.Fragment>
+        );
+      }
+
+      // Not signed in
+      if (!session?.user) {
+        return (
+          <React.Fragment>
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Calls Campaigns Management" />
+            <div style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>
+              Please sign in to access Live Calls Campaigns.
+            </div>
+          </React.Fragment>
+        );
+      }
+
+      // Finesse authentication gate
+      if (!isFinesseAuthenticated) {
+        const userId = session.user.id != null ? String(session.user.username) : '';
+        const extension = session.user.phone != null ? String(session.user.phone) : '';
+        return (
+          <React.Fragment>
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Calls Campaigns Management" />
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '70vh', padding: '24px' }}>
+              <div className="card" style={{ maxWidth: '420px', width: '100%', padding: '32px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+                  <Lock size={28} color="#667eea" />
+                  <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>Authentication Required</h2>
+                </div>
+                <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '24px' }}>
+                  Enter your password to access Live Calls Campaigns.
+                </p>
+                <form onSubmit={handleFinesseAuth}>
+                  {/* <div style={{ marginBottom: '16px' }}>
+                    <label htmlFor="finesse-user-id" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>User ID</label>
+                    <input
+                      id="finesse-user-id"
+                      type="text"
+                      value={userId}
+                      readOnly
+                      style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', background: '#f8fafc', color: '#64748b' }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label htmlFor="finesse-extension" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Extension (Phone)</label>
+                    <input
+                      id="finesse-extension"
+                      type="text"
+                      value={extension}
+                      readOnly
+                      style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', background: '#f8fafc', color: '#64748b' }}
+                    />
+                  </div> */}
+                  <div style={{ marginBottom: '20px' }}>
+                    <label htmlFor="finesse-password" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Password</label>
+                    <input
+                      id="finesse-password"
+                      type="password"
+                      value={finessePassword}
+                      onChange={(e) => setFinessePassword(e.target.value)}
+                      placeholder="Enter your password"
+                      autoComplete="current-password"
+                      style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px' }}
+                    />
+                  </div>
+                  {finesseError && (
+                    <div style={{ marginBottom: '16px', padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#b91c1c', fontSize: '14px' }}>
+                      {finesseError}
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={isFinesseLoading}
+                    className="btn btn-primary"
+                    style={{ width: '100%', justifyContent: 'center', padding: '12px' }}
+                  >
+                    {isFinesseLoading ? (
+                      <>
+                        <Loader size={20} style={{ animation: 'spin 1s linear infinite' }} />
+                        Authenticating...
+                      </>
+                    ) : (
+                      <>
+                        <Lock size={20} />
+                        Authenticate
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </React.Fragment>
+        );
+      }
 
   return (
     <React.Fragment>
@@ -1543,6 +1792,7 @@ const LiveCallsCampaignsManagement = () => {
           setShowUserMenu={setShowUserMenu}
           statusOptions={statusOptions}
           handleLogout={handleLogout}
+          onStatusChange={handleAgentStatusChange}
         />
         </Col>
 </Row>
@@ -1579,7 +1829,21 @@ const LiveCallsCampaignsManagement = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCampaigns.map(campaign => (
+                  {campaignsLoading ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '48px 24px', color: '#64748b' }}>
+                        <Loader size={32} style={{ display: 'inline-block', marginBottom: '12px', animation: 'spin 1s linear infinite' }} />
+                        <div>Loading campaigns...</div>
+                      </td>
+                    </tr>
+                  ) : filteredCampaigns.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '48px 24px', color: '#64748b' }}>
+                        No campaigns found.
+                      </td>
+                    </tr>
+                  ) : (
+                  filteredCampaigns.map(campaign => (
                     <tr
                       key={campaign.id}
                       className={selectedCampaigns.includes(campaign.id) ? 'selected' : ''}
@@ -1615,16 +1879,16 @@ const LiveCallsCampaignsManagement = () => {
                             <input
                               type="time"
                               className="time-input"
-                              value={campaign.timeFrom}
-                              onChange={(e) => handleTimeChange(campaign.id, 'timeFrom', e.target.value)}
+                              value={campaign.startTime}
+                              onChange={(e) => handleTimeChange(campaign.id, 'startTime', e.target.value)}
                             />
                             <Clock size={14} color="#94a3b8" />
                             <span>To</span>
                             <input
                               type="time"
                               className="time-input"
-                              value={campaign.timeTo}
-                              onChange={(e) => handleTimeChange(campaign.id, 'timeTo', e.target.value)}
+                              value={campaign.endTime}
+                              onChange={(e) => handleTimeChange(campaign.id, 'endTime', e.target.value)}
                             />
                           </div>
                           <div className="timezone-text">{campaign.timezone}</div>
@@ -1632,7 +1896,7 @@ const LiveCallsCampaignsManagement = () => {
                       </td>
                       <td>
                         <span className="contacts-remaining">
-                          {campaign.contactsRemaining}
+                          {campaign.pendingContacts ?? campaign.contactsRemaining}
                         </span>
                       </td>
                       <td>
@@ -1653,7 +1917,8 @@ const LiveCallsCampaignsManagement = () => {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  ))
+                  )}
                 </tbody>
               </table>
             </div>
