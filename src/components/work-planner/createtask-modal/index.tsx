@@ -843,7 +843,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           </Col>
           )}
           
-          {!isEdit && (
+          {/* {!isEdit && ( */}
           <Col xs={12} md={6}>
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -861,8 +861,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               />
             </Form.Group>
           </Col>
-          )}
-          {!isEdit && (
+          {/* )} */}
+          {/* {!isEdit && ( */}
           <Col xs={12} md={6}>
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -880,7 +880,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               />
             </Form.Group>
           </Col>
-          )}
+          {/* )} */}
           <Col xs={12} md={6}>
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>

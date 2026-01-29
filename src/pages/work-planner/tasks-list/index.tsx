@@ -1334,7 +1334,8 @@ const TasksList = () => {
                       </td>
 
                       <td onClick={() => handleTaskClick(task)}>{task.rawData?.start_date ? moment(task.rawData?.start_date).format(GlobalDateTimeFormat) : ''}</td>
-                      <td onClick={() => handleTaskClick(task)}>{task.rawData?.due_time ? moment(task.rawData?.due_time).format(GlobalDateTimeFormat) : ''}</td>
+                      {/* <td onClick={() => handleTaskClick(task)}>{task.rawData?.due_time ? moment(task.rawData?.due_time).format(GlobalDateTimeFormat) : ''}</td> */}
+                      <td onClick={() => handleTaskClick(task)}>{task.rawData?.due_date}</td>
                       
                       <td onClick={() => handleTaskClick(task)}>
                         {(() => {
@@ -1355,7 +1356,7 @@ const TasksList = () => {
                         <td onClick={() => handleTaskClick(task)}>{task.rawData?.created_at ? moment(task.rawData?.created_at).format(GlobalDateTimeFormat) : ''}</td>
                       <td>
                         <div className="d-flex align-items-center gap-1 " onClick={(e) => e.stopPropagation()}>
-                          {!task.rawData?.start_date && (
+                          {/* {!task.rawData?.start_date && (
                             <Button
                               variant="outline-primary"
                               size="sm"
@@ -1382,7 +1383,7 @@ const TasksList = () => {
                               ) : null}
                               End Task
                             </Button>
-                          )} 
+                          )}  */}
                           <Button variant="link" className="text-secondary p-0" onClick={() => handleTaskClick(task)}>
                             <MoreVertical size={20} />
                           </Button>
