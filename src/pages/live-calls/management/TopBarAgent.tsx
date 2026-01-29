@@ -365,7 +365,7 @@ const TopBar: React.FC<TopBarProps> = ({
             
             {showUserMenu && (
               <div className="dropdown-menu" style={{ display: 'block' }}>
-                <button 
+                {/* <button 
                   type="button"
                   className="dropdown-item"
                   onClick={(e) => {
@@ -390,7 +390,7 @@ const TopBar: React.FC<TopBarProps> = ({
                 >
                   <Settings size={18} />
                   <span>Settings</span>
-                </button>
+                </button> */}
                 <div style={{ 
                   height: '1px', 
                   background: '#f1f5f9', 

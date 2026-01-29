@@ -99,6 +99,7 @@
     "simplebar": "^6.3.1",
     "simplebar-react": "^3.3.1",
     "socket.io-client": "^4.8.1",
+    "sockjs-client": "^1.6.1",
     "stripe": "^19.1.0",
     "styled-components": "^6.1.19",
     "sweetalert2": "^11.22.0",
