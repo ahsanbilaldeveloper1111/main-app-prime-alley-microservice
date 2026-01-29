@@ -90,18 +90,18 @@ export interface FinesseLinkPayload {
  * POST link - Link Finesse user with credentials and extension
  */
 export const finesseLink = async (payload: FinesseLinkPayload) => {
-  const params = {
-    finesseUserId: "ali.bahadar",
-    finessePassword: "NzKv@0cF",
-    extension: "532",
-  };
+  // const params = {
+  //   finesseUserId: "ali.bahadar",
+  //   finessePassword: "NzKv@0cF",
+  //   extension: "532",
+  // };
 
   // const params = {
   //   finesseUserId: "ali.niaz",
   //   finessePassword: "KYIdq8@G",
   //   extension: "590",
   // };
-  const response = await axiosInstance.post(`${prefix}/finesse/link`, params);
+  const response = await axiosInstance.post(`${prefix}/finesse/link`, payload);
   return response.data;
 };
 
