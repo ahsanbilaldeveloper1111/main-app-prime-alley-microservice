@@ -5,6 +5,7 @@ const prefix = 'finesse';
 // ==================== Storage ====================
 
 export const FINESSE_USER_DATA_KEY = 'finesseResponseData';
+export const FINESSE_TOKEN_KEY = 'finesseToken';
 
 export interface FinesseUserData {
   dialogsUri?: string;
@@ -47,10 +48,29 @@ export const getFinesseUserData = (): FinesseUserData | null => {
   }
 };
 
+export const setFinesseToken = (token: string): void => {
+  if (typeof globalThis.window === 'undefined') return;
+  try {
+    globalThis.sessionStorage.setItem(FINESSE_TOKEN_KEY, token);
+  } catch {
+    // ignore
+  }
+};
+
+export const getFinesseToken = (): string | null => {
+  if (typeof globalThis.window === 'undefined') return null;
+  try {
+    return globalThis.sessionStorage.getItem(FINESSE_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+};
+
 export const clearFinesseUserData = (): void => {
   if (typeof globalThis.window === 'undefined') return;
   try {
     globalThis.sessionStorage.removeItem(FINESSE_USER_DATA_KEY);
+    globalThis.sessionStorage.removeItem(FINESSE_TOKEN_KEY);
   } catch {
     // ignore
   }
@@ -70,7 +90,28 @@ export interface FinesseLinkPayload {
  * POST link - Link Finesse user with credentials and extension
  */
 export const finesseLink = async (payload: FinesseLinkPayload) => {
+  // const params = {
+  //   finesseUserId: "ali.bahadar",
+  //   finessePassword: "NzKv@0cF",
+  //   extension: "532",
+  // };
+
+  // const params = {
+  //   finesseUserId: "ali.niaz",
+  //   finessePassword: "KYIdq8@G",
+  //   extension: "590",
+  // };
   const response = await axiosInstance.post(`${prefix}/finesse/link`, payload);
+  return response.data;
+};
+
+/**
+ * POST finesse/unlink/{username} - Unlink Finesse user (Bearer token required)
+ */
+export const finesseUnlink = async (username: string) => {
+  const response = await axiosInstance.post(
+    `${prefix}/finesse/unlink/${encodeURIComponent(username)}`,{}
+  );
   return response.data;
 };
 
@@ -167,6 +208,42 @@ export const getFinesseCampaignContactsConfig = async (
   );
   return response.data;
 };
+
+// ==================== Dialog Actions (call answer, decline, wrap-up) ====================
+
+export interface FinesseDialogActionPayload {
+  extension: string;
+  action: string;
+  actionParam?: string | null;
+  wrapUpItems?: Array<{ reason?: string }>;
+  callVariables?: Record<string, string>;
+}
+
+/**
+ * POST finesse/user/{username}/dialog/{dialogId}/action - Send dialog action (ACCEPT, REJECT, CLOSE, DROP, UPDATE_CALL_DATA, RECLASSIFY)
+ */
+export const sendFinesseDialogAction = async (
+  username: string,
+  dialogId: string,
+  payload: FinesseDialogActionPayload
+) => {
+  const body: Record<string, unknown> = {
+    extension: payload.extension,
+    action: payload.action,
+  };
+  if (payload.actionParam != null) body.actionParam = payload.actionParam;
+  if (payload.action === 'UPDATE_CALL_DATA') {
+    if (payload.wrapUpItems != null) body.wrapUpItems = payload.wrapUpItems;
+    if (payload.callVariables != null) body.callVariables = payload.callVariables;
+  }
+  const response = await axiosInstance.post(
+    `${prefix}/finesse/user/${encodeURIComponent(username)}/dialog/${encodeURIComponent(dialogId)}/action`,
+    body
+  );
+  return response.data;
+};
+
+// ==================== Campaign Contacts Import ====================
 
 /**
  * POST finesse/admins/users/{username}/campaigns/{campaignId}/contacts/import - Upload + Import Contacts

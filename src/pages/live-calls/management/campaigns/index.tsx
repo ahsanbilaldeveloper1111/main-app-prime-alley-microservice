@@ -1,72 +1,25 @@
 import "@assets/scss/datatable-style.scss";
-import  {
-  ReactElement,
-} from "react";
+import "@assets/scss/common.scss";
+import "@assets/scss/tabs.scss";
+import React, { type ReactElement, useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Row, Col } from "react-bootstrap";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
-
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-
-import React, { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import {
-  Users,
-  User,
-  Settings,
-  Search,
   Plus,
-  Filter,
-  Download,
   Upload,
-  MoreVertical,
-  Phone,
-  Mail,
-  Edit,
   Trash2,
-  Eye,
   Clock,
-  PhoneCall,
-  PhoneOff,
   CheckCircle,
   XCircle,
   AlertCircle,
-  Menu,
   X,
   ChevronDown,
-  LogOut,
-  UserPlus,
-  BarChart3,
-  Bell,
   Grid,
-  List,
-  RefreshCw,
-  TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
-  ArrowDownRight,
-  Activity,
-  Zap,
-  Calendar,
   Target,
-  PlayCircle,
-  PauseCircle,
-  Copy,
-  RotateCcw,
-  Mic,
-  MicOff,
-  Volume2,
-  VolumeX,
-  Pause,
-  Play,
-  SkipForward,
-  PhoneIncoming,
-  PhoneOutgoing,
   Loader,
-  Lock
+  Lock,
 } from 'lucide-react';
 
 import CallWidget from '../CallWidget';
@@ -78,12 +31,20 @@ import {
   finesseLink,
   setFinesseUserData,
   getFinesseUserData,
+  getFinesseToken,
+  setFinesseToken,
+  clearFinesseUserData,
+  finesseUnlink,
   getFinesseUser,
   finesseSetState,
   getFinesseCampaigns,
   setFinesseCampaignEnabled,
   importFinesseCampaignContacts,
+  getFinesseCampaignsContactsStatus,
+  sendFinesseDialogAction,
 } from '@utils/finesse';
+import { useFinesseCapabilities } from '@hooks/live-calls/useFinesseCapabilities';
+import { useFinesseStomp, type FinessePreviewEvent } from '@hooks/live-calls/useFinesseStomp';
 
 export interface CampaignRow {
   id: number;
@@ -119,6 +80,40 @@ const mapApiCampaignToRow = (item: any, index: number): CampaignRow => {
   };
 };
 
+interface ImportStatusShape {
+  status?: string;
+  result?: string;
+  lastImportTime?: string;
+  importedCount?: number;
+  message?: string;
+  importStatus?: { states?: Array<{ result?: string; numContactsImported?: number; message?: string }> };
+}
+
+function formatImportStatusDisplay(s: ImportStatusShape | null | undefined): string {
+  if (!s) return '—';
+  const result = s.importStatus?.states?.[0]?.result ?? s.result ?? s.status;
+  const upper = String(result ?? '').toUpperCase();
+  if (upper === 'SUCCESS') {
+    const count = s.importStatus?.states?.[0]?.numContactsImported ?? s.importedCount ?? 0;
+    const date = s.lastImportTime
+      ? new Date(s.lastImportTime).toLocaleString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })
+      : '';
+    return `Imported ${count} contacts${date ? ` (${date})` : ''}.`;
+  }
+  if (upper === 'IN_PROGRESS') return 'Import in progress…';
+  if (upper === 'FAILURE' || upper === 'ERROR') {
+    const msg = s.importStatus?.states?.[0]?.message ?? s.message ?? 'Unknown error';
+    return `Failed: ${msg}`;
+  }
+  return '—';
+}
+
 const LiveCallsCampaignsManagement = () => {
       const { data: session, status: sessionStatus } = useSession();
       const [isFinesseAuthenticated, setIsFinesseAuthenticated] = useState(false);
@@ -129,10 +124,8 @@ const LiveCallsCampaignsManagement = () => {
       const [teams, setTeams] = useState<string[]>([]);
       const [selectedTeam, setSelectedTeam] = useState('');
       const [agentStatus, setAgentStatus] = useState('READY');
-      const [isRefreshing, setIsRefreshing] = useState(false);
       const [showStatusDropdown, setShowStatusDropdown] = useState(false);
       const [showUserMenu, setShowUserMenu] = useState(false);
-      const [sidebarOpen, setSidebarOpen] = useState(true);
       const [selectedCampaigns, setSelectedCampaigns] = useState<number[]>([]);
       const [searchQuery, setSearchQuery] = useState('');
       const [showCallWidget, setShowCallWidget] = useState(false);
@@ -144,10 +137,8 @@ const LiveCallsCampaignsManagement = () => {
       const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
       const [uploadedFile, setUploadedFile] = useState<File | null>(null);
       const [columnMapping, setColumnMapping] = useState<Array<{id: number, name: string, order: number}>>([]);
-      const [editingTimeFor, setEditingTimeFor] = useState<number | null>(null);
       const [isWrapUpOpen, setIsWrapUpOpen] = useState(false);
-      const [isWrapUpMinimized, setIsWrapUpMinimized] = useState(false);
-      
+
       const statusDropdownRef = useRef<HTMLDivElement>(null);
       const userMenuRef = useRef<HTMLDivElement>(null);
       const fileInputRef = useRef<HTMLInputElement>(null);
@@ -222,6 +213,30 @@ const LiveCallsCampaignsManagement = () => {
         loadCampaigns();
       }, [isFinesseAuthenticated]);
 
+      // Load import statuses in background when authenticated (reference: CampaignsPage loadImportStatuses)
+      useEffect(() => {
+        if (!isFinesseAuthenticated) return;
+        const finesseData = getFinesseUserData();
+        const username = finesseData?.loginId ?? finesseData?.loginName;
+        if (!username) return;
+
+        const loadImportStatuses = async () => {
+          try {
+            const statusData = await getFinesseCampaignsContactsStatus(username);
+            const list = (statusData as { importStatuses?: Array<{ campaignId: number }> })?.importStatuses ?? (statusData as { campaigns?: Array<{ campaignId: number }> })?.campaigns ?? [];
+            const arr = Array.isArray(list) ? list : [];
+            const map: Record<number, unknown> = {};
+            arr.forEach((s: { campaignId: number }) => {
+              map[s.campaignId] = s;
+            });
+            setImportStatuses(map);
+          } catch {
+            // Non-blocking
+          }
+        };
+        loadImportStatuses();
+      }, [isFinesseAuthenticated]);
+
       const statusOptions = [
         { value: 'READY', label: 'Ready', color: '#10b981', icon: CheckCircle },
         { value: 'NOT_READY', label: 'Not Ready', color: '#ef4444', icon: XCircle }
@@ -229,7 +244,93 @@ const LiveCallsCampaignsManagement = () => {
 
       const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
       const [campaignsLoading, setCampaignsLoading] = useState(false);
-    
+      const [importStatuses, setImportStatuses] = useState<Record<number, unknown>>({});
+      const [previewDialogs, setPreviewDialogs] = useState<Record<string, FinessePreviewEvent>>({});
+      const [token, setToken] = useState<string | null>(null);
+
+      const capabilityUsername = isFinesseAuthenticated
+        ? (getFinesseUserData()?.loginId ?? getFinesseUserData()?.loginName ?? '')
+        : null;
+      const { hasCampaignMgmt, loading: capabilityLoading } = useFinesseCapabilities(capabilityUsername);
+
+      const activePreviewDialog = useMemo(() => {
+        const dialogs = Object.values(previewDialogs);
+        if (dialogs.length === 0) return null;
+        const active = dialogs
+          .filter((d) => {
+            if ((d as { eventType?: string }).eventType === 'ENDED') return false;
+            const p = d.participants?.[0];
+            if (p?.state === 'DROPPED') return false;
+            return true;
+          })
+          .sort((a, b) => {
+            const timeA = a.participants?.[0]?.stateChangeTime ?? a.participants?.[0]?.startTime ?? '';
+            const timeB = b.participants?.[0]?.stateChangeTime ?? b.participants?.[0]?.startTime ?? '';
+            return new Date(timeB).getTime() - new Date(timeA).getTime();
+          });
+        return active[0] ?? null;
+      }, [previewDialogs]);
+
+      const getFinesseContext = useCallback(() => {
+        const d = getFinesseUserData();
+        const u = session?.user as { phone?: string } | undefined;
+        return {
+          username: d?.loginId ?? d?.loginName,
+          extension: d?.extension ?? u?.phone,
+        };
+      }, [session?.user]);
+
+      const handlePreviewEvent = useCallback((payload: FinessePreviewEvent) => {
+        if (payload?.dialogId == null) return;
+        const eventType = (payload as { eventType?: string }).eventType;
+        const dialogId = String(payload.dialogId);
+        if (eventType === 'CREATED') {
+          setPreviewDialogs((prev) => ({ ...prev, [dialogId]: payload }));
+        } else if (eventType === 'UPDATED') {
+          setPreviewDialogs((prev) => {
+            const existing = prev[dialogId];
+            if (existing) {
+              return {
+                ...prev,
+                [dialogId]: { ...existing, ...payload, participants: payload.participants ?? existing.participants },
+              };
+            }
+            return { ...prev, [dialogId]: payload };
+          });
+        } else if (eventType === 'ENDED') {
+          setPreviewDialogs((prev) => {
+            const next = { ...prev };
+            delete next[dialogId];
+            return next;
+          });
+        }
+      }, []);
+
+      useEffect(() => {
+        if (!isFinesseAuthenticated || !session?.user) return;
+        const t = globalThis.window !== undefined ? getFinesseToken() : null;
+        setToken(t);
+      }, [isFinesseAuthenticated, session?.user]);
+
+      useFinesseStomp({
+        token,
+        finesseUserId: capabilityUsername,
+        onStateEvent: (p) => p?.state && setAgentStatus(p.state),
+        onErrorEvent: (p) => toast.error((p as { message?: string })?.message ?? 'Finesse error'),
+        onAuthError: (msg) => toast.error(msg),
+        onPreviewEvent: handlePreviewEvent,
+      });
+
+      useEffect(() => {
+        if (!activePreviewDialog?.dialogId) return;
+        const participant = activePreviewDialog.participants?.[0];
+        const isAlerting = activePreviewDialog.dialogState === 'ALERTING' || participant?.state === 'ALERTING';
+        if (isAlerting) {
+          setShowCallWidget(true);
+          setCallStatus('Ringing');
+        }
+      }, [activePreviewDialog?.dialogId, activePreviewDialog?.dialogState, activePreviewDialog?.participants]);
+
       // Simulate call timer
       useEffect(() => {
         let interval: NodeJS.Timeout | undefined;
@@ -269,29 +370,27 @@ const LiveCallsCampaignsManagement = () => {
         }
       };
     
-      const handleRefresh = () => {
-        setIsRefreshing(true);
-        setTimeout(() => setIsRefreshing(false), 1000);
-      };
-    
-      const handleLogout = () => {
-        if (confirm('Are you sure you want to logout?')) {
-          alert('Logging out...');
-          // Add your logout logic here
-          // window.location.href = '/signin-page';
+      const handleLogout = async () => {
+        const { username } = getFinesseContext();
+        try {
+          if (username) {
+            await finesseUnlink(username);
+          }
+        } catch (err: unknown) {
+          const message = err && typeof err === 'object' && 'response' in err
+            ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+            : err instanceof Error ? err.message : 'Unlink failed';
+          toast.error(message ?? 'Failed to unlink from Finesse');
+        } finally {
+          clearFinesseUserData();
+          setIsFinesseAuthenticated(false);
         }
-      };
-    
-      const handleStatusChange = (status: string) => {
-        setAgentStatus(status);
-        setShowStatusDropdown(false);
       };
     
       const handleToggleCampaign = async (id: number) => {
         const campaign = campaigns.find(c => c.id === id);
         if (!campaign) return;
-        const finesseData = getFinesseUserData();
-        const username = finesseData?.loginId ?? finesseData?.loginName;
+        const { username } = getFinesseContext();
         if (!username) {
           toast.error('user not found.');
           return;
@@ -310,18 +409,75 @@ const LiveCallsCampaignsManagement = () => {
         }
       };
     
-      const handleAcceptCall = () => {
-        setCallStatus('Connected');
-        setCallTimer(0);
+      const handleAcceptCall = async () => {
+        const { username, extension } = getFinesseContext();
+        const dialogId = activePreviewDialog?.dialogId;
+        if (username && extension && dialogId) {
+          try {
+            await sendFinesseDialogAction(username, String(dialogId), {
+              extension: String(extension),
+              action: 'ACCEPT',
+            });
+            setCallStatus('Connected');
+            setCallTimer(0);
+          } catch (err: unknown) {
+            toast.error((err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to accept call');
+          }
+        } else {
+          setCallStatus('Connected');
+          setCallTimer(0);
+        }
       };
-    
-      const handleRejectCall = () => {
+
+      const handleRejectCall = async () => {
+        const { username, extension } = getFinesseContext();
+        const dialogId = activePreviewDialog?.dialogId;
+        if (username && extension && dialogId) {
+          try {
+            await sendFinesseDialogAction(username, String(dialogId), {
+              extension: String(extension),
+              action: 'REJECT',
+            });
+          } catch (err: unknown) {
+            toast.error((err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to reject call');
+          }
+        }
         setShowCallWidget(false);
         setCallTimer(0);
         setCallStatus('Ringing');
       };
-    
-      const handleEndCall = () => {
+
+      const handleRejectOrClose = async (action: 'REJECT' | 'CLOSE') => {
+        const { username, extension } = getFinesseContext();
+        const dialogId = activePreviewDialog?.dialogId;
+        if (username && extension && dialogId) {
+          try {
+            await sendFinesseDialogAction(username, String(dialogId), {
+              extension: String(extension),
+              action,
+            });
+          } catch (err: unknown) {
+            toast.error((err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? `Failed to ${action.toLowerCase()} call`);
+          }
+        }
+        setShowCallWidget(false);
+        setCallTimer(0);
+        setCallStatus('Ringing');
+      };
+
+      const handleEndCall = async () => {
+        const { username, extension } = getFinesseContext();
+        const dialogId = activePreviewDialog?.dialogId;
+        if (username && extension && dialogId) {
+          try {
+            await sendFinesseDialogAction(username, String(dialogId), {
+              extension: String(extension),
+              action: 'DROP',
+            });
+          } catch (err: unknown) {
+            toast.error((err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to end call');
+          }
+        }
         setShowCallWidget(false);
         setCallTimer(0);
         setCallStatus('Ringing');
@@ -401,8 +557,7 @@ const LiveCallsCampaignsManagement = () => {
           toast.error('Please select a file to upload.');
           return;
         }
-        const finesseData = getFinesseUserData();
-        const username = finesseData?.loginId ?? finesseData?.loginName;
+        const { username } = getFinesseContext();
         if (!username) {
           toast.error('user not found.');
           return;
@@ -411,11 +566,20 @@ const LiveCallsCampaignsManagement = () => {
           await importFinesseCampaignContacts(username, selectedCampaignId, uploadedFile);
           toast.success('Contacts imported successfully.');
           handleCloseUploadModal();
-          // Optionally refetch campaigns to update contacts count
           const response = await getFinesseCampaigns(username);
           const list = response?.data ?? response?.responseData ?? response;
           const arr = Array.isArray(list) ? list : list?.campaigns ?? list?.items ?? [];
           setCampaigns((arr as any[]).map((item, index) => mapApiCampaignToRow(item, index)));
+          const statusData = await getFinesseCampaignsContactsStatus(username).catch(() => null);
+          if (statusData) {
+            const listStatus = (statusData as { importStatuses?: Array<{ campaignId: number }> })?.importStatuses ?? (statusData as { campaigns?: Array<{ campaignId: number }> })?.campaigns ?? [];
+            const arrStatus = Array.isArray(listStatus) ? listStatus : [];
+            const map: Record<number, unknown> = {};
+            arrStatus.forEach((s: { campaignId: number }) => {
+              map[s.campaignId] = s;
+            });
+            setImportStatuses(map);
+          }
         } catch (err: any) {
           toast.error(err?.response?.data?.message ?? err?.message ?? 'Failed to import contacts.');
         }
@@ -433,19 +597,35 @@ const LiveCallsCampaignsManagement = () => {
         }));
       };
     
-      const handleWrapUpSubmit = (data: { wrapUp: string; variables: Record<string, string> }) => {
-        console.log('Wrap Up Data:', data);
-        alert(`✅ Wrap Up Submitted!\n\nStatus: ${data.wrapUp}\nVariables: ${JSON.stringify(data.variables, null, 2)}`);
+      const handleWrapUpSubmit = async (data: { wrapUp: string; variables: Record<string, string> }) => {
+        const { username, extension } = getFinesseContext();
+        const dialogId = activePreviewDialog?.dialogId;
+        if (username && extension && dialogId) {
+          try {
+            await sendFinesseDialogAction(username, String(dialogId), {
+              extension: String(extension),
+              action: 'UPDATE_CALL_DATA',
+              wrapUpItems: [{ reason: data.wrapUp }],
+              callVariables: data.variables,
+            });
+            await sendFinesseDialogAction(username, String(dialogId), {
+              extension: String(extension),
+              action: 'DROP',
+            });
+            toast.success('Wrap up submitted and call ended.');
+          } catch (err: unknown) {
+            toast.error((err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to submit wrap up');
+          }
+        }
         setIsWrapUpOpen(false);
-        setIsWrapUpMinimized(false);
-        // Here you can also end the call or perform other actions
-        handleEndCall();
+        setShowCallWidget(false);
+        setCallTimer(0);
+        setCallStatus('Ringing');
+        setIsMuted(false);
+        setIsHold(false);
       };
     
-      const handleWrapUpMinimize = () => {
-        setIsWrapUpMinimized(true);
-        setIsWrapUpOpen(false);
-      };
+      const handleWrapUpMinimize = () => setIsWrapUpOpen(false);
 
       const handleFinesseAuth = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -470,10 +650,13 @@ const LiveCallsCampaignsManagement = () => {
           if (response?.status === 'success' && response?.responseData) {
             const data = response.responseData;
             setFinesseUserData(data);
+            if (response?.token) {
+              setFinesseToken(response.token);
+            }
             const teamNames = data.teams?.map((t: { name: string }) => t.name) ?? [];
             setTeams(teamNames);
             setSelectedTeam(data.teamName ?? (teamNames[0] ?? ''));
-            setAgentStatus(data.state ?? 'READY');
+            setAgentStatus(data.state);
             setIsFinesseAuthenticated(true);
           } else {
             setFinesseError(response?.message || response?.statusCode || 'authentication failed.');
@@ -486,8 +669,7 @@ const LiveCallsCampaignsManagement = () => {
       };  
 
       const handleAgentStatusChange = async (newState: string) => {
-        const finesseData = getFinesseUserData();
-        const username = finesseData?.loginId ?? finesseData?.loginName;
+        const { username } = getFinesseContext();
         if (!username) {
           toast.error('user not found.');
           return;
@@ -501,8 +683,6 @@ const LiveCallsCampaignsManagement = () => {
         }
       };
     
-      const currentStatus = statusOptions.find(s => s.value === agentStatus) || statusOptions[0];
-
       // Session loading
       if (sessionStatus === 'loading') {
         return (
@@ -529,7 +709,7 @@ const LiveCallsCampaignsManagement = () => {
 
       // Finesse authentication gate
       if (!isFinesseAuthenticated) {
-        const userId = session.user.id != null ? String(session.user.username) : '';
+        const userId = session.user.id != null ? String(session.user.id) : '';
         const extension = session.user.phone != null ? String(session.user.phone) : '';
         return (
           <React.Fragment>
@@ -600,6 +780,38 @@ const LiveCallsCampaignsManagement = () => {
                     )}
                   </button>
                 </form>
+              </div>
+            </div>
+          </React.Fragment>
+        );
+      }
+
+      // Capability check loading (reference: CampaignMgmtGate loading)
+      if (isFinesseAuthenticated && capabilityUsername && capabilityLoading) {
+        return (
+          <React.Fragment>
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Calls Campaigns Management" />
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+              <Loader size={40} className="text-primary" style={{ animation: 'spin 1s linear infinite' }} />
+            </div>
+          </React.Fragment>
+        );
+      }
+
+      // Capability gate (reference: CampaignMgmtGate) – require CAMPAIGN_MGMT
+      if (isFinesseAuthenticated && capabilityUsername && !capabilityLoading && !hasCampaignMgmt) {
+        return (
+          <React.Fragment>
+            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Calls Campaigns Management" />
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '70vh', padding: '24px' }}>
+              <div className="card" style={{ maxWidth: '420px', width: '100%', padding: '32px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+                  <AlertCircle size={28} color="#f59e0b" />
+                  <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>Insufficient Capabilities</h2>
+                </div>
+                <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '24px' }}>
+                  You don&apos;t have sufficient capabilities to access Live Calls Campaigns.
+                </p>
               </div>
             </div>
           </React.Fragment>
@@ -1924,7 +2136,7 @@ const LiveCallsCampaignsManagement = () => {
             </div>
           </div>
 
-      {/* Outgoing Call Widget */}
+      {/* Outgoing Call Widget – dynamic from preview event */}
       <CallWidget 
         showCallWidget={showCallWidget}
         setShowCallWidget={setShowCallWidget}
@@ -1940,6 +2152,11 @@ const LiveCallsCampaignsManagement = () => {
         formatTime={formatTime}
         selectedTeam={selectedTeam}
         activeAgentName="Campaign Agent"
+        campaignName={activePreviewDialog?.campaignName}
+        customerNumber={activePreviewDialog?.customerNumber}
+        dialedNumber={activePreviewDialog?.dialedNumber}
+        previewActions={activePreviewDialog?.participants?.[0]?.actions}
+        onRejectWithAction={handleRejectOrClose}
       />
 
       <WrapUpModal
@@ -2013,6 +2230,25 @@ const LiveCallsCampaignsManagement = () => {
                   </div>
                 )}
               </div>
+
+              {/* Import Status (reference: UpdateContactsModal initialImportStatus) */}
+              {selectedCampaignId != null && importStatuses[selectedCampaignId] != null && (
+                <div className="modal-section">
+                  <div
+                    style={{
+                      padding: '16px',
+                      background: '#f0f9ff',
+                      border: '1px solid #bae6fd',
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      color: '#0c4a6e',
+                    }}
+                  >
+                    <strong>Last import:</strong>{' '}
+                    {formatImportStatusDisplay(importStatuses[selectedCampaignId] as ImportStatusShape)}
+                  </div>
+                </div>
+              )}
 
               {/* Column Mapping Section */}
               <div className="modal-section">

@@ -422,6 +422,7 @@ const TasksList = () => {
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingTask, setDeletingTask] = useState(false);
+  const [taskActionLoadingId, setTaskActionLoadingId] = useState<string | null>(null);
   const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [taskActivities, setTaskActivities] = useState<any[]>([]);
@@ -525,6 +526,38 @@ const TasksList = () => {
       console.error('Error deleting task:', error);
     } finally {
       setDeletingTask(false);
+    }
+  };
+
+  const handleStartTask = async (task: Task, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const taskId = String(task.rawData?.id ?? task.id);
+    if (!taskId) return;
+    try {
+      setTaskActionLoadingId(taskId);
+      await updateTask(taskId, { start_date: new Date().toISOString() ,timezone: Intl.DateTimeFormat().resolvedOptions().timeZone});
+      await fetchTasks();
+    } catch (error) {
+      console.error('Error starting task:', error);
+    } finally {
+      setTaskActionLoadingId(null);
+    }
+  };
+
+  const handleEndTask = async (task: Task, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const taskId = String(task.rawData?.id ?? task.id);
+    if (!taskId) return;
+    try {
+      setTaskActionLoadingId(taskId);
+      const now = new Date();  
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      await updateTask(taskId, { end_date: now.toISOString(), due_date:now.toISOString(), due_time:now.toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+      await fetchTasks();
+    } catch (error) {
+      console.error('Error ending task:', error);
+    } finally {
+      setTaskActionLoadingId(null);
     }
   };
 
@@ -1185,9 +1218,10 @@ const TasksList = () => {
                     <th>Status</th>
                     <th>Priority</th>
                     <th>Project</th>
-                    <th>Assignee</th>
-                    <th>Start Date</th>
-                    <th>End Date</th>
+                    <th>Assignees</th>
+                    <th>Watchers</th>
+                    <th>Tast Start</th>
+                    <th>Task End</th>
                    
                     <th>Created By</th>
                     <th>DateTime</th>
@@ -1197,7 +1231,7 @@ const TasksList = () => {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-5">
+                      <td colSpan={20} className="text-center py-5">
                         <Spinner animation="border" variant="primary" />
                         <div className="mt-2">Loading tasks...</div>
                       </td>
@@ -1268,9 +1302,39 @@ const TasksList = () => {
                         )}
                         </div>
                       </td>
+                      <td onClick={() => handleTaskClick(task)}>
+                        <div className="d-flex align-items-center gap-2">
+                          {(() => {
+                            const watchers = task.rawData?.watchers ?? task.rawData?.watcher_numbers?.map((extNum: string) => ({ extension_number: extNum })) ?? [];
+                            if (!watchers.length) return <span className="text-muted">—</span>;
+                            return watchers.map((watcher: any, idx: number) => {
+                              const extNumber = watcher.extension_number ?? watcher ?? '';
+                              if (!hierarchyDataExtensions) {
+                                return (
+                                  <div key={idx} className="assignee-badge" title={extNumber}>
+                                    {String(extNumber).toUpperCase().slice(0, 2) || '—'}
+                                  </div>
+                                );
+                              }
+                              const extension = (hierarchyDataExtensions as any[]).find(
+                                (ext: any) => ext.id === extNumber || ext.extension_number === extNumber
+                              );
+                              const name = extension?.name || extNumber;
+                              const initials = name !== extNumber
+                                ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+                                : String(extNumber || '—').slice(0, 2).toUpperCase();
+                              return (
+                                <div key={idx} className="assignee-badge" title={name}>
+                                  {initials}
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </td>
 
                       <td onClick={() => handleTaskClick(task)}>{task.rawData?.start_date ? moment(task.rawData?.start_date).format(GlobalDateTimeFormat) : ''}</td>
-                      <td onClick={() => handleTaskClick(task)}>{task.dueDate}</td>
+                      <td onClick={() => handleTaskClick(task)}>{task.rawData?.due_time ? moment(task.rawData?.due_time).format(GlobalDateTimeFormat) : ''}</td>
                       
                       <td onClick={() => handleTaskClick(task)}>
                         {(() => {
@@ -1290,9 +1354,39 @@ const TasksList = () => {
                         </td>
                         <td onClick={() => handleTaskClick(task)}>{task.rawData?.created_at ? moment(task.rawData?.created_at).format(GlobalDateTimeFormat) : ''}</td>
                       <td>
-                        <Button variant="link" className="text-secondary p-0" onClick={() => handleTaskClick(task)}>
-                          <MoreVertical size={20} />
-                        </Button>
+                        <div className="d-flex align-items-center gap-1 " onClick={(e) => e.stopPropagation()}>
+                          {!task.rawData?.start_date && (
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              className="me-1"
+                              disabled={taskActionLoadingId === String(task.rawData?.id ?? task.id)}
+                              onClick={(e) => handleStartTask(task, e)}
+                            >
+                              {taskActionLoadingId === String(task.rawData?.id ?? task.id) ? (
+                                <Spinner animation="border" size="sm" className="me-1" style={{ width: '14px', height: '14px' }} />
+                              ) : null}
+                              Start Task
+                            </Button>
+                          )}
+                          {task.rawData?.start_date && !task.rawData?.due_time && (
+                            <Button
+                              variant="outline-secondary"
+                              size="sm"
+                              className="me-1"
+                              disabled={taskActionLoadingId === String(task.rawData?.id ?? task.id)}
+                              onClick={(e) => handleEndTask(task, e)}
+                            >
+                              {taskActionLoadingId === String(task.rawData?.id ?? task.id) ? (
+                                <Spinner animation="border" size="sm" className="me-1" style={{ width: '14px', height: '14px' }} />
+                              ) : null}
+                              End Task
+                            </Button>
+                          )} 
+                          <Button variant="link" className="text-secondary p-0" onClick={() => handleTaskClick(task)}>
+                            <MoreVertical size={20} />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                     ))
@@ -1302,17 +1396,50 @@ const TasksList = () => {
             </div>
             
             {/* Pagination Controls */}
-            {!loading && pagination.last_page > 1 && filteredTasks.length > 0 && (
+            {!loading && filteredTasks.length > 0 && (
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 marginTop: '20px',
                 paddingTop: '16px',
-                borderTop: '1px solid #e8eef5'
+                borderTop: '1px solid #e8eef5',
+                flexWrap: 'wrap',
+                gap: '12px'
               }}>
-                <div style={{ fontSize: '13px', color: '#718096' }}>
-                  Showing {pagination.from || 0} to {pagination.to || 0} of {pagination.total || 0} tasks
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', color: '#718096' }}>
+                    Showing {pagination.from || 0} to {pagination.to || 0} of {pagination.total || 0} tasks
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <label htmlFor="per-page-select" style={{ fontSize: '13px', color: '#718096', margin: 0 }}>Per page</label>
+                    <select
+                      id="per-page-select"
+                      value={pagination.limit}
+                      onChange={(e) => {
+                        const limit = Number(e.target.value);
+                        if (!loading) setPagination(prev => ({ ...prev, limit, page: 1 }));
+                      }}
+                      disabled={loading}
+                      style={{
+                        padding: '6px 10px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        backgroundColor: loading ? '#f8fafc' : 'white',
+                        color: loading ? '#cbd5e0' : '#4a5568',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        minWidth: '56px'
+                      }}
+                    >
+                      {[15, 25, 50, 100].map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <button
@@ -1454,7 +1581,7 @@ const TasksList = () => {
       >
         <Offcanvas.Header closeButton className="task-detail-header d-flex align-items-center">
           <Offcanvas.Title className="d-flex align-items-center flex-grow-1 min-w-0 me-2">
-            <span className="fw-bold text-truncate">{selectedTask?.title}</span>
+            <span className="fw-bold">{selectedTask?.title} </span>
           </Offcanvas.Title>
           <div className="d-flex align-items-center gap-1 flex-shrink-0">
             {/* {selectedTask?.rawData?.is_completed === false && ( */}
@@ -1535,6 +1662,43 @@ const TasksList = () => {
                 </div>
               </div>
 
+              <div className="detail-section">
+                <div className="detail-label">Watchers</div>
+                <div className="assignee-group">
+                  {(() => {
+                    const watchers = selectedTask.rawData?.watchers ?? selectedTask.rawData?.watcher_numbers?.map((extNum: string) => ({ extension_number: extNum })) ?? [];
+                    if (watchers.length === 0) {
+                      return <span className="text-muted small">No watchers</span>;
+                    }
+                    return watchers.map((watcher: any, idx: number) => {
+                      const extNumber = watcher.extension_number ?? watcher ?? '';
+                      if (!hierarchyDataExtensions) {
+                        return (
+                          <div key={idx} className="assignee-badge" title={extNumber}>
+                            {String(extNumber).toUpperCase().slice(0, 2) || '—'}
+                          </div>
+                        );
+                      }
+                      const extension = (hierarchyDataExtensions as any[]).find(
+                        (ext: any) => ext.id === extNumber || ext.extension_number === extNumber
+                      );
+                      const name = extension?.name || extNumber;
+                      const initials = name !== extNumber
+                        ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+                        : String(extNumber || '—').slice(0, 2).toUpperCase();
+                      return (
+                        <div key={idx} className="assignee-badge" title={name}>
+                          {initials}
+                        </div>
+                      );
+                    });
+                  })()}
+                  <div className="add-assignee" onClick={handleEditTask} title="Edit watchers">
+                    <Plus size={16} />
+                  </div>
+                </div>
+              </div>
+
 {selectedTask.dueDate && (
               <div className="detail-section">
                 <div className="detail-label">Due Date</div>
@@ -1552,9 +1716,13 @@ const TasksList = () => {
 
               <div className="detail-section">
                 <div className="detail-label">Description</div>
-                <p style={{ fontSize: '0.875rem', color: '#475569', lineHeight: '1.6', margin: 0 }}>
-                  {selectedTask.description || 'No description provided'}
-                </p>
+                <div
+                  style={{ fontSize: '0.875rem', color: '#475569', lineHeight: '1.6', margin: 0 }}
+                  className="task-description-html"
+                  dangerouslySetInnerHTML={{
+                    __html: (selectedTask.rawData?.description ?? selectedTask.description)?.trim() || '<span class="text-muted">No description provided</span>',
+                  }}
+                />
               </div>
 
               <Nav variant="tabs" className="detail-tabs">

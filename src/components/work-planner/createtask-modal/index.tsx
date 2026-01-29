@@ -7,6 +7,7 @@ import {
   FileText, 
   Tag,
   Users,
+  Eye,
   Flag,
   ListTodo,
   Plus,
@@ -118,6 +119,7 @@ interface CreateTaskFormData {
   statusId: number | null;
   priorityId: number | null;
   assigneeIds: number[];
+  watcherIds: number[];
   dueDate: string;
   startDate: string;
   labelIds: number[];
@@ -185,6 +187,16 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         return extension ? Number(extension.id) : Number(extNum);
       }) || [];
 
+      const watcherIds = editTask.watchers?.map((watcher: any) => {
+        const extension = extensions.find((ext: any) =>
+          ext.id === watcher.extension_number || ext.extension_number === watcher.extension_number
+        );
+        return extension ? Number(extension.id) : Number(watcher.extension_number);
+      }) || editTask.watcher_numbers?.map((extNum: string) => {
+        const extension = extensions.find((ext: any) => ext.id === extNum || ext.extension_number === extNum);
+        return extension ? Number(extension.id) : Number(extNum);
+      }) || [];
+
       return {
         title: editTask.title || '',
         description: editTask.description || '',
@@ -192,6 +204,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         statusId: statusIdRaw ? Number(statusIdRaw) : null,
         priorityId: mapPriorityStringToId(editTask.priority),
         assigneeIds: assigneeIds,
+        watcherIds: watcherIds,
         dueDate: formatDateForInput(editTask.due_date),
         startDate: formatDateForInput(editTask.start_date),
         labelIds: editTask.label_ids || editTask.labels?.map((l: any) => l.id) || [],
@@ -206,6 +219,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
       priorityId: 0, // Default to "Select Priority" (empty value)
       assigneeIds: [],
+      watcherIds: [],
       dueDate: '',
       startDate: '',
       labelIds: [],
@@ -217,6 +231,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('');
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
+  const [watcherSearchQuery, setWatcherSearchQuery] = useState('');
+  const [showWatcherDropdown, setShowWatcherDropdown] = useState(false);
   const [fetchedProjects, setFetchedProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [genericStatuses, setGenericStatuses] = useState<Status[]>([]);
@@ -311,6 +327,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
         priorityId: 0,
         assigneeIds: [],
+        watcherIds: [],
         dueDate: '',
         startDate: '',
         labelIds: [],
@@ -467,6 +484,10 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           const extension = extensions.find((ext: any) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
+        watchers: formData.watcherIds?.map((id: number) => {
+          const extension = extensions.find((ext: any) => Number(ext.id) === id);
+          return extension ? extension.id : String(id);
+        }) || [],
         type: taskType // Add task type (regular, recurring, or todo)
       };
 
@@ -543,7 +564,10 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         due_date: formData.dueDate || '',
         start_date: formData.startDate || '',
         extension_numbers: formData.assigneeIds?.map((id: number) => {
-          // Find the extension by id from extensions prop
+          const extension = extensions.find((ext: any) => Number(ext.id) === id);
+          return extension ? extension.id : String(id);
+        }) || [],
+        watchers: formData.watcherIds?.map((id: number) => {
           const extension = extensions.find((ext: any) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
@@ -616,10 +640,20 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }));
   };
 
+  const toggleWatcher = (userId: number) => {
+    setFormData(prev => ({
+      ...prev,
+      watcherIds: prev.watcherIds.includes(userId)
+        ? prev.watcherIds.filter(id => id !== userId)
+        : [...prev.watcherIds, userId]
+    }));
+  };
+
   const selectedProject = projects.find(p => p.id === formData.projectId) || null;
   const selectedStatus = statuses.find(s => s.id === formData.statusId) || null;
   const selectedPriority = priorities.find(p => p.id === formData.priorityId) || null;
   const selectedAssignees = users.filter(u => formData.assigneeIds.includes(u.id));
+  const selectedWatchers = users.filter(u => formData.watcherIds.includes(u.id));
   const selectedLabels = labels.filter(l => formData.labelIds.includes(l.id));
 
   return (
@@ -809,6 +843,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           </Col>
           )}
           
+          {!isEdit && (
           <Col xs={12} md={6}>
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -826,7 +861,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               />
             </Form.Group>
           </Col>
-
+          )}
+          {!isEdit && (
           <Col xs={12} md={6}>
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -844,7 +880,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               />
             </Form.Group>
           </Col>
-
+          )}
           <Col xs={12} md={6}>
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -989,11 +1025,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                     backgroundColor: formData.assigneeIds.includes(user.id) ? '#edf6ff' : 'white',
                     transition: 'background-color 0.2s'
                   }}
-                  onClick={() => {
-                    toggleAssignee(user.id);
-                    setShowAssigneeDropdown(false);
-                    setAssigneeSearchQuery(''); // Clear search when selecting
-                  }}
+                  onClick={() => toggleAssignee(user.id)}
                   onMouseEnter={(e) => {
                     if (!formData.assigneeIds.includes(user.id)) {
                       e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -1013,6 +1045,156 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                   ))
                 );
               })()}
+              {/* Done button to close dropdown after multiple selection */}
+              <div className="p-2 border-top" style={{ backgroundColor: 'white' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm w-100"
+                  onClick={() => {
+                    setShowAssigneeDropdown(false);
+                    setAssigneeSearchQuery('');
+                  }}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+        </Form.Group>
+        )}
+
+        {/* Watchers Field */}
+        {taskType !== 'todo' && (
+        <Form.Group className="mb-3">
+          <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
+            <Eye size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
+            Watchers
+          </Form.Label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+            {selectedWatchers.map((user) => (
+              <div
+                key={user.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer'
+                }}
+                onClick={() => toggleWatcher(user.id)}
+              >
+                <span style={{ color: '#2d3748', fontWeight: '500' }}>{user.name}</span>
+                <X size={14} style={{ color: '#64748b' }} />
+              </div>
+            ))}
+
+            <Button
+              variant="light"
+              size="sm"
+              onClick={() => {
+                setShowWatcherDropdown(!showWatcherDropdown);
+                if (!showWatcherDropdown) {
+                  setWatcherSearchQuery('');
+                }
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '0.875rem',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px'
+              }}
+            >
+              <Plus size={14} />
+              Add Watcher
+            </Button>
+          </div>
+
+          {showWatcherDropdown && (
+            <div
+              className="border rounded"
+              style={{
+                backgroundColor: '#f8fafc',
+                maxHeight: '300px',
+                overflowY: 'auto'
+              }}
+            >
+              <div className="p-2 border-bottom" style={{ backgroundColor: 'white' }}>
+                <div className="position-relative">
+                  <Search
+                    size={16}
+                    className="position-absolute text-muted"
+                    style={{ left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                  />
+                  <Form.Control
+                    type="text"
+                    placeholder="Search watchers..."
+                    value={watcherSearchQuery}
+                    onChange={(e) => setWatcherSearchQuery(e.target.value)}
+                    className="py-2"
+                    style={{ paddingLeft: '40px', fontSize: '14px' }}
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {(() => {
+                const filteredWatchers = users.filter((user) =>
+                  user.name.toLowerCase().includes(watcherSearchQuery.toLowerCase())
+                );
+
+                return filteredWatchers.length === 0 ? (
+                  <div className="p-3 text-center text-muted" style={{ fontSize: '14px' }}>
+                    {watcherSearchQuery ? 'No watchers found' : 'No extensions available'}
+                  </div>
+                ) : (
+                  filteredWatchers.map((user) => (
+                    <div
+                      key={user.id}
+                      className="d-flex align-items-center justify-content-between p-3 border-bottom cursor-pointer"
+                      style={{
+                        cursor: 'pointer',
+                        backgroundColor: formData.watcherIds.includes(user.id) ? '#f0fdf4' : 'white',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onClick={() => toggleWatcher(user.id)}
+                      onMouseEnter={(e) => {
+                        if (!formData.watcherIds.includes(user.id)) {
+                          e.currentTarget.style.backgroundColor = '#f8fafc';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!formData.watcherIds.includes(user.id)) {
+                          e.currentTarget.style.backgroundColor = 'white';
+                        }
+                      }}
+                    >
+                      <span style={{ fontSize: '14px', color: '#2d3748', fontWeight: '500' }}>{user.name}</span>
+                      {formData.watcherIds.includes(user.id) && (
+                        <Check size={18} className="text-success" style={{ flexShrink: 0 }} />
+                      )}
+                    </div>
+                  ))
+                );
+              })()}
+              <div className="p-2 border-top" style={{ backgroundColor: 'white' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm w-100"
+                  onClick={() => {
+                    setShowWatcherDropdown(false);
+                    setWatcherSearchQuery('');
+                  }}
+                >
+                  Done
+                </button>
+              </div>
             </div>
           )}
         </Form.Group>

@@ -94,6 +94,7 @@ interface CreateTaskData {
   estimated_hours?: string;
   progress?: number;
   extension_numbers?: string[];
+  watchers?: string[];
   label_ids?: number[];
   timezone?: string;
   type?: "regular" | "recurring" | "todo";
@@ -124,7 +125,12 @@ interface UpdateTaskData {
   status_id?: number;
   project_id?: number;
   due_date?: string;
+  due_time?: string;
+  timezone?: string;
+  start_date?: string;
+  end_date?: string;
   extension_numbers?: string[];
+  watchers?: string[];
   label_ids?: number[];
 }
 
