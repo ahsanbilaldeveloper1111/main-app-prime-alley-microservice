@@ -13,6 +13,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import {
   FiUpload,
   FiDatabase,
@@ -47,7 +48,18 @@ import {
   deleteMeeting,
   markDealLost,
   getLead,
-  createApproval,
+  updateDeal,
+  getCrmProducts,
+  getCampaignById,
+  getIndustries,
+  getBusinessTypes,
+  createEstimate,
+  CrmProduct,
+  StageData,
+  IndustryData,
+  DealTemplateData,
+  DealTemplateField,
+  BusinessTypeData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -61,6 +73,8 @@ import {
   Table,
   InputGroup,
   Modal,
+  Spinner,
+  
 } from "react-bootstrap";
 import Select from 'react-select';
 import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper";
@@ -110,7 +124,10 @@ import {
   Download as DownloadIcon,
   AlertCircle,
   RotateCcw,
-  ClipboardCheck,
+  Percent,
+  Package,
+  RefreshCw,
+  ArrowLeft,
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -123,10 +140,14 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+
 } from 'recharts';
 import Link from "next/link";
 import { toast } from "react-toastify";
 import moment from "moment";
+import PhoneInput from "react-phone-number-input";
+import { parsePhoneNumber as parsePhoneNumberLib } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -510,9 +531,88 @@ const CrmDeals = () => {
   const [lostReasonId, setLostReasonId] = useState<number | null>(null);
   const [lostFeedback, setLostFeedback] = useState("");
   
+  // Edit Deal Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingDealId, setEditingDealId] = useState<number | null>(null);
+  const [editFormStep, setEditFormStep] = useState(0);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editFetching, setEditFetching] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    ticket_id: null as number | null,
+    stage_id: undefined as number | undefined,
+    assigned_to: null as string | null,
+    expected_close_date: "",
+    company_name: "",
+    industry_ids: [] as number[],
+    decision_maker_title: "",
+    decision_maker_name: "",
+    decision_maker_phone_country_code: "",
+    decision_maker_phone: "",
+    decision_maker_email: "",
+    deal_type: "",
+    contract_length: "",
+    contract_length_custom: "",
+    billing_model: "",
+    payment_terms: "",
+    payment_terms_custom: "",
+    risk_level: "",
+    competitors: "",
+    quotation_sent: false,
+    contract_sent: false,
+    contract_received: false,
+    follow_up_date: "",
+    currency: "AED",
+    tax_percentage: "0",
+    standard_discount_percentage: "0",
+    special_discount_percentage: "0",
+  });
+  const [editProducts, setEditProducts] = useState<CrmProduct[]>([]);
+  const [editLoadingProducts, setEditLoadingProducts] = useState(false);
+  const [editCampaign, setEditCampaign] = useState<any>(null);
+  const [editCampaignIndustries, setEditCampaignIndustries] = useState<IndustryData[]>([]);
+  const [editSelectedIndustryId, setEditSelectedIndustryId] = useState<number | null>(null);
+  const [editLoadingIndustries, setEditLoadingIndustries] = useState(false);
+  const [editAllIndustries, setEditAllIndustries] = useState<IndustryData[]>([]);
+  const [editLoadingAllIndustries, setEditLoadingAllIndustries] = useState(false);
+  const [editSourceLead, setEditSourceLead] = useState<any>(null);
+  const [editDealTemplate, setEditDealTemplate] = useState<DealTemplateData | null>(null);
+  const [editTemplateFieldsData, setEditTemplateFieldsData] = useState<Record<string, any>>({});
+  const [editBusinessTypes, setEditBusinessTypes] = useState<BusinessTypeData[]>([]);
+  const [editBusinessTypeId, setEditBusinessTypeId] = useState<number | null>(null);
+  const [editBusinessTypeOther, setEditBusinessTypeOther] = useState<string>("");
+  const [editShowOtherBusinessType, setEditShowOtherBusinessType] = useState(false);
+  const [editShowAllIndustries, setEditShowAllIndustries] = useState(false);
+  const [editEstimationItems, setEditEstimationItems] = useState<Array<{
+    product_id: number;
+    product_service: string;
+    description: string;
+    qty: number;
+    unit_price: number;
+    original_currency: string;
+    original_price: number;
+  }>>([]);
+  const [editShowAddItemModal, setEditShowAddItemModal] = useState(false);
+  const [editEditingItemIndex, setEditEditingItemIndex] = useState<number | null>(null);
+  const [editItemFormData, setEditItemFormData] = useState({
+    product_id: null as number | null,
+    product_service: "",
+    description: "",
+    qty: 1,
+    unit_price: 0,
+  });
+  const [editShowRevisionHistoryModal, setEditShowRevisionHistoryModal] = useState(false);
+  const [editConvertingPrice, setEditConvertingPrice] = useState(false);
+  const [editEstimates, setEditEstimates] = useState<any[]>([]);
+  const [editAttachments, setEditAttachments] = useState<any[]>([]);
+  const [editHistories, setEditHistories] = useState<any[]>([]);
+  const [editNegotiationBar, setEditNegotiationBar] = useState(0);
+  const [editProbability, setEditProbability] = useState(0);
+  
   // UI State
   const [showDealsAnalytics, setShowDealsAnalytics] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showFilterBar, setShowFilterBar] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [dealsSearch, setDealsSearch] = useState('');
   const [selectedDealsColumns, setSelectedDealsColumns] = useState<string[]>(() => {
@@ -1216,20 +1316,6 @@ const CrmDeals = () => {
     }
   }, []);
 
-  // Create Approval Handler
-  const handleCreateApproval = useCallback(async (dealId: number) => {
-    try {
-      await createApproval({
-        item_id: dealId,
-        type: 'deal'
-      });
-      setRefreshKey((oldKey) => oldKey + 1);
-    } catch (error) {
-      console.error("Failed to create approval:", error);
-      toast.error("Failed to create approval request");
-    }
-  }, []);
-
   // Mark Deal Lost Modal
   const handleMarkLost = useCallback((deal: any) => {
     setDealToMarkLost(deal);
@@ -1257,6 +1343,282 @@ const CrmDeals = () => {
       console.error("Failed to mark deal as lost:", error);
     }
   }, [dealToMarkLost, lostReasonId, lostFeedback]);
+
+
+  // Edit Deal Handlers
+const handleEditDeal = useCallback(async (dealId: number) => {
+  setEditingDealId(dealId);
+  setEditFetching(true);
+  setShowEditModal(true);
+  
+  try {
+    // Fetch deal data
+    const deal = await getDeal(dealId);
+    
+    // Format dates for input fields
+    const formatDate = (dateString: string | null) => {
+      if (!dateString) return "";
+      return dateString.split('T')[0];
+    };
+    // Set form data
+    setEditFormData({
+      name: deal.name || "",
+      ticket_id: deal.ticket_id ? Number(deal.ticket_id) : null,
+      stage_id: deal.stage_id ? Number(deal.stage_id) : undefined,
+      assigned_to: deal.assigned_to || null,
+      expected_close_date: formatDate(deal.expected_close_date),
+      company_name: deal.company_name || "",
+      industry_ids: (deal as any).industry_ids && Array.isArray((deal as any).industry_ids) 
+        ? (deal as any).industry_ids.map((id: any) => Number(id)).filter((id: number) => !Number.isNaN(id))
+        : (deal as any).industries && Array.isArray((deal as any).industries)
+        ? (deal as any).industries.map((ind: any) => typeof ind === 'object' ? Number(ind.id) : Number(ind)).filter((id: number) => !Number.isNaN(id))
+        : [],
+      decision_maker_title: deal.decision_maker_title || "",
+      decision_maker_name: deal.decision_maker_name || (deal as any).main_decision_maker?.name || "",
+      decision_maker_phone_country_code: deal.decision_maker_phone_country_code || (deal as any).main_decision_maker?.phone_country_code || "",
+      decision_maker_phone: deal.decision_maker_phone || (deal as any).main_decision_maker?.phone || "",
+      decision_maker_email: (deal as any).main_decision_maker?.email || "",
+      deal_type: deal.deal_type || "",
+      contract_length: deal.contract_length || "",
+      contract_length_custom: deal.contract_length_custom || "",
+      billing_model: deal.billing_model || "",
+      payment_terms: deal.payment_terms || "",
+      payment_terms_custom: deal.payment_terms_custom || "",
+      risk_level: deal.risk_level || "",
+      competitors: deal.competitors || "",
+      quotation_sent: deal.quotation_sent || false,
+      contract_sent: deal.contract_sent || false,
+      contract_received: deal.contract_received || false,
+      follow_up_date: formatDate(deal.follow_up_date),
+      currency: deal.currency || "AED",
+      tax_percentage: (deal as any).tax_percentage?.toString() || "0",
+      standard_discount_percentage: (deal as any).standard_discount_percentage?.toString() || "0",
+      special_discount_percentage: (deal as any).special_discount_percentage?.toString() || "0",
+    });
+    // Set business type
+    const dealAny = deal as any;
+    if (dealAny.business_type_id) {
+      setEditBusinessTypeId(Number(dealAny.business_type_id));
+      setEditBusinessTypeOther("");
+      setEditShowOtherBusinessType(false);
+    } else if (dealAny.business_type_other) {
+      setEditBusinessTypeId(null);
+      setEditBusinessTypeOther(dealAny.business_type_other);
+      setEditShowOtherBusinessType(true);
+    }
+    // Fetch lead data if ticket_id exists
+    if (deal.ticket_id) {
+      try {
+        const leadData: any = await getLead(Number(deal.ticket_id));
+        setEditSourceLead(leadData);
+      } catch (error) {
+        console.error("Failed to fetch lead:", error);
+      }
+    }
+    // Set deal template
+    const dealTemplateData = (deal as any).deal_template;
+    if (dealTemplateData) {
+      setEditDealTemplate(dealTemplateData);
+      const dealTemplateFieldValues = (deal as any).deal_template_field_values || {};
+      setEditTemplateFieldsData(dealTemplateFieldValues);
+    }
+    // Set estimates and other data
+    const sortedEstimates = deal.estimates && deal.estimates.length > 0
+      ? [...deal.estimates].sort((a: any, b: any) => {
+          const dateA = new Date(a.created_at).getTime();
+          const dateB = new Date(b.created_at).getTime();
+          return dateB - dateA;
+        })
+      : [];
+    setEditEstimates(sortedEstimates);
+    setEditAttachments((deal as any).attachments || []);
+    setEditHistories((deal as any).histories || []);
+    setEditNegotiationBar(deal.negotiation_bar || 0);
+    setEditProbability(deal.probability || 0);
+    // Load estimation chart from the most recent estimate
+    if (sortedEstimates.length > 0) {
+      const latestEstimate = sortedEstimates[0];
+      
+      if (latestEstimate.tax_percentage) {
+        setEditFormData(prev => ({ ...prev, tax_percentage: latestEstimate.tax_percentage.toString() }));
+      }
+      if (latestEstimate.standard_discount_percentage) {
+        setEditFormData(prev => ({ ...prev, standard_discount_percentage: latestEstimate.standard_discount_percentage.toString() }));
+      }
+      if (latestEstimate.special_discount_percentage) {
+        setEditFormData(prev => ({ ...prev, special_discount_percentage: latestEstimate.special_discount_percentage.toString() }));
+      }
+      
+      if (latestEstimate.estimation_chart && latestEstimate.estimation_chart.length > 0) {
+        setEditEstimationItems(latestEstimate.estimation_chart.map((item: any) => ({
+          product_id: item.product_id || 0,
+          product_service: item.product_service || "",
+          description: item.description || "",
+          qty: item.qty || 1,
+          unit_price: item.unit_price || 0,
+          original_currency: item.original_currency || deal.currency || "AED",
+          original_price: item.original_price || item.unit_price || 0,
+        })));
+      }
+    } else if (deal.estimation_chart && Array.isArray(deal.estimation_chart) && deal.estimation_chart.length > 0) {
+      setEditEstimationItems(deal.estimation_chart.map((item: any) => ({
+        product_id: item.product_id || 0,
+        product_service: item.product_service || "",
+        description: item.description || "",
+        qty: item.qty || 1,
+        unit_price: item.unit_price || 0,
+        original_currency: item.original_currency || deal.currency || "AED",
+        original_price: item.original_price || item.unit_price || 0,
+      })));
+    }
+    // Fetch business types
+    try {
+      const businessTypesResponse = await getBusinessTypes({ per_page: 1000 });
+      setEditBusinessTypes(businessTypesResponse?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch business types:", error);
+    }
+    // Fetch all industries
+    try {
+      const response = await getIndustries({ per_page: 1000 });
+      setEditAllIndustries(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch industries:", error);
+    }
+    
+  } catch (error) {
+    console.error("Failed to fetch deal:", error);
+    toast.error("Failed to load deal data");
+    setShowEditModal(false);
+  } finally {
+    setEditFetching(false);
+  }
+}, []);
+const handleEditSubmit = useCallback(async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (!editingDealId) return;
+  setEditLoading(true);
+  try {
+    const payload: any = {
+      name: editFormData.name,
+      stage_id: editFormData.stage_id ? String(editFormData.stage_id) : undefined,
+      assigned_to: editFormData.assigned_to,
+      expected_close_date: editFormData.expected_close_date,
+      company_name: editFormData.company_name,
+      industry_ids: editFormData.industry_ids,
+      ...(editBusinessTypeId ? { business_type_id: String(editBusinessTypeId) } : {}),
+      ...(editBusinessTypeOther ? { business_type_other: editBusinessTypeOther } : {}),
+      decision_maker_title: editFormData.decision_maker_title,
+      decision_maker_name: editFormData.decision_maker_name,
+      decision_maker_phone_country_code: editFormData.decision_maker_phone_country_code,
+      decision_maker_phone: editFormData.decision_maker_phone,
+      decision_maker_email: editFormData.decision_maker_email,
+      deal_type: editFormData.deal_type,
+      contract_length: editFormData.contract_length,
+      contract_length_custom: editFormData.contract_length_custom || "",
+      billing_model: editFormData.billing_model,
+      payment_terms: editFormData.payment_terms,
+      payment_terms_custom: editFormData.payment_terms_custom || "",
+      risk_level: editFormData.risk_level,
+      competitors: editFormData.competitors || "",
+      quotation_sent: editFormData.quotation_sent,
+      contract_sent: editFormData.contract_sent,
+      contract_received: editFormData.contract_received,
+      follow_up_date: editFormData.follow_up_date || "",
+      currency: editFormData.currency,
+      negotiation_bar: editNegotiationBar,
+      probability: editProbability,
+    };
+    // Add deal template data if template exists
+    if (editDealTemplate && editDealTemplate.id) {
+      payload.deal_template_id = editDealTemplate.id;
+      Object.entries(editTemplateFieldsData).forEach(([key, value]) => {
+        payload[`deal_template_field_values[${key}]`] = value;
+      });
+    }
+    if (editFormData.ticket_id) {
+      payload.ticket_id = editFormData.ticket_id;
+    }
+    // Update deal
+    await updateDeal(editingDealId, payload);
+    // Create/update estimation chart if items exist
+    if (editEstimationItems.length > 0) {
+      const estimatePayload = {
+        deal_id: editingDealId,
+        estimation_chart: editEstimationItems.map(item => ({
+          product_id: item.product_id,
+          product_service: item.product_service,
+          description: item.description || "",
+          qty: item.qty,
+          unit_price: item.unit_price,
+          original_currency: item.original_currency || editFormData.currency,
+          original_price: item.original_price || item.unit_price,
+        })),
+        standard_discount_percentage: parseFloat(editFormData.standard_discount_percentage || "0"),
+        special_discount_percentage: parseFloat(editFormData.special_discount_percentage || "0"),
+        tax_percentage: parseFloat(editFormData.tax_percentage || "0"),
+        currency: editFormData.currency,
+      };
+      await createEstimate(estimatePayload, false);
+    }
+    toast.success("Deal updated successfully!");
+    setShowEditModal(false);
+    setRefreshKey((oldKey) => oldKey + 1);
+    
+    // Reset form
+    setEditFormStep(0);
+    setEditingDealId(null);
+  } catch (error: any) {
+    console.error("Failed to update deal:", error);
+    toast.error("Failed to update deal");
+  } finally {
+    setEditLoading(false);
+  }
+}, [editingDealId, editFormData, editBusinessTypeId, editBusinessTypeOther, editDealTemplate, editTemplateFieldsData, editNegotiationBar, editProbability, editEstimationItems]);
+const handleCloseEditModal = useCallback(() => {
+  setShowEditModal(false);
+  setEditFormStep(0);
+  setEditingDealId(null);
+  // Reset all edit states
+  setEditFormData({
+    name: "",
+    ticket_id: null,
+    stage_id: undefined,
+    assigned_to: null,
+    expected_close_date: "",
+    company_name: "",
+    industry_ids: [],
+    decision_maker_title: "",
+    decision_maker_name: "",
+    decision_maker_phone_country_code: "",
+    decision_maker_phone: "",
+    decision_maker_email: "",
+    deal_type: "",
+    contract_length: "",
+    contract_length_custom: "",
+    billing_model: "",
+    payment_terms: "",
+    payment_terms_custom: "",
+    risk_level: "",
+    competitors: "",
+    quotation_sent: false,
+    contract_sent: false,
+    contract_received: false,
+    follow_up_date: "",
+    currency: "AED",
+    tax_percentage: "0",
+    standard_discount_percentage: "0",
+    special_discount_percentage: "0",
+  });
+  setEditEstimationItems([]);
+  setEditProducts([]);
+  setEditDealTemplate(null);
+  setEditTemplateFieldsData({});
+  setEditBusinessTypeId(null);
+  setEditBusinessTypeOther("");
+  setEditShowOtherBusinessType(false);
+}, []);
 
   // Helper functions
   const handleSort = (column: string, paginationState: any, setPaginationState: (state: any) => void) => {
@@ -1661,7 +2023,7 @@ const CrmDeals = () => {
           icon: <Edit size={16} />,
           onClick: (row: any) => {
             if (activeFilter !== "lost") {
-              window.location.href = `/crm/deals/${row.rawData?.id || row.id}/edit`;
+              handleEditDeal(row.rawData?.id || row.id);
             }
           },
           variant: 'link' as const,
@@ -1750,18 +2112,28 @@ const CrmDeals = () => {
       <div>
         {/* Page Header */}
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-          <div className="mb-3 mb-md-0">
-            <h2 className="mb-1 fw-bold">Deals</h2>
-            <p className="text-muted mb-0">Manage your sales pipeline and deals</p>
-          </div>
+        <div className="mb-3 mb-md-0">
+  <nav aria-label="breadcrumb">
+    <ol className="breadcrumb mb-0">
+      <li className="breadcrumb-item">
+        <a href="/dashboard" className="text-decoration-none">
+          CRM
+        </a>
+      </li>
+      <li className="breadcrumb-item active fw-bold" aria-current="page">
+        Prospects
+      </li>
+    </ol>
+  </nav>
+</div>
           <div className="d-flex flex-wrap gap-2">
-            <Button 
+            {/* <Button 
               variant={showDealsAnalytics ? "primary" : "outline-secondary"}
               onClick={() => setShowDealsAnalytics(!showDealsAnalytics)}
             >
               <BarChart3 size={16} className="me-2" />
               {showDealsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
-            </Button>
+            </Button> */}
             {/* {session?.user?.permissions?.includes('add-crm-deals') && (
               <Link href="/crm/deals/create">
                 <Button variant="primary">
@@ -1770,8 +2142,14 @@ const CrmDeals = () => {
                 </Button>
               </Link>
             )} */}
-
-<Button
+            <Button
+              variant={showFilterBar ? "secondary" : "outline-secondary"}
+              onClick={() => setShowFilterBar(!showFilterBar)}
+            >
+              <Layers size={16} className="me-2" />
+              {showFilterBar ? "Hide Tabs" : "Show Tabs"}
+            </Button>
+            <Button
             variant={showFiltersSidebar ? "secondary" : "outline-secondary"}
             onClick={() => setShowFiltersSidebar(!showFiltersSidebar)}
           >
@@ -1780,6 +2158,90 @@ const CrmDeals = () => {
           </Button>
           </div>
         </div>
+
+        {/* Stats Cards */}
+        <StatsCards 
+          data={[
+            {
+              title: 'All Deals',
+              value: summaryTiles?.total_deals || totalDeals || 0,
+              icon: Handshake,
+              iconColor: '#6366F1',
+              iconBgColor: '#EEF2FF',
+              subtitle: 'Total in pipeline'
+            },
+            {
+              title: 'New',
+              value: summaryTiles?.new_deals || analyticsData.stageCounts['New'] || 0,
+              icon: PlusCircle,
+              iconColor: '#3B82F6',
+              iconBgColor: '#DBEAFE',
+              metric: {
+                text: 'Fresh opportunities',
+                dotColor: '#2563EB'
+              }
+            },
+            {
+              title: 'Qualified',
+              value: summaryTiles?.qualified_deals || analyticsData.stageCounts['Qualified'] || 0,
+              icon: CheckCircle,
+              iconColor: '#10B981',
+              iconBgColor: '#D1FAE5',
+              subtitle: 'Verified & ready'
+            },
+            {
+              title: 'Proposal',
+              value: analyticsData.stageCounts['Proposal'] || 0,
+              icon: FileText,
+              iconColor: '#8B5CF6',
+              iconBgColor: '#EDE9FE',
+              metric: {
+                text: 'Submitted',
+                dotColor: '#7C3AED'
+              }
+            },
+            {
+              title: 'Negotiation',
+              value: analyticsData.stageCounts['Negotiation'] || analyticsData.inNegotiation || 0,
+              icon: Users,
+              iconColor: '#F59E0B',
+              iconBgColor: '#FEF3C7',
+              subtitle: 'In discussion'
+            },
+            {
+              title: 'Closed Won',
+              value: analyticsData.stageCounts['Closed Won'] || analyticsData.stageCounts['Won'] || analyticsData.won || 0,
+              icon: Target,
+              iconColor: '#059669',
+              iconBgColor: '#D1FAE5',
+              badge: {
+                text: 'Success',
+                bgColor: '#D1FAE5',
+                textColor: '#065F46'
+              }
+            },
+            {
+              title: 'Lost',
+              value: summaryTiles?.lost_deals || filterCounts.lost || 0,
+              icon: AlertCircle,
+              iconColor: '#EF4444',
+              iconBgColor: '#FEE2E2',
+              subtitle: 'Needs review'
+            },
+            {
+              title: 'Deleted',
+              value: summaryTiles?.deleted_deals || filterCounts.deleted || 0,
+              icon: Trash2,
+              iconColor: '#6B7280',
+              iconBgColor: '#F3F4F6',
+              metric: {
+                text: 'Archived',
+                dotColor: '#9CA3AF'
+              }
+            }
+          ]}
+          gridMinWidth="180px"
+        />
 
         {/* Analytics Section - Collapsible */}
         {showDealsAnalytics && (
@@ -1872,62 +2334,64 @@ const CrmDeals = () => {
         )}
 
         {/* Filter Bar */}
-        <FilterBar
-          quickFilters={[
-            {
-              id: 'all',
-              label: 'All Deals',
-              count: filterCounts.all,
-              color: '#0d6efd',
-              icon: <Users size={16} />
-            },
-            ...stages.slice(0, 5).map((stage: any) => ({
-              id: stage.id.toString(),
-              label: stage.name,
-              count: filterCounts[stage.id] || 0,
-              color: stage.color || '#6c757d',
-              icon: <Layers size={16} />
-            })),
-            {
-              id: 'lost',
-              label: 'Lost',
-              count: filterCounts.lost || 0,
-              color: '#fd7e14',
-              icon: <X size={16} />
-            },
-            {
-              id: 'deleted',
-              label: 'Deleted',
-              count: filterCounts.deleted || 0,
-              color: '#dc3545',
-              icon: <Trash2 size={16} />
-            }
-          ]}
-          activeFilter={activeFilter}
-          onFilterChange={handleFilterChange}
-          // searchValue={dealsSearch}
-          // onSearchChange={(value) => setDealsSearch(value)}
-          // onSearch={() => {
-          //   if (dealsSearch.trim()) {
-          //     handleFiltersChange({ search: dealsSearch.trim() });
-          //   } else {
-          //     handleFiltersChange({ search: null });
-          //   }
-          //   setDealsPagination({ ...dealsPagination, currentPage: 1 });
-          // }}
-          // searchPlaceholder="Search deals by name, company..."
-          // showAdvancedFilters={showAdvancedFilters}
-          // onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
-          // advancedFilterCount={
-          //   (dealsFilters.assignedTo !== null ? 1 : 0) +
-          //   (dealsFilters.stage !== null ? 1 : 0) +
-          //   (dealsFilters.followUpDateFrom !== null || dealsFilters.followUpDateTo !== null ? 1 : 0) +
-          //   (dealsFilters.probabilityMin !== null || dealsFilters.probabilityMax !== null ? 1 : 0) +
-          //   (dealsFilters.dealType !== null ? 1 : 0) +
-          //   (dealsFilters.industry !== null ? 1 : 0) +
-          //   (dealsFilters.expectedCloseDateFrom !== null || dealsFilters.expectedCloseDateTo !== null ? 1 : 0)
-          // }
-        />
+        {showFilterBar && (
+          <FilterBar
+            quickFilters={[
+              {
+                id: 'all',
+                label: 'All Deals',
+                count: filterCounts.all,
+                color: '#0d6efd',
+                icon: <Users size={16} />
+              },
+              ...stages.slice(0, 5).map((stage: any) => ({
+                id: stage.id.toString(),
+                label: stage.name,
+                count: filterCounts[stage.id] || 0,
+                color: stage.color || '#6c757d',
+                icon: <Layers size={16} />
+              })),
+              {
+                id: 'lost',
+                label: 'Lost',
+                count: filterCounts.lost || 0,
+                color: '#fd7e14',
+                icon: <X size={16} />
+              },
+              {
+                id: 'deleted',
+                label: 'Deleted',
+                count: filterCounts.deleted || 0,
+                color: '#dc3545',
+                icon: <Trash2 size={16} />
+              }
+            ]}
+            activeFilter={activeFilter}
+            onFilterChange={handleFilterChange}
+            // searchValue={dealsSearch}
+            // onSearchChange={(value) => setDealsSearch(value)}
+            // onSearch={() => {
+            //   if (dealsSearch.trim()) {
+            //     handleFiltersChange({ search: dealsSearch.trim() });
+            //   } else {
+            //     handleFiltersChange({ search: null });
+            //   }
+            //   setDealsPagination({ ...dealsPagination, currentPage: 1 });
+            // }}
+            // searchPlaceholder="Search deals by name, company..."
+            // showAdvancedFilters={showAdvancedFilters}
+            // onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            // advancedFilterCount={
+            //   (dealsFilters.assignedTo !== null ? 1 : 0) +
+            //   (dealsFilters.stage !== null ? 1 : 0) +
+            //   (dealsFilters.followUpDateFrom !== null || dealsFilters.followUpDateTo !== null ? 1 : 0) +
+            //   (dealsFilters.probabilityMin !== null || dealsFilters.probabilityMax !== null ? 1 : 0) +
+            //   (dealsFilters.dealType !== null ? 1 : 0) +
+            //   (dealsFilters.industry !== null ? 1 : 0) +
+            //   (dealsFilters.expectedCloseDateFrom !== null || dealsFilters.expectedCloseDateTo !== null ? 1 : 0)
+            // }
+          />
+        )}
 
         {/* Advanced Filters */}
         {showAdvancedFilters && (
@@ -2321,692 +2785,885 @@ const CrmDeals = () => {
       />
 
       {/* Deal View Modal */}
-      {viewingDeal && (
-        <Modal show={showDealViewModal} onHide={() => setShowDealViewModal(false)} size="xl" centered>
-          {/* Custom Header */}
-          <div style={{
-            color: 'black',
-            padding: '30px',
-            position: 'relative',
-            borderTopLeftRadius: '8px',
-            borderTopRightRadius: '8px',
-            borderBottom: '1px solid #e5e7eb'
+     
+{viewingDeal && (
+  <Modal
+    show={showDealViewModal}
+    onHide={() => setShowDealViewModal(false)}
+    size="xl"
+    centered
+    className="deal-view-modal"
+  >
+    {/* Modern Header with Gradient */}
+    <div
+      style={{
+        background: "#fff",
+        color: "black",
+        padding: "24px 32px",
+        position: "relative",
+        borderTopLeftRadius: "12px",
+        borderTopRightRadius: "12px",
+        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+        borderBottom: "1px solid #ccc",
+      }}
+    >
+      <button
+        onClick={() => setShowDealViewModal(false)}
+        style={{
+          position: "absolute",
+          top: "16px",
+          right: "16px",
+          background: "rgba(255,255,255,0.15)",
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255,255,255,0.2)",
+          color: "black",
+          width: "32px",
+          height: "32px",
+          borderRadius: "8px",
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+          e.currentTarget.style.transform = "scale(1.05)";
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+          e.currentTarget.style.transform = "scale(1)";
+        }}
+      >
+        <X size={18} />
+      </button>
+      
+      {/* Header Content */}
+      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <div
+          style={{
+            width: "64px",
+            height: "64px",
+            borderRadius: "16px",
+            background: "#10b981",
+            backdropFilter: "blur(10px)",
+            border: "2px solid rgba(255,255,255,0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "28px",
+            fontWeight: "700",
+            flexShrink: 0,
+            color: "#fff",
+          }}
+        >
+          {viewingDeal.name
+            ? viewingDeal.name.charAt(0).toUpperCase()
+            : "D"}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h2 style={{ 
+            margin: 0, 
+            fontWeight: 700, 
+            fontSize: "26px",
+            textShadow: "0 2px 4px rgba(0,0,0,0.1)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}>
-            <button 
-              onClick={() => setShowDealViewModal(false)}
-              style={{
-                position: 'absolute',
-                top: '20px',
-                right: '20px',
-                background: 'rgba(255,255,255,0.2)',
-                border: 'none',
-                color: 'black',
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                cursor: 'pointer',
-                transition: 'all 0.3s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
-                e.currentTarget.style.transform = 'rotate(90deg)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-                e.currentTarget.style.transform = 'rotate(0deg)';
-              }}
-            >
-              <X size={20} />
-            </button>
-            <h3 style={{ margin: 0, fontWeight: 600, fontSize: '24px' }}>
-              {viewingDeal.name}
-            </h3>
-            <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: '14px' }}>
-              Deal Details
-            </p>
+            {viewingDeal.name}
+          </h2>
+          <div style={{ 
+            marginTop: "6px", 
+            opacity: 0.95, 
+            fontSize: "14px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+            color: "#000",
+          }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <Handshake size={14} />
+              {viewingDeal.stage?.name || "No stage"}
+            </span>
+            <span>•</span>
+            <span style={{ fontWeight: 600 }}>
+              {viewingDeal.currency || 'AED'} {parseFloat(String(viewingDeal.net_value || viewingDeal.grand_total || 0)).toLocaleString()}
+            </span>
+            <span>•</span>
+            <span>
+              Created {viewingDeal.created_at
+                ? moment(viewingDeal.created_at).format("MMM DD, YYYY")
+                : "N/A"}
+            </span>
           </div>
+        </div>
+      </div>
+    </div>
 
-          <Modal.Body style={{ padding: '30px' }}>
-            {loadingDeal ? (
-              <div className="text-center py-4">
-                <div className="spinner-border" role="status">
-                  <span className="visually-hidden">Loading...</span>
-                </div>
+    <Modal.Body style={{ padding: 0, maxHeight: "calc(90vh - 200px)", overflowY: "auto" }}>
+      {loadingDeal ? (
+        <div style={{
+          padding: "48px 20px",
+          textAlign: "center",
+        }}>
+          <Spinner animation="border" variant="primary" size="sm" style={{ marginBottom: "12px" }} />
+          <p className="mb-0" style={{ color: "#6b7280", fontSize: "14px" }}>Loading deal details...</p>
+        </div>
+      ) : (
+        <>
+          <style>{`
+            .deal-detail-filter-buttons {
+              display: flex;
+              flex-direction: row;
+              align-items: center;
+              gap: 12px;
+              flex-wrap: wrap;
+              margin-bottom: 0;
+              padding: 0;
+              width: 100%;
+            }
+
+            .deal-detail-filter-button {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              padding: 10px 20px;
+              border-radius: 8px;
+              border: 1px solid;
+              font-weight: 500;
+              font-size: 14px;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              background: white;
+              white-space: nowrap;
+            }
+
+            .deal-detail-filter-button:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
+
+            .deal-detail-filter-button.active {
+              color: white;
+            }
+
+            .deal-detail-filter-button.active .filter-icon {
+              color: white;
+            }
+
+            .deal-detail-filter-button:not(.active) .filter-icon {
+              color: inherit;
+            }
+
+            .filter-icon {
+              width: 18px;
+              height: 18px;
+              flex-shrink: 0;
+            }
+          `}</style>
+
+          {/* Main Content Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", minHeight: "500px" }}>
+            
+            {/* Left Panel - Main Information */}
+            <div style={{ padding: "32px", borderRight: "1px solid #e5e7eb" }}>
+              
+              {/* Tabs Navigation */}
+              <div className="deal-detail-filter-buttons mb-4">
+                <button
+                  className={`deal-detail-filter-button ${activeTab === "general-info" ? 'active' : ''}`}
+                  onClick={() => setActiveTab("general-info")}
+                  style={{
+                    backgroundColor: activeTab === "general-info" ? "#10b981" : 'white',
+                    borderColor: "#10b981",
+                    color: activeTab === "general-info" ? 'white' : "#10b981"
+                  }}
+                >
+                  <Handshake className="filter-icon" size={18} />
+                  <span>General Information</span>
+                </button>
+                <button
+                  className={`deal-detail-filter-button ${activeTab === "campaign-prospect" ? 'active' : ''}`}
+                  onClick={() => setActiveTab("campaign-prospect")}
+                  style={{
+                    backgroundColor: activeTab === "campaign-prospect" ? "#10b981" : 'white',
+                    borderColor: "#10b981",
+                    color: activeTab === "campaign-prospect" ? 'white' : "#10b981"
+                  }}
+                >
+                  <FileText className="filter-icon" size={18} />
+                  <span>Campaign & Prospect</span>
+                </button>
               </div>
-            ) : (
-              <>
-                <style jsx>{`
-                  .lead-detail-filter-buttons {
-                    display: flex;
-                    gap: 12px;
-                    flex-wrap: wrap;
-                    margin-bottom: 24px;
-                  }
 
-                  .lead-detail-filter-button {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 10px 20px;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.3s;
-                    border: 1px solid;
-                  }
-
-                  .lead-detail-filter-button:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-                  }
-
-                  .lead-detail-filter-button.active {
-                    color: white;
-                  }
-
-                  .lead-detail-filter-button.active .filter-icon {
-                    color: white;
-                  }
-
-                  .lead-detail-filter-button:not(.active) .filter-icon {
-                    color: inherit;
-                  }
-
-                  .filter-icon {
-                    width: 18px;
-                    height: 18px;
-                    flex-shrink: 0;
-                  }
-                `}</style>
-                {/* Tabs Navigation */}
-                <div className="lead-detail-filter-buttons   mb-4">
-                  <button
-                    className={`lead-detail-filter-button ${activeTab === "general-info" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("general-info")}
-                    style={{
-                      backgroundColor: activeTab === "general-info" ? "#4680ff" : 'white',
-                      borderColor: "#4680ff",
-                      color: activeTab === "general-info" ? 'white' : "#4680ff"
-                    }}
-                  >
-                    <Handshake className="filter-icon" size={18} />
-                    <span>General Information</span>
-                  </button>
-                  <button
-                    className={`lead-detail-filter-button ${activeTab === "campaign-prospect" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("campaign-prospect")}
-                    style={{
-                      backgroundColor: activeTab === "campaign-prospect" ? "#4680ff" : 'white',
-                      borderColor: "#4680ff",
-                      color: activeTab === "campaign-prospect" ? 'white' : "#4680ff"
-                    }}
-                  >
-                    <FileText className="filter-icon" size={18} />
-                    <span>Campaign & Prospect</span>
-                  </button>
-                </div>
-
-                {/* Tab Content */}
-                {activeTab === "general-info" && (
-                  <div style={{ paddingTop: "20px" }}>
-                      {/* Deal Information Section */}
-                      <div style={{
-                        fontSize: '16px',
-                        fontWeight: 600,
-                        color: '#1f2937',
-                        marginBottom: '20px',
-                        paddingBottom: '10px',
-                        borderBottom: '2px solid #f8f9fa',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px'
-                      }}>
-                        <Handshake size={18} style={{ color: '#4680ff' }} />
-                        Deal Information
-                      </div>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                  gap: '20px',
-                  marginBottom: '30px'
-                }}>
-                  <div style={{
-                    background: '#f8f9fa',
-                    padding: '16px',
-                    borderRadius: '10px',
-                  }}>
-                    <div style={{
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      marginBottom: '6px'
-                    }}>Deal Name</div>
-                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                      {viewingDeal.name}
-                    </div>
-                  </div>
-                  <div style={{
-                    background: '#f8f9fa',
-                    padding: '16px',
-                    borderRadius: '10px',
-                  }}>
-                    <div style={{
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      marginBottom: '6px'
-                    }}>Stage</div>
-                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                      <Badge 
-                        bg="primary"
-                        style={{
-                          padding: '6px 14px',
-                          borderRadius: '20px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          backgroundColor: viewingDeal.stage?.color || '#6c757d'
-                        }}
-                      >
-                        {viewingDeal.stage?.name || 'Not assigned'}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div style={{
-                    background: '#f8f9fa',
-                    padding: '16px',
-                    borderRadius: '10px',
-                  }}>
-                    <div style={{
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      marginBottom: '6px'
-                    }}>Deal Value</div>
-                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                      {viewingDeal.currency || 'AED'} {parseFloat(String(viewingDeal.net_value || viewingDeal.grand_total || 0)).toLocaleString()}
-                    </div>
-                  </div>
-                  <div style={{
-                    background: '#f8f9fa',
-                    padding: '16px',
-                    borderRadius: '10px',
-                  }}>
-                    <div style={{
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      marginBottom: '6px'
-                    }}>Probability</div>
-                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                      {viewingDeal?.stage?.probability || 0}%
-                    </div>
-                  </div>
-                  <div style={{
-                    background: '#f8f9fa',
-                    padding: '16px',
-                    borderRadius: '10px',
-                  }}>
-                    <div style={{
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      marginBottom: '6px'
-                    }}>Assigned To</div>
-                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                      <User size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                      {extensions.find((ext: any) => ext?.id == viewingDeal?.assigned_to || ext?.extension == viewingDeal?.assigned_to)?.display_name || 
-                       extensions.find((ext: any) => ext?.id == viewingDeal?.assigned_to || ext?.extension == viewingDeal?.assigned_to)?.name || 
-                       viewingDeal.assigned_to || 'Not assigned'}
-                    </div>
-                  </div>
-                  <div style={{
-                    background: '#f8f9fa',
-                    padding: '16px',
-                    borderRadius: '10px',
-                  }}>
-                    <div style={{
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: '#6b7280',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      marginBottom: '6px'
-                    }}>Created Date</div>
-                    <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                      <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                      {viewingDeal.created_at ? formatDateForTable(viewingDeal.created_at) : 'N/A'}
-                    </div>
-                  </div>
-                </div>
-
-                      {/* Client Information Section */}
-                      {viewingDeal.company_name && (
-                        <>
-                          <div style={{
-                            fontSize: '16px',
-                            fontWeight: 600,
-                            color: '#1f2937',
-                            marginTop: '40px',
-                            marginBottom: '20px',
-                            paddingBottom: '10px',
-                            borderBottom: '2px solid #f8f9fa',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px'
-                          }}>
-                            <Building2 size={18} style={{ color: '#4680ff' }} />
-                            Client information
-                          </div>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                      gap: '20px',
-                      marginBottom: '30px'
-                    }}>
-                      <div style={{
-                        background: '#f8f9fa',
-                        padding: '16px',
-                        borderRadius: '10px',
-                      }}>
-                        <div style={{
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.5px',
-                          marginBottom: '6px'
-                        }}>Client Name</div>
-                        <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                          <Building2 size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                          {viewingDeal.company_name}
-                        </div>
-                      </div>
-                      {viewingDeal.industry && (
-                        <div style={{
-                          background: '#f8f9fa',
-                          padding: '16px',
-                          borderRadius: '10px',
-                        }}>
-                          <div style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: '#6b7280',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            marginBottom: '6px'
-                          }}>Industry</div>
-                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                            {viewingDeal.industry}
-                          </div>
-                        </div>
-                      )}
-                        </div>
-                      </>
-                    )}
-
-                      {/* Lead Information Section */}
-                      {relatedLead && (
-                        <>
-                          <div style={{
-                            fontSize: '16px',
-                            fontWeight: 600,
-                            color: '#1f2937',
-                            marginTop: '40px',
-                            marginBottom: '20px',
-                            paddingBottom: '10px',
-                            borderBottom: '2px solid #f8f9fa',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px'
-                          }}>
-                            <Target size={18} style={{ color: '#4680ff' }} />
-                            Lead Information
-                          </div>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                      gap: '20px',
-                      marginBottom: '30px'
-                    }}>
-                      <div style={{
-                        background: '#f8f9fa',
-                        padding: '16px',
-                        borderRadius: '10px',
-                        transition: 'all 0.3s'
+              {/* Tab Content */}
+              {activeTab === "general-info" && (
+                <div>
+                  {/* Quick Info Cards */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px", marginBottom: "28px" }}>
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        transition: "all 0.3s ease",
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.background = '#e5e7eb';
-                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.transform = "translateY(-4px)";
+                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(16, 185, 129, 0.15)";
                       }}
                       onMouseOut={(e) => {
-                        e.currentTarget.style.background = '#f8f9fa';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                      }}>
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                         <div style={{
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          color: '#6b7280',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.5px',
-                          marginBottom: '6px'
-                        }}>Lead Name</div>
-                        <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                          {relatedLead.name}
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "10px",
+                          background: "#10b981",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          <User size={20} style={{ color: "white" }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#10b981",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.8px",
+                            marginBottom: "4px",
+                          }}>
+                            Assigned To
+                          </div>
+                          <div style={{
+                            fontSize: "15px",
+                            color: "#1f2937",
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>
+                            {extensions.find((ext: any) => ext?.id == viewingDeal?.assigned_to || ext?.extension == viewingDeal?.assigned_to)?.display_name || 
+                             extensions.find((ext: any) => ext?.id == viewingDeal?.assigned_to || ext?.extension == viewingDeal?.assigned_to)?.name || 
+                             viewingDeal.assigned_to || 'Not assigned'}
+                          </div>
                         </div>
                       </div>
-                    
-                      {relatedLead.lead_potential && (
-                        <div style={{
-                          background: '#f8f9fa',
-                          padding: '16px',
-                          borderRadius: '10px',
-                          transition: 'all 0.3s'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = '#e5e7eb';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = '#f8f9fa';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}>
-                          <div style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: '#6b7280',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            marginBottom: '6px'
-                          }}>Lead Potential</div>
-                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                            <Badge 
-                              bg={relatedLead.lead_potential === 'Hot' ? 'danger' : relatedLead.lead_potential === 'Warm' ? 'warning' : 'secondary'}
-                              style={{
-                                padding: '6px 14px',
-                                borderRadius: '20px',
-                                fontSize: '12px',
-                                fontWeight: 600
-                              }}
-                            >
-                              {relatedLead.lead_potential || 'N/A'}
-                            </Badge>
-                          </div>
-                        </div>
-                      )}
-                      {relatedLead.user_extension && (
-                        <div style={{
-                          background: '#f8f9fa',
-                          padding: '16px',
-                          borderRadius: '10px',
-                          transition: 'all 0.3s'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = '#e5e7eb';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = '#f8f9fa';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}>
-                          <div style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: '#6b7280',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            marginBottom: '6px'
-                          }}>Assigned To</div>
-                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                            <User size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                            {extensions.find((ext: any) => ext?.id == relatedLead?.user_extension || ext?.extension == relatedLead?.user_extension)?.display_name || 
-                             extensions.find((ext: any) => ext?.id == relatedLead?.user_extension || ext?.extension == relatedLead?.user_extension)?.name || 
-                             relatedLead.user_extension || 'Not assigned'}
-                          </div>
-                        </div>
-                      )}
-                      {relatedLead.created_at && (
-                        <div style={{
-                          background: '#f8f9fa',
-                          padding: '16px',
-                          borderRadius: '10px',
-                          transition: 'all 0.3s'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = '#e5e7eb';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = '#f8f9fa';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                        }}>
-                          <div style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: '#6b7280',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                            marginBottom: '6px'
-                          }}>Created Date</div>
-                          <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                            <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                            {relatedLead.created_at ? formatDateForTable(relatedLead.created_at) : 'N/A'}
-                          </div>
-                        </div>
-                      )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
+                    </div>
 
-                {activeTab === "campaign-prospect" && (
-                  <div style={{ paddingTop: "20px" }}>
-                      {/* Campaign Information Section */}
-                      {relatedLead.campaign && (
-                        <>
-                          <div style={{
-                            fontSize: '16px',
-                            fontWeight: 600,
-                            color: '#1f2937',
-                            marginBottom: '20px',
-                            paddingBottom: '10px',
-                            borderBottom: '2px solid #f8f9fa',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px'
-                          }}>
-                            <FileText size={18} style={{ color: '#4680ff' }} />
-                            Campaign Information
-                          </div>
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = "translateY(-4px)";
+                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(16, 185, 129, 0.15)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                         <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                          gap: '20px',
-                          marginBottom: '30px'
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "10px",
+                          background: "#f59e0b",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
                         }}>
+                          <DollarSign size={20} style={{ color: "white" }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{
-                            background: '#f8f9fa',
-                            padding: '16px',
-                            borderRadius: '10px',
-                            transition: 'all 0.3s'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = '#e5e7eb';
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = '#f8f9fa';
-                            e.currentTarget.style.transform = 'translateY(0)';
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#f59e0b",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.8px",
+                            marginBottom: "4px",
                           }}>
+                            Deal Value
+                          </div>
+                          <div style={{
+                            fontSize: "15px",
+                            color: "#1f2937",
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>
+                            {viewingDeal.currency || 'AED'} {parseFloat(String(viewingDeal.net_value || viewingDeal.grand_total || 0)).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = "translateY(-4px)";
+                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(16, 185, 129, 0.15)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "10px",
+                          background: viewingDeal.stage?.color || "#6c757d",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          <Target size={20} style={{ color: "white" }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.8px",
+                            marginBottom: "4px",
+                          }}>
+                            Stage
+                          </div>
+                          <div style={{
+                            fontSize: "15px",
+                            color: "#1f2937",
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>
+                            {viewingDeal.stage?.name || "Not assigned"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = "translateY(-4px)";
+                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(16, 185, 129, 0.15)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "10px",
+                          background: "#8b5cf6",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          <Percent size={20} style={{ color: "white" }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#8b5cf6",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.8px",
+                            marginBottom: "4px",
+                          }}>
+                            Probability
+                          </div>
+                          <div style={{
+                            fontSize: "15px",
+                            color: "#1f2937",
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>
+                            {viewingDeal?.stage?.probability || 0}%
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Deal Information Section */}
+                  <div style={{ marginBottom: "28px" }}>
+                    <h5 style={{
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      color: "#1f2937",
+                      marginBottom: "16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}>
+                      <div style={{
+                        width: "4px",
+                        height: "18px",
+                        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                        borderRadius: "2px",
+                      }} />
+                      Deal Details
+                    </h5>
+                    <div style={{
+                      background: "#f9fafb",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      padding: "20px",
+                    }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
+                          <Handshake size={16} style={{ color: "#10b981" }} />
+                          Deal Name
+                        </div>
+                        <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
+                          {viewingDeal.name}
+                        </div>
+                        
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
+                          <Calendar size={16} style={{ color: "#10b981" }} />
+                          Created
+                        </div>
+                        <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
+                          {viewingDeal.created_at
+                            ? moment(viewingDeal.created_at).format("MMMM DD, YYYY [at] hh:mm A")
+                            : "N/A"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Client Information Section */}
+                  {viewingDeal.company_name && (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        color: "#1f2937",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Client Information
+                      </h5>
+                      <div style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                          <div>
                             <div style={{
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              color: '#6b7280',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.5px',
-                              marginBottom: '6px'
-                            }}>Campaign Name</div>
-                            <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Client Name
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              <Building2 size={14} style={{ color: "#10b981", marginRight: "6px", display: "inline" }} />
+                              {viewingDeal.company_name}
+                            </div>
+                          </div>
+                          {viewingDeal.industry && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Industry
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                {viewingDeal.industry}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lead Information Section */}
+                  {relatedLead && (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        color: "#1f2937",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Lead Information
+                      </h5>
+                      <div style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Lead Name
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              {relatedLead.name}
+                            </div>
+                          </div>
+                          {relatedLead.lead_potential && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Lead Potential
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <Badge 
+                                  bg={relatedLead.lead_potential === 'Hot' ? 'danger' : relatedLead.lead_potential === 'Warm' ? 'warning' : 'secondary'}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '20px',
+                                    fontSize: '12px',
+                                    fontWeight: 600
+                                  }}
+                                >
+                                  {relatedLead.lead_potential || 'N/A'}
+                                </Badge>
+                              </div>
+                            </div>
+                          )}
+                          {relatedLead.user_extension && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Assigned To
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <User size={14} style={{ color: "#10b981", marginRight: "6px", display: "inline" }} />
+                                {extensions.find((ext: any) => ext?.id == relatedLead?.user_extension || ext?.extension == relatedLead?.user_extension)?.display_name || 
+                                 extensions.find((ext: any) => ext?.id == relatedLead?.user_extension || ext?.extension == relatedLead?.user_extension)?.name || 
+                                 relatedLead.user_extension || 'Not assigned'}
+                              </div>
+                            </div>
+                          )}
+                          {relatedLead.created_at && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Created Date
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <Calendar size={14} style={{ color: "#10b981", marginRight: "6px", display: "inline" }} />
+                                {relatedLead.created_at ? formatDateForTable(relatedLead.created_at) : 'N/A'}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "campaign-prospect" && (
+                <div>
+                  {/* Campaign Information Section */}
+                  <div style={{ marginBottom: "28px" }}>
+                    <h5 style={{
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      color: "#1f2937",
+                      marginBottom: "16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}>
+                      <div style={{
+                        width: "4px",
+                        height: "18px",
+                        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                        borderRadius: "2px",
+                      }} />
+                      Campaign Information
+                    </h5>
+                    {relatedLead?.campaign ? (
+                      <div style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Campaign Name
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
                               {relatedLead.campaign.name}
                             </div>
                           </div>
                           {relatedLead.campaign_field_values && Object.keys(relatedLead.campaign_field_values).length > 0 && (
                             Object.entries(relatedLead.campaign_field_values).map(([key, value]: [string, any]) => (
-                              <div key={key} style={{
-                                background: '#f8f9fa',
-                                padding: '16px',
-                                borderRadius: '10px',
-                                transition: 'all 0.3s'
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.background = '#e5e7eb';
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.background = '#f8f9fa';
-                                e.currentTarget.style.transform = 'translateY(0)';
-                              }}>
+                              <div key={key}>
                                 <div style={{
-                                  fontSize: '12px',
-                                  fontWeight: 600,
-                                  color: '#6b7280',
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.5px',
-                                  marginBottom: '6px'
-                                }}>{key}</div>
-                                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                  fontSize: "12px",
+                                  fontWeight: 700,
+                                  color: "#6b7280",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.5px",
+                                  marginBottom: "6px",
+                                }}>
+                                  {key}
+                                </div>
+                                <div style={{
+                                  fontSize: "14px",
+                                  color: "#1f2937",
+                                  fontWeight: 500,
+                                  wordBreak: "break-word",
+                                }}>
                                   {String(value)}
                                 </div>
                               </div>
                             ))
                           )}
-                          </div>
-                        </>
-                      )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{
+                        padding: "40px",
+                        textAlign: "center",
+                        color: "#6b7280",
+                        background: "#f9fafb",
+                        border: "2px dashed #d1d5db",
+                        borderRadius: "12px"
+                      }}>
+                        No campaign information available
+                      </div>
+                    )}
+                  </div>
 
-                      {/* Prospect Information Section */}
-                      {relatedLead.crm_data && (
-                        <>
-                          <div style={{
-                            fontSize: '16px',
-                            fontWeight: 600,
-                            color: '#1f2937',
-                            marginTop: '40px',
-                            marginBottom: '20px',
-                            paddingBottom: '10px',
-                            borderBottom: '2px solid #f8f9fa',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px'
-                          }}>
-                            <FileText size={18} style={{ color: '#4680ff' }} />
-                            Prospect Information
-                          </div>
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                          gap: '20px',
-                          marginBottom: '30px'
-                        }}>
+                  {/* Prospect Information Section */}
+                  <div style={{ marginBottom: "28px" }}>
+                    <h5 style={{
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      color: "#1f2937",
+                      marginBottom: "16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}>
+                      <div style={{
+                        width: "4px",
+                        height: "18px",
+                        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                        borderRadius: "2px",
+                      }} />
+                      Prospect Information
+                    </h5>
+                    {relatedLead?.crm_data ? (
+                      <div style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
                           {relatedLead.crm_data.id && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
+                            <div>
                               <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>CRM Data ID</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                CRM Data ID
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
                                 #{relatedLead.crm_data.id}
                               </div>
                             </div>
                           )}
                           {(relatedLead.crm_data.name || (relatedLead.crm_data.data && relatedLead.crm_data.data.name)) && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
+                            <div>
                               <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>Name</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Name
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
                                 {relatedLead.crm_data.name || (relatedLead.crm_data.data && relatedLead.crm_data.data.name) || 'N/A'}
                               </div>
                             </div>
                           )}
                           {(relatedLead.crm_data.phone || (relatedLead.crm_data.data && relatedLead.crm_data.data.phone)) && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
+                            <div>
                               <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>Phone</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Phone
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
                                 <PhoneDisplay
                                   phone={
                                     relatedLead.crm_data.phone ||
-                                    (relatedLead.crm_data.data &&
-                                      relatedLead.crm_data.data.phone) ||
+                                    (relatedLead.crm_data.data && relatedLead.crm_data.data.phone) ||
                                     ""
                                   }
                                 />
@@ -3014,299 +3671,364 @@ const CrmDeals = () => {
                             </div>
                           )}
                           {relatedLead.crm_data.source_file && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
+                            <div>
                               <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>Source File</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Source File
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
                                 {relatedLead.crm_data.source_file}
                               </div>
                             </div>
                           )}
                           {relatedLead.crm_data.uploaded_by && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
+                            <div>
                               <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>Uploaded By</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                                <User size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Uploaded By
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <User size={14} style={{ color: "#10b981", marginRight: "6px", display: "inline" }} />
                                 {relatedLead.crm_data.uploaded_by}
                               </div>
                             </div>
                           )}
                           {relatedLead.crm_data.created_at && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
+                            <div>
                               <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>Created At</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                                <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Created At
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <Calendar size={14} style={{ color: "#10b981", marginRight: "6px", display: "inline" }} />
                                 {formatDateForTable(relatedLead.crm_data.created_at)}
                               </div>
                             </div>
                           )}
-                          </div>
-                          
-                          {/* Prospect Fields Section */}
-                          {relatedLead.crm_data.data && typeof relatedLead.crm_data.data === 'object' && Object.keys(relatedLead.crm_data.data).length > 0 && (
-                            <>
-                              <div style={{
-                                fontSize: '16px',
-                                fontWeight: 600,
-                                color: '#1f2937',
-                                marginTop: '40px',
-                                marginBottom: '20px',
-                                paddingBottom: '10px',
-                                borderBottom: '2px solid #f8f9fa',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px'
-                              }}>
-                                <FileText size={18} style={{ color: '#4680ff' }} />
-                                Prospect Fields
-                              </div>
-                            <div style={{
-                              display: 'grid',
-                              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                              gap: '20px',
-                              marginBottom: '30px'
-                            }}>
-                              {Object.entries(relatedLead.crm_data.data)
-                                .filter(([key]) => key.toLowerCase() !== 'name' && key.toLowerCase() !== 'phone')
-                                .map(([key, value]: [string, any]) => (
-                                <div key={key} style={{
-                                  background: '#f8f9fa',
-                                  padding: '16px',
-                                  borderRadius: '10px',
-                                  transition: 'all 0.3s'
-                                }}
-                                onMouseOver={(e) => {
-                                  e.currentTarget.style.background = '#e5e7eb';
-                                  e.currentTarget.style.transform = 'translateY(-2px)';
-                                }}
-                                onMouseOut={(e) => {
-                                  e.currentTarget.style.background = '#f8f9fa';
-                                  e.currentTarget.style.transform = 'translateY(0)';
-                                }}>
-                                  <div style={{
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    color: '#6b7280',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.5px',
-                                    marginBottom: '6px'
-                                  }}>{key.replace(/_/g, ' ')}</div>
-                                  <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                                    {String(value || 'N/A')}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            </>
-                          )}
-                        </>
-                      )}
-                  </div>
-                )}
-
-                {/* Meetings Timeline */}
-                {viewingDeal.meetings && Array.isArray(viewingDeal.meetings) && viewingDeal.meetings.length > 0 && (
-                  <>
-                    <div style={{
-                      fontSize: '16px',
-                      fontWeight: 600,
-                      color: '#1f2937',
-                      marginBottom: '20px',
-                      paddingBottom: '10px',
-                      borderBottom: '2px solid #f8f9fa',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '10px'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Users size={18} style={{ color: '#4680ff' }} />
-                        Meetings ({viewingDeal.meetings.length})
+                        </div>
                       </div>
-                      {session?.user?.permissions?.includes('add-meeting-crm-deals') && (
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={() => {
-                          setMeetingData({
-                            dealId: viewingDeal.id,
-                            dealName: viewingDeal.name,
-                            meetingName: '',
-                            meetingType: 'Online',
-                            meetingDate: '',
-                            meetingTime: '',
-                            meetingOutcome: '',
-                            extensions: [],
-                          });
-                          setMeetingAttendees([]);
-                          setShowAddMeetingModal(true);
+                    ) : (
+                      <div style={{
+                        padding: "40px",
+                        textAlign: "center",
+                        color: "#6b7280",
+                        background: "#f9fafb",
+                        border: "2px dashed #d1d5db",
+                        borderRadius: "12px"
+                      }}>
+                        No prospect information available
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Prospect Fields Section */}
+                  {relatedLead?.crm_data?.data && typeof relatedLead.crm_data.data === 'object' && Object.keys(relatedLead.crm_data.data).length > 0 && (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        color: "#1f2937",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Prospect Fields
+                      </h5>
+                      <div style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                          {Object.entries(relatedLead.crm_data.data)
+                            .filter(([key]) => key.toLowerCase() !== 'name' && key.toLowerCase() !== 'phone')
+                            .map(([key, value]: [string, any]) => (
+                              <div key={key}>
+                                <div style={{
+                                  fontSize: "12px",
+                                  fontWeight: 700,
+                                  color: "#6b7280",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.5px",
+                                  marginBottom: "6px",
+                                }}>
+                                  {key.replace(/_/g, ' ')}
+                                </div>
+                                <div style={{
+                                  fontSize: "14px",
+                                  color: "#1f2937",
+                                  fontWeight: 500,
+                                  wordBreak: "break-word",
+                                }}>
+                                  {String(value || 'N/A')}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Right Panel - Quick Actions & Timeline */}
+            <div style={{ 
+              padding: "32px 24px", 
+              background: "#fafbfc",
+              display: "flex",
+              flexDirection: "column",
+              gap: "24px",
+            }}>
+              
+              {/* Quick Actions */}
+              <div>
+                <h6 style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  marginBottom: "14px",
+                }}>
+                  Quick Actions
+                </h6>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {session?.user?.permissions?.includes("edit-crm-deals") && (
+                    <button
+                      style={{
+                        background: "white",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "10px",
+                        padding: "12px 16px",
+                        cursor: activeFilter === "lost" ? "not-allowed" : "pointer",
+                        opacity: activeFilter === "lost" ? 0.6 : 1,
+                        transition: "all 0.2s ease",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                        color: "#1f2937",
+                      }}
+                      onClick={() => {
+                        if (activeFilter === "lost") return;
+                        setShowDealViewModal(false);
+                        window.location.href = `/crm/deals/${viewingDeal.id}/edit`;
+                      }}
+                      disabled={activeFilter === "lost"}
+                      onMouseOver={(e) => {
+                        if (activeFilter === "lost") return;
+                        e.currentTarget.style.borderColor = "#10b981";
+                        e.currentTarget.style.background = "#f0fdf4";
+                        e.currentTarget.style.transform = "translateX(4px)";
+                      }}
+                      onMouseOut={(e) => {
+                        if (activeFilter === "lost") return;
+                        e.currentTarget.style.borderColor = "#e5e7eb";
+                        e.currentTarget.style.background = "white";
+                        e.currentTarget.style.transform = "translateX(0)";
+                      }}
+                    >
+                      <div style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "8px",
+                        background: "#10b981",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}>
+                        <Edit size={16} style={{ color: "white" }} />
+                      </div>
+                      Edit Deal
+                    </button>
+                  )}
+
+                  <button
+                    style={{
+                      background: "white",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "10px",
+                      padding: "12px 16px",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      fontSize: "14px",
+                      fontWeight: 500,
+                      color: "#1f2937",
+                    }}
+                    onClick={() => setShowDealHistoryModal(true)}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.borderColor = "#10b981";
+                      e.currentTarget.style.background = "#f0fdf4";
+                      e.currentTarget.style.transform = "translateX(4px)";
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.borderColor = "#e5e7eb";
+                      e.currentTarget.style.background = "white";
+                      e.currentTarget.style.transform = "translateX(0)";
+                    }}
+                  >
+                    <div style={{
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "8px",
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      <History size={16} style={{ color: "white" }} />
+                    </div>
+                    View History
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Overview */}
+              <div>
+                <h6 style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  marginBottom: "14px",
+                }}>
+                  Status Overview
+                </h6>
+                <div style={{
+                  background: "white",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  padding: "16px",
+                }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                        Stage
+                      </span>
+                      <Badge 
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          padding: "4px 10px",
+                          borderRadius: "6px",
+                          backgroundColor: viewingDeal.stage?.color || "#6c757d",
                         }}
                       >
-                        <Plus size={14} className="me-1" />
-                        Schedule Meeting
-                      </Button>
-                      )}
+                        {viewingDeal.stage?.name || "N/A"}
+                      </Badge>
                     </div>
-                    <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
-                      <div style={{
-                        content: '',
-                        position: 'absolute',
-                        left: '8px',
-                        top: 0,
-                        bottom: 0,
-                        width: '2px',
-                        background: '#e5e7eb'
-                      }} />
-                      {viewingDeal.meetings.map((meeting: any, idx: number) => (
-                        <div key={meeting.id || idx} style={{ position: 'relative', paddingBottom: '20px' }}>
-                          <div style={{
-                            content: '',
-                            position: 'absolute',
-                            left: '-26px',
-                            top: '4px',
-                            width: '12px',
-                            height: '12px',
-                            borderRadius: '50%',
-                            background: meeting.meeting_outcome === 'Completed - Successful' ? '#10b981' : 
-                                       meeting.meeting_outcome === 'Cancelled' ? '#dc3545' : '#4680ff',
-                            border: '3px solid white',
-                            boxShadow: '0 0 0 2px #e5e7eb'
-                          }} />
-                          <div style={{
-                            background: '#f8f9fa',
-                            padding: '12px 16px',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start'
-                          }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '4px', fontWeight: 600 }}>
-                                {meeting.name}
-                              </div>
-                              <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>
-                                {meeting.meeting_date ? formatDateForTable(meeting.meeting_date) : 'N/A'} {meeting.meeting_time || ''} - {meeting.meeting_type}
-                              </div>
-                              {meeting.meeting_outcome && (
-                                <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '4px', fontWeight: 500 }}>
-                                  <Badge bg={
-                                    meeting.meeting_outcome === 'Completed - Successful' ? 'success' : 
-                                    meeting.meeting_outcome === 'Completed - Needs Follow-up' ? 'info' : 
-                                    meeting.meeting_outcome === 'Cancelled' ? 'danger' : 
-                                    meeting.meeting_outcome === 'Rescheduled' ? 'warning' : 
-                                    'secondary'
-                                  }>
-                                    {meeting.meeting_outcome}
-                                  </Badge>
-                                </div>
-                              )}
-                            </div>
-                            <div className="d-flex gap-1">
-                              {session?.user?.permissions?.includes('add-meeting-crm-deals') && (
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1"
-                                  title="Edit"
-                                  onClick={() => handleEditMeeting(meeting)}
-                                >
-                                  <Edit size={16} />
-                                </Button>
-                              )}
-                              {session?.user?.permissions?.includes('delete-meeting-crm-deals') && (
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1 text-danger"
-                                  title="Delete"
-                                  onClick={() => handleDeleteMeeting(meeting.id, meeting.name)}
-                                >
-                                  <Trash2 size={16} />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                    
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                        Value
+                      </span>
+                      <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
+                        {viewingDeal.currency || 'AED'} {parseFloat(String(viewingDeal.net_value || viewingDeal.grand_total || 0)).toLocaleString()}
+                      </span>
                     </div>
-                  </>
-                )}
 
-                {/* Add Meeting Button if no meetings exist */}
-                {(!viewingDeal.meetings || viewingDeal.meetings.length === 0) && (
-                  <div style={{
-                    marginBottom: '30px',
-                    padding: '20px',
-                    background: '#f8f9fa',
-                    borderRadius: '10px',
-                    textAlign: 'center'
-                  }}>
-                    <Users size={32} style={{ color: '#9ca3af', marginBottom: '12px' }} />
-                    <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '16px' }}>
-                      No meetings scheduled yet
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                        Probability
+                      </span>
+                      <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
+                        {viewingDeal?.stage?.probability || 0}%
+                      </span>
                     </div>
-                    {session?.user?.permissions?.includes('add-meeting-crm-deals') && (
-                    <Button
-                      variant="outline-primary"
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                        Meetings
+                      </span>
+                      <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
+                        {viewingDeal.meetings?.length || 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Meetings Timeline */}
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "14px",
+                }}>
+                  <h6 style={{
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    margin: 0,
+                  }}>
+                    Recent Meetings
+                  </h6>
+                  {session?.user?.permissions?.includes("add-meeting-crm-deals") && (
+                    <button
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "#10b981",
+                        cursor: "pointer",
+                        padding: "4px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: "6px",
+                        transition: "all 0.2s ease",
+                      }}
                       onClick={() => {
                         setMeetingData({
                           dealId: viewingDeal.id,
@@ -3315,111 +4037,214 @@ const CrmDeals = () => {
                           meetingType: 'Online',
                           meetingDate: '',
                           meetingTime: '',
-                          meetingOutcome: '',
+                          meetingOutcome: 'Scheduled',
                           extensions: [],
                         });
+                        setMeetingAttendees([]);
                         setShowAddMeetingModal(true);
                       }}
-                    >
-                      <Plus size={14} className="me-1" />
-                      Schedule Meeting
-                    </Button>
-                    )}
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div style={{
-                  display: 'flex',
-                  gap: '12px',
-                  flexWrap: 'wrap',
-                  paddingTop: '20px',
-                  borderTop: '1px solid #e5e7eb'
-                }}>
-                  {session?.user?.permissions?.includes('edit-crm-deals') && (
-                    <Button
-                      variant="primary"
-                      disabled={activeFilter === "lost"}
-                      style={{
-                        padding: '10px 20px',
-                        borderRadius: '8px',
-                        fontWeight: 500,
-                        fontSize: '14px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        background: activeFilter === "lost" ? "#9ca3af" : "#4680ff",
-                        border: 'none',
-                        opacity: activeFilter === "lost" ? 0.6 : 1,
-                        cursor: activeFilter === "lost" ? "not-allowed" : "pointer",
-                      }}
-                      onClick={() => {
-                        if (activeFilter === "lost") return;
-                        setShowDealViewModal(false);
-                        window.location.href = `/crm/deals/${viewingDeal.id}/edit`;
-                      }}
                       onMouseOver={(e) => {
-                        if (activeFilter === "lost") return;
-                        e.currentTarget.style.background = "#3b6ce5";
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(70, 128, 255, 0.4)";
+                        e.currentTarget.style.background = "#f0fdf4";
                       }}
                       onMouseOut={(e) => {
-                        if (activeFilter === "lost") return;
-                        e.currentTarget.style.background = "#4680ff";
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
+                        e.currentTarget.style.background = "transparent";
                       }}
+                      title="Schedule Meeting"
                     >
-                      <Edit size={16} />
-                      Edit Deal
-                    </Button>
+                      <Plus size={16} />
+                    </button>
                   )}
-                  <Button
-                    variant="outline-primary"
-                    style={{
-                      padding: '10px 20px',
-                      borderRadius: '8px',
-                      fontWeight: 500,
-                      fontSize: '14px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: 'white',
-                      color: '#4680ff',
-                      border: '2px solid #4680ff'
-                    }}
-                    onClick={() => {
-                      setShowDealHistoryModal(true);
-                    }}
-                  >
-                    <History size={16} />
-                    View History
-                  </Button>
-                  <Button
-                    variant="outline-secondary"
-                    style={{
-                      padding: '10px 20px',
-                      borderRadius: '8px',
-                      fontWeight: 500,
-                      fontSize: '14px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: 'white',
-                      color: '#6b7280',
-                      border: '2px solid #e5e7eb'
-                    }}
-                    onClick={() => setShowDealViewModal(false)}
-                  >
-                    Close
-                  </Button>
                 </div>
-              </>
-            )}
-          </Modal.Body>
-        </Modal>
+                <div style={{
+                  background: "white",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  padding: "16px",
+                  maxHeight: "300px",
+                  overflowY: "auto",
+                }}>
+                  {viewingDeal.meetings && viewingDeal.meetings.length > 0 ? (
+                    <div style={{ position: "relative" }}>
+                      {/* Timeline line */}
+                      <div style={{
+                        position: "absolute",
+                        left: "7px",
+                        top: "8px",
+                        bottom: "8px",
+                        width: "2px",
+                        background: "#e5e7eb",
+                      }} />
+                      
+                      {viewingDeal.meetings.slice(0, 5).map((meeting: any, index: number) => {
+                        const isCompleted = meeting.meeting_outcome === "Completed - Successful";
+                        const isCancelled = meeting.meeting_outcome === "Cancelled";
+                        return (
+                          <div 
+                            key={meeting.id || index}
+                            style={{ 
+                              position: "relative",
+                              paddingLeft: "28px",
+                              paddingBottom: index < Math.min(viewingDeal.meetings.length, 5) - 1 ? "16px" : "0",
+                            }}
+                          >
+                            {/* Timeline dot */}
+                            <div style={{
+                              position: "absolute",
+                              left: "0",
+                              top: "4px",
+                              width: "16px",
+                              height: "16px",
+                              borderRadius: "50%",
+                              background: isCompleted ? "#10b981" : isCancelled ? "#dc3545" : "#f59e0b",
+                              border: "3px solid white",
+                              boxShadow: "0 0 0 1px #e5e7eb",
+                            }} />
+                            
+                            <div>
+                              <div style={{ fontSize: "12px", color: "#1f2937", fontWeight: 600, marginBottom: "4px" }}>
+                                {meeting.name}
+                              </div>
+                              <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}>
+                                {meeting.meeting_date ? moment(meeting.meeting_date).format("MMM DD, YYYY") : "N/A"}
+                              </div>
+                              {meeting.meeting_outcome && (
+                                <Badge
+                                  bg={
+                                    meeting.meeting_outcome === "Completed - Successful"
+                                      ? "success"
+                                      : meeting.meeting_outcome === "Completed - Needs Follow-up"
+                                      ? "info"
+                                      : meeting.meeting_outcome === "Cancelled"
+                                      ? "danger"
+                                      : meeting.meeting_outcome === "Rescheduled"
+                                      ? "warning"
+                                      : "secondary"
+                                  }
+                                  style={{ fontSize: "10px", padding: "2px 8px" }}
+                                >
+                                  {meeting.meeting_outcome}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {viewingDeal.meetings.length > 5 && (
+                        <div style={{
+                          textAlign: "center",
+                          marginTop: "12px",
+                          paddingTop: "12px",
+                          borderTop: "1px solid #f3f4f6",
+                        }}>
+                          <span style={{ fontSize: "12px", color: "#10b981", fontWeight: 600 }}>
+                            +{viewingDeal.meetings.length - 5} more meetings
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{
+                      textAlign: "center",
+                      padding: "20px",
+                      color: "#9ca3af",
+                    }}>
+                      <Users size={32} style={{ marginBottom: "8px", opacity: 0.5 }} />
+                      <div style={{ fontSize: "13px" }}>No meetings yet</div>
+                      {session?.user?.permissions?.includes("add-meeting-crm-deals") && (
+                        <button
+                          style={{
+                            marginTop: "12px",
+                            padding: "8px 16px",
+                            background: "#10b981",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            fontWeight: 500,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            transition: "all 0.2s ease",
+                          }}
+                          onClick={() => {
+                            setMeetingData({
+                              dealId: viewingDeal.id,
+                              dealName: viewingDeal.name,
+                              meetingName: '',
+                              meetingType: 'Online',
+                              meetingDate: '',
+                              meetingTime: '',
+                              meetingOutcome: 'Scheduled',
+                              extensions: [],
+                            });
+                            setMeetingAttendees([]);
+                            setShowAddMeetingModal(true);
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = "#059669";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = "#10b981";
+                          }}
+                        >
+                          <Plus size={14} />
+                          Schedule Meeting
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
+    </Modal.Body>
+
+    {/* Footer */}
+    <div style={{
+      padding: "20px 32px",
+      borderTop: "1px solid #e5e7eb",
+      background: "white",
+      borderBottomLeftRadius: "12px",
+      borderBottomRightRadius: "12px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}>
+      <div style={{ fontSize: "13px", color: "#6b7280" }}>
+        Deal ID: <strong>#{viewingDeal.id}</strong>
+      </div>
+      <Button
+        variant="outline-secondary"
+        onClick={() => setShowDealViewModal(false)}
+        style={{
+          padding: "10px 24px",
+          borderRadius: "8px",
+          fontWeight: 600,
+          fontSize: "14px",
+          border: "2px solid #e5e7eb",
+          transition: "all 0.2s ease",
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.borderColor = "#10b981";
+          e.currentTarget.style.color = "#10b981";
+          e.currentTarget.style.background = "#f0fdf4";
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.borderColor = "#e5e7eb";
+          e.currentTarget.style.color = "#6c757d";
+          e.currentTarget.style.background = "white";
+        }}
+      >
+        Close
+      </Button>
+    </div>
+  </Modal>
+)}
+
 
       {/* Deal History Modal */}
       {viewingDeal && (
@@ -4600,6 +5425,1007 @@ const CrmDeals = () => {
         showApplyButton={true}
         showResetButton={true}
       />
+
+      {/* Edit Deal Modal */}
+      <Modal 
+        show={showEditModal} 
+        onHide={handleCloseEditModal} 
+        size="xl"
+        fullscreen="lg-down"
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <Edit size={20} className="me-2" />
+            Edit Deal Information
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+          {editFetching ? (
+            <div className="text-center py-5">
+              <Spinner animation="border" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </Spinner>
+              <p className="mt-3">Loading deal data...</p>
+            </div>
+          ) : (
+            <Form onSubmit={handleEditSubmit}>
+              {/* Timeline Navigation */}
+              <div className="mb-4">
+                <div className="d-flex align-items-center justify-content-between position-relative">
+                  <div 
+                    className="position-absolute bg-light" 
+                    style={{ 
+                      left: '0', 
+                      right: '0', 
+                      top: '20px', 
+                      height: '2px', 
+                      zIndex: 0 
+                    }}
+                  />
+                  <div 
+                    className="position-absolute bg-primary" 
+                    style={{ 
+                      left: '0', 
+                      top: '20px', 
+                      height: '2px', 
+                      width: `${(() => {
+                        const totalVisibleSteps = editDealTemplate ? 5 : 4;
+                        let visualPosition = editFormStep;
+                        if (!editDealTemplate && editFormStep > 2) {
+                          visualPosition = editFormStep - 1;
+                        }
+                        return ((visualPosition + 1) / totalVisibleSteps) * 100;
+                      })()}%`,
+                      zIndex: 0,
+                      transition: 'width 0.3s ease'
+                    }}
+                  />
+                  
+                  {[0, 1, 2, 3, 4].map((step) => {
+                    if (step === 2 && !editDealTemplate) {
+                      return null;
+                    }
+                    
+                    const displayNumber = (!editDealTemplate && step > 2) ? step : step + 1;
+                    
+                    return (
+                      <div 
+                        key={step}
+                        className="text-center position-relative" 
+                        style={{ cursor: 'pointer', flex: 1 }}
+                        onClick={() => setEditFormStep(step)}
+                      >
+                        <div 
+                          className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${editFormStep >= step ? 'bg-primary text-white' : 'bg-light text-muted'}`}
+                          style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
+                        >
+                          {editFormStep > step ? <CheckCircle size={20} /> : displayNumber}
+                        </div>
+                        <small className={`d-block mt-2 ${editFormStep === step ? 'fw-bold text-primary' : 'text-muted'}`}>
+                          {step === 0 ? 'Deal Info' : step === 1 ? 'Company Info' : step === 2 ? 'Characteristics' : step === 3 ? 'Progress & Notes' : 'Estimation'}
+                        </small>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Form Content */}
+              <div style={{ minHeight: '400px' }}>
+                {/* Step 0: Deal Information */}
+                {editFormStep === 0 && (
+                  <Card className="mb-3 border-0 bg-light">
+                    <Card.Body>
+                      <h5 className="fw-bold mb-4 text-primary">DEAL INFORMATION</h5>
+                      <Row>
+                        <Col md={6}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Deal Name <span className="text-danger">*</span></Form.Label>
+                            <Form.Control 
+                              type="text" 
+                              value={editFormData.name}
+                              onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                              placeholder="Enter deal name" 
+                              required 
+                            />
+                          </Form.Group>
+                        </Col>
+                        <Col md={6}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Stage <span className="text-danger">*</span></Form.Label>
+                            <Form.Select 
+                              value={editFormData.stage_id || ''}
+                              onChange={(e) => setEditFormData({ ...editFormData, stage_id: e.target.value ? Number(e.target.value) : undefined })}
+                              required
+                            >
+                              <option value="">Select Stage</option>
+                              {stages.map((stage) => (
+                                <option key={stage.id} value={stage.id}>
+                                  {stage.name}
+                                </option>
+                              ))}
+                            </Form.Select>
+                          </Form.Group>
+                        </Col>
+                        <Col md={6}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Expected Close Date <span className="text-danger">*</span></Form.Label>
+                            <Form.Control 
+                              type="date" 
+                              value={editFormData.expected_close_date}
+                              onChange={(e) => setEditFormData({ ...editFormData, expected_close_date: e.target.value })}
+                              required 
+                            />
+                          </Form.Group>
+                        </Col>
+                        <Col md={6}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Assigned to <span className="text-danger">*</span></Form.Label>
+                            <Form.Select 
+                              value={editFormData.assigned_to || ''}
+                              onChange={(e) => setEditFormData({ ...editFormData, assigned_to: e.target.value || null })}
+                              required
+                            >
+                              <option value="">Select User</option>
+                              {extensions.map((ext: any) => (
+                                <option key={ext.id || ext.extension} value={ext.id || ext.extension}>
+                                  {ext.display_name || ext.name || ext.id}
+                                </option>
+                              ))}
+                            </Form.Select>
+                          </Form.Group>
+                        </Col>
+                        <Col md={6}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Currency <span className="text-danger">*</span></Form.Label>
+                            <Form.Select 
+                              value={editFormData.currency}
+                              onChange={(e) => setEditFormData({ ...editFormData, currency: e.target.value })}
+                              required
+                            >
+                              <option value="AED">AED</option>
+                            </Form.Select>
+                          </Form.Group>
+                        </Col>
+                        <Col md={6}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Follow-up Date</Form.Label>
+                            <Form.Control 
+                              type="date" 
+                              value={editFormData.follow_up_date}
+                              onChange={(e) => setEditFormData({ ...editFormData, follow_up_date: e.target.value })}
+                            />
+                          </Form.Group>
+                        </Col>
+                      </Row>
+                    </Card.Body>
+                  </Card>
+                )}
+
+                {/* Step 1: Company Information */}
+                {editFormStep === 1 && (
+                  <Card className="mb-3 border-0 bg-light">
+                    <Card.Body>
+                      <h5 className="fw-bold mb-4 text-success">COMPANY INFORMATION</h5>
+                      <Row>
+                        <Col md={6}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Company Name <span className="text-danger">*</span></Form.Label>
+                            <Form.Control 
+                              type="text" 
+                              value={editFormData.company_name}
+                              onChange={(e) => setEditFormData({ ...editFormData, company_name: e.target.value })}
+                              placeholder="Enter company name" 
+                              required 
+                            />
+                          </Form.Group>
+                        </Col>
+                        <Col md={6}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Select Business Type <span className="text-danger">*</span></Form.Label>
+                            <Form.Select
+                              value={editShowOtherBusinessType ? "other" : (editBusinessTypeId ? String(editBusinessTypeId) : "")}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === "other") {
+                                  setEditShowOtherBusinessType(true);
+                                  setEditBusinessTypeId(null);
+                                  setEditBusinessTypeOther("");
+                                } else if (value) {
+                                  setEditShowOtherBusinessType(false);
+                                  setEditBusinessTypeId(Number(value));
+                                  setEditBusinessTypeOther("");
+                                } else {
+                                  setEditShowOtherBusinessType(false);
+                                  setEditBusinessTypeId(null);
+                                  setEditBusinessTypeOther("");
+                                }
+                              }}
+                              required
+                            >
+                              <option value="">Select Business Type</option>
+                              {editBusinessTypes.map((businessType) => (
+                                <option key={businessType.id} value={businessType.id}>
+                                  {businessType.name}
+                                </option>
+                              ))}
+                              <option value="other">Other</option>
+                            </Form.Select>
+                          </Form.Group>
+                        </Col>
+
+                        {editShowOtherBusinessType && (
+                          <Col md={6}>
+                            <Form.Group className="mb-3">
+                              <Form.Label>Business Type (Other) <span className="text-danger">*</span></Form.Label>
+                              <Form.Control
+                                type="text"
+                                value={editBusinessTypeOther}
+                                onChange={(e) => setEditBusinessTypeOther(e.target.value)}
+                                placeholder="Enter business type"
+                                required
+                              />
+                            </Form.Group>
+                          </Col>
+                        )}
+                        <Col md={4}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Decision Maker Title</Form.Label>
+                            <Form.Select 
+                              value={editFormData.decision_maker_title}
+                              onChange={(e) => setEditFormData({ ...editFormData, decision_maker_title: e.target.value })}
+                            >
+                              <option value="">Select Title</option>
+                              <option value="Mr.">Mr.</option>
+                              <option value="Mrs.">Mrs.</option>
+                              <option value="Ms.">Ms.</option>
+                              <option value="Dr.">Dr.</option>
+                            </Form.Select>
+                          </Form.Group>
+                        </Col>
+                        <Col md={8}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Decision Maker Name <span className="text-danger">*</span></Form.Label>
+                            <Form.Control 
+                              type="text" 
+                              value={editFormData.decision_maker_name}
+                              onChange={(e) => setEditFormData({ ...editFormData, decision_maker_name: e.target.value })}
+                              placeholder="Decision maker name" 
+                              required 
+                            />
+                          </Form.Group>
+                        </Col>
+                        <Col md={6}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Decision Maker Email <span className="text-danger">*</span></Form.Label>
+                            <Form.Control 
+                              type="email" 
+                              value={editFormData.decision_maker_email}
+                              onChange={(e) => setEditFormData({ ...editFormData, decision_maker_email: e.target.value })}
+                              placeholder="decisionmaker@company.com" 
+                              required 
+                            />
+                          </Form.Group>
+                        </Col>
+                        <Col md={6}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Decision Maker Phone <span className="text-danger">*</span></Form.Label>
+                            <div className="phone-input-wrapper">
+                              <PhoneInput
+                                international
+                                defaultCountry="US"
+                                value={editFormData.decision_maker_phone_country_code && editFormData.decision_maker_phone 
+                                  ? `${editFormData.decision_maker_phone_country_code}${editFormData.decision_maker_phone}` 
+                                  : editFormData.decision_maker_phone || undefined}
+                                onChange={(value) => {
+                                  if (value) {
+                                    try {
+                                      const phoneNumber = parsePhoneNumberLib(value);
+                                      if (phoneNumber) {
+                                        setEditFormData(prev => ({
+                                          ...prev,
+                                          decision_maker_phone_country_code: `+${phoneNumber.countryCallingCode}`,
+                                          decision_maker_phone: phoneNumber.nationalNumber,
+                                        }));
+                                      } else {
+                                        setEditFormData(prev => ({
+                                          ...prev,
+                                          decision_maker_phone_country_code: "",
+                                          decision_maker_phone: value,
+                                        }));
+                                      }
+                                    } catch (error) {
+                                      setEditFormData(prev => ({
+                                        ...prev,
+                                        decision_maker_phone_country_code: "",
+                                        decision_maker_phone: value,
+                                      }));
+                                    }
+                                  } else {
+                                    setEditFormData(prev => ({
+                                      ...prev,
+                                      decision_maker_phone_country_code: "",
+                                      decision_maker_phone: "",
+                                    }));
+                                  }
+                                }}
+                                placeholder="Enter phone number"
+                              />
+                            </div>
+                          </Form.Group>
+                        </Col>
+                      </Row>
+                    </Card.Body>
+                  </Card>
+                )}
+
+                {/* Step 2: Deal Characteristics - Only show if template is available */}
+                {editFormStep === 2 && editDealTemplate && (
+                  <Card className="mb-3 border-0 bg-light">
+                    <Card.Body>
+                      <div className="d-flex justify-content-between align-items-center mb-4">
+                        <h5 className="fw-bold mb-0 text-info">DEAL CHARACTERISTICS</h5>
+                        {editDealTemplate.name && (
+                          <Badge bg="info" className="ms-2">
+                            Template: {editDealTemplate.name}
+                          </Badge>
+                        )}
+                      </div>
+                      {editDealTemplate.description && (
+                        <div className="alert alert-info mb-4">
+                          <small>{editDealTemplate.description}</small>
+                        </div>
+                      )}
+                      {editDealTemplate.fields && editDealTemplate.fields.length > 0 ? (
+                        <Row>
+                          {(() => {
+                            const fieldsArray = editDealTemplate.fields || [];
+                            const sortedFields = [...fieldsArray].sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
+                            return sortedFields.map((field: DealTemplateField) => {
+                              const fieldValue = editTemplateFieldsData[field.field_name] || '';
+                              
+                              return (
+                                <Col md={6} key={field.field_name}>
+                                  <Form.Group className="mb-3">
+                                    <Form.Label>
+                                      {field.field_name}
+                                      {field.is_required && <span className="text-danger"> *</span>}
+                                    </Form.Label>
+                                    {field.field_type === 'dropdown' ? (
+                                      <Form.Select
+                                        value={fieldValue}
+                                        onChange={(e) => setEditTemplateFieldsData({
+                                          ...editTemplateFieldsData,
+                                          [field.field_name]: e.target.value
+                                        })}
+                                        required={field.is_required}
+                                      >
+                                        <option value="">Select {field.field_name}</option>
+                                        {field.options && Array.isArray(field.options) && field.options.map((option: string, index: number) => (
+                                          <option key={index} value={option}>
+                                            {option}
+                                          </option>
+                                        ))}
+                                      </Form.Select>
+                                    ) : field.field_type === 'text' || !field.field_type ? (
+                                      <Form.Control
+                                        type="text"
+                                        value={fieldValue}
+                                        onChange={(e) => setEditTemplateFieldsData({
+                                          ...editTemplateFieldsData,
+                                          [field.field_name]: e.target.value
+                                        })}
+                                        placeholder={`Enter ${field.field_name}`}
+                                        required={field.is_required}
+                                      />
+                                    ) : (
+                                      <Form.Control
+                                        type={field.field_type === 'date' ? 'date' : field.field_type === 'email' ? 'email' : 'text'}
+                                        value={fieldValue}
+                                        onChange={(e) => setEditTemplateFieldsData({
+                                          ...editTemplateFieldsData,
+                                          [field.field_name]: e.target.value
+                                        })}
+                                        placeholder={`Enter ${field.field_name}`}
+                                        required={field.is_required}
+                                      />
+                                    )}
+                                  </Form.Group>
+                                </Col>
+                              );
+                            });
+                          })()}
+                        </Row>
+                      ) : (
+                        <div className="text-center py-4 text-muted">
+                          <p>No fields defined in this template.</p>
+                        </div>
+                      )}
+                    </Card.Body>
+                  </Card>
+                )}
+
+                {/* Step 3: Progress & Notes */}
+                {editFormStep === 3 && (
+                  <Card className="mb-3 border-0 bg-light">
+                    <Card.Body>
+                      <h5 className="fw-bold mb-4 text-warning">NEGOTIATION PROGRESS</h5>
+                      <Row>
+                        <Col md={4}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Quotation Sent</Form.Label>
+                            <Form.Check
+                              type="checkbox"
+                              checked={editFormData.quotation_sent}
+                              onChange={(e) => setEditFormData({ ...editFormData, quotation_sent: e.target.checked })}
+                            />
+                          </Form.Group>
+                        </Col>
+                        <Col md={4}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Contract Sent</Form.Label>
+                            <Form.Check
+                              type="checkbox"
+                              checked={editFormData.contract_sent}
+                              onChange={(e) => setEditFormData({ ...editFormData, contract_sent: e.target.checked })}
+                            />
+                          </Form.Group>
+                        </Col>
+                        <Col md={4}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Contract Received</Form.Label>
+                            <Form.Check
+                              type="checkbox"
+                              checked={editFormData.contract_received}
+                              onChange={(e) => setEditFormData({ ...editFormData, contract_received: e.target.checked })}
+                            />
+                          </Form.Group>
+                        </Col>
+                      </Row>
+                    </Card.Body>
+                  </Card>
+                )}
+
+                {/* Step 4: Estimation Chart */}
+                {editFormStep === 4 && (
+                  <Card className="mb-3 border-0 bg-light">
+                    <Card.Body>
+                      <h5 className="fw-bold mb-4 text-success">ESTIMATION CHART</h5>
+                      
+                      {/* Deal-level settings */}
+                      <Row className="mb-4">
+                        <Col md={4}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Tax Percentage (%)</Form.Label>
+                            <Form.Control
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={editFormData.tax_percentage}
+                              onChange={(e) => setEditFormData({ ...editFormData, tax_percentage: e.target.value })}
+                              placeholder="0"
+                            />
+                          </Form.Group>
+                        </Col>
+                        <Col md={4}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Standard Discount (%)</Form.Label>
+                            <Form.Select
+                              value={(editFormData.standard_discount_percentage && parseFloat(editFormData.standard_discount_percentage))}
+                              onChange={(e) => setEditFormData({ ...editFormData, standard_discount_percentage: e.target.value })}
+                            >
+                              <option value="0">0%</option>
+                              <option value="5">5%</option>
+                              <option value="10">10%</option>
+                              <option value="15">15%</option>
+                            </Form.Select>
+                          </Form.Group>
+                        </Col>
+                        {extensions?.length > 1 && <Col md={4}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>Special Discount (%)</Form.Label>
+                            <Form.Control
+                              disabled={extensions?.length <= 1}
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={editFormData.special_discount_percentage}
+                              onChange={(e) => setEditFormData({ ...editFormData, special_discount_percentage: e.target.value })}
+                              placeholder="0"
+                            />
+                          </Form.Group>
+                        </Col>}
+                      </Row>
+
+                      {/* Action Buttons */}
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <Button
+                          variant="outline-info"
+                          size="sm"
+                          onClick={() => setEditShowRevisionHistoryModal(true)}
+                        >
+                          <History size={14} className="me-1" />
+                          Revision History
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => {
+                            setEditEditingItemIndex(null);
+                            setEditItemFormData({
+                              product_id: null,
+                              product_service: "",
+                              description: "",
+                              qty: 1,
+                              unit_price: 0,
+                            });
+                            setEditShowAllIndustries(false);
+                            setEditShowAddItemModal(true);
+                          }}
+                        >
+                          <Plus size={14} className="me-1" />
+                          Add Item
+                        </Button>
+                      </div>
+
+                      {/* Estimation Items Table */}
+                      <div className="table-responsive">
+                        <Table hover>
+                          <thead className="bg-light">
+                            <tr>
+                              <th>#</th>
+                              <th>Product Name</th>
+                              <th>Qty</th>
+                              {editEstimationItems.some((item) => item.description) && <th>Description</th>}
+                              <th className="text-end">Unit Price</th>
+                              <th className="text-end">Total Price</th>
+                              <th className="text-center">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {editEstimationItems.map((item, index) => {
+                              const subtotal = item.qty * item.unit_price;
+                              
+                              return (
+                                <tr key={index}>
+                                  <td>{index + 1}</td>
+                                  <td className="fw-semibold">{item.product_service || 'N/A'}</td>
+                                  <td className="text-center">{item.qty || '0'}</td>
+                                  {editEstimationItems.some((i) => i.description) && (
+                                    <td className="text-muted small">{item.description || '-'}</td>
+                                  )}
+                                  <td className="text-end">
+                                    {editFormData.currency || 'AED'} {parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="text-end fw-semibold">
+                                    {editFormData.currency || 'AED'} {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td>
+                                    <div className="d-flex gap-1 justify-content-center">
+                                      <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="p-1"
+                                        title="Edit Item"
+                                        onClick={() => {
+                                          setEditEditingItemIndex(index);
+                                          setEditItemFormData({
+                                            product_id: item.product_id,
+                                            product_service: item.product_service,
+                                            description: item.description,
+                                            qty: item.qty,
+                                            unit_price: item.unit_price,
+                                          });
+                                          setEditShowAllIndustries(false);
+                                          setEditShowAddItemModal(true);
+                                        }}
+                                      >
+                                        <Edit size={16} />
+                                      </Button>
+                                      <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="p-1 text-danger"
+                                        title="Delete Item"
+                                        onClick={() => {
+                                          setEditEstimationItems(editEstimationItems.filter((_, i) => i !== index));
+                                        }}
+                                      >
+                                        <Trash2 size={16} />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                            {editEstimationItems.length === 0 && (
+                              <tr>
+                                <td colSpan={editEstimationItems.some((item) => item.description) ? 7 : 6} className="text-center text-muted py-5">
+                                  <Package size={40} className="text-muted mb-3" style={{ opacity: 0.5 }} />
+                                  <div>No items in estimation chart</div>
+                                  <small>Click "Add Item" to add products or services</small>
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                          {editEstimationItems.length > 0 && (() => {
+                            const grandTotal = editEstimationItems.reduce((sum, item) => sum + (item.qty * item.unit_price), 0);
+                            const totalDiscountPercentage = parseFloat(editFormData.standard_discount_percentage || "0") + parseFloat(editFormData.special_discount_percentage || "0");
+                            const totalDiscount = (grandTotal * totalDiscountPercentage) / 100;
+                            const subtotalAfterDiscount = grandTotal - totalDiscount;
+                            const taxAmount = (subtotalAfterDiscount * parseFloat(editFormData.tax_percentage || "0")) / 100;
+                            const netValue = subtotalAfterDiscount + taxAmount;
+                            
+                            return (
+                              <tfoot className="bg-light">
+                                <tr>
+                                  <td colSpan={editEstimationItems.some((item) => item.description) ? 6 : 5} className="text-end">
+                                    <strong>Subtotal:</strong>
+                                  </td>
+                                  <td className="text-end fw-semibold">
+                                    {editFormData.currency || 'AED'} {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                                {totalDiscount > 0 && (
+                                  <tr>
+                                    <td colSpan={editEstimationItems.some((item) => item.description) ? 6 : 5} className="text-end text-muted">
+                                      Discount ({totalDiscountPercentage}%):
+                                    </td>
+                                    <td className="text-end text-danger">
+                                      - {editFormData.currency || 'AED'} {totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                  </tr>
+                                )}
+                                {parseFloat(editFormData.tax_percentage || "0") > 0 && (
+                                  <tr>
+                                    <td colSpan={editEstimationItems.some((item) => item.description) ? 6 : 5} className="text-end">
+                                      <strong>Tax ({editFormData.tax_percentage}%):</strong>
+                                    </td>
+                                    <td className="text-end fw-semibold">
+                                      {editFormData.currency || 'AED'} {taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                  </tr>
+                                )}
+                                <tr className="border-top border-2">
+                                  <td colSpan={editEstimationItems.some((item) => item.description) ? 6 : 5} className="text-end">
+                                    <strong className="fs-5">Total:</strong>
+                                  </td>
+                                  <td className="text-end fw-bold text-success fs-5">
+                                    {editFormData.currency || 'AED'} {netValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            );
+                          })()}
+                        </Table>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                )}
+              </div>
+
+              {/* Form Footer */}
+              <div className="d-flex justify-content-between mt-4">
+                <Button 
+                  variant="secondary" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (editFormStep > 0) {
+                      let prevStep = editFormStep - 1;
+                      if (prevStep === 2 && !editDealTemplate) {
+                        prevStep = 1;
+                      }
+                      setEditFormStep(prevStep);
+                    } else {
+                      handleCloseEditModal();
+                    }
+                  }}
+                >
+                  {editFormStep > 0 ? <><ChevronLeft size={16} className="me-1" /> Previous</> : 'Cancel'}
+                </Button>
+                <div className="d-flex gap-2">
+                  {editFormStep < 4 ? (
+                    <Button 
+                      variant="primary"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        let nextStep = editFormStep + 1;
+                        if (nextStep === 2 && !editDealTemplate) {
+                          nextStep = 3;
+                        }
+                        setEditFormStep(Math.min(4, nextStep));
+                      }}
+                    >
+                      Next <ChevronRight size={16} className="ms-1" />
+                    </Button>
+                  ) : (
+                    <Button variant="primary" type="submit" disabled={editLoading}>
+                      {editLoading ? 'Updating...' : 'Update Deal'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </Form>
+          )}
+        </Modal.Body>
+      </Modal>
+
+      {/* Add/Edit Item Modal (Sub-modal for Estimation) */}
+      <Modal 
+        show={editShowAddItemModal} 
+        onHide={() => {
+          setEditShowAddItemModal(false);
+          setEditEditingItemIndex(null);
+          setEditItemFormData({
+            product_id: null,
+            product_service: "",
+            description: "",
+            qty: 1,
+            unit_price: 0,
+          });
+        }} 
+        size="lg" 
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>{editEditingItemIndex !== null ? 'Edit Item' : 'Add New Item'}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Row className="g-3">
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Product/Service Name <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={editItemFormData.product_service}
+                    onChange={(e) => setEditItemFormData({ ...editItemFormData, product_service: e.target.value })}
+                    placeholder="Enter product or service name"
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Description</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={3}
+                    placeholder="Enter product description or specifications"
+                    value={editItemFormData.description}
+                    onChange={(e) => setEditItemFormData({ ...editItemFormData, description: e.target.value })}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Quantity <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="1"
+                    placeholder="Enter quantity"
+                    value={editItemFormData.qty}
+                    onChange={(e) => setEditItemFormData({ ...editItemFormData, qty: parseInt(e.target.value) || 1 })}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Unit Price <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Enter unit price"
+                    value={editItemFormData.unit_price}
+                    onChange={(e) => setEditItemFormData({ ...editItemFormData, unit_price: parseFloat(e.target.value) || 0 })}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={12}>
+                <Card className="bg-light border-0">
+                  <Card.Body>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span className="text-muted">Sub Total:</span>
+                      <h5 className="mb-0 text-success">
+                        {editFormData.currency} {(editItemFormData.qty * editItemFormData.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </h5>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="outline-secondary" onClick={() => {
+            setEditShowAddItemModal(false);
+            setEditEditingItemIndex(null);
+            setEditItemFormData({
+              product_id: null,
+              product_service: "",
+              description: "",
+              qty: 1,
+              unit_price: 0,
+            });
+          }}>
+            Cancel
+          </Button>
+          <Button 
+            variant="primary" 
+            disabled={!editItemFormData.product_service || editItemFormData.qty < 1 || editItemFormData.unit_price <= 0}
+            onClick={() => {
+              const newItem = {
+                product_id: editItemFormData.product_id || Date.now(),
+                product_service: editItemFormData.product_service,
+                description: editItemFormData.description,
+                qty: editItemFormData.qty,
+                unit_price: editItemFormData.unit_price,
+                original_currency: editFormData.currency,
+                original_price: editItemFormData.unit_price,
+              };
+
+              if (editEditingItemIndex !== null) {
+                const updated = [...editEstimationItems];
+                updated[editEditingItemIndex] = newItem;
+                setEditEstimationItems(updated);
+              } else {
+                setEditEstimationItems([...editEstimationItems, newItem]);
+              }
+
+              setEditShowAddItemModal(false);
+              setEditEditingItemIndex(null);
+              setEditItemFormData({
+                product_id: null,
+                product_service: "",
+                description: "",
+                qty: 1,
+                unit_price: 0,
+              });
+            }}
+          >
+            {editEditingItemIndex !== null ? 'Update Item' : 'Add Item'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Revision History Modal */}
+      <Modal 
+        show={editShowRevisionHistoryModal} 
+        onHide={() => setEditShowRevisionHistoryModal(false)} 
+        size="lg" 
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <History size={20} className="me-2" />
+            Revision History
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {editEstimates.length > 0 ? (
+            <>
+              <div className="table-responsive">
+                <Table hover>
+                  <thead className="bg-light">
+                    <tr>
+                      <th>Version</th>
+                      <th>Created</th>
+                      <th>Grand Total</th>
+                      <th>Net Value</th>
+                      <th>Items</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editEstimates.map((estimate: any, index: number) => {
+                      const grandTotal = parseFloat(estimate.grand_total || "0");
+                      const netValue = parseFloat(estimate.net_value || "0");
+                      const itemCount = estimate.estimation_chart?.length || 0;
+                      
+                      return (
+                        <tr key={estimate.id || index}>
+                          <td>
+                            <Badge bg="secondary">
+                              {estimate.version || `v${editEstimates.length - index}.0`}
+                            </Badge>
+                          </td>
+                          <td>
+                            <div className="d-flex align-items-center">
+                              <Calendar size={14} className="me-2 text-muted" />
+                              {new Date(estimate.created_at).toLocaleString()}
+                            </div>
+                          </td>
+                          <td className="fw-bold text-success">
+                            {grandTotal.toLocaleString()} {estimate.currency || editFormData.currency}
+                          </td>
+                          <td>
+                            {netValue.toLocaleString()} {estimate.currency || editFormData.currency}
+                          </td>
+                          <td>
+                            <Badge bg="secondary">{itemCount} items</Badge>
+                          </td>
+                          <td>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-1 text-info"
+                              title="Load Version"
+                              onClick={() => {
+                                if (estimate.estimation_chart && estimate.estimation_chart.length > 0) {
+                                  setEditEstimationItems(estimate.estimation_chart.map((item: any) => ({
+                                    product_id: item.product_id || 0,
+                                    product_service: item.product_service || "",
+                                    description: item.description || "",
+                                    qty: item.qty || 1,
+                                    unit_price: item.unit_price || 0,
+                                    original_currency: item.original_currency || estimate.currency || editFormData.currency,
+                                    original_price: item.original_price || item.unit_price || 0,
+                                  })));
+                                  
+                                  if (estimate.tax_percentage) {
+                                    setEditFormData(prev => ({ ...prev, tax_percentage: estimate.tax_percentage.toString() }));
+                                  }
+                                  if (estimate.standard_discount_percentage) {
+                                    setEditFormData(prev => ({ ...prev, standard_discount_percentage: estimate.standard_discount_percentage.toString() }));
+                                  }
+                                  if (estimate.special_discount_percentage) {
+                                    setEditFormData(prev => ({ ...prev, special_discount_percentage: estimate.special_discount_percentage.toString() }));
+                                  }
+                                  
+                                  setEditShowRevisionHistoryModal(false);
+                                  toast.success(`${estimate.version || `v${editEstimates.length - index}.0`} has been loaded successfully!`);
+                                } else {
+                                  toast.error("This revision has no items to load");
+                                }
+                              }}
+                            >
+                              <RefreshCw size={14} />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Table>
+              </div>
+              
+              <Card className="border-0 bg-light mt-3">
+                <Card.Body>
+                  <Row>
+                    <Col md={6}>
+                      <small className="text-muted">Total Revisions</small>
+                      <div className="fw-bold">{editEstimates.length}</div>
+                    </Col>
+                    <Col md={6}>
+                      <small className="text-muted">Latest Update</small>
+                      <div className="fw-bold">
+                        {editEstimates.length > 0 ? new Date(editEstimates[0].created_at).toLocaleString() : 'N/A'}
+                      </div>
+                    </Col>
+                  </Row>
+                </Card.Body>
+              </Card>
+            </>
+          ) : (
+            <div className="text-center text-muted p-5">
+              <History size={48} className="mb-3 text-muted" />
+              <p className="mb-0">No revision history available</p>
+              <small>Revisions will appear here when estimates are created</small>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setEditShowRevisionHistoryModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
     </React.Fragment>
   );

@@ -7,6 +7,7 @@ import React, {
   useCallback,
   useMemo,
   useEffect,
+  useRef,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -29,7 +30,13 @@ import {
   restoreLead,
   updateLead,
   getCampaigns,
+  getCampaignById,
+  getCrmData,
+  getCrmDataById,
+  getIndustries,
+  getBusinessTypes,
 } from "@utils/crm";
+import type { StageData, CampaignData, CrmDataItem, IndustryData, BusinessTypeData } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
   Button,
@@ -44,9 +51,14 @@ import {
   Modal,
   Popover,
   OverlayTrigger,
+  Spinner,
 } from "react-bootstrap";
 import Select from "react-select";
 import CreatableSelect from "react-select/creatable";
+import PhoneInput from "react-phone-number-input";
+import { parsePhoneNumber as parsePhoneLib } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
+import { Country, State, City } from "country-state-city";
 import { ModuleSlug, formatDateForTable, checkRequiredFields, GlobalDateFormat } from "@utils/Helper";
 import {
   Target,
@@ -85,6 +97,7 @@ import {
   UserCheck,
   AlertCircle,
   RotateCcw,
+ 
 } from "lucide-react";
 import {
   PieChart,
@@ -116,6 +129,7 @@ import {
   FiCalendar,
   FiTarget,
   FiMoreVertical,
+  FiPlus,
 } from "react-icons/fi";
 import Link from "next/link";
 import { toast } from "react-toastify";
@@ -128,7 +142,7 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import { useCti } from "../../../contexts/CtiContext";
-
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 // Type definition for transformed lead data
 interface LeadData {
   id: any;
@@ -567,6 +581,7 @@ const CrmLeads = () => {
   // UI State
   const [showLeadsAnalytics, setShowLeadsAnalytics] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showFilterBar, setShowFilterBar] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
   const [leadsSearch, setLeadsSearch] = useState("");
   const [showLeadViewModal, setShowLeadViewModal] = useState(false);
@@ -579,6 +594,61 @@ const CrmLeads = () => {
   const [showLeadSidebar, setShowLeadSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any>(null);
+
+  // Edit Modal states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingLead, setEditingLead] = useState<any>(null);
+  const [editFormStep, setEditFormStep] = useState(0);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    user_extension: null as number | null,
+    type: "lead" as "lead" | "opportunity",
+    description: "",
+    source: "",
+    company_name: "",
+    industry_ids: [] as number[],
+    business_type: "",
+    company_country: "",
+    company_province: "",
+    company_city: "",
+    company_location_other: "",
+    company_size: "",
+    stage_id: undefined as number | undefined,
+    campaign_id: undefined as number | undefined,
+    crm_data_id: undefined as number | undefined,
+    lead_potential: "",
+    campaign_field_values: {} as Record<string, any>,
+    contact_persons: [{
+      title: "",
+      name: "",
+      phone_country_code: "",
+      phone: "",
+      email: "",
+    }] as Array<{
+      title: string;
+      name: string;
+      phone_country_code: string;
+      phone: string;
+      email: string;
+    }>,
+  });
+  const [editStages, setEditStages] = useState<StageData[]>([]);
+  const [editExtensions, setEditExtensions] = useState<any[]>([]);
+  const [editCampaigns, setEditCampaigns] = useState<CampaignData[]>([]);
+  const [editCrmData, setEditCrmData] = useState<CrmDataItem[]>([]);
+  const [editSelectedCampaign, setEditSelectedCampaign] = useState<CampaignData | null>(null);
+  const [editSelectedCrmData, setEditSelectedCrmData] = useState<CrmDataItem | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editFetching, setEditFetching] = useState(false);
+  const [editBusinessTypes, setEditBusinessTypes] = useState<BusinessTypeData[]>([]);
+  const [editBusinessTypeId, setEditBusinessTypeId] = useState<number | null>(null);
+  const [editBusinessTypeOther, setEditBusinessTypeOther] = useState<string>("");
+  const [editShowOtherBusinessType, setEditShowOtherBusinessType] = useState(false);
+  const [editSelectedCountry, setEditSelectedCountry] = useState<{ value: string; label: string; isoCode: string; } | null>(null);
+  const [editSelectedState, setEditSelectedState] = useState<{ value: string; label: string; } | null>(null);
+  const [editSelectedCity, setEditSelectedCity] = useState<{ value: string; label: string; } | null>(null);
+  const isEditInitialLoad = useRef(true);
+  const [allIndustries, setAllIndustries] = useState<IndustryData[]>([]);
 
   // Follow-up Modal
   const [showAddFollowupModal, setShowAddFollowupModal] = useState(false);
@@ -1536,6 +1606,432 @@ const CrmLeads = () => {
     }
   }, []);
 
+  // Handle edit lead - open modal with lead data
+  const handleEditLead = useCallback(async (leadId: number) => {
+    setEditFetching(true);
+    setShowEditModal(true);
+    setEditFormStep(0);
+    isEditInitialLoad.current = true;
+    
+    try {
+      const leadData: any = await getLead(leadId);
+      setEditingLead(leadData);
+      
+      // Parse contact_persons
+      let contactPersonsArray: Array<{
+        title: string;
+        name: string;
+        phone_country_code: string;
+        phone: string;
+        email: string;
+      }> = [];
+      
+      if (leadData.contact_persons) {
+        if (typeof leadData.contact_persons === 'string') {
+          try {
+            contactPersonsArray = JSON.parse(leadData.contact_persons);
+          } catch (e) {
+            console.error("Failed to parse contact_persons:", e);
+          }
+        } else if (Array.isArray(leadData.contact_persons)) {
+          contactPersonsArray = leadData.contact_persons;
+        }
+      }
+
+      // Convert IDs to numbers
+      const stageId = leadData.stage_id ? Number(leadData.stage_id) : undefined;
+      const campaignId = leadData.campaign_id ? Number(leadData.campaign_id) : undefined;
+      const crmDataId = leadData.crm_data_id ? Number(leadData.crm_data_id) : undefined;
+      const userExtension = leadData.user_extension ? Number(leadData.user_extension) : null;
+
+      // Populate form data
+      setEditFormData({
+        name: leadData.name || "",
+        user_extension: userExtension,
+        type: "lead",
+        description: leadData.description || "",
+        source: leadData.source || "",
+        company_name: leadData.company_name || "",
+        industry_ids: (leadData.industry_ids && Array.isArray(leadData.industry_ids))
+          ? leadData.industry_ids.map((id: any) => Number(id)).filter((id: number) => !Number.isNaN(id))
+          : (leadData.industries && Array.isArray(leadData.industries))
+          ? leadData.industries.map((ind: any) => typeof ind === 'object' ? Number(ind.id) : Number(ind)).filter((id: number) => !Number.isNaN(id))
+          : [],
+        business_type: leadData.business_type || "",
+        company_country: leadData.company_country || "",
+        company_province: leadData.company_province || "",
+        company_city: leadData.company_city || "",
+        company_location_other: leadData.company_location_other || "",
+        company_size: leadData.company_size || "",
+        stage_id: stageId,
+        campaign_id: campaignId,
+        crm_data_id: crmDataId,
+        lead_potential: leadData.lead_potential || "",
+        campaign_field_values: leadData.campaign_field_values || {},
+        contact_persons: contactPersonsArray.length > 0 
+          ? contactPersonsArray 
+          : [{
+              title: "",
+              name: "",
+              phone_country_code: "",
+              phone: "",
+              email: "",
+            }],
+      });
+
+      // Set business type
+      if (leadData.business_type_id) {
+        setEditBusinessTypeId(Number(leadData.business_type_id));
+        setEditBusinessTypeOther("");
+        setEditShowOtherBusinessType(false);
+      } else if (leadData.business_type_other) {
+        setEditBusinessTypeId(null);
+        setEditBusinessTypeOther(leadData.business_type_other);
+        setEditShowOtherBusinessType(true);
+      }
+
+      // Fetch stages for lead
+      const stagesData = await getStages("lead");
+      setEditStages(stagesData || []);
+      
+      // Fetch extensions
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
+      if (hierarchyData?.extensions) {
+        setEditExtensions(hierarchyData.extensions);
+      }
+
+      // Fetch campaigns
+      const campaignsData = await getCampaigns({ per_page: 100 });
+      setEditCampaigns(campaignsData?.data || []);
+
+      // Fetch CRM data
+      const crmDataResponse = await getCrmData({ per_page: 100 });
+      setEditCrmData(crmDataResponse?.data || []);
+
+      // Fetch business types
+      const businessTypesResponse = await getBusinessTypes({ per_page: 1000 });
+      setEditBusinessTypes(businessTypesResponse?.data || []);
+
+      // Fetch industries
+      const industriesResponse = await getIndustries({ per_page: 1000 });
+      setAllIndustries(industriesResponse?.data || []);
+
+      // Fetch campaign if available
+      if (campaignId) {
+        try {
+          const campaign = await getCampaignById(campaignId);
+          setEditSelectedCampaign(campaign);
+        } catch (error) {
+          console.error("Failed to fetch campaign:", error);
+        }
+      }
+
+      // Fetch CRM data if available
+      if (crmDataId) {
+        try {
+          const crmDataRecord = await getCrmDataById(crmDataId);
+          setEditSelectedCrmData(crmDataRecord);
+        } catch (error) {
+          console.error("Failed to fetch CRM data:", error);
+        }
+      }
+
+      // Initialize location dropdowns
+      if (leadData.company_country) {
+        const country = Country.getAllCountries().find(
+          (c: any) => c.name === leadData.company_country
+        );
+        if (country) {
+          setEditSelectedCountry({
+            value: country.isoCode,
+            label: country.name,
+            isoCode: country.isoCode,
+          });
+
+          if (leadData.company_province) {
+            const state = State.getStatesOfCountry(country.isoCode).find(
+              (s: any) => s.name === leadData.company_province
+            );
+            if (state) {
+              setEditSelectedState({
+                value: state.isoCode,
+                label: state.name,
+              });
+
+              if (leadData.company_city) {
+                const city = City.getCitiesOfState(
+                  country.isoCode,
+                  state.isoCode
+                ).find((c: any) => c.name === leadData.company_city);
+                if (city) {
+                  setEditSelectedCity({
+                    value: city.name,
+                    label: city.name,
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
+      isEditInitialLoad.current = false;
+    } catch (error) {
+      console.error("Failed to fetch lead:", error);
+      toast.error("Failed to load lead data");
+      setShowEditModal(false);
+    } finally {
+      setEditFetching(false);
+    }
+  }, []);
+
+  // Edit Modal Helper Functions
+  const handleEditInputChange = (field: string, value: any) => {
+    setEditFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleEditCampaignChange = async (campaignId: number | undefined) => {
+    handleEditInputChange("campaign_id", campaignId);
+    
+    if (!campaignId) {
+      setEditSelectedCampaign(null);
+      handleEditInputChange("campaign_field_values", {});
+      return;
+    }
+
+    try {
+      const campaign = await getCampaignById(campaignId);
+      setEditSelectedCampaign(campaign);
+
+      // Pre-fill fields from campaign
+      if (!isEditInitialLoad.current) {
+        if ((campaign as any).company_name) {
+          handleEditInputChange("company_name", (campaign as any).company_name);
+        }
+        if ((campaign as any).source) {
+          handleEditInputChange("source", (campaign as any).source);
+        }
+        if ((campaign as any).stage_id) {
+          handleEditInputChange("stage_id", Number((campaign as any).stage_id));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch campaign:", error);
+    }
+  };
+
+  const handleEditCampaignFieldChange = (fieldKey: string, value: any) => {
+    setEditFormData((prev) => ({
+      ...prev,
+      campaign_field_values: {
+        ...prev.campaign_field_values,
+        [fieldKey]: value,
+      },
+    }));
+  };
+
+  const addEditContactPerson = () => {
+    setEditFormData((prev) => ({
+      ...prev,
+      contact_persons: [
+        ...prev.contact_persons,
+        {
+          title: "",
+          name: "",
+          phone_country_code: "",
+          phone: "",
+          email: "",
+        },
+      ],
+    }));
+  };
+
+  const removeEditContactPerson = (index: number) => {
+    if (editFormData.contact_persons.length <= 1) {
+      toast.error("At least one contact person is required");
+      return;
+    }
+    setEditFormData((prev) => ({
+      ...prev,
+      contact_persons: prev.contact_persons.filter((_, i) => i !== index),
+    }));
+  };
+
+  const updateEditContactPerson = (index: number, field: string, value: any) => {
+    setEditFormData((prev) => {
+      const updated = [...prev.contact_persons];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, contact_persons: updated };
+    });
+  };
+
+  const handleEditCountryChange = (selected: any) => {
+    setEditSelectedCountry(selected);
+    setEditSelectedState(null);
+    setEditSelectedCity(null);
+    handleEditInputChange("company_country", selected?.label || "");
+    handleEditInputChange("company_province", "");
+    handleEditInputChange("company_city", "");
+  };
+
+  const handleEditStateChange = (selected: any) => {
+    setEditSelectedState(selected);
+    setEditSelectedCity(null);
+    handleEditInputChange("company_province", selected?.label || "");
+    handleEditInputChange("company_city", "");
+  };
+
+  const handleEditCityChange = (selected: any) => {
+    setEditSelectedCity(selected);
+    handleEditInputChange("company_city", selected?.label || "");
+  };
+
+  const validateEditStep0 = (): boolean => {
+    if (!editFormData.name?.trim()) {
+      toast.error("Lead name is required");
+      return false;
+    }
+    if (!editFormData.stage_id) {
+      toast.error("Stage is required");
+      return false;
+    }
+    return true;
+  };
+
+  const validateEditStep1 = (): boolean => {
+    if (!editFormData.company_name?.trim()) {
+      toast.error("Company name is required");
+      return false;
+    }
+    if (editShowOtherBusinessType && !editBusinessTypeOther?.trim()) {
+      toast.error("Please specify the business type");
+      return false;
+    }
+    if (!editShowOtherBusinessType && !editBusinessTypeId) {
+      toast.error("Business type is required");
+      return false;
+    }
+    return true;
+  };
+
+  const validateEditStep2 = (): boolean => {
+    for (let i = 0; i < editFormData.contact_persons.length; i++) {
+      const person = editFormData.contact_persons[i];
+      if (!person.title?.trim()) {
+        toast.error(`Contact person ${i + 1}: Title is required`);
+        return false;
+      }
+      if (!person.name?.trim()) {
+        toast.error(`Contact person ${i + 1}: Name is required`);
+        return false;
+      }
+      if (!person.phone?.trim()) {
+        toast.error(`Contact person ${i + 1}: Phone is required`);
+        return false;
+      }
+      if (!person.email?.trim()) {
+        toast.error(`Contact person ${i + 1}: Email is required`);
+        return false;
+      }
+      if (!/\S+@\S+\.\S+/.test(person.email)) {
+        toast.error(`Contact person ${i + 1}: Invalid email format`);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const validateEditStep3 = (): boolean => {
+    if ((editSelectedCampaign as any)?.custom_fields) {
+      for (const field of (editSelectedCampaign as any).custom_fields) {
+        if (field.required && !editFormData.campaign_field_values?.[field.field_key]) {
+          toast.error(`${field.field_name} is required`);
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  const handleEditNextStep = () => {
+    let isValid = false;
+    switch (editFormStep) {
+      case 0:
+        isValid = validateEditStep0();
+        break;
+      case 1:
+        isValid = validateEditStep1();
+        break;
+      case 2:
+        isValid = validateEditStep2();
+        break;
+      case 3:
+        isValid = validateEditStep3();
+        break;
+      default:
+        isValid = true;
+    }
+    
+    if (isValid && editFormStep < 3) {
+      setEditFormStep((prev) => prev + 1);
+    }
+  };
+
+  const handleEditSubmit = async () => {
+    // Validate all steps
+    if (!validateEditStep0() || !validateEditStep1() || !validateEditStep2() || !validateEditStep3()) {
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const payload: any = {
+        name: editFormData.name,
+        user_extension: editFormData.user_extension || (session?.user as any)?.extension || "admin",
+        type: editFormData.type,
+        description: editFormData.description,
+        source: editFormData.source,
+        company_name: editFormData.company_name,
+        industry_ids: editFormData.industry_ids,
+        company_country: editFormData.company_country,
+        company_province: editFormData.company_province,
+        company_city: editFormData.company_city,
+        company_location_other: editFormData.company_location_other,
+        company_size: editFormData.company_size,
+        stage_id: editFormData.stage_id,
+        campaign_id: editFormData.campaign_id,
+        crm_data_id: editFormData.crm_data_id,
+        lead_potential: editFormData.lead_potential,
+        campaign_field_values: editFormData.campaign_field_values,
+        contact_persons: JSON.stringify(editFormData.contact_persons),
+      };
+
+      // Handle business type
+      if (editShowOtherBusinessType) {
+        payload.business_type_id = null;
+        payload.business_type_other = editBusinessTypeOther;
+      } else {
+        payload.business_type_id = editBusinessTypeId;
+        payload.business_type_other = null;
+      }
+
+      if (editingLead?.id) {
+        await updateLead(editingLead.id, payload);
+        toast.success("Lead updated successfully");
+        setShowEditModal(false);
+        fetchLeads(); // Refresh the list
+      }
+    } catch (error: any) {
+      console.error("Failed to update lead:", error);
+      toast.error(error.message || "Failed to update lead");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   // Handle follow-up creation
   const handleCreateFollowUp = useCallback(async () => {
     // Validate required fields
@@ -2114,7 +2610,7 @@ const CrmLeads = () => {
       key: 'phone',
       label: 'Phone',
       sortable: true,
-      align: 'center',
+      align: 'left',
       type: 'custom',
       render: (lead: LeadData) => lead.phone ? (
         <PhoneContainer phone={lead.phone} onClick={() => handleCallClick(lead)} />
@@ -2204,7 +2700,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
     actions.push({
       label: 'Edit',
       icon: <Edit size={16} />,
-      onClick: (lead: LeadData) => window.location.href = `/crm/leads/${lead.rawData?.id || lead.id}/edit`,
+      onClick: (lead: LeadData) => handleEditLead(lead.rawData?.id || lead.id),
       show: () => activeFilter !== 'lost'
     });
   }
@@ -2281,20 +2777,28 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
       <div>
         {/* Page Header */}
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-          <div className="mb-3 mb-md-0">
-            <h2 className="mb-1 fw-bold">Leads</h2>
-            <p className="text-muted mb-0">
-              Track and manage your qualified leads with scoring
-            </p>
-          </div>
+        <div className="mb-3 mb-md-0">
+  <nav aria-label="breadcrumb">
+    <ol className="breadcrumb mb-0">
+      <li className="breadcrumb-item">
+        <a href="/dashboard" className="text-decoration-none">
+          CRM
+        </a>
+      </li>
+      <li className="breadcrumb-item active fw-bold" aria-current="page">
+        Leads
+      </li>
+    </ol>
+  </nav>
+</div>
           <div className="d-flex flex-wrap gap-2">
-            <Button
+            {/* <Button
               variant={showLeadsAnalytics ? "primary" : "outline-secondary"}
               onClick={() => setShowLeadsAnalytics(!showLeadsAnalytics)}
             >
               <BarChart3 size={16} className="me-2" />
               {showLeadsAnalytics ? "Hide Analytics" : "Show Analytics"}
-            </Button>
+            </Button> */}
             {session?.user?.permissions?.includes("add-crm-leads") && (
               <Link href="/crm/leads/create">
                 <Button variant="primary">
@@ -2303,6 +2807,13 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                 </Button>
               </Link>
             )}
+            <Button
+              variant={showFilterBar ? "secondary" : "outline-secondary"}
+              onClick={() => setShowFilterBar(!showFilterBar)}
+            >
+              <Layers size={16} className="me-2" />
+              {showFilterBar ? "Hide Tabs" : "Show Tabs"}
+            </Button>
             <Button
               variant={showFiltersSidebar ? "secondary" : "outline-secondary"}
               onClick={() => setShowFiltersSidebar(true)}
@@ -2313,6 +2824,90 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           </div>
         </div>
 
+            
+        {/* Stats Cards */}
+        <StatsCards 
+          data={[
+            {
+              title: 'All Leads',
+              value: summaryTiles?.total_leads || totalLeads || 0,
+              icon: Users,
+              iconColor: '#6366F1',
+              iconBgColor: '#EEF2FF',
+              subtitle: 'Total in system'
+            },
+            {
+              title: 'New',
+              value: summaryTiles?.new_leads || analyticsData.stageCounts['New'] || 0,
+              icon: UserCheck,
+              iconColor: '#3B82F6',
+              iconBgColor: '#DBEAFE',
+              metric: {
+                text: 'Fresh leads',
+                dotColor: '#2563EB'
+              }
+            },
+            {
+              title: 'Qualified',
+              value: summaryTiles?.qualified_leads || analyticsData.stageCounts['Qualified'] || 0,
+              icon: CheckCircle,
+              iconColor: '#10B981',
+              iconBgColor: '#D1FAE5',
+              subtitle: 'Verified & ready'
+            },
+            {
+              title: 'Proposal',
+              value: analyticsData.stageCounts['Proposal'] || 0,
+              icon: FileText,
+              iconColor: '#8B5CF6',
+              iconBgColor: '#EDE9FE',
+              metric: {
+                text: 'In review',
+                dotColor: '#7C3AED'
+              }
+            },
+            {
+              title: 'Negotiation',
+              value: analyticsData.stageCounts['Negotiation'] || 0,
+              icon: Handshake,
+              iconColor: '#F59E0B',
+              iconBgColor: '#FEF3C7',
+              subtitle: 'Active discussions'
+            },
+            {
+              title: 'Closed Won',
+              value: analyticsData.stageCounts['Closed Won'] || analyticsData.stageCounts['Won'] || 0,
+              icon: Target,
+              iconColor: '#059669',
+              iconBgColor: '#D1FAE5',
+              badge: {
+                text: 'Success',
+                bgColor: '#D1FAE5',
+                textColor: '#065F46'
+              }
+            },
+            {
+              title: 'Lost',
+              value: summaryTiles?.lost_leads || filterCounts.lost || 0,
+              icon: AlertCircle,
+              iconColor: '#EF4444',
+              iconBgColor: '#FEE2E2',
+              subtitle: 'Requires review'
+            },
+            {
+              title: 'Deleted',
+              value: summaryTiles?.deleted_leads || filterCounts.deleted || 0,
+              icon: Trash2,
+              iconColor: '#6B7280',
+              iconBgColor: '#F3F4F6',
+              metric: {
+                text: 'Archived',
+                dotColor: '#9CA3AF'
+              }
+            }
+          ]}
+          gridMinWidth="180px"
+        />
         {/* Analytics Section - Collapsible */}
         {showLeadsAnalytics && (
           <>
@@ -2433,41 +3028,43 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         )}
 
         {/* Filter Bar */}
-        <FilterBar
-          quickFilters={[
-            {
-              id: "all",
-              label: "All Leads",
-              count: filterCounts.all,
-              color: "#0d6efd",
-              icon: <Users size={16} />,
-            },
-            ...stages.slice(0, 5).map((stage: any) => ({
-              id: stage.id.toString(),
-              label: stage.name,
-              count: filterCounts[stage.id] || 0,
-              color: stage.color || "#6c757d",
-              icon: <Layers size={16} />,
-            })),
-            {
-              id: "lost",
-              label: "Lost",
-              count: filterCounts.lost || 0,
-              color: "#fd7e14",
-              icon: <X size={16} />,
-            },
-            {
-              id: "deleted",
-              label: "Deleted",
-              count: filterCounts.deleted || 0,
-              color: "#dc3545",
-              icon: <Trash2 size={16} />,
-            },
-          ]}
-          activeFilter={activeFilter}
-          onFilterChange={handleFilterChange}
-          
-        />
+        {showFilterBar && (
+          <FilterBar
+            quickFilters={[
+              {
+                id: "all",
+                label: "All Leads",
+                count: filterCounts.all,
+                color: "#0d6efd",
+                icon: <Users size={16} />,
+              },
+              ...stages.slice(0, 5).map((stage: any) => ({
+                id: stage.id.toString(),
+                label: stage.name,
+                count: filterCounts[stage.id] || 0,
+                color: stage.color || "#6c757d",
+                icon: <Layers size={16} />,
+              })),
+              {
+                id: "lost",
+                label: "Lost",
+                count: filterCounts.lost || 0,
+                color: "#fd7e14",
+                icon: <X size={16} />,
+              },
+              {
+                id: "deleted",
+                label: "Deleted",
+                count: filterCounts.deleted || 0,
+                color: "#dc3545",
+                icon: <Trash2 size={16} />,
+              },
+            ]}
+            activeFilter={activeFilter}
+            onFilterChange={handleFilterChange}
+            
+          />
+        )}
 
         {/* Advanced Filters */}
         {showAdvancedFilters && (
@@ -3100,2288 +3697,1912 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
 
       {/* Lead View Modal */}
       {viewingLead && (
-        <Modal
-          show={showLeadViewModal}
-          onHide={() => setShowLeadViewModal(false)}
-          size="xl"
-          centered
+  <Modal
+    show={showLeadViewModal}
+    onHide={() => setShowLeadViewModal(false)}
+    size="xl"
+    centered
+    className="lead-view-modal"
+  >
+    {/* Modern Header with Gradient */}
+    <div
+      style={{
+        background: "#fff",
+        color: "black",
+        padding: "24px 32px",
+        position: "relative",
+        borderTopLeftRadius: "12px",
+        borderTopRightRadius: "12px",
+        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+        borderBottom: "1px solid #ccc",
+      }}
+    >
+      <button
+        onClick={() => setShowLeadViewModal(false)}
+        style={{
+          position: "absolute",
+          top: "16px",
+          right: "16px",
+          background: "rgba(255,255,255,0.15)",
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255,255,255,0.2)",
+          color: "black",
+          width: "32px",
+          height: "32px",
+          borderRadius: "8px",
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+          e.currentTarget.style.transform = "scale(1.05)";
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+          e.currentTarget.style.transform = "scale(1)";
+        }}
+      >
+        <X size={18} />
+      </button>
+      
+      {/* Header Content */}
+      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <div
+          style={{
+            width: "64px",
+            height: "64px",
+            borderRadius: "16px",
+            background: "#2563eb",
+            backdropFilter: "blur(10px)",
+            border: "2px solid rgba(255,255,255,0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "28px",
+            fontWeight: "700",
+            flexShrink: 0,
+            color: "#fff",
+          }}
         >
-          {/* Custom Header */}
-          <div
-            style={{
-              color: "black",
-              padding: "30px",
-              position: "relative",
-              borderTopLeftRadius: "8px",
-              borderTopRightRadius: "8px",
-              borderBottom: "1px solid #e5e7eb",
-            }}
-          >
-            <button
-              onClick={() => setShowLeadViewModal(false)}
-              style={{
-                position: "absolute",
-                top: "20px",
-                right: "20px",
-                background: "rgba(255,255,255,0.2)",
-                border: "none",
-                color: "black",
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                cursor: "pointer",
-                transition: "all 0.3s",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.3)";
-                e.currentTarget.style.transform = "rotate(90deg)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.2)";
-                e.currentTarget.style.transform = "rotate(0deg)";
-              }}
-            >
-              <X size={20} />
-            </button>
-            <h3 style={{ margin: 0, fontWeight: 600, fontSize: "24px" }}>
-              {viewingLead.name}
-            </h3>
-            <p style={{ margin: "8px 0 0 0", opacity: 0.9, fontSize: "14px" }}>
-              Lead Details
-            </p>
-          </div>
-
-          <Modal.Body style={{ padding: "30px" }}>
-            {loadingLead ? (
-              <div className="text-center py-4">
-                <div className="spinner-border" role="status">
-                  <span className="visually-hidden">Loading...</span>
-                </div>
-              </div>
-            ) : (
+          {viewingLead.name
+            ? viewingLead.name.charAt(0).toUpperCase()
+            : "L"}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h2 style={{ 
+            margin: 0, 
+            fontWeight: 700, 
+            fontSize: "26px",
+            textShadow: "0 2px 4px rgba(0,0,0,0.1)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}>
+            {viewingLead.name}
+          </h2>
+          <div style={{ 
+            marginTop: "6px", 
+            opacity: 0.95, 
+            fontSize: "14px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+            color: "#000",
+          }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <Target size={14} />
+              {viewingLead.stage?.name || "No stage"}
+            </span>
+            <span>•</span>
+            <span>
+              Created {viewingLead.created_at
+                ? moment(viewingLead.created_at).format("MMM DD, YYYY")
+                : "N/A"}
+            </span>
+            {viewingLead.is_lost && (
               <>
-                <style>{`
-                  .lead-detail-filter-buttons {
-                    display: flex;
-                    flex-direction: row;
-                    align-items: center;
-                    gap: 12px;
-                    flex-wrap: wrap;
-                    margin-bottom: 0;
-                    padding: 0;
-                    width: 100%;
-                  }
-
-                  .lead-detail-filter-button {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 10px 20px;
-                    border-radius: 8px;
-                    border: 1px solid;
-                    font-weight: 500;
-                    font-size: 14px;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                    background: white;
-                    white-space: nowrap;
-                  }
-
-                  .lead-detail-filter-button:hover {
-                    transform: translateY(-1px);
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                  }
-
-                  .lead-detail-filter-button.active {
-                    color: white;
-                  }
-
-                  .lead-detail-filter-button.active .filter-icon {
-                    color: white;
-                  }
-
-                  .lead-detail-filter-button:not(.active) .filter-icon {
-                    color: inherit;
-                  }
-
-                  .filter-icon {
-                    width: 18px;
-                    height: 18px;
-                    flex-shrink: 0;
-                  }
-                `}</style>
-                {/* Tabs Navigation */}
-                <div className="lead-detail-filter-buttons   mb-4">
-                  <button
-                    className={`lead-detail-filter-button ${activeTab === "general-info" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("general-info")}
-                    style={{
-                      backgroundColor: activeTab === "general-info" ? "#4680ff" : 'white',
-                      borderColor: "#4680ff",
-                      color: activeTab === "general-info" ? 'white' : "#4680ff"
-                    }}
-                  >
-                    <Target className="filter-icon" size={18} />
-                    <span>General Information</span>
-                  </button>
-                  <button
-                    className={`lead-detail-filter-button ${activeTab === "campaign-prospect" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("campaign-prospect")}
-                    style={{
-                      backgroundColor: activeTab === "campaign-prospect" ? "#4680ff" : 'white',
-                      borderColor: "#4680ff",
-                      color: activeTab === "campaign-prospect" ? 'white' : "#4680ff"
-                    }}
-                  >
-                    <FileText className="filter-icon" size={18} />
-                    <span>Campaign & Prospect</span>
-                  </button>
-                </div>
-
-                {/* Tab Content */}
-                {activeTab === "general-info" && (
-                  <div style={{ paddingTop: "20px" }}>
-                      {/* Lead Information Section */}
-                      <div
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 600,
-                          color: "#1f2937",
-                          marginBottom: "20px",
-                          paddingBottom: "10px",
-                          borderBottom: "2px solid #f8f9fa",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <Target size={18} style={{ color: "#4680ff" }} />
-                        Lead Information
-                      </div>
-                <div
+                <span>•</span>
+                <Badge 
+                  bg="danger"
                   style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                    gap: "20px",
-                    marginBottom: "30px",
+                    fontWeight: 500,
                   }}
                 >
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Lead Name
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {viewingLead.name}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Stage
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      <Badge
-                        bg={
-                          viewingLead.stage?.name
-                            ?.toLowerCase()
-                            .includes("qualified")
-                            ? "success"
-                            : viewingLead.stage?.name
-                                ?.toLowerCase()
-                                .includes("contacted")
-                            ? "info"
-                            : "secondary"
-                        }
-                        style={{
-                          padding: "6px 14px",
-                          borderRadius: "20px",
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          backgroundColor:
-                            viewingLead.stage?.color || "#6c757d",
-                        }}
-                      >
-                        {viewingLead.stage?.name || "Not assigned"}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Lead Potential
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      <Badge
-                        bg={
-                          viewingLead.lead_potential === "Hot"
-                            ? "danger"
-                            : viewingLead.lead_potential === "Warm"
-                            ? "warning"
-                            : "secondary"
-                        }
-                        style={{
-                          padding: "6px 14px",
-                          borderRadius: "20px",
-                          fontSize: "12px",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {viewingLead.lead_potential || "N/A"}
-                      </Badge>
-                    </div>
-                  </div>
+                  Lost
+                </Badge>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
 
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Assigned To
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      <User
-                        size={14}
-                        style={{
-                          color: "#4680ff",
-                          marginRight: "6px",
-                          display: "inline",
-                        }}
-                      />
-                      {extensions.find(
-                        (ext: any) =>
-                          ext?.id == viewingLead?.user_extension ||
-                          ext?.extension == viewingLead?.user_extension
-                      )?.display_name ||
-                        extensions.find(
-                          (ext: any) =>
-                            ext?.id == viewingLead?.user_extension ||
-                            ext?.extension == viewingLead?.user_extension
-                        )?.name ||
-                        viewingLead.user_extension ||
-                        "Not assigned"}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Created Date
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      <Calendar
-                        size={14}
-                        style={{
-                          color: "#4680ff",
-                          marginRight: "6px",
-                          display: "inline",
-                        }}
-                      />
-                      {viewingLead.created_at
-                        ? formatDateForTable(viewingLead.created_at)
-                        : "N/A"}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Lead Score (Based on Stage)
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      <ChartLine
-                        size={14}
-                        style={{
-                          color: "#4680ff",
-                          marginRight: "6px",
-                          display: "inline",
-                        }}
-                      />
-                      {viewingLead?.lead_score !== null
-                        ? `${viewingLead?.lead_score}%`
-                        : "Not Set"}
-                    </div>
-                  </div>
-                </div>
+    <Modal.Body style={{ padding: 0, maxHeight: "calc(90vh - 200px)", overflowY: "auto" }}>
+      {loadingLead ? (
+        <div style={{
+          padding: "48px 20px",
+          textAlign: "center",
+        }}>
+          <Spinner animation="border" variant="primary" size="sm" style={{ marginBottom: "12px" }} />
+          <p className="mb-0" style={{ color: "#6b7280", fontSize: "14px" }}>Loading lead details...</p>
+        </div>
+      ) : (
+        <>
+          <style>{`
+            .lead-detail-filter-buttons {
+              display: flex;
+              flex-direction: row;
+              align-items: center;
+              gap: 12px;
+              flex-wrap: wrap;
+              margin-bottom: 0;
+              padding: 0;
+              width: 100%;
+            }
 
-                      {/* Company Information Section */}
-                      <div
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 600,
-                          color: "#1f2937",
-                          marginTop: "40px",
-                          marginBottom: "20px",
-                          paddingBottom: "10px",
-                          borderBottom: "2px solid #f8f9fa",
+            .lead-detail-filter-button {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              padding: 10px 20px;
+              border-radius: 8px;
+              border: 1px solid;
+              font-weight: 500;
+              font-size: 14px;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              background: white;
+              white-space: nowrap;
+            }
+
+            .lead-detail-filter-button:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
+
+            .lead-detail-filter-button.active {
+              color: white;
+            }
+
+            .lead-detail-filter-button.active .filter-icon {
+              color: white;
+            }
+
+            .lead-detail-filter-button:not(.active) .filter-icon {
+              color: inherit;
+            }
+
+            .filter-icon {
+              width: 18px;
+              height: 18px;
+              flex-shrink: 0;
+            }
+          `}</style>
+
+          {/* Main Content Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", minHeight: "500px" }}>
+            
+            {/* Left Panel - Main Information */}
+            <div style={{ padding: "32px", borderRight: "1px solid #e5e7eb" }}>
+              
+              {/* Tabs Navigation */}
+              <div className="lead-detail-filter-buttons mb-4">
+                <button
+                  className={`lead-detail-filter-button ${activeTab === "general-info" ? 'active' : ''}`}
+                  onClick={() => setActiveTab("general-info")}
+                  style={{
+                    backgroundColor: activeTab === "general-info" ? "#2563eb" : 'white',
+                    borderColor: "#2563eb",
+                    color: activeTab === "general-info" ? 'white' : "#2563eb"
+                  }}
+                >
+                  <Target className="filter-icon" size={18} />
+                  <span>General Information</span>
+                </button>
+                <button
+                  className={`lead-detail-filter-button ${activeTab === "campaign-prospect" ? 'active' : ''}`}
+                  onClick={() => setActiveTab("campaign-prospect")}
+                  style={{
+                    backgroundColor: activeTab === "campaign-prospect" ? "#2563eb" : 'white',
+                    borderColor: "#2563eb",
+                    color: activeTab === "campaign-prospect" ? 'white' : "#2563eb"
+                  }}
+                >
+                  <FileText className="filter-icon" size={18} />
+                  <span>Campaign & Prospect</span>
+                </button>
+              </div>
+
+              {/* Tab Content */}
+              {activeTab === "general-info" && (
+                <div>
+                  {/* Quick Info Cards */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px", marginBottom: "28px" }}>
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = "translateY(-4px)";
+                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(37, 99, 235, 0.15)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "10px",
+                          background: "#2563eb",
                           display: "flex",
                           alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <Building2 size={18} style={{ color: "#4680ff" }} />
-                        Company Information
-                      </div>
-                    {viewingLead.company_name ? (
-                      <>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fit, minmax(250px, 1fr))",
-                        gap: "20px",
-                        marginBottom: "30px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          background: "#f8f9fa",
-                          padding: "16px",
-                          borderRadius: "10px",
-                          transition: "all 0.3s",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = "#e5e7eb";
-                          e.currentTarget.style.transform = "translateY(-2px)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = "#f8f9fa";
-                          e.currentTarget.style.transform = "translateY(0)";
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.5px",
-                            marginBottom: "6px",
-                          }}
-                        >
-                          Company Name
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          <User size={20} style={{ color: "white" }} />
                         </div>
-                        <div
-                          style={{
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#2563eb",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.8px",
+                            marginBottom: "4px",
+                          }}>
+                            Assigned To
+                          </div>
+                          <div style={{
                             fontSize: "15px",
                             color: "#1f2937",
-                            fontWeight: 500,
-                          }}
-                        >
-                          <Building2
-                            size={14}
-                            style={{
-                              color: "#4680ff",
-                              marginRight: "6px",
-                              display: "inline",
-                            }}
-                          />
-                          {viewingLead.company_name}
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>
+                            {extensions.find(
+                              (ext: any) =>
+                                ext?.id == viewingLead?.user_extension ||
+                                ext?.extension == viewingLead?.user_extension
+                            )?.display_name ||
+                              extensions.find(
+                                (ext: any) =>
+                                  ext?.id == viewingLead?.user_extension ||
+                                  ext?.extension == viewingLead?.user_extension
+                              )?.name ||
+                              viewingLead.user_extension ||
+                              "Not assigned"}
+                          </div>
                         </div>
                       </div>
-                      {viewingLead.industry && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Industry
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {viewingLead.industry}
-                          </div>
-                        </div>
-                      )}
-                      {viewingLead.business_type && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Business Type
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {viewingLead.business_type}
-                          </div>
-                        </div>
-                      )}
-                      {viewingLead.company_size && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Company Size
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {viewingLead.company_size}
-                          </div>
-                        </div>
-                      )}
-                      {viewingLead.company_city && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Location
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {[
-                              viewingLead.company_city,
-                              viewingLead.company_country,
-                            ]
-                              .filter(Boolean)
-                              .join(", ") || "N/A"}
-                          </div>
-                        </div>
-                      )}
                     </div>
-                  </>
-                ) : (
-                  <div style={{
-                    padding: "40px",
-                    textAlign: "center",
-                    color: "#6b7280",
-                    background: "#f8f9fa",
-                    borderRadius: "10px"
-                  }}>
-                    No company information available
-                  </div>
-                )}
 
-                      {/* Contact Persons Section */}
-                      <div
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 600,
-                          color: "#1f2937",
-                          marginTop: "40px",
-                          marginBottom: "20px",
-                          paddingBottom: "10px",
-                          borderBottom: "2px solid #f8f9fa",
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = "translateY(-4px)";
+                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(37, 99, 235, 0.15)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "10px",
+                          background: "#0284c7",
                           display: "flex",
                           alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <Users size={18} style={{ color: "#4680ff" }} />
-                        Contact Persons ({viewingLead.contact_persons && Array.isArray(viewingLead.contact_persons) ? viewingLead.contact_persons.length : 0})
-                      </div>
-                      {viewingLead.contact_persons &&
-                        Array.isArray(viewingLead.contact_persons) &&
-                        viewingLead.contact_persons.length > 0 ? (
-                        <>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns:
-                            "repeat(auto-fit, minmax(300px, 1fr))",
-                          gap: "20px",
-                          marginBottom: "30px",
-                        }}
-                      >
-                        {viewingLead.contact_persons.map(
-                          (person: any, index: number) => (
-                            <div
-                              key={index}
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          <Target size={20} style={{ color: "white" }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#0284c7",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.8px",
+                            marginBottom: "4px",
+                          }}>
+                            Lead Potential
+                          </div>
+                          <div style={{
+                            fontSize: "15px",
+                            color: "#1f2937",
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>
+                            <Badge
+                              bg={
+                                viewingLead.lead_potential === "Hot"
+                                  ? "danger"
+                                  : viewingLead.lead_potential === "Warm"
+                                  ? "warning"
+                                  : "secondary"
+                              }
                               style={{
-                                background: "#f8f9fa",
-                                padding: "16px",
-                                borderRadius: "10px",
-                                transition: "all 0.3s",
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.background = "#e5e7eb";
-                                e.currentTarget.style.transform =
-                                  "translateY(-2px)";
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.background = "#f8f9fa";
-                                e.currentTarget.style.transform =
-                                  "translateY(0)";
+                                padding: "6px 14px",
+                                borderRadius: "20px",
+                                fontSize: "12px",
+                                fontWeight: 600,
                               }}
                             >
+                              {viewingLead.lead_potential || "N/A"}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = "translateY(-4px)";
+                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(37, 99, 235, 0.15)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "10px",
+                          background: viewingLead.stage?.color || "#6c757d",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          <Target size={20} style={{ color: "white" }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.8px",
+                            marginBottom: "4px",
+                          }}>
+                            Stage
+                          </div>
+                          <div style={{
+                            fontSize: "15px",
+                            color: "#1f2937",
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>
+                            {viewingLead.stage?.name || "Not assigned"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = "translateY(-4px)";
+                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(37, 99, 235, 0.15)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "10px",
+                          background: "#10b981",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          <ChartLine size={20} style={{ color: "white" }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#10b981",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.8px",
+                            marginBottom: "4px",
+                          }}>
+                            Lead Score
+                          </div>
+                          <div style={{
+                            fontSize: "15px",
+                            color: "#1f2937",
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>
+                            {viewingLead?.lead_score !== null
+                              ? `${viewingLead?.lead_score}%`
+                              : "Not Set"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Lead Information Section */}
+                  <div style={{ marginBottom: "28px" }}>
+                    <h5 style={{
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      color: "#1f2937",
+                      marginBottom: "16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}>
+                      <div style={{
+                        width: "4px",
+                        height: "18px",
+                        background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                        borderRadius: "2px",
+                      }} />
+                      Lead Details
+                    </h5>
+                    <div style={{
+                      background: "#f9fafb",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      padding: "20px",
+                    }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
+                          <User size={16} style={{ color: "#2563eb" }} />
+                          Lead Name
+                        </div>
+                        <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
+                          {viewingLead.name}
+                        </div>
+                        
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
+                          <Calendar size={16} style={{ color: "#2563eb" }} />
+                          Created
+                        </div>
+                        <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
+                          {viewingLead.created_at
+                            ? moment(viewingLead.created_at).format("MMMM DD, YYYY [at] hh:mm A")
+                            : "N/A"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Company Information Section */}
+                  {viewingLead.company_name && (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        color: "#1f2937",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Company Information
+                      </h5>
+                      <div style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Company Name
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              <Building2 size={14} style={{ color: "#2563eb", marginRight: "6px", display: "inline" }} />
+                              {viewingLead.company_name}
+                            </div>
+                          </div>
+                          {viewingLead.industry && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Industry
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                {viewingLead.industry}
+                              </div>
+                            </div>
+                          )}
+                          {viewingLead.business_type && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Business Type
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                {viewingLead.business_type}
+                              </div>
+                            </div>
+                          )}
+                          {viewingLead.company_size && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Company Size
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                {viewingLead.company_size}
+                              </div>
+                            </div>
+                          )}
+                          {viewingLead.company_city && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Location
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                {[viewingLead.company_city, viewingLead.company_country]
+                                  .filter(Boolean)
+                                  .join(", ") || "N/A"}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Contact Persons Section */}
+                  {viewingLead.contact_persons &&
+                    Array.isArray(viewingLead.contact_persons) &&
+                    viewingLead.contact_persons.length > 0 && (
+                      <div style={{ marginBottom: "28px" }}>
+                        <h5 style={{
+                          fontSize: "15px",
+                          fontWeight: 700,
+                          color: "#1f2937",
+                          marginBottom: "16px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}>
+                          <div style={{
+                            width: "4px",
+                            height: "18px",
+                            background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                            borderRadius: "2px",
+                          }} />
+                          Contact Persons
+                          <Badge 
+                            bg="secondary"
+                            style={{
+                              marginLeft: "8px",
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              padding: "4px 10px",
+                              borderRadius: "6px",
+                            }}
+                          >
+                            {viewingLead.contact_persons.length}
+                          </Badge>
+                        </h5>
+                        <div style={{
+                          background: "#f9fafb",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "12px",
+                          padding: "20px",
+                        }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                            {viewingLead.contact_persons.map((person: any, index: number) => (
                               <div
+                                key={index}
                                 style={{
+                                  background: "white",
+                                  padding: "16px",
+                                  borderRadius: "8px",
+                                  border: "1px solid #e5e7eb",
+                                }}
+                              >
+                                <div style={{
                                   fontSize: "14px",
                                   fontWeight: 600,
                                   color: "#1f2937",
-                                  marginBottom: "12px",
-                                }}
-                              >
-                                {person.title} {person.name}
-                              </div>
-                              {person.email && (
-                                <div
-                                  style={{
+                                  marginBottom: "8px",
+                                }}>
+                                  {person.title} {person.name}
+                                </div>
+                                {person.email && (
+                                  <div style={{
                                     fontSize: "13px",
                                     color: "#6b7280",
-                                    marginBottom: "6px",
-                                  }}
-                                >
-                                  <Mail
-                                    size={12}
-                                    style={{
-                                      marginRight: "6px",
-                                      display: "inline",
-                                    }}
-                                  />
-                                  {person.email}
-                                </div>
-                              )}
-                              {person.phone && (
-                                <div
-                                  style={{ fontSize: "13px", color: "#6b7280" }}
-                                >
-                                  <PhoneDisplay
-                                    phone={
-                                      person.phone_country_code && person.phone
-                                        ? `${person.phone_country_code}${person.phone}`
-                                        : person.phone
-                                    }
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          )
-                        )}
-                      </div>
-                      </>
-                    ) : (
-                      <div style={{
-                        padding: "40px",
-                        textAlign: "center",
-                        color: "#6b7280",
-                        background: "#f8f9fa",
-                        borderRadius: "10px"
-                      }}>
-                        No contact persons available
+                                    marginBottom: "4px",
+                                  }}>
+                                    <Mail size={12} style={{ marginRight: "6px", display: "inline" }} />
+                                    {person.email}
+                                  </div>
+                                )}
+                                {person.phone && (
+                                  <div style={{ fontSize: "13px", color: "#6b7280" }}>
+                                    <PhoneDisplay
+                                      phone={
+                                        person.phone_country_code && person.phone
+                                          ? `${person.phone_country_code}${person.phone}`
+                                          : person.phone
+                                      }
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     )}
-                  </div>
-                )}
 
-                {activeTab === "campaign-prospect" && (
-                  <div style={{ paddingTop: "20px" }}>
-                      {/* Campaign Information Section */}
-                      <div
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 600,
-                          color: "#1f2937",
-                          marginBottom: "20px",
-                          paddingBottom: "10px",
-                          borderBottom: "2px solid #f8f9fa",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <FileText size={18} style={{ color: "#4680ff" }} />
-                        Campaign Information
+                  {/* Description */}
+                  {viewingLead.description && (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        color: "#1f2937",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Description
+                      </h5>
+                      <div style={{
+                        background: "#fffbeb",
+                        border: "1px solid #fcd34d",
+                        borderRadius: "12px",
+                        padding: "16px 20px",
+                        fontSize: "14px",
+                        color: "#78350f",
+                        lineHeight: "1.6",
+                        whiteSpace: "pre-wrap",
+                      }}>
+                        {viewingLead.description}
                       </div>
-                      {viewingLead.campaign ? (
-                        <>
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns:
-                                "repeat(auto-fit, minmax(250px, 1fr))",
-                              gap: "20px",
-                              marginBottom: "30px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                background: "#f8f9fa",
-                                padding: "16px",
-                                borderRadius: "10px",
-                                transition: "all 0.3s",
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.background = "#e5e7eb";
-                                e.currentTarget.style.transform = "translateY(-2px)";
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.background = "#f8f9fa";
-                                e.currentTarget.style.transform = "translateY(0)";
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: "12px",
-                                  fontWeight: 600,
-                                  color: "#6b7280",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.5px",
-                                  marginBottom: "6px",
-                                }}
-                              >
-                                Campaign Name
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "15px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                }}
-                              >
-                                {viewingLead.campaign.name}
-                              </div>
-                            </div>
-                            {viewingLead.campaign_field_values &&
-                              Object.keys(viewingLead.campaign_field_values).length >
-                                0 &&
-                              Object.entries(viewingLead.campaign_field_values).map(
-                                ([key, value]: [string, any]) => (
-                                  <div
-                                    key={key}
-                                    style={{
-                                      background: "#f8f9fa",
-                                      padding: "16px",
-                                      borderRadius: "10px",
-                                      transition: "all 0.3s",
-                                    }}
-                                    onMouseOver={(e) => {
-                                      e.currentTarget.style.background = "#e5e7eb";
-                                      e.currentTarget.style.transform =
-                                        "translateY(-2px)";
-                                    }}
-                                    onMouseOut={(e) => {
-                                      e.currentTarget.style.background = "#f8f9fa";
-                                      e.currentTarget.style.transform =
-                                        "translateY(0)";
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 600,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      {key}
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "15px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                      }}
-                                    >
-                                      {String(value)}
-                                    </div>
-                                  </div>
-                                )
-                              )}
+                    </div>
+                  )}
+
+                  {/* Lost Reason */}
+                  {viewingLead.is_lost && viewingLead.lost_reason && (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        color: "#1f2937",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Lead Lost Information
+                      </h5>
+                      <div style={{
+                        background: "#fee2e2",
+                        border: "1px solid #fecaca",
+                        borderRadius: "12px",
+                        padding: "16px 20px",
+                      }}>
+                        <div style={{
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#dc2626",
+                          marginBottom: "8px",
+                        }}>
+                          Reason: {viewingLead.lost_reason.name}
+                        </div>
+                        {viewingLead.lost_feedback && (
+                          <div style={{
+                            fontSize: "13px",
+                            color: "#991b1b",
+                            lineHeight: "1.6",
+                          }}>
+                            Feedback: {viewingLead.lost_feedback}
                           </div>
-                      </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "campaign-prospect" && (
+                <div>
+                  {/* Campaign Information Section */}
+                  <div style={{ marginBottom: "28px" }}>
+                    <h5 style={{
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      color: "#1f2937",
+                      marginBottom: "16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}>
+                      <div style={{
+                        width: "4px",
+                        height: "18px",
+                        background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                        borderRadius: "2px",
+                      }} />
+                      Campaign Information
+                    </h5>
+                    {viewingLead.campaign ? (
+                      <div style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Campaign Name
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              {viewingLead.campaign.name}
+                            </div>
+                          </div>
+                          {viewingLead.campaign_field_values &&
+                            Object.keys(viewingLead.campaign_field_values).length > 0 &&
+                            Object.entries(viewingLead.campaign_field_values).map(
+                              ([key, value]: [string, any]) => (
+                                <div key={key}>
+                                  <div style={{
+                                    fontSize: "12px",
+                                    fontWeight: 700,
+                                    color: "#6b7280",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.5px",
+                                    marginBottom: "6px",
+                                  }}>
+                                    {key}
+                                  </div>
+                                  <div style={{
+                                    fontSize: "14px",
+                                    color: "#1f2937",
+                                    fontWeight: 500,
+                                    wordBreak: "break-word",
+                                  }}>
+                                    {String(value)}
+                                  </div>
+                                </div>
+                              )
+                            )}
+                        </div>
+                      </div>
                     ) : (
                       <div style={{
                         padding: "40px",
                         textAlign: "center",
                         color: "#6b7280",
-                        background: "#f8f9fa",
-                        borderRadius: "10px"
+                        background: "#f9fafb",
+                        border: "2px dashed #d1d5db",
+                        borderRadius: "12px"
                       }}>
                         No campaign information available
                       </div>
                     )}
-
-                      {/* Prospect Information Section */}
-                      <div
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 600,
-                          color: "#1f2937",
-                          marginTop: "40px",
-                          marginBottom: "20px",
-                          paddingBottom: "10px",
-                          borderBottom: "2px solid #f8f9fa",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <FileText size={18} style={{ color: "#4680ff" }} />
-                        Prospect Information
-                      </div>
-                      {viewingLead.crm_data ? (
-                        <>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fit, minmax(250px, 1fr))",
-                        gap: "20px",
-                        marginBottom: "30px",
-                      }}
-                    >
-                      {viewingLead.crm_data.id && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            CRM Data ID
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            #{viewingLead.crm_data.id}
-                          </div>
-                        </div>
-                      )}
-                      {(viewingLead.crm_data.name ||
-                        (viewingLead.crm_data.data &&
-                          viewingLead.crm_data.data.name)) && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Name
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {viewingLead.crm_data.name ||
-                              (viewingLead.crm_data.data &&
-                                viewingLead.crm_data.data.name) ||
-                              "N/A"}
-                          </div>
-                        </div>
-                      )}
-                      {(viewingLead.crm_data.phone ||
-                        (viewingLead.crm_data.data &&
-                          viewingLead.crm_data.data.phone)) && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Phone
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            <PhoneDisplay
-                              phone={
-                                viewingLead.crm_data.phone ||
-                                (viewingLead.crm_data.data &&
-                                  viewingLead.crm_data.data.phone) ||
-                                ""
-                              }
-                            />
-                          </div>
-                        </div>
-                      )}
-                      {viewingLead.crm_data.source_file && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Source File
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {viewingLead.crm_data.source_file}
-                          </div>
-                        </div>
-                      )}
-                      {viewingLead.crm_data.uploaded_by && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Uploaded By
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            <User
-                              size={14}
-                              style={{
-                                color: "#4680ff",
-                                marginRight: "6px",
-                                display: "inline",
-                              }}
-                            />
-                            {viewingLead.crm_data.uploaded_by}
-                          </div>
-                        </div>
-                      )}
-
-                      {viewingLead?.crm_data?.scheduled_call_at && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Prospect Call Scheduled At
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            <Calendar
-                              size={14}
-                              style={{
-                                color: "#4680ff",
-                                marginRight: "6px",
-                                display: "inline",
-                              }}
-                            />
-                            {(() => {
-                              const scheduledAt =
-                                viewingLead.crm_data.scheduled_call_at;
-                              const isOverdue = moment(scheduledAt).isBefore(
-                                moment()
-                              );
-                              const isNextHour = moment(scheduledAt).isBefore(
-                                moment().add(1, "hour")
-                              );
-                              return (
-                                <span>
-                                  {moment(scheduledAt).format(
-                                    "MMM DD, YYYY HH:mm"
-                                  )}
-                                  {isOverdue && (
-                                    <Badge
-                                      bg="danger"
-                                      className="ms-2"
-                                      style={{
-                                        fontSize: "10px",
-                                        padding: "2px 6px",
-                                      }}
-                                    >
-                                      Overdue
-                                    </Badge>
-                                  )}
-                                  {isNextHour && !isOverdue && (
-                                    <Badge
-                                      bg="warning"
-                                      className="ms-2"
-                                      style={{
-                                        fontSize: "10px",
-                                        padding: "2px 6px",
-                                      }}
-                                    >
-                                      Soon
-                                    </Badge>
-                                  )}
-                                </span>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      )}
-                      {viewingLead.crm_data.created_at && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Created At
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            <Calendar
-                              size={14}
-                              style={{
-                                color: "#4680ff",
-                                marginRight: "6px",
-                                display: "inline",
-                              }}
-                            />
-                            {formatDateForTable(
-                              viewingLead.crm_data.created_at
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {/* Scheduled Call Information */}
-                    {viewingLead.crm_data?.note && (
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns:
-                            "repeat(auto-fit, minmax(250px, 1fr))",
-                          gap: "20px",
-                          marginBottom: "30px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                            gridColumn: "span 2",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Scheduled Call Notes
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              whiteSpace: "pre-wrap",
-                            }}
-                          >
-                            {viewingLead.crm_data.note}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div style={{
-                    padding: "40px",
-                    textAlign: "center",
-                    color: "#6b7280",
-                    background: "#f8f9fa",
-                    borderRadius: "10px"
-                  }}>
-                    No prospect information available
                   </div>
-                )}
 
-                      {/* Prospect Fields Section */}
-                      <div
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 600,
-                          color: "#1f2937",
-                          marginTop: "40px",
-                          marginBottom: "20px",
-                          paddingBottom: "10px",
-                          borderBottom: "2px solid #f8f9fa",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <FileText size={18} style={{ color: "#4680ff" }} />
-                        Prospect Fields
-                      </div>
-                      {viewingLead.crm_data?.data &&
-                        typeof viewingLead.crm_data.data === "object" &&
-                        Object.keys(viewingLead.crm_data.data).length > 0 ? (
-                        <>
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns:
-                                "repeat(auto-fit, minmax(250px, 1fr))",
-                              gap: "20px",
-                              marginBottom: "30px",
-                            }}
-                          >
-                            {Object.entries(viewingLead.crm_data.data)
-                              .filter(
-                                ([key]) =>
-                                  key.toLowerCase() !== "name" &&
-                                  key.toLowerCase() !== "phone"
-                              )
-                              .map(([key, value]: [string, any]) => (
-                                <div
-                                  key={key}
-                                  style={{
-                                    background: "#f8f9fa",
-                                    padding: "16px",
-                                    borderRadius: "10px",
-                                    transition: "all 0.3s",
-                                  }}
-                                  onMouseOver={(e) => {
-                                    e.currentTarget.style.background =
-                                      "#e5e7eb";
-                                    e.currentTarget.style.transform =
-                                      "translateY(-2px)";
-                                  }}
-                                  onMouseOut={(e) => {
-                                    e.currentTarget.style.background =
-                                      "#f8f9fa";
-                                    e.currentTarget.style.transform =
-                                      "translateY(0)";
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 600,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    {key}
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "15px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    {String(value || "N/A")}
-                                  </div>
-                                </div>
-                              ))}
+                  {/* Prospect Information Section */}
+                  <div style={{ marginBottom: "28px" }}>
+                    <h5 style={{
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      color: "#1f2937",
+                      marginBottom: "16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}>
+                      <div style={{
+                        width: "4px",
+                        height: "18px",
+                        background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                        borderRadius: "2px",
+                      }} />
+                      Prospect Information
+                    </h5>
+                    {viewingLead.crm_data ? (
+                      <div style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                          {viewingLead.crm_data.id && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                CRM Data ID
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                #{viewingLead.crm_data.id}
+                              </div>
+                            </div>
+                          )}
+                          {(viewingLead.crm_data.name || (viewingLead.crm_data.data && viewingLead.crm_data.data.name)) && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Name
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                {viewingLead.crm_data.name || (viewingLead.crm_data.data && viewingLead.crm_data.data.name) || "N/A"}
+                              </div>
+                            </div>
+                          )}
+                          {(viewingLead.crm_data.phone || (viewingLead.crm_data.data && viewingLead.crm_data.data.phone)) && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Phone
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <PhoneDisplay
+                                  phone={
+                                    viewingLead.crm_data.phone ||
+                                    (viewingLead.crm_data.data && viewingLead.crm_data.data.phone) ||
+                                    ""
+                                  }
+                                />
+                              </div>
+                            </div>
+                          )}
+                          {viewingLead.crm_data.source_file && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Source File
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                {viewingLead.crm_data.source_file}
+                              </div>
+                            </div>
+                          )}
+                          {viewingLead.crm_data.uploaded_by && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Uploaded By
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <User size={14} style={{ color: "#2563eb", marginRight: "6px", display: "inline" }} />
+                                {viewingLead.crm_data.uploaded_by}
+                              </div>
+                            </div>
+                          )}
+                          {viewingLead?.crm_data?.scheduled_call_at && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Scheduled Call
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <Calendar size={14} style={{ color: "#2563eb", marginRight: "6px", display: "inline" }} />
+                                {(() => {
+                                  const scheduledAt = viewingLead.crm_data.scheduled_call_at;
+                                  const isOverdue = moment(scheduledAt).isBefore(moment());
+                                  const isNextHour = moment(scheduledAt).isBefore(moment().add(1, "hour"));
+                                  return (
+                                    <span>
+                                      {moment(scheduledAt).format("MMM DD, YYYY HH:mm")}
+                                      {isOverdue && (
+                                        <Badge bg="danger" className="ms-2" style={{ fontSize: "10px", padding: "2px 6px" }}>
+                                          Overdue
+                                        </Badge>
+                                      )}
+                                      {isNextHour && !isOverdue && (
+                                        <Badge bg="warning" className="ms-2" style={{ fontSize: "10px", padding: "2px 6px" }}>
+                                          Soon
+                                        </Badge>
+                                      )}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          )}
+                          {viewingLead.crm_data.created_at && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Created At
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <Calendar size={14} style={{ color: "#2563eb", marginRight: "6px", display: "inline" }} />
+                                {formatDateForTable(viewingLead.crm_data.created_at)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Scheduled Call Notes */}
+                        {viewingLead.crm_data?.note && (
+                          <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: "1px solid #e5e7eb" }}>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "8px",
+                            }}>
+                              Scheduled Call Notes
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              lineHeight: "1.6",
+                              whiteSpace: "pre-wrap",
+                            }}>
+                              {viewingLead.crm_data.note}
+                            </div>
                           </div>
-                      </>
+                        )}
+                      </div>
                     ) : (
                       <div style={{
                         padding: "40px",
                         textAlign: "center",
                         color: "#6b7280",
-                        background: "#f8f9fa",
-                        borderRadius: "10px"
+                        background: "#f9fafb",
+                        border: "2px dashed #d1d5db",
+                        borderRadius: "12px"
                       }}>
-                        No prospect fields available
+                        No prospect information available
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* Lost Reason */}
-                {viewingLead.is_lost && viewingLead.lost_reason && (
-                  <div
-                    style={{
-                      background: "#fee2e2",
-                      border: "1px solid #fecaca",
-                      borderRadius: "8px",
-                      padding: "16px",
-                      marginBottom: "30px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "14px",
-                        fontWeight: 600,
-                        color: "#dc2626",
-                        marginBottom: "8px",
-                      }}
-                    >
-                      Lead Lost
-                    </div>
-                    <div style={{ fontSize: "13px", color: "#991b1b" }}>
-                      Reason: {viewingLead.lost_reason.name}
-                    </div>
-                    {viewingLead.lost_feedback && (
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          color: "#991b1b",
-                          marginTop: "8px",
-                        }}
-                      >
-                        Feedback: {viewingLead.lost_feedback}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Audit Trail / History */}
-
-                {/* Description */}
-                {viewingLead.description && (
-                  <React.Fragment>
-                    <div
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: 600,
+                  {/* Prospect Fields Section */}
+                  {viewingLead.crm_data?.data && typeof viewingLead.crm_data.data === "object" && Object.keys(viewingLead.crm_data.data).length > 0 && (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
                         color: "#1f2937",
-                        marginBottom: "20px",
-                        paddingBottom: "10px",
-                        borderBottom: "2px solid #f8f9fa",
+                        marginBottom: "16px",
                         display: "flex",
                         alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
-                      <FileText size={18} style={{ color: "#4680ff" }} />
-                      Description
-                    </div>
-                    <div
-                      style={{
-                        background: "#f8f9fa",
-                        padding: "16px",
-                        borderRadius: "10px",
-                        marginBottom: "30px",
-                        fontSize: "14px",
-                        color: "#1f2937",
-                        whiteSpace: "pre-wrap",
-                      }}
-                    >
-                      {viewingLead.description}
-                    </div>
-                  </React.Fragment>
-                )}
-
-                {/* Follow-ups Timeline */}
-                {viewingLead.follow_ups &&
-                  Array.isArray(viewingLead.follow_ups) &&
-                  viewingLead.follow_ups.length > 0 && (
-                    <>
-                      <div
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 600,
-                          color: "#1f2937",
-                          marginBottom: "20px",
-                          paddingBottom: "10px",
-                          borderBottom: "2px solid #f8f9fa",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: "10px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "10px",
-                          }}
-                        >
-                          <History size={18} style={{ color: "#4680ff" }} />
-                          Follow-up Activity ({viewingLead.follow_ups.length})
-                        </div>
-                        {session?.user?.permissions?.includes(
-                          "add-follow-up-crm-leads"
-                        ) && (
-                          <Button
-                            variant="outline-primary"
-                            size="sm"
-                            onClick={() => {
-                              setFollowupData({
-                                leadId: viewingLead.id,
-                                leadName: viewingLead.name,
-                                followUpDate: "",
-                                followUpStatus: "Pending",
-                                communicationChannel: "Phone Call",
-                                communicationChannelOther: "",
-                                notes: "",
-                                userExtension:
-                                  (session?.user as any)?.extension || "admin",
-                              });
-                              setShowAddFollowupModal(true);
-                            }}
-                          >
-                            <Plus size={14} className="me-1" />
-                            Add Follow-up
-                          </Button>
-                        )}
-                      </div>
-                      <div
-                        style={{
-                          position: "relative",
-                          paddingLeft: "30px",
-                          marginBottom: "30px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            content: "",
-                            position: "absolute",
-                            left: "8px",
-                            top: 0,
-                            bottom: 0,
-                            width: "2px",
-                            background: "#e5e7eb",
-                          }}
-                        />
-                        {viewingLead.follow_ups.map(
-                          (followUp: any, idx: number) => (
-                            <div
-                              key={followUp.id || idx}
-                              style={{
-                                position: "relative",
-                                paddingBottom: "20px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  content: "",
-                                  position: "absolute",
-                                  left: "-26px",
-                                  top: "4px",
-                                  width: "12px",
-                                  height: "12px",
-                                  borderRadius: "50%",
-                                  background:
-                                    followUp.follow_up_status === "Completed"
-                                      ? "#10b981"
-                                      : "#4680ff",
-                                  border: "3px solid white",
-                                  boxShadow: "0 0 0 2px #e5e7eb",
-                                }}
-                              />
-                              <div
-                                style={{
-                                  background: "#f8f9fa",
-                                  padding: "12px 16px",
-                                  borderRadius: "8px",
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "flex-start",
-                                }}
-                              >
-                                <div style={{ flex: 1 }}>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      color: "#6b7280",
-                                      fontWeight: 600,
-                                      marginBottom: "4px",
-                                    }}
-                                  >
-                                    {followUp.follow_up_date
-                                      ? formatDateForTable(
-                                          followUp.follow_up_date
-                                        )
-                                      : "N/A"}{" "}
-                                    -{" "}
-                                    {followUp.communication_channel === "Other"
-                                      ? followUp.communication_channel_other
-                                      : followUp.communication_channel}
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      marginBottom: "4px",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    <Badge
-                                      bg={
-                                        followUp.follow_up_status ===
-                                        "Completed"
-                                          ? "success"
-                                          : followUp.follow_up_status ===
-                                            "In Progress"
-                                          ? "primary"
-                                          : "warning"
-                                      }
-                                    >
-                                      {followUp.follow_up_status}
-                                    </Badge>
-                                  </div>
-                                  {followUp.notes && (
-                                    <div
-                                      style={{
-                                        fontSize: "13px",
-                                        color: "#6b7280",
-                                        marginTop: "8px",
-                                      }}
-                                    >
-                                      {followUp.notes}
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="d-flex gap-1">
-                                  {session?.user?.permissions?.includes(
-                                    "add-follow-up-crm-leads"
-                                  ) && (
-                                    <Button
-                                      variant="link"
-                                      size="sm"
-                                      className="p-1"
-                                      title="Edit"
-                                      onClick={() =>
-                                        handleEditFollowUp(followUp)
-                                      }
-                                    >
-                                      <Edit size={16} />
-                                    </Button>
-                                  )}
-                                  {session?.user?.permissions?.includes(
-                                    "delete-follow-up-crm-leads"
-                                  ) && (
-                                    <Button
-                                      variant="link"
-                                      size="sm"
-                                      className="p-1 text-danger"
-                                      title="Delete"
-                                      onClick={() =>
-                                        handleDeleteFollowUp(
-                                          viewingLead.id,
-                                          followUp.id,
-                                          viewingLead.name
-                                        )
-                                      }
-                                    >
-                                      <Trash2 size={16} />
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        )}
-                      </div>
-                    </>
-                  )}
-
-                {/* Add Follow-up Button if no follow-ups exist */}
-                {(!viewingLead.follow_ups ||
-                  viewingLead.follow_ups.length === 0) && (
-                  <div
-                    style={{
-                      marginBottom: "30px",
-                      padding: "20px",
-                      background: "#f8f9fa",
-                      borderRadius: "10px",
-                      textAlign: "center",
-                    }}
-                  >
-                    <History
-                      size={32}
-                      style={{ color: "#9ca3af", marginBottom: "12px" }}
-                    />
-                    <div
-                      style={{
-                        fontSize: "14px",
-                        color: "#6b7280",
-                        marginBottom: "16px",
-                      }}
-                    >
-                      No follow-ups yet
-                    </div>
-                    {session?.user?.permissions?.includes(
-                      "add-follow-up-crm-leads"
-                    ) && (
-                      <Button
-                        variant="outline-primary"
-                        onClick={() => {
-                          setFollowupData({
-                            leadId: viewingLead.id,
-                            leadName: viewingLead.name,
-                            followUpDate: "",
-                            followUpStatus: "Pending",
-                            communicationChannel: "Phone Call",
-                            communicationChannelOther: "",
-                            notes: "",
-                            userExtension:
-                              (session?.user as any)?.extension || "admin",
-                          });
-                          setShowAddFollowupModal(true);
-                        }}
-                      >
-                        <Plus size={14} className="me-1" />
-                        Add Follow-up
-                      </Button>
-                    )}
-                  </div>
-                )}
-
-                {/* Meetings Timeline */}
-                {viewingLead.meetings &&
-                  Array.isArray(viewingLead.meetings) &&
-                  viewingLead.meetings.length > 0 && (
-                    <>
-                      <div
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 600,
-                          color: "#1f2937",
-                          marginBottom: "20px",
-                          paddingBottom: "10px",
-                          borderBottom: "2px solid #f8f9fa",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: "10px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "10px",
-                          }}
-                        >
-                          <Users size={18} style={{ color: "#4680ff" }} />
-                          Meetings ({viewingLead.meetings.length})
-                        </div>
-                        {session?.user?.permissions?.includes(
-                          "add-meeting-crm-leads"
-                        ) && (
-                          <Button
-                            variant="outline-primary"
-                            size="sm"
-                            onClick={() => {
-                              setMeetingData({
-                                leadId: viewingLead.id,
-                                leadName: viewingLead.name,
-                                meetingName: "",
-                                meetingType: "Online",
-                                meetingDate: "",
-                                meetingTime: "",
-                                meetingOutcome: "Scheduled",
-                                extensions: [],
-                              });
-                              setMeetingAttendees([]);
-                              setShowAddMeetingModal(true);
-                            }}
-                          >
-                            <Plus size={14} className="me-1" />
-                            Schedule Meeting
-                          </Button>
-                        )}
-                      </div>
-                      <div
-                        style={{
-                          position: "relative",
-                          paddingLeft: "30px",
-                          marginBottom: "30px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            content: "",
-                            position: "absolute",
-                            left: "8px",
-                            top: 0,
-                            bottom: 0,
-                            width: "2px",
-                            background: "#e5e7eb",
-                          }}
-                        />
-                        {viewingLead.meetings.map(
-                          (meeting: any, idx: number) => (
-                            <div
-                              key={meeting.id || idx}
-                              style={{
-                                position: "relative",
-                                paddingBottom: "20px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  content: "",
-                                  position: "absolute",
-                                  left: "-26px",
-                                  top: "4px",
-                                  width: "12px",
-                                  height: "12px",
-                                  borderRadius: "50%",
-                                  background:
-                                    meeting.meeting_outcome ===
-                                    "Completed - Successful"
-                                      ? "#10b981"
-                                      : meeting.meeting_outcome === "Cancelled"
-                                      ? "#dc3545"
-                                      : "#4680ff",
-                                  border: "3px solid white",
-                                  boxShadow: "0 0 0 2px #e5e7eb",
-                                }}
-                              />
-                              <div
-                                style={{
-                                  background: "#f8f9fa",
-                                  padding: "12px 16px",
-                                  borderRadius: "8px",
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "flex-start",
-                                }}
-                              >
-                                <div style={{ flex: 1 }}>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      marginBottom: "4px",
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    {meeting.name}
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      color: "#6b7280",
-                                      fontWeight: 600,
-                                      marginBottom: "4px",
-                                    }}
-                                  >
-                                    {meeting.meeting_date
-                                      ? formatDateForTable(meeting.meeting_date)
-                                      : "N/A"}{" "}
-                                    {meeting.meeting_time || ""} -{" "}
-                                    {meeting.meeting_type}
-                                  </div>
-                                  {meeting.meeting_outcome && (
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        marginBottom: "4px",
-                                        fontWeight: 500,
-                                      }}
-                                    >
-                                      <Badge
-                                        bg={
-                                          meeting.meeting_outcome ===
-                                          "Completed - Successful"
-                                            ? "success"
-                                            : meeting.meeting_outcome ===
-                                              "Completed - Needs Follow-up"
-                                            ? "info"
-                                            : meeting.meeting_outcome ===
-                                              "Cancelled"
-                                            ? "danger"
-                                            : meeting.meeting_outcome ===
-                                              "Rescheduled"
-                                            ? "warning"
-                                            : "secondary"
-                                        }
-                                      >
-                                        {meeting.meeting_outcome}
-                                      </Badge>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="d-flex gap-1">
-                                  {session?.user?.permissions?.includes(
-                                    "add-meeting-crm-leads"
-                                  ) && (
-                                    <Button
-                                      variant="link"
-                                      size="sm"
-                                      className="p-1"
-                                      title="Edit"
-                                      onClick={() => handleEditMeeting(meeting)}
-                                    >
-                                      <Edit size={16} />
-                                    </Button>
-                                  )}
-                                  {session?.user?.permissions?.includes(
-                                    "delete-meeting-crm-leads"
-                                  ) && (
-                                    <Button
-                                      variant="link"
-                                      size="sm"
-                                      className="p-1 text-danger"
-                                      title="Delete"
-                                      onClick={() =>
-                                        handleDeleteMeeting(
-                                          meeting.id,
-                                          meeting.name
-                                        )
-                                      }
-                                    >
-                                      <Trash2 size={16} />
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        )}
-                      </div>
-                    </>
-                  )}
-
-                {/* Add Meeting Button if no meetings exist */}
-                {(!viewingLead.meetings ||
-                  viewingLead.meetings.length === 0) && (
-                  <div
-                    style={{
-                      marginBottom: "30px",
-                      padding: "20px",
-                      background: "#f8f9fa",
-                      borderRadius: "10px",
-                      textAlign: "center",
-                    }}
-                  >
-                    <Users
-                      size={32}
-                      style={{ color: "#9ca3af", marginBottom: "12px" }}
-                    />
-                    <div
-                      style={{
-                        fontSize: "14px",
-                        color: "#6b7280",
-                        marginBottom: "16px",
-                      }}
-                    >
-                      No meetings scheduled yet
-                    </div>
-                    {session?.user?.permissions?.includes(
-                      "add-meeting-crm-leads"
-                    ) && (
-                      <Button
-                        variant="outline-primary"
-                        onClick={() => {
-                          setMeetingData({
-                            leadId: viewingLead.id,
-                            leadName: viewingLead.name,
-                            meetingName: "",
-                            meetingType: "Online",
-                            meetingDate: "",
-                            meetingTime: "",
-                            meetingOutcome: "Scheduled",
-                            extensions: [],
-                          });
-                          setShowAddMeetingModal(true);
-                        }}
-                      >
-                        <Plus size={14} className="me-1" />
-                        Schedule Meeting
-                      </Button>
-                    )}
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "12px",
-                    flexWrap: "wrap",
-                    paddingTop: "20px",
-                    borderTop: "1px solid #e5e7eb",
-                  }}
-                >
-                  {session?.user?.permissions?.includes("edit-crm-leads") && (
-                    <Button
-                      variant="primary"
-                      disabled={activeFilter === "lost"}
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: "8px",
-                        fontWeight: 500,
-                        fontSize: "14px",
-                        display: "inline-flex",
-                        alignItems: "center",
                         gap: "8px",
-                        background: activeFilter === "lost" ? "#9ca3af" : "#4680ff",
-                        border: "none",
-                        opacity: activeFilter === "lost" ? 0.6 : 1,
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Prospect Fields
+                      </h5>
+                      <div style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                          {Object.entries(viewingLead.crm_data.data)
+                            .filter(([key]) => key.toLowerCase() !== "name" && key.toLowerCase() !== "phone")
+                            .map(([key, value]: [string, any]) => (
+                              <div key={key}>
+                                <div style={{
+                                  fontSize: "12px",
+                                  fontWeight: 700,
+                                  color: "#6b7280",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.5px",
+                                  marginBottom: "6px",
+                                }}>
+                                  {key}
+                                </div>
+                                <div style={{
+                                  fontSize: "14px",
+                                  color: "#1f2937",
+                                  fontWeight: 500,
+                                  wordBreak: "break-word",
+                                }}>
+                                  {String(value || "N/A")}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Right Panel - Quick Actions & Timeline */}
+            <div style={{ 
+              padding: "32px 24px", 
+              background: "#fafbfc",
+              display: "flex",
+              flexDirection: "column",
+              gap: "24px",
+            }}>
+              
+              {/* Quick Actions */}
+              <div>
+                <h6 style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  marginBottom: "14px",
+                }}>
+                  Quick Actions
+                </h6>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {session?.user?.permissions?.includes("edit-crm-leads") && (
+                    <button
+                      style={{
+                        background: "white",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "10px",
+                        padding: "12px 16px",
                         cursor: activeFilter === "lost" ? "not-allowed" : "pointer",
+                        opacity: activeFilter === "lost" ? 0.6 : 1,
+                        transition: "all 0.2s ease",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                        color: "#1f2937",
                       }}
                       onClick={() => {
                         if (activeFilter === "lost") return;
                         setShowLeadViewModal(false);
                         window.location.href = `/crm/leads/${viewingLead.id}/edit`;
                       }}
+                      disabled={activeFilter === "lost"}
                       onMouseOver={(e) => {
                         if (activeFilter === "lost") return;
-                        e.currentTarget.style.background = "#3b6ce5";
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow =
-                          "0 4px 12px rgba(70, 128, 255, 0.4)";
+                        e.currentTarget.style.borderColor = "#2563eb";
+                        e.currentTarget.style.background = "#eff6ff";
+                        e.currentTarget.style.transform = "translateX(4px)";
                       }}
                       onMouseOut={(e) => {
                         if (activeFilter === "lost") return;
-                        e.currentTarget.style.background = "#4680ff";
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
+                        e.currentTarget.style.borderColor = "#e5e7eb";
+                        e.currentTarget.style.background = "white";
+                        e.currentTarget.style.transform = "translateX(0)";
                       }}
                     >
-                      <Edit size={16} />
-                      Edit Lead
-                    </Button>
-                  )}
-                  {session?.user?.permissions?.includes("add-crm-deals") && (
-                    <Button
-                      variant="success"
-                      style={{
-                        padding: "10px 20px",
+                      <div style={{
+                        width: "32px",
+                        height: "32px",
                         borderRadius: "8px",
-                        fontWeight: 500,
-                        fontSize: "14px",
-                        display: "inline-flex",
+                        background: "#2563eb",
+                        display: "flex",
                         alignItems: "center",
-                        gap: "8px",
-                        background: "#10b981",
-                        border: "none",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}>
+                        <Edit size={16} style={{ color: "white" }} />
+                      </div>
+                      Edit Lead
+                    </button>
+                  )}
+                  
+                  {session?.user?.permissions?.includes("add-crm-deals") && (
+                    <button
+                      style={{
+                        background: "white",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "10px",
+                        padding: "12px 16px",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                        color: "#1f2937",
                       }}
                       onClick={() => {
                         setShowLeadViewModal(false);
                         handleConvertLead(viewingLead);
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#059669";
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow =
-                          "0 4px 12px rgba(16, 185, 129, 0.4)";
+                        e.currentTarget.style.borderColor = "#10b981";
+                        e.currentTarget.style.background = "#f0fdf4";
+                        e.currentTarget.style.transform = "translateX(4px)";
                       }}
                       onMouseOut={(e) => {
-                        e.currentTarget.style.background = "#10b981";
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
+                        e.currentTarget.style.borderColor = "#e5e7eb";
+                        e.currentTarget.style.background = "white";
+                        e.currentTarget.style.transform = "translateX(0)";
                       }}
                     >
-                      <Handshake size={16} />
+                      <div style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "8px",
+                        background: "#10b981",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}>
+                        <Handshake size={16} style={{ color: "white" }} />
+                      </div>
                       Convert to Deal
-                    </Button>
+                    </button>
                   )}
-                  <Button
-                    variant="outline-primary"
+
+                  <button
                     style={{
-                      padding: "10px 20px",
-                      borderRadius: "8px",
-                      fontWeight: 500,
-                      fontSize: "14px",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "8px",
                       background: "white",
-                      color: "#4680ff",
-                      border: "2px solid #4680ff",
-                    }}
-                    onClick={() => {
-                      setShowLeadHistoryModal(true);
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.borderColor = "#3b6ce5";
-                      e.currentTarget.style.color = "#3b6ce5";
-                      e.currentTarget.style.background = "#f0f4ff";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.borderColor = "#4680ff";
-                      e.currentTarget.style.color = "#4680ff";
-                      e.currentTarget.style.background = "white";
-                    }}
-                  >
-                    <History size={16} />
-                    View History
-                  </Button>
-                  <Button
-                    variant="outline-secondary"
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: "8px",
-                      fontWeight: 500,
-                      fontSize: "14px",
-                      display: "inline-flex",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "10px",
+                      padding: "12px 16px",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      display: "flex",
                       alignItems: "center",
-                      gap: "8px",
-                      background: "white",
-                      color: "#6b7280",
-                      border: "2px solid #e5e7eb",
+                      gap: "12px",
+                      fontSize: "14px",
+                      fontWeight: 500,
+                      color: "#1f2937",
                     }}
-                    onClick={() => setShowLeadViewModal(false)}
+                    onClick={() => setShowLeadHistoryModal(true)}
                     onMouseOver={(e) => {
-                      e.currentTarget.style.borderColor = "#4680ff";
-                      e.currentTarget.style.color = "#4680ff";
-                      e.currentTarget.style.background = "#f0f4ff";
+                      e.currentTarget.style.borderColor = "#2563eb";
+                      e.currentTarget.style.background = "#eff6ff";
+                      e.currentTarget.style.transform = "translateX(4px)";
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.borderColor = "#e5e7eb";
-                      e.currentTarget.style.color = "#6b7280";
                       e.currentTarget.style.background = "white";
+                      e.currentTarget.style.transform = "translateX(0)";
                     }}
                   >
-                    Close
-                  </Button>
+                    <div style={{
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "8px",
+                      background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      <History size={16} style={{ color: "white" }} />
+                    </div>
+                    View History
+                  </button>
                 </div>
-              </>
-            )}
-          </Modal.Body>
-        </Modal>
+              </div>
+
+              {/* Status Overview */}
+              <div>
+                <h6 style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  marginBottom: "14px",
+                }}>
+                  Status Overview
+                </h6>
+                <div style={{
+                  background: "white",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  padding: "16px",
+                }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                        Stage
+                      </span>
+                      <Badge 
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          padding: "4px 10px",
+                          borderRadius: "6px",
+                          backgroundColor: viewingLead.stage?.color || "#6c757d",
+                        }}
+                      >
+                        {viewingLead.stage?.name || "N/A"}
+                      </Badge>
+                    </div>
+                    
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                        Lead Score
+                      </span>
+                      <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
+                        {viewingLead?.lead_score !== null ? `${viewingLead?.lead_score}%` : "N/A"}
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                        Follow-ups
+                      </span>
+                      <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
+                        {viewingLead.follow_ups?.length || 0}
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                        Meetings
+                      </span>
+                      <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
+                        {viewingLead.meetings?.length || 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Follow-ups Timeline */}
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "14px",
+                }}>
+                  <h6 style={{
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    margin: 0,
+                  }}>
+                    Recent Follow-ups
+                  </h6>
+                  {session?.user?.permissions?.includes("add-follow-up-crm-leads") && (
+                    <button
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "#2563eb",
+                        cursor: "pointer",
+                        padding: "4px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: "6px",
+                        transition: "all 0.2s ease",
+                      }}
+                      onClick={() => {
+                        setFollowupData({
+                          leadId: viewingLead.id,
+                          leadName: viewingLead.name,
+                          followUpDate: "",
+                          followUpStatus: "Pending",
+                          communicationChannel: "Phone Call",
+                          communicationChannelOther: "",
+                          notes: "",
+                          userExtension: (session?.user as any)?.extension || "admin",
+                        });
+                        setShowAddFollowupModal(true);
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = "#eff6ff";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                      title="Add Follow-up"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  )}
+                </div>
+                <div style={{
+                  background: "white",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  padding: "16px",
+                  maxHeight: "300px",
+                  overflowY: "auto",
+                }}>
+                  {viewingLead.follow_ups && viewingLead.follow_ups.length > 0 ? (
+                    <div style={{ position: "relative" }}>
+                      {/* Timeline line */}
+                      <div style={{
+                        position: "absolute",
+                        left: "7px",
+                        top: "8px",
+                        bottom: "8px",
+                        width: "2px",
+                        background: "#e5e7eb",
+                      }} />
+                      
+                      {viewingLead.follow_ups.slice(0, 5).map((followUp: any, index: number) => {
+                        const isCompleted = followUp.follow_up_status === "Completed";
+                        return (
+                          <div 
+                            key={followUp.id || index}
+                            style={{ 
+                              position: "relative",
+                              paddingLeft: "28px",
+                              paddingBottom: index < Math.min(viewingLead.follow_ups.length, 5) - 1 ? "16px" : "0",
+                            }}
+                          >
+                            {/* Timeline dot */}
+                            <div style={{
+                              position: "absolute",
+                              left: "0",
+                              top: "4px",
+                              width: "16px",
+                              height: "16px",
+                              borderRadius: "50%",
+                              background: isCompleted ? "#10b981" : "#2563eb",
+                              border: "3px solid white",
+                              boxShadow: "0 0 0 1px #e5e7eb",
+                            }} />
+                            
+                            <div>
+                              <div style={{ fontSize: "12px", color: "#1f2937", fontWeight: 600, marginBottom: "4px" }}>
+                                {followUp.communication_channel === "Other" ? followUp.communication_channel_other : followUp.communication_channel}
+                              </div>
+                              <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}>
+                                {followUp.follow_up_date ? moment(followUp.follow_up_date).format("MMM DD, YYYY") : "N/A"}
+                              </div>
+                              <Badge
+                                bg={
+                                  followUp.follow_up_status === "Completed"
+                                    ? "success"
+                                    : followUp.follow_up_status === "In Progress"
+                                    ? "primary"
+                                    : "warning"
+                                }
+                                style={{ fontSize: "10px", padding: "2px 8px" }}
+                              >
+                                {followUp.follow_up_status}
+                              </Badge>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {viewingLead.follow_ups.length > 5 && (
+                        <div style={{
+                          textAlign: "center",
+                          marginTop: "12px",
+                          paddingTop: "12px",
+                          borderTop: "1px solid #f3f4f6",
+                        }}>
+                          <span style={{ fontSize: "12px", color: "#2563eb", fontWeight: 600 }}>
+                            +{viewingLead.follow_ups.length - 5} more follow-ups
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{
+                      textAlign: "center",
+                      padding: "20px",
+                      color: "#9ca3af",
+                    }}>
+                      <History size={32} style={{ marginBottom: "8px", opacity: 0.5 }} />
+                      <div style={{ fontSize: "13px" }}>No follow-ups yet</div>
+                      {session?.user?.permissions?.includes("add-follow-up-crm-leads") && (
+                        <button
+                          style={{
+                            marginTop: "12px",
+                            padding: "8px 16px",
+                            background: "#2563eb",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            fontWeight: 500,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            transition: "all 0.2s ease",
+                          }}
+                          onClick={() => {
+                            setFollowupData({
+                              leadId: viewingLead.id,
+                              leadName: viewingLead.name,
+                              followUpDate: "",
+                              followUpStatus: "Pending",
+                              communicationChannel: "Phone Call",
+                              communicationChannelOther: "",
+                              notes: "",
+                              userExtension: (session?.user as any)?.extension || "admin",
+                            });
+                            setShowAddFollowupModal(true);
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = "#1d4ed8";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = "#2563eb";
+                          }}
+                        >
+                          <Plus size={14} />
+                          Add Follow-up
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Meetings Timeline */}
+              <div>
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "14px",
+                }}>
+                  <h6 style={{
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    margin: 0,
+                  }}>
+                    Recent Meetings
+                  </h6>
+                  {session?.user?.permissions?.includes("add-meeting-crm-leads") && (
+                    <button
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "#2563eb",
+                        cursor: "pointer",
+                        padding: "4px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: "6px",
+                        transition: "all 0.2s ease",
+                      }}
+                      onClick={() => {
+                        setMeetingData({
+                          leadId: viewingLead.id,
+                          leadName: viewingLead.name,
+                          meetingName: "",
+                          meetingType: "Online",
+                          meetingDate: "",
+                          meetingTime: "",
+                          meetingOutcome: "Scheduled",
+                          extensions: [],
+                        });
+                        setMeetingAttendees([]);
+                        setShowAddMeetingModal(true);
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = "#eff6ff";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                      title="Schedule Meeting"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  )}
+                </div>
+                <div style={{
+                  background: "white",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  padding: "16px",
+                  maxHeight: "300px",
+                  overflowY: "auto",
+                }}>
+                  {viewingLead.meetings && viewingLead.meetings.length > 0 ? (
+                    <div style={{ position: "relative" }}>
+                      {/* Timeline line */}
+                      <div style={{
+                        position: "absolute",
+                        left: "7px",
+                        top: "8px",
+                        bottom: "8px",
+                        width: "2px",
+                        background: "#e5e7eb",
+                      }} />
+                      
+                      {viewingLead.meetings.slice(0, 5).map((meeting: any, index: number) => {
+                        const isCompleted = meeting.meeting_outcome === "Completed - Successful";
+                        const isCancelled = meeting.meeting_outcome === "Cancelled";
+                        return (
+                          <div 
+                            key={meeting.id || index}
+                            style={{ 
+                              position: "relative",
+                              paddingLeft: "28px",
+                              paddingBottom: index < Math.min(viewingLead.meetings.length, 5) - 1 ? "16px" : "0",
+                            }}
+                          >
+                            {/* Timeline dot */}
+                            <div style={{
+                              position: "absolute",
+                              left: "0",
+                              top: "4px",
+                              width: "16px",
+                              height: "16px",
+                              borderRadius: "50%",
+                              background: isCompleted ? "#10b981" : isCancelled ? "#dc3545" : "#2563eb",
+                              border: "3px solid white",
+                              boxShadow: "0 0 0 1px #e5e7eb",
+                            }} />
+                            
+                            <div>
+                              <div style={{ fontSize: "12px", color: "#1f2937", fontWeight: 600, marginBottom: "4px" }}>
+                                {meeting.name}
+                              </div>
+                              <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}>
+                                {meeting.meeting_date ? moment(meeting.meeting_date).format("MMM DD, YYYY") : "N/A"}
+                              </div>
+                              {meeting.meeting_outcome && (
+                                <Badge
+                                  bg={
+                                    meeting.meeting_outcome === "Completed - Successful"
+                                      ? "success"
+                                      : meeting.meeting_outcome === "Completed - Needs Follow-up"
+                                      ? "info"
+                                      : meeting.meeting_outcome === "Cancelled"
+                                      ? "danger"
+                                      : meeting.meeting_outcome === "Rescheduled"
+                                      ? "warning"
+                                      : "secondary"
+                                  }
+                                  style={{ fontSize: "10px", padding: "2px 8px" }}
+                                >
+                                  {meeting.meeting_outcome}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {viewingLead.meetings.length > 5 && (
+                        <div style={{
+                          textAlign: "center",
+                          marginTop: "12px",
+                          paddingTop: "12px",
+                          borderTop: "1px solid #f3f4f6",
+                        }}>
+                          <span style={{ fontSize: "12px", color: "#2563eb", fontWeight: 600 }}>
+                            +{viewingLead.meetings.length - 5} more meetings
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{
+                      textAlign: "center",
+                      padding: "20px",
+                      color: "#9ca3af",
+                    }}>
+                      <Users size={32} style={{ marginBottom: "8px", opacity: 0.5 }} />
+                      <div style={{ fontSize: "13px" }}>No meetings yet</div>
+                      {session?.user?.permissions?.includes("add-meeting-crm-leads") && (
+                        <button
+                          style={{
+                            marginTop: "12px",
+                            padding: "8px 16px",
+                            background: "#2563eb",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            fontWeight: 500,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            transition: "all 0.2s ease",
+                          }}
+                          onClick={() => {
+                            setMeetingData({
+                              leadId: viewingLead.id,
+                              leadName: viewingLead.name,
+                              meetingName: "",
+                              meetingType: "Online",
+                              meetingDate: "",
+                              meetingTime: "",
+                              meetingOutcome: "Scheduled",
+                              extensions: [],
+                            });
+                            setMeetingAttendees([]);
+                            setShowAddMeetingModal(true);
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = "#1d4ed8";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = "#2563eb";
+                          }}
+                        >
+                          <Plus size={14} />
+                          Schedule Meeting
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
+    </Modal.Body>
+
+    {/* Footer */}
+    <div style={{
+      padding: "20px 32px",
+      borderTop: "1px solid #e5e7eb",
+      background: "white",
+      borderBottomLeftRadius: "12px",
+      borderBottomRightRadius: "12px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}>
+      <div style={{ fontSize: "13px", color: "#6b7280" }}>
+        Lead ID: <strong>#{viewingLead.id}</strong>
+      </div>
+      <Button
+        variant="outline-secondary"
+        onClick={() => setShowLeadViewModal(false)}
+        style={{
+          padding: "10px 24px",
+          borderRadius: "8px",
+          fontWeight: 600,
+          fontSize: "14px",
+          border: "2px solid #e5e7eb",
+          transition: "all 0.2s ease",
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.borderColor = "#2563eb";
+          e.currentTarget.style.color = "#2563eb";
+          e.currentTarget.style.background = "#eff6ff";
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.borderColor = "#e5e7eb";
+          e.currentTarget.style.color = "#6c757d";
+          e.currentTarget.style.background = "white";
+        }}
+      >
+        Close
+      </Button>
+    </div>
+  </Modal>
+)}
+
 
       {/* Lead History Modal */}
       {viewingLead && (
@@ -6548,6 +6769,721 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               </>
             )}
           </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Edit Lead Modal */}
+      <Modal
+        show={showEditModal}
+        onHide={() => {
+          setShowEditModal(false);
+          setEditingLead(null);
+          setEditFormStep(0);
+        }}
+        size="xl"
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            Edit Lead: {editingLead?.name || ""}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {editFetching ? (
+            <div className="text-center py-5">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
+              <p className="mt-3">Loading lead data...</p>
+            </div>
+          ) : (
+            <>
+              {/* Step Timeline */}
+              <div className="mb-4">
+                <div className="d-flex justify-content-between align-items-center position-relative">
+                  <div
+                    className="position-absolute top-50 start-0 end-0"
+                    style={{
+                      height: "2px",
+                      backgroundColor: "#e0e0e0",
+                      zIndex: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        backgroundColor: "#198754",
+                        width: `${(editFormStep / 3) * 100}%`,
+                        transition: "width 0.3s ease",
+                      }}
+                    />
+                  </div>
+                  {[
+                    { step: 0, label: "Lead Info" },
+                    { step: 1, label: "Company Info" },
+                    { step: 2, label: "Contact Persons" },
+                    { step: 3, label: "Other Info" },
+                  ].map(({ step, label }) => (
+                    <div
+                      key={step}
+                      className="d-flex flex-column align-items-center position-relative"
+                      style={{ zIndex: 1, cursor: "pointer" }}
+                      onClick={() => setEditFormStep(step)}
+                    >
+                      <div
+                        className={`rounded-circle d-flex align-items-center justify-content-center ${
+                          editFormStep >= step
+                            ? "bg-primary text-white"
+                            : "bg-light border border-secondary text-secondary"
+                        }`}
+                        style={{
+                          width: "40px",
+                          height: "40px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {editFormStep > step ? (
+                          <CheckCircle size={20} />
+                        ) : (
+                          step + 1
+                        )}
+                      </div>
+                      <small
+                        className={`mt-2 ${
+                          editFormStep === step ? "text-primary fw-bold" : "text-muted"
+                        }`}
+                      >
+                        {label}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Step 0: Lead Information */}
+              {editFormStep === 0 && (
+                <Card className="border-0 bg-light">
+                  <Card.Body>
+                    <h5 className="fw-bold mb-4 text-primary">LEAD INFORMATION</h5>
+                    <Row>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>
+                            Lead Name <span className="text-danger">*</span>
+                          </Form.Label>
+                          <Form.Control
+                            type="text"
+                            value={editFormData.name}
+                            onChange={(e) => handleEditInputChange("name", e.target.value)}
+                            placeholder="Enter lead name"
+                            required
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>
+                            Assigned To <span className="text-danger">*</span>
+                          </Form.Label>
+                          <Form.Select
+                            value={editFormData.user_extension || ""}
+                            onChange={(e) =>
+                              handleEditInputChange("user_extension", e.target.value ? Number(e.target.value) : null)
+                            }
+                          >
+                            <option value="">Select User</option>
+                            {editExtensions.map((ext: any) => (
+                              <option key={ext.extension} value={ext.extension}>
+                                {ext.display_name || ext.name}
+                              </option>
+                            ))}
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>
+                            Stage <span className="text-danger">*</span>
+                          </Form.Label>
+                          <Form.Select
+                            value={editFormData.stage_id || ""}
+                            onChange={(e) =>
+                              handleEditInputChange("stage_id", e.target.value ? Number(e.target.value) : undefined)
+                            }
+                            required
+                          >
+                            <option value="">Select a stage</option>
+                            {editStages.map((stage) => (
+                              <option key={stage.id} value={stage.id}>
+                                {stage.name}
+                              </option>
+                            ))}
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Source</Form.Label>
+                          <Form.Control
+                            type="text"
+                            value={editFormData.source}
+                            onChange={(e) => handleEditInputChange("source", e.target.value)}
+                            placeholder="e.g., LinkedIn, Website, Referral"
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Campaign</Form.Label>
+                          <Select
+                            value={
+                              editFormData.campaign_id
+                                ? {
+                                    value: editFormData.campaign_id,
+                                    label: editCampaigns.find((c) => c.id === editFormData.campaign_id)?.name || "",
+                                  }
+                                : null
+                            }
+                            onChange={(selectedOption: any) => {
+                              handleEditCampaignChange(selectedOption?.value || undefined);
+                            }}
+                            options={editCampaigns.map((campaign) => ({
+                              value: campaign.id,
+                              label: campaign.name,
+                            }))}
+                            placeholder="Select a campaign (Optional)"
+                            isClearable
+                            isSearchable
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Prospect</Form.Label>
+                          <Select
+                            value={
+                              editFormData.crm_data_id
+                                ? {
+                                    value: editFormData.crm_data_id,
+                                    label: `${editCrmData.find((d) => d.id === editFormData.crm_data_id)?.name || "No Name"}`,
+                                  }
+                                : null
+                            }
+                            onChange={(selectedOption: any) => {
+                              handleEditInputChange("crm_data_id", selectedOption?.value || undefined);
+                            }}
+                            options={editCrmData.map((data) => ({
+                              value: data.id,
+                              label: `${data?.name || "No Name"} - ${data?.phone || "No Phone"}`,
+                            }))}
+                            placeholder="Select Prospect (Optional)"
+                            isClearable
+                            isSearchable
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={12}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Description</Form.Label>
+                          <Form.Control
+                            as="textarea"
+                            rows={3}
+                            value={editFormData.description}
+                            onChange={(e) => handleEditInputChange("description", e.target.value)}
+                            placeholder="Enter lead description or notes"
+                          />
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
+              )}
+
+              {/* Step 1: Company Information */}
+              {editFormStep === 1 && (
+                <Card className="border-0 bg-light">
+                  <Card.Body>
+                    <h5 className="fw-bold mb-4 text-primary">COMPANY INFORMATION</h5>
+                    <Row>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>
+                            Company Name <span className="text-danger">*</span>
+                          </Form.Label>
+                          <Form.Control
+                            type="text"
+                            value={editFormData.company_name}
+                            onChange={(e) => handleEditInputChange("company_name", e.target.value)}
+                            placeholder="Enter company name"
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>
+                            Business Type <span className="text-danger">*</span>
+                          </Form.Label>
+                          <Form.Select
+                            value={editShowOtherBusinessType ? "other" : (editBusinessTypeId ? String(editBusinessTypeId) : "")}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === "other") {
+                                setEditShowOtherBusinessType(true);
+                                setEditBusinessTypeId(null);
+                                setEditBusinessTypeOther("");
+                              } else if (value) {
+                                setEditShowOtherBusinessType(false);
+                                setEditBusinessTypeId(Number(value));
+                                setEditBusinessTypeOther("");
+                              } else {
+                                setEditShowOtherBusinessType(false);
+                                setEditBusinessTypeId(null);
+                                setEditBusinessTypeOther("");
+                              }
+                            }}
+                          >
+                            <option value="">Select Business Type</option>
+                            {editBusinessTypes.map((businessType) => (
+                              <option key={businessType.id} value={businessType.id}>
+                                {businessType.name}
+                              </option>
+                            ))}
+                            <option value="other">Other</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      {editShowOtherBusinessType && (
+                        <Col md={6}>
+                          <Form.Group className="mb-3">
+                            <Form.Label>
+                              Specify Business Type <span className="text-danger">*</span>
+                            </Form.Label>
+                            <Form.Control
+                              type="text"
+                              value={editBusinessTypeOther}
+                              onChange={(e) => setEditBusinessTypeOther(e.target.value)}
+                              placeholder="Enter business type"
+                            />
+                          </Form.Group>
+                        </Col>
+                      )}
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Country</Form.Label>
+                          <Select
+                            value={editSelectedCountry}
+                            onChange={handleEditCountryChange}
+                            options={Country.getAllCountries().map((country: any) => ({
+                              value: country.isoCode,
+                              label: country.name,
+                              isoCode: country.isoCode,
+                            }))}
+                            placeholder="Select Country"
+                            isClearable
+                            isSearchable
+                            formatOptionLabel={(option: any) => (
+                              <div className="d-flex align-items-center">
+                                <img
+                                  src={`https://flagcdn.com/w20/${option.isoCode.toLowerCase()}.png`}
+                                  alt={option.label}
+                                  className="me-2"
+                                  style={{ width: "20px", height: "15px" }}
+                                />
+                                {option.label}
+                              </div>
+                            )}
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Province/State</Form.Label>
+                          <Select
+                            value={editSelectedState}
+                            onChange={handleEditStateChange}
+                            options={
+                              editSelectedCountry
+                                ? State.getStatesOfCountry(editSelectedCountry.value).map((state: any) => ({
+                                    value: state.isoCode,
+                                    label: state.name,
+                                  }))
+                                : []
+                            }
+                            placeholder="Select Province/State"
+                            isClearable
+                            isSearchable
+                            isDisabled={!editSelectedCountry}
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>City</Form.Label>
+                          <Select
+                            value={editSelectedCity}
+                            onChange={handleEditCityChange}
+                            options={
+                              editSelectedCountry && editSelectedState
+                                ? City.getCitiesOfState(
+                                    editSelectedCountry.value,
+                                    editSelectedState.value
+                                  ).map((city: any) => ({
+                                    value: city.name,
+                                    label: city.name,
+                                  }))
+                                : []
+                            }
+                            placeholder="Select City"
+                            isClearable
+                            isSearchable
+                            isDisabled={!editSelectedCountry || !editSelectedState}
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Company Size</Form.Label>
+                          <Form.Select
+                            value={editFormData.company_size}
+                            onChange={(e) => handleEditInputChange("company_size", e.target.value)}
+                          >
+                            <option value="">Select Company Size</option>
+                            <option value="1-10">1-10 employees</option>
+                            <option value="11-50">11-50 employees</option>
+                            <option value="51-200">51-200 employees</option>
+                            <option value="201-500">201-500 employees</option>
+                            <option value="501-1000">501-1000 employees</option>
+                            <option value="1000+">1000+ employees</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                      <Col md={12}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Location Notes</Form.Label>
+                          <Form.Control
+                            as="textarea"
+                            rows={2}
+                            value={editFormData.company_location_other}
+                            onChange={(e) => handleEditInputChange("company_location_other", e.target.value)}
+                            placeholder="Any additional location details"
+                          />
+                        </Form.Group>
+                      </Col>
+                      <Col md={12}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Industries</Form.Label>
+                          <Select
+                            isMulti
+                            value={editFormData.industry_ids.map((id) => {
+                              const industry = allIndustries.find((ind) => ind.id === id);
+                              return industry
+                                ? { value: industry.id, label: industry.name }
+                                : null;
+                            }).filter(Boolean)}
+                            onChange={(selectedOptions: any) => {
+                              handleEditInputChange(
+                                "industry_ids",
+                                selectedOptions ? selectedOptions.map((opt: any) => opt.value) : []
+                              );
+                            }}
+                            options={allIndustries.map((industry) => ({
+                              value: industry.id,
+                              label: industry.name,
+                            }))}
+                            placeholder="Select industries (Optional)"
+                            isClearable
+                            isSearchable
+                          />
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
+              )}
+
+              {/* Step 2: Contact Persons */}
+              {editFormStep === 2 && (
+                <Card className="border-0 bg-light">
+                  <Card.Body>
+                    <div className="d-flex justify-content-between align-items-center mb-4">
+                      <h5 className="fw-bold text-primary mb-0">CONTACT PERSONS</h5>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={addEditContactPerson}
+                      >
+                        <FiPlus size={16} className="me-1" />
+                        Add Contact Person
+                      </Button>
+                    </div>
+                    {editFormData.contact_persons.map((person, index) => (
+                      <Card key={index} className="mb-3 border">
+                        <Card.Body>
+                          <div className="d-flex justify-content-between align-items-center mb-3">
+                            <h6 className="mb-0">Contact Person {index + 1}</h6>
+                            {editFormData.contact_persons.length > 1 && (
+                              <Button
+                                variant="outline-danger"
+                                size="sm"
+                                onClick={() => removeEditContactPerson(index)}
+                              >
+                                <X size={16} />
+                              </Button>
+                            )}
+                          </div>
+                          <Row>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>
+                                  Title <span className="text-danger">*</span>
+                                </Form.Label>
+                                <Form.Control
+                                  type="text"
+                                  value={person.title}
+                                  onChange={(e) =>
+                                    updateEditContactPerson(index, "title", e.target.value)
+                                  }
+                                  placeholder="e.g., CEO, Manager"
+                                />
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>
+                                  Name <span className="text-danger">*</span>
+                                </Form.Label>
+                                <Form.Control
+                                  type="text"
+                                  value={person.name}
+                                  onChange={(e) =>
+                                    updateEditContactPerson(index, "name", e.target.value)
+                                  }
+                                  placeholder="Enter contact name"
+                                />
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>
+                                  Phone <span className="text-danger">*</span>
+                                </Form.Label>
+                                <PhoneInput
+                                  international
+                                  defaultCountry="PK"
+                                  value={person.phone}
+                                  onChange={(value: any) => {
+                                    updateEditContactPerson(index, "phone", value || "");
+                                    if (value) {
+                                      try {
+                                        const phoneNumber = parsePhoneLib(value);
+                                        if (phoneNumber) {
+                                          updateEditContactPerson(
+                                            index,
+                                            "phone_country_code",
+                                            `+${phoneNumber.countryCallingCode}`
+                                          );
+                                        }
+                                      } catch (e) {
+                                        console.error("Phone parse error:", e);
+                                      }
+                                    }
+                                  }}
+                                  className="form-control"
+                                />
+                              </Form.Group>
+                            </Col>
+                            <Col md={6}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>
+                                  Email <span className="text-danger">*</span>
+                                </Form.Label>
+                                <Form.Control
+                                  type="email"
+                                  value={person.email}
+                                  onChange={(e) =>
+                                    updateEditContactPerson(index, "email", e.target.value)
+                                  }
+                                  placeholder="Enter email address"
+                                />
+                              </Form.Group>
+                            </Col>
+                          </Row>
+                        </Card.Body>
+                      </Card>
+                    ))}
+                  </Card.Body>
+                </Card>
+              )}
+
+              {/* Step 3: Other Information */}
+              {editFormStep === 3 && (
+                <Card className="border-0 bg-light">
+                  <Card.Body>
+                    <h5 className="fw-bold mb-4 text-primary">OTHER INFORMATION</h5>
+                    <Row>
+                      <Col md={6}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Lead Potential</Form.Label>
+                          <Form.Select
+                            value={editFormData.lead_potential}
+                            onChange={(e) => handleEditInputChange("lead_potential", e.target.value)}
+                          >
+                            <option value="">Select Lead Potential</option>
+                            <option value="Hot">Hot</option>
+                            <option value="Warm">Warm</option>
+                            <option value="Cold">Cold</option>
+                          </Form.Select>
+                        </Form.Group>
+                      </Col>
+                    </Row>
+
+                    {/* Campaign Custom Fields */}
+                    {(editSelectedCampaign as any)?.custom_fields && (editSelectedCampaign as any).custom_fields.length > 0 && (
+                      <>
+                        <h6 className="fw-bold mt-4 mb-3 text-primary">Campaign Custom Fields</h6>
+                        <Row>
+                          {(editSelectedCampaign as any).custom_fields.map((field: any) => (
+                            <Col md={6} key={field.field_key}>
+                              <Form.Group className="mb-3">
+                                <Form.Label>
+                                  {field.field_name}
+                                  {field.required && <span className="text-danger">*</span>}
+                                </Form.Label>
+                                {field.field_type === "string" && (
+                                  <Form.Control
+                                    type="text"
+                                    value={editFormData.campaign_field_values?.[field.field_key] || ""}
+                                    onChange={(e) =>
+                                      handleEditCampaignFieldChange(field.field_key, e.target.value)
+                                    }
+                                    placeholder={`Enter ${field.field_name.toLowerCase()}`}
+                                    required={field.required}
+                                  />
+                                )}
+                                {field.field_type === "email" && (
+                                  <Form.Control
+                                    type="email"
+                                    value={editFormData.campaign_field_values?.[field.field_key] || ""}
+                                    onChange={(e) =>
+                                      handleEditCampaignFieldChange(field.field_key, e.target.value)
+                                    }
+                                    placeholder={`Enter ${field.field_name.toLowerCase()}`}
+                                    required={field.required}
+                                  />
+                                )}
+                                {field.field_type === "text" && (
+                                  <Form.Control
+                                    as="textarea"
+                                    rows={3}
+                                    value={editFormData.campaign_field_values?.[field.field_key] || ""}
+                                    onChange={(e) =>
+                                      handleEditCampaignFieldChange(field.field_key, e.target.value)
+                                    }
+                                    placeholder={`Enter ${field.field_name.toLowerCase()}`}
+                                    required={field.required}
+                                  />
+                                )}
+                                {field.field_type === "integer" && (
+                                  <Form.Control
+                                    type="number"
+                                    value={editFormData.campaign_field_values?.[field.field_key] || ""}
+                                    onChange={(e) =>
+                                      handleEditCampaignFieldChange(field.field_key, e.target.value)
+                                    }
+                                    placeholder={`Enter ${field.field_name.toLowerCase()}`}
+                                    required={field.required}
+                                  />
+                                )}
+                                {field.field_type === "date" && (
+                                  <Form.Control
+                                    type="date"
+                                    value={editFormData.campaign_field_values?.[field.field_key] || ""}
+                                    onChange={(e) =>
+                                      handleEditCampaignFieldChange(field.field_key, e.target.value)
+                                    }
+                                    required={field.required}
+                                  />
+                                )}
+                                {field.field_type === "dropdown" && (
+                                  <Form.Select
+                                    value={editFormData.campaign_field_values?.[field.field_key] || ""}
+                                    onChange={(e) =>
+                                      handleEditCampaignFieldChange(field.field_key, e.target.value)
+                                    }
+                                    required={field.required}
+                                  >
+                                    <option value="">Select {field.field_name}</option>
+                                    {field.dropdown_options?.map((option: string) => (
+                                      <option key={option} value={option}>
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </Form.Select>
+                                )}
+                              </Form.Group>
+                            </Col>
+                          ))}
+                        </Row>
+                      </>
+                    )}
+                  </Card.Body>
+                </Card>
+              )}
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          {editFormStep > 0 && (
+            <Button
+              variant="outline-secondary"
+              onClick={() => setEditFormStep((prev) => prev - 1)}
+            >
+              <ChevronLeft size={16} className="me-1" />
+              Back
+            </Button>
+          )}
+          <Button
+            variant="outline-secondary"
+            onClick={() => {
+              setShowEditModal(false);
+              setEditingLead(null);
+              setEditFormStep(0);
+            }}
+          >
+            <X size={16} className="me-1" />
+            Cancel
+          </Button>
+          {editFormStep < 3 ? (
+            <Button
+              variant="primary"
+              onClick={handleEditNextStep}
+            >
+              Next
+              <ChevronRight size={16} className="ms-1" />
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              onClick={handleEditSubmit}
+              disabled={editLoading}
+            >
+              {editLoading ? (
+                <>
+                  <span
+                    className="spinner-border spinner-border-sm me-2"
+                    role="status"
+                    aria-hidden="true"
+                  ></span>
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={16} className="me-1" />
+                  Update Lead
+                </>
+              )}
+            </Button>
+          )}
         </Modal.Footer>
       </Modal>
 

@@ -1,8 +1,9 @@
 import React, { ReactElement, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
-import { Row, Col, Card, Button, Badge, Form } from "react-bootstrap";
+import { Row, Col, Card, Button, Badge, Form, Modal, Spinner} from "react-bootstrap";
 import Layout from "@layout/index";
 import ProtectedRoute from "@components/ProtectedRoute";
+import { X } from "lucide-react";
 import { HistoryListRecord, getHistoryChain, HistoryChainRecord, getStages, StageData, getCrmDataById, CrmDataItem } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import axiosInstance from "@utils/axios";
@@ -26,6 +27,7 @@ import {
   Calendar,
   PlusCircle,
   TrendingUp,
+  Layers,
 } from "lucide-react";
 import "@assets/scss/ticketsnew.scss";
 import { GlobalDateFormat, GlobalTimeFormat, ModuleSlug } from "@utils/Helper";
@@ -33,6 +35,7 @@ import moment from "moment";
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 
 // Types
 interface ActivityRecord {
@@ -57,6 +60,8 @@ const HistoryPage = () => {
   });
   const [showActivitySidebar, setShowActivitySidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
+  const [showActivityTimelineModal, setShowActivityTimelineModal] = useState(false);
+  const [showFilterBar, setShowFilterBar] = useState(false);
   const [selectedActivityRecord, setSelectedActivityRecord] = useState<any>(null);
   const [activitySearch, setActivitySearch] = useState('');
   const [allActivityRecords, setAllActivityRecords] = useState<ActivityRecord[]>([]);
@@ -262,9 +267,9 @@ const HistoryPage = () => {
     orders: allActivityRecords.filter(a => a.type === 'Order').length,
   };
 
-  // Fetch history chain and stages when sidebar opens
+  // Fetch history chain and stages when modal or sidebar opens
   useEffect(() => {
-    if (showActivitySidebar && selectedActivityRecord) {
+    if ((showActivitySidebar || showActivityTimelineModal) && selectedActivityRecord) {
       const fetchHistoryAndStages = async () => {
         setLoadingHistory(true);
         try {
@@ -344,7 +349,7 @@ const HistoryPage = () => {
       setCurrentStageIndex(0);
       setCrmData(null);
     }
-  }, [showActivitySidebar, selectedActivityRecord]);
+  }, [showActivitySidebar, showActivityTimelineModal, selectedActivityRecord]);
 
 
   const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -489,11 +494,28 @@ const HistoryPage = () => {
       <div>
       {/* Header */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-        <div className="mb-3 mb-md-0">
-          <h2 className="mb-1 fw-bold">Activity Management</h2>
-          <p className="text-muted mb-0">Track and manage all customer activities across the pipeline</p>
-        </div>
+      <div className="mb-3 mb-md-0">
+  <nav aria-label="breadcrumb">
+    <ol className="breadcrumb mb-0">
+      <li className="breadcrumb-item">
+        <a href="/dashboard" className="text-decoration-none">
+          CRM
+        </a>
+      </li>
+      <li className="breadcrumb-item active fw-bold" aria-current="page">
+        Activity Management
+      </li>
+    </ol>
+  </nav>
+</div>
         <div className="d-flex flex-wrap gap-2">
+          <Button
+              variant={showFilterBar ? "secondary" : "outline-secondary"}
+              onClick={() => setShowFilterBar(!showFilterBar)}
+            >
+              <Layers size={16} className="me-2" />
+              {showFilterBar ? "Hide Tabs" : "Show Tabs"}
+            </Button>
           <Button variant="outline-secondary" >
             <Download size={16} className="me-2" />
             Export
@@ -505,7 +527,52 @@ const HistoryPage = () => {
         </div>
       </div>
 
+     {/* Stats Cards */}
+     <StatsCards 
+        data={[
+          {
+            title: 'All Types',
+            value: typeFilterCounts.all || pagination.total || 0,
+            icon: Activity,
+            iconColor: '#6366F1',
+            iconBgColor: '#EEF2FF',
+            subtitle: 'Total activities'
+          },
+          {
+            title: 'Leads',
+            value: typeFilterCounts.leads || 0,
+            icon: Target,
+            iconColor: '#3B82F6',
+            iconBgColor: '#DBEAFE',
+            metric: {
+              text: 'Lead activities',
+              dotColor: '#2563EB'
+            }
+          },
+          {
+            title: 'Deals',
+            value: typeFilterCounts.deals || 0,
+            icon: Handshake,
+            iconColor: '#10B981',
+            iconBgColor: '#D1FAE5',
+            subtitle: 'Deal activities'
+          },
+          {
+            title: 'Orders',
+            value: typeFilterCounts.orders || 0,
+            icon: ShoppingBag,
+            iconColor: '#8B5CF6',
+            iconBgColor: '#EDE9FE',
+            metric: {
+              text: 'Order activities',
+              dotColor: '#7C3AED'
+            }
+          }
+        ]}
+        gridMinWidth="220px"
+      />
       {/* Quick Filter Buttons */}
+      {showFilterBar && (
       <Card className="border-0 shadow-sm mb-3">
         <Card.Body className="p-3">
           <div className="d-flex gap-2 flex-wrap">
@@ -540,7 +607,7 @@ const HistoryPage = () => {
           </div>
         </Card.Body>
       </Card>
-
+      )}
       {/* Generic Sidebar for Activity Details */}
       <GenericSidebar
         isOpen={showActivitySidebar}
@@ -881,7 +948,7 @@ const HistoryPage = () => {
             icon: <Eye size={16} />,
             onClick: (row) => {
               setSelectedActivityRecord(row);
-              setShowActivitySidebar(true);
+              setShowActivityTimelineModal(true);
             },
             variant: 'link'
           }
@@ -893,6 +960,723 @@ const HistoryPage = () => {
         hover={true}
         striped={false}
       />
+
+{/* Activity Timeline Modal */}
+{selectedActivityRecord && (
+  <Modal
+    show={showActivityTimelineModal}
+    onHide={() => setShowActivityTimelineModal(false)}
+    size="xl"
+    centered
+    className="activity-timeline-modal"
+  >
+    {/* Modern Header with Gradient */}
+    <div
+      style={{
+        background: "#fff",
+        color: "black",
+        padding: "24px 32px",
+        position: "relative",
+        borderTopLeftRadius: "12px",
+        borderTopRightRadius: "12px",
+        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+        borderBottom: "1px solid #ccc",
+      }}
+    >
+      <button
+        onClick={() => setShowActivityTimelineModal(false)}
+        style={{
+          position: "absolute",
+          top: "16px",
+          right: "16px",
+          background: "rgba(255,255,255,0.15)",
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255,255,255,0.2)",
+          color: "black",
+          width: "32px",
+          height: "32px",
+          borderRadius: "8px",
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+          e.currentTarget.style.transform = "scale(1.05)";
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+          e.currentTarget.style.transform = "scale(1)";
+        }}
+      >
+        <X size={18} />
+      </button>
+      
+      {/* Header Content */}
+      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <div
+          style={{
+            width: "64px",
+            height: "64px",
+            borderRadius: "16px",
+            background: "#8b5cf6",
+            backdropFilter: "blur(10px)",
+            border: "2px solid rgba(255,255,255,0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "28px",
+            fontWeight: "700",
+            flexShrink: 0,
+            color: "#fff",
+          }}
+        >
+          {selectedActivityRecord.customer
+            ? selectedActivityRecord.customer.charAt(0).toUpperCase()
+            : "A"}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h2 style={{ 
+            margin: 0, 
+            fontWeight: 700, 
+            fontSize: "26px",
+            textShadow: "0 2px 4px rgba(0,0,0,0.1)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}>
+            {selectedActivityRecord.customer}
+          </h2>
+          <div style={{ 
+            marginTop: "6px", 
+            opacity: 0.95, 
+            fontSize: "14px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+            color: "#000",
+          }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <Users size={14} />
+              Assigned to {selectedActivityRecord.agent}
+            </span>
+            <span>•</span>
+            <span>
+              {['Prospect', 'Lead', 'Deal', 'Order'][currentStageIndex] || 'Unknown'} Stage
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <Modal.Body style={{ padding: 0, maxHeight: "calc(90vh - 200px)", overflowY: "auto" }}>
+      <style>{`
+        .activity-timeline-modal .timeline-progress-bar {
+          transition: width 0.5s ease;
+        }
+      `}</style>
+
+      {/* Main Content Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", minHeight: "500px" }}>
+        
+        {/* Left Panel - Stage Progress & Timeline */}
+        <div style={{ padding: "32px", borderRight: "1px solid #e5e7eb" }}>
+          
+          {/* Enhanced Stage Progress */}
+          <div style={{ marginBottom: "28px" }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "24px",
+            }}>
+              <h5 style={{
+                fontSize: "15px",
+                fontWeight: 700,
+                color: "#1f2937",
+                margin: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}>
+                <div style={{
+                  width: "4px",
+                  height: "18px",
+                  background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+                  borderRadius: "2px",
+                }} />
+                Stage Progress
+              </h5>
+              <Badge 
+                bg="primary"
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: "20px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  backgroundColor: "#8b5cf6",
+                }}
+              >
+                {['Prospect', 'Lead', 'Deal', 'Order'][currentStageIndex] || 'Unknown'}
+              </Badge>
+            </div>
+            
+            {loadingHistory ? (
+              <div style={{
+                padding: "48px 20px",
+                textAlign: "center",
+              }}>
+                <Spinner animation="border" variant="primary" size="sm" style={{ marginBottom: "12px" }} />
+                <p className="mb-0" style={{ color: "#6b7280", fontSize: "14px" }}>Loading stages...</p>
+              </div>
+            ) : (
+              <div style={{
+                background: "#f9fafb",
+                border: "1px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "40px 20px",
+                position: "relative",
+              }}>
+                {/* Background Progress Bar */}
+                <div 
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '10%',
+                    right: '10%',
+                    height: '4px',
+                    backgroundColor: '#e3e8ef',
+                    borderRadius: '4px',
+                    transform: 'translateY(-50%)',
+                    zIndex: 0
+                  }}
+                />
+                {/* Filled Progress Bar */}
+                <div 
+                  className="timeline-progress-bar"
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '10%',
+                    width: currentStageIndex > 0 ? `${(currentStageIndex / 3) * 80}%` : '0%',
+                    height: '4px',
+                    background: 'linear-gradient(90deg, #8b5cf6 0%, #7c3aed 100%)',
+                    borderRadius: '4px',
+                    transform: 'translateY(-50%)',
+                    zIndex: 0,
+                  }}
+                />
+                
+                {/* Stage Items */}
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  position: "relative",
+                  zIndex: 1,
+                }}>
+                  {[
+                    { name: 'Prospect', icon: <Users size={20} />, color: '#9c27b0' },
+                    { name: 'Lead', icon: <Target size={20} />, color: '#2196f3' },
+                    { name: 'Deal', icon: <TrendingUp size={20} />, color: '#ff9800' },
+                    { name: 'Order', icon: <ShoppingBag size={20} />, color: '#4caf50' }
+                  ].map((stage, idx) => {
+                    const isCompleted = idx < currentStageIndex;
+                    const isCurrent = idx === currentStageIndex;
+                    
+                    return (
+                      <div 
+                        key={stage.name}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          flex: 1,
+                        }}
+                      >
+                        {/* Circle */}
+                        <div 
+                          style={{
+                            width: isCurrent ? '56px' : '48px',
+                            height: isCurrent ? '56px' : '48px',
+                            borderRadius: "50%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginBottom: "8px",
+                            background: isCompleted || isCurrent 
+                              ? stage.color
+                              : '#fff',
+                            border: isCurrent ? `3px solid ${stage.color}` : `2px solid ${isCompleted ? stage.color : '#dee2e6'}`,
+                            color: isCompleted || isCurrent ? '#fff' : '#6c757d',
+                            boxShadow: isCurrent ? `0 8px 24px ${stage.color}40` : isCompleted ? `0 4px 12px ${stage.color}30` : 'none',
+                            transition: 'all 0.3s ease',
+                            transform: isCurrent ? 'scale(1.1)' : 'scale(1)',
+                          }}
+                        >
+                          {isCompleted ? <CheckCircle size={isCurrent ? 24 : 20} /> : stage.icon}
+                        </div>
+                        
+                        {/* Label */}
+                        <div 
+                          style={{
+                            textAlign: "center",
+                            fontSize: isCurrent ? '0.9rem' : '0.8rem',
+                            fontWeight: isCurrent ? 700 : 600,
+                            color: isCompleted || isCurrent ? stage.color : '#6c757d',
+                            transition: 'all 0.3s ease',
+                          }}
+                        >
+                          {stage.name}
+                        </div>
+                        
+                        {/* Current indicator */}
+                        {isCurrent && (
+                          <div 
+                            style={{
+                              marginTop: "8px",
+                              padding: "4px 8px",
+                              borderRadius: "6px",
+                              backgroundColor: `${stage.color}15`,
+                              color: stage.color,
+                              fontSize: '0.7rem',
+                              fontWeight: 600,
+                            }}
+                          >
+                            Current
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Enhanced Activity Timeline */}
+          <div style={{ marginBottom: "28px" }}>
+            <h5 style={{
+              fontSize: "15px",
+              fontWeight: 700,
+              color: "#1f2937",
+              marginBottom: "16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}>
+              <div style={{
+                width: "4px",
+                height: "18px",
+                background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+                borderRadius: "2px",
+              }} />
+              Activity Timeline
+              {!loadingHistory && historyChain.length > 0 && (
+                <Badge 
+                  bg="secondary"
+                  style={{
+                    marginLeft: "8px",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                  }}
+                >
+                  {historyChain.length}
+                </Badge>
+              )}
+            </h5>
+            
+            {loadingHistory ? (
+              <div style={{
+                padding: "48px 20px",
+                textAlign: "center",
+              }}>
+                <Spinner animation="border" variant="primary" size="sm" style={{ marginBottom: "12px" }} />
+                <p className="mb-0" style={{ color: "#6b7280", fontSize: "14px" }}>Loading activity timeline...</p>
+              </div>
+            ) : historyChain.length === 0 ? (
+              <div style={{
+                padding: "40px",
+                textAlign: "center",
+                color: "#6b7280",
+                background: "#f9fafb",
+                border: "2px dashed #d1d5db",
+                borderRadius: "12px"
+              }}>
+                <Clock size={40} style={{ marginBottom: "12px", opacity: 0.5 }} />
+                <div style={{ fontSize: "14px", fontWeight: 500 }}>No activity history available</div>
+              </div>
+            ) : (
+              <div style={{
+                background: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "20px",
+              }}>
+                <div style={{ position: "relative", paddingLeft: "56px" }}>
+                  {/* Timeline Line */}
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      left: '30px',
+                      top: '0',
+                      bottom: '20px',
+                      width: '3px',
+                      background: 'linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%)',
+                      borderRadius: '3px',
+                      opacity: 0.2
+                    }}
+                  />
+
+                  {historyChain.map((record, index) => {
+                    const dateObj = new Date(record.created_at);
+                    const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    
+                    const userExtension = record.user_extension_done_by || record.user_extension;
+                    const userName = userExtension 
+                      ? (extensions.find((ext: any) => ext?.id == userExtension || ext?.extension == userExtension)?.display_name || 
+                         extensions.find((ext: any) => ext?.id == userExtension || ext?.extension == userExtension)?.name || 
+                         userExtension)
+                      : 'System';
+                    const cleanUserName = userName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                    
+                    const getIconForEvent = (event: string, action: string | null) => {
+                      if (event === 'created') {
+                        return { icon: <PlusCircle size={20} />, bg: '#10b981' };
+                      }
+                      if (action?.toLowerCase().includes('stage') || event?.toLowerCase().includes('stage')) {
+                        return { icon: <ArrowRight size={20} />, bg: '#3b82f6' };
+                      }
+                      if (action?.toLowerCase().includes('call') || event?.toLowerCase().includes('call')) {
+                        return { icon: <Phone size={20} />, bg: '#8b5cf6' };
+                      }
+                      if (action?.toLowerCase().includes('email') || event?.toLowerCase().includes('email')) {
+                        return { icon: <Mail size={20} />, bg: '#ec4899' };
+                      }
+                      return { icon: <FileText size={20} />, bg: '#f59e0b' };
+                    };
+                    
+                    const iconData = getIconForEvent(record.event, record.action);
+                    
+                    return (
+                      <div 
+                        key={index}
+                        style={{
+                          position: "relative",
+                          marginBottom: index < historyChain.length - 1 ? "24px" : "0",
+                        }}
+                      >
+                        {/* Timeline Icon */}
+                        <div 
+                          style={{
+                            width: '60px',
+                            height: '60px',
+                            borderRadius: "50%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            position: "absolute",
+                            left: '-56px',
+                            top: '0',
+                            background: iconData.bg,
+                            border: '4px solid #fff',
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                            color: '#fff'
+                          }}
+                        >
+                          {iconData.icon}
+                        </div>
+                        
+                        {/* Timeline Content */}
+                        <div 
+                          style={{
+                            background: "#f9fafb",
+                            border: "1px solid #e5e7eb",
+                            borderLeft: `3px solid ${iconData.bg}`,
+                            borderRadius: "8px",
+                            padding: "12px 16px",
+                          }}
+                        >
+                          <div style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "start",
+                            marginBottom: "8px",
+                          }}>
+                            <div style={{
+                              fontSize: "14px",
+                              fontWeight: 600,
+                              color: "#1f2937",
+                            }}>
+                              {record.description || record.action_display || 'Activity recorded'}
+                            </div>
+                            <Badge 
+                              bg="light"
+                              text="dark"
+                              style={{
+                                marginLeft: "8px",
+                                fontSize: "11px",
+                                fontWeight: 500,
+                                padding: "4px 10px",
+                                borderRadius: "6px",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {record.created_at_human || dateStr}
+                            </Badge>
+                          </div>
+                          <div style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            color: "#6b7280",
+                            fontSize: "13px",
+                          }}>
+                            <Users size={14} />
+                            <span>{cleanUserName}</span>
+                            <span>•</span>
+                            <Clock size={14} />
+                            <span>{timeStr}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Panel - Quick Actions & Info */}
+        <div style={{ 
+          padding: "32px 24px", 
+          background: "#fafbfc",
+          display: "flex",
+          flexDirection: "column",
+          gap: "24px",
+        }}>
+          
+          {/* Customer Info */}
+          <div>
+            <h6 style={{
+              fontSize: "13px",
+              fontWeight: 700,
+              color: "#6b7280",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              marginBottom: "14px",
+            }}>
+              Customer Information
+            </h6>
+            <div style={{
+              background: "white",
+              border: "1px solid #e5e7eb",
+              borderRadius: "10px",
+              padding: "16px",
+            }}>
+              {loadingCrmData ? (
+                <div style={{
+                  textAlign: "center",
+                  padding: "20px",
+                }}>
+                  <Spinner animation="border" size="sm" variant="primary" />
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                      Name
+                    </span>
+                    <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
+                      {crmData?.name || selectedActivityRecord?.customer || 'N/A'}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                      Phone
+                    </span>
+                    <span style={{ fontSize: "13px", color: "#1f2937", fontWeight: 500 }}>
+                      {crmData?.phone || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Agent Info */}
+          <div>
+            <h6 style={{
+              fontSize: "13px",
+              fontWeight: 700,
+              color: "#6b7280",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              marginBottom: "14px",
+            }}>
+              Agent Information
+            </h6>
+            <div style={{
+              background: "white",
+              border: "1px solid #e5e7eb",
+              borderRadius: "10px",
+              padding: "16px",
+            }}>
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+              }}>
+                <div 
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+                    color: '#fff',
+                    fontWeight: 600,
+                    fontSize: "16px",
+                    flexShrink: 0,
+                  }}
+                >
+                  {(() => {
+                    const alphabeticChars = (selectedActivityRecord?.agent || '').replace(/[^a-zA-Z]/g, '');
+                    const splittedArray = alphabeticChars.split(' ');
+                    return [splittedArray[0]?.[0] || '', splittedArray?.[1]?.[0] || ''].join('').toUpperCase() || 'NA';
+                  })()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "#1f2937",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}>
+                    {selectedActivityRecord?.agent || 'N/A'}
+                  </div>
+                  <div style={{
+                    fontSize: "12px",
+                    color: "#6b7280",
+                  }}>
+                    Assigned Agent
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stage Summary */}
+          <div>
+            <h6 style={{
+              fontSize: "13px",
+              fontWeight: 700,
+              color: "#6b7280",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              marginBottom: "14px",
+            }}>
+              Stage Summary
+            </h6>
+            <div style={{
+              background: "white",
+              border: "1px solid #e5e7eb",
+              borderRadius: "10px",
+              padding: "16px",
+            }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                    Current Stage
+                  </span>
+                  <Badge 
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      padding: "4px 10px",
+                      borderRadius: "6px",
+                      backgroundColor: "#8b5cf6",
+                    }}
+                  >
+                    {['Prospect', 'Lead', 'Deal', 'Order'][currentStageIndex] || 'Unknown'}
+                  </Badge>
+                </div>
+                
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                    Progress
+                  </span>
+                  <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
+                    {currentStageIndex + 1} / 4
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                    Activities
+                  </span>
+                  <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
+                    {historyChain.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Modal.Body>
+
+    {/* Footer */}
+    <div style={{
+      padding: "20px 32px",
+      borderTop: "1px solid #e5e7eb",
+      background: "white",
+      borderBottomLeftRadius: "12px",
+      borderBottomRightRadius: "12px",
+      display: "flex",
+      justifyContent: "flex-end",
+      alignItems: "center",
+    }}>
+      <Button
+        variant="outline-secondary"
+        onClick={() => setShowActivityTimelineModal(false)}
+        style={{
+          padding: "10px 24px",
+          borderRadius: "8px",
+          fontWeight: 600,
+          fontSize: "14px",
+          border: "2px solid #e5e7eb",
+          transition: "all 0.2s ease",
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.borderColor = "#8b5cf6";
+          e.currentTarget.style.color = "#8b5cf6";
+          e.currentTarget.style.background = "#f5f3ff";
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.borderColor = "#e5e7eb";
+          e.currentTarget.style.color = "#6c757d";
+          e.currentTarget.style.background = "white";
+        }}
+      >
+        Close
+      </Button>
+    </div>
+  </Modal>
+)}
+
+
 
       {/* Generic Filter Sidebar */}
       <GenericFilterSidebar

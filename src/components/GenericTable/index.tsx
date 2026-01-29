@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Table, Form, Button, Dropdown, Card } from 'react-bootstrap';
 import {
   ArrowUpDown,
@@ -183,6 +183,61 @@ const GenericTable = <T extends Record<string, any>>({
     }
     return defaultSelectedColumns || columns.map(c => c.key);
   });
+
+  // Context menu (right‑click) state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: T } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  // Flatten actions into context menu items (buttons + dropdown options)
+  type ContextMenuItem = { label: string; icon?: React.ReactNode; onClick: (row: T) => void; divider?: boolean; className?: string };
+  const getContextMenuItems = useMemo(() => {
+    return (row: T): ContextMenuItem[] => {
+      const items: ContextMenuItem[] = [];
+      for (const action of actions) {
+        if (action.show && !action.show(row)) continue;
+        if (action.dropdown) {
+          const opts = action.dropdown.options.filter(o => !o.show || o.show(row));
+          for (let i = 0; i < opts.length; i++) {
+            const o = opts[i];
+            items.push({
+              label: o.label,
+              icon: o.icon,
+              onClick: o.onClick,
+              divider: o.divider ?? false,
+              className: o.className,
+            });
+          }
+        } else if (action.onClick && !action.render) {
+          items.push({
+            label: action.label,
+            icon: action.icon,
+            onClick: action.onClick,
+            divider: false,
+            className: action.className,
+          });
+        }
+      }
+      return items;
+    };
+  }, [actions]);
+
+  // Close context menu on outside click or Escape
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const onMouseDown = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) close();
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [contextMenu]);
 
   // Check if a row is selected
   const isSelected = (row: T) => {
@@ -451,8 +506,37 @@ const GenericTable = <T extends Record<string, any>>({
 
   return (
     <div className="generic-table-container">
+      {/* Right‑click context menu */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="gt-context-menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          role="menu"
+        >
+          {getContextMenuItems(contextMenu.row).map((item, idx) => (
+            <React.Fragment key={idx}>
+              <button
+                type="button"
+                className={`gt-context-menu-item ${item.className || ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  item.onClick(contextMenu.row);
+                  setContextMenu(null);
+                }}
+                role="menuitem"
+              >
+                {item.icon && <span className="gt-context-menu-icon">{item.icon}</span>}
+                {item.label}
+              </button>
+              {item.divider && <div className="gt-context-menu-divider" />}
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+
       {/* Column Customization */}
-      {customizableColumns && (
+      {/* {customizableColumns && (
         <div className="d-flex justify-content-end gap-2 mb-3">
           <Dropdown>
             <Dropdown.Toggle variant="outline-secondary" size="sm">
@@ -490,7 +574,7 @@ const GenericTable = <T extends Record<string, any>>({
             </Dropdown.Menu>
           </Dropdown>
         </div>
-      )}
+      )} */}
 
       {/* Table */}
       <Card className="border-0 shadow-sm generic-table-card">
@@ -557,6 +641,14 @@ const GenericTable = <T extends Record<string, any>>({
                       key={row[uniqueKey] || index}
                       onClick={() => onRowClick?.(row, index)}
                       onDoubleClick={() => onRowDoubleClick?.(row, index)}
+                      onContextMenu={(e) => {
+                        if (!showActions || actions.length === 0) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const items = getContextMenuItems(row);
+                        if (items.length === 0) return;
+                        setContextMenu({ x: e.clientX, y: e.clientY, row });
+                      }}
                       className={`generic-table-row ${rowClassName?.(row, index) || ''} ${onRowClick || onRowDoubleClick ? 'clickable' : ''}`}
                     >
                       {selectable && (

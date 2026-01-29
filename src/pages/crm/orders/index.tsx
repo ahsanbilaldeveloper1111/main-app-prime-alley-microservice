@@ -13,6 +13,8 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import OrderEditModal from "@components/OrderEditModal";
 import {
   FiUpload,
   FiDatabase,
@@ -47,7 +49,6 @@ import {
   getLead,
   getDealAttachments,
   downloadDealAttachment,
-  createApproval,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -61,6 +62,7 @@ import {
   Table,
   InputGroup,
   Modal,
+  Spinner
 } from "react-bootstrap";
 import Select from "react-select";
 import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper";
@@ -112,7 +114,6 @@ import {
   AlertCircle,
   Handshake,
   Info,
-  ClipboardCheck,
 } from "lucide-react";
 import {
   PieChart,
@@ -489,6 +490,8 @@ const CrmOrders = () => {
     null
   );
 
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
   // Mark Order Lost Modal
   const [showMarkLostModal, setShowMarkLostModal] = useState(false);
   const [orderToMarkLost, setOrderToMarkLost] = useState<any>(null);
@@ -498,6 +501,7 @@ const CrmOrders = () => {
   // UI State
   const [showOrdersAnalytics, setShowOrdersAnalytics] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showFilterBar, setShowFilterBar] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
   const [ordersSearch, setOrdersSearch] = useState("");
   const [selectedOrdersColumns, setSelectedOrdersColumns] = useState<string[]>(
@@ -1137,20 +1141,6 @@ const CrmOrders = () => {
   }, []);
 
   // Mark Order Lost Modal
-  // Create Approval Handler
-  const handleCreateApproval = useCallback(async (orderId: number) => {
-    try {
-      await createApproval({
-        item_id: orderId,
-        type: 'order'
-      });
-      setRefreshKey((oldKey) => oldKey + 1);
-    } catch (error) {
-      console.error("Failed to create approval:", error);
-      toast.error("Failed to create approval request");
-    }
-  }, []);
-
   const handleMarkLost = useCallback((order: any) => {
     setOrderToMarkLost(order);
     setShowMarkLostModal(true);
@@ -1771,7 +1761,8 @@ const CrmOrders = () => {
           label: 'Edit',
           icon: <Edit size={16} />,
           onClick: (row: any) => {
-            window.location.href = `/crm/orders/${row.rawData?.id || row.id}/edit`;
+            setEditingOrderId(row.rawData?.id || row.id);
+            setShowEditModal(true);
           },
           variant: 'link' as const
         }] : []),
@@ -1853,17 +1844,34 @@ const CrmOrders = () => {
       <div>
         {/* Page Header */}
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-          <div className="mb-3 mb-md-0">
-            <h2 className="mb-1 fw-bold">Orders</h2>
-            <p className="text-muted mb-0">Track and fulfill customer orders</p>
-          </div>
+        <div className="mb-3 mb-md-0">
+  <nav aria-label="breadcrumb">
+    <ol className="breadcrumb mb-0">
+      <li className="breadcrumb-item">
+        <a href="/dashboard" className="text-decoration-none">
+          CRM
+        </a>
+      </li>
+      <li className="breadcrumb-item active fw-bold" aria-current="page">
+        Order Management
+      </li>
+    </ol>
+  </nav>
+</div>
           <div className="d-flex flex-wrap gap-2">
-            <Button
+            {/* <Button
               variant={showOrdersAnalytics ? "primary" : "outline-secondary"}
               onClick={() => setShowOrdersAnalytics(!showOrdersAnalytics)}
             >
               <BarChart3 size={16} className="me-2" />
               {showOrdersAnalytics ? "Hide Analytics" : "Show Analytics"}
+            </Button> */}
+            <Button
+              variant={showFilterBar ? "secondary" : "outline-secondary"}
+              onClick={() => setShowFilterBar(!showFilterBar)}
+            >
+              <Layers size={16} className="me-2" />
+              {showFilterBar ? "Hide Tabs" : "Show Tabs"}
             </Button>
             <Button
             variant={showFiltersSidebar ? "secondary" : "outline-secondary"}
@@ -1874,6 +1882,78 @@ const CrmOrders = () => {
           </Button>
           </div>
         </div>
+
+        {/* Stats Cards */}
+        <StatsCards 
+          data={[
+            {
+              title: 'All Orders',
+              value: summaryTiles?.total_orders || totalOrders || 0,
+              icon: ShoppingBag,
+              iconColor: '#6366F1',
+              iconBgColor: '#EEF2FF',
+              subtitle: 'Total orders'
+            },
+            {
+              title: 'New',
+              value: summaryTiles?.new_orders || analyticsData.stageCounts['New'] || 0,
+              icon: PlusCircle,
+              iconColor: '#3B82F6',
+              iconBgColor: '#DBEAFE',
+              metric: {
+                text: 'Fresh orders',
+                dotColor: '#2563EB'
+              }
+            },
+            {
+              title: 'Qualified',
+              value: summaryTiles?.qualified_orders || analyticsData.stageCounts['Qualified'] || 0,
+              icon: CheckCircle,
+              iconColor: '#10B981',
+              iconBgColor: '#D1FAE5',
+              subtitle: 'Verified & ready'
+            },
+            {
+              title: 'Proposal',
+              value: analyticsData.stageCounts['Proposal'] || 0,
+              icon: FileText,
+              iconColor: '#8B5CF6',
+              iconBgColor: '#EDE9FE',
+              metric: {
+                text: 'Under review',
+                dotColor: '#7C3AED'
+              }
+            },
+            {
+              title: 'Negotiation',
+              value: analyticsData.stageCounts['Negotiation'] || 0,
+              icon: Users,
+              iconColor: '#F59E0B',
+              iconBgColor: '#FEF3C7',
+              subtitle: 'In discussion'
+            },
+            {
+              title: 'Lost',
+              value: summaryTiles?.lost_orders || filterCounts.lost || 0,
+              icon: AlertCircle,
+              iconColor: '#EF4444',
+              iconBgColor: '#FEE2E2',
+              subtitle: 'Requires review'
+            },
+            {
+              title: 'Deleted',
+              value: summaryTiles?.deleted_orders || filterCounts.deleted || 0,
+              icon: Trash2,
+              iconColor: '#6B7280',
+              iconBgColor: '#F3F4F6',
+              metric: {
+                text: 'Archived',
+                dotColor: '#9CA3AF'
+              }
+            }
+          ]}
+          gridMinWidth="180px"
+        />
 
         {/* Analytics Section - Collapsible */}
         {showOrdersAnalytics && (
@@ -1990,71 +2070,73 @@ const CrmOrders = () => {
         )}
 
         {/* Filter Bar */}
-        <FilterBar
-          quickFilters={[
-            {
-              id: "all",
-              label: "All Orders",
-              count: filterCounts.all,
-              color: "#0d6efd",
-              icon: <ShoppingCart size={16} />,
-            },
-            ...stages.slice(0, 5).map((stage: any) => ({
-              id: stage.id.toString(),
-              label: stage.name,
-              count: filterCounts[stage.id] || 0,
-              color: stage.color || "#6c757d",
-              icon: <Layers size={16} />,
-            })),
-            {
-              id: "lost",
-              label: "Lost",
-              count: filterCounts.lost || 0,
-              color: "#fd7e14",
-              icon: <X size={16} />,
-            },
-            {
-              id: "deleted",
-              label: "Deleted",
-              count: filterCounts.deleted || 0,
-              color: "#dc3545",
-              icon: <Trash2 size={16} />,
-            },
-          ]}
-          activeFilter={activeFilter}
-          onFilterChange={handleFilterChange}
-          // searchValue={ordersSearch}
-          
-          // onSearch={() => {
-          //   if (ordersSearch.trim()) {
-          //     handleFiltersChange({ search: ordersSearch.trim() });
-          //   } else {
-          //     handleFiltersChange({ search: null });
-          //   }
-          //   setOrdersPagination({ ...ordersPagination, currentPage: 1 });
-          // }}
-          // searchPlaceholder="Search orders by number, customer, deal..."
-          // onSearchChange={(value) => setOrdersSearch(value)}
-          // showAdvancedFilters={showAdvancedFilters}
-          // onToggleAdvancedFilters={() =>
-          //   setShowAdvancedFilters(!showAdvancedFilters)
-          // }
-          // advancedFilterCount={
-          //   (ordersFilters.assignedTo !== null ? 1 : 0) +
-          //   (ordersFilters.stage !== null ? 1 : 0) +
-          //   (ordersFilters.industry !== null ? 1 : 0) +
-          //   (ordersFilters.orderValueMin !== null ||
-          //   ordersFilters.orderValueMax !== null
-          //     ? 1
-          //     : 0) +
-          //   (ordersFilters.orderApprovalStatus !== null ? 1 : 0) +
-          //   (ordersFilters.fulfillmentStatus !== null ? 1 : 0) +
-          //   (ordersFilters.paymentStatus !== null ? 1 : 0) +
-          //   (ordersFilters.dateFrom !== null || ordersFilters.dateTo !== null
-          //     ? 1
-          //     : 0)
-          // }
-        />
+        {showFilterBar && (
+          <FilterBar
+            quickFilters={[
+              {
+                id: "all",
+                label: "All Orders",
+                count: filterCounts.all,
+                color: "#0d6efd",
+                icon: <ShoppingCart size={16} />,
+              },
+              ...stages.slice(0, 5).map((stage: any) => ({
+                id: stage.id.toString(),
+                label: stage.name,
+                count: filterCounts[stage.id] || 0,
+                color: stage.color || "#6c757d",
+                icon: <Layers size={16} />,
+              })),
+              {
+                id: "lost",
+                label: "Lost",
+                count: filterCounts.lost || 0,
+                color: "#fd7e14",
+                icon: <X size={16} />,
+              },
+              {
+                id: "deleted",
+                label: "Deleted",
+                count: filterCounts.deleted || 0,
+                color: "#dc3545",
+                icon: <Trash2 size={16} />,
+              },
+            ]}
+            activeFilter={activeFilter}
+            onFilterChange={handleFilterChange}
+            // searchValue={ordersSearch}
+            
+            // onSearch={() => {
+            //   if (ordersSearch.trim()) {
+            //     handleFiltersChange({ search: ordersSearch.trim() });
+            //   } else {
+            //     handleFiltersChange({ search: null });
+            //   }
+            //   setOrdersPagination({ ...ordersPagination, currentPage: 1 });
+            // }}
+            // searchPlaceholder="Search orders by number, customer, deal..."
+            // onSearchChange={(value) => setOrdersSearch(value)}
+            // showAdvancedFilters={showAdvancedFilters}
+            // onToggleAdvancedFilters={() =>
+            //   setShowAdvancedFilters(!showAdvancedFilters)
+            // }
+            // advancedFilterCount={
+            //   (ordersFilters.assignedTo !== null ? 1 : 0) +
+            //   (ordersFilters.stage !== null ? 1 : 0) +
+            //   (ordersFilters.industry !== null ? 1 : 0) +
+            //   (ordersFilters.orderValueMin !== null ||
+            //   ordersFilters.orderValueMax !== null
+            //     ? 1
+            //     : 0) +
+            //   (ordersFilters.orderApprovalStatus !== null ? 1 : 0) +
+            //   (ordersFilters.fulfillmentStatus !== null ? 1 : 0) +
+            //   (ordersFilters.paymentStatus !== null ? 1 : 0) +
+            //   (ordersFilters.dateFrom !== null || ordersFilters.dateTo !== null
+            //     ? 1
+            //     : 0)
+            // }
+          />
+        )}
 
         {/* Advanced Filters */}
         {showAdvancedFilters && (
@@ -2914,7 +2996,9 @@ const CrmOrders = () => {
             label: 'Edit Order',
             icon: Edit,
             onClick: () => {
-              router.push(`/crm/orders/${viewingOrder?.id}/edit`);
+              setShowOrderSidebar(false);
+              setEditingOrderId(viewingOrder?.id);
+              setShowEditModal(true);
             },
             variant: 'primary',
             show: session?.user?.permissions?.includes('edit-crm-orders') && activeFilter !== 'lost'
@@ -3214,321 +3298,1765 @@ const CrmOrders = () => {
         isSubmitDisabled={!lostReasonId || !lostFeedback.trim()}
       />
 
-      {/* Order View Modal */}
-      {viewingOrder && (
-        <Modal
-          show={showOrderViewModal}
-          onHide={() => setShowOrderViewModal(false)}
-          size="xl"
-          centered
+    {/* Order View Modal */}
+{viewingOrder && (
+  <Modal
+    show={showOrderViewModal}
+    onHide={() => setShowOrderViewModal(false)}
+    size="xl"
+    centered
+    className="order-view-modal"
+  >
+    {/* Modern Header with Gradient */}
+    <div
+      style={{
+        background: "#fff",
+        color: "black",
+        padding: "24px 32px",
+        position: "relative",
+        borderTopLeftRadius: "12px",
+        borderTopRightRadius: "12px",
+        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+        borderBottom: "1px solid #ccc",
+      }}
+    >
+      <button
+        onClick={() => setShowOrderViewModal(false)}
+        style={{
+          position: "absolute",
+          top: "16px",
+          right: "16px",
+          background: "rgba(255,255,255,0.15)",
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255,255,255,0.2)",
+          color: "black",
+          width: "32px",
+          height: "32px",
+          borderRadius: "8px",
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+          e.currentTarget.style.transform = "scale(1.05)";
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+          e.currentTarget.style.transform = "scale(1)";
+        }}
+      >
+        <X size={18} />
+      </button>
+      
+      {/* Header Content */}
+      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <div
+          style={{
+            width: "64px",
+            height: "64px",
+            borderRadius: "16px",
+            background: "#f59e0b",
+            backdropFilter: "blur(10px)",
+            border: "2px solid rgba(255,255,255,0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "28px",
+            fontWeight: "700",
+            flexShrink: 0,
+            color: "#fff",
+          }}
         >
-          {/* Custom Header */}
-          <div
-            style={{
-              color: "black",
-              padding: "30px",
-              position: "relative",
-              borderTopLeftRadius: "8px",
-              borderTopRightRadius: "8px",
-              borderBottom: "1px solid #e5e7eb",
-            }}
-          >
-            <button
-              onClick={() => setShowOrderViewModal(false)}
-              style={{
-                position: "absolute",
-                top: "20px",
-                right: "20px",
-                background: "rgba(255,255,255,0.2)",
-                border: "none",
-                color: "black",
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                cursor: "pointer",
-                transition: "all 0.3s",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.3)";
-                e.currentTarget.style.transform = "rotate(90deg)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.2)";
-                e.currentTarget.style.transform = "rotate(0deg)";
-              }}
-            >
-              <X size={20} />
-            </button>
-            <h3 style={{ margin: 0, fontWeight: 600, fontSize: "24px" }}>
-              {viewingOrder.order_number || `Order #${viewingOrder.id}`}
-            </h3>
-            <p style={{ margin: "8px 0 0 0", opacity: 0.9, fontSize: "14px" }}>
-              Order Details
-            </p>
+          <ShoppingBag size={32} style={{ color: "white" }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h2 style={{ 
+            margin: 0, 
+            fontWeight: 700, 
+            fontSize: "26px",
+            textShadow: "0 2px 4px rgba(0,0,0,0.1)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}>
+            {viewingOrder.order_number || `Order #${viewingOrder.id}`}
+          </h2>
+          <div style={{ 
+            marginTop: "6px", 
+            opacity: 0.95, 
+            fontSize: "14px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
+            color: "#000",
+          }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <Target size={14} />
+              {viewingOrder.stage?.name || "No stage"}
+            </span>
+            <span>•</span>
+            <span style={{ fontWeight: 600 }}>
+              {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            <span>•</span>
+            <span>
+              {viewingOrder.order_date ? moment(viewingOrder.order_date).format("MMM DD, YYYY") : "N/A"}
+            </span>
           </div>
+        </div>
+      </div>
+    </div>
 
-          <Modal.Body style={{ padding: "30px" }}>
-            {loadingOrder ? (
-              <div className="text-center py-4">
-                <div className="spinner-border" role="status">
-                  <span className="visually-hidden">Loading...</span>
+    <Modal.Body style={{ padding: 0, maxHeight: "calc(90vh - 200px)", overflowY: "auto" }}>
+      {loadingOrder ? (
+        <div style={{
+          padding: "48px 20px",
+          textAlign: "center",
+        }}>
+          <Spinner animation="border" variant="primary" size="sm" style={{ marginBottom: "12px" }} />
+          <p className="mb-0" style={{ color: "#6b7280", fontSize: "14px" }}>Loading order details...</p>
+        </div>
+      ) : (
+        <>
+          <style>{`
+            .order-detail-filter-buttons {
+              display: flex;
+              flex-direction: row;
+              align-items: center;
+              gap: 12px;
+              flex-wrap: wrap;
+              margin-bottom: 0;
+              padding: 0;
+              width: 100%;
+            }
+
+            .order-detail-filter-button {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              padding: 10px 20px;
+              border-radius: 8px;
+              border: 1px solid;
+              font-weight: 500;
+              font-size: 14px;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              background: white;
+              white-space: nowrap;
+            }
+
+            .order-detail-filter-button:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
+
+            .order-detail-filter-button.active {
+              color: white;
+            }
+
+            .order-detail-filter-button.active .filter-icon {
+              color: white;
+            }
+
+            .order-detail-filter-button:not(.active) .filter-icon {
+              color: inherit;
+            }
+
+            .filter-icon {
+              width: 18px;
+              height: 18px;
+              flex-shrink: 0;
+            }
+          `}</style>
+
+          {/* Main Content Grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", minHeight: "500px" }}>
+            
+            {/* Left Panel - Main Information */}
+            <div style={{ padding: "32px", borderRight: "1px solid #e5e7eb" }}>
+              
+              {/* Tabs Navigation */}
+              <div className="order-detail-filter-buttons mb-4">
+                <button
+                  className={`order-detail-filter-button ${activeTab === "tab1" ? 'active' : ''}`}
+                  onClick={() => setActiveTab("tab1")}
+                  style={{
+                    backgroundColor: activeTab === "tab1" ? "#f59e0b" : 'white',
+                    borderColor: "#f59e0b",
+                    color: activeTab === "tab1" ? 'white' : "#f59e0b"
+                  }}
+                >
+                  <ShoppingBag className="filter-icon" size={18} />
+                  <span>General Information</span>
+                </button>
+                <button
+                  className={`order-detail-filter-button ${activeTab === "tab2" ? 'active' : ''}`}
+                  onClick={() => setActiveTab("tab2")}
+                  style={{
+                    backgroundColor: activeTab === "tab2" ? "#f59e0b" : 'white',
+                    borderColor: "#f59e0b",
+                    color: activeTab === "tab2" ? 'white' : "#f59e0b"
+                  }}
+                >
+                  <FileText className="filter-icon" size={18} />
+                  <span>Lead/Deal Information</span>
+                </button>
+                <button
+                  className={`order-detail-filter-button ${activeTab === "additional-info" ? 'active' : ''}`}
+                  onClick={() => setActiveTab("additional-info")}
+                  style={{
+                    backgroundColor: activeTab === "additional-info" ? "#f59e0b" : 'white',
+                    borderColor: "#f59e0b",
+                    color: activeTab === "additional-info" ? 'white' : "#f59e0b"
+                  }}
+                >
+                  <Info className="filter-icon" size={18} />
+                  <span>Additional Information</span>
+                </button>
+                <button
+                  className={`order-detail-filter-button ${activeTab === "history" ? 'active' : ''}`}
+                  onClick={() => setActiveTab("history")}
+                  style={{
+                    backgroundColor: activeTab === "history" ? "#f59e0b" : 'white',
+                    borderColor: "#f59e0b",
+                    color: activeTab === "history" ? 'white' : "#f59e0b"
+                  }}
+                >
+                  <History className="filter-icon" size={18} />
+                  <span>History</span>
+                </button>
+              </div>
+
+              {/* Tab Content */}
+              {activeTab === "tab1" && (
+                <div>
+                  {/* Quick Info Cards */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px", marginBottom: "28px" }}>
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = "translateY(-4px)";
+                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(245, 158, 11, 0.15)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "10px",
+                          background: viewingOrder.stage?.color || "#6c757d",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          <Target size={20} style={{ color: "white" }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.8px",
+                            marginBottom: "4px",
+                          }}>
+                            Stage
+                          </div>
+                          <div style={{
+                            fontSize: "15px",
+                            color: "#1f2937",
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>
+                            {viewingOrder.stage?.name || "Not assigned"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = "translateY(-4px)";
+                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(245, 158, 11, 0.15)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "10px",
+                          background: viewingOrder.status?.toLowerCase() === "completed" ? "#10b981" : viewingOrder.status?.toLowerCase() === "pending" ? "#f59e0b" : "#6c757d",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          <CheckCircle size={20} style={{ color: "white" }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.8px",
+                            marginBottom: "4px",
+                          }}>
+                            Status
+                          </div>
+                          <div style={{
+                            fontSize: "15px",
+                            color: "#1f2937",
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>
+                            {viewingOrder.status || "N/A"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = "translateY(-4px)";
+                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(245, 158, 11, 0.15)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "10px",
+                          background: "#10b981",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          <DollarSign size={20} style={{ color: "white" }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#10b981",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.8px",
+                            marginBottom: "4px",
+                          }}>
+                            Final Amount
+                          </div>
+                          <div style={{
+                            fontSize: "15px",
+                            color: "#1f2937",
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>
+                            {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = "translateY(-4px)";
+                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(245, 158, 11, 0.15)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "10px",
+                          background: "#3b82f6",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          <Calendar size={20} style={{ color: "white" }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            color: "#3b82f6",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.8px",
+                            marginBottom: "4px",
+                          }}>
+                            Order Date
+                          </div>
+                          <div style={{
+                            fontSize: "15px",
+                            color: "#1f2937",
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}>
+                            {viewingOrder.order_date ? formatDateForTable(viewingOrder.order_date) : "N/A"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Order Information Section */}
+                  <div style={{ marginBottom: "28px" }}>
+                    <h5 style={{
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      color: "#1f2937",
+                      marginBottom: "16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}>
+                      <div style={{
+                        width: "4px",
+                        height: "18px",
+                        background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                        borderRadius: "2px",
+                      }} />
+                      Order Details
+                    </h5>
+                    <div style={{
+                      background: "#f9fafb",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      padding: "20px",
+                    }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
+                          <ShoppingBag size={16} style={{ color: "#f59e0b" }} />
+                          Order Number
+                        </div>
+                        <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
+                          {viewingOrder.order_number || `ORD-${viewingOrder.id}`}
+                        </div>
+                        
+                        {viewingOrder.expected_delivery_date && (
+                          <>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
+                              <Calendar size={16} style={{ color: "#f59e0b" }} />
+                              Expected Delivery
+                            </div>
+                            <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
+                              {formatDateForTable(viewingOrder.expected_delivery_date)}
+                            </div>
+                          </>
+                        )}
+
+                        {viewingOrder.industry && (
+                          <>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
+                              <Building2 size={16} style={{ color: "#f59e0b" }} />
+                              Industry
+                            </div>
+                            <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
+                              {viewingOrder.industry}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Company Information Section */}
+                  <div style={{ marginBottom: "28px" }}>
+                    <h5 style={{
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      color: "#1f2937",
+                      marginBottom: "16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}>
+                      <div style={{
+                        width: "4px",
+                        height: "18px",
+                        background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                        borderRadius: "2px",
+                      }} />
+                      Company Information
+                    </h5>
+                    <div style={{
+                      background: "#f9fafb",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      padding: "20px",
+                    }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                        {viewingOrder.customer_name && (
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Company Name
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                            }}>
+                              <div
+                                style={{
+                                  width: "30px",
+                                  height: "30px",
+                                  borderRadius: "50%",
+                                  backgroundColor: getRandomColor(viewingOrder.customer_name),
+                                  color: "#fff",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: "10px",
+                                  fontWeight: "600",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {getInitials(viewingOrder.customer_name)}
+                              </div>
+                              <span>{viewingOrder.customer_name}</span>
+                            </div>
+                          </div>
+                        )}
+                        {viewingOrder.customer_email && (
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Email
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              <Mail size={14} style={{ color: "#f59e0b", marginRight: "6px", display: "inline" }} />
+                              {viewingOrder.customer_email}
+                            </div>
+                          </div>
+                        )}
+                        {viewingOrder.customer_phone && (
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Phone
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              <PhoneDisplay phone={viewingOrder.customer_phone || ""} />
+                            </div>
+                          </div>
+                        )}
+                        {viewingOrder.customer_address && (
+                          <div style={{ gridColumn: "1 / -1" }}>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Address
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              {viewingOrder.customer_address}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Order Items/Products */}
+                  {viewingOrder.items && Array.isArray(viewingOrder.items) && viewingOrder.items.length > 0 && (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        color: "#1f2937",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Order Items
+                        <Badge 
+                          bg="secondary"
+                          style={{
+                            marginLeft: "8px",
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            padding: "4px 10px",
+                            borderRadius: "6px",
+                          }}
+                        >
+                          {viewingOrder.items.length}
+                        </Badge>
+                      </h5>
+                      <div style={{
+                        background: "white",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        overflow: "hidden",
+                      }}>
+                        <div style={{ overflowX: "auto" }}>
+                          <Table hover style={{ width: "100%", marginBottom: 0, tableLayout: "auto" }}>
+                            <thead style={{ background: "#f9fafb" }}>
+                              <tr>
+                                <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>#</th>
+                                <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Product Name</th>
+                                <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>SKU</th>
+                                <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Quantity</th>
+                                {viewingOrder.items.some((item: any) => item.description) && (
+                                  <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Description</th>
+                                )}
+                                <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Unit Price</th>
+                                <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Total Price</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {viewingOrder.items.map((item: any, index: number) => (
+                                <tr key={item.id || index} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                                  <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937" }}>{index + 1}</td>
+                                  <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937", fontWeight: 600 }}>
+                                    {item.product_name || item.product?.name || "N/A"}
+                                  </td>
+                                  <td style={{ padding: "14px 16px", fontSize: "13px", color: "#6b7280" }}>{item.product?.sku || "N/A"}</td>
+                                  <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937" }}>{item.quantity || "0"}</td>
+                                  {viewingOrder.items.some((i: any) => i.description) && (
+                                    <td style={{ padding: "14px 16px", fontSize: "13px", color: "#6b7280", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {item.description || "-"}
+                                    </td>
+                                  )}
+                                  <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937" }}>
+                                    {viewingOrder.currency || "AED"} {parseFloat(item.unit_price || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937", fontWeight: 600 }}>
+                                    {viewingOrder.currency || "AED"} {parseFloat(item.total_price || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot style={{ background: "#f9fafb", fontWeight: 600 }}>
+                              <tr>
+                                <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} style={{ padding: "12px 16px", textAlign: "right", fontSize: "13px", color: "#6b7280" }}>
+                                  Subtotal:
+                                </td>
+                                <td style={{ padding: "12px 16px", fontSize: "13px", color: "#1f2937" }}>
+                                  {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                              </tr>
+                              {viewingOrder.discount_amount && parseFloat(viewingOrder.discount_amount) > 0 && (
+                                <tr>
+                                  <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} style={{ padding: "12px 16px", textAlign: "right", fontSize: "13px", color: "#6b7280" }}>
+                                    Discount:
+                                  </td>
+                                  <td style={{ padding: "12px 16px", fontSize: "13px", color: "#dc2626" }}>
+                                    - {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.discount_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                              )}
+                              {viewingOrder.tax_amount && parseFloat(viewingOrder.tax_amount) > 0 && (
+                                <tr>
+                                  <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} style={{ padding: "12px 16px", textAlign: "right", fontSize: "13px", color: "#6b7280" }}>
+                                    Tax:
+                                  </td>
+                                  <td style={{ padding: "12px 16px", fontSize: "13px", color: "#1f2937" }}>
+                                    {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.tax_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                              )}
+                              <tr style={{ fontSize: "16px" }}>
+                                <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} style={{ padding: "12px 16px", textAlign: "right", fontSize: "14px", color: "#1f2937", fontWeight: 700 }}>
+                                  Total:
+                                </td>
+                                <td style={{ padding: "12px 16px", fontSize: "14px", color: "#1f2937", fontWeight: 700 }}>
+                                  {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </Table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "tab2" && (
+                <div>
+                  {/* Deal Information */}
+                  {relatedDeal && (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        color: "#1f2937",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Deal Information
+                      </h5>
+                      <div style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Deal Name
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              {relatedDeal.name || "N/A"}
+                            </div>
+                          </div>
+                          {relatedDeal.stage && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Stage
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <Badge
+                                  style={{
+                                    padding: "6px 14px",
+                                    borderRadius: "20px",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                    backgroundColor: relatedDeal.stage?.color || "#6c757d",
+                                  }}
+                                >
+                                  {relatedDeal.stage?.name || "Not assigned"}
+                                </Badge>
+                              </div>
+                            </div>
+                          )}
+                          {relatedDeal.net_value && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Deal Value
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                {relatedDeal.currency || "AED"} {parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total || 0)).toLocaleString()}
+                              </div>
+                            </div>
+                          )}
+                          {relatedDeal.assigned_to && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Assigned To
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <User size={14} style={{ color: "#f59e0b", marginRight: "6px", display: "inline" }} />
+                                {extensions.find((ext: any) => ext?.id == relatedDeal?.assigned_to || ext?.extension == relatedDeal?.assigned_to)?.display_name || 
+                                 extensions.find((ext: any) => ext?.id == relatedDeal?.assigned_to || ext?.extension == relatedDeal?.assigned_to)?.name || 
+                                 relatedDeal.assigned_to || "Not assigned"}
+                              </div>
+                            </div>
+                          )}
+                          {relatedDeal.created_at && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Created Date
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <Calendar size={14} style={{ color: "#f59e0b", marginRight: "6px", display: "inline" }} />
+                                {relatedDeal.created_at ? formatDateForTable(relatedDeal.created_at) : "N/A"}
+                              </div>
+                            </div>
+                          )}
+                          {relatedDeal.company_name && (
+                            <div style={{ gridColumn: "1 / -1" }}>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Company Name
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <Building2 size={14} style={{ color: "#f59e0b", marginRight: "6px", display: "inline" }} />
+                                {relatedDeal.company_name}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lead Information */}
+                  {relatedLead && (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        color: "#1f2937",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Lead Information
+                      </h5>
+                      <div style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Lead Name
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              {relatedLead.name}
+                            </div>
+                          </div>
+                          {relatedLead.stage && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Stage
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <Badge
+                                  style={{
+                                    padding: "6px 14px",
+                                    borderRadius: "20px",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                    backgroundColor: relatedLead.stage?.color || "#6c757d",
+                                  }}
+                                >
+                                  {relatedLead.stage?.name || "Not assigned"}
+                                </Badge>
+                              </div>
+                            </div>
+                          )}
+                          {relatedLead.lead_potential && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Lead Potential
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <Badge
+                                  bg={relatedLead.lead_potential === "Hot" ? "danger" : relatedLead.lead_potential === "Warm" ? "warning" : "secondary"}
+                                  style={{
+                                    padding: "6px 14px",
+                                    borderRadius: "20px",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {relatedLead.lead_potential || "N/A"}
+                                </Badge>
+                              </div>
+                            </div>
+                          )}
+                          {relatedLead.user_extension && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Assigned To
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                <User size={14} style={{ color: "#f59e0b", marginRight: "6px", display: "inline" }} />
+                                {extensions.find((ext: any) => ext?.id == relatedLead?.user_extension || ext?.extension == relatedLead?.user_extension)?.display_name || 
+                                 extensions.find((ext: any) => ext?.id == relatedLead?.user_extension || ext?.extension == relatedLead?.user_extension)?.name || 
+                                 relatedLead.user_extension || "Not assigned"}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Campaign Information */}
+                  {relatedLead?.campaign && (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        color: "#1f2937",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Campaign Information
+                      </h5>
+                      <div style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Campaign Name
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              {relatedLead.campaign.name}
+                            </div>
+                          </div>
+                          {relatedLead.campaign_field_values && Object.keys(relatedLead.campaign_field_values).length > 0 && (
+                            Object.entries(relatedLead.campaign_field_values).map(([key, value]: [string, any]) => (
+                              <div key={key}>
+                                <div style={{
+                                  fontSize: "12px",
+                                  fontWeight: 700,
+                                  color: "#6b7280",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.5px",
+                                  marginBottom: "6px",
+                                }}>
+                                  {key}
+                                </div>
+                                <div style={{
+                                  fontSize: "14px",
+                                  color: "#1f2937",
+                                  fontWeight: 500,
+                                  wordBreak: "break-word",
+                                }}>
+                                  {String(value)}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Prospect Information */}
+                  {relatedLead?.crm_data && (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        color: "#1f2937",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Prospect Information
+                      </h5>
+                      <div style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                          {relatedLead.crm_data.id && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                CRM Data ID
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                #{relatedLead.crm_data.id}
+                              </div>
+                            </div>
+                          )}
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Name
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              {relatedLead.crm_data.name || (relatedLead.crm_data.data && relatedLead.crm_data.data.name) || "N/A"}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Phone
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              <PhoneDisplay phone={relatedLead.crm_data.phone || (relatedLead.crm_data.data && relatedLead.crm_data.data.phone) || ""} />
+                            </div>
+                          </div>
+                          {relatedLead.crm_data.source_file && (
+                            <div>
+                              <div style={{
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                color: "#6b7280",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                marginBottom: "6px",
+                              }}>
+                                Source File
+                              </div>
+                              <div style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 500,
+                                wordBreak: "break-word",
+                              }}>
+                                {relatedLead.crm_data.source_file}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "additional-info" && (
+                <div>
+                  {/* Additional Information Section */}
+                  <div style={{ marginBottom: "28px" }}>
+                    <h5 style={{
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      color: "#1f2937",
+                      marginBottom: "16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}>
+                      <div style={{
+                        width: "4px",
+                        height: "18px",
+                        background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                        borderRadius: "2px",
+                      }} />
+                      Additional Information
+                    </h5>
+                    <div style={{
+                      background: "#f9fafb",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      padding: "20px",
+                    }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                        <div>
+                          <div style={{
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.5px",
+                            marginBottom: "6px",
+                          }}>
+                            Approval Status
+                          </div>
+                          <div style={{
+                            fontSize: "14px",
+                            color: "#1f2937",
+                            fontWeight: 500,
+                            wordBreak: "break-word",
+                          }}>
+                            {viewingOrder.order_approval_status ? (
+                              <Badge
+                                bg={
+                                  viewingOrder.order_approval_status?.toLowerCase() === "approved"
+                                    ? "success"
+                                    : viewingOrder.order_approval_status?.toLowerCase() === "rejected"
+                                    ? "danger"
+                                    : "warning"
+                                }
+                              >
+                                {viewingOrder.order_approval_status}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted">Not Set</span>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.5px",
+                            marginBottom: "6px",
+                          }}>
+                            Fulfillment Status
+                          </div>
+                          <div style={{
+                            fontSize: "14px",
+                            color: "#1f2937",
+                            fontWeight: 500,
+                            wordBreak: "break-word",
+                          }}>
+                            {viewingOrder.fulfillment_status ? (
+                              <Badge
+                                bg={
+                                  viewingOrder.fulfillment_status?.toLowerCase().includes("completed") ||
+                                  viewingOrder.fulfillment_status?.toLowerCase().includes("delivered")
+                                    ? "success"
+                                    : viewingOrder.fulfillment_status?.toLowerCase().includes("progress")
+                                    ? "primary"
+                                    : "secondary"
+                                }
+                              >
+                                {viewingOrder.fulfillment_status}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted">Not Set</span>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.5px",
+                            marginBottom: "6px",
+                          }}>
+                            Payment Status
+                          </div>
+                          <div style={{
+                            fontSize: "14px",
+                            color: "#1f2937",
+                            fontWeight: 500,
+                            wordBreak: "break-word",
+                          }}>
+                            {viewingOrder.payment_status ? (
+                              <Badge
+                                bg={
+                                  viewingOrder.payment_status?.toLowerCase() === "paid"
+                                    ? "success"
+                                    : viewingOrder.payment_status?.toLowerCase() === "partial"
+                                    ? "warning"
+                                    : "danger"
+                                }
+                              >
+                                {viewingOrder.payment_status}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted">Not Set</span>
+                            )}
+                          </div>
+                        </div>
+                        {viewingOrder.assigned_to && (
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Assigned To
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              <User size={14} style={{ color: "#f59e0b", marginRight: "6px", display: "inline" }} />
+                              {extensions.find((ext: any) => ext?.id == viewingOrder?.assigned_to || ext?.extension == viewingOrder?.assigned_to)?.display_name ||
+                               extensions.find((ext: any) => ext?.id == viewingOrder?.assigned_to || ext?.extension == viewingOrder?.assigned_to)?.name ||
+                               viewingOrder.assigned_to || "Not assigned"}
+                            </div>
+                          </div>
+                        )}
+                        {viewingOrder.contract_length && (
+                          <div>
+                            <div style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: "#6b7280",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              marginBottom: "6px",
+                            }}>
+                              Contract Length
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
+                              color: "#1f2937",
+                              fontWeight: 500,
+                              wordBreak: "break-word",
+                            }}>
+                              {viewingOrder.contract_length}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  {viewingOrder.notes && (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        color: "#1f2937",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Notes
+                      </h5>
+                      <div style={{
+                        background: "#fffbeb",
+                        border: "1px solid #fcd34d",
+                        borderRadius: "12px",
+                        padding: "16px 20px",
+                        fontSize: "14px",
+                        color: "#78350f",
+                        lineHeight: "1.6",
+                        whiteSpace: "pre-wrap",
+                      }}>
+                        {viewingOrder.notes}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "history" && (
+                <div>
+                  {/* Activity History */}
+                  {viewingOrder.histories && Array.isArray(viewingOrder.histories) && viewingOrder.histories.length > 0 ? (
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5 style={{
+                        fontSize: "15px",
+                        fontWeight: 700,
+                        color: "#1f2937",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}>
+                        <div style={{
+                          width: "4px",
+                          height: "18px",
+                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                          borderRadius: "2px",
+                        }} />
+                        Activity History
+                        <Badge 
+                          bg="secondary"
+                          style={{
+                            marginLeft: "8px",
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            padding: "4px 10px",
+                            borderRadius: "6px",
+                          }}
+                        >
+                          {viewingOrder.histories.length}
+                        </Badge>
+                      </h5>
+                      <div style={{
+                        background: "white",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "12px",
+                        padding: "20px",
+                      }}>
+                        <div style={{ position: "relative", paddingLeft: "30px" }}>
+                          <div style={{
+                            content: "",
+                            position: "absolute",
+                            left: "8px",
+                            top: 0,
+                            bottom: 0,
+                            width: "2px",
+                            background: "#e5e7eb",
+                          }} />
+                          {viewingOrder.histories.map((history: any, idx: number) => (
+                            <div key={history.id || idx} style={{ position: "relative", paddingBottom: idx < viewingOrder.histories.length - 1 ? "20px" : "0" }}>
+                              <div style={{
+                                content: "",
+                                position: "absolute",
+                                left: "-26px",
+                                top: "4px",
+                                width: "12px",
+                                height: "12px",
+                                borderRadius: "50%",
+                                background: history.event === "created" ? "#10b981" : "#f59e0b",
+                                border: "3px solid white",
+                                boxShadow: "0 0 0 2px #e5e7eb",
+                              }} />
+                              <div style={{
+                                background: "#f9fafb",
+                                padding: "12px 16px",
+                                borderRadius: "8px",
+                              }}>
+                                <div style={{
+                                  fontSize: "12px",
+                                  color: "#6b7280",
+                                  fontWeight: 600,
+                                  marginBottom: "4px",
+                                }}>
+                                  {new Date(history.created_at).toLocaleString()}
+                                </div>
+                                <div style={{
+                                  fontSize: "14px",
+                                  color: "#1f2937",
+                                  marginBottom: "4px",
+                                  fontWeight: 500,
+                                }}>
+                                  {history.event === "created" ? "Created" : history.event === "updated" ? "Updated" : history.event}
+                                </div>
+                                {history.description && (
+                                  <div style={{
+                                    fontSize: "13px",
+                                    color: "#6b7280",
+                                    marginBottom: "8px",
+                                  }}>
+                                    {history.description}
+                                  </div>
+                                )}
+                                {history.changes && Object.keys(history.changes).length > 0 && (
+                                  <div style={{
+                                    fontSize: "12px",
+                                    color: "#6b7280",
+                                  }}>
+                                    {Object.entries(history.changes).map(([key, change]: [string, any]) => {
+                                      if (ignoredKeys.includes(key)) {
+                                        return null;
+                                      }
+                                      return (
+                                        <div key={key} style={{ marginTop: "4px" }}>
+                                          <strong>{key}:</strong> {change.old ? `${change.old} → ` : ""}{change.new || "N/A"}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: "40px",
+                      textAlign: "center",
+                      color: "#6b7280",
+                      background: "#f9fafb",
+                      border: "2px dashed #d1d5db",
+                      borderRadius: "12px"
+                    }}>
+                      <History size={40} style={{ marginBottom: "12px", opacity: 0.5 }} />
+                      <div style={{ fontSize: "14px", fontWeight: 500 }}>No activity history found</div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Right Panel - Quick Actions & Info */}
+            <div style={{ 
+              padding: "32px 24px", 
+              background: "#fafbfc",
+              display: "flex",
+              flexDirection: "column",
+              gap: "24px",
+            }}>
+              
+              {/* Quick Actions */}
+              <div>
+                <h6 style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  marginBottom: "14px",
+                }}>
+                  Quick Actions
+                </h6>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {session?.user?.permissions?.includes("edit-crm-orders") && (
+                    <button
+                      style={{
+                        background: "white",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "10px",
+                        padding: "12px 16px",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                        color: "#1f2937",
+                      }}
+                      onClick={() => {
+                        setShowOrderViewModal(false);
+                        window.location.href = `/crm/orders/${viewingOrder.id}/edit`;
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.borderColor = "#f59e0b";
+                        e.currentTarget.style.background = "#fffbeb";
+                        e.currentTarget.style.transform = "translateX(4px)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.borderColor = "#e5e7eb";
+                        e.currentTarget.style.background = "white";
+                        e.currentTarget.style.transform = "translateX(0)";
+                      }}
+                    >
+                      <div style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "8px",
+                        background: "#f59e0b",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}>
+                        <Edit size={16} style={{ color: "white" }} />
+                      </div>
+                      Edit Order
+                    </button>
+                  )}
                 </div>
               </div>
-            ) : (
-              <>
-                <style jsx>{`
-                  .lead-detail-filter-buttons {
-                    display: flex;
-                    gap: 12px;
-                    flex-wrap: wrap;
-                    margin-bottom: 24px;
-                  }
 
-                  .lead-detail-filter-button {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 10px 20px;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.3s;
-                    border: 1px solid;
-                  }
-
-                  .lead-detail-filter-button:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-                  }
-
-                  .lead-detail-filter-button.active {
-                    color: white;
-                  }
-
-                  .lead-detail-filter-button.active .filter-icon {
-                    color: white;
-                  }
-
-                  .lead-detail-filter-button:not(.active) .filter-icon {
-                    color: inherit;
-                  }
-
-                  .filter-icon {
-                    width: 18px;
-                    height: 18px;
-                    flex-shrink: 0;
-                  }
-                `}</style>
-                {/* Tabs Navigation */}
-                <div className="lead-detail-filter-buttons mb-4">
-                  <button
-                    className={`lead-detail-filter-button ${activeTab === "tab1" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("tab1")}
-                    style={{
-                      backgroundColor: activeTab === "tab1" ? "#4680ff" : 'white',
-                      borderColor: "#4680ff",
-                      color: activeTab === "tab1" ? 'white' : "#4680ff"
-                    }}
-                  >
-                    <Handshake className="filter-icon" size={18} />
-                    <span>General Information</span>
-                  </button>
-
-                  <button
-                    className={`lead-detail-filter-button ${activeTab === "tab2" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("tab2")}
-                    style={{
-                      backgroundColor: activeTab === "tab2" ? "#4680ff" : 'white',
-                      borderColor: "#4680ff",
-                      color: activeTab === "tab2" ? 'white' : "#4680ff"
-                    }}
-                  >
-                    <FileText className="filter-icon" size={18} />
-                    <span>Lead/Deal Information</span>
-                  </button>
-
-                  <button
-                    className={`lead-detail-filter-button ${activeTab === "additional-info" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("additional-info")}
-                    style={{
-                      backgroundColor: activeTab === "additional-info" ? "#4680ff" : 'white',
-                      borderColor: "#4680ff",
-                      color: activeTab === "additional-info" ? 'white' : "#4680ff"
-                    }}
-                  >
-                    <Info className="filter-icon" size={18} />
-                    <span>Additional Information</span>
-                  </button>
-
-                  <button
-                    className={`lead-detail-filter-button ${activeTab === "history" ? 'active' : ''}`}
-                    onClick={() => setActiveTab("history")}
-                    style={{
-                      backgroundColor: activeTab === "history" ? "#4680ff" : 'white',
-                      borderColor: "#4680ff",
-                      color: activeTab === "history" ? 'white' : "#4680ff"
-                    }}
-                  >
-                    <History className="filter-icon" size={18} />
-                    <span>History</span>
-                  </button>
-                </div>
-
-                {/* Tab Content */}
-                {activeTab === "tab1" && (
-                  <div style={{ paddingTop: "20px" }}>
-                    {/* Order Information Section */}
-                <div
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: 600,
-                    color: "#1f2937",
-                    marginBottom: "20px",
-                    paddingBottom: "10px",
-                    borderBottom: "2px solid #f8f9fa",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                  }}
-                >
-                  <ShoppingBag size={18} style={{ color: "#4680ff" }} />
-                  Order Information
-                </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                    gap: "20px",
-                    marginBottom: "30px",
-                  }}
-                >
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Order Number
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {viewingOrder.order_number || `ORD-${viewingOrder.id}`}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Stage
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      <Badge
-                        bg="secondary"
+              {/* Status Overview */}
+              <div>
+                <h6 style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  marginBottom: "14px",
+                }}>
+                  Status Overview
+                </h6>
+                <div style={{
+                  background: "white",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  padding: "16px",
+                }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                        Stage
+                      </span>
+                      <Badge 
                         style={{
-                          padding: "6px 14px",
-                          borderRadius: "20px",
-                          fontSize: "12px",
+                          fontSize: "11px",
                           fontWeight: 600,
-                          backgroundColor:
-                            viewingOrder.stage?.color || "#6c757d",
+                          padding: "4px 10px",
+                          borderRadius: "6px",
+                          backgroundColor: viewingOrder.stage?.color || "#6c757d",
                         }}
                       >
-                        {viewingOrder.stage?.name || "Not assigned"}
+                        {viewingOrder.stage?.name || "N/A"}
                       </Badge>
                     </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Status
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
+                    
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                        Status
+                      </span>
                       <Badge
                         bg={
                           viewingOrder.status?.toLowerCase() === "completed"
@@ -3537,2645 +5065,144 @@ const CrmOrders = () => {
                             ? "warning"
                             : "secondary"
                         }
-                        style={{
-                          padding: "6px 14px",
-                          borderRadius: "20px",
-                          fontSize: "12px",
-                          fontWeight: 600,
-                        }}
+                        style={{ fontSize: "11px", padding: "4px 10px" }}
                       >
                         {viewingOrder.status || "N/A"}
                       </Badge>
                     </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Final Amount
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                        Total Amount
+                      </span>
+                      <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
+                        {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
                     </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {viewingOrder.currency || "AED"}{" "}
-                      {parseFloat(
-                        viewingOrder.final_amount ||
-                          viewingOrder.total_amount ||
-                          "0"
-                      ).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                        Items
+                      </span>
+                      <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
+                        {viewingOrder.items?.length || 0}
+                      </span>
                     </div>
                   </div>
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Order Date
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {viewingOrder.order_date
-                        ? formatDateForTable(viewingOrder.order_date)
-                        : "N/A"}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Expected Delivery
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {viewingOrder.expected_delivery_date
-                        ? formatDateForTable(
-                            viewingOrder.expected_delivery_date
-                          )
-                        : "N/A"}
-                    </div>
-                  </div>
-                  {viewingOrder.industry && (
-                    <div
-                      style={{
-                        background: "#f8f9fa",
-                        padding: "16px",
-                        borderRadius: "10px",
-                        transition: "all 0.3s",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#e5e7eb";
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "#f8f9fa";
-                        e.currentTarget.style.transform = "translateY(0)";
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "6px",
-                        }}
-                      >
-                        Industry
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "15px",
-                          color: "#1f2937",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {viewingOrder.industry}
-                      </div>
-                    </div>
-                  )}
                 </div>
+              </div>
 
-                {/* Customer Information */}
-                <div
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: 600,
-                    color: "#1f2937",
-                    marginBottom: "20px",
-                    paddingBottom: "10px",
-                    borderBottom: "2px solid #f8f9fa",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                  }}
-                >
-                  <User size={18} style={{ color: "#4680ff" }} />
-                  Company Information
-                </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                    gap: "20px",
-                    marginBottom: "30px",
-                  }}
-                >
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                      }}
-                    >
-                      <User size={14} />
-                      Company Name
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                      className="d-flex align-items-center gap-2"
-                    >
-                      {viewingOrder.customer_name ? (
-                        <>
-                          <div
-                            style={{
-                              width: "30px",
-                              height: "30px",
-                              borderRadius: "50%",
-                              backgroundColor: getRandomColor(
-                                viewingOrder.customer_name
-                              ),
-                              color: "#fff",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "10px",
-                              fontWeight: "600",
-                              flexShrink: 0,
-                            }}
-                          >
-                            {getInitials(viewingOrder.customer_name)}
-                          </div>
-                          <span>{viewingOrder.customer_name}</span>
-                        </>
-                      ) : (
-                        "N/A"
-                      )}
-                    </div>
-                  </div>
-                  {viewingOrder.customer_email && (
-                    <div
-                      style={{
-                        background: "#f8f9fa",
-                        padding: "16px",
-                        borderRadius: "10px",
-                        transition: "all 0.3s",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#e5e7eb";
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "#f8f9fa";
-                        e.currentTarget.style.transform = "translateY(0)";
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "6px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                        }}
-                      >
-                        <Mail size={14} />
-                        Email
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "15px",
-                          color: "#1f2937",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {viewingOrder.customer_email}
-                      </div>
-                    </div>
-                  )}
-                  {viewingOrder.customer_phone && (
-                    <div
-                      style={{
-                        background: "#f8f9fa",
-                        padding: "16px",
-                        borderRadius: "10px",
-                        transition: "all 0.3s",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#e5e7eb";
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "#f8f9fa";
-                        e.currentTarget.style.transform = "translateY(0)";
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "6px",
-                        }}
-                      >
-                        Phone
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "15px",
-                          color: "#1f2937",
-                          fontWeight: 500,
-                        }}
-                      >
-                        <PhoneDisplay
-                          phone={viewingOrder.customer_phone || ""}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  {viewingOrder.customer_address && (
-                    <div
-                      style={{
-                        background: "#f8f9fa",
-                        padding: "16px",
-                        borderRadius: "10px",
-                        transition: "all 0.3s",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#e5e7eb";
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "#f8f9fa";
-                        e.currentTarget.style.transform = "translateY(0)";
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "6px",
-                        }}
-                      >
-                        Address
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "15px",
-                          color: "#1f2937",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {viewingOrder.customer_address}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                
-
-                {/* Order Items/Products */}
-                {viewingOrder.items &&
-                  Array.isArray(viewingOrder.items) &&
-                  viewingOrder.items.length > 0 && (
-                    <>
-                      <div
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 600,
-                          color: "#1f2937",
-                          marginBottom: "20px",
-                          paddingBottom: "10px",
-                          borderBottom: "2px solid #f8f9fa",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <Package size={18} style={{ color: "#4680ff" }} />
-                        Order Items ({viewingOrder.items.length})
-                      </div>
-                      <div
-                        style={{
-                          marginBottom: "30px",
-                          width: "100%",
-                          overflowX: "auto",
-                        }}
-                      >
-                        <div
-                          className="table-responsive custom-table-order"
-                          style={{ width: "100%" }}
-                        >
-                          <Table
-                            hover
-                            style={{
-                              width: "100%",
-                              marginBottom: 0,
-                              tableLayout: "auto",
-                            }}
-                          >
-                            <thead style={{ background: "#f8f9fa" }}>
-                              <tr>
-                                <th>#</th>
-                                <th>Product Name</th>
-                                <th>SKU</th>
-                                <th>Quantity</th>
-                                {viewingOrder.items.some(
-                                  (item: any) => item.description
-                                ) && <th>Description</th>}
-                                <th>Unit Price</th>
-                                <th
-                                  style={{
-                                    maxWidth: "100px",
-                                    minWidth: "unset",
-                                  }}
-                                >
-                                  Total Price
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {viewingOrder.items.map(
-                                (item: any, index: number) => (
-                                  <tr key={item.id || index}>
-                                    <td>{index + 1}</td>
-                                    <td className="fw-semibold">
-                                      {item.product_name ||
-                                        item.product?.name ||
-                                        "N/A"}
-                                    </td>
-                                    <td>{item.product?.sku || "N/A"}</td>
-                                    <td>{item.quantity || "0"}</td>
-                                    {viewingOrder.items.some(
-                                      (i: any) => i.description
-                                    ) && (
-                                      <td
-                                        style={{
-                                          maxWidth: "200px",
-                                          overflow: "hidden",
-                                          textOverflow: "ellipsis",
-                                          whiteSpace: "nowrap",
-                                        }}
-                                      >
-                                        {item.description || "-"}
-                                      </td>
-                                    )}
-                                    <td>
-                                      {viewingOrder.currency || "AED"}{" "}
-                                      {parseFloat(
-                                        item.unit_price || "0"
-                                      ).toLocaleString(undefined, {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      })}
-                                    </td>
-                                    <td
-                                      style={{
-                                        maxWidth: "100px",
-                                        minWidth: "unset",
-                                      }}
-                                      className="fw-semibold"
-                                    >
-                                      {viewingOrder.currency || "AED"}{" "}
-                                      {parseFloat(
-                                        item.total_price || "0"
-                                      ).toLocaleString(undefined, {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      })}
-                                    </td>
-                                  </tr>
-                                )
-                              )}
-                            </tbody>
-                            <tfoot
-                              style={{ background: "#f8f9fa", fontWeight: 600 }}
-                            >
-                              <tr>
-                                <td
-                                  colSpan={
-                                    viewingOrder.items.some(
-                                      (item: any) => item.description
-                                    )
-                                      ? 6
-                                      : 5
-                                  }
-                                  className="text-end"
-                                >
-                                  Subtotal:
-                                </td>
-                                <td
-                                  style={{
-                                    maxWidth: "100px",
-                                    minWidth: "unset",
-                                  }}
-                                >
-                                  {viewingOrder.currency || "AED"}{" "}
-                                  {parseFloat(
-                                    viewingOrder.total_amount || "0"
-                                  ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </td>
-                              </tr>
-                              {viewingOrder.discount_amount &&
-                                parseFloat(viewingOrder.discount_amount) >
-                                  0 && (
-                                  <tr>
-                                    <td
-                                      colSpan={
-                                        viewingOrder.items.some(
-                                          (item: any) => item.description
-                                        )
-                                          ? 6
-                                          : 5
-                                      }
-                                      className="text-end"
-                                    >
-                                      Discount:
-                                    </td>
-                                    <td
-                                      style={{
-                                        maxWidth: "100px",
-                                        minWidth: "unset",
-                                      }}
-                                    >
-                                      - {viewingOrder.currency || "AED"}{" "}
-                                      {parseFloat(
-                                        viewingOrder.discount_amount
-                                      ).toLocaleString(undefined, {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      })}
-                                    </td>
-                                  </tr>
-                                )}
-                              {viewingOrder.tax_amount &&
-                                parseFloat(viewingOrder.tax_amount) > 0 && (
-                                  <tr>
-                                    <td
-                                      colSpan={
-                                        viewingOrder.items.some(
-                                          (item: any) => item.description
-                                        )
-                                          ? 6
-                                          : 5
-                                      }
-                                      className="text-end"
-                                    >
-                                      Tax:
-                                    </td>
-                                    <td
-                                      style={{
-                                        maxWidth: "100px",
-                                        minWidth: "unset",
-                                      }}
-                                    >
-                                      {viewingOrder.currency || "AED"}{" "}
-                                      {parseFloat(
-                                        viewingOrder.tax_amount
-                                      ).toLocaleString(undefined, {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                      })}
-                                    </td>
-                                  </tr>
-                                )}
-                              <tr style={{ fontSize: "16px" }}>
-                                <td
-                                  colSpan={
-                                    viewingOrder.items.some(
-                                      (item: any) => item.description
-                                    )
-                                      ? 6
-                                      : 5
-                                  }
-                                  className="text-end"
-                                >
-                                  Total:
-                                </td>
-                                <td
-                                  style={{
-                                    maxWidth: "100px",
-                                    minWidth: "unset",
-                                  }}
-                                >
-                                  {viewingOrder.currency || "AED"}{" "}
-                                  {parseFloat(
-                                    viewingOrder.final_amount ||
-                                      viewingOrder.total_amount ||
-                                      "0"
-                                  ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </td>
-                              </tr>
-                            </tfoot>
-                          </Table>
+              {/* Order Summary */}
+              <div style={{ flex: 1 }}>
+                <h6 style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                  marginBottom: "14px",
+                }}>
+                  Order Summary
+                </h6>
+                <div style={{
+                  background: "white",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  padding: "16px",
+                }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    {viewingOrder.order_date && (
+                      <div>
+                        <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: 600, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          Order Date
+                        </div>
+                        <div style={{ fontSize: "13px", color: "#1f2937", fontWeight: 500 }}>
+                          {moment(viewingOrder.order_date).format("MMM DD, YYYY")}
                         </div>
                       </div>
-                    </>
-                  )}
-
-               
-
-               
-
-                {/* Action Buttons */}
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "12px",
-                    flexWrap: "wrap",
-                    paddingTop: "20px",
-                    borderTop: "1px solid #e5e7eb",
-                  }}
-                >
-                  {session?.user?.permissions?.includes("edit-crm-orders") && (
-                    <Button
-                      variant="primary"
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: "8px",
-                        fontWeight: 500,
-                        fontSize: "14px",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        background: "#4680ff",
-                        border: "none",
-                      }}
-                      onClick={() => {
-                        setShowOrderViewModal(false);
-                        window.location.href = `/crm/orders/${viewingOrder.id}/edit`;
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#3b6ce5";
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow =
-                          "0 4px 12px rgba(70, 128, 255, 0.4)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "#4680ff";
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    >
-                      <Edit size={16} />
-                      Edit Order
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline-secondary"
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: "8px",
-                      fontWeight: 500,
-                      fontSize: "14px",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                    onClick={() => setShowOrderViewModal(false)}
-                  >
-                    Close
-                  </Button>
-                </div>
-                  </div>
-                )}
-
-                {activeTab === "tab2" && (
-                  <div style={{ paddingTop: "20px" }}>
-                    <div
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: 600,
-                        color: "#1f2937",
-                        marginBottom: "20px",
-                        paddingBottom: "10px",
-                        borderBottom: "2px solid #f8f9fa",
-                      }}
-                    >
-                      {/* Deal Information */}
-                {relatedDeal && (
-                  <>
-                    <div
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: 600,
-                        color: "#1f2937",
-                        marginBottom: "20px",
-                        paddingBottom: "10px",
-                        borderBottom: "2px solid #f8f9fa",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
-                      <Link2 size={18} style={{ color: "#4680ff" }} />
-                      Deal Information
-                    </div>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fit, minmax(250px, 1fr))",
-                        gap: "20px",
-                        marginBottom: "30px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          background: "#f8f9fa",
-                          padding: "16px",
-                          borderRadius: "10px",
-                          transition: "all 0.3s",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = "#e5e7eb";
-                          e.currentTarget.style.transform = "translateY(-2px)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = "#f8f9fa";
-                          e.currentTarget.style.transform = "translateY(0)";
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.5px",
-                            marginBottom: "6px",
-                          }}
-                        >
-                          Deal Name
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "15px",
-                            color: "#1f2937",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {relatedDeal.name || "N/A"}
-                        </div>
-                      </div>
-                      {relatedDeal.stage && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Stage
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            <Badge
-                              bg="primary"
-                              style={{
-                                padding: "6px 14px",
-                                borderRadius: "20px",
-                                fontSize: "12px",
-                                fontWeight: 600,
-                                backgroundColor:
-                                  relatedDeal.stage?.color || "#6c757d",
-                              }}
-                            >
-                              {relatedDeal.stage?.name || "Not assigned"}
-                            </Badge>
-                          </div>
-                        </div>
-                      )}
-                      {relatedDeal.net_value && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Deal Value
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {relatedDeal.currency || "AED"}{" "}
-                            {parseFloat(
-                              String(
-                                relatedDeal.net_value ||
-                                  relatedDeal.grand_total ||
-                                  0
-                              )
-                            ).toLocaleString()}
-                          </div>
-                        </div>
-                      )}
-                      {relatedDeal.assigned_to && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Assigned To
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            <User
-                              size={14}
-                              style={{
-                                color: "#4680ff",
-                                marginRight: "6px",
-                                display: "inline",
-                              }}
-                            />
-                            {extensions.find(
-                              (ext: any) =>
-                                ext?.id == relatedDeal?.assigned_to ||
-                                ext?.extension == relatedDeal?.assigned_to
-                            )?.display_name ||
-                              extensions.find(
-                                (ext: any) =>
-                                  ext?.id == relatedDeal?.assigned_to ||
-                                  ext?.extension == relatedDeal?.assigned_to
-                              )?.name ||
-                              relatedDeal.assigned_to ||
-                              "Not assigned"}
-                          </div>
-                        </div>
-                      )}
-                      {relatedDeal.created_at && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Created Date
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            <Calendar
-                              size={14}
-                              style={{
-                                color: "#4680ff",
-                                marginRight: "6px",
-                                display: "inline",
-                              }}
-                            />
-                            {relatedDeal.created_at
-                              ? formatDateForTable(relatedDeal.created_at)
-                              : "N/A"}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Deal Company Information */}
-                    {relatedDeal.company_name && (
-                      <>
-                        <div
-                          style={{
-                            fontSize: "16px",
-                            fontWeight: 600,
-                            color: "#1f2937",
-                            marginBottom: "20px",
-                            paddingBottom: "10px",
-                            borderBottom: "2px solid #f8f9fa",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "10px",
-                          }}
-                        >
-                          <Building2 size={18} style={{ color: "#4680ff" }} />
-                          Deal Company Information
-                        </div>
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              "repeat(auto-fit, minmax(250px, 1fr))",
-                            gap: "20px",
-                            marginBottom: "30px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              background: "#f8f9fa",
-                              padding: "16px",
-                              borderRadius: "10px",
-                              transition: "all 0.3s",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = "#e5e7eb";
-                              e.currentTarget.style.transform =
-                                "translateY(-2px)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = "#f8f9fa";
-                              e.currentTarget.style.transform = "translateY(0)";
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                fontWeight: 600,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                              }}
-                            >
-                              <Building2 size={14} />
-                              Company Name
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "15px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                              }}
-                            >
-                              {relatedDeal.company_name}
-                            </div>
-                          </div>
-                          {relatedDeal.industry && (
-                            <div
-                              style={{
-                                background: "#f8f9fa",
-                                padding: "16px",
-                                borderRadius: "10px",
-                                transition: "all 0.3s",
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.background = "#e5e7eb";
-                                e.currentTarget.style.transform =
-                                  "translateY(-2px)";
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.background = "#f8f9fa";
-                                e.currentTarget.style.transform =
-                                  "translateY(0)";
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: "12px",
-                                  fontWeight: 600,
-                                  color: "#6b7280",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.5px",
-                                  marginBottom: "6px",
-                                }}
-                              >
-                                Industry
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "15px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                }}
-                              >
-                                {relatedDeal.industry}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </>
                     )}
-                  </>
-                )}
-
-                {/* Lead Information */}
-                {relatedLead && (
-                  <>
-                    <div
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: 600,
-                        color: "#1f2937",
-                        marginBottom: "20px",
-                        paddingBottom: "10px",
-                        borderBottom: "2px solid #f8f9fa",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
-                      <Target size={18} style={{ color: "#4680ff" }} />
-                      Lead Information
-                    </div>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fit, minmax(250px, 1fr))",
-                        gap: "20px",
-                        marginBottom: "30px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          background: "#f8f9fa",
-                          padding: "16px",
-                          borderRadius: "10px",
-                          transition: "all 0.3s",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = "#e5e7eb";
-                          e.currentTarget.style.transform = "translateY(-2px)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = "#f8f9fa";
-                          e.currentTarget.style.transform = "translateY(0)";
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.5px",
-                            marginBottom: "6px",
-                          }}
-                        >
-                          Lead Name
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "15px",
-                            color: "#1f2937",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {relatedLead.name}
-                        </div>
-                      </div>
-                      {relatedLead.stage && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Stage
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            <Badge
-                              bg="primary"
-                              style={{
-                                padding: "6px 14px",
-                                borderRadius: "20px",
-                                fontSize: "12px",
-                                fontWeight: 600,
-                                backgroundColor:
-                                  relatedLead.stage?.color || "#6c757d",
-                              }}
-                            >
-                              {relatedLead.stage?.name || "Not assigned"}
-                            </Badge>
-                          </div>
-                        </div>
-                      )}
-                      {relatedLead.lead_potential && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Lead Potential
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            <Badge
-                              bg={
-                                relatedLead.lead_potential === "Hot"
-                                  ? "danger"
-                                  : relatedLead.lead_potential === "Warm"
-                                  ? "warning"
-                                  : "secondary"
-                              }
-                              style={{
-                                padding: "6px 14px",
-                                borderRadius: "20px",
-                                fontSize: "12px",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {relatedLead.lead_potential || "N/A"}
-                            </Badge>
-                          </div>
-                        </div>
-                      )}
-                      {relatedLead.status && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Status
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            <Badge
-                              bg={
-                                relatedLead.is_lost
-                                  ? "danger"
-                                  : relatedLead.status === "new"
-                                  ? "primary"
-                                  : "success"
-                              }
-                            >
-                              {relatedLead.is_lost
-                                ? "Lost"
-                                : relatedLead.status || "N/A"}
-                            </Badge>
-                          </div>
-                        </div>
-                      )}
-                      {relatedLead.user_extension && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Assigned To
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            <User
-                              size={14}
-                              style={{
-                                color: "#4680ff",
-                                marginRight: "6px",
-                                display: "inline",
-                              }}
-                            />
-                            {extensions.find(
-                              (ext: any) =>
-                                ext?.id == relatedLead?.user_extension ||
-                                ext?.extension == relatedLead?.user_extension
-                            )?.display_name ||
-                              extensions.find(
-                                (ext: any) =>
-                                  ext?.id == relatedLead?.user_extension ||
-                                  ext?.extension == relatedLead?.user_extension
-                              )?.name ||
-                              relatedLead.user_extension ||
-                              "Not assigned"}
-                          </div>
-                        </div>
-                      )}
-                      {relatedLead.created_at && (
-                        <div
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              fontWeight: 600,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}
-                          >
-                            Created Date
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                            }}
-                          >
-                            <Calendar
-                              size={14}
-                              style={{
-                                color: "#4680ff",
-                                marginRight: "6px",
-                                display: "inline",
-                              }}
-                            />
-                            {relatedLead.created_at
-                              ? formatDateForTable(relatedLead.created_at)
-                              : "N/A"}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Lead Company Information */}
-                    {/* {relatedLead.company_name && (
-                      <>
-                        <div style={{
-                          fontSize: '16px',
-                          fontWeight: 600,
-                          color: '#1f2937',
-                          marginBottom: '20px',
-                          paddingBottom: '10px',
-                          borderBottom: '2px solid #f8f9fa',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px'
-                        }}>
-                          <Building2 size={18} style={{ color: '#4680ff' }} />
-                          Lead Company Information
-                        </div>
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                          gap: '20px',
-                          marginBottom: '30px'
-                        }}>
-                          <div style={{
-                            background: '#f8f9fa',
-                            padding: '16px',
-                            borderRadius: '10px',
-                            transition: 'all 0.3s'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = '#e5e7eb';
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = '#f8f9fa';
-                            e.currentTarget.style.transform = 'translateY(0)';
-                          }}>
-                            <div style={{
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              color: '#6b7280',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.5px',
-                              marginBottom: '6px'
-                            }}>Company Name</div>
-                            <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                              <Building2 size={14} style={{ color: '#4680ff', marginRight: '6px', display: 'inline' }} />
-                              {relatedLead.company_name}
-                            </div>
-                          </div>
-                          {relatedLead.industry && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
-                              <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>Industry</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                                {relatedLead.industry}
-                              </div>
-                            </div>
-                          )}
-                          {relatedLead.business_type && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
-                              <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>Business Type</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                                {relatedLead.business_type}
-                              </div>
-                            </div>
-                          )}
-                          {relatedLead.company_size && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
-                              <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>Company Size</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                                {relatedLead.company_size}
-                              </div>
-                            </div>
-                          )}
-                          {(relatedLead.company_city || relatedLead.company_country) && (
-                            <div style={{
-                              background: '#f8f9fa',
-                              padding: '16px',
-                              borderRadius: '10px',
-                              transition: 'all 0.3s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = '#e5e7eb';
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = '#f8f9fa';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}>
-                              <div style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#6b7280',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                marginBottom: '6px'
-                              }}>Location</div>
-                              <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                                {[relatedLead.company_city, relatedLead.company_country].filter(Boolean).join(', ') || 'N/A'}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )} */}
-
-                    {/* Campaign Information */}
-                    {relatedLead.campaign && (
-                      <>
-                        <div
-                          style={{
-                            fontSize: "16px",
-                            fontWeight: 600,
-                            color: "#1f2937",
-                            marginBottom: "20px",
-                            paddingBottom: "10px",
-                            borderBottom: "2px solid #f8f9fa",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "10px",
-                          }}
-                        >
-                          <FileText size={18} style={{ color: "#4680ff" }} />
-                          Campaign Information
-                        </div>
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              "repeat(auto-fit, minmax(250px, 1fr))",
-                            gap: "20px",
-                            marginBottom: "30px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              background: "#f8f9fa",
-                              padding: "16px",
-                              borderRadius: "10px",
-                              transition: "all 0.3s",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = "#e5e7eb";
-                              e.currentTarget.style.transform =
-                                "translateY(-2px)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = "#f8f9fa";
-                              e.currentTarget.style.transform = "translateY(0)";
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                fontWeight: 600,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}
-                            >
-                              Campaign Name
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "15px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                              }}
-                            >
-                              {relatedLead.campaign.name}
-                            </div>
-                          </div>
-                          {relatedLead.campaign_field_values &&
-                            Object.keys(relatedLead.campaign_field_values)
-                              .length > 0 &&
-                            Object.entries(
-                              relatedLead.campaign_field_values
-                            ).map(([key, value]: [string, any]) => (
-                              <div
-                                key={key}
-                                style={{
-                                  background: "#f8f9fa",
-                                  padding: "16px",
-                                  borderRadius: "10px",
-                                  transition: "all 0.3s",
-                                }}
-                                onMouseOver={(e) => {
-                                  e.currentTarget.style.background = "#e5e7eb";
-                                  e.currentTarget.style.transform =
-                                    "translateY(-2px)";
-                                }}
-                                onMouseOut={(e) => {
-                                  e.currentTarget.style.background = "#f8f9fa";
-                                  e.currentTarget.style.transform =
-                                    "translateY(0)";
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    fontSize: "12px",
-                                    fontWeight: 600,
-                                    color: "#6b7280",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.5px",
-                                    marginBottom: "6px",
-                                  }}
-                                >
-                                  {key}
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "15px",
-                                    color: "#1f2937",
-                                    fontWeight: 500,
-                                  }}
-                                >
-                                  {String(value)}
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      </>
-                    )}
-
-                    {/* Prospect Information */}
-                    {relatedLead.crm_data && (
-                      <>
-                        <div
-                          style={{
-                            fontSize: "16px",
-                            fontWeight: 600,
-                            color: "#1f2937",
-                            marginBottom: "20px",
-                            paddingBottom: "10px",
-                            borderBottom: "2px solid #f8f9fa",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "10px",
-                          }}
-                        >
-                          <FileText size={18} style={{ color: "#4680ff" }} />
-                          Prospect Information
-                        </div>
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              "repeat(auto-fit, minmax(250px, 1fr))",
-                            gap: "20px",
-                            marginBottom: "30px",
-                          }}
-                        >
-                          {relatedLead.crm_data.id && (
-                            <div
-                              style={{
-                                background: "#f8f9fa",
-                                padding: "16px",
-                                borderRadius: "10px",
-                                transition: "all 0.3s",
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.background = "#e5e7eb";
-                                e.currentTarget.style.transform =
-                                  "translateY(-2px)";
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.background = "#f8f9fa";
-                                e.currentTarget.style.transform =
-                                  "translateY(0)";
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: "12px",
-                                  fontWeight: 600,
-                                  color: "#6b7280",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.5px",
-                                  marginBottom: "6px",
-                                }}
-                              >
-                                CRM Data ID
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "15px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                }}
-                              >
-                                #{relatedLead.crm_data.id}
-                              </div>
-                            </div>
-                          )}
-                          <div
-                            style={{
-                              background: "#f8f9fa",
-                              padding: "16px",
-                              borderRadius: "10px",
-                              transition: "all 0.3s",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = "#e5e7eb";
-                              e.currentTarget.style.transform =
-                                "translateY(-2px)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = "#f8f9fa";
-                              e.currentTarget.style.transform = "translateY(0)";
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                fontWeight: 600,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}
-                            >
-                              Name
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "15px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                              }}
-                            >
-                              {relatedLead.crm_data.name ||
-                                (relatedLead.crm_data.data &&
-                                  relatedLead.crm_data.data.name) ||
-                                "N/A"}
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              background: "#f8f9fa",
-                              padding: "16px",
-                              borderRadius: "10px",
-                              transition: "all 0.3s",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = "#e5e7eb";
-                              e.currentTarget.style.transform =
-                                "translateY(-2px)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = "#f8f9fa";
-                              e.currentTarget.style.transform = "translateY(0)";
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                fontWeight: 600,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}
-                            >
-                              Phone
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "15px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                              }}
-                            >
-                              <PhoneDisplay
-                                phone={
-                                  relatedLead.crm_data.phone ||
-                                  (relatedLead.crm_data.data &&
-                                    relatedLead.crm_data.data.phone) ||
-                                  ""
-                                }
-                              />
-                            </div>
-                          </div>
-                          {relatedLead.crm_data.source_file && (
-                            <div
-                              style={{
-                                background: "#f8f9fa",
-                                padding: "16px",
-                                borderRadius: "10px",
-                                transition: "all 0.3s",
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.background = "#e5e7eb";
-                                e.currentTarget.style.transform =
-                                  "translateY(-2px)";
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.background = "#f8f9fa";
-                                e.currentTarget.style.transform =
-                                  "translateY(0)";
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: "12px",
-                                  fontWeight: 600,
-                                  color: "#6b7280",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.5px",
-                                  marginBottom: "6px",
-                                }}
-                              >
-                                Source File
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "15px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                }}
-                              >
-                                {relatedLead.crm_data.source_file}
-                              </div>
-                            </div>
-                          )}
-                          {relatedLead.crm_data.uploaded_by && (
-                            <div
-                              style={{
-                                background: "#f8f9fa",
-                                padding: "16px",
-                                borderRadius: "10px",
-                                transition: "all 0.3s",
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.background = "#e5e7eb";
-                                e.currentTarget.style.transform =
-                                  "translateY(-2px)";
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.background = "#f8f9fa";
-                                e.currentTarget.style.transform =
-                                  "translateY(0)";
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: "12px",
-                                  fontWeight: 600,
-                                  color: "#6b7280",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.5px",
-                                  marginBottom: "6px",
-                                }}
-                              >
-                                Uploaded By
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "15px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                }}
-                              >
-                                <User
-                                  size={14}
-                                  style={{
-                                    color: "#4680ff",
-                                    marginRight: "6px",
-                                    display: "inline",
-                                  }}
-                                />
-                                {relatedLead.crm_data.uploaded_by}
-                              </div>
-                            </div>
-                          )}
-                          {relatedLead.crm_data.created_at && (
-                            <div
-                              style={{
-                                background: "#f8f9fa",
-                                padding: "16px",
-                                borderRadius: "10px",
-                                transition: "all 0.3s",
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.background = "#e5e7eb";
-                                e.currentTarget.style.transform =
-                                  "translateY(-2px)";
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.background = "#f8f9fa";
-                                e.currentTarget.style.transform =
-                                  "translateY(0)";
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: "12px",
-                                  fontWeight: 600,
-                                  color: "#6b7280",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.5px",
-                                  marginBottom: "6px",
-                                }}
-                              >
-                                Created At
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "15px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                }}
-                              >
-                                <Calendar
-                                  size={14}
-                                  style={{
-                                    color: "#4680ff",
-                                    marginRight: "6px",
-                                    display: "inline",
-                                  }}
-                                />
-                                {formatDateForTable(
-                                  relatedLead.crm_data.created_at
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Prospect Fields */}
-                        {relatedLead.crm_data.data &&
-                          typeof relatedLead.crm_data.data === "object" &&
-                          Object.keys(relatedLead.crm_data.data).length > 0 && (
-                            <>
-                              <div
-                                style={{
-                                  fontSize: "16px",
-                                  fontWeight: 600,
-                                  color: "#1f2937",
-                                  marginBottom: "20px",
-                                  paddingBottom: "10px",
-                                  borderBottom: "2px solid #f8f9fa",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "10px",
-                                }}
-                              >
-                                <FileText
-                                  size={18}
-                                  style={{ color: "#4680ff" }}
-                                />
-                                Prospect Fields
-                              </div>
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns:
-                                    "repeat(auto-fit, minmax(250px, 1fr))",
-                                  gap: "20px",
-                                  marginBottom: "30px",
-                                }}
-                              >
-                                {Object.entries(relatedLead.crm_data.data)
-                                  .filter(([key]) => {
-                                    // Show all fields, but if name/phone are already shown from crm_data directly,
-                                    // only show them from data if they're not in crm_data
-                                    const keyLower = key.toLowerCase();
-                                    if (
-                                      keyLower === "name" &&
-                                      relatedLead.crm_data.name
-                                    )
-                                      return false;
-                                    if (
-                                      keyLower === "phone" &&
-                                      relatedLead.crm_data.phone
-                                    )
-                                      return false;
-                                    return true;
-                                  })
-                                  .map(([key, value]: [string, any]) => (
-                                    <div
-                                      key={key}
-                                      style={{
-                                        background: "#f8f9fa",
-                                        padding: "16px",
-                                        borderRadius: "10px",
-                                        transition: "all 0.3s",
-                                      }}
-                                      onMouseOver={(e) => {
-                                        e.currentTarget.style.background =
-                                          "#e5e7eb";
-                                        e.currentTarget.style.transform =
-                                          "translateY(-2px)";
-                                      }}
-                                      onMouseOut={(e) => {
-                                        e.currentTarget.style.background =
-                                          "#f8f9fa";
-                                        e.currentTarget.style.transform =
-                                          "translateY(0)";
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          fontSize: "12px",
-                                          fontWeight: 600,
-                                          color: "#6b7280",
-                                          textTransform: "uppercase",
-                                          letterSpacing: "0.5px",
-                                          marginBottom: "6px",
-                                        }}
-                                      >
-                                        {key.replace(/_/g, " ")}
-                                      </div>
-                                      <div
-                                        style={{
-                                          fontSize: "15px",
-                                          color: "#1f2937",
-                                          fontWeight: 500,
-                                        }}
-                                      >
-                                        {String(value || "N/A")}
-                                      </div>
-                                    </div>
-                                  ))}
-                              </div>
-                            </>
-                          )}
-                      </>
-                    )}
-                  </>
-                )}
-                    </div>
                     
-                  </div>
-                )}
-
-                {activeTab === "history" && (
-                  <div>
-                     {/* History */}
-                {viewingOrder.histories &&
-                  Array.isArray(viewingOrder.histories) &&
-                  viewingOrder.histories.length > 0 && (
-                    <>
-                      <div
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 600,
-                          color: "#1f2937",
-                          marginBottom: "20px",
-                          paddingBottom: "10px",
-                          borderBottom: "2px solid #f8f9fa",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                        }}
-                      >
-                        <History size={18} style={{ color: "#4680ff" }} />
-                        Activity History ({viewingOrder.histories.length})
+                    {viewingOrder.expected_delivery_date && (
+                      <div>
+                        <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: 600, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          Expected Delivery
+                        </div>
+                        <div style={{ fontSize: "13px", color: "#1f2937", fontWeight: 500 }}>
+                          {moment(viewingOrder.expected_delivery_date).format("MMM DD, YYYY")}
+                        </div>
                       </div>
-                      <div
-                        style={{
-                          position: "relative",
-                          paddingLeft: "30px",
-                          marginBottom: "30px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            content: "",
-                            position: "absolute",
-                            left: "8px",
-                            top: 0,
-                            bottom: 0,
-                            width: "2px",
-                            background: "#e5e7eb",
-                          }}
-                        />
-                        {viewingOrder.histories.map(
-                          (history: any, idx: number) => (
-                            <div
-                              key={history.id || idx}
-                              style={{
-                                position: "relative",
-                                paddingBottom: "20px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  content: "",
-                                  position: "absolute",
-                                  left: "-26px",
-                                  top: "4px",
-                                  width: "12px",
-                                  height: "12px",
-                                  borderRadius: "50%",
-                                  background:
-                                    history.event === "created"
-                                      ? "#10b981"
-                                      : "#4680ff",
-                                  border: "3px solid white",
-                                  boxShadow: "0 0 0 2px #e5e7eb",
-                                }}
-                              />
-                              <div
-                                style={{
-                                  background: "#f8f9fa",
-                                  padding: "12px 16px",
-                                  borderRadius: "8px",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    fontSize: "12px",
-                                    color: "#6b7280",
-                                    fontWeight: 600,
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  {new Date(
-                                    history.created_at
-                                  ).toLocaleString()}
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "14px",
-                                    color: "#1f2937",
-                                    marginBottom: "4px",
-                                    fontWeight: 500,
-                                  }}
-                                >
-                                  {history.event === "created"
-                                    ? "Created"
-                                    : history.event === "updated"
-                                    ? "Updated"
-                                    : history.event}
-                                </div>
-                                {history.description && (
-                                  <div
-                                    style={{
-                                      fontSize: "13px",
-                                      color: "#6b7280",
-                                      marginBottom: "8px",
-                                    }}
-                                  >
-                                    {history.description}
-                                  </div>
-                                )}
-                                {history.changes &&
-                                  Object.keys(history.changes).length > 0 && (
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        color: "#6b7280",
-                                      }}
-                                    >
-                                      {Object.entries(history.changes).map(
-                                        ([key, change]: [string, any]) => {
-                                          if (ignoredKeys.includes(key)) {
-                                            return <></>;
-                                          }
-                                          return (
-                                            <div
-                                              key={key}
-                                              style={{ marginTop: "4px" }}
-                                            >
-                                              <strong>{key}:</strong>{" "}
-                                              {change.old
-                                                ? `${change.old} → `
-                                                : ""}
-                                              {change.new || "N/A"}
-                                            </div>
-                                          );
-                                        }
-                                      )}
-                                    </div>
-                                  )}
-                              </div>
-                            </div>
-                          )
-                        )}
-                      </div>
-                    </>
-                  )}
-                  </div>
-                )}
+                    )}
 
-                {
-                  activeTab === "additional-info" && (
-                    <div>
-                       {/* Additional Order Details */}
-                <div
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: 600,
-                    color: "#1f2937",
-                    marginBottom: "20px",
-                    paddingBottom: "10px",
-                    borderBottom: "2px solid #f8f9fa",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                  }}
-                >
-                  <FileText size={18} style={{ color: "#4680ff" }} />
-                  Additional Information
-                </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                    gap: "20px",
-                    marginBottom: "30px",
-                  }}
-                >
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Approval Status
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {viewingOrder.order_approval_status ? (
+                    {viewingOrder.payment_status && (
+                      <div>
+                        <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: 600, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          Payment Status
+                        </div>
                         <Badge
                           bg={
-                            viewingOrder.order_approval_status?.toLowerCase() ===
-                            "approved"
+                            viewingOrder.payment_status?.toLowerCase() === "paid"
                               ? "success"
-                              : viewingOrder.order_approval_status?.toLowerCase() ===
-                                "rejected"
-                              ? "danger"
-                              : "warning"
-                          }
-                        >
-                          {viewingOrder.order_approval_status}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted">Not Set</span>
-                      )}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Fulfillment Status
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {viewingOrder.fulfillment_status ? (
-                        <Badge
-                          bg={
-                            viewingOrder.fulfillment_status
-                              ?.toLowerCase()
-                              .includes("completed") ||
-                            viewingOrder.fulfillment_status
-                              ?.toLowerCase()
-                              .includes("delivered")
-                              ? "success"
-                              : viewingOrder.fulfillment_status
-                                  ?.toLowerCase()
-                                  .includes("progress")
-                              ? "primary"
-                              : "secondary"
-                          }
-                        >
-                          {viewingOrder.fulfillment_status}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted">Not Set</span>
-                      )}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Payment Status
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {viewingOrder.payment_status ? (
-                        <Badge
-                          bg={
-                            viewingOrder.payment_status?.toLowerCase() ===
-                            "paid"
-                              ? "success"
-                              : viewingOrder.payment_status?.toLowerCase() ===
-                                "partial"
+                              : viewingOrder.payment_status?.toLowerCase() === "partial"
                               ? "warning"
                               : "danger"
                           }
+                          style={{ fontSize: "11px", padding: "4px 10px" }}
                         >
                           {viewingOrder.payment_status}
                         </Badge>
-                      ) : (
-                        <span className="text-muted">Not Set</span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
-                  {viewingOrder.assigned_to && (
-                    <div
-                      style={{
-                        background: "#f8f9fa",
-                        padding: "16px",
-                        borderRadius: "10px",
-                        transition: "all 0.3s",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#e5e7eb";
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "#f8f9fa";
-                        e.currentTarget.style.transform = "translateY(0)";
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "6px",
-                        }}
-                      >
-                        Assigned To
-                      </div>
-                      <div style={{ fontSize: "16px", fontWeight: 600 }}>
-                        {extensions.find(
-                          (ext: any) =>
-                            ext?.id == viewingOrder?.assigned_to ||
-                            ext?.extension == viewingOrder?.assigned_to
-                        )?.display_name ||
-                          extensions.find(
-                            (ext: any) =>
-                              ext?.id == viewingOrder?.assigned_to ||
-                              ext?.extension == viewingOrder?.assigned_to
-                          )?.name ||
-                          viewingOrder.assigned_to ||
-                          "Not assigned"}
-                      </div>
-                    </div>
-                  )}
-                  {viewingOrder.contract_length && (
-                    <div
-                      style={{
-                        background: "#f8f9fa",
-                        padding: "16px",
-                        borderRadius: "10px",
-                        transition: "all 0.3s",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#e5e7eb";
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "#f8f9fa";
-                        e.currentTarget.style.transform = "translateY(0)";
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "6px",
-                        }}
-                      >
-                        Contract Length
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "15px",
-                          color: "#1f2937",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {viewingOrder.contract_length}
-                      </div>
-                    </div>
-                  )}
                 </div>
-
-                {/* Notes */}
-                {viewingOrder.notes && (
-                  <>
-                    <div
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: 600,
-                        color: "#1f2937",
-                        marginBottom: "20px",
-                        paddingBottom: "10px",
-                        borderBottom: "2px solid #f8f9fa",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
-                      <FileText size={18} style={{ color: "#4680ff" }} />
-                      Notes
-                    </div>
-                    <div
-                      style={{
-                        background: "#f8f9fa",
-                        padding: "16px",
-                        borderRadius: "10px",
-                        marginBottom: "30px",
-                        fontSize: "14px",
-                        color: "#1f2937",
-                        whiteSpace: "pre-wrap",
-                      }}
-                    >
-                      {viewingOrder.notes}
-                    </div>
-                  </>
-                )}
-                    </div>
-                  )
-                }
-              </>
-            )}
-          </Modal.Body>
-        </Modal>
+              </div>
+            </div>
+          </div>
+        </>
       )}
+    </Modal.Body>
+
+    {/* Footer */}
+    <div style={{
+      padding: "20px 32px",
+      borderTop: "1px solid #e5e7eb",
+      background: "white",
+      borderBottomLeftRadius: "12px",
+      borderBottomRightRadius: "12px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}>
+      <div style={{ fontSize: "13px", color: "#6b7280" }}>
+        Order ID: <strong>#{viewingOrder.id}</strong>
+      </div>
+      <Button
+        variant="outline-secondary"
+        onClick={() => setShowOrderViewModal(false)}
+        style={{
+          padding: "10px 24px",
+          borderRadius: "8px",
+          fontWeight: 600,
+          fontSize: "14px",
+          border: "2px solid #e5e7eb",
+          transition: "all 0.2s ease",
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.borderColor = "#f59e0b";
+          e.currentTarget.style.color = "#f59e0b";
+          e.currentTarget.style.background = "#fffbeb";
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.borderColor = "#e5e7eb";
+          e.currentTarget.style.color = "#6c757d";
+          e.currentTarget.style.background = "white";
+        }}
+      >
+        Close
+      </Button>
+    </div>
+  </Modal>
+)}
+
 
       {/* Manage Attachments Modal */}
       {selectedOrderForAttachments && (
@@ -6507,6 +5534,21 @@ const CrmOrders = () => {
             </Button>
           </Modal.Footer>
         </Modal>
+      )}
+
+    {editingOrderId && (
+            <OrderEditModal
+              show={showEditModal}
+              onHide={() => {
+                setShowEditModal(false);
+                setEditingOrderId(null);
+              }}
+              orderId={editingOrderId}
+              onSuccess={() => {
+                setRefreshKey((prev) => prev + 1);
+                toast.success("Order updated successfully!");
+              }}
+            />
       )}
     </React.Fragment>
   );

@@ -128,7 +128,7 @@ const Dashboard = () => {
       <Button variant="outline-secondary" size="sm">This Month</Button> */}
     </div>
   </Col>
-  <Col xs={12} md={6}>
+  <Col xs={12} sm={12} md={12} lg={12} xl={12} xxl={6}>
     <div className="d-flex align-items-center justify-content-end bg-white border rounded" style={{ padding: '0' }}>
       <div className="position-relative flex-grow-1">
         <Search className="position-absolute" style={{ left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6c757d', zIndex: 10 }} size={18} />
@@ -153,7 +153,7 @@ const Dashboard = () => {
         <Row className="g-3 mb-3">
 
           {/* My Sales Summary */}
-          <Col xs={12} lg={3}>
+          <Col xs={12} sm={12} md={6} lg={6} xl={6} xxl={3}>
             <Card className="h-100 shadow-sm">
               <Card.Body className="p-3">
                 <div className="d-flex justify-content-between align-items-center mb-2">
@@ -247,7 +247,7 @@ const Dashboard = () => {
           </Col>
 
           {/* Meetings, Follow Ups, Tasks */}
-          <Col xs={12} lg={3}>
+          <Col xs={12} sm={12} md={6} lg={6} xl={6} xxl={3}>
             <Card className="h-100 shadow-sm">
               <Card.Body className="p-3 d-flex flex-column">
                 <div className="d-flex justify-content-between align-items-center mb-3">
@@ -341,7 +341,7 @@ const Dashboard = () => {
 
           
           {/* Overdue Today */}
-          <Col xs={12} lg={3}>
+          <Col xs={12} sm={12} md={6} lg={6} xl={6} xxl={3}>
             <Card className="h-100 shadow-sm">
               <Card.Body className="p-3 d-flex flex-column">
                 <div className="d-flex justify-content-between align-items-center mb-2">
@@ -409,7 +409,7 @@ const Dashboard = () => {
           </Col>
 
           {/* Next Best Actions */}
-          <Col xs={12} lg={3}>
+          <Col xs={12} sm={12} md={6} lg={6} xl={6} xxl={3}>
             <Card className="h-100 shadow-sm">
               {/* <Card.Body className="p-3 d-flex flex-column">
                 <div className="d-flex justify-content-between align-items-center mb-2">
@@ -462,7 +462,7 @@ const Dashboard = () => {
         {/* Call Details Row */}
         <Row className="g-3 mb-3">
           {/* Calls Today */}
-          <Col xs={12} md={6} lg={3}>
+          <Col xs={12} sm={12} md={6} lg={6} xl={6} xxl={3}>
             <Card className="h-100 shadow-sm">
               <Card.Body className="p-3">
                 <div className="d-flex justify-content-between align-items-center mb-2">
@@ -503,7 +503,7 @@ const Dashboard = () => {
           </Col>
 
           {/* Missed & Callbacks */}
-          <Col xs={12} md={6} lg={3}>
+          <Col xs={12} sm={12} md={6} lg={6} xl={6} xxl={3}>
             <Card 
               className="h-100 shadow-sm" 
               style={{
@@ -576,7 +576,7 @@ const Dashboard = () => {
           </Col>
 
           {/* Call Analytics - Merged Card */}
-          <Col xs={12} md={12} lg={6}>
+          <Col xs={12} sm={12} md={12} lg={12} xl={12} xxl={6}>
             <Card className="h-100 shadow-sm">
               <Card.Body className="p-3 d-flex flex-column">
                 <Row className="g-3 mb-2 flex-grow-1">
@@ -791,7 +791,7 @@ const Dashboard = () => {
 
         <Row className="g-3 mb-3">
           {/* Quick Help */}
-          <Col xs={12} md={6} lg={3}>
+          <Col xs={12} sm={12} md={6} lg={6} xl={6} xxl={3}>
             <Card className="h-100 shadow-sm">
             <Card.Body className="p-3">
                 <div className="d-flex justify-content-between align-items-center mb-2">
@@ -821,7 +821,7 @@ const Dashboard = () => {
           </Col>
 
           {/* Recommended Guides */}
-          <Col xs={12} md={6} lg={3}>
+          <Col xs={12} sm={12} md={6} lg={6} xl={6} xxl={3}>
             <Card className="h-100 shadow-sm">
               <Card.Body className="p-3">
                 <div className="d-flex justify-content-between align-items-center mb-2">
@@ -841,7 +841,7 @@ const Dashboard = () => {
           </Col>
 
           {/* Templates */}
-          <Col xs={12} md={6} lg={3}>
+          <Col xs={12} sm={12} md={6} lg={6} xl={6} xxl={3}>
             <Card className="h-100 shadow-sm">
               <Card.Body className="p-3">
                 <div className="d-flex justify-content-between align-items-center mb-2">
@@ -873,7 +873,7 @@ const Dashboard = () => {
           </Col>
 
           {/* My Day Summary */}
-          <Col xs={12} md={6} lg={3}>
+          <Col xs={12} sm={12} md={6} lg={6} xl={6} xxl={3}>
             <Card className="h-100 shadow-sm">
               <Card.Body className="p-3">
                 <div className="d-flex justify-content-between align-items-center mb-2">

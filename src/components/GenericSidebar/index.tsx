@@ -1,6 +1,97 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, LucideIcon, User, Phone, Mail, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, LucideIcon, User, Phone, Mail, ChevronLeft, ChevronRight, MessageSquare, Video, Calendar } from 'lucide-react';
 import { Badge, Button } from 'react-bootstrap';
+import AICompose from '@components/aicompose';
+
+// Wrapper component to add close functionality to AICompose
+const AIComposeWrapper: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  return (
+    <>
+      <style>{`
+        .ai-compose-container {
+          position: fixed;
+          top: 65px;
+          left: 177px;
+          right: 0;
+          bottom: 0;
+          z-index: 1049;
+          overflow-y: auto;
+          overflow-x: hidden;
+          background-color: rgba(0, 0, 0, 0.02);
+        }
+
+        @media (max-width: 1200px) {
+          .ai-compose-container {
+            left: 0 !important;
+            right: 0 !important;
+          }
+        }
+
+        .ai-compose-wrapper {
+          position: relative;
+          min-height: calc(100vh - 85px);
+          padding: 20px;
+        }
+
+        .ai-compose-content {
+          position: relative;
+          max-width: 900px;
+          margin: 0 auto;
+          background-color: #f8f9fa;
+          border-radius: 12px;
+          box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .ai-compose-close-btn {
+          position: sticky;
+          top: 43px;
+          float: right;
+          z-index: 1000;
+          background: #f3f4f6;
+          border: none;
+          border-radius: 50%;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          transition: all 0.2s;
+          color: #6b7280;
+          margin-right: 20px;
+          margin-bottom: -48px;
+        }
+
+        .ai-compose-close-btn:hover {
+          transform: scale(1.1);
+          background-color: #e5e7eb;
+        }
+      `}</style>
+      
+      <div 
+        className="ai-compose-container"
+        onClick={(e) => {
+          if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('ai-compose-wrapper')) {
+            onClose();
+          }
+        }}
+      >
+        <div className="ai-compose-wrapper">
+          <div className="ai-compose-content">
+            <button
+              className="ai-compose-close-btn"
+              onClick={onClose}
+            >
+              <X size={16} color="#374151" />
+            </button>
+            <AICompose />
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
 
 export interface SidebarField {
   label: string;
@@ -61,6 +152,13 @@ export interface GenericSidebarProps {
   email?: string;
   phone?: string;
   avatar?: SidebarAvatar;
+  // Quick Action Handlers
+  onCall?: () => void;
+  onWhatsApp?: () => void;
+  onEmail?: () => void;
+  onSMS?: () => void;
+  onMeetNow?: () => void;
+  onSchedule?: () => void;
   sections?: SidebarSection[];
   tabs?: SidebarTab[];
   actions?: SidebarAction[];
@@ -76,6 +174,12 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   email,
   phone,
   avatar,
+  onCall = () => console.log('Call action clicked'),
+  onWhatsApp = () => console.log('WhatsApp action clicked'),
+  onEmail = () => console.log('Email action clicked'),
+  onSMS = () => console.log('SMS action clicked'),
+  onMeetNow = () => console.log('Meet Now action clicked'),
+  onSchedule = () => console.log('Schedule action clicked'),
   sections,
   tabs,
   actions,
@@ -84,6 +188,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const [activeTab, setActiveTab] = useState(tabs && tabs.length > 0 ? tabs[0].id : '');
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
+  const [showAICompose, setShowAICompose] = useState(false);
   const tabsContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-select first tab when sidebar opens or tabs change
@@ -568,6 +673,282 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           </div>
         </div>
 
+        {/* Quick Actions - Permanent Section */}
+        <div style={{
+          padding: '16px 24px',
+          borderBottom: '1px solid #e5e7eb',
+          backgroundColor: '#fafbfc'
+        }}>
+          <div style={{
+            fontSize: '12px',
+            fontWeight: '600',
+            color: '#6b7280',
+            marginBottom: '12px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+          }}>
+            Quick Actions
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '10px'
+          }}>
+            {/* Call Button - Always Visible */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCall();
+              }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '14px 10px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <Phone 
+                size={22} 
+                color="#10b981"
+                strokeWidth={2.5}
+                style={{ marginBottom: '6px' }}
+              />
+              <span style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#374151',
+                textAlign: 'center',
+                lineHeight: '1.2'
+              }}>
+                Call
+              </span>
+            </button>
+
+            {/* WhatsApp Button - Always Visible */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAICompose(true);
+                onWhatsApp();
+              }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '14px 10px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <MessageSquare 
+                size={22} 
+                color="#25D366"
+                strokeWidth={2.5}
+                style={{ marginBottom: '6px' }}
+              />
+              <span style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#374151',
+                textAlign: 'center',
+                lineHeight: '1.2'
+              }}>
+                WhatsApp
+              </span>
+            </button>
+
+            {/* Email Button - Always Visible */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEmail();
+              }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '14px 10px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <Mail 
+                size={22} 
+                color="#ef4444"
+                strokeWidth={2.5}
+                style={{ marginBottom: '6px' }}
+              />
+              <span style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#374151',
+                textAlign: 'center',
+                lineHeight: '1.2'
+              }}>
+                Email
+              </span>
+            </button>
+
+            {/* SMS Button - Always Visible */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSMS();
+              }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '14px 10px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <MessageSquare 
+                size={22} 
+                color="#8b5cf6"
+                strokeWidth={2.5}
+                style={{ marginBottom: '6px' }}
+              />
+              <span style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#374151',
+                textAlign: 'center',
+                lineHeight: '1.2'
+              }}>
+                SMS
+              </span>
+            </button>
+
+            {/* Meet Now Button - Always Visible */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMeetNow();
+              }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '14px 10px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <Video 
+                size={22} 
+                color="#f59e0b"
+                strokeWidth={2.5}
+                style={{ marginBottom: '6px' }}
+              />
+              <span style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#374151',
+                textAlign: 'center',
+                lineHeight: '1.2'
+              }}>
+                Meet Now
+              </span>
+            </button>
+
+            {/* Schedule Button - Always Visible */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSchedule();
+              }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '14px 10px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <Calendar 
+                size={22} 
+                color="#6366f1"
+                strokeWidth={2.5}
+                style={{ marginBottom: '6px' }}
+              />
+              <span style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#374151',
+                textAlign: 'center',
+                lineHeight: '1.2'
+              }}>
+                Schedule
+              </span>
+            </button>
+          </div>
+        </div>
+
         {/* Navigation Tabs */}
         {tabs && tabs.length > 0 && (
           <div style={{
@@ -741,6 +1122,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           )}
         </div>
       </div>
+
+      {/* AI Compose Component - Opens alongside sidebar */}
+      {showAICompose && (
+        <AIComposeWrapper onClose={() => setShowAICompose(false)} />
+      )}
     </div>
   );
 };
