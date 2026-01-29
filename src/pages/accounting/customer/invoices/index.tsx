@@ -47,7 +47,7 @@ import { GetPaymentMethods,CompletePayment } from "@utils/accounting";
 import { formatNumber } from "@utils/Helper";
 
 import { Column } from "@components/CustomDataTable";
-import { Button, Modal, Row, Form, Alert, Card, Badge } from "react-bootstrap";
+import { Button, Modal, Row, Form, Alert, Card, Badge, Table } from "react-bootstrap";
 import { Col } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
@@ -791,7 +791,8 @@ const InvoiceList = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [currentFilters, setCurrentFilters] = useState<{search?: string; status?: string}>({});
   const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
-  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string | number>>(new Set());
+  const [showDescriptionModal, setShowDescriptionModal] = useState<boolean>(false);
+  const [selectedDescription, setSelectedDescription] = useState<string>('');
 
   const [companies, setCompanies] = useState<CompanyData[]>([]);
   const [companyProducts, setCompanyProducts] = useState<ProductData[]>([]);
@@ -2830,40 +2831,42 @@ const InvoiceList = () => {
                         </thead>
                         <tbody>
                           {selectedInvoiceForView.items.map((item: any, index: number) => (
+                            
                             <tr key={item.id || index}>
                               {/* <td>{index + 1}</td> */}
                               <td className="text-start">
                                 <div>
                                   <strong>{item.product?.name || item.description || 'N/A'}</strong>
-                                  {item.product?.description && item.product.description !== item.product.name && (
-                                    <div className="text-muted small">
-                                      {item.product.description && item.product.description.length > 100 ? (
-                                        <>
-                                          {expandedDescriptions.has(item.id || index) 
-                                            ? item.product.description 
-                                            : `${item.product.description.substring(0, 100)}...`}
-                                          <button
-                                            className="btn btn-link p-0 ms-1 text-decoration-none"
-                                            style={{ fontSize: '0.875rem' }}
-                                            onClick={() => {
-                                              const newExpanded = new Set(expandedDescriptions);
-                                              const key = item.id || index;
-                                              if (newExpanded.has(key)) {
-                                                newExpanded.delete(key);
-                                              } else {
-                                                newExpanded.add(key);
-                                              }
-                                              setExpandedDescriptions(newExpanded);
-                                            }}
-                                          >
-                                            {expandedDescriptions.has(item.id || index) ? 'Show less' : 'Show more'}
-                                          </button>
-                                        </>
-                                      ) : (
-                                        item.product.description
-                                      )}
-                                    </div>
-                                  )}
+                                  {(() => {
+                                    // Use item.description if available, otherwise use item.product.description
+                                    const description = item.description || item.product?.description || '';
+                                    const productName = item.product?.name || '';
+                                    // Only show description if it exists and is different from the product name
+                                    if (description && description !== productName) {
+                                      return (
+                                        <div className="text-muted small">
+                                          {description.length > 50 ? (
+                                            <>
+                                              {description.substring(0, 50)}...
+                                              <button
+                                                className="btn btn-link p-0 ms-1 text-decoration-none"
+                                                style={{ fontSize: '0.875rem' }}
+                                                onClick={() => {
+                                                  setSelectedDescription(description);
+                                                  setShowDescriptionModal(true);
+                                                }}
+                                              >
+                                                Show more
+                                              </button>
+                                            </>
+                                          ) : (
+                                            description
+                                          )}
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                 </div>
                               </td>
                               <td className="text-end">{formatNumber(parseFloat(item.quantity || '0'))}</td>
@@ -2883,6 +2886,30 @@ const InvoiceList = () => {
                           ))}
                         </tbody>
                       </table>
+                      <Row>
+                        <Col md={6}>
+                          <Card>
+                            <Card.Body>
+                              <Card.Title>Notes & Terms</Card.Title>
+                              <p>{selectedInvoiceForView.notes}</p>
+                              <p>{selectedInvoiceForView.terms_conditions}</p>
+                              <p>{!selectedInvoiceForView.notes && !selectedInvoiceForView.terms_conditions && 'No notes or terms provided'}</p>
+                            </Card.Body>
+                          </Card>
+                        </Col>
+                        <Col md={6}>
+                          <Card>
+                            <Card.Body>
+                              <Card.Title>Financial Summary</Card.Title>
+                              <table className="table table-bordered">
+                                <tr> <td>Subtotal</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.subtotal || '0'))}</td> </tr>
+                                <tr> <td>Tax Amount</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.tax_amount || '0'))}</td> </tr>
+                                <tr> <td className="fw-bold">Total Amount</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.total_amount || '0'))}</td> </tr>
+                              </table>
+                            </Card.Body>
+                          </Card>
+                        </Col>
+                      </Row>
                     </div>
                   ) : (
                     <Alert variant="info">No items found for this invoice</Alert>
@@ -2917,6 +2944,28 @@ const InvoiceList = () => {
           </Modal.Footer>
         </Modal>
       )}
+
+      {/* Description Modal */}
+      <Modal
+        show={showDescriptionModal}
+        onHide={() => setShowDescriptionModal(false)}
+        centered
+        size="lg"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Description</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            {selectedDescription}
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDescriptionModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </React.Fragment>
   );
 };

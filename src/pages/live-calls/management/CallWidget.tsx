@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   PhoneCall,
   PhoneOff,
@@ -9,7 +9,7 @@ import {
   Pause,
   Phone,
   Users,
-  Clock
+  ChevronDown
 } from 'lucide-react';
 
 interface CallWidgetProps {
@@ -27,6 +27,14 @@ interface CallWidgetProps {
   formatTime: (seconds: number) => string;
   selectedTeam: string;
   activeAgentName?: string;
+  /** Dynamic from preview event */
+  campaignName?: string;
+  customerNumber?: string;
+  dialedNumber?: string;
+  /** e.g. ['ACCEPT','REJECT','CLOSE'] – when both REJECT and CLOSE present, show dropdown */
+  previewActions?: string[];
+  /** When set, Reject area uses this with action 'REJECT' or 'CLOSE' instead of handleRejectCall */
+  onRejectWithAction?: (action: 'REJECT' | 'CLOSE') => void;
 }
 
 const CallWidget: React.FC<CallWidgetProps> = ({
@@ -43,9 +51,45 @@ const CallWidget: React.FC<CallWidgetProps> = ({
   handleEndCall,
   formatTime,
   selectedTeam,
-  activeAgentName
+  activeAgentName,
+  campaignName,
+  customerNumber,
+  dialedNumber,
+  previewActions = [],
+  onRejectWithAction,
 }) => {
+  const [showRejectMenu, setShowRejectMenu] = useState(false);
+
+  useEffect(() => {
+    if (!showCallWidget) setShowRejectMenu(false);
+  }, [showCallWidget]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (showRejectMenu && !document.querySelector('.call-widget-reject-menu')?.contains(target)) {
+        setShowRejectMenu(false);
+      }
+    };
+    if (showRejectMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showRejectMenu]);
+
   if (!showCallWidget) return null;
+
+  const hasReject = previewActions.includes('REJECT');
+  const hasClose = previewActions.includes('CLOSE');
+  const showRejectDropdown = (hasReject && hasClose) && !!onRejectWithAction;
+  const handleRejectClick = () => {
+    if (onRejectWithAction) {
+      if (showRejectDropdown) setShowRejectMenu((v) => !v);
+      else onRejectWithAction(hasReject ? 'REJECT' : 'CLOSE');
+    } else {
+      handleRejectCall();
+    }
+  };
 
   return (
     <>
@@ -320,6 +364,12 @@ const CallWidget: React.FC<CallWidgetProps> = ({
           </div>
 
           <div className="call-info-grid">
+            {campaignName != null && (
+              <div className="call-info-item">
+                <span className="call-info-label">Campaign</span>
+                <span className="call-info-value">{campaignName || 'N/A'}</span>
+              </div>
+            )}
             <div className="call-info-item">
               <span className="call-info-label">Agent</span>
               <span className="call-info-value">{activeAgentName || 'N/A'}</span>
@@ -328,10 +378,22 @@ const CallWidget: React.FC<CallWidgetProps> = ({
               <span className="call-info-label">Team</span>
               <span className="call-info-value">{selectedTeam.replace(/-/g, ' ')}</span>
             </div>
-            <div className="call-info-item">
-              <span className="call-info-label">Customer Number</span>
-              <span className="call-info-value">+92 300 1234567</span>
-            </div>
+            {(customerNumber != null || dialedNumber != null) && (
+              <div className="call-info-item">
+                <span className="call-info-label">Customer / Dialed</span>
+                <span className="call-info-value">
+                  {customerNumber && dialedNumber && customerNumber !== dialedNumber
+                    ? `${customerNumber} / ${dialedNumber}`
+                    : (customerNumber || dialedNumber || 'N/A')}
+                </span>
+              </div>
+            )}
+            {campaignName == null && customerNumber == null && dialedNumber == null && (
+              <div className="call-info-item">
+                <span className="call-info-label">Customer Number</span>
+                <span className="call-info-value">—</span>
+              </div>
+            )}
             <div className="call-info-item">
               <span className="call-info-label">State</span>
               <span className="call-info-value" style={{ 
@@ -378,14 +440,104 @@ const CallWidget: React.FC<CallWidgetProps> = ({
 
           {callStatus === 'Ringing' && (
             <div className="call-action-buttons">
-              <button className="btn-accept" onClick={handleAcceptCall}>
-                <PhoneCall />
-                Accept
-              </button>
-              <button className="btn-reject" onClick={handleRejectCall}>
-                <PhoneOff />
-                Reject
-              </button>
+              {previewActions.length ? (
+                <>
+                  {previewActions.includes('ACCEPT') && (
+                    <button className="btn-accept" onClick={handleAcceptCall}>
+                      <PhoneCall />
+                      Accept
+                    </button>
+                  )}
+                  {(hasReject || hasClose || !previewActions.length) && (
+                    <div className="call-widget-reject-menu" style={{ position: 'relative' }}>
+                      <button
+                        className="btn-reject"
+                        onClick={handleRejectClick}
+                        style={showRejectDropdown ? { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 } : undefined}
+                      >
+                        <PhoneOff />
+                        {showRejectDropdown ? (
+                          <>
+                            Reject
+                            <ChevronDown size={14} style={{ marginLeft: 2 }} />
+                          </>
+                        ) : (
+                          onRejectWithAction ? (hasReject ? 'Reject' : 'Close') : 'Reject'
+                        )}
+                      </button>
+                      {showRejectDropdown && showRejectMenu && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '100%',
+                            left: 0,
+                            right: 0,
+                            marginBottom: 4,
+                            background: 'white',
+                            border: '1px solid rgba(0,0,0,.15)',
+                            borderRadius: 8,
+                            boxShadow: '0 4px 12px rgba(0,0,0,.15)',
+                            zIndex: 10,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {hasReject && (
+                            <button
+                              type="button"
+                              className="dropdown-item-call"
+                              style={{
+                                display: 'block',
+                                width: '100%',
+                                padding: '8px 12px',
+                                border: 'none',
+                                background: 'none',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                fontSize: 13,
+                                color: '#dc2626',
+                              }}
+                              onClick={() => { setShowRejectMenu(false); onRejectWithAction('REJECT'); }}
+                            >
+                              Reject
+                            </button>
+                          )}
+                          {hasClose && (
+                            <button
+                              type="button"
+                              className="dropdown-item-call"
+                              style={{
+                                display: 'block',
+                                width: '100%',
+                                padding: '8px 12px',
+                                border: 'none',
+                                background: 'none',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                fontSize: 13,
+                                color: '#64748b',
+                              }}
+                              onClick={() => { setShowRejectMenu(false); onRejectWithAction('CLOSE'); }}
+                            >
+                              Close
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button className="btn-accept" onClick={handleAcceptCall}>
+                    <PhoneCall />
+                    Accept
+                  </button>
+                  <button className="btn-reject" onClick={handleRejectCall}>
+                    <PhoneOff />
+                    Reject
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

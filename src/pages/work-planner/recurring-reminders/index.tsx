@@ -11,11 +11,11 @@ import { useSession } from "next-auth/react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import { listTasks, getTask, updateTask, deleteTask } from "@utils/tasks";
+import { listTasks, getTask, updateTask, deleteTask, listProjects } from "@utils/tasks";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { ModuleSlug, formatDateForTable } from "@utils/Helper";
 import { Spinner, Button, Form, Dropdown, Table } from 'react-bootstrap';
-import CreateTaskModal from '@components/work-planner/createtask-modal';
+import CreateRecurringTaskModal from '@components/work-planner/createrecurringtask-modal';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import {
   Plus,
@@ -38,7 +38,8 @@ import {
   Target,
   Clock,
   X,
-  Repeat
+  Repeat,
+  FolderOpen
 } from 'lucide-react';
 
 
@@ -84,6 +85,16 @@ interface ApiRecurringTask {
   } | null;
 }
 
+interface ProjectOption {
+  id: number;
+  name: string;
+  labels?: Array<{
+    id: number;
+    name: string;
+    color?: string;
+  }>;
+}
+
 const RecurringReminders = () => {
   const { data: session } = useSession();
     const [activeTab, setActiveTab] = useState<'active' | 'dueToday' | 'enabled'>('active');
@@ -91,15 +102,27 @@ const RecurringReminders = () => {
     const [todoSearchQuery, setTodoSearchQuery] = useState('');
     const [frequencyFilter, setFrequencyFilter] = useState('all');
     const [statusFilter, setStatusFilter] = useState('all');
+    const [projectFilter, setProjectFilter] = useState('all');
     const [labelsFilter, setLabelsFilter] = useState('all');
+    const [projectsList, setProjectsList] = useState<ProjectOption[]>([]);
+    const [loadingProjectsList, setLoadingProjectsList] = useState(false);
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [recurringTasks, setRecurringTasks] = useState<RecurringTask[]>([]);
     const [loading, setLoading] = useState(true);
-    const [pagination, setPagination] = useState({
+    const [pagination, setPagination] = useState<{
+      page: number;
+      limit: number;
+      total: number;
+      last_page: number;
+      from: number;
+      to: number;
+    }>({
       page: 1,
-      limit: 20,
+      limit: 15,
       total: 0,
-      last_page: 1
+      last_page: 1,
+      from: 0,
+      to: 0
     });
     const [showTaskDetail, setShowTaskDetail] = useState(false);
     const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
@@ -184,20 +207,6 @@ const RecurringReminders = () => {
       }
     ];
   
-    const upcomingRuns = [
-      { date: 'Wed, Apr 17, 11:00 PM', checked: false },
-      { date: 'Thu, Apr 18, 11:00 PM', checked: false },
-      { date: 'Fri, Apr 19, 11:00 PM', checked: false },
-      { date: 'Mon, Apr 22, 11:00 PM', checked: false },
-      { date: 'Tue, Apr 23, 11:00 PM', checked: false }
-    ];
-  
-    const recentEvents = [
-      { date: 'Apr 17,, 11:00 PM', icon: <Mail size={16} />, checked: false },
-      { date: 'Apr 18,, 11:00 PM', icon: <Check size={16} />, checked: true },
-      { date: 'Apr 19,, 11:00 PM', icon: <Square size={16} />, checked: false }
-    ];
-  
     const getLabelIcon = (type?: string) => {
       switch (type) {
         case 'support': return <MessageSquare size={12} />;
@@ -210,6 +219,51 @@ const RecurringReminders = () => {
         default: return null;
       }
     };
+
+    useEffect(() => {
+      const fetchProjectsList = async () => {
+        try {
+          setLoadingProjectsList(true);
+          const response = await listProjects({ page: 1, limit: 200 });
+          if (response && response.success === true && Array.isArray(response.data)) {
+            const mapped = response.data.map((p: any) => ({
+              id: Number(p.id),
+              name: String(p.name || ''),
+              labels: Array.isArray(p.labels) ? p.labels : [],
+            }));
+            setProjectsList(mapped);
+          } else {
+            setProjectsList([]);
+          }
+        } catch (error) {
+          console.error('Error fetching projects:', error);
+          setProjectsList([]);
+        } finally {
+          setLoadingProjectsList(false);
+        }
+      };
+
+      fetchProjectsList();
+    }, []);
+
+    const labelOptions = React.useMemo(() => {
+      const toType = (name: string) => String(name || '').trim().toLowerCase().replace(/\s+/g, '-');
+
+      const sourceLabels =
+        projectFilter !== 'all'
+          ? projectsList.find(p => String(p.id) === String(projectFilter))?.labels || []
+          : projectsList.flatMap(p => p.labels || []);
+
+      const seen = new Set<string>();
+      return sourceLabels
+        .map(l => ({ id: l.id, name: l.name, type: toType(l.name) }))
+        .filter(l => l.type)
+        .filter(l => {
+          if (seen.has(l.type)) return false;
+          seen.add(l.type);
+          return true;
+        });
+    }, [projectFilter, projectsList]);
 
     // Map API task to RecurringTask format
     const mapApiTaskToRecurringTask = (apiTask: ApiRecurringTask): RecurringTask => {
@@ -314,6 +368,10 @@ const RecurringReminders = () => {
           params.is_active = statusFilter === 'active';
         }
 
+        if (projectFilter !== 'all') {
+          params.project_id = Number(projectFilter);
+        }
+
         const response = await listTasks(params);
         
         if (response && response.data) {
@@ -325,7 +383,9 @@ const RecurringReminders = () => {
               page: response.pagination.page || 1,
               limit: response.pagination.limit || 20,
               total: response.pagination.total || 0,
-              last_page: response.pagination.last_page || 1
+              last_page: response.pagination.last_page || 1,
+              from: response.pagination.from || 0,
+              to: response.pagination.to || 0
             }));
           }
         }
@@ -334,7 +394,7 @@ const RecurringReminders = () => {
       } finally {
         setLoading(false);
       }
-    }, [pagination.page, pagination.limit, todoSearchQuery, frequencyFilter, statusFilter]);
+    }, [pagination.page, pagination.limit, todoSearchQuery, frequencyFilter, statusFilter, projectFilter]);
 
     // Fetch tasks when dependencies change
     useEffect(() => {
@@ -428,16 +488,62 @@ const RecurringReminders = () => {
     };
 
     const selectedTaskDetails = recurringTasks.find(task => task.id === selectedTask);
+    const selectedTaskRaw: any = selectedTaskDetails?.rawData || null;
+    const upcomingRuns: any[] = selectedTaskRaw?.upcoming_runs || [];
+    const recentEvents: any[] = selectedTaskRaw?.recent_events || [];
+
+    const safeFormatDate = (value: any): string => {
+      if (!value) return '';
+      try {
+        return formatDateForTable(String(value));
+      } catch {
+        return String(value);
+      }
+    };
+
+    const descriptionText =
+      typeof selectedTaskRaw?.description === 'string'
+        ? selectedTaskRaw.description
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+        : '';
+
+    const dueTimeText = (() => {
+      const due = selectedTaskRaw?.due_time;
+      if (typeof due !== 'string') return '';
+      if (due.includes('T')) {
+        const timePart = due.split('T')[1] || '';
+        return timePart.slice(0, 5);
+      }
+      return due.slice(0, 5);
+    })();
+
+    const assigneesText: string[] = (() => {
+      if (Array.isArray(selectedTaskRaw?.assignees) && selectedTaskRaw.assignees.length > 0) {
+        return selectedTaskRaw.assignees
+          .map((a: any) => a?.name || a?.extension_number || a?.extension || a?.id)
+          .filter(Boolean)
+          .map((v: any) => String(v));
+      }
+      if (Array.isArray(selectedTaskRaw?.extension_numbers) && selectedTaskRaw.extension_numbers.length > 0) {
+        return selectedTaskRaw.extension_numbers.map((v: any) => String(v));
+      }
+      return [];
+    })();
   
     const filteredTasks = recurringTasks.filter(task => {
       const matchesSearch = task.name.toLowerCase().includes(todoSearchQuery.toLowerCase());
       const matchesFrequency = frequencyFilter === 'all' || task.recurrence.toLowerCase().includes(frequencyFilter.toLowerCase());
       const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
+      const matchesProject =
+        projectFilter === 'all' ||
+        String(task.rawData?.project?.id || task.rawData?.project_id || '') === String(projectFilter);
       const matchesLabel = labelsFilter === 'all' || task.labels.some(label => label.type === labelsFilter);
       const matchesTab = activeTab === 'active' || 
                          (activeTab === 'dueToday' && task.category === 'today') ||
                          (activeTab === 'enabled');
-      return matchesSearch && matchesFrequency && matchesStatus && matchesLabel && matchesTab;
+      return matchesSearch && matchesFrequency && matchesStatus && matchesProject && matchesLabel && matchesTab;
     });
 
   return (
@@ -452,9 +558,9 @@ const RecurringReminders = () => {
           min-width: initial !important;
           max-width: initial !important;
         }
-        h6, .h6, h5, .h5, h4, .h4, h3, .h3, h2, .h2, h1, .h1 {
-         color: #fff !important;
-        }
+        // h6, .h6, h5, .h5, h4, .h4, h3, .h3, h2, .h2, h1, .h1 {
+        //  color: #fff !important;
+        // }
         .task-dashboard {
           background-color: #f5f6fa;
           min-height: 100vh;
@@ -902,7 +1008,7 @@ const RecurringReminders = () => {
             Active
           </button>
 
-          <button
+          {/* <button
             onClick={() => setActiveTab('dueToday')}
             style={{
               backgroundColor: activeTab === 'dueToday' ? '#5b8fd8' : 'white',
@@ -934,7 +1040,7 @@ const RecurringReminders = () => {
               {recurringTasks.filter(t => t.category === 'today').length}
             </span>
             Due Today
-          </button>
+          </button> */}
 
           <button
             onClick={() => setActiveTab('enabled')}
@@ -1034,6 +1140,34 @@ const RecurringReminders = () => {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <FolderOpen size={16} style={{ color: '#6c757d' }} />
+                    <Form.Select
+                      value={projectFilter}
+                      onChange={(e) => {
+                        setProjectFilter(e.target.value);
+                        setLabelsFilter('all');
+                      }}
+                      size="sm"
+                      style={{
+                        padding: '7px 28px 7px 10px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        backgroundColor: 'white',
+                        color: '#4a5568'
+                      }}
+                      disabled={loadingProjectsList}
+                    >
+                      <option value="all">All Projects</option>
+                      {projectsList.map(p => (
+                        <option key={p.id} value={String(p.id)}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Target size={16} style={{ color: '#6c757d' }} />
                     <Form.Select
                       value={labelsFilter}
@@ -1049,20 +1183,22 @@ const RecurringReminders = () => {
                       }}
                     >
                       <option value="all">All Labels</option>
-                      <option value="support">Support</option>
-                      <option value="meeting">Meeting</option>
-                      <option value="report">Report</option>
-                      <option value="sales">Sales</option>
+                      {labelOptions.map(l => (
+                        <option key={`${l.id}-${l.type}`} value={l.type}>
+                          {l.name}
+                        </option>
+                      ))}
                     </Form.Select>
                   </div>
                   
-                  {(frequencyFilter !== 'all' || statusFilter !== 'all' || labelsFilter !== 'all') && (
+                  {(frequencyFilter !== 'all' || statusFilter !== 'all' || projectFilter !== 'all' || labelsFilter !== 'all') && (
                     <Button
                       variant="link"
                       size="sm"
                       onClick={() => {
                         setFrequencyFilter('all');
                         setStatusFilter('all');
+                        setProjectFilter('all');
                         setLabelsFilter('all');
                       }}
                       style={{ padding: '7px', fontSize: '13px', textDecoration: 'none' }}
@@ -1103,7 +1239,7 @@ const RecurringReminders = () => {
               </div>
 
                   {/* Table */}
-                  <div className="table-container">
+                  
                     <div className="table-responsive">
                       <Table hover className="tasks-table">
                         <thead>
@@ -1135,8 +1271,7 @@ const RecurringReminders = () => {
                             <tr
                               key={task.id}
                               onClick={() => {
-                                setSelectedTask(task.id);
-                                setShowTaskDetail(true);
+                                handleTaskClick(task);
                               }}
                               style={{
                                 backgroundColor: selectedTask === task.id ? '#eff6ff' : undefined
@@ -1274,266 +1409,576 @@ const RecurringReminders = () => {
                       </tbody>
                     </Table>
                     </div>
-                  </div>
+                    
+                    {/* Pagination Controls */}
+                    {!loading && pagination.last_page > 1 && filteredTasks.length > 0 && (
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginTop: '20px',
+                        paddingTop: '16px',
+                        borderTop: '1px solid #e8eef5'
+                      }}>
+                        <div style={{ fontSize: '13px', color: '#718096' }}>
+                          Showing {pagination.from || 0} to {pagination.to || 0} of {pagination.total || 0} tasks
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <button
+                            onClick={() => {
+                              if (pagination.page > 1 && !loading) {
+                                setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+                              }
+                            }}
+                            disabled={pagination.page === 1 || loading}
+                            style={{
+                              padding: '6px 12px',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              backgroundColor: (pagination.page === 1 || loading) ? '#f8fafc' : 'white',
+                              color: (pagination.page === 1 || loading) ? '#cbd5e0' : '#4a5568',
+                              cursor: (pagination.page === 1 || loading) ? 'not-allowed' : 'pointer',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (pagination.page > 1 && !loading) {
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#cbd5e0';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (pagination.page > 1 && !loading) {
+                                e.currentTarget.style.backgroundColor = 'white';
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                              }
+                            }}
+                          >
+                            Previous
+                          </button>
+                          
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            {Array.from({ length: Math.min(5, pagination.last_page) }, (_, i) => {
+                              let pageNum;
+                              if (pagination.last_page <= 5) {
+                                pageNum = i + 1;
+                              } else if (pagination.page <= 3) {
+                                pageNum = i + 1;
+                              } else if (pagination.page >= pagination.last_page - 2) {
+                                pageNum = pagination.last_page - 4 + i;
+                              } else {
+                                pageNum = pagination.page - 2 + i;
+                              }
+                              
+                              return (
+                                <button
+                                  key={pageNum}
+                                  onClick={() => {
+                                    if (!loading && pagination.page !== pageNum) {
+                                      setPagination(prev => ({ ...prev, page: pageNum }));
+                                    }
+                                  }}
+                                  disabled={loading}
+                                  style={{
+                                    minWidth: '32px',
+                                    height: '32px',
+                                    padding: '0 8px',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '6px',
+                                    backgroundColor: pagination.page === pageNum ? '#5b8fd8' : (loading ? '#f8fafc' : 'white'),
+                                    color: pagination.page === pageNum ? 'white' : (loading ? '#cbd5e0' : '#4a5568'),
+                                    cursor: loading ? 'not-allowed' : 'pointer',
+                                    fontSize: '13px',
+                                    fontWeight: pagination.page === pageNum ? '600' : '500',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (pagination.page !== pageNum && !loading) {
+                                      e.currentTarget.style.backgroundColor = '#f8fafc';
+                                      e.currentTarget.style.borderColor = '#cbd5e0';
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (pagination.page !== pageNum && !loading) {
+                                      e.currentTarget.style.backgroundColor = 'white';
+                                      e.currentTarget.style.borderColor = '#e2e8f0';
+                                    }
+                                  }}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              if (pagination.page < pagination.last_page && !loading) {
+                                setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+                              }
+                            }}
+                            disabled={pagination.page >= pagination.last_page || loading}
+                            style={{
+                              padding: '6px 12px',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              backgroundColor: (pagination.page >= pagination.last_page || loading) ? '#f8fafc' : 'white',
+                              color: (pagination.page >= pagination.last_page || loading) ? '#cbd5e0' : '#4a5568',
+                              cursor: (pagination.page >= pagination.last_page || loading) ? 'not-allowed' : 'pointer',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (pagination.page < pagination.last_page && !loading) {
+                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#cbd5e0';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (pagination.page < pagination.last_page && !loading) {
+                                e.currentTarget.style.backgroundColor = 'white';
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                              }
+                            }}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  
               </div>
           </div>
 
-          {/* Right Sidebar */}
-          <div style={{ 
-            width: '340px',
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            border: '1px solid #e2e8f0',
-            alignSelf: 'flex-start',
-            position: 'sticky',
-            top: '20px',
-            maxHeight: 'calc(100vh - 100px)',
-            overflowY: 'auto'
-          }}>
-            <div style={{ 
-              backgroundColor: '#f8fafc',
-              padding: '18px 20px',
-              marginBottom: '0',
-              borderBottom: '2px solid #e2e8f0'
-            }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'flex-start',
-                marginBottom: '8px'
-              }}>
-                <div style={{ flex: 1 }}>
-                  <h2 style={{ 
-                    fontSize: '16px', 
-                    fontWeight: '700',
-                    margin: '0 0 10px 0',
-                    color: '#1e293b',
-                    lineHeight: '1.3'
-                  }}>
-                    {selectedTaskDetails?.name || 'Backup server'}
-                  </h2>
-                  <span style={{
-                    display: 'inline-block',
-                    backgroundColor: '#d1fae5',
-                    color: '#065f46',
-                    fontSize: '10px',
-                    fontWeight: '700',
-                    padding: '5px 12px',
-                    borderRadius: '12px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.8px'
-                  }}>
-                    ✓ ACTIVE
-                  </span>
-                </div>
-                <button 
-                  onClick={() => setSelectedTask(null)}
+          {/* Right Sidebar (only when a task is selected) */}
+          {showTaskDetail && selectedTaskDetails ? (
+            <div
+              style={{
+                width: '340px',
+                backgroundColor: 'white',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                border: '1px solid #e2e8f0',
+                alignSelf: 'flex-start',
+                position: 'sticky',
+                top: '20px',
+                maxHeight: 'calc(100vh - 100px)',
+                overflowY: 'auto',
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: '#f8fafc',
+                  padding: '18px 20px',
+                  marginBottom: '0',
+                  borderBottom: '2px solid #e2e8f0',
+                }}
+              >
+                <div
                   style={{
-                    background: '#e2e8f0',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '6px',
                     display: 'flex',
-                    alignItems: 'center',
-                    color: '#64748b',
-                    borderRadius: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#cbd5e1';
-                    e.currentTarget.style.color = '#475569';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#e2e8f0';
-                    e.currentTarget.style.color = '#64748b';
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    marginBottom: '8px',
                   }}
                 >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            <div style={{ padding: '18px 20px' }}>
-
-            <div style={{ 
-              padding: '14px 16px',
-              backgroundColor: '#f0f9ff',
-              borderRadius: '8px',
-              marginBottom: '14px',
-              border: '1px solid #bae6fd'
-            }}>
-              <div style={{ 
-                fontSize: '11px', 
-                color: '#075985', 
-                marginBottom: '6px', 
-                fontWeight: '700', 
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                <Repeat size={13} color="#0369a1" />
-                Recurrence Pattern
-              </div>
-              <div style={{ 
-                fontSize: '14px', 
-                color: '#0c4a6e', 
-                fontWeight: '600', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '6px'
-              }}>
-                {selectedTaskDetails?.recurrence || 'Daily (Weekdays)'}
-              </div>
-            </div>
-
-            <div style={{ 
-              marginBottom: '16px',
-              padding: '14px 16px',
-              backgroundColor: '#fef9c3',
-              borderRadius: '8px',
-              border: '1px solid #fde047'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px' }}>
-                <span style={{ color: '#713f12', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Clock size={15} color="#a16207" /> Next Run
-                </span>
-                <span style={{ fontWeight: '700', color: '#713f12' }}>
-                  {selectedTaskDetails?.nextRun || 'Apr 17, 11:00 PM'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                <span style={{ color: '#713f12', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Bell size={15} color="#a16207" /> Reminder
-                </span>
-                <span style={{ fontWeight: '700', color: '#713f12' }}>
-                  {selectedTaskDetails?.reminder || '5 min before'}
-                </span>
-              </div>
-            </div>
-
-            {/* Upcoming Runs */}
-            <div style={{ marginBottom: '18px' }}>
-              <h3 style={{ 
-                fontSize: '12px', 
-                fontWeight: '700', 
-                marginBottom: '12px', 
-                color: '#1e293b', 
-                textTransform: 'uppercase', 
-                letterSpacing: '0.5px'
-              }}>
-                Upcoming Runs
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {upcomingRuns.slice(0, 4).map((run, idx) => (
-                  <div key={idx} style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '10px', 
-                    padding: '10px 12px', 
-                    backgroundColor: '#f8fafc', 
-                    borderRadius: '6px',
-                    border: '1px solid #e2e8f0',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f0f9ff';
-                    e.currentTarget.style.borderColor = '#bae6fd';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f8fafc';
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                  }}
-                  >
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '6px',
-                      backgroundColor: '#3b82f6',
+                  <div style={{ flex: 1 }}>
+                    <h2
+                      style={{
+                        fontSize: '16px',
+                        fontWeight: '700',
+                        margin: '0 0 10px 0',
+                        color: '#1e293b',
+                        lineHeight: '1.3',
+                      }}
+                    >
+                      {selectedTaskDetails.name}
+                    </h2>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        backgroundColor: selectedTaskDetails.status === 'active' ? '#d1fae5' : '#e2e8f0',
+                        color: selectedTaskDetails.status === 'active' ? '#065f46' : '#475569',
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        padding: '5px 12px',
+                        borderRadius: '12px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.8px',
+                      }}
+                    >
+                      {selectedTaskDetails.status === 'active' ? '✓ ACTIVE' : 'PAUSED'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedTask(null);
+                      setShowTaskDetail(false);
+                    }}
+                    style={{
+                      background: '#e2e8f0',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '6px',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      flexShrink: 0
-                    }}>
-                      <Calendar size={16} />
-                    </div>
-                    <span style={{ 
-                      color: '#1e293b', 
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      flex: 1
-                    }}>{run.date}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recent Activity */}
-            <div>
-              <h3 style={{ 
-                fontSize: '12px', 
-                fontWeight: '700', 
-                marginBottom: '12px', 
-                color: '#1e293b', 
-                textTransform: 'uppercase', 
-                letterSpacing: '0.5px'
-              }}>
-                Recent Activity
-              </h3>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {recentEvents.map((event, idx) => (
-                  <div key={idx} style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '10px', 
-                    padding: '10px 12px', 
-                    backgroundColor: event.checked ? '#d1fae5' : '#f8fafc', 
-                    borderRadius: '6px',
-                    border: event.checked ? '1px solid #6ee7b7' : '1px solid #e2e8f0',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = event.checked ? '#a7f3d0' : '#f0f9ff';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = event.checked ? '#d1fae5' : '#f8fafc';
-                  }}
-                  >
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
+                      color: '#64748b',
                       borderRadius: '6px',
-                      backgroundColor: event.checked ? '#10b981' : '#64748b',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = '#cbd5e1';
+                      e.currentTarget.style.color = '#475569';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = '#e2e8f0';
+                      e.currentTarget.style.color = '#64748b';
+                    }}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ padding: '18px 20px' }}>
+                {loadingTaskDetail && (
+                  <div
+                    style={{
+                      marginBottom: '12px',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '13px',
+                      color: '#64748b',
+                      fontWeight: '600',
+                    }}
+                  >
+                    Loading task details...
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    padding: '14px 16px',
+                    backgroundColor: '#f0f9ff',
+                    borderRadius: '8px',
+                    marginBottom: '14px',
+                    border: '1px solid #bae6fd',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      color: '#075985',
+                      marginBottom: '6px',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      flexShrink: 0
-                    }}>
-                      {event.icon}
-                    </div>
-                    <span style={{ 
-                      color: '#1e293b', 
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      flex: 1
-                    }}>{event.date}</span>
+                      gap: '6px',
+                    }}
+                  >
+                    <Repeat size={13} color="#0369a1" />
+                    Recurrence Pattern
                   </div>
-                ))}
+                  <div
+                    style={{
+                      fontSize: '14px',
+                      color: '#0c4a6e',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    {selectedTaskDetails.recurrence}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    marginBottom: '16px',
+                    padding: '14px 16px',
+                    backgroundColor: '#fef9c3',
+                    borderRadius: '8px',
+                    border: '1px solid #fde047',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px' }}>
+                    <span style={{ color: '#713f12', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Clock size={15} color="#a16207" /> Next Run
+                    </span>
+                    <span style={{ fontWeight: '700', color: '#713f12' }}>{selectedTaskDetails.nextRun}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                    <span style={{ color: '#713f12', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Bell size={15} color="#a16207" /> Reminder
+                    </span>
+                    <span style={{ fontWeight: '700', color: '#713f12' }}>{selectedTaskDetails.reminder}</span>
+                  </div>
+                </div>
+
+                {/* More Information */}
+                {selectedTaskRaw && (
+                  <>
+                    {descriptionText && (
+                      <div
+                        style={{
+                          marginBottom: '16px',
+                          padding: '14px 16px',
+                          backgroundColor: '#f8fafc',
+                          borderRadius: '8px',
+                          border: '1px solid #e2e8f0',
+                        }}
+                      >
+                        <div style={{ fontSize: '11px', fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                          Description
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#1e293b', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                          {descriptionText}
+                        </div>
+                      </div>
+                    )}
+
+                    <div
+                      style={{
+                        marginBottom: '16px',
+                        padding: '14px 16px',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '8px',
+                        border: '1px solid #e2e8f0',
+                      }}
+                    >
+                      <div style={{ fontSize: '11px', fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+                        Details
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {[
+                          { label: 'Project', value: selectedTaskRaw?.project?.name },
+                          { label: 'Status', value: selectedTaskRaw?.status?.name },
+                          { label: 'Priority', value: selectedTaskRaw?.priority },
+                          { label: 'Frequency', value: selectedTaskRaw?.frequency },
+                          { label: 'Repeat Interval', value: selectedTaskRaw?.repeat_interval },
+                          { label: 'Repeat On', value: selectedTaskRaw?.repeat_on },
+                          { label: 'Start Date', value: selectedTaskRaw?.start_date },
+                          { label: 'End Date', value: selectedTaskRaw?.end_date },
+                          { label: 'Due Time', value: dueTimeText },
+                          { label: 'Occurrences', value: selectedTaskRaw?.occurrences },
+                          { label: 'Timezone', value: selectedTaskRaw?.timezone },
+                          { label: 'Task ID', value: selectedTaskRaw?.task_id || selectedTaskRaw?.id || selectedTaskDetails.id },
+                        ]
+                          .filter(item => item.value !== null && item.value !== undefined && String(item.value).trim() !== '')
+                          .map((item, idx) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                              <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '700' }}>{item.label}</span>
+                              <span style={{ fontSize: '12px', color: '#1e293b', fontWeight: '700', textAlign: 'right' }}>
+                                {item.label.includes('Date') ? safeFormatDate(item.value) : String(item.value)}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    {(assigneesText.length > 0 || selectedTaskRaw?.assignees || selectedTaskRaw?.extension_numbers) && (
+                      <div
+                        style={{
+                          marginBottom: '16px',
+                          padding: '14px 16px',
+                          backgroundColor: '#f8fafc',
+                          borderRadius: '8px',
+                          border: '1px solid #e2e8f0',
+                        }}
+                      >
+                        <div style={{ fontSize: '11px', fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+                          Assignees
+                        </div>
+                        {assigneesText.length === 0 ? (
+                          <div style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>Unassigned</div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {assigneesText.map((a, idx) => (
+                              <span
+                                key={idx}
+                                style={{
+                                  backgroundColor: '#edf6ff',
+                                  border: '1px solid #bfdbfe',
+                                  color: '#1e293b',
+                                  fontSize: '12px',
+                                  fontWeight: '700',
+                                  padding: '6px 10px',
+                                  borderRadius: '999px',
+                                }}
+                              >
+                                {a}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {Array.isArray(selectedTaskDetails.labels) && selectedTaskDetails.labels.length > 0 && (
+                      <div
+                        style={{
+                          marginBottom: '16px',
+                          padding: '14px 16px',
+                          backgroundColor: '#ffffff',
+                          borderRadius: '8px',
+                          border: '1px solid #e2e8f0',
+                        }}
+                      >
+                        <div style={{ fontSize: '11px', fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+                          Labels
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {selectedTaskDetails.labels.map((label, idx) => (
+                            <span
+                              key={idx}
+                              style={{
+                                backgroundColor: label.color,
+                                color: 'white',
+                                padding: '6px 10px',
+                                fontWeight: '800',
+                                fontSize: '10px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.6px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                borderRadius: '999px',
+                                border: 'none',
+                              }}
+                            >
+                              {getLabelIcon(label.type)}
+                              {label.text}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Upcoming Runs (only when provided by API) */}
+                {Array.isArray(upcomingRuns) && upcomingRuns.length > 0 && (
+                  <div style={{ marginBottom: '18px' }}>
+                    <h3
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        marginBottom: '12px',
+                        color: '#1e293b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      Upcoming Runs
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {upcomingRuns.slice(0, 4).map((run: any, idx: number) => (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '10px 12px',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '6px',
+                            border: '1px solid #e2e8f0',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              backgroundColor: '#3b82f6',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'white',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Calendar size={16} />
+                          </div>
+                          <span style={{ color: '#1e293b', fontSize: '13px', fontWeight: '500', flex: 1 }}>
+                            {run?.date || run?.run_at || run?.next_run_at || ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Activity (only when provided by API) */}
+                {Array.isArray(recentEvents) && recentEvents.length > 0 && (
+                  <div>
+                    <h3
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        marginBottom: '12px',
+                        color: '#1e293b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      Recent Activity
+                    </h3>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {recentEvents.map((event: any, idx: number) => (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '10px 12px',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '6px',
+                            border: '1px solid #e2e8f0',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '6px',
+                              backgroundColor: '#64748b',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'white',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Check size={16} />
+                          </div>
+                          <span style={{ color: '#1e293b', fontSize: '13px', fontWeight: '500', flex: 1 }}>
+                            {event?.date || event?.created_at || event?.message || ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-            </div>
-          </div>
+          ) : null}
         </div>
       </div>
 
       {/* Create/Edit Task Modal */}
-      <CreateTaskModal
+      <CreateRecurringTaskModal
         show={showCreateTaskModal}
         onHide={() => {
           setShowCreateTaskModal(false);
@@ -1544,7 +1989,6 @@ const RecurringReminders = () => {
         extensions={hierarchyDataExtensions as any}
         task={editingTask}
         isEdit={!!editingTask}
-        taskType="recurring"
       />
 
       {/* Delete Confirmation Modal */}

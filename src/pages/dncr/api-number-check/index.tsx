@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, DragEvent, ChangeEvent, useCallback } from "react";
+import React, { ReactElement, useState, DragEvent, ChangeEvent, useCallback, useMemo, useEffect } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { toast } from 'react-toastify';
@@ -9,6 +9,7 @@ import "@assets/scss/tabs.scss";
 
 import { CheckNumber, BulkCheckNumber,CheckNumbers } from '@utils/dncr';
 import { Edit3, Upload, HelpCircle, Download, X } from 'lucide-react';
+import { Modal } from 'react-bootstrap';
 
 interface PhoneResult {
   input: string;
@@ -20,6 +21,7 @@ interface PhoneResult {
   accountNumber?: string;
   dncrStatus?: string;
   transactionStatus?: string;
+  details?: any;
 }
 const styles: { [key: string]: React.CSSProperties } = {
       container: {
@@ -270,6 +272,17 @@ const styles: { [key: string]: React.CSSProperties } = {
         gap: '4px',
         border: '1px solid #dee2e6'
       },
+      statusBadgeError: {
+        padding: '6px 12px',
+        backgroundColor: '#f8d7da',
+        color: '#721c24',
+        borderRadius: '6px',
+        fontSize: '13px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        border: '1px solid #dee2e6'
+      },
       statusRight: {
         display: 'flex',
         gap: '12px',
@@ -359,6 +372,7 @@ const APINumberCheck = () => {
       const [isChecking, setIsChecking] = useState<boolean>(false);
       const [isUploading, setIsUploading] = useState<boolean>(false);
       const [bulkResults, setBulkResults] = useState<any>(null);
+      const [showFormatGuide, setShowFormatGuide] = useState<boolean>(false);
     
       // Parse phone numbers from manual input (comma or newline separated)
       const parsePhoneNumbers = (input: string): string[] => {
@@ -368,6 +382,178 @@ const APINumberCheck = () => {
           .filter(num => num.length > 0)
           .slice(0, 10); // Limit to 10 numbers
       };
+
+      // Validate if a phone number is valid (starts with "05" and is exactly 10 digits)
+      const isValidPhoneNumber = (phoneNumber: string): boolean => {
+        const digitsOnly = phoneNumber.replace(/\D/g, '');
+        return digitsOnly.startsWith('05') && digitsOnly.length === 10;
+      };
+
+      // Check if all parsed phone numbers are valid
+      const isManualInputValid = useMemo(() => {
+        if (!manualInput.trim()) {
+          return false;
+        }
+        const phoneNumbers = parsePhoneNumbers(manualInput);
+        if (phoneNumbers.length === 0) {
+          return false;
+        }
+        // Check if all numbers are valid
+        return phoneNumbers.every(phoneNumber => isValidPhoneNumber(phoneNumber));
+      }, [manualInput]);
+
+      // Calculate valid and invalid numbers count for manual input
+      const { validCount, invalidCount } = useMemo(() => {
+        if (!manualInput.trim()) {
+          return { validCount: 0, invalidCount: 0 };
+        }
+        const phoneNumbers = parsePhoneNumbers(manualInput);
+        let valid = 0;
+        let invalid = 0;
+        phoneNumbers.forEach(phoneNumber => {
+          if (isValidPhoneNumber(phoneNumber)) {
+            valid++;
+          } else {
+            invalid++;
+          }
+        });
+        return { validCount: valid, invalidCount: invalid };
+      }, [manualInput]);
+
+      // Helper function to determine status category (matches badge display logic)
+      const getStatusCategory = (status: string | null | undefined, dncrStatus: string | null | undefined): 'invalid' | 'denied' | 'permitted' => {
+        // Normalize status to uppercase for comparison
+        const normalizedStatus = status?.toUpperCase();
+        const normalizedDncrStatus = dncrStatus?.toUpperCase();
+        
+        // Case 1: status === "INVALID" AND (dncrStatus === null OR dncrStatus === "" OR empty)
+        const isDncrStatusEmpty = !dncrStatus || dncrStatus === "" || dncrStatus === null || dncrStatus === undefined;
+        if (normalizedStatus === "INVALID" && isDncrStatusEmpty) {
+          return 'invalid';
+        }
+        
+        // Case 2: status === "TRUE" AND dncrStatus === "TRUE"
+        if (normalizedStatus === "TRUE" && normalizedDncrStatus === "TRUE") {
+          return 'denied';
+        }
+        
+        // Case 3: status === "FALSE" AND dncrStatus === "FALSE"
+        if (normalizedStatus === "FALSE" && normalizedDncrStatus === "FALSE") {
+          return 'permitted';
+        }
+        
+        // Fallback: Check dncrStatus alone if status doesn't match exact cases above
+        if (normalizedDncrStatus === "TRUE" || dncrStatus === "Denied") {
+          return 'denied';
+        }
+        
+        if (normalizedDncrStatus === "FALSE" || dncrStatus === "Permitted") {
+          return 'permitted';
+        }
+        
+        // Default to permitted
+        return 'permitted';
+      };
+
+      // Helper function to get status label for display/export
+      const getStatusLabel = (status: string | null | undefined, dncrStatus: string | null | undefined): string => {
+        const category = getStatusCategory(status, dncrStatus);
+        if (category === 'invalid') return 'Invalid';
+        if (category === 'denied') return 'Denied';
+        return 'Permitted';
+      };
+
+      // Helper function to render status badge (reusable component)
+      const renderStatusBadge = (status: string | null | undefined, dncrStatus: string | null | undefined, fallbackStatus?: string): React.ReactElement => {
+        console.log('renderStatusBadge called with:', { status, dncrStatus, fallbackStatus });
+        const category = getStatusCategory(status, dncrStatus);
+        const label = getStatusLabel(status, dncrStatus);
+        
+        if (category.toLowerCase() === 'invalid') {
+          return (
+            <span style={{
+              ...styles.badgeValid,
+              backgroundColor: '#c4c4c4',
+              color: 'gray',
+              borderColor: '#c4c4c4'
+            }}>
+              Invalid
+            </span>
+          );
+        }
+        
+        return (
+          <span style={{
+            ...styles.badgeValid,
+            backgroundColor: category === 'denied' ? '#f8d7da' : '#d4edda',
+            color: category === 'denied' ? '#721c24' : '#155724',
+            borderColor: category === 'denied' ? '#f5c6cb' : '#c3e6cb'
+          }}>
+            {label}
+          </span>
+        );
+      };
+
+      // Parse CSV file and calculate valid/invalid numbers
+      const [csvValidCount, setCsvValidCount] = useState<number>(0);
+      const [csvInvalidCount, setCsvInvalidCount] = useState<number>(0);
+
+      // Read and validate CSV file when it's uploaded
+      useEffect(() => {
+        if (!csvFile) {
+          setCsvValidCount(0);
+          setCsvInvalidCount(0);
+          return;
+        }
+
+        const validateCSV = async () => {
+          try {
+            const text = await csvFile.text();
+            if (!text) {
+              setCsvValidCount(0);
+              setCsvInvalidCount(0);
+              return;
+            }
+
+            // Parse CSV - split by newlines and get first column
+            const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+            let valid = 0;
+            let invalid = 0;
+
+            lines.forEach((line, index) => {
+              // Skip header row if it doesn't look like a phone number
+              if (index === 0) {
+                const firstValue = line.split(',')[0]?.trim() || '';
+                // If first line doesn't start with "05" or isn't 10 digits, it's likely a header
+                const digitsOnly = firstValue.replace(/\D/g, '');
+                if (!digitsOnly.startsWith('05') || digitsOnly.length !== 10) {
+                  return; // Skip header
+                }
+              }
+
+              // Get first column value (phone number)
+              const phoneNumber = line.split(',')[0]?.trim() || '';
+              if (phoneNumber) {
+                const digitsOnly = phoneNumber.replace(/\D/g, '');
+                if (digitsOnly.startsWith('05') && digitsOnly.length === 10) {
+                  valid++;
+                } else {
+                  invalid++;
+                }
+              }
+            });
+
+            setCsvValidCount(valid);
+            setCsvInvalidCount(invalid);
+          } catch (error) {
+            console.error('Error parsing CSV:', error);
+            setCsvValidCount(0);
+            setCsvInvalidCount(0);
+          }
+        };
+
+        validateCSV();
+      }, [csvFile]);
 
       // Transform API response to PhoneResult
       const transformCheckResult = (phoneNumber: string, response: any): PhoneResult => {
@@ -404,24 +590,12 @@ const APINumberCheck = () => {
           const details = response.details || {};
           
           // Determine status: "TRUE" or "VALID" = Valid, "FALSE" or "INVALID" = Invalid
-          let status = "Unknown";
-          if (response.status === "TRUE" || response.status === "VALID") {
-            status = "Valid";
-          } else if (response.status === "FALSE" || response.status === "INVALID") {
-            status = "Invalid";
-          } else if (response.status) {
-            status = response.status;
-          }
           
-          // Determine DNCR Status: "TRUE" = Active, "FALSE" = Inactive, null/undefined = "N/A"
-          let dncrStatus = "N/A";
-          if (details.dncrStatus === "TRUE" || details.dncrStatus === true) {
-            dncrStatus = "Active";
-          } else if (details.dncrStatus === "FALSE" || details.dncrStatus === false) {
-            dncrStatus = "Inactive";
-          } else if (details.dncrStatus !== null && details.dncrStatus !== undefined) {
-            dncrStatus = String(details.dncrStatus);
-          }
+            const status = response.status;
+          
+          
+          // Determine DNCR Status: "TRUE" = Denied, "FALSE" = Permitted, null/undefined = use status
+          const dncrStatus = details.dncrStatus;
           
           // Transaction Status: use details.transactionStatus, or "N/A" if null/undefined
           const transactionStatus = details.transactionStatus !== null && details.transactionStatus !== undefined 
@@ -492,6 +666,23 @@ const APINumberCheck = () => {
 
         if (phoneNumbers.length > 10) {
           toast.error('Maximum 10 numbers allowed');
+          return;
+        }
+
+        // Validate phone number format: must start with "05" and be exactly 10 digits
+        const invalidNumbers: string[] = [];
+        for (const phoneNumber of phoneNumbers) {
+          // Remove any non-digit characters for validation
+          const digitsOnly = phoneNumber.replace(/\D/g, '');
+          
+          // Check if starts with "05" and is exactly 10 digits
+          if (!digitsOnly.startsWith('05') || digitsOnly.length !== 10) {
+            invalidNumbers.push(phoneNumber);
+          }
+        }
+
+        if (invalidNumbers.length > 0) {
+          toast.error(`Invalid phone numbers: ${invalidNumbers.join(', ')}. Numbers must start with "05" and be exactly 10 digits.`);
           return;
         }
 
@@ -716,15 +907,18 @@ const APINumberCheck = () => {
         
         if (bulkResults) {
           // Download bulk results
-          csvContent = 'Phone Number,Status,Account Number,DNCR Status,Transaction Status\n';
+          csvContent = 'Called Number,DNCR Status\n';
           Object.entries(bulkResults).forEach(([phoneNumber, data]: [string, any]) => {
-            csvContent += `${phoneNumber},${data.status === "TRUE" ? "Registered" : "Not Registered"},${data.accountNumber || ""},${data.dncrStatus === "TRUE" ? "Active" : "Inactive"},${data.transactionStatus || "N/A"}\n`;
+            const statusLabel = getStatusLabel(data?.status, data?.details?.dncrStatus);
+            csvContent += `${data?.details?.accountNumber},${statusLabel}\n`;
           });
         } else if (results.length > 0) {
           // Download manual results
-          csvContent = 'Input,Normalized,Status,Account Number,DNCR Status,Transaction Status,Notes\n';
+          csvContent = 'Called Number,DNCR Status\n';
+          
           results.forEach((result) => {
-            csvContent += `${result.input},${result.normalized || result.input},${result.status || "N/A"},${result.accountNumber || ""},${result.dncrStatus || "N/A"},${result.transactionStatus || "N/A"},${result.notes || ""}\n`;
+            const statusLabel = getStatusLabel(result?.status, result?.dncrStatus);
+            csvContent += `${result?.input+"" || result?.accountNumber},${statusLabel}\n`;
           });
         }
 
@@ -743,9 +937,27 @@ const APINumberCheck = () => {
 
       // Calculate stats
       const totalNumbers = results.length || (bulkResults ? Object.keys(bulkResults).length : 0);
-      const validNumbers = results.filter(r => r.status === 'Valid').length || 
-                          (bulkResults ? Object.values(bulkResults).filter((d: any) => d.status === "TRUE").length : 0);
-      const invalidNumbers = totalNumbers - validNumbers;
+      
+      // Calculate counts for Denied, Permitted, and Invalid
+      let deniedCount = 0;
+      let permittedCount = 0;
+      let invalidStatusCount = 0;
+      
+      if (bulkResults) {
+        Object.values(bulkResults).forEach((data: any) => {
+          const category = getStatusCategory(data?.status, data?.details?.dncrStatus);
+          if (category === 'invalid') invalidStatusCount++;
+          else if (category === 'denied') deniedCount++;
+          else permittedCount++;
+        });
+      } else {
+        results.forEach((result: PhoneResult) => {
+          const category = getStatusCategory(result?.status, result?.dncrStatus);
+          if (category === 'invalid') invalidStatusCount++;
+          else if (category === 'denied') deniedCount++;
+          else permittedCount++;
+        });
+      }
       
       // Count manual numbers
       const manualNumbers = parsePhoneNumbers(manualInput).length;
@@ -763,12 +975,12 @@ const APINumberCheck = () => {
             type="button"
             onClick={(e) => {
               e.preventDefault();
-              toast.info('Format guide: Enter phone numbers in E.164 format (e.g., +15551234567) or local format, separated by comma or newline');
+              setShowFormatGuide(true);
             }}
             style={{...styles.formatGuide, background: 'none', border: 'none', cursor: 'pointer', padding: 0}}
           >
             <HelpCircle size={16} style={{ marginRight: '6px' }} />
-            Format guide
+            Guidelines
           </button>
         </div>
 
@@ -815,12 +1027,14 @@ const APINumberCheck = () => {
                     placeholder="Enter phone numbers separated by comma or newline (e.g., +15551234567, +447700900123)"
                   />
                   <div style={styles.manualFooter}>
-                    <span style={styles.hint}>Up to 10 numbers - E.164 or local format</span>
+                    <span style={styles.hint}>
+                      Numbers must start with "05" and be exactly 10 digits
+                    </span>
                     <div style={styles.manualButtons}>
                       <button 
-                        style={{...styles.btnPrimary, opacity: (!manualInput.trim() || isChecking) ? 0.6 : 1, cursor: (!manualInput.trim() || isChecking) ? 'not-allowed' : 'pointer'}} 
+                        style={{...styles.btnPrimary, opacity: (!isManualInputValid || isChecking) ? 0.6 : 1, cursor: (!isManualInputValid || isChecking) ? 'not-allowed' : 'pointer'}} 
                         onClick={handleCheckNumbers}
-                        disabled={!manualInput.trim() || isChecking}
+                        disabled={!isManualInputValid || isChecking}
                       >
                         {isChecking ? 'Checking...' : 'Check Numbers'}
                       </button>
@@ -903,35 +1117,52 @@ const APINumberCheck = () => {
             {/* Status Bar */}
             <div style={styles.statusBar}>
               <div style={styles.statusLeft}>
-                <span style={manualNumbers > 0 ? styles.statusBadgeSuccess : styles.statusBadgeDisabled}>
-                  Manual: {manualNumbers} {manualNumbers === 1 ? 'number' : 'numbers'}
-                </span>
-                <span style={csvFile ? styles.statusBadgeSuccess : styles.statusBadgeDisabled}>
-                  CSV: {csvFile ? csvFile.name : 'not selected'}
-                </span>
+              {activeTab === 'manual' ? (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={validCount > 0 ? styles.statusBadgeSuccess : styles.statusBadgeDisabled}>
+                    Valid Numbers: {validCount}
+                  </span>
+                  <span style={invalidCount > 0 ? styles.statusBadgeError : styles.statusBadgeDisabled}>
+                    Invalid Numbers: {invalidCount}
+                  </span>
+                  {validCount === 0 && invalidCount === 0 && (
+                    <span style={styles.statusBadgeDisabled}>
+                      Total Numbers: 0
+                    </span>
+                  )}
+                </div>
+                ) : (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {csvFile ? (
+                    <>
+                      <span style={csvValidCount > 0 ? styles.statusBadgeSuccess : styles.statusBadgeDisabled}>
+                        Valid Numbers: {csvValidCount}
+                      </span>
+                      <span style={csvInvalidCount > 0 ? styles.statusBadgeError : styles.statusBadgeDisabled}>
+                        Invalid Numbers: {csvInvalidCount}
+                      </span>
+                     
+                    </>
+                  ) : (
+                    <span style={styles.statusBadgeDisabled}>
+                      CSV: No file selected
+                    </span>
+                  )}
+                </div>
+                )}
               </div>
               <div style={styles.statusRight}>
                 {activeTab === 'manual' ? (
-                  <button 
-                    style={{
-                      ...styles.btnPrimaryLarge,
-                      opacity: (!manualInput.trim() || isChecking) ? 0.6 : 1,
-                      cursor: (!manualInput.trim() || isChecking) ? 'not-allowed' : 'pointer'
-                    }} 
-                    onClick={handleCheckNumbers}
-                    disabled={!manualInput.trim() || isChecking}
-                  >
-                    {isChecking ? 'Checking...' : 'Check Numbers'}
-                  </button>
+                  <></>
                 ) : (
                   <button 
                     style={{
                       ...styles.btnPrimaryLarge,
-                      opacity: (!csvFile || isUploading) ? 0.6 : 1,
-                      cursor: (!csvFile || isUploading) ? 'not-allowed' : 'pointer'
+                      opacity: (!csvFile || isUploading || csvInvalidCount > 0) ? 0.6 : 1,
+                      cursor: (!csvFile || isUploading || csvInvalidCount > 0) ? 'not-allowed' : 'pointer'
                     }} 
                     onClick={handleBulkUpload}
-                    disabled={!csvFile || isUploading}
+                    disabled={!csvFile || isUploading || csvInvalidCount > 0}
                   >
                     {isUploading ? 'Uploading...' : 'Upload & Check Numbers'}
                 </button>
@@ -958,8 +1189,9 @@ const APINumberCheck = () => {
             </div>
             <div style={styles.resultStats}>
               <span style={styles.statItem}>Total <strong>{totalNumbers}</strong></span>
-              <span style={styles.statItem}>Valid <strong style={{ color: '#28a745' }}>{validNumbers}</strong></span>
-              <span style={styles.statItem}>Invalid <strong style={{ color: '#dc3545' }}>{invalidNumbers}</strong></span>
+              <span style={{...styles.statItem, color: '#28a745'}}>Permitted <strong>{permittedCount}</strong></span>
+              <span style={{...styles.statItem, color: '#dc3545'}}>Denied <strong>{deniedCount}</strong></span>
+              <span style={{...styles.statItem, color: '#856404'}}>Invalid <strong>{invalidStatusCount}</strong></span>
             </div>
           </div>
 
@@ -973,12 +1205,8 @@ const APINumberCheck = () => {
               <table style={styles.table}>
                 <thead style={styles.thead}>
                   <tr>
-                      <th style={styles.th}>Phone Number</th>
-                    <th style={styles.th}>Status</th>
-                      
+                      <th style={styles.th}>Called Number</th>
                       <th style={styles.th}>DNCR Status</th>
-                      <th style={styles.th}>Transaction Status</th>
-                    <th style={styles.th}>Notes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -986,62 +1214,21 @@ const APINumberCheck = () => {
                       // Display bulk results
                       Object.entries(bulkResults).map(([phoneNumber, data]: [string, any]) => (
                         <tr key={phoneNumber} style={styles.tr}>
-                          <td style={styles.td}><strong>{data?.accountNumber || phoneNumber}</strong></td>
+                          <td style={styles.td}><strong>{data?.details?.accountNumber}</strong></td>
                           <td style={styles.td}>
-                            <span style={{
-                              ...styles.badgeValid,
-                              backgroundColor: data.status === "TRUE" ? '#d4edda' : '#f8d7da',
-                              color: data.status === "TRUE" ? '#155724' : '#721c24',
-                              borderColor: data.status === "TRUE" ? '#c3e6cb' : '#f5c6cb'
-                            }}>
-                              {data.status === "TRUE" ? "Registered" : "Not Registered"}
-                            </span>
+                            {renderStatusBadge(data?.status, data?.details?.dncrStatus, data?.status)}
                           </td>
-                         
-                          <td style={styles.td}>
-                            <span style={{
-                              ...styles.badgeValid,
-                              backgroundColor: data.dncrStatus === "TRUE" ? '#d4edda' : '#f8d7da',
-                              color: data.dncrStatus === "TRUE" ? '#155724' : '#721c24',
-                              borderColor: data.dncrStatus === "TRUE" ? '#c3e6cb' : '#f5c6cb'
-                            }}>
-                              {data.dncrStatus === "TRUE" ? "Active" : "Inactive"}
-                            </span>
-                          </td>
-                          <td style={styles.td}>{data.transactionStatus || "N/A"}</td>
-                          <td style={styles.td}>{data.status === "TRUE" ? "Registered" : "Not Registered"}</td>
+                          
                         </tr>
                       ))
                     ) : (
                       // Display manual results
                       results.map((result: PhoneResult, idx: number) => (
                         <tr key={`${result.input}-${idx}`} style={styles.tr}>
-                          <td style={styles.td}><strong>{result.input}</strong></td>
-                      <td style={styles.td}>
-                            <span style={{
-                              ...styles.badgeValid,
-                              backgroundColor: result.status === "Valid" ? '#d4edda' : '#f8d7da',
-                              color: result.status === "Valid" ? '#155724' : '#721c24',
-                              borderColor: result.status === "Valid" ? '#c3e6cb' : '#f5c6cb'
-                            }}>
-                              {result.status || "N/A"}
-                            </span>
-                      </td>
-                          
-                      <td style={styles.td}>
-                            {result.dncrStatus ? (
-                              <span style={{
-                                ...styles.badgeValid,
-                                backgroundColor: result.dncrStatus === "Active" ? '#d4edda' : '#f8d7da',
-                                color: result.dncrStatus === "Active" ? '#155724' : '#721c24',
-                                borderColor: result.dncrStatus === "Active" ? '#c3e6cb' : '#f5c6cb'
-                              }}>
-                                {result.dncrStatus}
-                              </span>
-                            ) : "N/A"}
-                      </td>
-                          <td style={styles.td}>{result.transactionStatus || "N/A"}</td>
-                          <td style={styles.td}>{result.notes || "N/A"}</td>
+                          <td style={styles.td}><strong>{result?.accountNumber}</strong></td>
+                          <td style={styles.td}>
+                            {renderStatusBadge(result?.status, result?.dncrStatus, result?.status)}
+                          </td>
                     </tr>
                       ))
                     )}
@@ -1053,6 +1240,100 @@ const APINumberCheck = () => {
         </div>
       </div>
     </div>
+
+    {/* Format Guide Modal */}
+    <Modal 
+      show={showFormatGuide} 
+      onHide={() => setShowFormatGuide(false)}
+      centered
+      size="lg"
+    >
+      <Modal.Header closeButton>
+        <Modal.Title style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <HelpCircle size={20} />
+          Format Guide
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Manual Input Section */}
+          <div>
+            <h5 style={{ marginBottom: '12px', color: '#212529', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Edit3 size={18} />
+              Manual Input Format
+            </h5>
+            <div style={{ backgroundColor: '#f8f9fa', padding: '16px', borderRadius: '8px', border: '1px solid #dee2e6' }}>
+              <ul style={{ margin: 0, paddingLeft: '20px', color: '#495057', lineHeight: '1.8' }}>
+                <li>Numbers must start with <strong>"05"</strong></li>
+                <li>Each number must be exactly <strong>10 digits</strong> total</li>
+                <li>Separate multiple numbers with <strong>comma</strong></li>
+                <li>Maximum <strong>10 numbers</strong> allowed per check</li>
+                <li>Non-digit characters (spaces, dashes) are automatically removed during validation</li>
+              </ul>
+              <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#ffffff', borderRadius: '4px', border: '1px solid #dee2e6' }}>
+                <strong style={{ color: '#212529', display: 'block', marginBottom: '8px' }}>Example:</strong>
+                <code style={{ color: '#0d6efd', fontSize: '14px' }}>
+                  0512345678, 0598765432, 0555555555
+                </code>
+              </div>
+            </div>
+          </div>
+
+          {/* CSV Upload Section */}
+          <div>
+            <h5 style={{ marginBottom: '12px', color: '#212529', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Upload size={18} />
+              CSV File Format
+            </h5>
+            <div style={{ backgroundColor: '#f8f9fa', padding: '16px', borderRadius: '8px', border: '1px solid #dee2e6' }}>
+              <ul style={{ margin: 0, paddingLeft: '20px', color: '#495057', lineHeight: '1.8' }}>
+                <li>File must be in <strong>CSV format</strong> (.csv extension)</li>
+                <li>First column should contain phone numbers</li>
+                <li>Numbers must start with <strong>"05"</strong> and be exactly <strong>10 digits</strong></li>
+                <li>Each row represents one phone number</li>
+                <li>Header row is optional (will be skipped if present)</li>
+                <li>Maximum file size and row limits may apply</li>
+              </ul>
+              <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#ffffff', borderRadius: '4px', border: '1px solid #dee2e6' }}>
+                <strong style={{ color: '#212529', display: 'block', marginBottom: '8px' }}>Example CSV:</strong>
+                <code style={{ color: '#0d6efd', fontSize: '14px', display: 'block', whiteSpace: 'pre' }}>
+                  {`Phone Number
+0512345678
+0598765432
+0555555555`}
+                </code>
+              </div>
+            </div>
+          </div>
+
+          {/* Validation Rules */}
+          <div style={{ backgroundColor: '#fff3cd', padding: '16px', borderRadius: '8px', border: '1px solid #ffc107' }}>
+            <h6 style={{ marginBottom: '8px', color: '#856404', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              ⚠️ Validation Rules
+            </h6>
+            <p style={{ margin: 0, color: '#856404', fontSize: '14px', lineHeight: '1.6' }}>
+              Invalid numbers will be highlighted in the status bar. Only valid numbers (starting with "05" and exactly 10 digits) can be checked.
+            </p>
+          </div>
+        </div>
+      </Modal.Body>
+      <Modal.Footer>
+        <button
+          onClick={() => setShowFormatGuide(false)}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#6c757d',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+        >
+          Close
+        </button>
+      </Modal.Footer>
+    </Modal>
     </React.Fragment>
   );
 };

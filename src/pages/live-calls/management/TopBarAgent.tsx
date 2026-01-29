@@ -31,6 +31,8 @@ interface TopBarProps {
   setShowUserMenu: (show: boolean) => void;
   statusOptions: StatusOption[];
   handleLogout: () => void;
+  /** When provided, called on status change (e.g. to call API); parent should update state on success */
+  onStatusChange?: (newState: string) => void | Promise<void>;
 }
 
 const TopBar: React.FC<TopBarProps> = ({
@@ -46,7 +48,8 @@ const TopBar: React.FC<TopBarProps> = ({
   showUserMenu,
   setShowUserMenu,
   statusOptions,
-  handleLogout
+  handleLogout,
+  onStatusChange
 }) => {
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -67,13 +70,16 @@ const TopBar: React.FC<TopBarProps> = ({
 
   const currentStatus = statusOptions.find(s => s.value === agentStatus) || statusOptions[0];
 
-  const handleStatusChange = (status: string) => {
-    setAgentStatus(status);
+  const handleStatusChange = async (status: string) => {
     setShowStatusDropdown(false);
-    
-    const statusLabel = statusOptions.find(s => s.value === status)?.label;
-    if (statusLabel) {
-      alert(`✅ Status changed to ${statusLabel}`);
+    if (onStatusChange) {
+      await onStatusChange(status);
+    } else {
+      setAgentStatus(status);
+      const statusLabel = statusOptions.find(s => s.value === status)?.label;
+      if (statusLabel) {
+        alert(`✅ Status changed to ${statusLabel}`);
+      }
     }
   };
 
@@ -359,7 +365,7 @@ const TopBar: React.FC<TopBarProps> = ({
             
             {showUserMenu && (
               <div className="dropdown-menu" style={{ display: 'block' }}>
-                <button 
+                {/* <button 
                   type="button"
                   className="dropdown-item"
                   onClick={(e) => {
@@ -384,7 +390,7 @@ const TopBar: React.FC<TopBarProps> = ({
                 >
                   <Settings size={18} />
                   <span>Settings</span>
-                </button>
+                </button> */}
                 <div style={{ 
                   height: '1px', 
                   background: '#f1f5f9', 

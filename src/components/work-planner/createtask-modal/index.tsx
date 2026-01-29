@@ -7,6 +7,7 @@ import {
   FileText, 
   Tag,
   Users,
+  Eye,
   Flag,
   ListTodo,
   Plus,
@@ -20,7 +21,9 @@ import {
   FileSpreadsheet,
   Phone
 } from 'lucide-react';
+import { toast } from 'react-toastify';
 import { listProjects, createTask, updateTask } from '@utils/tasks';
+import { listStatuses } from '@utils/work-planner';
 import { getAutoTimezone } from '@utils/Helper';
 import RichTextEditor from '../../../pages/help-center/partials/RichTextEditor';
 
@@ -116,7 +119,9 @@ interface CreateTaskFormData {
   statusId: number | null;
   priorityId: number | null;
   assigneeIds: number[];
+  watcherIds: number[];
   dueDate: string;
+  startDate: string;
   labelIds: number[];
   linkedRecordIds: number[];
 }
@@ -167,6 +172,9 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   // Initialize form data - populate from editTask if in edit mode
   const getInitialFormData = (): CreateTaskFormData => {
     if (isEdit && editTask) {
+      const projectIdRaw = editTask.project_id ?? editTask.project?.id;
+      const statusIdRaw = editTask.status_id ?? editTask.status?.id;
+
       // Map assignees from extension_numbers to assigneeIds
       const assigneeIds = editTask.assignees?.map((assignee: any) => {
         const extension = extensions.find((ext: any) => 
@@ -179,14 +187,26 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         return extension ? Number(extension.id) : Number(extNum);
       }) || [];
 
+      const watcherIds = editTask.watchers?.map((watcher: any) => {
+        const extension = extensions.find((ext: any) =>
+          ext.id === watcher.extension_number || ext.extension_number === watcher.extension_number
+        );
+        return extension ? Number(extension.id) : Number(watcher.extension_number);
+      }) || editTask.watcher_numbers?.map((extNum: string) => {
+        const extension = extensions.find((ext: any) => ext.id === extNum || ext.extension_number === extNum);
+        return extension ? Number(extension.id) : Number(extNum);
+      }) || [];
+
       return {
         title: editTask.title || '',
         description: editTask.description || '',
-        projectId: editTask.project_id || editTask.project?.id || null,
-        statusId: editTask.status_id || editTask.status?.id || null,
+        projectId: projectIdRaw ? Number(projectIdRaw) : null,
+        statusId: statusIdRaw ? Number(statusIdRaw) : null,
         priorityId: mapPriorityStringToId(editTask.priority),
         assigneeIds: assigneeIds,
+        watcherIds: watcherIds,
         dueDate: formatDateForInput(editTask.due_date),
+        startDate: formatDateForInput(editTask.start_date),
         labelIds: editTask.label_ids || editTask.labels?.map((l: any) => l.id) || [],
         linkedRecordIds: []
       };
@@ -197,9 +217,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       description: '',
       projectId: propProject?.id || null,
       statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
-      priorityId: 2, // Default to Medium priority
+      priorityId: 0, // Default to "Select Priority" (empty value)
       assigneeIds: [],
+      watcherIds: [],
       dueDate: '',
+      startDate: '',
       labelIds: [],
       linkedRecordIds: []
     };
@@ -209,8 +231,12 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('');
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
+  const [watcherSearchQuery, setWatcherSearchQuery] = useState('');
+  const [showWatcherDropdown, setShowWatcherDropdown] = useState(false);
   const [fetchedProjects, setFetchedProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const [genericStatuses, setGenericStatuses] = useState<Status[]>([]);
+  const [loadingGenericStatuses, setLoadingGenericStatuses] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch projects from API
@@ -243,6 +269,44 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     fetchProjects();
   }, [show]);
 
+  // Fetch generic statuses from API
+  useEffect(() => {
+    const fetchGenericStatuses = async () => {
+      if (!show) return; // Only fetch when modal is open
+      
+      try {
+        setLoadingGenericStatuses(true);
+        const response = await listStatuses();
+        if (response && Array.isArray(response)) {
+          const statusesList = response.map((status: any) => ({
+            id: status.id,
+            name: status.name,
+            icon: '',
+            color: status.color || '#3b82f6'
+          }));
+          setGenericStatuses(statusesList);
+        } else if (response?.data && Array.isArray(response.data)) {
+          const statusesList = response.data.map((status: any) => ({
+            id: status.id,
+            name: status.name,
+            icon: '',
+            color: status.color || '#3b82f6'
+          }));
+          setGenericStatuses(statusesList);
+        } else {
+          setGenericStatuses([]);
+        }
+      } catch (error) {
+        console.error('Error fetching generic statuses:', error);
+        setGenericStatuses([]);
+      } finally {
+        setLoadingGenericStatuses(false);
+      }
+    };
+
+    fetchGenericStatuses();
+  }, [show]);
+
   // Reset form data when modal opens/closes or editTask changes (after projects are loaded)
   useEffect(() => {
     if (show) {
@@ -261,9 +325,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         description: '',
         projectId: propProject?.id || null,
         statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
-        priorityId: 2,
+        priorityId: 0,
         assigneeIds: [],
+        watcherIds: [],
         dueDate: '',
+        startDate: '',
         labelIds: [],
         linkedRecordIds: []
       });
@@ -279,57 +345,71 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     initials: ext.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
   }));
 
-  // Get statuses and labels from selected project (no API call needed - data already in fetchedProjects)
-  useEffect(() => {
-    if (!formData.projectId || fetchedProjects.length === 0) {
-      return;
-    }
-
-    // Find the selected project from fetchedProjects
-    const selectedProject = fetchedProjects.find(p => p.id === formData.projectId);
-    
-    if (selectedProject && selectedProject.statuses && Array.isArray(selectedProject.statuses)) {
-      const statusesList = selectedProject.statuses.map((status: any) => ({
-        id: status.id,
-        name: status.name,
-        icon: '',
-        color: status.color || '#3b82f6'
-      }));
-      
-      // Auto-select first status if none selected (only in create mode, not edit mode)
-      if (!isEdit && !formData.statusId && statusesList.length > 0) {
-        setFormData(prev => ({ ...prev, statusId: selectedStatusForTask || statusesList[0].id }));
-      }
-    }
-  }, [formData.projectId, fetchedProjects, isEdit, selectedStatusForTask]);
-
   // Use API-fetched projects, or fallback to propProject if provided
   const projects: Project[] = fetchedProjects.length > 0 
     ? fetchedProjects 
     : (propProject ? [propProject] : []);
 
-  // Get statuses from selected project (from fetchedProjects), otherwise use propStatuses
+  // Get statuses: if project is selected, use project statuses; otherwise use generic statuses
   const getStatusesForSelectedProject = (): Status[] => {
-    if (!formData.projectId) {
-      return propStatuses;
+    // If project is selected, use project statuses
+    if (formData.projectId) {
+      const selectedProject = fetchedProjects.find(p => p.id === formData.projectId);
+      if (selectedProject && selectedProject.statuses && Array.isArray(selectedProject.statuses)) {
+        return selectedProject.statuses.map((status: any) => ({
+          id: status.id,
+          name: status.name,
+          icon: '',
+          color: status.color || '#3b82f6'
+        }));
+      }
+      // If project selected but no statuses found, return empty array
+      return [];
     }
     
-    const selectedProject = fetchedProjects.find(p => p.id === formData.projectId);
-    if (selectedProject && selectedProject.statuses && Array.isArray(selectedProject.statuses)) {
-      return selectedProject.statuses.map((status: any) => ({
-        id: status.id,
-        name: status.name,
-        icon: '',
-        color: status.color || '#3b82f6'
-      }));
+    // If no project selected, use generic statuses from API
+    if (genericStatuses.length > 0) {
+      return genericStatuses;
     }
     
+    // Fallback to propStatuses if provided
     return propStatuses;
   };
 
   const statuses: Status[] = getStatusesForSelectedProject();
 
+  // Auto-select first status when project changes or generic statuses load
+  useEffect(() => {
+    // Only auto-select in create mode, not edit mode
+    if (isEdit) {
+      return;
+    }
+
+    // If project is selected, wait for projects to load
+    if (formData.projectId && fetchedProjects.length === 0) {
+      return;
+    }
+
+    // If no project selected, wait for generic statuses to load
+    if (!formData.projectId && loadingGenericStatuses) {
+      return;
+    }
+
+    // Get available statuses
+    const availableStatuses = getStatusesForSelectedProject();
+    
+    // Auto-select first status if none selected and statuses are available
+    if (!formData.statusId && availableStatuses.length > 0) {
+      setFormData(prev => ({ 
+        ...prev, 
+        statusId: selectedStatusForTask || availableStatuses[0].id 
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.projectId, fetchedProjects, genericStatuses, loadingGenericStatuses, isEdit, selectedStatusForTask]);
+
   const priorities: Priority[] = [
+    { id: 0, name: "Select Priority", icon: "", color: "#6c757d" },
     { id: 1, name: "Low", icon: "🟢", color: "#10b981" },
     { id: 2, name: "Medium", icon: "🟡", color: "#eab308" },
     { id: 3, name: "High", icon: "🟠", color: "#f97316" },
@@ -362,14 +442,17 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   console.log('linkedRecords', linkedRecords);
 
   // Map priority ID to priority string
-  const mapPriorityIdToString = (priorityId: number | null): string => {
+  const mapPriorityIdToString = (priorityId: number | null): string | undefined => {
+    if (!priorityId || priorityId === 0) {
+      return ''; // Return empty for "Select Priority" (id: 0)
+    }
     const priorityMap: Record<number, string> = {
       1: 'low',
       2: 'normal',
       3: 'high',
       4: 'urgent'
     };
-    return priorityMap[priorityId || 2] || 'normal';
+    return priorityMap[priorityId] || undefined;
   };
 
   const handleCreate = async (e?: React.MouseEvent) => {
@@ -383,7 +466,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }
 
     if (!formData.title.trim()) {
-      alert('Please enter a task title');
+      toast.error('Please enter a task title');
       return;
     }
 
@@ -393,21 +476,30 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       const payload: any = {
         title: formData.title,
         description: formData.description || '',
-        status_id: formData.statusId || undefined,
-        priority: mapPriorityIdToString(formData.priorityId),
+        priority: mapPriorityIdToString(formData.priorityId) || undefined,
         due_date: formData.dueDate || '',
+        start_date: formData.startDate || '',
         extension_numbers: formData.assigneeIds?.map((id: number) => {
           // Find the extension by id from extensions prop
           const extension = extensions.find((ext: any) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
-        label_ids: formData.labelIds || [],
+        watchers: formData.watcherIds?.map((id: number) => {
+          const extension = extensions.find((ext: any) => Number(ext.id) === id);
+          return extension ? extension.id : String(id);
+        }) || [],
         type: taskType // Add task type (regular, recurring, or todo)
       };
 
       // Add project_id if available (optional)
       if (formData.projectId) {
         payload.project_id = formData.projectId;
+        payload.label_ids = formData.labelIds || [];
+      }
+
+      // Add status_id if available (works for both project-based and generic statuses)
+      if (formData.statusId) {
+        payload.status_id = formData.statusId;
       }
 
       // Add parent_task_id if records are linked (use first linked record as parent)
@@ -458,7 +550,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }
 
     if (!formData.title.trim()) {
-      alert('Please enter a task title');
+      toast.error('Please enter a task title');
       return;
     }
 
@@ -468,21 +560,29 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       const payload: any = {
         title: formData.title,
         description: formData.description || '',
-        status_id: formData.statusId || undefined,
-        priority: mapPriorityIdToString(formData.priorityId),
+        priority: mapPriorityIdToString(formData.priorityId) || undefined,
         due_date: formData.dueDate || '',
+        start_date: formData.startDate || '',
         extension_numbers: formData.assigneeIds?.map((id: number) => {
-          // Find the extension by id from extensions prop
           const extension = extensions.find((ext: any) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
-        label_ids: formData.labelIds || [],
+        watchers: formData.watcherIds?.map((id: number) => {
+          const extension = extensions.find((ext: any) => Number(ext.id) === id);
+          return extension ? extension.id : String(id);
+        }) || [],
         type: taskType // Add task type (regular, recurring, or todo)
       };
 
       // Add project_id if available (optional)
       if (formData.projectId) {
         payload.project_id = formData.projectId;
+        payload.label_ids = formData.labelIds || [];
+      }
+
+      // Add status_id if available (works for both project-based and generic statuses)
+      if (formData.statusId) {
+        payload.status_id = formData.statusId;
       }
 
       // Add parent_task_id if records are linked (use first linked record as parent)
@@ -540,10 +640,20 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }));
   };
 
+  const toggleWatcher = (userId: number) => {
+    setFormData(prev => ({
+      ...prev,
+      watcherIds: prev.watcherIds.includes(userId)
+        ? prev.watcherIds.filter(id => id !== userId)
+        : [...prev.watcherIds, userId]
+    }));
+  };
+
   const selectedProject = projects.find(p => p.id === formData.projectId) || null;
   const selectedStatus = statuses.find(s => s.id === formData.statusId) || null;
   const selectedPriority = priorities.find(p => p.id === formData.priorityId) || null;
   const selectedAssignees = users.filter(u => formData.assigneeIds.includes(u.id));
+  const selectedWatchers = users.filter(u => formData.watcherIds.includes(u.id));
   const selectedLabels = labels.filter(l => formData.labelIds.includes(l.id));
 
   return (
@@ -634,14 +744,22 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         <Row className="mb-3">
         {taskType !== 'todo' && (
           <Col xs={12} md={6} className="mb-3 mb-md-0">
-            <Form.Group>
+            <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
                 <FolderOpen size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
                 Project
               </Form.Label>
               <Form.Select
                 value={formData.projectId || ''}
-                onChange={(e) => setFormData({ ...formData, projectId: Number(e.target.value) })}
+                onChange={(e) => {
+                  const newProjectId = e.target.value ? Number(e.target.value) : null;
+                  // When project changes, clear status (project statuses are different from generic)
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    projectId: newProjectId,
+                    statusId: null // Clear status when project changes
+                  }));
+                }}
                 className="py-2"
                 style={{ fontSize: '14px' }}
                 disabled={loadingProjects || projects.length === 0}
@@ -665,63 +783,112 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           </Col>
           )}
 
-          <Col xs={12} md={6}>
-            <Form.Group>
-              <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
-                <Calendar size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
-                Due Date
-              </Form.Label>
-              <Form.Control
-                type="date"
-                placeholder="Select date"
-                value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                className="py-2"
-                style={{ fontSize: '14px' }}
-              />
-            </Form.Group>
-          </Col>
+
        
 
         {/* Status and Priority Row */}
         
           {taskType !== 'todo' && (
           <Col xs={12} md={6} className="mb-3 mb-md-0">
-            <Form.Group>
+            <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
                 <ListTodo size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
                 Status
               </Form.Label>
               <Form.Select
-                value={formData.statusId || ''}
-                onChange={(e) => setFormData({ ...formData, statusId: Number(e.target.value) })}
+                value={formData.statusId ?? ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    statusId: e.target.value ? Number(e.target.value) : null
+                  })
+                }
                 className="py-2"
                 style={{ fontSize: '14px' }}
-                disabled={!formData.projectId || statuses.length === 0}
+                disabled={
+                  (formData.projectId && loadingProjects) || 
+                  (!formData.projectId && loadingGenericStatuses) || 
+                  statuses.length === 0
+                }
               >
-                {!formData.projectId ? (
-                  <option value="">Select a project first</option>
+                {(formData.projectId && loadingProjects) || (!formData.projectId && loadingGenericStatuses) ? (
+                  <option value="">Loading statuses...</option>
                 ) : statuses.length === 0 ? (
-                  <option value="">No statuses available</option>
-                ) : (
-                  statuses.map(status => (
-                    <option key={status.id} value={status.id}>
-                      {status.name}
+                  isEdit && formData.statusId ? (
+                    <option value={formData.statusId}>
+                      {editTask?.status?.name || editTask?.status_name || `Status #${formData.statusId}`}
                     </option>
-                  ))
+                  ) : (
+                    <option value="">No statuses available</option>
+                  )
+                ) : (
+                  <>
+                    <option value="">Select status</option>
+                    {isEdit &&
+                      formData.statusId &&
+                      !statuses.some(s => String(s.id) === String(formData.statusId)) && (
+                        <option value={formData.statusId}>
+                          {editTask?.status?.name || editTask?.status_name || `Status #${formData.statusId}`}
+                        </option>
+                      )}
+                    {statuses.map(status => (
+                      <option key={status.id} value={status.id}>
+                        {status.name}
+                      </option>
+                    ))}
+                  </>
                 )}
               </Form.Select>
             </Form.Group>
           </Col>
           )}
+          
+          {!isEdit && (
           <Col xs={12} md={6}>
-            <Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
+                <Calendar size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
+                Start Date
+              </Form.Label>
+              <Form.Control
+                type="date"
+                placeholder="Select date"
+                value={formData.startDate}
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                min={new Date().toISOString().split('T')[0]}
+                className="py-2"
+                style={{ fontSize: '14px' }}
+              />
+            </Form.Group>
+          </Col>
+          )}
+          {!isEdit && (
+          <Col xs={12} md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
+                <Calendar size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
+                End Date
+              </Form.Label>
+              <Form.Control
+                type="date"
+                placeholder="Select date"
+                value={formData.dueDate}
+                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                min={new Date().toISOString().split('T')[0]}
+                className="py-2"
+                style={{ fontSize: '14px' }}
+              />
+            </Form.Group>
+          </Col>
+          )}
+          <Col xs={12} md={6}>
+            <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
                 <Flag size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
                 Priority
               </Form.Label>
               <Form.Select
-                value={formData.priorityId || ''}
+                value={formData.priorityId || 0}
                 onChange={(e) => setFormData({ ...formData, priorityId: Number(e.target.value) })}
                 className="py-2"
                 style={{ fontSize: '14px' }}
@@ -858,11 +1025,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                     backgroundColor: formData.assigneeIds.includes(user.id) ? '#edf6ff' : 'white',
                     transition: 'background-color 0.2s'
                   }}
-                  onClick={() => {
-                    toggleAssignee(user.id);
-                    setShowAssigneeDropdown(false);
-                    setAssigneeSearchQuery(''); // Clear search when selecting
-                  }}
+                  onClick={() => toggleAssignee(user.id)}
                   onMouseEnter={(e) => {
                     if (!formData.assigneeIds.includes(user.id)) {
                       e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -882,6 +1045,156 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                   ))
                 );
               })()}
+              {/* Done button to close dropdown after multiple selection */}
+              <div className="p-2 border-top" style={{ backgroundColor: 'white' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm w-100"
+                  onClick={() => {
+                    setShowAssigneeDropdown(false);
+                    setAssigneeSearchQuery('');
+                  }}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+        </Form.Group>
+        )}
+
+        {/* Watchers Field */}
+        {taskType !== 'todo' && (
+        <Form.Group className="mb-3">
+          <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
+            <Eye size={16} className="me-2" style={{ verticalAlign: 'middle' }} />
+            Watchers
+          </Form.Label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+            {selectedWatchers.map((user) => (
+              <div
+                key={user.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer'
+                }}
+                onClick={() => toggleWatcher(user.id)}
+              >
+                <span style={{ color: '#2d3748', fontWeight: '500' }}>{user.name}</span>
+                <X size={14} style={{ color: '#64748b' }} />
+              </div>
+            ))}
+
+            <Button
+              variant="light"
+              size="sm"
+              onClick={() => {
+                setShowWatcherDropdown(!showWatcherDropdown);
+                if (!showWatcherDropdown) {
+                  setWatcherSearchQuery('');
+                }
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                fontSize: '0.875rem',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px'
+              }}
+            >
+              <Plus size={14} />
+              Add Watcher
+            </Button>
+          </div>
+
+          {showWatcherDropdown && (
+            <div
+              className="border rounded"
+              style={{
+                backgroundColor: '#f8fafc',
+                maxHeight: '300px',
+                overflowY: 'auto'
+              }}
+            >
+              <div className="p-2 border-bottom" style={{ backgroundColor: 'white' }}>
+                <div className="position-relative">
+                  <Search
+                    size={16}
+                    className="position-absolute text-muted"
+                    style={{ left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                  />
+                  <Form.Control
+                    type="text"
+                    placeholder="Search watchers..."
+                    value={watcherSearchQuery}
+                    onChange={(e) => setWatcherSearchQuery(e.target.value)}
+                    className="py-2"
+                    style={{ paddingLeft: '40px', fontSize: '14px' }}
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {(() => {
+                const filteredWatchers = users.filter((user) =>
+                  user.name.toLowerCase().includes(watcherSearchQuery.toLowerCase())
+                );
+
+                return filteredWatchers.length === 0 ? (
+                  <div className="p-3 text-center text-muted" style={{ fontSize: '14px' }}>
+                    {watcherSearchQuery ? 'No watchers found' : 'No extensions available'}
+                  </div>
+                ) : (
+                  filteredWatchers.map((user) => (
+                    <div
+                      key={user.id}
+                      className="d-flex align-items-center justify-content-between p-3 border-bottom cursor-pointer"
+                      style={{
+                        cursor: 'pointer',
+                        backgroundColor: formData.watcherIds.includes(user.id) ? '#f0fdf4' : 'white',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onClick={() => toggleWatcher(user.id)}
+                      onMouseEnter={(e) => {
+                        if (!formData.watcherIds.includes(user.id)) {
+                          e.currentTarget.style.backgroundColor = '#f8fafc';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!formData.watcherIds.includes(user.id)) {
+                          e.currentTarget.style.backgroundColor = 'white';
+                        }
+                      }}
+                    >
+                      <span style={{ fontSize: '14px', color: '#2d3748', fontWeight: '500' }}>{user.name}</span>
+                      {formData.watcherIds.includes(user.id) && (
+                        <Check size={18} className="text-success" style={{ flexShrink: 0 }} />
+                      )}
+                    </div>
+                  ))
+                );
+              })()}
+              <div className="p-2 border-top" style={{ backgroundColor: 'white' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm w-100"
+                  onClick={() => {
+                    setShowWatcherDropdown(false);
+                    setWatcherSearchQuery('');
+                  }}
+                >
+                  Done
+                </button>
+              </div>
             </div>
           )}
         </Form.Group>

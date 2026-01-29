@@ -15,7 +15,7 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import { listTasks, listProjects, getTask, updateTask, deleteTask, getTaskActivities, getTaskComments, createTaskComment, updateTaskComment, deleteTaskComment } from "@utils/tasks";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
-import { ModuleSlug } from "@utils/Helper";
+import { GlobalDateTimeFormat, ModuleSlug } from "@utils/Helper";
 import { Spinner } from "react-bootstrap";
 import { 
   Container, 
@@ -56,12 +56,13 @@ import {
 import SelectBox from '@components/SelectBox';
 import CreateTaskModal from '@components/work-planner/createtask-modal';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
+import moment from 'moment';
 
 interface Task {
   id: string;
   title: string;
   status: 'To Do' | 'In Progress' | 'In Review' | 'Overdue' | string;
-  priority: 'Low' | 'Medium' | 'High' | string;
+  priority: 'Low' | 'Medium' | 'High' | 'Urgent' | string;
   project: string;
   assignee: string;
   assigneeInitials: string;
@@ -69,6 +70,7 @@ interface Task {
   assignees?: Array<{ name: string; initials: string }>;
   description?: string;
   comments?: number;
+  completed_by_extension_number?: string;
   rawData?: any; // Store raw API data for detail view
 }
 
@@ -102,9 +104,11 @@ const TasksList = () => {
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 20,
+    limit: 15,
     total: 0,
-    last_page: 1
+    last_page: 1,
+    from: 0,
+    to: 0
   });
   const [summary, setSummary] = useState({
     openTasks: 0,
@@ -126,11 +130,17 @@ const TasksList = () => {
   
   // Use refs to store latest filter values to avoid recreating fetchTasks on filter changes
   const filtersRef = useRef({ searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate });
+  const tasksRef = useRef<Task[]>([]);
   
   // Update refs when filters change
   useEffect(() => {
     filtersRef.current = { searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate };
   }, [searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate]);
+  
+  // Update tasks ref when tasks change
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
 
   // Fetch extensions for CreateTaskModal - MUST load first before other APIs
   const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
@@ -147,17 +157,18 @@ const TasksList = () => {
   // Map API task to UI Task
   const mapApiTaskToTask = (apiTask: ApiTask): Task => {
     const getStatusName = (status: any) => {
-      if (!status) return 'To Do';
-      return status.name || 'To Do';
+      if (!status) return 'N/A';
+      return status.name || 'N/A';
     };
 
     const getPriorityName = (priority: string) => {
       const priorityMap: Record<string, string> = {
         'low': 'Low',
         'normal': 'Medium',
-        'high': 'High'
+        'high': 'High',
+        'urgent': 'Urgent'
       };
-      return priorityMap[priority] || 'Medium';
+      return priorityMap[priority] || 'Low';
     };
 
     const formatDate = (dateStr: string | null | undefined) => {
@@ -272,9 +283,9 @@ const TasksList = () => {
       
       if (currentFilters.filterStatus !== 'All Status' && currentFilters.filterStatus) {
         // Map status name to status_id
-        // First, try to find status_id from existing tasks
+        // First, try to find status_id from existing tasks (use ref to get latest tasks)
         const statusMap: Record<string, number> = {};
-        tasks.forEach(task => {
+        tasksRef.current.forEach(task => {
           if (task.rawData?.status && task.status === currentFilters.filterStatus) {
             const statusId = task.rawData.status.id || task.rawData.status_id;
             if (statusId) {
@@ -294,7 +305,8 @@ const TasksList = () => {
         const priorityMap: Record<string, string> = {
           'Low': 'low',
           'Medium': 'normal',
-          'High': 'high'
+          'High': 'high',
+          'Urgent': 'urgent'
         };
         params.priority = priorityMap[currentFilters.filterPriority] || currentFilters.filterPriority.toLowerCase();
       }
@@ -310,21 +322,25 @@ const TasksList = () => {
       if (response && response.data) {
         const mappedTasks = response.data.map(mapApiTaskToTask);
         setTasks(mappedTasks);
-        
+        console.log('response.pagination', response.pagination);
         if (response.pagination) {
           setPagination(prev => {
-            // Only update if values actually changed to prevent infinite loop
             const newPagination = {
               page: response.pagination.page || 1,
-              limit: response.pagination.limit || 20,
+              limit: response.pagination.limit || 15,
               total: response.pagination.total || 0,
-              last_page: response.pagination.last_page || 1
+              last_page: response.pagination.last_page || 1,
+              from: response.pagination.from || 0,
+              to: response.pagination.to || 0
             };
-            // Only update if something actually changed
+            // Always update to sync with server response, but only if values are different
+            // This ensures pagination state matches server state
             if (prev.page !== newPagination.page || 
                 prev.limit !== newPagination.limit || 
                 prev.total !== newPagination.total || 
-                prev.last_page !== newPagination.last_page) {
+                prev.last_page !== newPagination.last_page ||
+                prev.from !== newPagination.from ||
+                prev.to !== newPagination.to) {
               return newPagination;
             }
             return prev;
@@ -348,7 +364,7 @@ const TasksList = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, allProjects, tasks]); // Only depend on pagination and data needed for status mapping (not filters)
+  }, [pagination.page, pagination.limit, allProjects]); // Only depend on pagination and data needed for status mapping (not filters)
 
   // Fetch projects list
   // Wait for hierarchy data to load first, then fetch projects
@@ -394,9 +410,10 @@ const TasksList = () => {
     // Skip initial load (handled by hierarchyLoading useEffect)
     // This handles pagination changes from Previous/Next buttons
     // Only trigger on actual pagination changes, not on filter changes
+    // fetchTasks is recreated when pagination.page or pagination.limit changes, so it will have latest values
     fetchTasks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, pagination.limit, hierarchyLoading]); // fetchTasks reads from refs, so it doesn't need to be in deps
+  }, [pagination.page, pagination.limit, hierarchyLoading, fetchTasks]); // Include fetchTasks in deps to ensure it has latest pagination values
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
@@ -405,6 +422,7 @@ const TasksList = () => {
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingTask, setDeletingTask] = useState(false);
+  const [taskActionLoadingId, setTaskActionLoadingId] = useState<string | null>(null);
   const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [taskActivities, setTaskActivities] = useState<any[]>([]);
@@ -433,9 +451,10 @@ const TasksList = () => {
   const getPriorityVariant = (priority: string) => {
     switch (priority) {
       case 'High': return 'danger';
+      case 'Urgent': return 'danger';
       case 'Medium': return 'warning';
       case 'Low': return 'success';
-      default: return 'secondary';
+      default: return 'info';
     }
   };
 
@@ -510,6 +529,38 @@ const TasksList = () => {
     }
   };
 
+  const handleStartTask = async (task: Task, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const taskId = String(task.rawData?.id ?? task.id);
+    if (!taskId) return;
+    try {
+      setTaskActionLoadingId(taskId);
+      await updateTask(taskId, { start_date: new Date().toISOString() ,timezone: Intl.DateTimeFormat().resolvedOptions().timeZone});
+      await fetchTasks();
+    } catch (error) {
+      console.error('Error starting task:', error);
+    } finally {
+      setTaskActionLoadingId(null);
+    }
+  };
+
+  const handleEndTask = async (task: Task, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const taskId = String(task.rawData?.id ?? task.id);
+    if (!taskId) return;
+    try {
+      setTaskActionLoadingId(taskId);
+      const now = new Date();  
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      await updateTask(taskId, { end_date: now.toISOString(), due_date:now.toISOString(), due_time:now.toISOString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+      await fetchTasks();
+    } catch (error) {
+      console.error('Error ending task:', error);
+    } finally {
+      setTaskActionLoadingId(null);
+    }
+  };
+
   const handleEditTask = () => {
     if (!selectedTask?.rawData) return;
     
@@ -537,14 +588,27 @@ const TasksList = () => {
     }
   };
 
-  const clearFilters = () => {
-    setFilterProject('All Projects');
-    setFilterAssignee([]);
-    setFilterStatus('All Status');
-    setFilterPriority('All Priority');
-    setFilterDueDate('All Dates');
-    setSearchTerm('');
-  };
+  const clearFilters = useCallback(() => {
+    const cleared = {
+      searchTerm: '',
+      filterProject: 'All Projects',
+      filterAssignee: [] as string[],
+      filterStatus: 'All Status',
+      filterPriority: 'All Priority',
+      filterDueDate: 'All Dates'
+    };
+
+    setSearchTerm(cleared.searchTerm);
+    setFilterProject(cleared.filterProject);
+    setFilterAssignee(cleared.filterAssignee);
+    setFilterStatus(cleared.filterStatus);
+    setFilterPriority(cleared.filterPriority);
+    setFilterDueDate(cleared.filterDueDate);
+
+    // Keep pagination unchanged; just refresh with cleared filters
+    filtersRef.current = cleared;
+    fetchTasks();
+  }, [fetchTasks]);
 
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -560,8 +624,8 @@ const TasksList = () => {
     return matchesProject && matchesAssignee && matchesStatus && matchesPriority;
   });
 
-  const statuses = ['All Status', 'To Do', 'In Progress', 'In Review', 'Overdue'];
-  const priorities = ['All Priority', 'Low', 'Medium', 'High'];
+  const statuses = ['All Status', 'To Do', 'In Progress', 'In Review', 'Overdue', 'Completed'];
+  const priorities = ['All Priority', 'Low', 'Medium', 'High', 'Urgent'];
   
   // Convert to SelectBox format (value should be the actual value, not the label)
   const projectOptions = projects.map(project => ({ value: project, label: project }));
@@ -1138,86 +1202,36 @@ const TasksList = () => {
             </div>
           </div>
 
-          <div className="tabs-section">
-            <Nav variant="tabs">
-              <Nav.Item>
-                <Nav.Link 
-                  active={activeTab === 'My Work'}
-                  onClick={() => setActiveTab('My Work')}
-                >
-                  My Work
-                </Nav.Link>
-              </Nav.Item>
-              <Nav.Item>
-                <Nav.Link 
-                  active={activeTab === 'All Tasks'}
-                  onClick={() => setActiveTab('All Tasks')}
-                >
-                  All Tasks
-                </Nav.Link>
-              </Nav.Item>
-              <Nav.Item>
-                <Nav.Link 
-                  active={activeTab === 'Activity'}
-                  onClick={() => setActiveTab('Activity')}
-                >
-                  Activity
-                </Nav.Link>
-              </Nav.Item>
-            </Nav>
-          </div>
-
-          <div className="table-container">
-            {pagination.last_page > 1 && (
-              <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
-                <div>
-                  Showing {pagination.page === 1 ? 1 : ((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} tasks
-                </div>
-                <div className="d-flex gap-2">
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    disabled={pagination.page === 1}
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    disabled={pagination.page >= pagination.last_page}
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            )}
             <div className="table-responsive">
               <Table className="tasks-table" hover>
                 <thead>
                   <tr>
-                    <th style={{ width: '50px' }}>
+                    {/* <th style={{ width: '50px' }}>
                       <Form.Check 
                         type="checkbox"
                         checked={selectedTasks.size === filteredTasks.length && filteredTasks.length > 0}
                         onChange={handleSelectAll}
                       />
-                    </th>
+                    </th> */}
                     <th>Task ID</th>
                     <th>Title</th>
                     <th>Status</th>
                     <th>Priority</th>
                     <th>Project</th>
-                    <th>Assignee</th>
-                    <th>Due</th>
+                    <th>Assignees</th>
+                    <th>Watchers</th>
+                    <th>Tast Start</th>
+                    <th>Task End</th>
+                   
+                    <th>Created By</th>
+                    <th>DateTime</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-5">
+                      <td colSpan={20} className="text-center py-5">
                         <Spinner animation="border" variant="primary" />
                         <div className="mt-2">Loading tasks...</div>
                       </td>
@@ -1231,13 +1245,14 @@ const TasksList = () => {
                   ) : (
                     filteredTasks.map(task => (
                     <tr key={task.id}>
-                      <td onClick={(e) => e.stopPropagation()}>
+                      {/*<td onClick={(e) => e.stopPropagation()}>
                         <Form.Check 
                           type="checkbox"
                           checked={selectedTasks.has(task.id)}
                           onChange={() => handleSelectTask(task.id)}
                         />
                       </td>
+                      */}
                       <td className="task-id" onClick={() => handleTaskClick(task)}>{task.id}</td>
                       <td onClick={() => handleTaskClick(task)}>{task.title}</td>
                       <td onClick={() => handleTaskClick(task)}>
@@ -1254,8 +1269,10 @@ const TasksList = () => {
                       <td onClick={() => handleTaskClick(task)}>
                         <div className="d-flex align-items-center gap-2">
                         
-                        {
-                          task.rawData?.assignees?.map((assignee: any, idx: number) => {
+                        {!task.rawData?.assignees || task.rawData.assignees.length === 0 ? (
+                          <span className="text-muted">Not assigned</span>
+                        ) : (
+                         task.rawData.assignees.map((assignee: any, idx: number) => {
                             const extNumber = assignee.extension_number || '';
                             
                             // Find name from hierarchyDataExtensions
@@ -1282,14 +1299,94 @@ const TasksList = () => {
                               </div>
                             );
                           })
-                        }
+                        )}
                         </div>
                       </td>
-                      <td onClick={() => handleTaskClick(task)}>{task.dueDate}</td>
+                      <td onClick={() => handleTaskClick(task)}>
+                        <div className="d-flex align-items-center gap-2">
+                          {(() => {
+                            const watchers = task.rawData?.watchers ?? task.rawData?.watcher_numbers?.map((extNum: string) => ({ extension_number: extNum })) ?? [];
+                            if (!watchers.length) return <span className="text-muted">—</span>;
+                            return watchers.map((watcher: any, idx: number) => {
+                              const extNumber = watcher.extension_number ?? watcher ?? '';
+                              if (!hierarchyDataExtensions) {
+                                return (
+                                  <div key={idx} className="assignee-badge" title={extNumber}>
+                                    {String(extNumber).toUpperCase().slice(0, 2) || '—'}
+                                  </div>
+                                );
+                              }
+                              const extension = (hierarchyDataExtensions as any[]).find(
+                                (ext: any) => ext.id === extNumber || ext.extension_number === extNumber
+                              );
+                              const name = extension?.name || extNumber;
+                              const initials = name !== extNumber
+                                ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+                                : String(extNumber || '—').slice(0, 2).toUpperCase();
+                              return (
+                                <div key={idx} className="assignee-badge" title={name}>
+                                  {initials}
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </td>
+
+                      <td onClick={() => handleTaskClick(task)}>{task.rawData?.start_date ? moment(task.rawData?.start_date).format(GlobalDateTimeFormat) : ''}</td>
+                      <td onClick={() => handleTaskClick(task)}>{task.rawData?.due_time ? moment(task.rawData?.due_time).format(GlobalDateTimeFormat) : ''}</td>
+                      
+                      <td onClick={() => handleTaskClick(task)}>
+                        {(() => {
+                          const extNumber = task.rawData?.created_by_extension_number || '';
+                          if (!extNumber) return '';
+                          
+                          if (!hierarchyDataExtensions) {
+                            return extNumber;
+                          }
+                          
+                          const extension = (hierarchyDataExtensions as any[]).find(
+                            (ext: any) => ext.id === extNumber || ext.extension_number === extNumber
+                          );
+                          
+                          return extension?.name || extNumber;
+                        })()}
+                        </td>
+                        <td onClick={() => handleTaskClick(task)}>{task.rawData?.created_at ? moment(task.rawData?.created_at).format(GlobalDateTimeFormat) : ''}</td>
                       <td>
-                        <Button variant="link" className="text-secondary p-0" onClick={() => handleTaskClick(task)}>
-                          <MoreVertical size={20} />
-                        </Button>
+                        <div className="d-flex align-items-center gap-1 " onClick={(e) => e.stopPropagation()}>
+                          {!task.rawData?.start_date && (
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              className="me-1"
+                              disabled={taskActionLoadingId === String(task.rawData?.id ?? task.id)}
+                              onClick={(e) => handleStartTask(task, e)}
+                            >
+                              {taskActionLoadingId === String(task.rawData?.id ?? task.id) ? (
+                                <Spinner animation="border" size="sm" className="me-1" style={{ width: '14px', height: '14px' }} />
+                              ) : null}
+                              Start Task
+                            </Button>
+                          )}
+                          {task.rawData?.start_date && !task.rawData?.due_time && (
+                            <Button
+                              variant="outline-secondary"
+                              size="sm"
+                              className="me-1"
+                              disabled={taskActionLoadingId === String(task.rawData?.id ?? task.id)}
+                              onClick={(e) => handleEndTask(task, e)}
+                            >
+                              {taskActionLoadingId === String(task.rawData?.id ?? task.id) ? (
+                                <Spinner animation="border" size="sm" className="me-1" style={{ width: '14px', height: '14px' }} />
+                              ) : null}
+                              End Task
+                            </Button>
+                          )} 
+                          <Button variant="link" className="text-secondary p-0" onClick={() => handleTaskClick(task)}>
+                            <MoreVertical size={20} />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                     ))
@@ -1297,7 +1394,179 @@ const TasksList = () => {
                 </tbody>
               </Table>
             </div>
-          </div>
+            
+            {/* Pagination Controls */}
+            {!loading && filteredTasks.length > 0 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '20px',
+                paddingTop: '16px',
+                borderTop: '1px solid #e8eef5',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', color: '#718096' }}>
+                    Showing {pagination.from || 0} to {pagination.to || 0} of {pagination.total || 0} tasks
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <label htmlFor="per-page-select" style={{ fontSize: '13px', color: '#718096', margin: 0 }}>Per page</label>
+                    <select
+                      id="per-page-select"
+                      value={pagination.limit}
+                      onChange={(e) => {
+                        const limit = Number(e.target.value);
+                        if (!loading) setPagination(prev => ({ ...prev, limit, page: 1 }));
+                      }}
+                      disabled={loading}
+                      style={{
+                        padding: '6px 10px',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        backgroundColor: loading ? '#f8fafc' : 'white',
+                        color: loading ? '#cbd5e0' : '#4a5568',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        minWidth: '56px'
+                      }}
+                    >
+                      {[15, 25, 50, 100].map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => {
+                      if (pagination.page > 1 && !loading) {
+                        setPagination(prev => ({ ...prev, page: prev.page - 1 }));
+                      }
+                    }}
+                    disabled={pagination.page === 1 || loading}
+                    style={{
+                      padding: '6px 12px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      backgroundColor: (pagination.page === 1 || loading) ? '#f8fafc' : 'white',
+                      color: (pagination.page === 1 || loading) ? '#cbd5e0' : '#4a5568',
+                      cursor: (pagination.page === 1 || loading) ? 'not-allowed' : 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (pagination.page > 1 && !loading) {
+                        e.currentTarget.style.backgroundColor = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#cbd5e0';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (pagination.page > 1 && !loading) {
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                      }
+                    }}
+                  >
+                    Previous
+                  </button>
+                  
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {Array.from({ length: Math.min(5, pagination.last_page) }, (_, i) => {
+                      let pageNum;
+                      if (pagination.last_page <= 5) {
+                        pageNum = i + 1;
+                      } else if (pagination.page <= 3) {
+                        pageNum = i + 1;
+                      } else if (pagination.page >= pagination.last_page - 2) {
+                        pageNum = pagination.last_page - 4 + i;
+                      } else {
+                        pageNum = pagination.page - 2 + i;
+                      }
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => {
+                            if (!loading && pagination.page !== pageNum) {
+                              setPagination(prev => ({ ...prev, page: pageNum }));
+                            }
+                          }}
+                          disabled={loading}
+                          style={{
+                            minWidth: '32px',
+                            height: '32px',
+                            padding: '0 8px',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '6px',
+                            backgroundColor: pagination.page === pageNum ? '#5b8fd8' : (loading ? '#f8fafc' : 'white'),
+                            color: pagination.page === pageNum ? 'white' : (loading ? '#cbd5e0' : '#4a5568'),
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            fontSize: '13px',
+                            fontWeight: pagination.page === pageNum ? '600' : '500',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (pagination.page !== pageNum && !loading) {
+                              e.currentTarget.style.backgroundColor = '#f8fafc';
+                              e.currentTarget.style.borderColor = '#cbd5e0';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (pagination.page !== pageNum && !loading) {
+                              e.currentTarget.style.backgroundColor = 'white';
+                              e.currentTarget.style.borderColor = '#e2e8f0';
+                            }
+                          }}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <button
+                    onClick={() => {
+                      if (pagination.page < pagination.last_page && !loading) {
+                        setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+                      }
+                    }}
+                    disabled={pagination.page >= pagination.last_page || loading}
+                    style={{
+                      padding: '6px 12px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      backgroundColor: (pagination.page >= pagination.last_page || loading) ? '#f8fafc' : 'white',
+                      color: (pagination.page >= pagination.last_page || loading) ? '#cbd5e0' : '#4a5568',
+                      cursor: (pagination.page >= pagination.last_page || loading) ? 'not-allowed' : 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (pagination.page < pagination.last_page && !loading) {
+                        e.currentTarget.style.backgroundColor = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#cbd5e0';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (pagination.page < pagination.last_page && !loading) {
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                      }
+                    }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          
         </Container>
       </div>
 
@@ -1310,30 +1579,30 @@ const TasksList = () => {
         placement="end"
         className="task-detail-panel"
       >
-        <Offcanvas.Header closeButton className="task-detail-header">
-          <Offcanvas.Title>
-            <div className="d-flex align-items-center justify-content-between w-100">
-              <span className="fw-bold">{selectedTask?.id} {selectedTask?.title}</span>
-              <div className="d-flex align-items-center gap-2">
-                <Button 
-                  variant="link" 
-                  className="text-primary p-0" 
-                  onClick={handleEditTask}
-                  title="Edit Task"
-                >
-                  <Edit size={20} />
-                </Button>
-                <Button 
-                  variant="link" 
-                  className="text-danger p-0" 
-                  onClick={() => setShowDeleteModal(true)}
-                  title="Delete Task"
-                >
-                  <Trash2 size={20} />
-                </Button>
-              </div>
-            </div>
+        <Offcanvas.Header closeButton className="task-detail-header d-flex align-items-center">
+          <Offcanvas.Title className="d-flex align-items-center flex-grow-1 min-w-0 me-2">
+            <span className="fw-bold">{selectedTask?.title} </span>
           </Offcanvas.Title>
+          <div className="d-flex align-items-center gap-1 flex-shrink-0">
+            {/* {selectedTask?.rawData?.is_completed === false && ( */}
+              <Button 
+                variant="link" 
+                className="text-primary p-0" 
+                onClick={handleEditTask}
+                title="Edit Task"
+              >
+                <Edit size={20} />
+              </Button>
+            {/* )} */}
+            <Button 
+              variant="link" 
+              className="text-danger p-0" 
+              onClick={() => setShowDeleteModal(true)}
+              title="Delete Task"
+            >
+              <Trash2 size={20} />
+            </Button>
+          </div>
         </Offcanvas.Header>
         <Offcanvas.Body className="task-detail-body">
           {selectedTask && (
@@ -1393,6 +1662,43 @@ const TasksList = () => {
                 </div>
               </div>
 
+              <div className="detail-section">
+                <div className="detail-label">Watchers</div>
+                <div className="assignee-group">
+                  {(() => {
+                    const watchers = selectedTask.rawData?.watchers ?? selectedTask.rawData?.watcher_numbers?.map((extNum: string) => ({ extension_number: extNum })) ?? [];
+                    if (watchers.length === 0) {
+                      return <span className="text-muted small">No watchers</span>;
+                    }
+                    return watchers.map((watcher: any, idx: number) => {
+                      const extNumber = watcher.extension_number ?? watcher ?? '';
+                      if (!hierarchyDataExtensions) {
+                        return (
+                          <div key={idx} className="assignee-badge" title={extNumber}>
+                            {String(extNumber).toUpperCase().slice(0, 2) || '—'}
+                          </div>
+                        );
+                      }
+                      const extension = (hierarchyDataExtensions as any[]).find(
+                        (ext: any) => ext.id === extNumber || ext.extension_number === extNumber
+                      );
+                      const name = extension?.name || extNumber;
+                      const initials = name !== extNumber
+                        ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+                        : String(extNumber || '—').slice(0, 2).toUpperCase();
+                      return (
+                        <div key={idx} className="assignee-badge" title={name}>
+                          {initials}
+                        </div>
+                      );
+                    });
+                  })()}
+                  <div className="add-assignee" onClick={handleEditTask} title="Edit watchers">
+                    <Plus size={16} />
+                  </div>
+                </div>
+              </div>
+
 {selectedTask.dueDate && (
               <div className="detail-section">
                 <div className="detail-label">Due Date</div>
@@ -1410,9 +1716,13 @@ const TasksList = () => {
 
               <div className="detail-section">
                 <div className="detail-label">Description</div>
-                <p style={{ fontSize: '0.875rem', color: '#475569', lineHeight: '1.6', margin: 0 }}>
-                  {selectedTask.description || 'No description provided'}
-                </p>
+                <div
+                  style={{ fontSize: '0.875rem', color: '#475569', lineHeight: '1.6', margin: 0 }}
+                  className="task-description-html"
+                  dangerouslySetInnerHTML={{
+                    __html: (selectedTask.rawData?.description ?? selectedTask.description)?.trim() || '<span class="text-muted">No description provided</span>',
+                  }}
+                />
               </div>
 
               <Nav variant="tabs" className="detail-tabs">

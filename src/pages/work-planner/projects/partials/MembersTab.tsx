@@ -2,7 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import Select from 'react-select';
 import { UserPlus, Trash2, Edit, Users } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { addMember, updateMemberRole, removeMember } from '@utils/tasks';
+import { canManage } from '@utils/work-planner';
 
 interface MembersTabProps {
   selectedProject: any;
@@ -21,12 +23,18 @@ const MembersTab: React.FC<MembersTabProps> = ({
   styles,
   hierarchyDataExtensions
 }) => {
+  const { data: session } = useSession();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [formData, setFormData] = useState({ extension_number: '', role: 'member' });
   const [processing, setProcessing] = useState(false);
+
+  // Check if user can add members
+  const isAllow = useMemo(() => {
+    return canManage(members, selectedProject, session);
+  }, [members, selectedProject, session]);
 
   const handleAddMember = async () => {
     if (!selectedProject?.id || !formData.extension_number) return;
@@ -94,7 +102,41 @@ const MembersTab: React.FC<MembersTabProps> = ({
   };
 
   const getInitials = (name: string) => {
-    return name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+    const clean = String(name || '').trim();
+    if (!clean) return 'UN';
+    return clean
+      .split(' ')
+      .filter(Boolean)
+      .map((n: string) => n[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase();
+  };
+
+  const extensionByNumber = useMemo(() => {
+    const map = new Map<string, any>();
+    (hierarchyDataExtensions || []).forEach((ext: any) => {
+      const key = String(ext?.extension_number || ext?.id || '').trim();
+      if (!key) return;
+      map.set(key, ext);
+    });
+    return map;
+  }, [hierarchyDataExtensions]);
+
+  const resolveMemberUser = (member: any) => {
+    const extNum = String(member?.extension_number || '').trim();
+    const hierarchyExt = extNum ? extensionByNumber.get(extNum) : null;
+
+    const name =
+      member?.user?.name ||
+      member?.user?.display_name ||
+      hierarchyExt?.user?.name ||
+      hierarchyExt?.name ||
+      extNum ||
+      'Unknown';
+
+    const email = member?.user?.email || hierarchyExt?.user?.email || '';
+    return { name: String(name), email: email ? String(email) : '' };
   };
 
   const getRoleColor = (role: string) => {
@@ -113,12 +155,33 @@ const MembersTab: React.FC<MembersTabProps> = ({
   // Prepare options for react-select
   const extensionOptions = useMemo(() => {
     return hierarchyDataExtensions
-      .filter((ext: any) => !members.some((m: any) => m.extension_number === ext.extension_number))
-      .map((ext: any) => ({
-        value: ext.extension_number,
-        label: ext.user?.name || ext.name || ext.extension_number || 'Unknown'
-      }));
+      .map((ext: any) => {
+        const value = String(ext?.extension_number || ext?.id || '').trim();
+        const name = String(ext?.user?.name || ext?.name || '').trim();
+        return {
+          value,
+          label: name ? `${name}` : value || 'Unknown'
+        };
+      })
+      .filter((opt: any) => opt.value)
+      .filter((opt: any) => !members.some((m: any) => String(m.extension_number || '').trim() === String(opt.value)));
   }, [hierarchyDataExtensions, members]);
+
+  const allExtensionOptions = useMemo(() => {
+    return (hierarchyDataExtensions || []).map((ext: any) => {
+      const value = String(ext?.extension_number || ext?.id || '').trim();
+      const label = String(ext?.user?.name || ext?.name || ext?.extension_number || ext?.id || 'Unknown').trim();
+      return { value, label };
+    }).filter((o: any) => o.value);
+  }, [hierarchyDataExtensions]);
+
+  const selectedMemberOptionForEdit = useMemo(() => {
+    const extNum = String(selectedMember?.extension_number || '').trim();
+    if (!extNum) return null;
+    const resolved = resolveMemberUser(selectedMember);
+    const label = resolved?.name && resolved.name !== extNum ? `${resolved.name} (${extNum})` : extNum;
+    return allExtensionOptions.find((o: any) => String(o.value) === extNum) || { value: extNum, label };
+  }, [selectedMember, allExtensionOptions, extensionByNumber]);
 
   // Get selected option for react-select
   const selectedExtensionOption = useMemo(() => {
@@ -135,15 +198,17 @@ const MembersTab: React.FC<MembersTabProps> = ({
       <div style={styles.card}>
         <div style={styles.cardHeader}>
           <h5 style={styles.cardTitle}>Project Members</h5>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setShowAddModal(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <UserPlus size={16} />
-            Add Member
-          </Button>
+          {isAllow && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowAddModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <UserPlus size={16} />
+              Add Member
+            </Button>
+          )}
         </div>
 
         {loading ? (
@@ -164,12 +229,15 @@ const MembersTab: React.FC<MembersTabProps> = ({
                   <th style={styles.th}>Member</th>
                   <th style={styles.th}>Extension</th>
                   <th style={styles.th}>Role</th>
-                  <th style={styles.th}>Actions</th>
+                  {isAllow && (
+                    <th style={styles.th}>Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {members.map((member: any, index: number) => {
-                  const userName = member.user?.name || member.user?.display_name || member.extension_number || 'Unknown';
+                  const resolved = resolveMemberUser(member);
+                  const userName = resolved.name;
                   const initials = getInitials(userName);
                   const colors = ['#48bb78', '#f56565', '#4299e1', '#ed64a6', '#667eea', '#9f7aea', '#fc8181', '#ed8936'];
                   const color = colors[index % colors.length];
@@ -200,8 +268,8 @@ const MembersTab: React.FC<MembersTabProps> = ({
                           </div>
                           <div>
                             <div style={{ fontWeight: '500', color: '#1F2937' }}>{userName}</div>
-                            {member.user?.email && (
-                              <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>{member.user.email}</div>
+                            {resolved.email && (
+                              <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>{resolved.email}</div>
                             )}
                           </div>
                         </div>
@@ -225,6 +293,9 @@ const MembersTab: React.FC<MembersTabProps> = ({
                           {member.role || 'Member'}
                         </span>
                       </td>
+
+
+                      {isAllow && (
                       <td style={styles.td}>
                         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                           <button
@@ -251,7 +322,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
                           >
                             <Edit size={16} />
                           </button>
-                          {member.role?.toLowerCase() !== 'owner' && (
+                          
                             <button
                               onClick={() => openDeleteModal(member)}
                               style={{
@@ -276,9 +347,12 @@ const MembersTab: React.FC<MembersTabProps> = ({
                             >
                               <Trash2 size={16} />
                             </button>
-                          )}
+                          
                         </div>
                       </td>
+                      )}
+
+
                     </tr>
                   );
                 })}
@@ -296,7 +370,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
         <Modal.Body>
           <Form>
             <Form.Group className="mb-3">
-              <Form.Label>Extension Number</Form.Label>
+              <Form.Label>Select Member</Form.Label>
               <Select
                 value={selectedExtensionOption}
                 onChange={(selectedOption: any) => {
@@ -306,7 +380,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
                   }));
                 }}
                 options={extensionOptions}
-                placeholder="Select Extension"
+                placeholder="Type to search"
                 isClearable
                 isSearchable
                 menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
@@ -351,7 +425,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
               >
                 <option value="member">Member</option>
                 <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
+                <option value="viewer">Viewer</option>
               </Form.Select>
             </Form.Group>
           </Form>
@@ -379,10 +453,39 @@ const MembersTab: React.FC<MembersTabProps> = ({
           <Form>
             <Form.Group className="mb-3">
               <Form.Label>Member</Form.Label>
-              <Form.Control
-                type="text"
-                value={selectedMember?.user?.name || selectedMember?.extension_number || ''}
-                disabled
+              <Select
+                value={selectedMemberOptionForEdit}
+                options={allExtensionOptions}
+                isDisabled
+                isSearchable
+                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                menuPosition="fixed"
+                className="react-select-container"
+                classNamePrefix="react-select"
+                styles={{
+                  control: (base: any, state: any) => ({
+                    ...base,
+                    minHeight: '38px',
+                    borderColor: '#E5E9F2',
+                    boxShadow: 'none',
+                    '&:hover': {
+                      borderColor: '#E5E9F2'
+                    }
+                  }),
+                  placeholder: (base: any) => ({
+                    ...base,
+                    color: '#9CA3AF'
+                  }),
+                  singleValue: (base: any) => ({
+                    ...base,
+                    color: '#1F2937',
+                    fontWeight: '500'
+                  }),
+                  menuPortal: (base: any) => ({
+                    ...base,
+                    zIndex: 9999
+                  })
+                }}
               />
             </Form.Group>
             <Form.Group className="mb-3">

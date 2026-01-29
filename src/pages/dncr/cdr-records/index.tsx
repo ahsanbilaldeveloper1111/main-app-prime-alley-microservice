@@ -42,6 +42,35 @@ interface CDRRecord {
 }
 
 interface CDRResponse {
+  statistics?: {
+    this_month?: {
+      total_calls: number;
+      local_dnd: {
+        allowed: number;
+        blocked: number;
+        not_checked: number;
+      };
+      call_repetition: {
+        allowed: number;
+        blocked: number;
+        not_checked: number;
+      };
+      dncr_api: {
+        allowed: number;
+        blocked: number;
+        not_checked: number;
+        invalid: number;
+        none: number;
+        error: number;
+      };
+      performance: {
+        avg_time_ms: number;
+        min_time_ms: number;
+        max_time_ms: number;
+      };
+    };
+    [key: string]: any;
+  };
   status: string;
   message: string;
   authenticated_user: string;
@@ -252,6 +281,22 @@ const CDRRecords = () => {
   const [repetitionStatusFilter, setRepetitionStatusFilter] = useState('');
   const [localDndStatusFilter, setLocalDndStatusFilter] = useState('');
   const [dncrApiStatusFilter, setDncrApiStatusFilter] = useState('');
+
+  // Mapping for DNCR API Status values to labels
+  const dncrApiStatusLabels: Record<string, string> = {
+    '': 'DNCR API',
+    'TRUE': '🚫 TRUE (Blocked in DNCR)',
+    'FALSE': '✅ FALSE (Allowed by DNCR)',
+    'Not Checked': '⏭️ Not Checked',
+    'INVALID': '⚠️ INVALID (Not Found)',
+    'NONE': '⚠️ NONE (Null Status)',
+    'NULL': '⚠️ NULL (Null Status)',
+    'UNKNOWN': '❌ UNKNOWN (Timeout/Error)',
+    'ERROR': '❌ ERROR (API Failed)',
+    '%CACHE-BLOCKED': '🔄 Cache: Blocked',
+    '%CACHE-ALLOWED': '🔄 Cache: Allowed',
+    '%NOT-IN-CACHE': '🚫 Cache: Miss (Fail-closed)'
+  };
   const [dateFromFilter, setDateFromFilter] = useState('');
   const [dateToFilter, setDateToFilter] = useState('');
   const [appliedFilters, setAppliedFilters] = useState({
@@ -271,6 +316,7 @@ const CDRRecords = () => {
   const [apiData, setApiData] = useState<CDRRecord[]>([]);
   const [metadata, setMetadata] = useState<CDRResponse['metadata'] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [statistics, setStatistics] = useState<CDRResponse['statistics'] | null>(null);
 
   // Fetch CDR data from API
   const fetchCDRData = useCallback(async () => {
@@ -319,6 +365,8 @@ const CDRRecords = () => {
       if (response.data?.status === 'success') {
         setApiData(response.data.data || []);
         setMetadata(response.data.metadata);
+        console.log('response.data.statistics', response?.data?.statistics);
+        setStatistics(response?.data?.statistics || undefined);
       } else {
         setError('Failed to fetch CDR records');
         setApiData([]);
@@ -372,15 +420,15 @@ const CDRRecords = () => {
       calling: record.CallingNumber || '',
       called: record.CalledNumber || '',
       userId: record.UserID || '',
-      localDND: record.LocalDNDStatus || 'Not Checked',
+      localDND: record.LocalDNDStatus,
       repetition: mapRepetitionStatus(record.CallRepetitionStatus),
       
-      dncrApi: record.DNCRAPIStatus === 'TRUE' ? 'TRUE' : 'FALSE',
+      dncrApi: record.DNCRAPIStatus,
 
       time: record.TotalTimeTakenMs?.toFixed(2) || '0',
-      allowLocalDNCL: record.AllowLocalDNCLCalls === 'True' ? 'TRUE' : 'FALSE',
-      allowApiDNCLCalls: record.AllowApiDNCLCalls === 'True' ? 'TRUE' : 'FALSE',
-      allowRepetition: record.AllowRepetitiveCalls === 'True' ? 'TRUE' : 'FALSE'
+      allowLocalDNCL: record.AllowLocalDNCLCalls,
+      allowApiDNCLCalls: record.AllowApiDNCLCalls,
+      allowRepetition: record.AllowRepetitiveCalls
     };
   };
 
@@ -405,14 +453,48 @@ const CDRRecords = () => {
       };
     }
 
+    // Use statistics.this_month data if available, otherwise fallback to calculated stats
+    const thisMonthStats = statistics?.this_month;
+    
+    if (thisMonthStats) {
+      return {
+        totalRecords: thisMonthStats.total_calls || 0,
+        localDNDNotChecked: thisMonthStats.local_dnd?.not_checked || 0,
+        localDNDAllowed: thisMonthStats.local_dnd?.allowed || 0,
+        localDNDBlocked: thisMonthStats.local_dnd?.blocked || 0,
+        repetitionAllowed: thisMonthStats.call_repetition?.allowed || 0,
+        repetitionNotAllowed: thisMonthStats.call_repetition?.blocked || 0,
+        repetitionNotChecked: thisMonthStats.call_repetition?.not_checked || 0,
+        dncrApiFalse: thisMonthStats.dncr_api?.allowed || 0,
+        dncrApiTrue: thisMonthStats.dncr_api?.blocked || 0,
+        dncrApiNotChecked: thisMonthStats.dncr_api?.not_checked || 0,
+        dncrApiInvalid: thisMonthStats.dncr_api?.invalid || 0,
+        dncrApiNone: thisMonthStats.dncr_api?.none || 0,
+        dncrApiError: thisMonthStats.dncr_api?.error || 0,
+        allowLocalDNCLTrue: 0,
+        allowLocalDNCLFalse: 0,
+        totalTime: 0,
+        avgTime: thisMonthStats.performance?.avg_time_ms || 0,
+        minTime: thisMonthStats.performance?.min_time_ms || 0,
+        maxTime: thisMonthStats.performance?.max_time_ms || 0
+      };
+    }
+
+    // Fallback to calculated stats from apiData if statistics not available
     const stats = {
       totalRecords: metadata?.total_records || apiData.length,
       localDNDNotChecked: 0,
       localDNDAllowed: 0,
+      localDNDBlocked: 0,
       repetitionAllowed: 0,
       repetitionNotAllowed: 0,
+      repetitionNotChecked: 0,
       dncrApiFalse: 0,
       dncrApiTrue: 0,
+      dncrApiNotChecked: 0,
+      dncrApiInvalid: 0,
+      dncrApiNone: 0,
+      dncrApiError: 0,
       allowLocalDNCLTrue: 0,
       allowLocalDNCLFalse: 0,
       totalTime: 0
@@ -422,6 +504,8 @@ const CDRRecords = () => {
       // Local DND
       if (record.LocalDNDStatus?.toLowerCase().includes('not blocked') || record.LocalDNDStatus?.toLowerCase().includes('allowed')) {
         stats.localDNDAllowed++;
+      } else if (record.LocalDNDStatus?.toLowerCase().includes('blocked')) {
+        stats.localDNDBlocked++;
       } else {
         stats.localDNDNotChecked++;
       }
@@ -429,8 +513,10 @@ const CDRRecords = () => {
       // Repetition
       if (record.CallRepetitionStatus?.toLowerCase().includes('allowed')) {
         stats.repetitionAllowed++;
-      } else {
+      } else if (record.CallRepetitionStatus?.toLowerCase().includes('blocked')) {
         stats.repetitionNotAllowed++;
+      } else {
+        stats.repetitionNotChecked++;
       }
 
       // DNCR API
@@ -453,7 +539,9 @@ const CDRRecords = () => {
 
     return {
       ...stats,
-      avgTime: stats.totalTime / apiData.length
+      avgTime: apiData.length > 0 ? stats.totalTime / apiData.length : 0,
+      minTime: 0,
+      maxTime: 0
     };
   };
 
@@ -465,9 +553,9 @@ const CDRRecords = () => {
   const avgTimeTrendData = Array.from({ length: 11 }, () => ({ value: Math.round(stats.avgTime) }));
 
   const repetitionData = [
-    { name: 'Not Allowed', value: stats.repetitionNotAllowed, color: '#a855f7' },
-    { name: 'Allowed', value: stats.repetitionAllowed, color: '#10b981' },
-    { name: 'Other', value: Math.max(0, stats.totalRecords - stats.repetitionAllowed - stats.repetitionNotAllowed), color: '#3b82f6' }
+    { name: 'Blocked', value: stats.repetitionNotAllowed || 0, color: '#ef4444' },
+    { name: 'Allowed', value: stats.repetitionAllowed || 0, color: '#10b981' },
+    { name: 'Not Checked', value: stats.repetitionNotChecked || 0, color: '#6c757d' }
   ];
 
   const allowLocalDNCLData = [
@@ -552,7 +640,7 @@ const CDRRecords = () => {
 
         {/* Stats Cards Row */}
         <Row className="g-3 mb-4">
-          <Col xs={12} sm={6} lg={2}>
+          <Col >
           <style>{`
       .stat-card-responsive {
         min-height: auto;
@@ -569,7 +657,6 @@ const CDRRecords = () => {
               icon={<TrendingUp size={20} />}
               title="Total Records"
               value={stats.totalRecords.toLocaleString()}
-              subtitle={metadata ? `Page ${metadata.page} of ${metadata.total_pages}` : 'Loading...'}
               chart={
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trendData}>
@@ -579,40 +666,49 @@ const CDRRecords = () => {
               }
             />
           </Col>
-          <Col xs={12} sm={6} lg={2}>
+          <Col >
             <MetricCard
               icon={<Shield size={20} />}
               title="Local DND"
               items={[
                 { 
                   label: 'Not Checked', 
-                  value: stats.totalRecords > 0 
-                    ? `${Math.round((stats.localDNDNotChecked / stats.totalRecords) * 100)}%` 
-                    : '0%', 
+                  value: stats.localDNDNotChecked || 0,
                   color: '#212529' 
                 },
                 { 
                   label: 'Allowed', 
-                  value: stats.totalRecords > 0 
-                    ? `${Math.round((stats.localDNDAllowed / stats.totalRecords) * 100)}%` 
-                    : '0%', 
-                  color: '#6c757d' 
+                  value: stats.localDNDAllowed || 0,
+                  color: '#10b981' 
+                },
+                { 
+                  label: 'Blocked', 
+                  value: stats.localDNDBlocked || 0,
+                  color: '#ef4444' 
                 }
               ]}
               bgGradient="linear-gradient(135deg, #ffffff 0%, #fff5f0 100%)"
             />
           </Col>
-          <Col xs={12} sm={6} lg={2}>
+          <Col >
             <MetricCard
               icon={<RefreshCw size={20} />}
               title="Repetition"
               items={[
                 { 
                   label: 'Allowed', 
-                  value: stats.totalRecords > 0 
-                    ? `${Math.round((stats.repetitionAllowed / stats.totalRecords) * 100)}%` 
-                    : '0%', 
-                  color: '#212529' 
+                  value: stats.repetitionAllowed || 0,
+                  color: '#10b981' 
+                },
+                { 
+                  label: 'Blocked', 
+                  value: stats.repetitionNotAllowed || 0,
+                  color: '#ef4444' 
+                },
+                { 
+                  label: 'Not Checked', 
+                  value: stats.repetitionNotChecked || 0,
+                  color: '#6c757d' 
                 }
               ]}
               chart={
@@ -628,12 +724,27 @@ const CDRRecords = () => {
               }
             />
           </Col>
-          <Col xs={12} sm={6} lg={2}>
-            <StatCard
+          <Col >
+            <MetricCard
               icon={<XCircle size={20} />}
               title="DNCR API"
-              value={stats.dncrApiFalse}
-              subtitle="FALSE"
+              items={[
+                { 
+                  label: 'Allowed', 
+                  value: stats.dncrApiFalse || 0,
+                  color: '#10b981' 
+                },
+                { 
+                  label: 'Blocked', 
+                  value: stats.dncrApiTrue || 0,
+                  color: '#ef4444' 
+                },
+                { 
+                  label: 'Not Checked', 
+                  value: stats.dncrApiNotChecked || 0,
+                  color: '#6c757d' 
+                },
+              ]}
               chart={
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={dncApiTrendData}>
@@ -641,10 +752,10 @@ const CDRRecords = () => {
                   </LineChart>
                 </ResponsiveContainer>
               }
-              bgClass=""
+              bgGradient="linear-gradient(135deg, #ffffff 0%, #fef2f2 100%)"
             />
           </Col>
-          <Col xs={12} sm={6} lg={2}>
+          {/* <Col xs={12} sm={6} lg={2}>
             <MetricCard
               icon={<X size={20} />}
               title="Allow Local DNCL"
@@ -670,12 +781,28 @@ const CDRRecords = () => {
               }
               bgGradient="linear-gradient(135deg, #ffffff 0%, #f5f0ff 100%)"
             />
-          </Col>
-          <Col xs={12} sm={6} lg={2}>
-            <StatCard
+          </Col> */}
+          <Col >
+            <MetricCard
               icon={<Clock size={20} />}
-              title="Avg Time"
-              value={`${Math.round(stats.avgTime)}ms`}
+              title="Performance"
+              items={[
+                { 
+                  label: 'Avg Time', 
+                  value: `${(stats.avgTime || 0).toFixed(1)}ms`,
+                  color: '#8b5cf6' 
+                },
+                { 
+                  label: 'Min Time', 
+                  value: `${(stats.minTime || 0).toFixed(1)}ms`,
+                  color: '#10b981' 
+                },
+                { 
+                  label: 'Max Time', 
+                  value: `${(stats.maxTime || 0).toFixed(1)}ms`,
+                  color: '#ef4444' 
+                }
+              ]}
               chart={
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={avgTimeTrendData}>
@@ -683,6 +810,7 @@ const CDRRecords = () => {
                   </LineChart>
                 </ResponsiveContainer>
               }
+              bgGradient="linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%)"
             />
           </Col>
         </Row>
@@ -694,6 +822,7 @@ const CDRRecords = () => {
               <div className="d-flex flex-wrap gap-2 align-items-center">
                 {/* Global Search */}
                 <div className="d-flex align-items-center" style={{ backgroundColor: '#ffffff', border: '1px solid #dee2e6', borderRadius: '8px', padding: '8px 12px', height: '38px' }}>
+                  
                   <Search size={16} style={{ color: '#6c757d', marginRight: '8px' }} />
                   <Form.Control
                     type="text"
@@ -791,8 +920,12 @@ const CDRRecords = () => {
                   </Dropdown.Toggle>
                   <Dropdown.Menu>
                     <Dropdown.Item onClick={() => setRepetitionStatusFilter('')}>All Status</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('TRUE')}>Allowed</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('FALSE')}>Not Allowed</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('Allowed')}>Allowed</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('Blocked - Daily')}>Blocked Daily</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('Blocked - Weekly')}>Blocked Weekly</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('Blocked - Both')}>Blocked Both</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('Not Checked')}>Not Checked</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setRepetitionStatusFilter('Not Checked - Zero Limits')}>Not Checked - Zero Limits</Dropdown.Item>
                   </Dropdown.Menu>
                 </Dropdown>
 
@@ -837,12 +970,29 @@ const CDRRecords = () => {
                       alignItems: 'center'
                     }}
                   >
-                    <span style={{ marginRight: '4px' }}>🚫</span> {dncrApiStatusFilter || 'DNCR API'}
+                    {dncrApiStatusLabels[dncrApiStatusFilter] || 'DNCR API'}
                   </Dropdown.Toggle>
                   <Dropdown.Menu>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('')}>All Status</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('TRUE')}>Blocked</Dropdown.Item>
-                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('FALSE')}>Not Blocked</Dropdown.Item>
+                    {/* <Dropdown.Item onClick={() => setDncrApiStatusFilter('')}>All Statuses</Dropdown.Item>
+                    <Dropdown.Divider /> */}
+                    <Dropdown.Header>✅ Normal Response</Dropdown.Header>
+                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('TRUE')}>🚫 TRUE (Blocked in DNCR)</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('FALSE')}>✅ FALSE (Allowed by DNCR)</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('Not Checked')}>⏭️ Not Checked</Dropdown.Item>
+                    <Dropdown.Divider />
+                    <Dropdown.Header>⚠️ Special Cases</Dropdown.Header>
+                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('INVALID')}>⚠️ INVALID (Not Found)</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('NONE')}>⚠️ NONE (Null Status)</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('NULL')}>⚠️ NULL (Null Status)</Dropdown.Item>
+                    <Dropdown.Divider />
+                    <Dropdown.Header>❌ API Error - No Fallback</Dropdown.Header>
+                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('UNKNOWN')}>❌ UNKNOWN (Timeout/Error)</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('ERROR')}>❌ ERROR (API Failed)</Dropdown.Item>
+                    <Dropdown.Divider />
+                    <Dropdown.Header>🔄 API Error - Fallback Used</Dropdown.Header>
+                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('%CACHE-BLOCKED')}>🔄 Cache: Blocked</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('%CACHE-ALLOWED')}>🔄 Cache: Allowed</Dropdown.Item>
+                    <Dropdown.Item onClick={() => setDncrApiStatusFilter('%NOT-IN-CACHE')}>🚫 Cache: Miss (Fail-closed)</Dropdown.Item>
                   </Dropdown.Menu>
                 </Dropdown>
 
@@ -960,7 +1110,7 @@ const CDRRecords = () => {
               )}
               {appliedFilters.dncr_api_status && (
                 <span style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                  DNCR API: {appliedFilters.dncr_api_status}
+                  DNCR API: {dncrApiStatusLabels[appliedFilters.dncr_api_status] || appliedFilters.dncr_api_status}
                 </span>
               )}
               {appliedFilters.date_from && (
@@ -1052,7 +1202,7 @@ const CDRRecords = () => {
                         <tr key={row.id} style={{ borderBottom: '1px solid #dee2e6' }}>
                         <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.id}</td>
                         <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          {convertDateTimeWithOffsetToLocal(row?.dateTime,undefined, GlobalDateTimeFormat as string)}</td>
+                          {row?.dateTime}</td>
                         <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
                           <PhoneContainer phone={row.calling} />
                         </td>
@@ -1060,23 +1210,29 @@ const CDRRecords = () => {
                           <PhoneContainer phone={row.called} />
                         </td>
                         <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.userId}</td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <span style={{ color: '#6c757d' }}>{row.localDND}</span>
-                        </td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
-                          <span style={{ 
-                            color: row.repetition === 'Allowed' ? '#0d8a5e' : '#c7337a', 
-                            backgroundColor: row.repetition === 'Allowed' ? '#d1f4e8' : '#fce4ec', 
+                        <td style={{  fontSize: '0.875rem', padding: '12px', border: 'none' }}>
+                        <span style={{ 
+                            color: row?.localDND === 'Allowed' ? '#0d8a5e' : row?.localDND === 'Not Checked' ? '#6c757d' : '#dc3545',
+                            backgroundColor: row?.localDND === 'Allowed' ? '#d1f4e8' : row?.localDND === 'Not Checked' ? '#e9ecef' : '#f8d7da',
                             padding: '4px 8px', 
                             borderRadius: '6px' 
                           }}>
-                            {row.repetition}
+                            {row.localDND}</span>
+                        </td>
+                        <td style={{ fontSize: '0.875rem', padding: '12px', border: 'none' }}>
+                          <span style={{ 
+                            color: row?.repetition === 'Allowed' ? '#0d8a5e' : row?.repetition === 'Not Checked' ? '#6c757d' : '#dc3545',
+                            backgroundColor: row?.repetition === 'Allowed' ? '#d1f4e8' : row?.repetition === 'Not Checked' ? '#e9ecef' : '#f8d7da',
+                            padding: '4px 8px', 
+                            borderRadius: '6px' 
+                          }}>
+                            {row?.repetition}
                           </span>
                         </td>
-                        <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
+                        <td style={{  fontSize: '0.875rem', padding: '12px', border: 'none' }}>
                           <span style={{ 
-                            color: row.dncrApi === 'TRUE' ? '#0d8a5e' : '#c7337a', 
-                            backgroundColor: row.dncrApi === 'TRUE' ? '#d1f4e8' : '#fce4ec', 
+                            color: row.dncrApi === 'TRUE' ? '#dc3545' : row.dncrApi === 'FALSE' ? '#0d8a5e' : '#6c757d',
+                            backgroundColor: row.dncrApi === 'TRUE' ? '#f8d7da' : row.dncrApi === 'FALSE' ? '#d1f4e8' : '#e9ecef',
                             padding: '4px 8px', 
                             borderRadius: '6px' 
                           }}>
@@ -1086,8 +1242,7 @@ const CDRRecords = () => {
                         <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>{row.time}</td>
                         <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
                           <span style={{ 
-                            color: row.allowLocalDNCL === 'TRUE' ? '#0d8a5e' : '#c7337a', 
-                            backgroundColor: row.allowLocalDNCL === 'TRUE' ? '#d1f4e8' : '#fce4ec', 
+                             
                             padding: '4px 8px', 
                             borderRadius: '6px' 
                           }}>
@@ -1096,8 +1251,6 @@ const CDRRecords = () => {
                         </td>
                         <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
                           <span style={{ 
-                            color: row?.allowApiDNCLCalls === 'TRUE' ? '#0d8a5e' : '#c7337a', 
-                            backgroundColor: row?.allowApiDNCLCalls === 'TRUE' ? '#d1f4e8' : '#fce4ec', 
                             padding: '4px 8px', 
                             borderRadius: '6px' 
                           }}>
@@ -1106,8 +1259,6 @@ const CDRRecords = () => {
                         </td>
                         <td style={{ color: '#212529', fontSize: '0.875rem', padding: '12px', border: 'none' }}>
                           <span style={{ 
-                            color: row.allowRepetition === 'TRUE' ? '#0d8a5e' : '#c7337a', 
-                            backgroundColor: row.allowRepetition === 'TRUE' ? '#d1f4e8' : '#fce4ec', 
                             padding: '4px 8px', 
                             borderRadius: '6px' 
                           }}>

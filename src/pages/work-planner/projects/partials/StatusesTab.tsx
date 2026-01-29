@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import { Plus, Trash2, Edit, AlertCircle } from 'lucide-react';
 import { createStatus, updateStatus, deleteStatus } from '@utils/tasks';
+import { canManage } from '@utils/work-planner';
+import { useSession } from 'next-auth/react';
 
 interface StatusesTabProps {
   selectedProject: any;
@@ -18,6 +20,10 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   onRefresh,
   styles
 }) => {
+  const { data: session } = useSession();
+  const isAllow = useMemo(() => {
+    return canManage(statuses, selectedProject, session);
+  }, [statuses, selectedProject, session]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -101,6 +107,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
       <div style={styles.card}>
         <div style={styles.cardHeader}>
           <h5 style={styles.cardTitle}>Project Statuses</h5>
+          {isAllow && (
           <Button
             variant="primary"
             size="sm"
@@ -110,6 +117,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
             <Plus size={16} />
             Add Status
           </Button>
+          )}
         </div>
 
         {loading ? (
@@ -129,7 +137,9 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
                 <tr>
                   <th style={styles.th}>Name</th>
                   <th style={styles.th}>Color</th>
-                  <th style={styles.th}>Actions</th>
+                  {isAllow && (
+                    <th style={styles.th}>Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -165,6 +175,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
                         </span>
                       </div>
                     </td>
+                    {isAllow && (
                     <td style={styles.td}>
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <button
@@ -217,6 +228,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
                         </button>
                       </div>
                     </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

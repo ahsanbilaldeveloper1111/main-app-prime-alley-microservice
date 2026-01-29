@@ -620,6 +620,7 @@ const CrmDeals = () => {
     return saved ? JSON.parse(saved) : ['name', 'company', 'stage', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner'];
   });
   const [dealsPagination, setDealsPagination] = useState({ currentPage: 1, rowsPerPage: 15, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
+  const [serverPaginationMeta, setServerPaginationMeta] = useState<{ total: number; current_page: number; per_page: number; last_page: number } | null>(null);
   const [dealsFilters, setDealsFilters] = useState({
     assignedTo: null as string | null,
     stage: null as string | null,
@@ -706,6 +707,23 @@ const CrmDeals = () => {
         setDealsData(Array.isArray(dealsArray) ? dealsArray : []);
         setTotalDeals(pagination?.total || 0);
         setSummaryTiles(summary);
+        
+        // Update server pagination meta
+        if (pagination && pagination.total !== undefined) {
+          setServerPaginationMeta({
+            total: pagination.total || 0,
+            current_page: pagination.current_page || 1,
+            per_page: pagination.per_page || 5,
+            last_page: pagination.last_page || 1
+          });
+          
+          // Sync local pagination state with server response
+          setDealsPagination(prev => ({
+            ...prev,
+            currentPage: pagination.current_page || prev.currentPage,
+            rowsPerPage: pagination.per_page || prev.rowsPerPage
+          }));
+        }
 
         return response;
       } finally {
@@ -1659,12 +1677,17 @@ const handleCloseEditModal = useCallback(() => {
     dataLength: number,
     paginationState: any,
     setPaginationState: (state: any) => void,
-    label: string
+    label: string,
+    serverMeta?: { total: number; current_page: number; per_page: number; last_page: number } | null
   ) => {
-    const totalPages = getTotalPages(dataLength, paginationState.rowsPerPage);
+    // Use server pagination meta if available, otherwise fall back to client-side calculation
+    const totalPages = serverMeta ? serverMeta.last_page : getTotalPages(dataLength, paginationState.rowsPerPage);
+    const totalItems = serverMeta ? serverMeta.total : dataLength;
     const { currentPage, rowsPerPage } = paginationState;
-    const startRow = (currentPage - 1) * rowsPerPage + 1;
-    const endRow = Math.min(currentPage * rowsPerPage, dataLength);
+    const actualCurrentPage = serverMeta ? serverMeta.current_page : currentPage;
+    const actualPerPage = serverMeta ? serverMeta.per_page : rowsPerPage;
+    const startRow = (actualCurrentPage - 1) * actualPerPage + 1;
+    const endRow = Math.min(actualCurrentPage * actualPerPage, totalItems);
 
     return (
       <div className="d-flex justify-content-between align-items-center mt-3">
@@ -1685,14 +1708,14 @@ const handleCloseEditModal = useCallback(() => {
         </div>
         
         <div className="text-muted small">
-          Showing {startRow} to {endRow} of {dataLength} {label}
+          Showing {startRow} to {endRow} of {totalItems} {label}
         </div>
 
         <div className="d-flex gap-1">
           <Button
             size="sm"
             variant="outline-secondary"
-            disabled={currentPage === 1}
+            disabled={actualCurrentPage === 1}
             onClick={() => setPaginationState({ ...paginationState, currentPage: 1 })}
           >
             <ChevronsLeft size={14} />
@@ -1700,8 +1723,8 @@ const handleCloseEditModal = useCallback(() => {
           <Button
             size="sm"
             variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() => setPaginationState({ ...paginationState, currentPage: currentPage - 1 })}
+            disabled={actualCurrentPage === 1}
+            onClick={() => setPaginationState({ ...paginationState, currentPage: actualCurrentPage - 1 })}
           >
             <ChevronLeft size={14} />
           </Button>
@@ -1711,19 +1734,19 @@ const handleCloseEditModal = useCallback(() => {
             if (
               pageNum === 1 ||
               pageNum === totalPages ||
-              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+              (pageNum >= actualCurrentPage - 1 && pageNum <= actualCurrentPage + 1)
             ) {
               return (
                 <Button
                   key={pageNum}
                   size="sm"
-                  variant={currentPage === pageNum ? 'primary' : 'outline-secondary'}
+                  variant={actualCurrentPage === pageNum ? 'primary' : 'outline-secondary'}
                   onClick={() => setPaginationState({ ...paginationState, currentPage: pageNum })}
                 >
                   {pageNum}
                 </Button>
               );
-            } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+            } else if (pageNum === actualCurrentPage - 2 || pageNum === actualCurrentPage + 2) {
               return <span key={pageNum} className="px-2">...</span>;
             }
             return null;
@@ -1732,15 +1755,15 @@ const handleCloseEditModal = useCallback(() => {
           <Button
             size="sm"
             variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() => setPaginationState({ ...paginationState, currentPage: currentPage + 1 })}
+            disabled={actualCurrentPage === totalPages}
+            onClick={() => setPaginationState({ ...paginationState, currentPage: actualCurrentPage + 1 })}
           >
             <ChevronRight size={14} />
           </Button>
           <Button
             size="sm"
             variant="outline-secondary"
-            disabled={currentPage === totalPages}
+            disabled={actualCurrentPage === totalPages}
             onClick={() => setPaginationState({ ...paginationState, currentPage: totalPages })}
           >
             <ChevronsRight size={14} />

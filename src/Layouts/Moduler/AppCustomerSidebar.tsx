@@ -728,6 +728,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               url: '/work-planner/projects',
               permission: PERMISSIONS.WORK_PLANNER_SERVICES 
             },
+            {
+              id: 'work-planner-statuses',
+              title: 'Statuses',
+              icon: <List size={16} />,
+              url: '/work-planner/statuses',
+              permission: PERMISSIONS.WORK_PLANNER_SERVICES 
+            },
            
             // {
             //   id: 'work-planner-saved-views',

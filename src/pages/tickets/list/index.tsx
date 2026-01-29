@@ -1117,6 +1117,20 @@ const TicketList = () => {
     setCreatingTicket(true);
     let response = null;
     try {
+      // Preserve existing tags/images when only toggling approval
+      const existingTags: string[] = Array.isArray(selectedTicketForApprove.tags)
+        ? selectedTicketForApprove.tags
+        : selectedTicketForApprove.tags
+          ? [selectedTicketForApprove.tags]
+          : [];
+
+      const existingImages: string[] = (() => {
+        const img = selectedTicketForApprove.image ?? selectedTicketForApprove.images;
+        if (!img) return [];
+        if (Array.isArray(img)) return img.filter(Boolean);
+        return [img].filter(Boolean);
+      })();
+
       // Only include user_extension if user has assign-user permission
       let userExtensionArray = undefined;
       if (session?.user?.permissions?.includes("assign-user-tickets")) {
@@ -1140,8 +1154,8 @@ const TicketList = () => {
         userExtensionArray,
         selectedTicketForApprove.priority,
         selectedTicketForApprove.due_date,
-        undefined,
-        undefined,
+        existingImages.length > 0 ? existingImages : undefined,
+        existingTags.length > 0 ? existingTags : undefined,
         newApprovalStatus
       );
     } catch (error) {
@@ -1193,34 +1207,43 @@ const TicketList = () => {
   ];
   
   const handleSubmitCreateTicket = useCallback(async () => {
+    if (creatingTicket) return;
+    setCreatingTicket(true);
     console.log("=== COMPONENT DEBUG ===");
     console.log("newTicketImages count:", newTicketImages.length);
     if (!newTicketTitle?.trim() || newTicketTitle?.trim()?.length < 5) {
       toast.error("Please enter a ticket title (Min: 5 chars)");
+      setCreatingTicket(false);
       return;
     }
     if (!newTicketType) {
       toast.error("Please select a ticket type");
+      setCreatingTicket(false);
       return;
     }
-    if (newTicketDescription.length < 50 ) {
+    if (newTicketDescription.length < 50) {
       toast.error("Ticket description must be at least 50 characters");
+      setCreatingTicket(false);
       return;
     }
     if (!newTicketStatus) {
       toast.error("Please select a ticket status");
+      setCreatingTicket(false);
       return;
     }
     if (!newTicketModule) {
       toast.error("Please select a ticket module");
+      setCreatingTicket(false);
       return;
     }
     if (!newTicketSubmodule) {
       toast.error("Please select a ticket primary issue");
+      setCreatingTicket(false);
       return;
     }
     if (!newTicketPriority) {
       toast.error("Please select a ticket priority");
+      setCreatingTicket(false);
       return;
     }
 
@@ -1262,10 +1285,12 @@ const TicketList = () => {
           toast.error(
             `Attachment ${i + 1} must be an image (jpeg, png, jpg, gif)`
           );
+          setCreatingTicket(false);
           return;
         }
         if (image.size > maxSize) {
           toast.error(`Attachment ${i + 1} size must be less than 5MB`);
+          setCreatingTicket(false);
           return;
         }
       }
@@ -1289,7 +1314,6 @@ const TicketList = () => {
         console.log(`Image ${index + 1} size:`, image.size);
       });
     }
-    setCreatingTicket(true);
     console.log(
       "FormData created type:",
       typeof formData,
@@ -1325,6 +1349,7 @@ const TicketList = () => {
       setRefreshKey((prev) => prev + 1); // Trigger refresh
     }
   }, [
+    creatingTicket,
     newTicketTitle,
     newTicketDescription,
     newTicketType,
@@ -2960,6 +2985,7 @@ const TicketList = () => {
         onCancel={closeCreateTicketModal}
         submitButtonVariant="primary"
         cancelButtonVariant="secondary"
+        isSubmitDisabled={creatingTicket}
       />
 
 <Modal
