@@ -633,9 +633,9 @@ const LiveCallsCampaignsManagement = () => {
           setFinesseError('Please enter your password.');
           return;
         }
-        const userId =session.user.id != null ? String(session.user.id) : '';
+        const username =session.user.username != null ? String(session.user.username) : '';
         const extension =  session.user.phone != null ? String(session.user.phone) : '';
-        if (!userId || !extension) {
+        if (!username || !extension) {
           setFinesseError('User ID or extension is missing from your session.');
           return;
         }
@@ -643,7 +643,7 @@ const LiveCallsCampaignsManagement = () => {
         setIsFinesseLoading(true);
         try {
           const response = await finesseLink({
-            finesseUserId: userId,
+            finesseUserId: username,
             finessePassword: finessePassword.trim(),
             extension,
           });

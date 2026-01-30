@@ -455,9 +455,9 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
 
   const styles = {
     tabsContainer: { backgroundColor: '#fff', borderBottom: '1px solid #E5E9F2' },
-    tabsInner: { maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem', display: 'flex', gap: '2rem' },
+    tabsInner: {  display: 'flex', gap: '2rem' },
     tab: { background: 'none', border: 'none', padding: '1rem 0', fontSize: '0.95rem', fontWeight: '500', cursor: 'pointer', transition: 'all 0.2s', position: 'relative' as const },
-    contentContainer: { maxWidth: '1400px', margin: '0 auto', padding: '0 1.5rem', marginTop: '1.5rem' },
+    contentContainer: {  margin: '0 auto', marginTop: '1.5rem' },
     grid: { display: 'grid', gap: '1rem', marginBottom: '1.5rem' },
     gridTwo: { gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))' },
     card: { backgroundColor: 'white', border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', padding: '1.5rem' },

@@ -21,7 +21,7 @@ import PageHeader from "@components/PageHeader";
 import FormModal from "../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import DatatableActionButton from "@components/DatatableActionButton";
-import { ModuleSlug } from '@utils/Helper';
+import { GlobalDateTimeFormat, ModuleSlug } from '@utils/Helper';
 import { Users, Package, CheckCircle,Eye,Edit,Trash2, Info } from 'lucide-react';
 
 
@@ -82,7 +82,7 @@ const TicketModules = () => {
                 //     )?.display_name || props.user_extension || 'Not assigned'}
                 // </span>
                 <Badge 
-                bg="light" 
+                
                 className="px-3 py-2"
                 style={{ 
                   fontWeight: 500,
@@ -109,7 +109,7 @@ const TicketModules = () => {
         { key: 'created_at', name: 'Created At', selector: (row: any) => row.created_at, sortable: true,
             cell: (props: any) => (
                 <span className="text-muted">
-                    {moment(props.created_at).format('DD/MM/YYYY')}
+                    {moment(props.created_at).format(GlobalDateTimeFormat)}
                 </span>
             )
          },
