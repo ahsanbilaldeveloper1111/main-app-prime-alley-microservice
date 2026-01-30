@@ -129,15 +129,17 @@ const TasksList = () => {
   const [filterStatus, setFilterStatus] = useState('All Status');
   const [filterPriority, setFilterPriority] = useState('All Priority');
   const [filterDueDate, setFilterDueDate] = useState('All Dates');
+  const [filterCreatedAtFrom, setFilterCreatedAtFrom] = useState('');
+  const [filterCreatedAtTo, setFilterCreatedAtTo] = useState('');
   
   // Use refs to store latest filter values to avoid recreating fetchTasks on filter changes
-  const filtersRef = useRef({ searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate });
+  const filtersRef = useRef({ searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate, filterCreatedAtFrom, filterCreatedAtTo });
   const tasksRef = useRef<Task[]>([]);
-  
+
   // Update refs when filters change
   useEffect(() => {
-    filtersRef.current = { searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate };
-  }, [searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate]);
+    filtersRef.current = { searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate, filterCreatedAtFrom, filterCreatedAtTo };
+  }, [searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate, filterCreatedAtFrom, filterCreatedAtTo]);
   
   // Update tasks ref when tasks change
   useEffect(() => {
@@ -316,7 +318,13 @@ const TasksList = () => {
       // Add extension_numbers filter (array of extension numbers)
       if (currentFilters.filterAssignee && currentFilters.filterAssignee.length > 0) {
         params.extension_numbers = currentFilters.filterAssignee;
-        params.extension_numbers = currentFilters.filterAssignee;
+      }
+
+      if (currentFilters.filterCreatedAtFrom) {
+        params.created_at_from = currentFilters.filterCreatedAtFrom;
+      }
+      if (currentFilters.filterCreatedAtTo) {
+        params.created_at_to = currentFilters.filterCreatedAtTo;
       }
 
       const response = await listTasks(params);
@@ -594,7 +602,9 @@ const TasksList = () => {
       filterAssignee: [] as string[],
       filterStatus: 'All Status',
       filterPriority: 'All Priority',
-      filterDueDate: 'All Dates'
+      filterDueDate: 'All Dates',
+      filterCreatedAtFrom: '',
+      filterCreatedAtTo: ''
     };
 
     setSearchTerm(cleared.searchTerm);
@@ -603,6 +613,8 @@ const TasksList = () => {
     setFilterStatus(cleared.filterStatus);
     setFilterPriority(cleared.filterPriority);
     setFilterDueDate(cleared.filterDueDate);
+    setFilterCreatedAtFrom(cleared.filterCreatedAtFrom);
+    setFilterCreatedAtTo(cleared.filterCreatedAtTo);
 
     // Keep pagination unchanged; just refresh with cleared filters
     filtersRef.current = cleared;
@@ -1147,6 +1159,25 @@ const TasksList = () => {
                   options={priorityOptions}
                   placeholder="Priority"
                   isSearchable
+                />
+              </div>
+
+              <div style={{ flex: '1 1 140px' }}>
+                <Form.Control
+                  type="date"
+                  value={filterCreatedAtFrom}
+                  onChange={(e) => setFilterCreatedAtFrom(e.target.value)}
+                  placeholder="Start date"
+                  style={{ fontSize: '0.875rem', minHeight: '38px' }}
+                />
+              </div>
+              <div style={{ flex: '1 1 140px' }}>
+                <Form.Control
+                  type="date"
+                  value={filterCreatedAtTo}
+                  onChange={(e) => setFilterCreatedAtTo(e.target.value)}
+                  placeholder="End date"
+                  style={{ fontSize: '0.875rem', minHeight: '38px' }}
                 />
               </div>
 
