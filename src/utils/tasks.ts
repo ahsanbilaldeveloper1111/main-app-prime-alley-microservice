@@ -76,6 +76,8 @@ interface ListTasksParams {
   frequency?: string;
   is_active?: boolean;
   withRelations?: string[];
+  created_at_from?: string;
+  created_at_to?: string;
   extension_numbers?: string[];
   order?: {
     column?: string;
@@ -550,6 +552,8 @@ export const listTasks = async (params: ListTasksParams = {}) => {
       frequency,
       is_active,
       withRelations,
+      created_at_from,
+      created_at_to,
       extension_numbers,
       order
     } = params;
@@ -571,6 +575,8 @@ export const listTasks = async (params: ListTasksParams = {}) => {
     if (due_date_to) formattedParams.append('due_date_to', due_date_to);
     if (frequency) formattedParams.append('frequency', frequency);
     if (is_active !== undefined) formattedParams.append('is_active', is_active.toString());
+    if (created_at_from) formattedParams.append('created_at_from', created_at_from);
+    if (created_at_to) formattedParams.append('created_at_to', created_at_to);
     
     // Add order parameters if provided
     if (order?.column) {
