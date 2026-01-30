@@ -956,6 +956,7 @@ const TicketList = () => {
     File[]
   >([]);
   const [selectedTicketExistingImages, setSelectedTicketExistingImages] = useState<string[]>([]);
+  const [editExistingImageUrls, setEditExistingImageUrls] = useState<(string | null)[]>([]);
   const [selectedTicketTags, setSelectedTicketTags] = useState<string[]>([]);
   const [showEditTicketModal, setShowEditTicketModal] =
     useState<boolean>(false);
@@ -1081,6 +1082,28 @@ const TicketList = () => {
     selectedTicketTags,
     session?.user?.permissions,
   ]);
+
+  // Resolve existing image paths to data URLs for the edit modal (same as reference [id] page)
+  useEffect(() => {
+    if (!showEditTicketModal || selectedTicketExistingImages.length === 0) {
+      setEditExistingImageUrls([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all(selectedTicketExistingImages.map((path) => loadImage(path)))
+      .then((results) => {
+        if (!cancelled) {
+          setEditExistingImageUrls(results.map((r) => r ?? null));
+        }
+      })
+      .catch((err) => {
+        console.error("Error loading edit modal images:", err);
+        if (!cancelled) setEditExistingImageUrls(selectedTicketExistingImages.map(() => null));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showEditTicketModal, selectedTicketExistingImages]);
 
   const handleDeleteTicket = useCallback((props: any) => {
     setSelectedTicket(props.id);
@@ -2351,9 +2374,24 @@ const TicketList = () => {
                         key={index}
                         className="d-flex align-items-center justify-content-between border rounded p-2"
                       >
-                        <small className="text-muted">
+                        {/* <small className="text-muted">
                           {imgPath}
-                        </small>
+                        </small> */}
+                        {editExistingImageUrls[index] ? (
+                          <img
+                            src={editExistingImageUrls[index] ?? ''}
+                            alt="Ticket image"
+                            className="img-fluid"
+                            style={{ width: '50px', height: '50px', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <div
+                            className="d-flex align-items-center justify-content-center bg-light rounded"
+                            style={{ width: '50px', height: '50px', fontSize: '0.75rem', color: '#6c757d' }}
+                          >
+                            Loading…
+                          </div>
+                        )}
                         <button
                           type="button"
                           className="btn btn-sm btn-danger"

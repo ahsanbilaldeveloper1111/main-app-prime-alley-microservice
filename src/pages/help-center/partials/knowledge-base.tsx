@@ -27,12 +27,16 @@ import { ListFAQTopics, ListFAQItems, getMostViewedFAQs } from '@utils/faqs';
 
 interface KnowledgeBaseProps {
   onBack: () => void;
+  moduleId?: string;
   searchQuery?: string;
+  moduleName?: string;
   onArticleClick?: (article: any) => void;
 }
 
-const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2FA', onArticleClick }) => {
+const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, moduleId, moduleName, searchQuery = '2FA', onArticleClick }) => {
   const router = useRouter();
+  console.log(moduleId);
+  console.log(moduleName);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('all');
@@ -54,7 +58,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
     const fetchTopics = async () => {
       setLoadingTopics(true);
       try {
-        const response = await ListFAQTopics({ page: 1, perPage: 100 });
+        const response = await ListFAQTopics({ page: 1, perPage: 100, filters: { faq_module_id: moduleId ? Number.parseInt(moduleId, 10) : undefined } });
         if (response && response.data) {
           setFaqTopics(response.data);
           // Check if topicId is in URL query params
@@ -113,7 +117,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
         const response = await ListFAQItems({ 
           page: 1, 
           perPage: 5,
-          filters: { topic_id: selectedTopicId }
+          filters: { topic_id: selectedTopicId, faq_module_id: moduleId ? Number.parseInt(moduleId, 10) : undefined }
         });
         
         let items: any[] = [];
@@ -392,6 +396,18 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
                       onClick={() => {
                         setSelectedCategory(category.name);
                         setSelectedTopicId(category.id);
+                        router.replace(
+                          {
+                            pathname: router.pathname,
+                            query: {
+                              ...router.query,
+                              topicId: String(category.id),
+                              topicName: category.name
+                            }
+                          },
+                          undefined,
+                          { shallow: true }
+                        );
                       }}
                       style={{
                         padding: '10px 14px',
@@ -494,7 +510,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ onBack, searchQuery = '2F
               background: '#667eea15',
               padding: '2px 8px',
               borderRadius: '4px'
-            }}>"{searchQuery}"</span>
+            }}>"{selectedCategory || searchQuery || moduleName}"</span>
           </p>
         </div>
         {/* <div style={{ 
