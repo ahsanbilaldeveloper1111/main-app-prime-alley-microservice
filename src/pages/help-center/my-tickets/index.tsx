@@ -37,8 +37,11 @@ const MyTicketsPage = () => {
         page: 1,
         perPage: 100,
         search: ticketsSearch,
-        filters: {},
+        filters: {
+          ticket_category:'user'
+        },
         moduleSlug: ModuleSlug.TICKET,
+        
       });
       
       if (response && response.data) {
