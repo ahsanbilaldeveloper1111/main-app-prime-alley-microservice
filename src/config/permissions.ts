@@ -45,7 +45,10 @@ export const routePermissions: RoutePermission[] = [
     {path:'/chat/ai-bot-faqs',permissions: [PERMISSIONS.TMS_SERVICES]},
     {path:'/chat/ai-faqs/tenant',permissions: [PERMISSIONS.TMS_SERVICES]},
     {path:'/chat/ai-faqs/global',permissions: [PERMISSIONS.TMS_SERVICES]},
-    
+    {path:'/company',permissions: ['set-company-image-control-hub']},
+    {path:'/staff-management/request-categories',permissions: [PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT]},
+    {path:'/staff-management/attendences',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
+    {path:'/staff-management/locations',permissions: ['']},
     {
         path: '/help-center',
         permissions: [''],

@@ -266,6 +266,8 @@ MENU_COLORS: {
     VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT: 'view-employees-onboarding-staff-management',
     VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT: 'view-approval-request-staff-management',
     VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT: 'view-organizational-chart-staff-management',
+    VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT: 'view-request-categories-staff-management',
+    VIEW_ATTENDENCE_STAFF_MANAGEMENT:'view-attendences-staff-management',
 
     CONTROL_HUB_SERVICES: 'control-hub-services',
     VIEW_USERS: 'view-users',

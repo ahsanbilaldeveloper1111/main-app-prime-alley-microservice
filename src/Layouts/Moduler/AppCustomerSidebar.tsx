@@ -57,7 +57,8 @@ import {
   Folder,
   UserPlus,
   CheckCheck,
-  Layers2
+  Layers2,
+  Map
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -779,6 +780,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             url: '/staff-management/employees',
             permission: PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT 
           },
+          {
+            id: 'staff-management-attendence',
+            title: 'Attendence',
+            icon: <Clock size={16} />,
+            url: '/staff-management/attendences',
+            permission: PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT 
+          },
           
           { 
             id: 'staff-management-employees-onboarding', 
@@ -803,6 +811,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             url: '/staff-management/organizational-chart', 
             permission: PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT 
           },
+          {
+            id:'staff-management-request-categories',
+            title: 'Request Categories',
+            icon: <List size={16} />,
+            url: '/staff-management/request-categories',
+            permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT
+          },
+          {
+            id:'staff-management-locations',
+            title: 'Manage Locations',
+            icon: <Map size={16} />,
+            url: '/staff-management/locations',
+            permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT
+          }
           
       ]
       .filter(item => !item.permission || hasPermission(item.permission))

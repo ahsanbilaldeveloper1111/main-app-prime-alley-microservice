@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
-import { 
-  X, 
-  Calendar, 
-  FileText, 
+import React, { useCallback, useState } from "react";
+import { toast } from "react-toastify";
+import { Button, Modal } from "react-bootstrap";
+import { ModuleSlug } from "@utils/Helper";
+import { useHierarchyData } from "@components/filters/useHierarchyData";
+import {
+  X,
+  Calendar,
+  FileText,
   Clock,
   Download,
   MoreVertical,
@@ -13,26 +17,20 @@ import {
   Edit3,
   UserPlus,
   File,
-  ExternalLink
-} from 'lucide-react';
-
-interface Request {
-  id: string;
-  title: string;
-  subtitle?: string;
-  type: string;
-  typeIcon: string;
-  requestedBy: string;
-  requestedBySubtitle?: string;
-  submittedOn: string;
-  aging: string;
-  status: 'Pending' | 'Approved' | 'Rejected';
-  days?: string;
-}
+  ExternalLink,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import { updateUserRequest, type UserRequest, type UserRequestAttachment } from "@utils/staffManagement";
 
 interface ApprovalDetailSidebarProps {
-  request: Request;
+  request: UserRequest;
+  categoryName?: string;
   onClose: () => void;
+  onSuccess?: () => void;
+  onEditClick?: (request: UserRequest) => void;
+  onDeleteClick?: (request: UserRequest) => void;
+  downloadAttachment: (attachmentId: number) => Promise<Blob>;
 }
 
 interface PendingApproval {
@@ -49,140 +47,203 @@ interface HistoryItem {
   timestamp: string;
 }
 
-const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({ request, onClose }) => {
-  const [comment, setComment] = useState('');
+function formatEventDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+  } catch {
+    return "—";
+  }
+}
+
+const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
+  request,
+  categoryName = "—",
+  onClose,
+  onSuccess,
+  onEditClick,
+  onDeleteClick,
+  downloadAttachment,
+}) => {
+  const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+
+  const getDisplayName = useCallback(
+    (userId: string | number | null | undefined): string => {
+      if (userId == null || userId === "") return "—";
+      const idStr = String(userId);
+      if (!hierarchyDataExtensions || !Array.isArray(hierarchyDataExtensions)) return idStr;
+      const ext = (
+        hierarchyDataExtensions as {
+          id?: string | number;
+          extension_number?: string;
+          name?: string;
+          user?: { name?: string };
+          user_id?: string;
+        }[]
+      ).find((e) => String(e.user_id ?? e.extension_number ?? e.id ?? "") === idStr);
+      if (ext) return String(ext.user?.name ?? ext.name ?? ext.extension_number ?? ext.user_id ?? idStr);
+      return idStr;
+    },
+    [hierarchyDataExtensions]
+  );
+
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const maxCommentLength = 500;
   const [showDialog, setShowDialog] = useState(false);
   const [dialogConfig, setDialogConfig] = useState<{
-    type: 'success' | 'error' | 'warning';
+    type: "success" | "error" | "warning";
     title: string;
     message: string;
     onConfirm?: () => void;
   } | null>(null);
 
+  const created_at = (request as UserRequest & { created_at?: string }).created_at;
   const pendingApprovals: PendingApproval[] = [
-    { count: 5, label: 'Aging', color: '#6b7280' },
-    { count: 1, label: '2d', color: '#9ca3af' },
-    { count: 0, label: '3-7d', color: '#d1d5db' },
-    { count: 0, label: '7d+', color: '#e5e7eb' }
+    { count: 5, label: "Aging", color: "#6b7280" },
+    { count: 1, label: "2d", color: "#9ca3af" },
+    { count: 0, label: "3-7d", color: "#d1d5db" },
+    { count: 0, label: "7d+", color: "#e5e7eb" },
   ];
 
-  const historyItems: HistoryItem[] = [
-    {
-      id: '1',
-      avatar: '👨',
-      name: 'Adeel Raza',
-      action: 'Submitted',
-      timestamp: 'Apr 1, 2024  10:12 AM'
-    }
-  ];
-
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (!comment.trim()) {
       setDialogConfig({
-        type: 'warning',
-        title: 'Comment Required',
-        message: 'Please add a comment before approving this request.',
+        type: "warning",
+        title: "Comment Required",
+        message: "Please add a comment before approving this request.",
       });
       setShowDialog(true);
       return;
     }
-    // Here you would typically make an API call
-    console.log('Approving request:', request.id, 'with comment:', comment);
-    setDialogConfig({
-      type: 'success',
-      title: 'Request Approved',
-      message: `The request "${request.title}" has been approved successfully!`,
-      onConfirm: () => {
-        setComment('');
-        setTimeout(() => onClose(), 300);
-      }
-    });
-    setShowDialog(true);
+    setSubmitting(true);
+    try {
+      await updateUserRequest(request.id, { status: "approved", comment: comment.trim() });
+      toast.success("Request approved");
+      setDialogConfig({
+        type: "success",
+        title: "Request Approved",
+        message: `The request has been approved successfully.`,
+        onConfirm: () => {
+          setComment("");
+          onSuccess?.();
+          onClose();
+        },
+      });
+      setShowDialog(true);
+    } catch {
+      setDialogConfig({
+        type: "error",
+        title: "Error",
+        message: "Failed to approve request.",
+      });
+      setShowDialog(true);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (!comment.trim()) {
       setDialogConfig({
-        type: 'warning',
-        title: 'Comment Required',
-        message: 'Please add a comment explaining the reason for rejection.',
+        type: "warning",
+        title: "Comment Required",
+        message: "Please add a comment explaining the reason for rejection.",
       });
       setShowDialog(true);
       return;
     }
-    // Here you would typically make an API call
-    console.log('Rejecting request:', request.id, 'with comment:', comment);
-    setDialogConfig({
-      type: 'error',
-      title: 'Request Rejected',
-      message: `The request "${request.title}" has been rejected.`,
-      onConfirm: () => {
-        setComment('');
-        setTimeout(() => onClose(), 300);
-      }
-    });
-    setShowDialog(true);
+    setSubmitting(true);
+    try {
+      await updateUserRequest(request.id, { status: "rejected", comment: comment.trim() });
+      toast.success("Request rejected");
+      setDialogConfig({
+        type: "error",
+        title: "Request Rejected",
+        message: "The request has been rejected.",
+        onConfirm: () => {
+          setComment("");
+          onSuccess?.();
+          onClose();
+        },
+      });
+      setShowDialog(true);
+    } catch {
+      setDialogConfig({
+        type: "error",
+        title: "Error",
+        message: "Failed to reject request.",
+      });
+      setShowDialog(true);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleRequestChanges = () => {
+  const handleRequestChanges = async () => {
     if (!comment.trim()) {
       setDialogConfig({
-        type: 'warning',
-        title: 'Comment Required',
-        message: 'Please add a comment explaining what changes are needed.',
+        type: "warning",
+        title: "Comment Required",
+        message: "Please add a comment explaining what changes are needed.",
       });
       setShowDialog(true);
       return;
     }
-    // Here you would typically make an API call
-    console.log('Requesting changes for:', request.id, 'with comment:', comment);
-    setDialogConfig({
-      type: 'warning',
-      title: 'Changes Requested',
-      message: `Changes have been requested for "${request.title}".`,
-      onConfirm: () => {
-        setComment('');
-        setTimeout(() => onClose(), 300);
-      }
-    });
-    setShowDialog(true);
+    setSubmitting(true);
+    try {
+      await updateUserRequest(request.id, { status: "pending", comment: comment.trim() });
+      toast.success("Changes requested");
+      setDialogConfig({
+        type: "warning",
+        title: "Changes Requested",
+        message: "Changes have been requested for this request.",
+        onConfirm: () => {
+          setComment("");
+          onSuccess?.();
+          onClose();
+        },
+      });
+      setShowDialog(true);
+    } catch {
+      setDialogConfig({
+        type: "error",
+        title: "Error",
+        message: "Failed to request changes.",
+      });
+      setShowDialog(true);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleDownloadAttachment = () => {
-    // Create a mock download for demonstration
-    const filename = 'Doc_Note.jpg';
-    console.log('Downloading attachment:', filename);
-    
-    // In a real application, you would fetch the file from your server
-    // For now, we'll create a simple text file as demonstration
-    const element = document.createElement('a');
-    const file = new Blob(['This is a sample document attachment for request: ' + request.title], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = filename;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-    
-    setDialogConfig({
-      type: 'success',
-      title: 'Download Started',
-      message: `Downloading ${filename}...`,
-    });
-    setShowDialog(true);
+  const handleDownloadAttachment = async (att: UserRequestAttachment) => {
+    try {
+      const blob = await downloadAttachment(att.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = att.original_name || "attachment";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Download started");
+    } catch {
+      toast.error("Download failed");
+    }
   };
 
-  const handleOpenAttachment = () => {
-    // Open attachment in new tab
-    console.log('Opening attachment in new tab');
-    // In a real application, you would have the actual file URL
-    window.open('about:blank', '_blank');
-    setDialogConfig({
-      type: 'success',
-      title: 'Opening Document',
-      message: 'The document is being opened in a new tab.',
+  const handleOpenAttachment = (att: UserRequestAttachment) => {
+    handleDownloadAttachment(att).then(() => {
+      setDialogConfig({
+        type: "success",
+        title: "Opening Document",
+        message: "The document has been downloaded.",
+      });
+      setShowDialog(true);
     });
-    setShowDialog(true);
   };
 
   const closeDialog = () => {
@@ -194,19 +255,19 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({ request, 
   };
 
   const getTypeIcon = (iconType: string) => {
-    switch (iconType) {
-      case 'leave':
-        return <Calendar size={20} color="#3b82f6" />;
-      case 'document':
-        return <FileText size={20} color="#8b5cf6" />;
-      case 'onboarding':
-        return <UserPlus size={20} color="#10b981" />;
-      case 'profile':
-        return <User size={20} color="#6366f1" />;
-      default:
-        return <File size={20} color="#6b7280" />;
-    }
+    const t = (iconType || "").toLowerCase();
+    if (t.includes("leave")) return <Calendar size={20} color="#3b82f6" />;
+    if (t.includes("document")) return <FileText size={20} color="#8b5cf6" />;
+    if (t.includes("onboarding")) return <UserPlus size={20} color="#10b981" />;
+    if (t.includes("profile")) return <User size={20} color="#6366f1" />;
+    return <File size={20} color="#6b7280" />;
   };
+
+  const attachments = request.attachments ?? [];
+  const events = request.events ?? [];
+  const dynamicFields = request.dynamic_fields && typeof request.dynamic_fields === "object" ? request.dynamic_fields : {};
+  const statusDisplay = (request.status || "").toLowerCase();
+  const isPending = statusDisplay === "pending";
 
   return (
     <div style={{
@@ -224,30 +285,88 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({ request, 
         borderBottom: '1px solid #e5e7eb',
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        gap: '8px',
       }}>
-        <h2 style={{ 
-          fontSize: '20px', 
-          fontWeight: '600', 
+        <h2 style={{
+          fontSize: '20px',
+          fontWeight: '600',
           color: '#1f2937',
-          margin: 0
+          margin: 0,
+          flex: 1,
         }}>
           Approval Detail
         </h2>
-        <button
-          onClick={onClose}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '4px',
-            color: '#6b7280',
-            display: 'flex',
-            alignItems: 'center'
-          }}
-        >
-          <X size={24} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            type="button"
+            onClick={() => onEditClick?.(request)}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px',
+              color: '#6b7280',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '6px',
+            }}
+            title="Edit"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+              e.currentTarget.style.color = '#6366f1';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = '#6b7280';
+            }}
+          >
+            <Pencil size={20} />
+          </button>
+          {onDeleteClick && (
+            <button
+              type="button"
+              onClick={() => onDeleteClick?.(request)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '6px',
+                color: '#6b7280',
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '6px',
+              }}
+              title="Delete"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#fef2f2';
+                e.currentTarget.style.color = '#dc2626';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = '#6b7280';
+              }}
+            >
+              <Trash2 size={20} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px',
+              color: '#6b7280',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="Close"
+          >
+            <X size={24} />
+          </button>
+        </div>
       </div>
 
       {/* Scrollable Content */}
@@ -278,33 +397,33 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({ request, 
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <h3 style={{ 
-                  fontSize: '18px', 
-                  fontWeight: '600', 
-                  color: '#1f2937',
-                  margin: '0 0 4px 0'
+                <h3 style={{
+                  fontSize: "18px",
+                  fontWeight: "600",
+                  color: "#1f2937",
+                  margin: "0 0 4px 0",
                 }}>
-                  {request.requestedBy}
+                  {getDisplayName(request.user_id)}
                 </h3>
-                <p style={{ 
-                  fontSize: '14px', 
-                  color: '#6b7280',
-                  margin: '0 0 8px 0'
+                {/* <p style={{
+                  fontSize: "14px",
+                  color: "#6b7280",
+                  margin: "0 0 8px 0",
                 }}>
-                  {request.requestedBySubtitle || 'Employee'}
-                </p>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px',
-                  fontSize: '13px',
-                  color: '#6b7280'
+                  {categoryName}
+                </p> */}
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "13px",
+                  color: "#6b7280",
                 }}>
-                  {getTypeIcon(request.typeIcon)}
-                  <span>{request.type}</span>
+                  {getTypeIcon(categoryName)}
+                  <span>{categoryName}</span>
                 </div>
               </div>
-              <button
+              {/* <button
                 style={{
                   background: 'none',
                   border: 'none',
@@ -314,7 +433,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({ request, 
                 }}
               >
                 <MoreVertical size={20} />
-              </button>
+              </button> */}
             </div>
           </div>
         </div>
@@ -336,146 +455,146 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({ request, 
             borderRadius: '8px',
             marginBottom: '16px'
           }}>
-            <div style={{ 
-              fontSize: '15px', 
-              fontWeight: '600', 
-              color: '#1f2937',
-              marginBottom: '8px'
+            <div style={{
+              fontSize: "15px",
+              fontWeight: "600",
+              color: "#1f2937",
+              marginBottom: "8px",
             }}>
-              {request.title}
+              {request.subject ?? "—"}
             </div>
-            {request.subtitle && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '6px',
-                fontSize: '13px',
-                color: '#6b7280'
-              }}>
-                <Calendar size={14} />
-                <span>{request.subtitle}</span>
+            {request.reason && (
+              <div style={{ fontSize: "14px", color: "#4b5563", marginBottom: "8px", lineHeight: 1.5 }}>
+                {request.reason}
               </div>
             )}
           </div>
 
-          <div style={{ 
-            display: 'flex',
-            gap: '12px',
-            marginBottom: '16px',
-            fontSize: '13px',
-            color: '#6b7280'
+          <div style={{
+            display: "flex",
+            gap: "12px",
+            marginBottom: "16px",
+            fontSize: "13px",
+            color: "#6b7280",
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <Calendar size={14} />
-              <span>Submitted: {request.submittedOn}</span>
+              <span>Submitted: {formatEventDate(created_at)}</span>
             </div>
           </div>
 
-          <p style={{ 
-            fontSize: '14px', 
-            color: '#4b5563',
-            lineHeight: '1.6',
-            margin: '0 0 16px 0'
-          }}>
-            This is a {request.type.toLowerCase()} request submitted by {request.requestedBy}.
-            {request.days && ` Duration: ${request.days}.`}
-          </p>
+          {Object.keys(dynamicFields).length > 0 && (
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ marginBottom: "8px", fontSize: "13px", fontWeight: "500", color: "#6b7280" }}>
+                Details
+              </div>
+              <div style={{ padding: "12px", backgroundColor: "#f9fafb", borderRadius: "8px", fontSize: "13px", color: "#374151" }}>
+                {Object.entries(dynamicFields).map(([key, value]) => (
+                  <div key={key} style={{ marginBottom: "4px" }}>
+                    <strong>{key}:</strong> {typeof value === "object" ? JSON.stringify(value) : String(value ?? "")}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-          {/* Attachment */}
-          <div style={{ marginBottom: '8px', fontSize: '13px', fontWeight: '500', color: '#6b7280' }}>
+          {/* Attachments */}
+          <div style={{ marginBottom: "8px", fontSize: "13px", fontWeight: "500", color: "#6b7280" }}>
             Attachments
           </div>
-          <div 
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '12px 16px',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              transition: 'all 0.2s',
-              backgroundColor: 'white'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                backgroundColor: '#dbeafe',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <FileText size={20} color="#3b82f6" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ 
-                  fontSize: '14px', 
-                  fontWeight: '500', 
-                  color: '#1f2937'
-                }}>
-                  Doc_Note.jpg
+          {attachments.length === 0 ? (
+            <div style={{ fontSize: "13px", color: "#9ca3af", marginBottom: "16px" }}>No attachments</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
+              {attachments.map((att) => (
+                <div
+                  key={att.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "12px 16px",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "8px",
+                    backgroundColor: "white",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1 }}>
+                    <div style={{
+                      width: "40px",
+                      height: "40px",
+                      backgroundColor: "#dbeafe",
+                      borderRadius: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}>
+                      <FileText size={20} color="#3b82f6" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "14px", fontWeight: "500", color: "#1f2937" }}>
+                        {att.original_name || "Attachment"}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#9ca3af" }}>
+                        {att.mime_type ?? "File"}
+                        {att.size_bytes != null && ` • ${(att.size_bytes / 1024).toFixed(1)} KB`}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAttachment(att)}
+                      style={{
+                        padding: "8px",
+                        backgroundColor: "#f3f4f6",
+                        border: "none",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                      title="Open / Download"
+                    >
+                      <ExternalLink size={16} color="#6b7280" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadAttachment(att)}
+                      style={{
+                        padding: "8px",
+                        backgroundColor: "#f3f4f6",
+                        border: "none",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                      title="Download"
+                    >
+                      <Download size={16} color="#6b7280" />
+                    </button>
+                  </div>
                 </div>
-                <div style={{ 
-                  fontSize: '12px', 
-                  color: '#9ca3af'
-                }}>
-                  Image • 345 KB
-                </div>
-              </div>
+              ))}
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={handleOpenAttachment}
-                style={{
-                  padding: '8px',
-                  backgroundColor: '#f3f4f6',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e5e7eb'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                title="Open in new tab"
-              >
-                <ExternalLink size={16} color="#6b7280" />
-              </button>
-              <button
-                onClick={handleDownloadAttachment}
-                style={{
-                  padding: '8px',
-                  backgroundColor: '#f3f4f6',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e5e7eb'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                title="Download"
-              >
-                <Download size={16} color="#6b7280" />
-              </button>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Action Buttons */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '12px',
-          marginBottom: '24px'
+        <div style={{
+          display: "flex",
+          gap: "12px",
+          marginBottom: "24px",
         }}>
+          {isPending ? (
+            <>
           <button
+            type="button"
             onClick={handleApprove}
+            disabled={submitting}
             style={{
               flex: 1,
               padding: '12px 20px',
@@ -499,7 +618,9 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({ request, 
             Approve
           </button>
           <button
+            type="button"
             onClick={handleReject}
+            disabled={submitting}
             style={{
               flex: 1,
               padding: '12px 20px',
@@ -523,7 +644,9 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({ request, 
             Reject
           </button>
           <button
+            type="button"
             onClick={handleRequestChanges}
+            disabled={submitting}
             style={{
               padding: '12px 12px',
               backgroundColor: 'white',
@@ -546,6 +669,8 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({ request, 
             <Edit3 size={16} />
             Request Changes
           </button>
+            </>
+          ) : null}
         </div>
 
         {/* Comment Section */}
@@ -664,116 +789,131 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({ request, 
 
         {/* History Section */}
         <div>
-          <h4 style={{ 
-            fontSize: '16px', 
-            fontWeight: '600', 
-            color: '#1f2937',
-            margin: '0 0 16px 0'
+          <h4 style={{
+            fontSize: "16px",
+            fontWeight: "600",
+            color: "#1f2937",
+            margin: "0 0 16px 0",
           }}>
             History
           </h4>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <div
               style={{
-                display: 'flex',
-                gap: '12px',
-                padding: '12px',
-                backgroundColor: '#f9fafb',
-                borderRadius: '8px'
+                display: "flex",
+                gap: "12px",
+                padding: "12px",
+                backgroundColor: "#f9fafb",
+                borderRadius: "8px",
               }}
             >
               <div style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '20px',
-                flexShrink: 0
+                width: "40px",
+                height: "40px",
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "20px",
+                flexShrink: 0,
               }}>
-                {request.requestedBy.charAt(0).toUpperCase()}
+                {(request.user_id || "U").charAt(0).toUpperCase()}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ 
-                  fontSize: '14px', 
-                  fontWeight: '500', 
-                  color: '#1f2937',
-                  marginBottom: '2px'
+                <div style={{
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  color: "#1f2937",
+                  marginBottom: "2px",
                 }}>
-                  {request.requestedBy}
-                  <span style={{ 
-                    fontWeight: '400',
-                    color: '#6b7280',
-                    marginLeft: '6px'
-                  }}>
+                  {getDisplayName(request.user_id)}
+                  <span style={{ fontWeight: "400", color: "#6b7280", marginLeft: "6px" }}>
                     Submitted
                   </span>
                 </div>
-                <div style={{ 
-                  fontSize: '12px', 
-                  color: '#9ca3af',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
+                <div style={{ fontSize: "12px", color: "#9ca3af", display: "flex", alignItems: "center", gap: "4px" }}>
                   <Clock size={12} />
-                  {request.submittedOn}
+                  {formatEventDate(created_at)}
                 </div>
               </div>
             </div>
-            {request.status !== 'Pending' && (
+            {events.map((ev) => (
               <div
+                key={ev.id}
                 style={{
-                  display: 'flex',
-                  gap: '12px',
-                  padding: '12px',
-                  backgroundColor: request.status === 'Approved' ? '#d1fae5' : '#fee2e2',
-                  borderRadius: '8px'
+                  display: "flex",
+                  gap: "12px",
+                  padding: "12px",
+                  backgroundColor:
+                    ev.event_type === "approved" ? "#d1fae5" : ev.event_type === "rejected" ? "#fee2e2" : "#f9fafb",
+                  borderRadius: "8px",
                 }}
               >
                 <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  backgroundColor: request.status === 'Approved' ? '#10b981' : '#ef4444',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '20px',
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  backgroundColor:
+                    ev.event_type === "approved" ? "#10b981" : ev.event_type === "rejected" ? "#ef4444" : "#6b7280",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   flexShrink: 0,
-                  color: 'white'
+                  color: "white",
                 }}>
-                  {request.status === 'Approved' ? <CheckCircle size={20} /> : <XCircle size={20} />}
+                  {ev.event_type === "approved" ? <CheckCircle size={20} /> : ev.event_type === "rejected" ? <XCircle size={20} /> : <Edit3 size={20} />}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ 
-                    fontSize: '14px', 
-                    fontWeight: '500', 
-                    color: '#1f2937',
-                    marginBottom: '2px'
-                  }}>
-                    System
-                    <span style={{ 
-                      fontWeight: '400',
-                      color: '#6b7280',
-                      marginLeft: '6px'
-                    }}>
-                      {request.status}
-                    </span>
+                  <div style={{ fontSize: "14px", fontWeight: "500", color: "#1f2937", marginBottom: "2px" }}>
+                    {ev.event_type}
+                    {ev.comment && (
+                      <span style={{ fontWeight: "400", color: "#6b7280", marginLeft: "6px" }}>
+                        {ev.comment}
+                      </span>
+                    )}
                   </div>
-                  <div style={{ 
-                    fontSize: '12px', 
-                    color: '#9ca3af',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}>
+                  <div style={{ fontSize: "12px", color: "#9ca3af", display: "flex", alignItems: "center", gap: "4px" }}>
                     <Clock size={12} />
-                    {request.submittedOn}
+                    {formatEventDate(ev.created_at)}
                   </div>
+                </div>
+              </div>
+            ))}
+            {!isPending && (
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  padding: "12px",
+                  backgroundColor: statusDisplay === "approved" ? "#d1fae5" : "#fee2e2",
+                  borderRadius: "8px",
+                }}
+              >
+                <div style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  backgroundColor: statusDisplay === "approved" ? "#10b981" : "#ef4444",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  color: "white",
+                }}>
+                  {statusDisplay === "approved" ? <CheckCircle size={20} /> : <XCircle size={20} />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "14px", fontWeight: "500", color: "#1f2937", marginBottom: "2px" }}>
+                    {request.status}
+                  </div>
+                  {request.approved_at && (
+                    <div style={{ fontSize: "12px", color: "#9ca3af", display: "flex", alignItems: "center", gap: "4px" }}>
+                      <Clock size={12} />
+                      {formatEventDate(request.approved_at)}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -782,10 +922,10 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({ request, 
       </div>
 
       {/* Confirmation Dialog */}
-      {showDialog && dialogConfig && (
+      {showDialog && dialogConfig ? (
         <div
           style={{
-            position: 'fixed',
+            position: "fixed",
             top: 0,
             left: 0,
             right: 0,
@@ -873,7 +1013,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({ request, 
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };
