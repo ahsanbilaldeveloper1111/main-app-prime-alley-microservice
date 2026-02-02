@@ -134,7 +134,7 @@ const DialTodo = () => {
     });
     
     // Fetch extensions for assignees
-    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
+    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
   
     // Helper function to find extension name
     const findExtensionName = (extensionNumber: string): string => {
@@ -1593,6 +1593,18 @@ const DialTodo = () => {
                       </div>
                     )}
 
+{selectedTask?.rawData?.completed_at && (
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        marginBottom: '8px',
+                        fontSize: '13px'
+                      }}>
+                        <span style={{ color: '#718096', fontWeight: '500' }}>Completed On:</span>
+                        <span style={{ fontWeight: '600', color: '#2d3748' }}>{formatDateForTable(selectedTask.rawData.completed_at)}</span>
+                      </div>
+                    )}
+
 {selectedTask?.rawData?.created_at && (
                       <div style={{ 
                         display: 'flex', 
@@ -1904,28 +1916,9 @@ interface TaskItemProps {
           {task.title}
         </span>
         {task.completed ? (
+          <>  
           <span
-            style={{
-              display: 'inline-block',
-              padding: '4px 10px',
-              backgroundColor: '#e2e8f0',
-              color: '#4a5568',
-              borderRadius: '5px',
-              fontSize: '11px',
-              fontWeight: '600',
-              flexShrink: 0
-            }}
-          >
-            Completed
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle(task.id);
-            }}
-            style={{
+             style={{
               display: 'inline-block',
               padding: '4px 10px',
               backgroundColor: '#5b8fd8',
@@ -1937,10 +1930,41 @@ interface TaskItemProps {
               cursor: 'pointer',
               flexShrink: 0
             }}
-            title="Mark as completed"
           >
-            Mark complete
-          </button>
+            Completed on: <b >{formatDateForTable(task.rawData.completed_at??task.rawData.updated_at)}</b>
+          </span>
+          </>
+        ) : (
+          <>
+          { task.rawData?.due_date && (
+              <span style={{ fontSize: '12px', color: '#dc3545', fontWeight: '500', flexShrink: 0 }}>
+                Due Date: {formatDateForTable(task.rawData.due_date)}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle(task.id);
+              }}
+              style={{
+                display: 'inline-block',
+                padding: '4px 10px',
+                backgroundColor: '#5b8fd8',
+                color: 'white',
+                borderRadius: '5px',
+                fontSize: '11px',
+                fontWeight: '600',
+                border: 'none',
+                cursor: 'pointer',
+                flexShrink: 0
+              }}
+              title="Mark as completed"
+            >
+              Mark complete
+            </button>
+            
+          </>
         )}
         {/* <span style={{
           padding: '3px 8px',

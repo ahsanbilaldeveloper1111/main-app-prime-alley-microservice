@@ -525,7 +525,7 @@ const HelpCenterHome = () => {
                   featuredTopics.map((topic) => {
                     return (
                       <Col xs={12} sm={6} md={4} lg={3} key={topic.id || `topic-${topic.title}`}>
-                        <Link href="/help-center/knowledge-base" style={{ textDecoration: 'none' }}>
+                        <Link href={`/help-center/knowledge-base?moduleId=${topic.id}&moduleName=${topic.title}`} style={{ textDecoration: 'none' }}>
                           <div style={{
                             background: '#fafbfc',
                             border: '1px solid #e9ecef',

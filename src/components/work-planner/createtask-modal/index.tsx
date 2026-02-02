@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Modal, Button, Form, Row, Col, Badge } from 'react-bootstrap';
 import { 
   X, 
@@ -22,7 +22,7 @@ import {
   Phone
 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { listProjects, createTask, updateTask } from '@utils/tasks';
+import { listProjects, createTask, updateTask, listTasks } from '@utils/tasks';
 import { listStatuses } from '@utils/work-planner';
 import { getAutoTimezone } from '@utils/Helper';
 import RichTextEditor from '../../../pages/help-center/partials/RichTextEditor';
@@ -238,6 +238,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [genericStatuses, setGenericStatuses] = useState<Status[]>([]);
   const [loadingGenericStatuses, setLoadingGenericStatuses] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [linkedRecordsFromApi, setLinkedRecordsFromApi] = useState<LinkedRecord[]>([]);
+  const [loadingLinkedRecords, setLoadingLinkedRecords] = useState(false);
 
   // Fetch projects from API
   useEffect(() => {
@@ -307,9 +309,50 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     fetchGenericStatuses();
   }, [show]);
 
+  // Fetch link records via listTasks (no relations); call with any search string (including single character)
+  const fetchLinkRecordsForSearch = useCallback(async (query: string, currentProjectId?: number | null) => {
+    const trimmed = query.trim();
+    setLoadingLinkedRecords(true);
+    try {
+      const projectId = currentProjectId ?? (isEdit ? (editTask?.project_id ?? editTask?.project?.id) : null);
+      const response = await listTasks({
+        page: 1,
+        limit: 30,
+        type: 'regular',
+        search: trimmed || undefined,
+        ...(projectId != null && projectId > 0 ? { project_id: projectId } : {}),
+      });
+      if (response?.data && Array.isArray(response.data)) {
+        const currentTaskId = isEdit && editTask?.rawData?.id != null ? Number(editTask.rawData.id) : null;
+        const records: LinkedRecord[] = response.data
+          .filter((t: any) => currentTaskId == null || Number(t.id) !== currentTaskId)
+          .map((t: any) => ({
+            id: Number(t.id),
+            type: 'task' as const,
+            title: t.title || '',
+            reference: t.reference || `#${t.id}`,
+          }));
+        setLinkedRecordsFromApi(records);
+      } else {
+        setLinkedRecordsFromApi([]);
+      }
+    } catch (error) {
+      console.error('Error fetching link records:', error);
+      setLinkedRecordsFromApi([]);
+    } finally {
+      setLoadingLinkedRecords(false);
+    }
+  }, [isEdit, editTask?.rawData?.id, editTask?.project_id, editTask?.project?.id]);
+
+  useEffect(() => {
+    if (!show) return;
+    void fetchLinkRecordsForSearch(searchQuery, formData.projectId);
+  }, [show, fetchLinkRecordsForSearch]);
+
   // Reset form data when modal opens/closes or editTask changes (after projects are loaded)
   useEffect(() => {
     if (show) {
+      setSearchQuery(''); // Clear Link Records search when modal opens
       // Recalculate initial form data when modal opens or editTask changes
       // Wait for projects to be fetched if in edit mode (needed for statuses/labels)
       if (isEdit && editTask && fetchedProjects.length === 0 && loadingProjects) {
@@ -320,6 +363,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       setFormData(initialData);
     } else {
       // Reset form when modal closes
+      setSearchQuery('');
       setFormData({
         title: '',
         description: '',
@@ -437,9 +481,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
 
   const labels: Label[] = getLabelsForSelectedProject();
 
-  // Use propLinkedRecords directly (project linking removed since type is now only 'task')
-  const linkedRecords: LinkedRecord[] = propLinkedRecords;
-  console.log('linkedRecords', linkedRecords);
+  // Link records are fetched via listTasks (see useEffect) with empty relations
 
   // Map priority ID to priority string
   const mapPriorityIdToString = (priorityId: number | null): string | undefined => {
@@ -759,6 +801,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                     projectId: newProjectId,
                     statusId: null // Clear status when project changes
                   }));
+                  // Refetch link records for the selected project
+                  fetchLinkRecordsForSearch(searchQuery, newProjectId);
                 }}
                 className="py-2"
                 style={{ fontSize: '14px' }}
@@ -843,7 +887,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           </Col>
           )}
           
-          {!isEdit && (
+          {/* {!isEdit && ( */}
           <Col xs={12} md={6}>
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -861,8 +905,8 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               />
             </Form.Group>
           </Col>
-          )}
-          {!isEdit && (
+          {/* )} */}
+          {/* {!isEdit && ( */}
           <Col xs={12} md={6}>
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -880,7 +924,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               />
             </Form.Group>
           </Col>
-          )}
+          {/* )} */}
           <Col xs={12} md={6}>
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold mb-2" style={{ fontSize: '14px', color: '#2d3748' }}>
@@ -1295,7 +1339,11 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               type="text"
               placeholder="Search task..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearchQuery(value);
+                fetchLinkRecordsForSearch(value, formData.projectId);
+              }}
               className="py-2"
               style={{ 
                 paddingLeft: '40px',
@@ -1304,35 +1352,25 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             />
           </div>
 
-          {/* Linked Records Display */}
-          {linkedRecords && linkedRecords.length > 0 && (
-            <div 
-              className="border rounded"
-              style={{ 
-                maxHeight: '200px', 
-                overflowY: 'auto',
-                backgroundColor: '#f8fafc'
-              }}
-            >
-              {(() => {
-                const filteredRecords = linkedRecords.filter(record => {
-                  // If there's a search query, filter by it; otherwise show all
-                  if (searchQuery) {
-                    return record.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           record.reference.toLowerCase().includes(searchQuery.toLowerCase());
-                  }
-                  return true;
-                });
-
-                if (filteredRecords.length === 0) {
-                  return (
-                    <div className="p-3 text-center text-muted" style={{ fontSize: '0.9rem' }}>
-                      {searchQuery ? 'No tasks found matching your search' : 'No tasks available'}
-                    </div>
-                  );
-                }
-
-                return filteredRecords.map((record) => (
+          {/* Linked Records Display - fetched via listTasks with empty relations */}
+          <div
+            className="border rounded"
+            style={{
+              maxHeight: '200px',
+              overflowY: 'auto',
+              backgroundColor: '#f8fafc'
+            }}
+          >
+            {loadingLinkedRecords ? (
+              <div className="p-3 text-center text-muted" style={{ fontSize: '0.9rem' }}>
+                Loading tasks...
+              </div>
+            ) : linkedRecordsFromApi.length === 0 ? (
+              <div className="p-3 text-center text-muted" style={{ fontSize: '0.9rem' }}>
+                {searchQuery ? 'No tasks found matching your search' : 'No tasks available'}
+              </div>
+            ) : (
+              linkedRecordsFromApi.map((record) => (
                   <div
                     key={record.id}
                     className="d-flex align-items-center p-3 border-bottom cursor-pointer"
@@ -1388,10 +1426,9 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                       <Check size={18} className="text-primary ms-2" style={{ flexShrink: 0 }} />
                     )}
                   </div>
-                ));
-              })()}
+                ))
+              )}
             </div>
-          )}
         </Form.Group>
         </>
         )}

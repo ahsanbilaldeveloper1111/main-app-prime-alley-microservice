@@ -426,6 +426,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
                 <option value="member">Member</option>
                 <option value="admin">Admin</option>
                 <option value="viewer">Viewer</option>
+                
               </Form.Select>
             </Form.Group>
           </Form>

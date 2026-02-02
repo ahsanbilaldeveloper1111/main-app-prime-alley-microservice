@@ -3,10 +3,12 @@ import {
   Search, Plus, MoreVertical, Calendar,
   X
 } from 'lucide-react';
-import { Offcanvas, Button, Badge, Row, Col, Nav } from 'react-bootstrap';
 import { formatDateForTable } from '@utils/Helper';
-import { updateTask } from '@utils/tasks';
+import { updateTask, deleteTask, getTask, getTaskActivities } from '@utils/tasks';
 import { toast } from 'react-toastify';
+import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
+import CreateTaskModal from '@components/work-planner/createtask-modal';
+import TaskDetailOffcanvas from '@pages/work-planner/partials/TaskDetailOffcanvas';
 
 interface BoardViewProps {
   selectedProject: any;
@@ -61,9 +63,21 @@ const BoardView: React.FC<BoardViewProps> = ({
 }) => {
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
-  const [activeDetailTab, setActiveDetailTab] = useState('activity');
+  const [activeDetailTab, setActiveDetailTab] = useState<'activity' | 'comments'>('activity');
+  const [taskActivities, setTaskActivities] = useState<any[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [taskComments, setTaskComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
   const [draggedTask, setDraggedTask] = useState<any>(null);
   const [dragOverStatus, setDragOverStatus] = useState<number | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [loadingTaskForEdit, setLoadingTaskForEdit] = useState(false);
 
   const extensionNameByNumber = useMemo(() => {
     const map = new Map<string, string>();
@@ -74,6 +88,11 @@ const BoardView: React.FC<BoardViewProps> = ({
     });
     return map;
   }, [hierarchyDataExtensions]);
+
+  const extensionsForModal = useMemo(() => (hierarchyDataExtensions || []).map((ext: any) => ({
+    id: String(ext?.extension_number ?? ext?.id ?? ''),
+    name: String(ext?.user?.name || ext?.name || '')
+  })), [hierarchyDataExtensions]);
 
   const getUserNameFromExtension = (extensionNumber: any): string => {
     const key = String(extensionNumber || '').trim();
@@ -88,12 +107,78 @@ const BoardView: React.FC<BoardViewProps> = ({
     return getUserNameFromExtension(extNum);
   };
 
-  const handleTaskClick = (task: any) => {
+  const handleTaskClick = async (task: any) => {
     setSelectedTask(task);
     setShowTaskDetail(true);
+    setTaskActivities([]);
+    setTaskComments([]);
+    setActiveDetailTab('activity');
     if (onTaskClick) {
       onTaskClick(task);
     }
+    if (task?.id) {
+      try {
+        setLoadingActivities(true);
+        const activitiesResponse = await getTaskActivities(task.id, 1, 5);
+        if (activitiesResponse) {
+          setTaskActivities(Array.isArray(activitiesResponse) ? activitiesResponse : []);
+        }
+      } catch (err) {
+        console.error('Error fetching task activities:', err);
+        setTaskActivities([]);
+      } finally {
+        setLoadingActivities(false);
+      }
+    }
+  };
+
+  const handleEditClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!selectedTask?.id) return;
+    try {
+      setLoadingTaskForEdit(true);
+      const withRelations = ['project', 'status', 'assignees', 'labels', 'parent', 'children'];
+      const taskData = await getTask(selectedTask.id, withRelations);
+      if (taskData) {
+        setSelectedTask(taskData);
+        setShowTaskDetail(false);
+        setShowEditModal(true);
+      }
+    } catch (err) {
+      console.error('Error loading task for edit:', err);
+      toast.error('Failed to load task');
+    } finally {
+      setLoadingTaskForEdit(false);
+    }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedTask?.id) return;
+    try {
+      setDeleting(true);
+      await deleteTask(selectedTask.id);
+      setShowDeleteModal(false);
+      setShowTaskDetail(false);
+      setSelectedTask(null);
+      if (onTaskStatusChange) onTaskStatusChange();
+      toast.success('Task deleted');
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      toast.error('Failed to delete task');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleTaskUpdate = () => {
+    setShowEditModal(false);
+    setSelectedTask(null);
+    if (onTaskStatusChange) onTaskStatusChange();
   };
 
   // Drag and drop handlers
@@ -746,143 +831,73 @@ const BoardView: React.FC<BoardViewProps> = ({
       </div>
 
       {/* Task Detail Sidebar */}
-      <Offcanvas 
-        show={showTaskDetail} 
-        onHide={() => setShowTaskDetail(false)} 
-        placement="end"
-        className="task-detail-panel"
-      >
-        <Offcanvas.Header closeButton className="task-detail-header">
-          <Offcanvas.Title>
-            <div className="d-flex align-items-center justify-content-between w-100">
-              <span className="fw-bold">{selectedTask?.task_id || `#${selectedTask?.id}`} {selectedTask?.title}</span>
-              <Button variant="link" className="text-secondary p-0">
-                <MoreVertical size={20} />
-              </Button>
-            </div>
-          </Offcanvas.Title>
-        </Offcanvas.Header>
-        <Offcanvas.Body className="task-detail-body">
-          {selectedTask && (
-            <>
-              <Row className="g-2 mb-3">
-                <Col xs={6}>
-                  <div className="detail-section">
-                    <div className="detail-label">Status</div>
-                    <Badge bg={getStatusVariant(selectedTask.status?.name || 'active')} className="px-3 py-2 w-100">
-                      {selectedTask.status?.name || 'Active'}
-                    </Badge>
-                  </div>
-                </Col>
-                <Col xs={6}>
-                  <div className="detail-section">
-                    <div className="detail-label">Priority</div>
-                    {selectedTask.priority ? (
-                      <Badge bg={getPriorityVariant(selectedTask.priority)} className="px-3 py-2 w-100">
-                        {selectedTask.priority.charAt(0).toUpperCase() + selectedTask.priority.slice(1)}
-                      </Badge>
-                    ) : (
-                      <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Not set</span>
-                    )}
-                  </div>
-                </Col>
-              </Row>
+      <TaskDetailOffcanvas
+        show={showTaskDetail}
+        onHide={() => {
+          setShowTaskDetail(false);
+          setTaskActivities([]);
+        }}
+        selectedTask={selectedTask ? {
+          id: String(selectedTask.id),
+          title: selectedTask.title,
+          status: selectedTask.status?.name || 'Active',
+          priority: selectedTask.priority || 'Normal',
+          project: selectedTask.project?.name || 'No Project',
+          dueDate: selectedTask.due_date ? formatDateForTable(selectedTask.due_date) : undefined,
+          description: selectedTask.description,
+          rawData: selectedTask
+        } : null}
+        taskActivities={taskActivities}
+        loadingActivities={loadingActivities}
+        activeDetailTab={activeDetailTab}
+        setActiveDetailTab={setActiveDetailTab}
+        taskComments={taskComments}
+        setTaskComments={setTaskComments}
+        loadingComments={loadingComments}
+        setLoadingComments={setLoadingComments}
+        newComment={newComment}
+        setNewComment={setNewComment}
+        submittingComment={submittingComment}
+        setSubmittingComment={setSubmittingComment}
+        editingCommentId={editingCommentId}
+        setEditingCommentId={setEditingCommentId}
+        editingCommentText={editingCommentText}
+        setEditingCommentText={setEditingCommentText}
+        onEditTask={() => handleEditClick({ stopPropagation: () => {} } as React.MouseEvent)}
+        onOpenDeleteModal={() => {
+          setShowTaskDetail(false);
+          setShowDeleteModal(true);
+        }}
+        hierarchyDataExtensions={hierarchyDataExtensions}
+        getStatusVariant={(s) => getStatusVariant(s)}
+        getPriorityVariant={(p) => getPriorityVariant(p || '')}
+      />
 
-              <div className="detail-section">
-                <div className="detail-label">Assignees</div>
-                <div className="assignee-group">
-                  {selectedTask.assignees && selectedTask.assignees.length > 0 ? (
-                    selectedTask.assignees.map((assignee: any, idx: number) => {
-                      const name = getAssigneeDisplayName(assignee);
-                      const initials = name !== '' 
-                        ? name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
-                        : 'UN';
-                      return (
-                        <div key={idx} className="assignee-badge" title={name}>
-                          {initials}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Unassigned</span>
-                  )}
-                </div>
-              </div>
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+        }}
+        onConfirm={confirmDelete}
+        itemName={selectedTask?.title ? `"${selectedTask.title}"` : `Task #${selectedTask?.task_id || selectedTask?.id}`}
+        itemType="task"
+        loading={deleting}
+      />
 
-              {selectedTask.due_date && (
-                <div className="detail-section">
-                  <div className="detail-label">Due Date</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Calendar size={16} color="#6B7280" />
-                    <span>{formatDateForTable(selectedTask.due_date)}</span>
-                  </div>
-                </div>
-              )}
-
-              {selectedTask.description && (
-                <div className="detail-section">
-                  <div className="detail-label">Description</div>
-                  <div 
-                    style={{ 
-                      fontSize: '0.9rem', 
-                      color: '#4B5563',
-                      lineHeight: '1.6',
-                      whiteSpace: 'pre-wrap'
-                    }}
-                    dangerouslySetInnerHTML={{ __html: selectedTask.description }}
-                  />
-                </div>
-              )}
-
-              {selectedTask.labels && selectedTask.labels.length > 0 && (
-                <div className="detail-section">
-                  <div className="detail-label">Labels</div>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {selectedTask.labels.map((label: any, idx: number) => (
-                      <Badge 
-                        key={idx}
-                        style={{ 
-                          backgroundColor: label.color || '#06b6d4',
-                          color: 'white',
-                          padding: '0.25rem 0.75rem'
-                        }}
-                      >
-                        {label.name}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <Nav variant="tabs" className="mt-4" defaultActiveKey="activity">
-                <Nav.Item>
-                  <Nav.Link eventKey="activity" onClick={() => setActiveDetailTab('activity')}>
-                    Activity
-                  </Nav.Link>
-                </Nav.Item>
-                <Nav.Item>
-                  <Nav.Link eventKey="history" onClick={() => setActiveDetailTab('history')}>
-                    History
-                  </Nav.Link>
-                </Nav.Item>
-              </Nav>
-
-              <div className="mt-3">
-                {activeDetailTab === 'activity' && (
-                  <div style={{ color: '#6B7280', fontSize: '0.9rem' }}>
-                    Activity feed will be displayed here
-                  </div>
-                )}
-                {activeDetailTab === 'history' && (
-                  <div style={{ color: '#6B7280', fontSize: '0.9rem' }}>
-                    History will be displayed here
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </Offcanvas.Body>
-      </Offcanvas>
+      <CreateTaskModal
+        show={showEditModal}
+        onHide={() => {
+          setShowEditModal(false);
+          setSelectedTask(null);
+        }}
+        onCreate={handleTaskUpdate}
+        extensions={extensionsForModal}
+        labels={labels}
+        statuses={statuses}
+        project={selectedProject}
+        task={selectedTask}
+        isEdit={true}
+      />
     </>
   );
 };

@@ -79,25 +79,16 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
     const files = e.target.files;
     if (!files) return;
 
-    const fileArray = Array.from(files);
-    const maxFiles = 3;
-    const maxSize = 1 * 1024 * 1024; // 1MB
+    const file = files[0];
+    if (!file) return;
 
-    if (attachedFiles.length + fileArray.length > maxFiles) {
-      toast.error(`Maximum ${maxFiles} files allowed`);
+    const maxSize = 1 * 1024 * 1024; // 1MB
+    if (file.size > maxSize) {
+      toast.error(`${file.name} exceeds 1MB limit`);
       return;
     }
 
-    const validFiles: File[] = [];
-    for (const file of fileArray) {
-      if (file.size > maxSize) {
-        toast.error(`${file.name} exceeds 1MB limit`);
-        continue;
-      }
-      validFiles.push(file);
-    }
-
-    setAttachedFiles([...attachedFiles, ...validFiles]);
+    setAttachedFiles([file]);
     
     // Reset input
     if (fileInputRef.current) {
@@ -238,7 +229,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
             color: '#495057',
             marginBottom: '40px'
           }}>
-            Your ticket <span style={{ color: '#4680ff', fontWeight: '600' }}>{submittedTicketId}</span> has been successfully created.
+            Your ticket <span style={{ color: '#4680ff', fontWeight: '600' }}>#{submittedTicketId}</span> has been successfully created.
           </p>
 
           <Button
@@ -490,7 +481,6 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  multiple
                   accept="image/*"
                   onChange={handleFileChange}
                   style={{ display: 'none' }}
@@ -498,7 +488,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                 <Button
                   variant="outline-secondary"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={attachedFiles.length >= 3}
+                  disabled={attachedFiles.length >= 1}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -518,7 +508,7 @@ const CreateTicket: React.FC<CreateTicketProps> = ({ onBack }) => {
                   fontSize: '13px',
                   color: '#6c757d'
                 }}>
-                  Max 3 files (Up to 1MB Each)
+                  1 file (Up to 1MB)
                 </span>
               </div>
               {currentStep === 1 ? (

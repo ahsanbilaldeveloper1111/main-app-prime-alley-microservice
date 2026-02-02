@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { Container, Row, Col, Card, Form, InputGroup, Badge, Button, Dropdown } from 'react-bootstrap';
-import { 
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Row, Col, Card, Form, Badge, Button, Dropdown } from 'react-bootstrap';
+import { GetTicket, GetComments, GetAssigneeComments, AddComment } from '@utils/tickets';
+import { toast } from 'react-toastify';
+import moment from 'moment';
+import {useSession} from 'next-auth/react';
+import {
   ChevronLeft,
-  User,
   Clock,
   Hash,
   Share2,
@@ -16,8 +19,18 @@ import {
   BookOpen,
   Wrench,
   RotateCcw,
-  ChevronRight
+  ChevronRight,
+  Flag,
+  CircleDot
 } from 'lucide-react';
+
+const PRIORITY_LABELS = ['Low', 'Medium', 'High', 'Critical'];
+const DEFAULT_AVATAR = 'https://i.pravatar.cc/150?img=48';
+
+interface GetTicketResponse {
+  success?: boolean;
+  data?: any;
+}
 
 interface TicketDetailProps {
   ticketId: string;
@@ -25,48 +38,126 @@ interface TicketDetailProps {
 }
 
 const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
+  const { data: session } = useSession();
+  const [ticketData, setTicketData] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
+  const [replyAttachment, setReplyAttachment] = useState<File | null>(null);
+  const [messages, setMessages] = useState<Array<{ user: string; avatar: string; time: string; message: string; isAgent?: boolean }>>([]);
+  const [loadingComments, setLoadingComments] = useState<boolean>(false);
+  const [sendingReply, setSendingReply] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sample ticket data
-  const ticketData = {
-    id: '#107254',
-    subject: "Can't enable 2FA",
-    priority: 'urgent',
-    status: 'Open',
-    assignedAgent: {
-      name: 'Assigned Agent',
-      avatar: 'https://i.pravatar.cc/150?img=48'
-    },
-    sla: 'R',
-    timeRemaining: '00:59:17',
-    channel: 'Portal',
-    timeline: [
-      { status: 'New', time: '1:07 pm', endTime: '2:02pm', progress: 100 },
-      { status: 'Open', time: '1:15 pm', endTime: '1:07pm', progress: 100 },
-      { status: 'Pending', time: 'x:xx x', endTime: 'x:xxxx', progress: 30 },
-      { status: 'Resolved', time: 'x:xx x', endTime: 'x:xxxx', progress: 0 }
-    ],
-    messages: [
-      {
-        user: 'Lisa Smith',
-        avatar: 'https://i.pravatar.cc/150?img=47',
-        time: '6 hours ago',
-        message: "Hi, I'm having issues enabling two-factor authentication (2FA) for my account. After entering the received code in the field, it says it's invalid. Could you please help me with this?"
-      },
-      {
-        user: 'Sarah Lee',
-        avatar: 'https://i.pravatar.cc/150?img=45',
-        time: '5 hours ago',
-        message: 'Hi Lisa, I\'m sorry to hear about the trouble with 2FA. Please make sure that the clock on your phone is set to "automatic" and synchronized with the correct time. Try to enter the code again and let me know if it works. If you\'re still having issues, I\'ll be here to assist further!',
-        isAgent: true
-      },
-      {
-        user: 'Lisa Smith',
-        avatar: 'https://i.pravatar.cc/150?img=47',
-        time: '2 hours ago',
-        message: "I tried entering the code again, but I'm still getting the same error message."
+  const fetchTicket = useCallback(async () => {
+    if (!ticketId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response: GetTicketResponse | undefined = await GetTicket(ticketId);
+      if (response?.success === true && response?.data) {
+        setTicketData(response.data);
+        fetchComments(ticketId);
+      } else {
+        setError('Failed to load ticket');
+        toast.error('Failed to load ticket');
       }
-    ]
+    } catch (err) {
+      setError('Failed to load ticket');
+      toast.error('Failed to load ticket');
+      if (err instanceof Error) {
+        console.error('GetTicket error:', err.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [ticketId]);
+
+  const fetchComments = useCallback(async (id: string) => {
+    setLoadingComments(true);
+    try {
+      const [commentsRes, assigneeRes] = await Promise.all([
+        GetComments(id),
+        GetAssigneeComments(id)
+      ]);
+      const commentsList = (commentsRes?.data?.data ?? commentsRes?.data ?? commentsRes) ?? [];
+      const assigneeList = (assigneeRes?.data?.data ?? assigneeRes?.data ?? assigneeRes) ?? [];
+      const merged: Array<{ user: string; avatar: string; time: string; message: string; isAgent?: boolean; sortKey: string }> = [];
+      (Array.isArray(commentsList) ? commentsList : []).forEach((c: any) => {
+        merged.push({
+          user: c.user_name ?? c.user_extension ?? 'Customer',
+          avatar: DEFAULT_AVATAR,
+          time: c.created_at ? moment(c.created_at).fromNow() : '',
+          message: c.content ?? '',
+          isAgent: false,
+          sortKey: c.created_at ?? ''
+        });
+      });
+      (Array.isArray(assigneeList) ? assigneeList : []).forEach((c: any) => {
+        merged.push({
+          user: c.user_name ?? c.user_extension ?? 'Support',
+          avatar: DEFAULT_AVATAR,
+          time: c.created_at ? moment(c.created_at).fromNow() : '',
+          message: c.content ?? '',
+          isAgent: true,
+          sortKey: c.created_at ?? ''
+        });
+      });
+      merged.sort((a, b) => (a.sortKey > b.sortKey ? 1 : -1));
+      setMessages(merged.map(({ sortKey, ...rest }) => rest));
+    } catch (err) {
+      console.error('Error fetching comments:', err);
+    } finally {
+      setLoadingComments(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (ticketId) fetchTicket();
+  }, [ticketId, fetchTicket]);
+
+  const handleSendReply = useCallback(async () => {
+    if (!replyText.trim() || !ticketData) return;
+    const userExtension = Array.isArray(ticketData.user_extension)
+      ? ticketData.user_extension[0] ?? ''
+      : ticketData.user_extension ?? '';
+    setSendingReply(true);
+    try {
+      const ok = await AddComment(
+        String(ticketData.id),
+        replyText.trim(),
+        userExtension,
+        replyAttachment ?? undefined
+      );
+      if (ok) {
+        setReplyText('');
+        setReplyAttachment(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        fetchComments(String(ticketData.id));
+      }
+    } finally {
+      setSendingReply(false);
+    }
+  }, [replyText, replyAttachment, ticketData, fetchComments]);
+
+  const getPriorityStyle = (priority: string | number) => {
+    const p = typeof priority === 'string' ? Number.parseInt(priority, 10) : (priority ?? 0);
+    switch (p) {
+      case 3: return { bg: '#fee', color: '#dc3545', dotColor: '#dc3545' };
+      case 2: return { bg: '#fff3cd', color: '#856404', dotColor: '#f4c22b' };
+      case 1: return { bg: '#e7f3ff', color: '#0d6efd', dotColor: '#0d6efd' };
+      case 0:
+      default: return { bg: '#f0f0f0', color: '#6c757d', dotColor: '#6c757d' };
+    }
+  };
+
+  const getStatusStyle = (status: string) => {
+    const s = (status ?? '').toLowerCase();
+    if (s.includes('open')) return { bg: '#4680ff', color: '#fff' };
+    if (s.includes('pending')) return { bg: '#fff3cd', color: '#856404' };
+    if (s.includes('resolved')) return { bg: '#d4edda', color: '#155724' };
+    if (s.includes('closed')) return { bg: '#e2e3e5', color: '#383d41' };
+    return { bg: '#4680ff', color: '#fff' };
   };
 
   const relatedArticles = [
@@ -75,36 +166,27 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
     { title: 'Resetting Your 2FA Device', icon: RotateCcw, color: '#1de9b6' }
   ];
 
-  const getPriorityStyle = (priority: string) => {
-    switch(priority) {
-      case 'urgent':
-        return { bg: '#fee', color: '#dc3545', dotColor: '#dc3545' };
-      case 'medium':
-        return { bg: '#fff3cd', color: '#856404', dotColor: '#f4c22b' };
-      case 'low':
-        return { bg: '#f0f0f0', color: '#6c757d', dotColor: '#6c757d' };
-      default:
-        return { bg: '#f0f0f0', color: '#6c757d', dotColor: '#6c757d' };
-    }
-  };
+  const statusName = ticketData?.status?.name ?? ticketData?.status ?? 'Open';
+  const priorityNum = ticketData?.priority ?? 0;
+  const priorityLabel = PRIORITY_LABELS[Number(priorityNum)] ?? 'Low';
+  const priorityStyle = getPriorityStyle(priorityNum);
+  const statusStyle = getStatusStyle(statusName);
 
-  const getStatusStyle = (status: string) => {
-    switch(status) {
-      case 'Open':
-        return { bg: '#4680ff', color: '#fff' };
-      case 'Pending':
-        return { bg: '#fff3cd', color: '#856404' };
-      case 'Resolved':
-        return { bg: '#d4edda', color: '#155724' };
-      case 'Closed':
-        return { bg: '#e2e3e5', color: '#383d41' };
-      default:
-        return { bg: '#4680ff', color: '#fff' };
-    }
-  };
-
-  const priorityStyle = getPriorityStyle(ticketData.priority);
-  const statusStyle = getStatusStyle(ticketData.status);
+  if (loading && !ticketData) {
+    return (
+      <div style={{ background: '#f4f7fa', minHeight: '100vh', padding: '40px', textAlign: 'center' }}>
+        <p style={{ color: '#6c757d' }}>Loading ticket...</p>
+      </div>
+    );
+  }
+  if (error || !ticketData) {
+    return (
+      <div style={{ background: '#f4f7fa', minHeight: '100vh', padding: '40px', textAlign: 'center' }}>
+        <p style={{ color: '#dc3545' }}>{error ?? 'Ticket not found'}</p>
+        <Button variant="outline-primary" onClick={onBack}>Back to My Tickets</Button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: '#f4f7fa', minHeight: '100vh', paddingBottom: '40px' }}>
@@ -134,7 +216,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
         </span>
         <span style={{ color: '#6c757d', margin: '0 8px' }}>›</span>
         <span style={{ color: '#2c3e50', fontWeight: '600', fontSize: '14px' }}>
-          Ticket {ticketData.id}
+          Ticket #{ticketData.id}
         </span>
       </div>
 
@@ -157,64 +239,50 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                 fontWeight: '600',
                 color: '#4680ff'
               }}>
-                {ticketData.id}
+                Ticket No: #{ticketData.id}
               </div>
               <div style={{
                 padding: '12px 20px',
-                cursor: 'pointer',
                 fontSize: '14px',
                 color: '#495057',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '3px'
               }}>
+                <Flag size={16} color={priorityStyle.dotColor} style={{ flexShrink: 0 }} />
                 <div style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
+                  // width: '8px',
+                  // height: '8px',
+                  // borderRadius: '50%',
                   background: priorityStyle.dotColor
                 }} />
-                <span style={{ textTransform: 'capitalize' }}>{ticketData.priority}</span>
+                <span style={{ textTransform: 'capitalize' }}>
+                  {priorityLabel}
+                </span>
               </div>
               <div style={{
                 padding: '12px 20px',
-                cursor: 'pointer',
                 fontSize: '14px',
                 color: '#495057',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '3px'
               }}>
+                <CircleDot size={16} color={statusStyle.bg} style={{ flexShrink: 0 }} />
                 <div style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
+                  // width: '0px',
+                  // height: '0px',
+                  // borderRadius: '50%',
                   background: statusStyle.bg
                 }} />
-                <span>{ticketData.status}</span>
-              </div>
-              <div style={{
-                padding: '12px 20px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                color: '#495057'
-              }}>
-                Pending
-              </div>
-              <div style={{
-                padding: '12px 20px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                color: '#495057'
-              }}>
-                Resolved
+                <span>{statusName}</span>
               </div>
             </div>
           </Card>
         </Col>
 
         {/* Main Content */}
-        <Col xs={12} lg={7}>
+        <Col xs={12} lg={10}>
           <Card style={{
             background: '#fff',
             border: '1px solid #e9ecef',
@@ -241,8 +309,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                     alignItems: 'center',
                     gap: '12px'
                   }}>
-                    <span style={{ color: '#6c757d', fontWeight: '500' }}>{ticketData.id}</span>
-                    {ticketData.subject}
+                    {ticketData.title}
                   </h3>
 
                   <div style={{
@@ -252,7 +319,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                     flexWrap: 'wrap'
                   }}>
                     {/* Priority Badge */}
-                    <Badge style={{
+                    {/* <Badge style={{
                       background: priorityStyle.bg,
                       color: priorityStyle.color,
                       padding: '6px 12px',
@@ -269,8 +336,8 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                         borderRadius: '50%',
                         background: priorityStyle.dotColor
                       }} />
-                      <span style={{ textTransform: 'capitalize' }}>{ticketData.priority}</span>
-                    </Badge>
+                      <span style={{ textTransform: 'capitalize' }}>{priorityLabel}</span>
+                    </Badge> */}
 
                     {/* Status Badge */}
                     <Badge style={{
@@ -290,13 +357,13 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                         borderRadius: '50%',
                         background: statusStyle.color
                       }} />
-                      {ticketData.status}
+                      {statusName}
                     </Badge>
                   </div>
                 </div>
 
                 {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '8px' }}>
+                {/* <div style={{ display: 'flex', gap: '8px' }}>
                   <Button
                     variant="outline-secondary"
                     size="sm"
@@ -309,7 +376,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                       border: '1px solid #dee2e6'
                     }}
                   >
-                    <Share2 size={14} /> Drop it a spancen
+                    <Share2 size={14} /> Share
                   </Button>
                   <Dropdown>
                     <Dropdown.Toggle
@@ -324,10 +391,10 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                       <ChevronDown size={14} />
                     </Dropdown.Toggle>
                   </Dropdown>
-                </div>
+                </div> */}
               </div>
 
-              {/* Agent and SLA Info */}
+              {/* Agent and meta Info */}
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -337,9 +404,33 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                 background: '#f8f9fa',
                 borderRadius: '8px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <>
+
+                {ticketData.due_date && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Clock size={14} color="#6c757d" />
+                      <span style={{ fontSize: '13px', color: '#495057', fontWeight: '500' }}>
+                        Due {moment(ticketData.due_date).format('MMM D, YYYY')}
+                      </span>
+                    </div>
+                  )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Hash size={14} color="#6c757d" />
+                    <span style={{ fontSize: '13px', color: '#6c757d' }}>Channel:</span>
+                    <span style={{ fontSize: '13px', color: '#495057', fontWeight: '500' }}>
+                      Portal
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', color: '#6c757d' }}>Created</span>
+                    <span style={{ fontSize: '13px', color: '#495057', fontWeight: '500' }}>
+                      {ticketData.created_at ? moment(ticketData.created_at).format('MMM D, YYYY') : '—'}
+                    </span>
+                  </div>
+                </>
+                {/* <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <img
-                    src={ticketData.assignedAgent.avatar}
+                    src={DEFAULT_AVATAR}
                     alt="Agent"
                     style={{
                       width: '36px',
@@ -349,178 +440,102 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                     }}
                   />
                   <span style={{ fontSize: '14px', color: '#495057', fontWeight: '500' }}>
-                    {ticketData.assignedAgent.name}
+                    {ticketData.assignee?.name ?? ticketData.user_extension ?? 'Support'}
                   </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '13px', color: '#6c757d' }}>SLA</span>
-                    <Badge style={{
-                      background: '#dc3545',
-                      color: '#fff',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      fontSize: '12px'
-                    }}>
-                      {ticketData.sla}
-                    </Badge>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Clock size={14} color="#6c757d" />
-                    <span style={{ fontSize: '13px', color: '#495057', fontWeight: '500' }}>
-                      {ticketData.timeRemaining}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Hash size={14} color="#6c757d" />
-                    <span style={{ fontSize: '13px', color: '#6c757d' }}>Channel:</span>
-                    <span style={{ fontSize: '13px', color: '#495057', fontWeight: '500' }}>
-                      {ticketData.channel}
-                    </span>
-                  </div>
-                </div>
+                </div> */}
+                {/* <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',gap: '16px' }}>
+                  
+                  
+                </div> */}
               </div>
 
-              {/* Status Timeline */}
-              <div style={{ marginBottom: '30px' }}>
-                <h5 style={{
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  color: '#2c3e50',
-                  marginBottom: '16px'
-                }}>
-                  Status Timeline
-                </h5>
-                <div style={{ position: 'relative', paddingLeft: '20px' }}>
-                  {ticketData.timeline.map((item, index) => (
-                    <div key={index} style={{ position: 'relative', paddingBottom: '24px' }}>
-                      {/* Vertical Line */}
-                      {index < ticketData.timeline.length - 1 && (
-                        <div style={{
-                          position: 'absolute',
-                          left: '-15px',
-                          top: '12px',
-                          bottom: '-12px',
-                          width: '2px',
-                          background: '#e9ecef'
-                        }} />
-                      )}
-                      
-                      {/* Status Dot */}
-                      <div style={{
-                        position: 'absolute',
-                        left: '-19px',
-                        top: '4px',
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        background: item.progress > 0 ? '#4680ff' : '#e9ecef',
-                        border: '2px solid #fff',
-                        boxShadow: '0 0 0 2px #e9ecef'
-                      }} />
+              {/* Description (initial message) */}
+              {ticketData.description && (
+                <div style={{ marginBottom: '24px', paddingBottom: '24px', borderBottom: '1px solid #f0f0f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                    <img
+                      src={DEFAULT_AVATAR}
+                      alt=""
+                      style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#2c3e50' }}>
+                          {session?.user?.name ?? 'You'}
+                        </span>
+                        <span style={{ fontSize: '13px', color: '#6c757d' }}>
+                          {ticketData.created_at ? moment(ticketData.created_at).fromNow() : ''}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '14px', color: '#495057', lineHeight: '1.6', margin: 0 }}>
+                        {ticketData.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
+              {/* Messages / Comments */}
+              <div style={{ marginBottom: '24px' }}>
+                {loadingComments ? (
+                  <p style={{ fontSize: '14px', color: '#6c757d' }}>Loading replies...</p>
+                ) : (
+                  messages.map((message, index) => (
+                    <div key={index} style={{
+                      marginBottom: '24px',
+                      paddingBottom: '24px',
+                      borderBottom: index < messages.length - 1 ? '1px solid #f0f0f0' : 'none'
+                    }}>
                       <div style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
+                        alignItems: 'flex-start',
+                        gap: '12px'
                       }}>
+                        <img
+                          src={message.avatar}
+                          alt={message.user}
+                          style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '50%',
+                            objectFit: 'cover',
+                            flexShrink: 0
+                          }}
+                        />
                         <div style={{ flex: 1 }}>
-                          <span style={{
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            color: item.progress > 0 ? '#2c3e50' : '#adb5bd'
-                          }}>
-                            {item.status}
-                          </span>
-                        </div>
-                        <div style={{ flex: 2, marginLeft: '16px', marginRight: '16px' }}>
                           <div style={{
-                            width: '100%',
-                            height: '6px',
-                            background: '#e9ecef',
-                            borderRadius: '3px',
-                            overflow: 'hidden'
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginBottom: '8px'
                           }}>
-                            <div style={{
-                              width: `${item.progress}%`,
-                              height: '100%',
-                              background: '#4680ff',
-                              borderRadius: '3px',
-                              transition: 'width 0.3s ease'
-                            }} />
+                            <span style={{
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              color: '#2c3e50'
+                            }}>
+                              {message.user}
+                            </span>
+                            <span style={{
+                              fontSize: '13px',
+                              color: '#6c757d'
+                            }}>
+                              {message.time}
+                            </span>
                           </div>
-                        </div>
-                        <div style={{ flex: 1, textAlign: 'right' }}>
-                          <span style={{
-                            fontSize: '12px',
-                            color: '#6c757d'
-                          }}>
-                            {item.time} <span style={{ margin: '0 4px' }}>x</span> {item.endTime}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Messages */}
-              <div style={{ marginBottom: '24px' }}>
-                {ticketData.messages.map((message, index) => (
-                  <div key={index} style={{
-                    marginBottom: '24px',
-                    paddingBottom: '24px',
-                    borderBottom: index < ticketData.messages.length - 1 ? '1px solid #f0f0f0' : 'none'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '12px'
-                    }}>
-                      <img
-                        src={message.avatar}
-                        alt={message.user}
-                        style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '50%',
-                          objectFit: 'cover',
-                          flexShrink: 0
-                        }}
-                      />
-                      <div style={{ flex: 1 }}>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          marginBottom: '8px'
-                        }}>
-                          <span style={{
+                          <p style={{
                             fontSize: '14px',
-                            fontWeight: '600',
-                            color: '#2c3e50'
+                            color: '#495057',
+                            lineHeight: '1.6',
+                            margin: 0
                           }}>
-                            {message.user}
-                          </span>
-                          <span style={{
-                            fontSize: '13px',
-                            color: '#6c757d'
-                          }}>
-                            {message.time}
-                          </span>
+                            {message.message}
+                          </p>
                         </div>
-                        <p style={{
-                          fontSize: '14px',
-                          color: '#495057',
-                          lineHeight: '1.6',
-                          margin: 0
-                        }}>
-                          {message.message}
-                        </p>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
 
               {/* Reply Box */}
@@ -530,6 +545,16 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                 borderRadius: '8px',
                 border: '1px solid #e9ecef'
               }}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) setReplyAttachment(f);
+                  }}
+                  style={{ display: 'none' }}
+                />
                 <Form.Control
                   as="textarea"
                   rows={3}
@@ -551,6 +576,8 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                 }}>
                   <Button
                     variant="link"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!!replyAttachment}
                     style={{
                       padding: '6px 12px',
                       fontSize: '13px',
@@ -564,39 +591,27 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
                     <Paperclip size={16} />
                     Add screenshot
                     <span style={{ fontSize: '12px', color: '#6c757d', marginLeft: '4px' }}>
-                      Max 3 Statens (or up to 20MB Each)
+                      1 file (Up to 1MB)
                     </span>
                   </Button>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <span style={{ fontSize: '13px', color: '#6c757d' }}>or</span>
-                    <Button
-                      variant="link"
-                      style={{
-                        padding: 0,
-                        fontSize: '13px',
-                        color: '#4680ff',
-                        textDecoration: 'none'
-                      }}
-                    >
-                      Add internal note
-                    </Button>
-                    <Button
-                      style={{
-                        background: '#4680ff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        padding: '8px 20px',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}
-                    >
-                      <Send size={16} />
-                      Send reply
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={handleSendReply}
+                    disabled={sendingReply || !replyText.trim()}
+                    style={{
+                      background: '#4680ff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '8px 20px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <Send size={16} />
+                    {sendingReply ? 'Sending...' : 'Send reply'}
+                  </Button>
                 </div>
               </div>
             </Card.Body>
@@ -604,7 +619,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({ ticketId, onBack }) => {
         </Col>
 
         {/* Right Sidebar */}
-        <Col xs={12} lg={3}>
+        <Col xs={12} lg={3} style={{ display: 'none' }}>
           {/* Actions Card */}
           <Card style={{
             background: '#fff',

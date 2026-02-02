@@ -26,7 +26,7 @@ const WorkPlannerProjectsDetails = () => {
   const projectTabsContentRef = useRef<ProjectTabsContentRef>(null);
 
   // Fetch extensions using hierarchy API
-  const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
+  const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
 
   // Fetch project data
   useEffect(() => {
@@ -165,15 +165,14 @@ const WorkPlannerProjectsDetails = () => {
         }
       />
 
-      <Container fluid className="py-4">
-        <ProjectTabsContent
+<ProjectTabsContent
           ref={projectTabsContentRef}
           selectedProject={project}
           hierarchyDataExtensions={hierarchyDataExtensions}
           hierarchyLoading={hierarchyLoading}
           onCreateTask={handleCreateTask}
         />
-      </Container>
+        
     </React.Fragment>
   );
 };

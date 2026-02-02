@@ -113,7 +113,7 @@ const WorkPlannerProjects = () => {
     const [loading, setLoading] = useState(true);
     
     // Fetch extensions for getting user names
-    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
+    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
     const [showProjectModal, setShowProjectModal] = useState(false);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1543,7 +1543,7 @@ const WorkPlannerProjects = () => {
               )}
             </div>
           </Offcanvas.Title>
-          <div className="d-flex align-items-center gap-2" style={{ position: 'absolute', right: '3rem', top: '50%', transform: 'translateY(-50%)' }}>
+          <div className="d-flex align-items-center gap-2" >
             {selectedProject && (
               <Button
                 variant="link"
@@ -1678,7 +1678,7 @@ const WorkPlannerProjects = () => {
                         </>
                       ) : (
                         <>
-                          <div
+                          {/* <div
                             style={{
                               width: '28px',
                               height: '28px',
@@ -1695,7 +1695,7 @@ const WorkPlannerProjects = () => {
                             {selectedProject.apiData?.owner_extension_number 
                               ? getInitials(selectedProject.apiData.owner_extension_number)
                               : selectedProject.owner.split(' ').map(n => n[0]).join('')}
-                          </div>
+                          </div> */}
                           <span>
                             {selectedProject.apiData?.owner_extension_number 
                               ? getUserNameFromExtension(selectedProject.apiData.owner_extension_number)
