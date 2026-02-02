@@ -45,10 +45,9 @@ export const routePermissions: RoutePermission[] = [
     {path:'/chat/ai-bot-faqs',permissions: [PERMISSIONS.TMS_SERVICES]},
     {path:'/chat/ai-faqs/tenant',permissions: [PERMISSIONS.TMS_SERVICES]},
     {path:'/chat/ai-faqs/global',permissions: [PERMISSIONS.TMS_SERVICES]},
-    {path:'/company',permissions: ['set-company-image-control-hub']},
-    {path:'/staff-management/request-categories',permissions: [PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT]},
-    {path:'/staff-management/attendences',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
-    {path:'/staff-management/locations',permissions: ['']},
+    {path:'/company',permissions: ['set-company-image-users']},
+
+    
     {
         path: '/help-center',
         permissions: [''],
@@ -317,6 +316,10 @@ export const routePermissions: RoutePermission[] = [
                 ]
             },
             {
+                path: '/manage-extensions',
+                permissions: [PERMISSIONS.MANAGE_EXTENSIONS_AIML]
+            },
+            {
                 path: '/translate',
                 permissions: ['translate-aiml']
             },
@@ -525,6 +528,9 @@ export const routePermissions: RoutePermission[] = [
             { path: '/employees/onboarding',permissions: [PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT]},
             { path: '/approval-request',permissions: [PERMISSIONS.VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT]},
             { path: '/organizational-chart',permissions: [PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT]},
+            {path:'/request-categories',permissions: [PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT]},
+            {path:'/attendences',permissions: [PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT]},
+            {path:'/locations',permissions: [PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT]}
         ]
     },
 
@@ -622,8 +628,8 @@ export const routePermissions: RoutePermission[] = [
             { path: '/',permissions: ['view-cti']},
             { path: '/new',permissions: ['view-cti']},
             { path: '/dialer',permissions: ['dial-call-cti', 'merge-call-cti', 'transfer-call-cti']},
-            { path: '/management/campaigns',permissions: [PERMISSIONS.TMS_SERVICES]},
-            { path: '/management/agents',permissions: [PERMISSIONS.TMS_SERVICES]},
+            { path: '/management/campaigns',permissions: [PERMISSIONS.VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT]},
+            { path: '/management/agents',permissions: [PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT]},
 
         ]
     }

@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useCallback, useEffect, useMemo, useState } from "react";
+import React, { ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import EmployeeDetailSidebar from "@components/employee-sidebar";
@@ -34,6 +34,7 @@ import Select, { SingleValue } from "react-select";
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
 const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { useSession } from "next-auth/react";
 
 interface Document {
   id: string;
@@ -79,6 +80,7 @@ function hierarchyLabel(item: unknown): string {
 }
 
 const Employees = () => {
+  const { data: session } = useSession();
   const { hierarchyDataUsers, hierarchyDataDepartments, hierarchyDataCompanies, hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
 
   /** Resolve display name from extensions (user_id/extension_number) then fallback to profile fields */
@@ -94,14 +96,18 @@ const Employees = () => {
   }, [hierarchyDataExtensions]);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchTermApi, setSearchTermApi] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState("");
+  const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
   const [selectedStatus, setSelectedStatus] = useState("");
   const [selectedManager, setSelectedManager] = useState("");
   const [selectedEmploymentType, setSelectedEmploymentType] = useState("");
   const [selectedContract, setSelectedContract] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
+  const [statusSearchTerm, setStatusSearchTerm] = useState("");
+  const [managerSearchTerm, setManagerSearchTerm] = useState("");
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState("Personal");
 
@@ -138,6 +144,8 @@ const Employees = () => {
   const [createModalDepartments, setCreateModalDepartments] = useState<MainAppDepartment[]>([]);
   const [createModalUsers, setCreateModalUsers] = useState<MainAppUser[]>([]);
   const [locationsList, setLocationsList] = useState<Location[]>([]);
+  const [filterLocations, setFilterLocations] = useState<Location[]>([]);
+  const [loadingFilterLocations, setLoadingFilterLocations] = useState(false);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingLocations, setLoadingLocations] = useState(false);
@@ -166,7 +174,17 @@ const Employees = () => {
   const loadProfiles = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const { data, pagination: p } = await getUserProfiles({ page, limit: ITEMS_PER_PAGE });
+      const params: { page: number; limit: number; employment_type?: string; contract_type?: string; status?: string; location_id?: number; department?: string; search?: string } = {
+        page,
+        limit: ITEMS_PER_PAGE,
+      };
+      if (selectedEmploymentType?.trim()) params.employment_type = selectedEmploymentType.trim();
+      if (selectedContract?.trim()) params.contract_type = selectedContract.trim();
+      if (selectedStatus?.trim()) params.status = selectedStatus.trim().toLowerCase();
+      if (selectedLocationId != null) params.location_id = selectedLocationId;
+      if (selectedDepartment?.trim()) params.department = selectedDepartment.trim();
+      if (searchTermApi?.trim()) params.search = searchTermApi.trim();
+      const { data, pagination: p } = await getUserProfiles(params);
       setProfiles(data ?? []);
       if (p) setPagination({ page: p.page, limit: p.limit, total: p.total, last_page: p.last_page });
       else setPagination(null);
@@ -176,11 +194,39 @@ const Employees = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedEmploymentType, selectedContract, selectedStatus, selectedLocationId, selectedDepartment, searchTermApi]);
 
   useEffect(() => {
     loadProfiles(currentPage);
   }, [currentPage, loadProfiles]);
+
+  const loadProfilesRef = useRef(loadProfiles);
+  loadProfilesRef.current = loadProfiles;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedEmploymentType, selectedContract, selectedStatus, selectedLocationId, selectedDepartment, searchTermApi]);
+
+  const loadFilterLocations = useCallback(async () => {
+    setLoadingFilterLocations(true);
+    try {
+      const { data } = await getLocations({ limit: 500 });
+      setFilterLocations(Array.isArray(data) ? data : []);
+    } catch {
+      setFilterLocations([]);
+    } finally {
+      setLoadingFilterLocations(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFilterLocations();
+  }, [loadFilterLocations]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearchTermApi(searchTerm), 400);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
   const toggleDropdown = (dropdown: string) => {
     setOpenDropdown(openDropdown === dropdown ? null : dropdown);
@@ -548,27 +594,26 @@ const Employees = () => {
       const idNum = String(p.identification_number ?? "").toLowerCase();
       const title = String(p.job_title ?? "").toLowerCase();
       const dept = String(p.department_id ?? "").toLowerCase();
-      const loc = String((p as UserProfile & { location?: string }).location ?? p.location_id ?? "").toLowerCase();
       const status = String(p.status ?? "").toLowerCase();
       const search = searchTerm.toLowerCase().trim();
       const matchesSearch =
         !search || name.includes(search) || idNum.includes(search) || title.includes(search);
       const matchesDepartment = !selectedDepartment || dept.includes(selectedDepartment.toLowerCase());
-      const matchesLocation = !selectedLocation || loc.includes(selectedLocation.toLowerCase());
+      const matchesLocation = selectedLocationId == null || p.location_id === selectedLocationId;
       const matchesStatus = !selectedStatus || status.includes(selectedStatus.toLowerCase());
       return matchesSearch && matchesDepartment && matchesLocation && matchesStatus;
     });
-  }, [profiles, searchTerm, selectedDepartment, selectedLocation, selectedStatus]);
+  }, [profiles, searchTerm, selectedDepartment, selectedLocationId, selectedStatus]);
 
   const totalPages = pagination?.last_page ?? 1;
   const totalCount = pagination?.total ?? filteredProfiles.length;
   const departments = Array.isArray(hierarchyDataDepartments) && hierarchyDataDepartments.length > 0
     ? hierarchyDataDepartments
     : ["Engineering", "Marketing", "Sales", "HR", "Finance"];
-  const locations = Array.isArray(hierarchyDataCompanies) && hierarchyDataCompanies.length > 0
-    ? hierarchyDataCompanies
-    : ["Toronto", "New York", "London", "Paris"];
   const statuses = ["Active", "Inactive"];
+  const selectedLocationName = selectedLocationId != null
+    ? (filterLocations.find((l) => l.id === selectedLocationId)?.name ?? String(selectedLocationId))
+    : "";
   const managers = Array.isArray(hierarchyDataUsers) && hierarchyDataUsers.length > 0
     ? hierarchyDataUsers
     : ["Hassan Mir", "Apr 15 ago"];
@@ -585,13 +630,15 @@ const Employees = () => {
   
     const resetFilters = () => {
       setSelectedDepartment('');
-      setSelectedLocation('');
+      setSelectedLocationId(null);
       setSelectedStatus('');
       setSelectedManager('');
       setSelectedEmploymentType('');
       setSelectedContract('');
       setSearchTerm('');
+      setSearchTermApi('');
       setCurrentPage(1);
+      setTimeout(() => loadProfilesRef.current(1), 0);
     };
 
   return (
@@ -621,6 +668,8 @@ const Employees = () => {
           <h1 style={{ fontSize: "28px", fontWeight: "600", color: "#111827", margin: 0 }}>
             Employees
           </h1>
+
+          {session?.user?.permissions?.includes('add-employee-staff-management') && (
           <button
             type="button"
             onClick={openCreateModal}
@@ -641,6 +690,7 @@ const Employees = () => {
             <Plus size={18} />
             Add Employee
           </button>
+          )}
         </div>
 
         {/* Search Bar & Filters */}
@@ -714,29 +764,59 @@ const Employees = () => {
                 borderRadius: '8px',
                 boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
                 zIndex: 10,
-                minWidth: '200px'
+                minWidth: '200px',
+                maxHeight: '280px',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
               }}>
-                {departments.map((dept, idx) => {
-                  const label = hierarchyLabel(dept);
-                  return (
-                    <div
-                      key={typeof dept === "object" && dept !== null && "id" in (dept as object) ? (dept as { id?: string }).id ?? idx : label}
-                      onClick={() => {
-                        setSelectedDepartment(label);
-                        setOpenDropdown(null);
-                      }}
-                      style={{
-                        padding: '10px 16px',
-                        cursor: 'pointer',
-                        backgroundColor: selectedDepartment === label ? '#f3f4f6' : 'white'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedDepartment === label ? '#f3f4f6' : 'white'}
-                    >
-                      {label}
-                    </div>
-                  );
-                })}
+                <div style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>
+                  <input
+                    type="text"
+                    placeholder="Search department..."
+                    value={departmentSearchTerm}
+                    onChange={(e) => setDepartmentSearchTerm(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {departments
+                    .filter((dept) => {
+                      const label = hierarchyLabel(dept);
+                      return !departmentSearchTerm.trim() || label.toLowerCase().includes(departmentSearchTerm.trim().toLowerCase());
+                    })
+                    .map((dept, idx) => {
+                      const label = hierarchyLabel(dept);
+                      return (
+                        <div
+                          key={typeof dept === "object" && dept !== null && "id" in (dept as object) ? (dept as { id?: string }).id ?? idx : label}
+                          onClick={() => {
+                            setSelectedDepartment(label);
+                            setOpenDropdown(null);
+                            setDepartmentSearchTerm('');
+                          }}
+                          style={{
+                            padding: '10px 16px',
+                            cursor: 'pointer',
+                            backgroundColor: selectedDepartment === label ? '#f3f4f6' : 'white'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedDepartment === label ? '#f3f4f6' : 'white'}
+                        >
+                          {label}
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
             )}
           </div>
@@ -761,7 +841,7 @@ const Employees = () => {
               }}
             >
               <span>📍</span>
-              <span>Location</span>
+              <span>{selectedLocationName || 'Location'}</span>
               <ChevronDown size={16} />
             </button>
             {openDropdown === 'location' && (
@@ -777,27 +857,34 @@ const Employees = () => {
                 zIndex: 10,
                 minWidth: '200px'
               }}>
-                {locations.map((loc, idx) => {
-                  const label = hierarchyLabel(loc);
-                  return (
-                    <div
-                      key={typeof loc === "object" && loc !== null && "id" in (loc as object) ? (loc as { id?: string }).id ?? idx : label}
-                      onClick={() => {
-                        setSelectedLocation(label);
-                        setOpenDropdown(null);
-                      }}
-                      style={{
-                        padding: '10px 16px',
-                        cursor: 'pointer',
-                        backgroundColor: selectedLocation === label ? '#f3f4f6' : 'white'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedLocation === label ? '#f3f4f6' : 'white'}
-                    >
-                      {label}
-                    </div>
-                  );
-                })}
+                {loadingFilterLocations ? (
+                  <div style={{ padding: '12px 16px', color: '#6b7280', fontSize: '14px' }}>Loading locations…</div>
+                ) : filterLocations.length === 0 ? (
+                  <div style={{ padding: '12px 16px', color: '#6b7280', fontSize: '14px' }}>No locations</div>
+                ) : (
+                  filterLocations.map((loc) => {
+                    const label = loc.name ?? String(loc.id);
+                    const isSelected = selectedLocationId === loc.id;
+                    return (
+                      <div
+                        key={loc.id}
+                        onClick={() => {
+                          setSelectedLocationId(loc.id);
+                          setOpenDropdown(null);
+                        }}
+                        style={{
+                          padding: '10px 16px',
+                          cursor: 'pointer',
+                          backgroundColor: isSelected ? '#f3f4f6' : 'white'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f3f4f6'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isSelected ? '#f3f4f6' : 'white'; }}
+                      >
+                        {label}
+                      </div>
+                    );
+                  })
+                )}
               </div>
             )}
           </div>
@@ -892,34 +979,64 @@ const Employees = () => {
                 borderRadius: '8px',
                 boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
                 zIndex: 10,
-                minWidth: '200px'
+                minWidth: '200px',
+                maxHeight: '280px',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
               }}>
-                {managers.map((mgr, idx) => {
-                  const label = hierarchyLabel(mgr);
-                  return (
-                    <div
-                      key={typeof mgr === "object" && mgr !== null && "id" in (mgr as object) ? (mgr as { id?: string }).id ?? idx : label}
-                      onClick={() => {
-                        setSelectedManager(label);
-                        setOpenDropdown(null);
-                      }}
-                      style={{
-                        padding: '10px 16px',
-                        cursor: 'pointer',
-                        backgroundColor: selectedManager === label ? '#f3f4f6' : 'white'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedManager === label ? '#f3f4f6' : 'white'}
-                    >
-                      {label}
-                    </div>
-                  );
-                })}
+                <div style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>
+                  <input
+                    type="text"
+                    placeholder="Search manager..."
+                    value={managerSearchTerm}
+                    onChange={(e) => setManagerSearchTerm(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  {managers
+                    .filter((mgr) => {
+                      const label = hierarchyLabel(mgr);
+                      return !managerSearchTerm.trim() || label.toLowerCase().includes(managerSearchTerm.trim().toLowerCase());
+                    })
+                    .map((mgr, idx) => {
+                      const label = hierarchyLabel(mgr);
+                      return (
+                        <div
+                          key={typeof mgr === "object" && mgr !== null && "id" in (mgr as object) ? (mgr as { id?: string }).id ?? idx : label}
+                          onClick={() => {
+                            setSelectedManager(label);
+                            setOpenDropdown(null);
+                            setManagerSearchTerm('');
+                          }}
+                          style={{
+                            padding: '10px 16px',
+                            cursor: 'pointer',
+                            backgroundColor: selectedManager === label ? '#f3f4f6' : 'white'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedManager === label ? '#f3f4f6' : 'white'}
+                        >
+                          {label}
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Full-Time Filter */}
+          {/* Employment Type Filter */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={(e) => {
@@ -938,7 +1055,7 @@ const Employees = () => {
                 fontSize: '14px'
               }}
             >
-              <span>Full-Time</span>
+              <span>{selectedEmploymentType || 'Employment'}</span>
               <ChevronDown size={16} />
             </button>
             {openDropdown === 'employment' && (
@@ -954,7 +1071,23 @@ const Employees = () => {
                 zIndex: 10,
                 minWidth: '150px'
               }}>
-                {['Full-Time', 'Part-Time', 'Contract'].map(type => (
+                <div
+                  onClick={() => {
+                    setSelectedEmploymentType("");
+                    setOpenDropdown(null);
+                  }}
+                  style={{
+                    padding: '10px 16px',
+                    cursor: 'pointer',
+                    backgroundColor: !selectedEmploymentType ? '#f3f4f6' : 'white',
+                    borderBottom: '1px solid #e5e7eb'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedEmploymentType ? '#f3f4f6' : 'white'}
+                >
+                  All
+                </div>
+                {EMPLOYMENT_TYPES.map(type => (
                   <div
                     key={type}
                     onClick={() => {
@@ -976,7 +1109,7 @@ const Employees = () => {
             )}
           </div>
 
-          {/* Contract Filter */}
+          {/* Contract Type Filter */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={(e) => {
@@ -995,7 +1128,7 @@ const Employees = () => {
                 fontSize: '14px'
               }}
             >
-              <span>Contract</span>
+              <span>{selectedContract || 'Contract'}</span>
               <ChevronDown size={16} />
             </button>
             {openDropdown === 'contract' && (
@@ -1011,7 +1144,23 @@ const Employees = () => {
                 zIndex: 10,
                 minWidth: '150px'
               }}>
-                {['Permanent', 'Temporary', 'Freelance'].map(type => (
+                <div
+                  onClick={() => {
+                    setSelectedContract("");
+                    setOpenDropdown(null);
+                  }}
+                  style={{
+                    padding: '10px 16px',
+                    cursor: 'pointer',
+                    backgroundColor: !selectedContract ? '#f3f4f6' : 'white',
+                    borderBottom: '1px solid #e5e7eb'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedContract ? '#f3f4f6' : 'white'}
+                >
+                  All
+                </div>
+                {CONTRACT_TYPES.map(type => (
                   <div
                     key={type}
                     onClick={() => {
@@ -1034,7 +1183,7 @@ const Employees = () => {
           </div>
 
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px' }}>
-            <button
+            {/* <button
               onClick={handleExport}
               style={{
                 padding: '10px 20px',
@@ -1050,7 +1199,7 @@ const Employees = () => {
             >
               <Download size={16} />
               <span>Export</span>
-            </button>
+            </button> */}
             <button
               onClick={handleApply}
               style={{
@@ -1070,7 +1219,7 @@ const Employees = () => {
         </div>
 
         {/* Active Filters */}
-        {(selectedDepartment || selectedLocation || selectedStatus || selectedManager) && (
+        {(selectedDepartment || selectedLocationId != null || selectedStatus || selectedManager) && (
           <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: '14px', color: '#6b7280' }}>Active filters:</span>
             {selectedDepartment && (
@@ -1092,7 +1241,7 @@ const Employees = () => {
                 </button>
               </span>
             )}
-            {selectedLocation && (
+            {selectedLocationId != null && (
               <span style={{
                 padding: '4px 12px',
                 backgroundColor: '#e0e7ff',
@@ -1102,9 +1251,9 @@ const Employees = () => {
                 alignItems: 'center',
                 gap: '6px'
               }}>
-                {selectedLocation}
+                {selectedLocationName}
                 <button
-                  onClick={() => setSelectedLocation('')}
+                  onClick={() => setSelectedLocationId(null)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
                 >
                   ×
@@ -1309,6 +1458,7 @@ const Employees = () => {
                       </td>
                       <td style={{ padding: "16px" }} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          {session?.user?.permissions?.includes('update-employee-staff-management') && (
                           <button
                             type="button"
                             onClick={(e) => openEditModal(profile, e)}
@@ -1326,6 +1476,8 @@ const Employees = () => {
                           >
                             <Pencil size={16} color="#6366f1" />
                           </button>
+                          )}
+                          {session?.user?.permissions?.includes('delete-employee-staff-management') && (
                           <button
                             type="button"
                             onClick={(e) => handleDeleteClick(profile, e)}
@@ -1343,6 +1495,7 @@ const Employees = () => {
                           >
                             <Trash2 size={16} color="#dc2626" />
                           </button>
+                          )}
                         </div>
                       </td>
                     </tr>

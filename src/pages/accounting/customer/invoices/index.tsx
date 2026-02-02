@@ -1012,8 +1012,10 @@ const InvoiceList = () => {
             >
               Paid
             </Button> 
-
-            <Button 
+              </>
+             )}
+                      
+                      <Button 
               variant="info" 
               size="sm"
               style={{ 
@@ -1027,11 +1029,6 @@ const InvoiceList = () => {
               >
               Download
               </Button>
-
-
-              </>
-             )}
-                      
                         </div>
                        
             </>
@@ -2757,38 +2754,42 @@ const InvoiceList = () => {
                   <div className="border p-3 rounded bg-light mb-3">
                     <p className="mb-2 fw-bold">{selectedInvoiceForView?.company?.name || ''}</p>
                     <p className="mb-2">{selectedInvoiceForView?.company?.profile?.address || ''}</p>
-                    <p className="mb-0">{selectedInvoiceForView?.company?.country || ''}</p>
+                    <p className="mb-3">{selectedInvoiceForView?.company?.country || ''}</p>
+                  
+                    <p className="mb-0 fw-bold"><b>TRN No:</b> {selectedInvoiceForView?.company?.profile?.tax_id || ''}</p>
                   </div>
                 </Col>
                 <Col md={6}>
                 <table className="table table-borderless">
                       <tbody>
                         <tr>
-                          <td className="fw-bold p-1" style={{ verticalAlign: 'top', width: '40%' }}>Invoice Number:</td>
-                          <td className="p-1">{selectedInvoiceForView.invoice_number || 'N/A'}</td>
+                          <td className="fw-bold p-2" style={{ verticalAlign: 'top', width: '40%' }}>Invoice Number:</td>
+                          <td className="p-2">{selectedInvoiceForView.invoice_number || 'N/A'}</td>
                         </tr>
                         <tr>
-                          <td className="fw-bold p-1" style={{ verticalAlign: 'top' }}>Date:</td>
-                          <td className="p-1">
+                          <td className="fw-bold p-2" style={{ verticalAlign: 'top' }}>Invoice Date:</td>
+                          <td className="p-2">
                             {selectedInvoiceForView.invoice_date
                               ? moment(selectedInvoiceForView.invoice_date).format('DD MMM YYYY')
                               : 'N/A'}
                           </td>
                         </tr>
-                        
-                        <tr>
-                          <td className="fw-bold p-1" style={{ verticalAlign: 'top', width: '40%' }}>Terms:</td>
-                          <td className="p-1">{selectedInvoiceForView?.company?.reseller?.profile?.payment_terms+ ' days'}</td>
-                        </tr>
-                        
-                        <tr>
-                          <td className="fw-bold p-1" style={{ verticalAlign: 'top' }}>Invoice Period:</td>
-                          <td className="p-1">{selectedInvoiceForView?.invoice_date ? moment(selectedInvoiceForView?.invoice_date).format(GlobalDateFormat) : 'N/A'} to {selectedInvoiceForView?.due_date ? moment(selectedInvoiceForView?.due_date).format(GlobalDateFormat) : ''}</td>
-                        </tr>
 
                         <tr>
-                          <td className="fw-bold p-1" style={{ verticalAlign: 'top', width: '40%' }}>Due Date:</td>
-                          <td className="p-1">{selectedInvoiceForView?.due_date ? moment(selectedInvoiceForView?.due_date).format(GlobalDateFormat) : ''}</td>
+                          <td className="fw-bold p-2" style={{ verticalAlign: 'top' }}>End Date:</td>
+                          <td className="p-2">{selectedInvoiceForView?.due_date ? moment(selectedInvoiceForView?.due_date).format(GlobalDateFormat) : ''}</td>
+                        </tr>
+                        
+                        <tr>
+                          <td className="fw-bold p-2" style={{ verticalAlign: 'top', width: '40%' }}>Terms:</td>
+                          <td className="p-2">{selectedInvoiceForView?.company?.reseller?.profile?.payment_terms+ ' days'}</td>
+                        </tr>
+                        
+                        
+
+                        <tr>
+                          <td className="fw-bold p-2" style={{ verticalAlign: 'top', width: '40%' }}>Due Date:</td>
+                          <td className="p-2">{selectedInvoiceForView?.due_date ? moment(selectedInvoiceForView?.due_date).format(GlobalDateFormat) : ''}</td>
                         </tr>
 
                       </tbody>
@@ -2894,22 +2895,24 @@ const InvoiceList = () => {
                       <table className="table table-bordered table-sm">
                         <thead className="table-dark" style={{backgroundColor: '#0f3b66', color: 'white'}}>
                           <tr>
-                            {/* <th>#</th> */}
-                            <th className="text-start text-white">Product/Description</th>
-                            <th className="text-end text-white">Unit Price</th>
-                            <th className="text-end text-white">Quantity</th>
-                            <th className="text-end text-white">Vat</th>
-                            <th className="text-end text-white">Vat Amount</th>
-                            <th className="text-end text-white">Total Price</th>
+                            <th className="text-uppercase">Product Name</th>
+                            <th className="text-uppercase text-start">Product Description</th>
+                            <th className="text-uppercase text-end">QTY</th>
+                            <th className="text-uppercase text-end">Unit Price</th>
+                            <th className="text-uppercase text-end">Tax</th>
+                            <th className="text-uppercase text-end">Total</th>
+                            <th className="text-uppercase text-end">Total Price</th>
                           </tr>
                         </thead>
                         <tbody>
                           {selectedInvoiceForView.items.map((item: any, index: number) => (
                             
                             <tr key={item.id || index}>
-                              {/* <td>{index + 1}</td> */}
-                              <td className="text-start">
-                                <div>
+                              <td className="text-capitalize">{item.product?.name}</td>
+                              <td className="text-start" style={{whiteSpace: 'wrap'}}>
+                              <strong className="text-capitalize">{item.product?.name }</strong>
+                              <p className="mb-0">{item.description}</p>
+                                {/* <div>
                                   <strong>{item.product?.name || item.description || 'N/A'}</strong>
                                   {(() => {
                                     // Use item.description if available, otherwise use item.product.description
@@ -2941,17 +2944,23 @@ const InvoiceList = () => {
                                     }
                                     return null;
                                   })()}
-                                </div>
+                                </div> */}
                               </td>
-                              
+                              <td className="text-end">{item.quantity}</td>
                               <td className="text-end">
                                 {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.unit_price || '0'))}
                               </td>
-                              <td className="text-end">{item.quantity}</td>
-                              <td className="text-end">{formatNumber(parseFloat(item.tax_rate || '0'))}%</td>
+                              
+                              {/* <td className="text-end">{formatNumber(parseFloat(item.tax_rate || '0'))}%</td> */}
                               <td className="text-end">
                                 {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.tax_amount || '0'))}
                               </td>
+
+
+                              <td className="text-end">
+                                {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.line_total || '0'))}
+                              </td>
+                              
                               <td className="text-end">
                                 <strong>
                                   {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.tax_amount || '0') + parseFloat(item.line_total || '0'))}
@@ -2985,8 +2994,22 @@ const InvoiceList = () => {
                                 <tr> <td className="p-0 fw-bold">Vat Total</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.tax_amount || '0'))}</td> </tr>
                                 <tr> <td className="p-0 fw-bold">Total</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.total_amount || '0'))}</td> </tr>
                                 
-                                <tr style={{borderTop: '2px #000 solid'}}> <td className="p-0 fw-bold">Balance Paid</td> <td className="text-end fw-bold text-success">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.paid_amount || '0'))}</td> </tr>
-                              </table>
+
+                                {Number(selectedInvoiceForView.paid_amount) >= 0 && (
+                                <tr style={{borderTop: '2px #000 solid'}}>
+                                  <td className="p-0 fw-bold text-uppercase">Paid Amount</td>
+                                  <td className="text-end fw-bold text-success">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(String(selectedInvoiceForView.paid_amount ?? 0)))}</td>
+                                </tr>
+                                )}
+                                {Number(selectedInvoiceForView.amount_due) >= 0 && (
+                                <tr >
+                                  <td className="p-0 fw-bold text-uppercase">Due Amount</td>
+                                  <td className="text-end fw-bold text-danger">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(String(selectedInvoiceForView.amount_due ?? 0)))}</td>
+                                </tr>
+                                )}
+
+
+                           </table>
                         </Col>
                       </Row>
                     </div>

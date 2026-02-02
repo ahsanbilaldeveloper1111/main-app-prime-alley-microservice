@@ -894,3 +894,29 @@ export const DispatchCampaign = async (payload: {
     throw error;
   }
 };
+
+// ==================== Imagicle Trigger ====================
+
+/**
+ * GET imagicle-trigger/extensions?imagicles=node1,node2
+ * @param imagicles - Array of node names e.g. ["node1", "node2"]
+ */
+export const getImagicleTriggerExtensions = async (imagicles: string[]) => {
+  const imagiclesQuery = Array.isArray(imagicles) ? imagicles.join(',') : '';
+  const response = await axiosInstance.get('aiml/imagicle-trigger/extensions', {
+    params: { imagicles: imagiclesQuery }
+  });
+  return response.data;
+};
+
+/**
+ * POST imagicle-trigger/update
+ * @param payload - { imagicles: string[], extension_numbers: number[] }
+ */
+export const updateImagicleTrigger = async (payload: {
+  imagicles: string[];
+  extension_numbers: number[];
+}) => {
+  const response = await axiosInstance.post('aiml/imagicle-trigger/update', payload);
+  return response.data;
+};

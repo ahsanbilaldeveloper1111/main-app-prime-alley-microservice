@@ -4,6 +4,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import PageHeader from "@components/PageHeader";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import { useSession } from "next-auth/react";
 import {
   getLocations,
   getLocation,
@@ -20,7 +21,7 @@ import { ChevronLeft, ChevronRight, MapPin, Pencil, Plus, Trash2 } from "lucide-
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const emptyForm: Partial<LocationPayload> = {
   name: "",
@@ -31,6 +32,7 @@ const emptyForm: Partial<LocationPayload> = {
 };
 
 const Locations = () => {
+  const { data: session } = useSession();
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -221,6 +223,8 @@ const Locations = () => {
             </span>
           )}
         </div>
+
+        {session?.user?.permissions?.includes('add-location-staff-management') && (
         <Button
           variant="primary"
           size="sm"
@@ -237,6 +241,7 @@ const Locations = () => {
           <Plus size={18} />
           Add Location
         </Button>
+        )}
       </div>
 
       <div
@@ -322,6 +327,8 @@ const Locations = () => {
                     </td>
                     <td style={{ padding: "16px", textAlign: "center" }}>
                       <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                       
+                        {session?.user?.permissions?.includes('update-location-staff-management') && (
                         <button
                           type="button"
                           onClick={() => openEditModal(loc)}
@@ -349,6 +356,9 @@ const Locations = () => {
                         >
                           <Pencil size={18} />
                         </button>
+                        )}
+                        {session?.user?.permissions?.includes('delete-location-staff-management') && (
+                        
                         <button
                           type="button"
                           onClick={() => openDeleteModal(loc)}
@@ -376,6 +386,8 @@ const Locations = () => {
                         >
                           <Trash2 size={18} />
                         </button>
+                        )}
+                      
                       </div>
                     </td>
                   </tr>

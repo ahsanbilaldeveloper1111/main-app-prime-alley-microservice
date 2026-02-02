@@ -13,6 +13,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { useSession } from "next-auth/react";
 import axiosInstance from "@utils/axios";
+import { getCurrentUserCompanyImage } from "@utils/company";
 import { toast } from "react-toastify";
 import { Upload, Trash2, Building2 } from "lucide-react";
 import ThemeSelect from "@components/ThemeSelect";
@@ -54,17 +55,6 @@ async function getCompanyImage(companyId: string): Promise<Blob | null> {
 
 async function deleteCompanyImage(companyId: string): Promise<void> {
   await axiosInstance.delete(`${PREFIX}/image`, { params: { company_id: companyId } });
-}
-
-async function getCurrentUserCompanyImage(): Promise<Blob | null> {
-  try {
-    const { data } = await axiosInstance.get<Blob>(`${PREFIX}/image`, {
-      responseType: "blob",
-    });
-    return data;
-  } catch {
-    return null;
-  }
 }
 
 const CompanyData = () => {
@@ -416,7 +406,7 @@ const CompanyData = () => {
                 {selectedCompanyId && (
                   <div>
                     <span style={{ fontSize: 14, fontWeight: 500, color: "#374151", display: "block", marginBottom: 8 }}>
-                      Current logo
+                      Current logo {selectedCompanyId}
                     </span>
                     <div
                       style={{

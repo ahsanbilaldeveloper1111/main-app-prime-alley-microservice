@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import { Button, Modal } from "react-bootstrap";
 import { ModuleSlug } from "@utils/Helper";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
+import { useSession } from "next-auth/react";
 import {
   X,
   Calendar,
@@ -66,6 +67,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
   onDeleteClick,
   downloadAttachment,
 }) => {
+  const { data: session } = useSession();
   const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
 
   const getDisplayName = useCallback(
@@ -298,6 +300,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
           Approval Detail
         </h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {session?.user?.permissions?.includes('update-approval-request-staff-management') && (
           <button
             type="button"
             onClick={() => onEditClick?.(request)}
@@ -323,7 +326,8 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
           >
             <Pencil size={20} />
           </button>
-          {onDeleteClick && (
+          )}
+          {session?.user?.permissions?.includes('delete-approval-request-staff-management') && onDeleteClick && (
             <button
               type="button"
               onClick={() => onDeleteClick?.(request)}
@@ -350,6 +354,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
               <Trash2 size={20} />
             </button>
           )}
+          
           <button
             type="button"
             onClick={onClose}
@@ -591,6 +596,8 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
         }}>
           {isPending ? (
             <>
+         
+         {session?.user?.permissions?.includes('approve-request-approval-request-staff-management') && (
           <button
             type="button"
             onClick={handleApprove}
@@ -617,6 +624,9 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
             <CheckCircle size={18} />
             Approve
           </button>
+          )}
+
+          {session?.user?.permissions?.includes('reject-request-approval-request-staff-management') && (
           <button
             type="button"
             onClick={handleReject}
@@ -643,6 +653,9 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
             <XCircle size={18} />
             Reject
           </button>
+          )}
+
+          {session?.user?.permissions?.includes('request-changes-approval-request-staff-management') && (
           <button
             type="button"
             onClick={handleRequestChanges}
@@ -669,6 +682,10 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
             <Edit3 size={16} />
             Request Changes
           </button>
+          )}
+
+
+
             </>
           ) : null}
         </div>

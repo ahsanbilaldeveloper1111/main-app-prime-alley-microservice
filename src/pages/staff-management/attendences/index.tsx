@@ -18,14 +18,16 @@ import { Button, Spinner } from "react-bootstrap";
 import moment from "moment";
 import { GlobalDateTimeFormat, ModuleSlug } from "@utils/Helper";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
+import { useSession } from "next-auth/react";
 import { Calendar, ChevronLeft, ChevronRight, Clock, LogIn, LogOut, Trash2, User } from "lucide-react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 const Attendences = () => {
+  const { data: session } = useSession();
   const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
 
   /** Resolve display name from extensions by user_id (or extension_number / id) */
@@ -193,6 +195,7 @@ const Attendences = () => {
               </div>
             ) : status ? (
               <>
+              {records.length > 0 && (
                 <div
                   style={{
                     display: "inline-flex",
@@ -209,6 +212,7 @@ const Attendences = () => {
                   <Clock size={18} />
                   {status.is_checked_in ? "Checked in" : "Checked out"}
                 </div>
+                )}
                 {status.work_date && (
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", color: "#6b7280" }}>
                     <Calendar size={16} />
@@ -228,6 +232,7 @@ const Attendences = () => {
               </div>
             )}
           </div>
+          {session?.user?.permissions?.includes('check-in-out-attendence-staff-management') && (
           <div style={{ display: "flex", gap: "10px" }}>
             <Button
               variant="success"
@@ -264,6 +269,8 @@ const Attendences = () => {
               {checkInOutLoading ? "…" : "Check Out"}
             </Button>
           </div>
+          )}
+
         </div>
       </div>
 
@@ -314,7 +321,7 @@ const Attendences = () => {
                 <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
                     <User size={14} />
-                    User ID
+                    User Name
                   </span>
                 </th>
                 <th style={{ padding: "14px 16px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -387,6 +394,7 @@ const Attendences = () => {
                         : "—"}
                     </td>
                     <td style={{ padding: "16px", textAlign: "center" }}>
+                      {/* {session?.user?.permissions?.includes('delete-attendence-staff-management') && ( */}
                       <button
                         type="button"
                         onClick={() => openDeleteModal(record)}
@@ -414,6 +422,7 @@ const Attendences = () => {
                       >
                         <Trash2 size={18} />
                       </button>
+                      {/* )} */}
                     </td>
                   </tr>
                 ))

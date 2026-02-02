@@ -5,6 +5,7 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import PageHeader from "@components/PageHeader";
 import { Button, Modal, Form } from "react-bootstrap";
 import { toast } from "react-toastify";
+import { useSession } from "next-auth/react";
 import {
   getUserRequestCategories,
   createUserRequestCategory,
@@ -58,6 +59,7 @@ function slugifyForKey(label: string): string {
 }
 
 const RequestCategories = () => {
+  const { data: session } = useSession();
   const [categories, setCategories] = useState<UserRequestCategory[]>([]);
   const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; last_page: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -307,10 +309,14 @@ const RequestCategories = () => {
         title="Request Categories"
         showSearch={false}
         buttons={
+          <>
+          {session?.user?.permissions?.includes('manage-request-categories-staff-management') && (
           <Button variant="primary" onClick={openCreateCategory}>
             <Plus size={18} className="me-1" />
             Add Category
           </Button>
+          )}
+          </>
         }
       />
 
@@ -391,7 +397,9 @@ const RequestCategories = () => {
                         </span>
                       </td>
                       <td style={{ padding: "16px" }}>
-                        <button
+                        {session?.user?.permissions?.includes('manage-request-categories-staff-management') && (
+                       <>
+                       <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -446,6 +454,8 @@ const RequestCategories = () => {
                         >
                           <Trash2 size={14} />
                         </button>
+                        </>
+                        )}
                       </td>
                     </tr>
                   ))

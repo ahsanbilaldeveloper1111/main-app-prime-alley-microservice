@@ -2,15 +2,19 @@ import React, { useMemo } from 'react';
 import { Column } from '@components/CustomDataTable';
 import { FiEdit } from 'react-icons/fi';
 import DatatableActionButton from '@components/DatatableActionButton';
-import { Button } from 'react-bootstrap';
+import { Button, Dropdown } from 'react-bootstrap';
 import { Eye, Key } from 'lucide-react';
+import { updateUserStatus } from '@utils/users';
+
+const STATUS_OPTIONS = ['Active', 'Disabled', 'Pending', 'Deleted'] as const;
 
 interface UseUserColumnsOptions {
     onResetPassword?: (username: string) => void;
+    onChangeStatus?: (encId: string, status: string) => void;
 }
 
 export const useUserColumns = (session: any, customFieldColumns: Column[], options?: UseUserColumnsOptions) => {
-    const { onResetPassword } = options || {};
+    const { onResetPassword, onChangeStatus } = options || {};
     // Memoize base columns to prevent recreation on every render
     const baseColumns: Column[] = useMemo(() => [
         { key: 'name', name: 'Display Name', selector: (row: any) => row.name, sortable: true },
@@ -52,6 +56,15 @@ export const useUserColumns = (session: any, customFieldColumns: Column[], optio
                 return props.company?.name || '---';
             }
         },
+        { 
+            key: 'Status', 
+            name: 'status', 
+            selector: (row: any) => row.status, 
+            sortable: true,
+            cell: (props: any) => {
+                return props.status
+            }
+        },
     ], [session?.user?.permissions]);
 
     // Action column kept last
@@ -83,9 +96,30 @@ export const useUserColumns = (session: any, customFieldColumns: Column[], optio
                         <Eye size={16} />
                     </Button>
                 )}
+
+{session?.user?.permissions?.includes('change-status-users') && (
+                    <Dropdown align="end" onSelect={async (status) => {
+                        if (!status) return;
+                        const response = await updateUserStatus(props.encId, status);
+                        if (response) {
+                            onChangeStatus?.(props.encId, status);
+                        }
+                    }}>
+                        <Dropdown.Toggle variant="outline-primary" size="sm" className="" title="Status" id={`status-dropdown-${props.encId}`}>
+                            Change Status
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu>
+                            {STATUS_OPTIONS.filter((status) => status.toLowerCase() !== (props.status || '').toLowerCase()).map((status) => (
+                                <Dropdown.Item key={status} eventKey={status}>
+                                    {status}
+                                </Dropdown.Item>
+                            ))}
+                        </Dropdown.Menu>
+                    </Dropdown>
+                )}
             </div>
         ),
-    }), [session?.user?.permissions, onResetPassword]);
+    }), [session?.user?.permissions, onResetPassword, onChangeStatus]);
 
     // Memoize the columns array to prevent unnecessary re-renders
     const columns: Column[] = useMemo(() => {

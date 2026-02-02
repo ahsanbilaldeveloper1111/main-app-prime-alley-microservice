@@ -107,6 +107,34 @@ function getAgingLabel(iso: string | null | undefined): string {
   }
 }
 
+type ExtensionLike = {
+  extension_number?: string | number;
+  extensionNumber?: string | number;
+  user_id?: string | number;
+  userId?: string | number;
+  name?: string;
+  user?: { name?: string };
+  id?: string | number;
+  [key: string]: unknown;
+};
+
+function getExtensionDisplayName(ext: ExtensionLike): string {
+  return String(ext?.user?.name ?? ext?.name ?? ext?.extension_number ?? ext?.extensionNumber ?? ext?.user_id ?? ext?.userId ?? "—");
+}
+
+function getExtensionNumber(ext: ExtensionLike): string | null {
+  const num = ext?.extension_number ?? ext?.extensionNumber ?? ext?.user_id ?? ext?.userId ?? ext?.id;
+  if (num == null || num === "") return null;
+  return String(num);
+}
+
+function getExtensionOptionLabel(ext: ExtensionLike): string {
+  const displayName = getExtensionDisplayName(ext);
+  return displayName;
+  const extNum = getExtensionNumber(ext);
+  return extNum ? `${displayName} (${extNum})` : displayName;
+}
+
 const ApprovalRequest = () => {
   const { data: session } = useSession();
   const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
@@ -139,7 +167,8 @@ const ApprovalRequest = () => {
   const [activeTab, setActiveTab] = useState<"Pending" | "Approved" | "Rejected">("Pending");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState("");
-  const [selectedRequestedBy, setSelectedRequestedBy] = useState("");
+  const [selectedRequestedByExtensionNumber, setSelectedRequestedByExtensionNumber] = useState<string | null>(null);
+  const [requestedBySearchTerm, setRequestedBySearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedAging, setSelectedAging] = useState("");
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
@@ -280,6 +309,9 @@ const ApprovalRequest = () => {
         if (searchTerm?.trim()) params.search = searchTerm.trim();
         const category = selectedType ? categories.find((c) => (c.name ?? c.code ?? String(c.id)) === selectedType) : undefined;
         if (category?.id != null) params.user_request_category_id = category.id;
+        const extNumForApi = selectedRequestedByExtensionNumber != null ? String(selectedRequestedByExtensionNumber).trim() : "";
+        if (extNumForApi) params.user_id = extNumForApi;
+        if (selectedDate?.trim()) params.created_at = selectedDate.trim();
         const { data, pagination: p } = await getUserRequests(params);
         setRequests(data ?? []);
         if (p) setRequestsPagination({ page: p.page, limit: p.limit, total: p.total, last_page: p.last_page });
@@ -291,12 +323,16 @@ const ApprovalRequest = () => {
         setLoadingRequests(false);
       }
     },
-    [activeTab, isAdmin, selectedTenantId, searchTerm, selectedType, categories]
+    [activeTab, isAdmin, selectedTenantId, searchTerm, selectedType, selectedRequestedByExtensionNumber, selectedDate, categories]
   );
 
   useEffect(() => {
     loadRequests(currentPage);
   }, [currentPage, loadRequests]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedRequestedByExtensionNumber, selectedDate]);
 
   const refreshRequests = useCallback(() => {
     loadRequests(currentPage);
@@ -436,7 +472,14 @@ const ApprovalRequest = () => {
   const typeOptionsFromCategories = useMemo(() => categories.map((c) => c.name ?? c.code ?? String(c.id)), [categories]);
 
   const types = typeOptionsFromCategories.length > 0 ? typeOptionsFromCategories : ["Leave", "Document", "Onboarding", "Profile"];
-  const requestedByOptions = ["Adeel Raza", "Farah Ahmed", "Zohaib Rehman", "Hassan Mir"];
+  const requestedByExtensions = (Array.isArray(hierarchyDataExtensions) ? hierarchyDataExtensions : []) as unknown as ExtensionLike[];
+  const selectedRequestedByExtension = requestedByExtensions.find(
+    (ext) => getExtensionNumber(ext) !== null && getExtensionNumber(ext) === selectedRequestedByExtensionNumber
+  );
+  const selectedRequestedByName =
+    selectedRequestedByExtensionNumber != null
+      ? (selectedRequestedByExtension ? getExtensionOptionLabel(selectedRequestedByExtension) : selectedRequestedByExtensionNumber)
+      : "";
   const dateOptions = ["Last 7 days", "Last 30 days", "Last 3 months", "All time"];
   const agingOptions = ["Less than 1 day", "1-3 days", "3-7 days", "More than 7 days"];
 
@@ -506,10 +549,10 @@ const ApprovalRequest = () => {
           <h1 style={{ fontSize: "28px", fontWeight: "600", color: "#111827", margin: 0 }}>
             Approval Requests
           </h1>
+          {session?.user?.permissions?.includes('add-approval-request-staff-management') && (
           <button
             type="button"
             onClick={openCreateModal}
-            disabled={categories.length === 0 || (isAdmin && !selectedTenantId)}
             style={{
               display: "flex",
               alignItems: "center",
@@ -527,6 +570,7 @@ const ApprovalRequest = () => {
             <Plus size={18} />
             New Request
           </button>
+          )}
         </div>
         {/* Tabs */}
         <div style={{ 
@@ -711,12 +755,12 @@ const ApprovalRequest = () => {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <User size={16} />
-                <span>{selectedRequestedBy || 'Requested by'}</span>
+                <span>{selectedRequestedByName || 'Requested by'}</span>
               </div>
               <ChevronDown size={16} />
             </button>
             {showRequestedByDropdown && (
-              <div style={{
+              <div onClick={(e) => e.stopPropagation()} style={{
                 position: 'absolute',
                 top: '100%',
                 left: 0,
@@ -726,44 +770,85 @@ const ApprovalRequest = () => {
                 borderRadius: '8px',
                 boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
                 zIndex: 10,
-                minWidth: '200px'
+                minWidth: '200px',
+                maxHeight: '280px',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
               }}>
-                <div
-                  onClick={() => {
-                    setSelectedRequestedBy('');
-                    setShowRequestedByDropdown(false);
-                  }}
-                  style={{
-                    padding: '10px 16px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#6366f1'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                >
-                  All Users
+                <div style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>
+                  <input
+                    type="text"
+                    placeholder="Search user..."
+                    value={requestedBySearchTerm}
+                    onChange={(e) => setRequestedBySearchTerm(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
                 </div>
-                {requestedByOptions.map(person => (
+                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   <div
-                    key={person}
                     onClick={() => {
-                      setSelectedRequestedBy(person);
+                      setSelectedRequestedByExtensionNumber(null);
                       setShowRequestedByDropdown(false);
+                      setRequestedBySearchTerm('');
                     }}
                     style={{
                       padding: '10px 16px',
                       cursor: 'pointer',
                       fontSize: '14px',
-                      backgroundColor: selectedRequestedBy === person ? '#f3f4f6' : 'white'
+                      fontWeight: '500',
+                      color: '#6366f1',
+                      backgroundColor: selectedRequestedByExtensionNumber === null ? '#f3f4f6' : 'white'
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedRequestedBy === person ? '#f3f4f6' : 'white'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedRequestedByExtensionNumber === null ? '#f3f4f6' : 'white'}
                   >
-                    {person}
+                    All Users
                   </div>
-                ))}
+                  {requestedByExtensions
+                    .filter((ext) => getExtensionNumber(ext) != null)
+                    .filter((ext) => {
+                      const label = getExtensionOptionLabel(ext);
+                      return !requestedBySearchTerm.trim() || label.toLowerCase().includes(requestedBySearchTerm.trim().toLowerCase());
+                    })
+                    .map((ext, idx) => {
+                      const label = getExtensionOptionLabel(ext);
+                      const extNum = getExtensionNumber(ext);
+                      const key = extNum ?? `ext-${idx}`;
+                      const isSelected = selectedRequestedByExtensionNumber != null && extNum === selectedRequestedByExtensionNumber;
+                      return (
+                        <div
+                          key={key}
+                          onClick={() => {
+                            if (extNum != null) {
+                              setSelectedRequestedByExtensionNumber(extNum);
+                              setShowRequestedByDropdown(false);
+                              setRequestedBySearchTerm('');
+                            }
+                          }}
+                          style={{
+                            padding: '10px 16px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            backgroundColor: isSelected ? '#f3f4f6' : 'white'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#f3f4f6' : 'white'}
+                        >
+                          {label}
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
             )}
           </div>
@@ -843,7 +928,7 @@ const ApprovalRequest = () => {
           </div>
 
           {/* All Aging Filter */}
-          <div style={{ position: 'relative' }}>
+          {/* <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowAgingDropdown(!showAgingDropdown)}
               style={{
@@ -914,7 +999,7 @@ const ApprovalRequest = () => {
                 ))}
               </div>
             )}
-          </div>
+          </div> */}
 
           <button
             onClick={() => {
