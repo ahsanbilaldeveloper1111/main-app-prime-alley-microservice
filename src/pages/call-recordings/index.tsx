@@ -3,7 +3,7 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
 import { io, Socket } from "socket.io-client";
 import { Col, Button, Card, Modal, Row, Form } from 'react-bootstrap';
-import { BarChart3 } from 'lucide-react';
+
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import type { NextPage } from 'next';
@@ -27,7 +27,9 @@ import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 import EmptyState from '@components/EmptyState';
 import { ModuleSlug } from '@utils/Helper';
 import SelectBox from '@components/SelectBox';
-
+import { BarChart3, Hash, Phone, PhoneIncoming, PhoneOutgoing, Filter } from 'lucide-react';
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import GenericFilterSidebar, { FilterFieldType } from '@components/GenericFilterSidebar';
 
 import '@assets/scss/common.scss';
 
@@ -127,7 +129,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>(defaultFilters.applied); // Filters that trigger API calls
   const [searchValue, setSearchValue] = useState<string>('');
   const [showAnalytics, setShowAnalytics] = useState<boolean>(false);
-  
+  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   // Refs to prevent duplicate API calls
   const appliedFiltersRef = useRef<Record<string, any>>(defaultFilters.applied);
   const isFetchingRef = useRef(false);
@@ -173,6 +175,42 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     inbound: 0,
     outbound: 0
   });
+
+  // Stats cards data for StatsCards component
+  const statsCardsData = [
+    {
+      title: 'Extensions',
+      value: summary?.extensions || 0,
+      icon: Hash,
+      iconColor: '#8B5CF6',
+      iconBgColor: '#EDE9FE',
+      subtitle: 'Extensions in the system',
+    },
+    {
+      title: 'Remote Numbers',
+      value: summary?.numbers || 0,
+      icon: Phone,
+      iconColor: '#3B82F6',
+      iconBgColor: '#DBEAFE',
+      subtitle: 'Remote numbers in the system',
+    },
+    {
+      title: 'Inbound',
+      value: summary?.inbound || 0,
+      icon: PhoneIncoming,
+      iconColor: '#10B981',
+      iconBgColor: '#D1FAE5',
+      subtitle: 'Inbound calls in the system',
+    },
+    {
+      title: 'Outbound',
+      value: summary?.outbound || 0,
+      icon: PhoneOutgoing,
+      iconColor: '#0EA5E9',
+      iconBgColor: '#E0F2FE',
+      subtitle: 'Outbound calls in the system',
+    },
+  ];
 
   // Create cards data for PageSummaryGrid
   const summaryCards: SummaryCard[] = [
@@ -1065,18 +1103,23 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
                     <Col md={8} className="d-flex justify-content-end">
                       
-                    <div className="action-buttons">
+                    <div className="action-buttons d-flex align-items-center gap-2">
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={() => setShowFiltersSidebar(true)}
+                        className="d-flex align-items-center"
+                        style={{ fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', padding: '0.5rem 1rem' }}
+                      >
+                        <Filter size={16} className="me-1" />
+                        Filters
+                      </Button>
                       <Button
                         variant={showAnalytics ? "primary" : "outline-secondary"}
                         size="sm"
                         onClick={() => setShowAnalytics(!showAnalytics)}
                         className="d-flex align-items-center"
-                        style={{ 
-                          fontSize: '0.875rem',
-                          fontWeight: 500,
-                          whiteSpace: 'nowrap',
-                          padding: '0.5rem 1rem'
-                        }}
+                        style={{ fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', padding: '0.5rem 1rem' }}
                       >
                         <BarChart3 size={16} className="me-1" />
                         <span>{showAnalytics ? 'Hide Analytics' : 'Show Analytics'}</span>
@@ -1095,8 +1138,10 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
     
 
-      <PageSummaryGrid cards={summaryCards} />
-
+      {/* <PageSummaryGrid cards={summaryCards} /> */}
+      <div className="mb-4">
+        <StatsCards data={statsCardsData} gridMinWidth="180px" />
+      </div>
       {/* Charts */}
       {showAnalytics && (
       <Row className="mb-3">
@@ -1380,6 +1425,127 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                  tableStyle='table-style-2'
              />
             )}
+
+<GenericFilterSidebar
+        isOpen={showFiltersSidebar}
+        onClose={() => setShowFiltersSidebar(false)}
+        title="Filters"
+        subtitle="Filter and refine call recordings"
+        width="400px"
+        filters={[
+          {
+            id: 'call_direction',
+            label: 'Call Direction',
+            type: 'select',
+            value: (currentFilters as any)?.call_direction
+              ? { value: (currentFilters as any).call_direction, label: (currentFilters as any).call_direction === 'OUTGOING' ? 'Outgoing' : (currentFilters as any).call_direction === 'INCOMING' ? 'Incoming' : 'Both' }
+              : null,
+            onChange: (selected: any) => setCurrentFilters({ ...currentFilters, call_direction: selected?.value ?? '' }),
+            options: [
+              { value: 'OUTGOING', label: 'Outgoing' },
+              { value: 'INCOMING', label: 'Incoming' },
+              { value: 'Both', label: 'Both' },
+            ],
+            placeholder: 'Select call direction',
+            isClearable: true,
+          },
+          {
+            id: 'extension_number',
+            label: 'Extension',
+            type: 'multi-select',
+            value: ((currentFilters as any)?.extension_number || []).map((id: string) => {
+              const ext = (hierarchyDataExtensions as any)?.find((e: any) => e.id === id);
+              return ext ? { value: ext.id, label: ext.name } : { value: id, label: id };
+            }).filter((o: { value: string; label: string }) => o.value),
+            onChange: (selected: any) => setCurrentFilters({ ...currentFilters, extension_number: selected ? selected.map((s: any) => s.value) : [] }),
+            options: (hierarchyDataExtensions as any)?.map((ext: any) => ({ value: ext.id, label: ext.name })) || [],
+            placeholder: 'Select extensions',
+            isClearable: true,
+          },
+          {
+            id: 'department',
+            label: 'Departments',
+            type: 'multi-select',
+            value: ((currentFilters as any)?.department || []).map((id: string) => {
+              const dept = (hierarchyDataDepartments as any)?.find((d: any) => d.id === id);
+              return dept ? { value: dept.id, label: dept.name } : { value: id, label: id };
+            }).filter((o: { value: string; label: string }) => o.value),
+            onChange: (selected: any) => setCurrentFilters({ ...currentFilters, department: selected ? selected.map((s: any) => s.value) : [] }),
+            options: (hierarchyDataDepartments as any)?.map((d: any) => ({ value: d.id, label: d.name })) || [],
+            placeholder: 'Select departments',
+            isClearable: true,
+          },
+          {
+            id: 'username',
+            label: 'Username',
+            type: 'select',
+            value: (currentFilters as any)?.username
+              ? (() => {
+                  const uid = (currentFilters as any).username;
+                  const user = (hierarchyDataUsers as any)?.find((u: any) => u.id === uid);
+                  return user ? { value: user.id, label: user.name } : { value: uid, label: uid };
+                })()
+              : null,
+            onChange: (selected: any) => setCurrentFilters({ ...currentFilters, username: selected?.value ?? '' }),
+            options: (hierarchyDataUsers as any)?.map((u: any) => ({ value: u.id, label: u.name })) || [],
+            placeholder: 'Select username',
+            isClearable: true,
+          },
+          {
+            id: 'remote_party_number',
+            label: 'Remote Party Numbers',
+            type: 'text',
+            value: ((currentFilters as any)?.remote_party_number || []).join(', '),
+            onChange: (v: string) => {
+              const values = v.split(',').map((s) => s.trim()).filter(Boolean);
+              setCurrentFilters({ ...currentFilters, remote_party_number: values });
+            },
+            placeholder: 'Enter remote party numbers (comma separated)',
+          },
+          {
+            id: 'start_date',
+            label: 'Start Date & Time',
+            type: 'datetime' as FilterFieldType,
+            value: (currentFilters as any)?.start_date || '',
+            onChange: (v: string | null) => {
+              const datetimeValue = v || '';
+              const endDate = (currentFilters as any)?.end_date || '';
+              let next: Record<string, any> = { ...currentFilters, start_date: datetimeValue };
+              if (datetimeValue && endDate && moment(datetimeValue).isAfter(moment(endDate))) next.end_date = datetimeValue;
+              setCurrentFilters(next);
+            },
+            placeholder: 'Start',
+          },
+          {
+            id: 'end_date',
+            label: 'End Date & Time',
+            type: 'datetime' as FilterFieldType,
+            value: (currentFilters as any)?.end_date || '',
+            onChange: (v: string | null) => {
+              const datetimeValue = v || '';
+              const startDate = (currentFilters as any)?.start_date || '';
+              let next: Record<string, any> = { ...currentFilters, end_date: datetimeValue };
+              if (datetimeValue && startDate && moment(datetimeValue).isBefore(moment(startDate))) next.start_date = datetimeValue;
+              setCurrentFilters(next);
+            },
+            placeholder: 'End',
+          },
+        ]}
+        onApply={() => {
+          handleFiltersChange(currentFilters);
+          setRefreshKey((prev) => prev + 1);
+        }}
+        onReset={() => {
+          const resetCurrent: Record<string, any> = {
+            start_date: (currentFilters as any)?.start_date ?? defaultFilters.current.start_date,
+            end_date: (currentFilters as any)?.end_date ?? defaultFilters.current.end_date,
+          };
+          setCurrentFilters(resetCurrent);
+          setSearchValue('');
+          handleFiltersChange(resetCurrent);
+          setRefreshKey((prev) => prev + 1);
+        }}
+      />
 
       {/* Media Player Modal */}
       <Modal

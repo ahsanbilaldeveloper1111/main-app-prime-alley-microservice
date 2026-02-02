@@ -30,6 +30,9 @@ import "nprogress/nprogress.css";
 import PageLoader from '@components/PageLoader';
 
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, PhoneOff } from 'lucide-react';
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+
 import { motion } from 'framer-motion';
 
 
@@ -112,6 +115,48 @@ const CallDashboard = () => {
         totalAvgDuration: 0,
         totalAvgCost: 0,
     });
+    const statsCardsData = [
+      {
+          title: 'Total Calls',
+          value: generalStats.totalCalls,
+          icon: Phone,
+          iconColor: '#3B82F6',
+          iconBgColor: '#DBEAFE',
+          subtitle: 'Total calls in the system',
+      },
+      {
+          title: 'Inbound',
+          value: generalStats.totalInbound,
+          icon: PhoneIncoming,
+          iconColor: '#10B981',
+          iconBgColor: '#D1FAE5',
+          subtitle: 'Inbound calls in the system',
+      },
+      {
+          title: 'Outbound',
+          value: generalStats.totalOutbound,
+          icon: PhoneOutgoing,
+          iconColor: '#0EA5E9',
+          iconBgColor: '#E0F2FE',
+          subtitle: 'Outbound calls in the system',
+      },
+      {
+          title: 'Missed Incoming',
+          value: generalStats.totalMissedIncoming,
+          icon: PhoneMissed,
+          iconColor: '#F59E0B',
+          iconBgColor: '#FEF3C7',
+          subtitle: 'Missed incoming calls in the system',
+      },
+      {
+          title: 'Missed Outgoing',
+          value: generalStats.totalMissedOutgoing,
+          icon: PhoneOff,
+          iconColor: '#EF4444',
+          iconBgColor: '#FEE2E2',
+          subtitle: 'Missed outgoing calls in the system',
+      },
+  ];
 
     // Create cards data for PageSummaryGrid
     const summaryCards: SummaryCard[] = [
@@ -738,10 +783,12 @@ const [ExtensionChart, setExtensionChart] = React.useState({
 
 
 
-            <PageSummaryGrid 
+            {/* <PageSummaryGrid 
               cards={summaryCards} 
-            />
-
+            /> */}
+             <div className="mb-4">
+              <StatsCards data={statsCardsData} gridMinWidth="180px" />
+            </div>
             <Row>
                 {showCountryChart && (
                 <Col md={4}>

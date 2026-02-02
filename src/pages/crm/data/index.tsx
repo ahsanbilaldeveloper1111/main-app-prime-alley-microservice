@@ -82,6 +82,7 @@ import {
   Target,
   Layers,
 } from "lucide-react";
+import ConvertToLeadModal from "@components/ConvertToLeadModal";
 import { Column } from "@components/CustomDataTable";
 import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
@@ -380,10 +381,10 @@ const FilterBar: React.FC<FilterBarProps> = ({
       : "outline-secondary"
   }
   onClick={() => onFilterChange && onFilterChange(filter.id)}
-  className="d-flex align-items-center gap-2 btn-slanted-only"
+  className="d-flex align-items-center gap-2 "
   style={hasCustomColor ? buttonStyle : undefined}
 >
-  <span className="btn-slanted-content d-flex align-items-center gap-2">
+  <span className="d-flex align-items-center gap-2">
     {filter.icon && (
       <span className="d-flex align-items-center">
         {filter.icon}
@@ -523,6 +524,8 @@ const CrmProspectsManagement = () => {
   );
   const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
   const [assignToCampaignUsers, setAssignToCampaignUsers] = useState(false);
+  const [showConvertToLeadModal, setShowConvertToLeadModal] = useState(false);
+const [convertingProspectId, setConvertingProspectId] = useState<number | null>(null);
 
   // Data assignment modal states
   const [assignmentFilters, setAssignmentFilters] = useState({
@@ -2339,7 +2342,8 @@ const CrmProspectsManagement = () => {
               label: 'Convert to Lead',
               icon: <FiTarget size={14} />,
               onClick: (row: any) => {
-                window.location.href = `/crm/leads/create?crm_data_id=${row.id}`;
+                setConvertingProspectId(row.id);
+                setShowConvertToLeadModal(true);
               }
             },
             {
@@ -2797,11 +2801,11 @@ const CrmProspectsManagement = () => {
 
 {session?.user?.permissions?.includes("add-crm-data-management") && (
   <Button
-    variant="primary"
-    className="btn-3d-slant-primary"
+    variant="outline-secondary"
+    className=""
     onClick={() => setShowUploadModal(true)}
   >
-    <span className="btn-3d-content">
+    <span className="">
       <Download size={16} className="me-2" />
       Import Contacts
     </span>
@@ -2809,22 +2813,22 @@ const CrmProspectsManagement = () => {
 )}
 
 <Button
-  variant="primary"
-  className="btn-3d-slant-primary"
+  variant="outline-secondary"
+  className=""
   onClick={() => setShowFilterBar(!showFilterBar)}
 >
-  <span className="btn-3d-content">
+  <span className="">
     <Layers size={16} className="me-2" />
     {showFilterBar ? "Hide Tabs" : "Show Tabs"}
   </span>
 </Button>
 
 <Button
-  variant="primary"
-  className="btn-3d-slant-primary"
+  variant="outline-secondary"
+  className=""
   onClick={handleOpenFiltersSidebar}
 >
-  <span className="btn-3d-content">
+  <span className="">
     <FiFilter size={16} className="me-2" />
     Filters
   </span>
@@ -5942,6 +5946,22 @@ const CrmProspectsManagement = () => {
           setRefreshKey((prev) => prev + 1);
         }}
       />
+
+      {/* Convert to Lead Modal */}
+{convertingProspectId && (
+  <ConvertToLeadModal
+    show={showConvertToLeadModal}
+    onHide={() => {
+      setShowConvertToLeadModal(false);
+      setConvertingProspectId(null);
+    }}
+    prospectId={convertingProspectId}
+    onSuccess={() => {
+      setRefreshKey((prev) => prev + 1);
+      toast.success("Prospect converted to lead successfully!");
+    }}
+  />
+)}
     </React.Fragment>
   );
 };

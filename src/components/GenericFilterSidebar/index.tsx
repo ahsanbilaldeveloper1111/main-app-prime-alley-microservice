@@ -8,10 +8,12 @@ export interface FilterOption {
   label: string;
 }
 
+export type FilterFieldType = 'text' | 'select' | 'multi-select' | 'date' | 'datetime' | 'dropdown';
+
 export interface FilterField {
   id: string;
   label: string;
-  type: 'text' | 'select' | 'multi-select' | 'date' | 'dropdown';
+  type: FilterFieldType;
   value: any;
   onChange: (value: any) => void;
   placeholder?: string;
@@ -171,6 +173,16 @@ const GenericFilterSidebar: React.FC<GenericFilterSidebarProps> = ({
         return (
           <Form.Control
             type="date"
+            value={filter.value || ''}
+            onChange={(e) => filter.onChange(e.target.value || null)}
+            style={baseStyles}
+          />
+        );
+
+      case 'datetime':
+        return (
+          <Form.Control
+            type="datetime-local"
             value={filter.value || ''}
             onChange={(e) => filter.onChange(e.target.value || null)}
             style={baseStyles}

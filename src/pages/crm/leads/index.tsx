@@ -143,6 +143,9 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import { useCti } from "../../../contexts/CtiContext";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import CreateLeadModal from "@components/CreateLeadModal";
+
+import ConvertToDealModal from "@components/ConvertToDealModal";
 // Type definition for transformed lead data
 interface LeadData {
   id: any;
@@ -590,11 +593,14 @@ const CrmLeads = () => {
   const [loadingLead, setLoadingLead] = useState(false);
   const [showLeadHistoryModal, setShowLeadHistoryModal] = useState(false);
 
+  const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
   // Sidebar states
   const [showLeadSidebar, setShowLeadSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any>(null);
 
+  const [showConvertToDealModal, setShowConvertToDealModal] = useState(false);
+const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   // Edit Modal states
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingLead, setEditingLead] = useState<any>(null);
@@ -2709,7 +2715,11 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
     actions.push({
       label: 'Convert to Deal',
       icon: <Handshake size={16} />,
-      onClick: (lead: LeadData) => handleConvertLead(lead.rawData || lead),
+      onClick: (lead: LeadData) => {
+        setConvertingLeadId(lead.rawData?.id || lead.id);
+        setShowConvertToDealModal(true);
+      },
+      className: 'text-success'
     });
   }
 
@@ -2718,6 +2728,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
       label: 'Delete',
       icon: <Trash2 size={16} />,
       onClick: (lead: LeadData) => handleDeleteLead(lead.rawData?.id || lead.id, lead.name),
+      className: 'text-danger'
     });
   }
 
@@ -2800,13 +2811,14 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               {showLeadsAnalytics ? "Hide Analytics" : "Show Analytics"}
             </Button> */}
             {session?.user?.permissions?.includes("add-crm-leads") && (
-              <Link href="/crm/leads/create">
-                <Button variant="primary">
-                  <Plus size={16} className="me-2" />
-                  Add Lead
-                </Button>
-              </Link>
-            )}
+    <Button 
+      variant="outline-secondary"
+      onClick={() => setShowCreateLeadModal(true)}
+    >
+      <Plus size={16} className="me-2" />
+      Add Lead
+    </Button>
+  )}
             <Button
               variant={showFilterBar ? "secondary" : "outline-secondary"}
               onClick={() => setShowFilterBar(!showFilterBar)}
@@ -7989,6 +8001,33 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           setActiveFilter("all");
         }}
       />
+
+{convertingLeadId && (
+  <ConvertToDealModal
+    show={showConvertToDealModal}
+    onHide={() => {
+      setShowConvertToDealModal(false);
+      setConvertingLeadId(null);
+    }}
+    leadId={convertingLeadId}
+    onSuccess={() => {
+      setRefreshKey((prev) => prev + 1);
+      toast.success("Lead converted to deal successfully!");
+    }}
+  />
+)}
+
+{/* Add modal at the end */}
+<CreateLeadModal
+  show={showCreateLeadModal}
+  onHide={() => setShowCreateLeadModal(false)}
+  onSuccess={() => {
+    setShowCreateLeadModal(false);
+    // Refresh your leads list here
+    // e.g., fetchLeads();
+  }}
+  type="lead" // or "opportunity"
+/>
     </React.Fragment>
   );
 };

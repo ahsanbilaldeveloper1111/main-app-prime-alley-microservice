@@ -48,7 +48,7 @@ import {
   Legend,
 } from "recharts";
 
-
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import { ListGroup, Form } from 'react-bootstrap';
 import {
   Users,
@@ -447,7 +447,7 @@ const CrmDashboard = () => {
         </Row>
 
         {/* Top Stats */}
-        <Row className="g-3 mb-4">
+        {/* <Row className="g-3 mb-4">
           <Col xxl={2}  xl={4} lg={4} md={4} sm={6}>
             <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
               <Card.Body>
@@ -538,12 +538,62 @@ const CrmDashboard = () => {
               </Card.Body>
             </Card>
           </Col>
-        </Row>
+        </Row> */}
+
+<div className="mb-4">
+          <StatsCards
+            gridMinWidth="180px"
+            data={[
+              {
+                title: 'Prospects',
+                value: formatNumber(dashboardData?.counts?.crm_data || 0, true),
+                icon: Users,
+                iconColor: '#0EA5E9',
+                iconBgColor: '#E0F2FE',
+              },
+              {
+                title: 'Leads',
+                value: formatNumber(dashboardData?.counts?.leads || 0, true),
+                icon: UserPlus,
+                iconColor: '#3B82F6',
+                iconBgColor: '#DBEAFE',
+              },
+              {
+                title: 'Deals',
+                value: formatNumber(dashboardData?.counts?.deals || 0, true),
+                icon: DollarSign,
+                iconColor: '#F59E0B',
+                iconBgColor: '#FEF3C7',
+              },
+              {
+                title: 'Orders',
+                value: formatNumber(dashboardData?.counts?.orders || 0, true),
+                icon: ShoppingCart,
+                iconColor: '#F97316',
+                iconBgColor: '#FED7AA',
+              },
+              {
+                title: 'Leads to Deals Conversion',
+                value: `${(dashboardData?.conversion_ratios?.lead_to_deal ?? 0).toFixed(2)}%`,
+                icon: TrendingUp,
+                iconColor: '#0EA5E9',
+                iconBgColor: '#E0F2FE',
+              },
+              {
+                title: 'Deals to Orders Conversion',
+                value: `${(dashboardData?.conversion_ratios?.deal_to_order ?? 0).toFixed(2)}%`,
+                icon: TrendingUp,
+                iconColor: '#10B981',
+                iconBgColor: '#D1FAE5',
+              },
+            ]}
+          />
+        </div>
 
         {/* Main Content */}
         <Row className="g-4">
           {/* Left Column */}
-          <Col xxl={4}  xl={6} lg={6} md={6} sm={12}>
+          <Col xxl={4} xl={6} lg={12} md={12}>
             {/* Leads Funnel */}
             <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '24px' }}>
               <Card.Body>
@@ -723,7 +773,7 @@ const CrmDashboard = () => {
           </Col>
 
           {/* Middle Column */}
-          <Col xxl={4}  xl={6} lg={6} md={6} sm={12}>
+          <Col xxl={4} xl={6} lg={12} md={12}>
             {/* Orders Revenue */}
             <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '24px' }}>
               <Card.Body>
@@ -850,7 +900,7 @@ const CrmDashboard = () => {
           </Col>
 
           {/* Right Column */}
-          <Col xxl={4}  xl={12} lg={12} md={12} sm={12}>
+          <Col xxl={4} xl={12} lg={12} md={12}>
             {/* Campaign Performance */}
             <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '16px' }}>
               <Card.Body style={{ padding: '20px' }}>

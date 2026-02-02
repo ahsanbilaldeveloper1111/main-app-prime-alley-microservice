@@ -171,6 +171,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/crm/deals'
         },
         {
+          id: 'crm-deals',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS_APPROVAL,
+          icon: <Handshake size={16} />,
+          permission: PERMISSIONS.VIEW_CRM_DEALS,
+          url: '/crm/deals-approval'
+        },
+        {
           id: 'crm-orders',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.ORDERS,
           icon: <ReceiptText size={16} />,
@@ -657,6 +664,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
               permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
             },
             { 
+              id: 'orders-billing', 
+              title: 'Orders', 
+              icon: <ShoppingBag size={16} />, 
+              url: '/accounting/customer/orders', 
+              permission: PERMISSIONS.VIEW_INVOICES_BILLING 
+            },
+            { 
               id: 'billing-invoices', 
               title: 'Invoices', 
               icon: <DollarSign size={16} />, 
@@ -692,6 +706,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: "Work Planner",
       url: '',
       subItems: [
+          { 
+              id: 'work-planner-orders', 
+              title: 'Orders', 
+              icon: <ReceiptText size={16} />, 
+              url: '/work-planner/orders', 
+              permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
+            },
 
             { 
               id: 'work-planner-recurring-reminders', 

@@ -177,11 +177,19 @@ const GenericTable = <T extends Record<string, any>>({
   
   // Column selection state
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
+    const defaults = defaultSelectedColumns || columns.map(c => c.key);
     if (columnStorageKey && typeof window !== 'undefined') {
-      const saved = localStorage.getItem(columnStorageKey);
-      if (saved) return JSON.parse(saved);
+      try {
+        const saved = localStorage.getItem(columnStorageKey);
+        if (saved) {
+          const savedCols: string[] = JSON.parse(saved);
+          // Merge in any default columns missing from saved (e.g. newly added columns)
+          const missing = defaults.filter((c: string) => !savedCols.includes(c));
+          return missing.length > 0 ? [...savedCols, ...missing] : savedCols;
+        }
+      } catch (_e) {}
     }
-    return defaultSelectedColumns || columns.map(c => c.key);
+    return defaults;
   });
 
   // Context menu (right‑click) state
@@ -680,7 +688,11 @@ const GenericTable = <T extends Record<string, any>>({
                               
                               // If action has custom render (for dropdowns, etc.)
                               if (action.render) {
-                                return <div key={actionIndex}>{action.render(row)}</div>;
+                                return (
+                                  <div key={actionIndex} onClick={(e) => e.stopPropagation()}>
+                                    {action.render(row)}
+                                  </div>
+                                );
                               }
                               
                               // If action has dropdown configuration

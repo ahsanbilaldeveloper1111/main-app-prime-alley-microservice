@@ -398,6 +398,7 @@
     white-space: nowrap;
     vertical-align: baseline;
     border-radius: 16px;
+    background-color: transparent !important;
   }
   
   /* Status badge with dot indicator */
@@ -410,6 +411,7 @@
     font-weight: 500;
     line-height: 1.4;
     border-radius: 16px;
+    background-color: transparent !important;
   }
   
   .gt-status-dot {
@@ -525,6 +527,15 @@
     background-color: #212529;
   }
   
+  .generic-table-td span.bg-info {
+    background: transparent !important;
+  }
+
+  .generic-table-td .badge {
+    background: transparent !important;
+    color: #495057 !important;
+  }
+ 
   /* Text utilities */
   .gt-text-muted {
     color: #6c757d !important;

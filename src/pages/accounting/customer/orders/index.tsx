@@ -133,7 +133,7 @@ import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import FormModal from "../../partial/FormModal";
+import FormModal from "@pages/partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import moment from "moment";
@@ -1792,6 +1792,7 @@ const CrmOrders = () => {
             }]
           : []),
       
+          
         // ✅ ALWAYS SHOW MORE ACTIONS
         {
           label: 'More Actions',
@@ -1855,7 +1856,7 @@ const CrmOrders = () => {
       />
       <BreadcrumbItem
         mainTitle="CRM"
-        mainLink="/crm/dashboard"
+        mainLink="/accounting/customer/dashboard"
         subTitle="Orders"
       />
       <div>
@@ -1866,11 +1867,11 @@ const CrmOrders = () => {
     <ol className="breadcrumb mb-0">
       <li className="breadcrumb-item">
         <a href="/dashboard" className="text-decoration-none">
-          CRM
+          Accounts
         </a>
       </li>
       <li className="breadcrumb-item active fw-bold" aria-current="page">
-        Orders
+        Order Management
       </li>
     </ol>
   </nav>

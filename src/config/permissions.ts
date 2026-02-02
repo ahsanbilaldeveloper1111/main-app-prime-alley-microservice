@@ -38,6 +38,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/faqs/topics',permissions: ['']},
     {path:'/faqs/types',permissions: ['']},
     {path:'/crm/approvals',permissions: ['']},
+    {path:'/crm/deals-approval',permissions: ['']},
     
     {path:'/ai-ml/tenant-faqs',permissions: ['']},
     {path:'/ai-ml/global-faqs',permissions: ['']},
@@ -432,7 +433,8 @@ export const routePermissions: RoutePermission[] = [
                     { path: '/product-details',permissions: [PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING]},
                     { path: '/billing-history',permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING]},
                     { path: '/payment-methods',permissions: [PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING]},
-                    { path: '/invoices',permissions: [PERMISSIONS.VIEW_INVOICES_BILLING]}
+                    { path: '/invoices',permissions: [PERMISSIONS.VIEW_INVOICES_BILLING]},
+                    { path: '/orders',permissions: [PERMISSIONS.VIEW_INVOICES_BILLING]}
                 ]
             },
             {
@@ -502,6 +504,7 @@ export const routePermissions: RoutePermission[] = [
         path: '/work-planner',
         permissions: [PERMISSIONS.WORK_PLANNER_SERVICES],
         children: [
+            { path: '/orders',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
             { path: '/recurring-reminders',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
             { path: '/todo',permissions: [PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER]},
             { path: '/tasks-list',permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER]},

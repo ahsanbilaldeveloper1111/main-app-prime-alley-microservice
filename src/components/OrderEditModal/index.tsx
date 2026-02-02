@@ -354,6 +354,7 @@ const OrderEditModal: React.FC<OrderEditModalProps> = ({ show, onHide, orderId, 
             <h4 className="mb-0 app-heading">Edit Order #{orderId}</h4>
           </Modal.Title>
           <button
+          className="btn-close"
             onClick={onHide}
             style={{
               background: "transparent",
