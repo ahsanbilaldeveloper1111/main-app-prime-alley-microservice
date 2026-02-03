@@ -543,7 +543,7 @@ const AIMLCampaignReports = () => {
               )}
 
               {/* Sessions Table */}
-              <div className="table-responsive">
+              {/* <div className="table-responsive"> */}
                 <table className="table table-hover align-middle">
                   <thead className="table-light">
                     <tr>
@@ -607,7 +607,7 @@ const AIMLCampaignReports = () => {
                     )}
                   </tbody>
                 </table>
-              </div>
+              {/* </div> */}
 
               {/* Pagination */}
               <div className="d-flex justify-content-between align-items-center mt-3">

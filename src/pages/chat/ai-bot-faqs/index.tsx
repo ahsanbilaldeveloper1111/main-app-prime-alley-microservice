@@ -36,11 +36,16 @@ const AIBotFAQs = () => {
   const [storeInfo, setStoreInfo] = useState<GetVectorStoreResponse | null>(null);
   const [storeInfoLoading, setStoreInfoLoading] = useState(false);
 
+  useEffect(() => {
+    loadFaqs();
+  }, []);
+
   const loadFaqs = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res: any = await getFaqsInbound();
+      setLoading(false);
       //const res: any = DUMMY_FAQS;
       console.log(res);
       if(res?.data?.status  === true) {
@@ -48,6 +53,7 @@ const AIBotFAQs = () => {
         setFaqs(list ?? []);
       }
     } catch (err: unknown) {
+      setLoading(false);
       setFaqs([]);
       toast.error("Failed to load FAQs");
     } 
