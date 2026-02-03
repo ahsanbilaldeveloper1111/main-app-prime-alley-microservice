@@ -43,9 +43,9 @@ const AIBotFAQs = () => {
       const res: any = await getFaqsInbound();
       //const res: any = DUMMY_FAQS;
       console.log(res);
-      if(res.status  === true) {
-        const list = res.faqs;
-        setFaqs(list);
+      if(res?.data?.status  === true) {
+        const list = res?.data?.faqs;
+        setFaqs(list ?? []);
       }
     } catch (err: unknown) {
       setFaqs([]);

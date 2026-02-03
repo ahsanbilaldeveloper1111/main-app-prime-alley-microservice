@@ -157,7 +157,7 @@ export const getVectorStore = () => {
 export const getFaqsInboundPaginated = (params: GetFaqsInboundPaginatedParams = {}) => {
   const { page = 1, page_size = 50 } = params;
   return axiosInstance.post<GetFaqsInboundPaginatedResponse>(
-    `${prefix}/getFaqsInbound/`,
+    `${prefix}/get-all-outbound-calls/`,
     {},
     { params: { page, page_size } }
   );

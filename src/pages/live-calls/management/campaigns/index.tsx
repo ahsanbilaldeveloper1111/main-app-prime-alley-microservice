@@ -151,15 +151,21 @@ const LiveCallsCampaignsManagement = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
       }, []);
 
+      // Username available after FinesseAuthGate (from storage or session)
+      const finesseData = getFinesseUserData();
+      const finesseUsername =
+        finesseData?.loginId ??
+        finesseData?.loginName ??
+        (session?.user as { username?: string } | undefined)?.username ??
+        '';
+
       // Fetch Finesse user and map to TopBar (teams, selectedTeam, agentStatus) – runs when past FinesseAuthGate
       useEffect(() => {
-        const finesseData = getFinesseUserData();
-        const username = finesseData?.loginId ?? finesseData?.loginName;
-        if (!username) return;
+        if (!finesseUsername) return;
 
         const loadUser = async () => {
           try {
-            const response = await getFinesseUser(username);
+            const response = await getFinesseUser(finesseUsername);
             const data = response?.responseData ?? response;
             if (!data) return;
             const teamNames = data.teams?.map((t: { name: string }) => t.name) ?? [];
@@ -178,18 +184,16 @@ const LiveCallsCampaignsManagement = () => {
           }
         };
         loadUser();
-      }, []);
+      }, [finesseUsername]);
 
       // Fetch campaigns from Finesse – runs when past FinesseAuthGate
       useEffect(() => {
-        const finesseData = getFinesseUserData();
-        const username = finesseData?.loginId ?? finesseData?.loginName;
-        if (!username) return;
+        if (!finesseUsername) return;
 
         const loadCampaigns = async () => {
           setCampaignsLoading(true);
           try {
-            const response = await getFinesseCampaigns(username);
+            const response = await getFinesseCampaigns(finesseUsername);
             const list = response?.data ?? response?.responseData ?? response;
             const arr = Array.isArray(list) ? list : list?.campaigns ?? list?.items ?? [];
             setCampaigns((arr as any[]).map((item, index) => mapApiCampaignToRow(item, index)));
@@ -201,17 +205,15 @@ const LiveCallsCampaignsManagement = () => {
           }
         };
         loadCampaigns();
-      }, []);
+      }, [finesseUsername]);
 
       // Load import statuses in background – runs when past FinesseAuthGate
       useEffect(() => {
-        const finesseData = getFinesseUserData();
-        const username = finesseData?.loginId ?? finesseData?.loginName;
-        if (!username) return;
+        if (!finesseUsername) return;
 
         const loadImportStatuses = async () => {
           try {
-            const statusData = await getFinesseCampaignsContactsStatus(username);
+            const statusData = await getFinesseCampaignsContactsStatus(finesseUsername);
             const list = (statusData as { importStatuses?: Array<{ campaignId: number }> })?.importStatuses ?? (statusData as { campaigns?: Array<{ campaignId: number }> })?.campaigns ?? [];
             const arr = Array.isArray(list) ? list : [];
             const map: Record<number, unknown> = {};
@@ -224,7 +226,7 @@ const LiveCallsCampaignsManagement = () => {
           }
         };
         loadImportStatuses();
-      }, []);
+      }, [finesseUsername]);
 
       const statusOptions = [
         { value: 'READY', label: 'Ready', color: '#10b981', icon: CheckCircle },

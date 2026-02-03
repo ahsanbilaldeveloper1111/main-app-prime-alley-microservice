@@ -2779,18 +2779,18 @@ const InvoiceList = () => {
                           <td className="p-2">{selectedInvoiceForView.invoice_number || 'N/A'}</td>
                         </tr>
                         <tr>
-                          <td className="fw-bold p-2" style={{ verticalAlign: 'top' }}>Invoice Date:</td>
+                          <td className="fw-bold p-2" style={{ verticalAlign: 'top' }}>Invoice Period:</td>
                           <td className="p-2">
                             {selectedInvoiceForView.invoice_date
                               ? moment(selectedInvoiceForView.invoice_date).format('DD MMM YYYY')
-                              : 'N/A'}
+                              : 'N/A'} - {(selectedInvoiceForView?.end_date ?? selectedInvoiceForView?.due_date) ? moment(selectedInvoiceForView?.end_date ?? selectedInvoiceForView?.due_date).format('DD MMM YYYY') : 'N/A'}
                           </td>
                         </tr>
 
-                        <tr>
+                        {/* <tr>
                           <td className="fw-bold p-2" style={{ verticalAlign: 'top' }}>End Date:</td>
                           <td className="p-2">{(selectedInvoiceForView?.end_date ?? selectedInvoiceForView?.due_date) ? moment(selectedInvoiceForView?.end_date ?? selectedInvoiceForView?.due_date).format(GlobalDateFormat) : ''}</td>
-                        </tr>
+                        </tr> */}
                         
                         <tr>
                           <td className="fw-bold p-2" style={{ verticalAlign: 'top', width: '40%' }}>Terms:</td>
