@@ -267,6 +267,13 @@ MENU_COLORS: {
     VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT: 'view-employees-onboarding-staff-management',
     VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT: 'view-approval-request-staff-management',
     VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT: 'view-organizational-chart-staff-management',
+    VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT: 'view-request-categories-staff-management',
+    VIEW_ATTENDENCE_STAFF_MANAGEMENT:'view-attendences-staff-management',
+
+    VIEW_LOCATIONS_STAFF_MANAGEMENT: 'view-locations-staff-management',
+    ADD_LOCATION_STAFF_MANAGEMENT: 'add-location-staff-management',
+    UPDATE_LOCATION_STAFF_MANAGEMENT: 'update-location-staff-management',
+    DELETE_LOCATION_STAFF_MANAGEMENT: 'delete-location-staff-management',
 
     CONTROL_HUB_SERVICES: 'control-hub-services',
     VIEW_USERS: 'view-users',
@@ -299,6 +306,7 @@ MENU_COLORS: {
     TRANSCRIPTION_ANALYSIS_AIML: 'transcriptions-analysis-aiml',
     TRANSCRIPTION_ANALYZE_RECORDINGS_AIML: 'analyze-recordings-aiml',
     TRANSLATE_AIML: 'translate-aiml',
+    MANAGE_EXTENSIONS_AIML: 'manage-extensions-aiml',
     OUTBOUND_CALLS_AIML: 'outbound-call-aiml',
     LIVE_CHAT_AIML: 'live-chat-users',
 
@@ -306,6 +314,8 @@ MENU_COLORS: {
     VIEW_CTI:'view-cti',
     DIAL_CALL_CTI:'dial-call-cti',
     CTI_MONITORING:'dashboard-cti',
+    VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT: 'view-campaigns-tms',
+    VIEW_LIVE_CALLS_AGENT_MANAGEMENT: 'view-teams-tms',
 
 
     TICKETS_SERVICES: 'tickets-services',

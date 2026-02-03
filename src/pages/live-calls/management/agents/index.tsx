@@ -53,6 +53,7 @@ import { LineChart, Line, ResponsiveContainer, AreaChart, Area } from 'recharts'
 
 import CallWidget from '../CallWidget';
 import WrapUpModal from '../WrapUp';
+import { getFinesseUserTeam } from '@utils/finesse';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -111,6 +112,19 @@ const LiveCallsAgentsManagement = () => {
           if (interval) clearInterval(interval);
         };
       }, [showCallWidget, callStatus]);
+
+      // Fetch and log user team (finesse/users/{username}/teams/{eamId})
+      useEffect(() => {
+        const username = 'ali.bahadar';
+        const eamId = 1;
+        getFinesseUserTeam(username, eamId)
+          .then((data) => {
+            console.log('getFinesseUserTeam:', data);
+          })
+          .catch((err) => {
+            console.log('getFinesseUserTeam error:', err);
+          });
+      }, [selectedTeam]);
     
       const teams = [
         'PRIMEALLEY-SALES',

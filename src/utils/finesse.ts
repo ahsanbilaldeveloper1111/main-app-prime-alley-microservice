@@ -266,3 +266,16 @@ export const importFinesseCampaignContacts = async (
   );
   return response.data;
 };
+
+// ==================== Users / Teams ====================
+
+/**
+ * GET finesse/users/{username}/teams/{eamId} - Get user team by eamId
+ */
+export const getFinesseUserTeam = async (username: string, eamId: number | string) => {
+  const response = await axiosInstance.get(
+    `${prefix}/finesse/users/${encodeURIComponent(username)}/teams/${eamId}`
+  );
+  return response.data;
+};
+
