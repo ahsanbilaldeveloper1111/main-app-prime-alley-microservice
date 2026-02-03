@@ -1,244 +1,416 @@
 import "@assets/scss/datatable-style.scss";
-import React, {
-  ReactElement,
-  useState,
-} from "react";
+import React, { ReactElement, useState, useEffect, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import { useRouter } from 'next/router';
-import { Container, Row, Col, Card, Button, Modal, Spinner } from 'react-bootstrap';
-import { Building2, Globe, ChevronRight, Bot, X } from 'lucide-react';
-import { submitChatTraining, ChatTrainingResponse } from '@utils/chat';
+import { Card, Table, Button, Modal, Form, Spinner } from "react-bootstrap";
+import { Plus, Pencil, Trash2, RefreshCw, MessageCircle, ArrowLeft } from "lucide-react";
+import { toast } from "react-toastify";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import {
+    getFaqsInbound,
+  postFaqsInbound,
+  putFaqInbound,
+  deleteFaqInbound,
+  postVectorStore,
+  getVectorStore,
+  type FaqItemWithId,
+  type GetVectorStoreResponse,
+} from "@utils/aibot";
 
-
-
-const AIChatFAQs = () => {
-  const router = useRouter();
-  const [showTrainingModal, setShowTrainingModal] = useState(false);
-  const [trainingResponse, setTrainingResponse] = useState<ChatTrainingResponse | null>(null);
+const AIBotFAQs = () => {
+  const [faqs, setFaqs] = useState<FaqItemWithId[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<number | string | null>(null);
+  const [formQuestion, setFormQuestion] = useState("");
+  const [formAnswer, setFormAnswer] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [faqToDelete, setFaqToDelete] = useState<number | string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [trainLoading, setTrainLoading] = useState(false);
+  const [showStoreInfoModal, setShowStoreInfoModal] = useState(false);
+  const [storeInfo, setStoreInfo] = useState<GetVectorStoreResponse | null>(null);
+  const [storeInfoLoading, setStoreInfoLoading] = useState(false);
 
-  const handleTrainBot = async () => {
+  const loadFaqs = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      const payload = {
-        tenant_id: "tenant_123",
-        chunk_size: 1000,
-        chunk_overlap: 200
-      };
-      
-      const response = await submitChatTraining(payload);
-      setTrainingResponse(response);
-      setShowTrainingModal(true);
-    } catch (error) {
-      console.error('Error training bot:', error);
-      // Error is already handled by submitChatTraining (toast notification)
+      const res: any = await getFaqsInbound();
+      //const res: any = DUMMY_FAQS;
+      console.log(res);
+      if(res.status  === true) {
+        const list = res.faqs;
+        setFaqs(list);
+      }
+    } catch (err: unknown) {
+      setFaqs([]);
+      toast.error("Failed to load FAQs");
+    } 
+  }, []);
+
+  const openAdd = () => {
+    setEditingId(null);
+    setFormQuestion("");
+    setFormAnswer("");
+    setShowModal(true);
+  };
+
+  const openEdit = (faq: FaqItemWithId) => {
+    setEditingId(faq.id ?? null);
+    setFormQuestion(faq.question);
+    setFormAnswer(faq.answer);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingId(null);
+    setFormQuestion("");
+    setFormAnswer("");
+  };
+
+  const handleSave = async () => {
+    const q = formQuestion.trim();
+    const a = formAnswer.trim();
+    if (!q || !a) {
+      toast.error("Question and answer are required.");
+      return;
+    }
+    try {
+      if (editingId != null) {
+        await putFaqInbound(editingId, { question: q, answer: a });
+        toast.success("FAQ updated.");
+      } else {
+        await postFaqsInbound([...faqs, { question: q, answer: a }]);
+        toast.success("FAQ added.");
+      }
+      closeModal();
+      loadFaqs();
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to save FAQ";
+      toast.error(String(message));
+    }
+  };
+
+  const openDeleteModal = (id: number | string) => {
+    setFaqToDelete(id);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (faqToDelete == null) return;
+    setDeleteLoading(true);
+    try {
+      await deleteFaqInbound(faqToDelete);
+      toast.success("FAQ deleted.");
+      setShowDeleteModal(false);
+      setFaqToDelete(null);
+      loadFaqs();
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to delete FAQ";
+      toast.error(String(message));
     } finally {
-      setLoading(false);
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleTrainData = async () => {
+    setTrainLoading(true);
+    try {
+      const res = await postVectorStore(false);
+      const status = res?.data?.status === true;
+      if (status) {
+        toast.success("Vector store training completed successfully.");
+      } else {
+        toast.warning("Vector store request completed but status was not true.");
+      }
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to train vector store";
+      toast.error(String(message));
+    } finally {
+      setTrainLoading(false);
+    }
+  };
+
+  const handleGetStoreInfo = async () => {
+    setStoreInfoLoading(true);
+    setStoreInfo(null);
+    setShowStoreInfoModal(true);
+    try {
+      const res = await getVectorStore();
+      setStoreInfo(res?.data ?? null);
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to load vector store info"
+      );
+      setStoreInfo(null);
+    } finally {
+      setStoreInfoLoading(false);
     }
   };
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="AI BOT FAQs" />
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="AI Bot FAQs" />
 
       <PageHeader
         title="AI Bot FAQs"
+        description="Manage inbound FAQs for voicebot."
         showSearch={false}
         buttons={
-          <Button 
-            variant="primary" 
-            onClick={handleTrainBot}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <Spinner size="sm" className="me-2" />
-                Training...
-              </>
-            ) : (
-              <>
-                <Bot size={16} className="me-2" />
-                Train Bot
-              </>
-            )}
+         <>
+          <Button variant="primary" onClick={openAdd} disabled={loading}>
+            <Plus size={18} className="me-2" />
+            Add FAQ
           </Button>
+          <Button
+            variant="outline-secondary"
+            onClick={handleTrainData}
+            disabled={trainLoading}
+          >
+            {trainLoading ? (
+              <Spinner animation="border" size="sm" className="me-2" />
+            ) : (
+              <ArrowLeft size={16} className="me-2" />
+            )}
+            Train Data
+          </Button>
+          <Button
+            variant="outline-secondary"
+            onClick={handleGetStoreInfo}
+            disabled={storeInfoLoading}
+          >
+            {storeInfoLoading ? (
+              <Spinner animation="border" size="sm" className="me-2" />
+            ) : (
+              <RefreshCw size={16} className="me-2" />
+            )}
+            Store Info
+          </Button>
+         </>
         }
       />
 
-      <Container fluid className="">
-        <Row className="g-4">
-          {/* Tenant FAQs Card */}
-          <Col md={6}>
-            <Card 
-              className="h-100 shadow-sm"
-              style={{ 
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                border: '1px solid #e9ecef'
-              }}
-              onClick={() => router.push('/chat/ai-faqs/tenant')}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-              }}
-            >
-              <Card.Body className="d-flex flex-column align-items-center justify-content-center text-center p-5">
-                <div 
-                  className="rounded-circle d-flex align-items-center justify-content-center mb-3"
-                  style={{
-                    width: '80px',
-                    height: '80px',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white'
-                  }}
-                >
-                  <Building2 size={40} />
-                </div>
-                <h4 className="mb-3" style={{ color: '#263238', fontWeight: '600' }}>
-                  Tenant FAQs
-                </h4>
-                <p className="text-muted mb-4" style={{ fontSize: '0.95rem' }}>
-                  Manage and configure tenant-specific frequently asked questions for your AI chat system.
-                </p>
-                <div className="d-flex align-items-center text-primary" style={{ fontSize: '0.9rem', fontWeight: '500' }}>
-                  View Tenant FAQs
-                  <ChevronRight size={18} className="ms-1" />
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
+      <Card className="shadow-sm">
+        <Card.Body>
+          <div className="d-flex justify-content-end mb-3">
+            <Button variant="outline-primary" onClick={loadFaqs} disabled={loading} size="sm">
+              {loading ? (
+                <Spinner animation="border" size="sm" />
+              ) : (
+                <>
+                  <RefreshCw size={16} className="me-1" />
+                  Refresh
+                </>
+              )}
+            </Button>
+          </div>
 
-          {/* Global FAQs Card */}
-          <Col md={6}>
-            <Card 
-              className="h-100 shadow-sm"
-              style={{ 
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                border: '1px solid #e9ecef'
-              }}
-              onClick={() => router.push('/chat/ai-faqs/global')}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-              }}
-            >
-              <Card.Body className="d-flex flex-column align-items-center justify-content-center text-center p-5">
-                <div 
-                  className="rounded-circle d-flex align-items-center justify-content-center mb-3"
-                  style={{
-                    width: '80px',
-                    height: '80px',
-                    background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                    color: 'white'
-                  }}
-                >
-                  <Globe size={40} />
-                </div>
-                <h4 className="mb-3" style={{ color: '#263238', fontWeight: '600' }}>
-                  Global FAQs
-                </h4>
-                <p className="text-muted mb-4" style={{ fontSize: '0.95rem' }}>
-                  Manage and configure global frequently asked questions that apply across all tenants.
-                </p>
-                <div className="d-flex align-items-center text-primary" style={{ fontSize: '0.9rem', fontWeight: '500' }}>
-                  View Global FAQs
-                  <ChevronRight size={18} className="ms-1" />
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
+          {error && (
+            <div className="alert alert-danger py-2 mb-3" role="alert">
+              {error}
+            </div>
+          )}
 
-      {/* Training Response Modal */}
-      <Modal 
-        show={showTrainingModal} 
+          {loading && faqs.length === 0 ? (
+            <div className="text-center py-5 text-muted">
+              <Spinner animation="border" />
+              <div className="mt-2">Loading FAQs...</div>
+            </div>
+          ) : faqs.length === 0 ? (
+            <div className="text-center py-5 text-muted">
+              <MessageCircle size={48} className="mb-2" />
+              <p className="mb-0">No FAQs yet. Add one to get started.</p>
+            </div>
+          ) : (
+            <Table responsive hover className="mb-0">
+              <thead>
+                <tr>
+                  <th style={{ width: "40px" }}>#</th>
+                  <th>Question</th>
+                  <th>Answer</th>
+                  <th style={{ width: "120px", textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {faqs.map((faq, index) => (
+                  <tr key={faq.id ?? index}>
+                    <td className="text-muted">{faq.id ?? index + 1}</td>
+                    <td>{faq.question}</td>
+                    <td className="text-muted" style={{ maxWidth: "320px" }}>
+                      {faq.answer}
+                    </td>
+                    <td className="text-end">
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        className="me-1"
+                        onClick={() => openEdit(faq)}
+                      >
+                        <Pencil size={14} />
+                      </Button>
+                      {faq.id != null && (
+                        <Button
+                          variant="outline-danger"
+                          size="sm"
+                          onClick={() => openDeleteModal(faq.id!)}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card.Body>
+      </Card>
+
+      <DeleteConfirmationModal
+        show={showDeleteModal && faqToDelete != null}
         onHide={() => {
-          setShowTrainingModal(false);
-          setTrainingResponse(null);
+          setShowDeleteModal(false);
+          setFaqToDelete(null);
         }}
-        size="lg"
-        centered
-      >
-        <Modal.Header style={{ borderBottom: '1px solid #e8eef5' }}>
-          <Modal.Title style={{ fontSize: '18px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Bot size={20} color="#4e6fa5" />
-            Training Results
-          </Modal.Title>
-          <Button
-            variant="link"
-            onClick={() => {
-              setShowTrainingModal(false);
-              setTrainingResponse(null);
-            }}
-            style={{ 
-              background: 'none',
-              border: 'none',
-              padding: '4px',
-              cursor: 'pointer',
-              color: '#6c757d',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            <X size={20} />
-          </Button>
+        onConfirm={handleConfirmDelete}
+        itemName={faqToDelete != null ? faqs.find((f) => f.id === faqToDelete)?.question : undefined}
+        itemType="FAQ"
+        loading={deleteLoading}
+      />
+
+      <Modal show={showStoreInfoModal} onHide={() => setShowStoreInfoModal(false)} centered size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Vector Store Info</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {trainingResponse && (
-            <div style={{ 
-              padding: '20px',
-              textAlign: 'center'
-            }}>
-              <p style={{ 
-                fontSize: '16px',
-                color: '#2d3748',
-                margin: 0,
-                lineHeight: '1.6'
-              }}>
-                {(() => {
-                  const tenantFiles = trainingResponse.tenant_documents?.files || 0;
-                  const globalFiles = trainingResponse.global_documents?.files || 0;
-                  const totalChunks = trainingResponse.total_chunks || 0;
-                  return `Training completed successfully! Processed ${tenantFiles} tenant files and ${globalFiles} global files. Total chunks: ${totalChunks}`;
-                })()}
-              </p>
+          {storeInfoLoading ? (
+            <div className="text-center py-4">
+              <Spinner animation="border" />
+              <div className="mt-2 text-muted">Loading store info...</div>
             </div>
+          ) : storeInfo ? (
+            <div className="small">
+              <p className="mb-2">
+                <strong>Status:</strong>{" "}
+                <span className={storeInfo.status ? "text-success" : "text-warning"}>
+                  {storeInfo.status ? "OK" : "Not OK"}
+                </span>
+              </p>
+              <p className="mb-2">
+                <strong>Client ID:</strong> {storeInfo.client_id}
+              </p>
+              {storeInfo.vector_store_info && (
+                <>
+                  <hr />
+                  <p className="mb-1">
+                    <strong>Exists:</strong> {storeInfo.vector_store_info.exists ? "Yes" : "No"}
+                  </p>
+                  <p className="mb-1">
+                    <strong>Total FAQs:</strong> {storeInfo.vector_store_info.total_faqs}
+                  </p>
+                  <p className="mb-1">
+                    <strong>Vector dimension:</strong> {storeInfo.vector_store_info.vector_dimension}
+                  </p>
+                  <p className="mb-1">
+                    <strong>Last update:</strong> {storeInfo.vector_store_info.last_update}
+                  </p>
+                  <p className="mb-1">
+                    <strong>Directory:</strong> {storeInfo.vector_store_info.directory}
+                  </p>
+                  {storeInfo.vector_store_info.metadata && (
+                    <>
+                      <hr />
+                      <p className="mb-1">
+                        <strong>Model:</strong> {storeInfo.vector_store_info.metadata.model}
+                      </p>
+                      <p className="mb-1">
+                        <strong>Version:</strong> {storeInfo.vector_store_info.metadata.version}
+                      </p>
+                      <p className="mb-1">
+                        <strong>Created:</strong> {storeInfo.vector_store_info.metadata.created_at}
+                      </p>
+                      <p className="mb-0">
+                        <strong>Last updated:</strong>{" "}
+                        {storeInfo.vector_store_info.metadata.last_updated}
+                      </p>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-muted">No store info available.</div>
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button 
-            variant="secondary" 
-            onClick={() => {
-              setShowTrainingModal(false);
-              setTrainingResponse(null);
-            }}
-          >
+          <Button variant="secondary" onClick={() => setShowStoreInfoModal(false)}>
             Close
           </Button>
         </Modal.Footer>
       </Modal>
 
+      <Modal show={showModal} onHide={closeModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>{editingId != null ? "Edit FAQ" : "Add FAQ"}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form.Group className="mb-3">
+            <Form.Label>Question</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={2}
+              value={formQuestion}
+              onChange={(e) => setFormQuestion(e.target.value)}
+              placeholder="e.g. What are your business hours?"
+            />
+          </Form.Group>
+          <Form.Group>
+            <Form.Label>Answer</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              value={formAnswer}
+              onChange={(e) => setFormAnswer(e.target.value)}
+              placeholder="e.g. Our business hours are Monday to Friday, 9 AM to 6 PM."
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeModal}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleSave}>
+            {editingId != null ? "Update" : "Add"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </React.Fragment>
   );
 };
 
-AIChatFAQs.getLayout = (page: ReactElement) => {
+AIBotFAQs.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default AIChatFAQs;
+export default AIBotFAQs;

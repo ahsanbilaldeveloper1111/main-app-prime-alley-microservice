@@ -2744,11 +2744,15 @@ const InvoiceList = () => {
                   <p className="mb-3"><b>Email:</b> {selectedInvoiceForView?.company?.reseller?.email || ''}</p>
                 </Col>
                 <Col md={6}>
-                  <img src={PrimeAlleyLogo.src} alt="Logo" className="img-fluid" style={{maxWidth: '60%',float:"right"}} />
+                  <div>
+                  <img src={selectedInvoiceForView?.company?.reseller?.profile?.logo_url || PrimeAlleyLogo.src} alt="Logo" className="img-fluid" style={{maxWidth: '60%',float:"right"}} />
+                    </div>
                   {Number(selectedInvoiceForView.amount_due) > 0 && (
-                        <div>Due Amount
+                        <>
+                        <div className="text-end mt-3" style={{float:"right",clear:"both",fontSize:"1.2rem",}}>Due Amount: 
                           <span className="fw-bold text-danger">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(String(selectedInvoiceForView.amount_due ?? 0)))}</span>
                         </div>
+                        </>
                     )}
                 </Col>
               </Row>
