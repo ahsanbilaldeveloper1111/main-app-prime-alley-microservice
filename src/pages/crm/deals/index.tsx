@@ -529,6 +529,10 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
   const [showDeleteAttachmentModal, setShowDeleteAttachmentModal] = useState(false);
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: number; name: string } | null>(null);
   
+  // Download file modal (table column)
+  const [showDownloadFileModal, setShowDownloadFileModal] = useState(false);
+  const [dealForDownload, setDealForDownload] = useState<any>(null);
+  
   // Follow-up Modal
   const [showAddFollowupModal, setShowAddFollowupModal] = useState(false);
   const [followUpIdToEdit, setFollowUpIdToEdit] = useState<number | null>(null);
@@ -2239,6 +2243,16 @@ const handleCloseEditModal = useCallback(() => {
           variant: 'link' as const,
           className: 'text-info'
         },
+        {
+          label: 'Download',
+          icon: <DownloadIcon size={16} />,
+          onClick: (row: any) => {
+            setDealForDownload(row.rawData || row);
+            setShowDownloadFileModal(true);
+          },
+          variant: 'link' as const,
+          className: 'text-secondary'
+        },
         ...(session?.user?.permissions?.includes('add-crm-orders') ? [{
           label: 'Convert to Order',
           icon: <ShoppingBag size={16} />,
@@ -2420,26 +2434,26 @@ const handleCloseEditModal = useCallback(() => {
                 bgColor: '#D1FAE5',
                 textColor: '#065F46'
               }
-            },
-            {
-              title: 'Lost',
-              value: summaryTiles?.lost_deals || filterCounts.lost || 0,
-              icon: AlertCircle,
-              iconColor: '#EF4444',
-              iconBgColor: '#FEE2E2',
-              subtitle: 'Needs review'
-            },
-            {
-              title: 'Deleted',
-              value: summaryTiles?.deleted_deals || filterCounts.deleted || 0,
-              icon: Trash2,
-              iconColor: '#6B7280',
-              iconBgColor: '#F3F4F6',
-              metric: {
-                text: 'Archived',
-                dotColor: '#9CA3AF'
-              }
             }
+            // {
+            //   title: 'Lost',
+            //   value: summaryTiles?.lost_deals || filterCounts.lost || 0,
+            //   icon: AlertCircle,
+            //   iconColor: '#EF4444',
+            //   iconBgColor: '#FEE2E2',
+            //   subtitle: 'Needs review'
+            // },
+            // {
+            //   title: 'Deleted',
+            //   value: summaryTiles?.deleted_deals || filterCounts.deleted || 0,
+            //   icon: Trash2,
+            //   iconColor: '#6B7280',
+            //   iconBgColor: '#F3F4F6',
+            //   metric: {
+            //     text: 'Archived',
+            //     dotColor: '#9CA3AF'
+            //   }
+            // }
           ]}
           gridMinWidth="180px"
         />
@@ -5207,6 +5221,63 @@ const handleCloseEditModal = useCallback(() => {
         itemName={attachmentToDelete?.name}
         itemType="attachment"
       />
+
+      {/* Download File Modal */}
+      <Modal
+        show={showDownloadFileModal}
+        onHide={() => {
+          setShowDownloadFileModal(false);
+          setDealForDownload(null);
+        }}
+        centered
+        size="sm"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title className="d-flex align-items-center">
+            <DownloadIcon size={22} className="me-2" />
+            Download File
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-0">
+            You can download a file for this deal. Click the button below to download a summary file (dummy file for now).
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowDownloadFileModal(false);
+              setDealForDownload(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              const content = dealForDownload
+                ? `Deal: ${dealForDownload.name || 'N/A'}\nCompany: ${dealForDownload.company || dealForDownload.company_name || 'N/A'}\nValue: ${dealForDownload.currency || 'AED'} ${dealForDownload.value ?? 'N/A'}\n\nThis is a dummy file for download.`
+                : 'This is a dummy file for download.';
+              const blob = new Blob([content], { type: 'text/plain' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `deal-${dealForDownload?.name?.replace(/\s+/g, '-') || 'export'}-${new Date().toISOString().slice(0, 10)}.txt`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              setShowDownloadFileModal(false);
+              setDealForDownload(null);
+              toast.success('File downloaded successfully');
+            }}
+          >
+            <DownloadIcon size={16} className="me-1" />
+            Download file
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       {/* Add/Edit Follow-up Modal */}
       <Modal

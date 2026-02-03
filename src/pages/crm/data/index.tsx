@@ -2871,9 +2871,40 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
               bgColor: '#FEF3C7',
               textColor: '#92400E'
             }
+          },
+          {
+            title: 'All Prospects',
+            value: totalRecords,
+            icon: Users,
+            iconColor: '#6366F1',
+            iconBgColor: '#EEF2FF',
+            subtitle: `${metrics.assigned_records} Assigned / ${metrics.unassigned_records} Unassigned`
+          },
+          {
+            title: 'Scheduled',
+            value: metrics.scheduled_records,
+            icon: Calendar,
+            iconColor: '#10B981',
+            iconBgColor: '#D1FAE5',
+            metric: {
+              text: `${metrics.scheduled_next_hour_records} in next hour`,
+              dotColor: '#F59E0B'
+            }
+          },
+          {
+            title: 'Convert to Leads',
+            value: totalRecords > 0 ? `${((metrics.assigned_records / totalRecords) * 100).toFixed(1)}%` : '0%',
+            icon: Target,
+            iconColor: '#8B5CF6',
+            iconBgColor: '#EDE9FE',
+            badge: {
+              text: `${metrics.assigned_records} Ready`,
+              bgColor: '#FEF3C7',
+              textColor: '#92400E'
+            }
           }
         ]}
-        gridMinWidth="250px"
+        gridMinWidth="180px"
       />
 
       <div className="container-fluid">

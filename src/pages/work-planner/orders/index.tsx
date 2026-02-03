@@ -1939,18 +1939,18 @@ const CrmOrders = () => {
               iconColor: '#EF4444',
               iconBgColor: '#FEE2E2',
               subtitle: 'Requires review'
-            },
-            {
-              title: 'Deleted',
-              value: summaryTiles?.deleted_orders || filterCounts.deleted || 0,
-              icon: Trash2,
-              iconColor: '#6B7280',
-              iconBgColor: '#F3F4F6',
-              metric: {
-                text: 'Archived',
-                dotColor: '#9CA3AF'
-              }
             }
+            // {
+            //   title: 'Deleted',
+            //   value: summaryTiles?.deleted_orders || filterCounts.deleted || 0,
+            //   icon: Trash2,
+            //   iconColor: '#6B7280',
+            //   iconBgColor: '#F3F4F6',
+            //   metric: {
+            //     text: 'Archived',
+            //     dotColor: '#9CA3AF'
+            //   }
+            // }
           ]}
           gridMinWidth="180px"
         />

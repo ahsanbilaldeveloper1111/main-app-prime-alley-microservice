@@ -567,6 +567,25 @@ const HistoryPage = () => {
               text: 'Order activities',
               dotColor: '#7C3AED'
             }
+          },
+          {
+            title: 'Deals',
+            value: typeFilterCounts.deals || 0,
+            icon: Handshake,
+            iconColor: '#10B981',
+            iconBgColor: '#D1FAE5',
+            subtitle: 'Deal activities'
+          },
+          {
+            title: 'Orders',
+            value: typeFilterCounts.orders || 0,
+            icon: ShoppingBag,
+            iconColor: '#8B5CF6',
+            iconBgColor: '#EDE9FE',
+            metric: {
+              text: 'Order activities',
+              dotColor: '#7C3AED'
+            }
           }
         ]}
         gridMinWidth="220px"
@@ -959,6 +978,8 @@ const HistoryPage = () => {
         }}
         hover={true}
         striped={false}
+        customizableColumns={true}
+        defaultSelectedColumns={['customer', 'agent', 'lastActivity', 'type', 'stage']}
       />
 
 {/* Activity Timeline Modal */}
