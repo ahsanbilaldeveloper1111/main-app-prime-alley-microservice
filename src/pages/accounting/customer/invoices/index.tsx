@@ -2745,6 +2745,11 @@ const InvoiceList = () => {
                 </Col>
                 <Col md={6}>
                   <img src={PrimeAlleyLogo.src} alt="Logo" className="img-fluid" style={{maxWidth: '60%',float:"right"}} />
+                  {Number(selectedInvoiceForView.amount_due) > 0 && (
+                        <div>Due Amount
+                          <span className="fw-bold text-danger">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(String(selectedInvoiceForView.amount_due ?? 0)))}</span>
+                        </div>
+                    )}
                 </Col>
               </Row>
 
@@ -2755,8 +2760,11 @@ const InvoiceList = () => {
                     <p className="mb-2 fw-bold">{selectedInvoiceForView?.company?.name || ''}</p>
                     <p className="mb-2">{selectedInvoiceForView?.company?.profile?.address || ''}</p>
                     <p className="mb-3">{selectedInvoiceForView?.company?.country || ''}</p>
-                  
-                    <p className="mb-0 fw-bold"><b>TRN No:</b> {selectedInvoiceForView?.company?.profile?.tax_id || ''}</p>
+
+                    {selectedInvoiceForView?.company?.profile?.tax_id && (
+                    <p className="mb-0 fw-bold"><b>Tax ID:</b> {selectedInvoiceForView?.company?.profile?.tax_id || ''}</p>
+                    )}
+
                   </div>
                 </Col>
                 <Col md={6}>
@@ -2777,7 +2785,7 @@ const InvoiceList = () => {
 
                         <tr>
                           <td className="fw-bold p-2" style={{ verticalAlign: 'top' }}>End Date:</td>
-                          <td className="p-2">{selectedInvoiceForView?.due_date ? moment(selectedInvoiceForView?.due_date).format(GlobalDateFormat) : ''}</td>
+                          <td className="p-2">{(selectedInvoiceForView?.end_date ?? selectedInvoiceForView?.due_date) ? moment(selectedInvoiceForView?.end_date ?? selectedInvoiceForView?.due_date).format(GlobalDateFormat) : ''}</td>
                         </tr>
                         
                         <tr>
@@ -2900,7 +2908,7 @@ const InvoiceList = () => {
                             <th className="text-uppercase text-end">QTY</th>
                             <th className="text-uppercase text-end">Unit Price</th>
                             <th className="text-uppercase text-end">Tax</th>
-                            <th className="text-uppercase text-end">Total</th>
+                            <th className="text-uppercase text-end">Amount</th>
                             <th className="text-uppercase text-end">Total Price</th>
                           </tr>
                         </thead>
@@ -2910,7 +2918,6 @@ const InvoiceList = () => {
                             <tr key={item.id || index}>
                               <td className="text-capitalize">{item.product?.name}</td>
                               <td className="text-start" style={{whiteSpace: 'wrap'}}>
-                              <strong className="text-capitalize">{item.product?.name }</strong>
                               <p className="mb-0">{item.description}</p>
                                 {/* <div>
                                   <strong>{item.product?.name || item.description || 'N/A'}</strong>
@@ -3047,22 +3054,6 @@ const InvoiceList = () => {
                
                  
                   </div>
-
-               
-
-                {/* Notes */}
-                {selectedInvoiceForView.notes && (
-                  <div className="mb-3">
-                    <h6>Notes</h6>
-                    <Card>
-                      <Card.Body>
-                        <p className="mb-0" style={{ whiteSpace: 'pre-wrap' }}>
-                          {selectedInvoiceForView.notes}
-                        </p>
-                      </Card.Body>
-                    </Card>
-                  </div>
-                )}
               </div>
 
               </>

@@ -19,20 +19,18 @@ import {
   Grid,
   Target,
   Loader,
-  Lock,
 } from 'lucide-react';
 
 import CallWidget from '../CallWidget';
 import WrapUpModal from '../WrapUp';
 
 import TopBar from '../TopBarAgent';
+import FinesseAuthGate from '../FinesseAuthGate';
 import { toast } from 'react-toastify';
 import {
-  finesseLink,
-  setFinesseUserData,
   getFinesseUserData,
   getFinesseToken,
-  setFinesseToken,
+  setFinesseUserData,
   clearFinesseUserData,
   finesseUnlink,
   getFinesseUser,
@@ -115,12 +113,7 @@ function formatImportStatusDisplay(s: ImportStatusShape | null | undefined): str
 }
 
 const LiveCallsCampaignsManagement = () => {
-      const { data: session, status: sessionStatus } = useSession();
-      const [isFinesseAuthenticated, setIsFinesseAuthenticated] = useState(false);
-      const [finessePassword, setFinessePassword] = useState('');
-      const [finesseError, setFinesseError] = useState<string | null>(null);
-      const [isFinesseLoading, setIsFinesseLoading] = useState(false);
-
+      const { data: session } = useSession();
       const [teams, setTeams] = useState<string[]>([]);
       const [selectedTeam, setSelectedTeam] = useState('');
       const [agentStatus, setAgentStatus] = useState('READY');
@@ -158,9 +151,8 @@ const LiveCallsCampaignsManagement = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
       }, []);
 
-      // Fetch Finesse user and map to TopBar (teams, selectedTeam, agentStatus) when authenticated
+      // Fetch Finesse user and map to TopBar (teams, selectedTeam, agentStatus) – runs when past FinesseAuthGate
       useEffect(() => {
-        if (!isFinesseAuthenticated) return;
         const finesseData = getFinesseUserData();
         const username = finesseData?.loginId ?? finesseData?.loginName;
         if (!username) return;
@@ -176,7 +168,6 @@ const LiveCallsCampaignsManagement = () => {
             setAgentStatus(data.state ?? 'READY');
             setFinesseUserData(data);
           } catch {
-            // Fallback to storage if GET fails
             const stored = getFinesseUserData();
             if (stored) {
               const teamNames = stored.teams?.map((t) => t.name) ?? [];
@@ -187,11 +178,10 @@ const LiveCallsCampaignsManagement = () => {
           }
         };
         loadUser();
-      }, [isFinesseAuthenticated]);
+      }, []);
 
-      // Fetch campaigns from Finesse when authenticated
+      // Fetch campaigns from Finesse – runs when past FinesseAuthGate
       useEffect(() => {
-        if (!isFinesseAuthenticated) return;
         const finesseData = getFinesseUserData();
         const username = finesseData?.loginId ?? finesseData?.loginName;
         if (!username) return;
@@ -211,11 +201,10 @@ const LiveCallsCampaignsManagement = () => {
           }
         };
         loadCampaigns();
-      }, [isFinesseAuthenticated]);
+      }, []);
 
-      // Load import statuses in background when authenticated (reference: CampaignsPage loadImportStatuses)
+      // Load import statuses in background – runs when past FinesseAuthGate
       useEffect(() => {
-        if (!isFinesseAuthenticated) return;
         const finesseData = getFinesseUserData();
         const username = finesseData?.loginId ?? finesseData?.loginName;
         if (!username) return;
@@ -235,7 +224,7 @@ const LiveCallsCampaignsManagement = () => {
           }
         };
         loadImportStatuses();
-      }, [isFinesseAuthenticated]);
+      }, []);
 
       const statusOptions = [
         { value: 'READY', label: 'Ready', color: '#10b981', icon: CheckCircle },
@@ -248,9 +237,7 @@ const LiveCallsCampaignsManagement = () => {
       const [previewDialogs, setPreviewDialogs] = useState<Record<string, FinessePreviewEvent>>({});
       const [token, setToken] = useState<string | null>(null);
 
-      const capabilityUsername = isFinesseAuthenticated
-        ? (getFinesseUserData()?.loginId ?? getFinesseUserData()?.loginName ?? '')
-        : null;
+      const capabilityUsername = getFinesseUserData()?.loginId ?? getFinesseUserData()?.loginName ?? null;
       const { hasCampaignMgmt, loading: capabilityLoading } = useFinesseCapabilities(capabilityUsername);
 
       const activePreviewDialog = useMemo(() => {
@@ -307,10 +294,10 @@ const LiveCallsCampaignsManagement = () => {
       }, []);
 
       useEffect(() => {
-        if (!isFinesseAuthenticated || !session?.user) return;
-        const t = globalThis.window !== undefined ? getFinesseToken() : null;
+        if (!session?.user) return;
+        const t = typeof globalThis.window !== 'undefined' ? getFinesseToken() : null;
         setToken(t);
-      }, [isFinesseAuthenticated, session?.user]);
+      }, [session?.user]);
 
       useFinesseStomp({
         token,
@@ -383,7 +370,7 @@ const LiveCallsCampaignsManagement = () => {
           toast.error(message ?? 'Failed to unlink from Finesse');
         } finally {
           clearFinesseUserData();
-          setIsFinesseAuthenticated(false);
+          globalThis.window.location.reload();
         }
       };
     
@@ -627,47 +614,6 @@ const LiveCallsCampaignsManagement = () => {
     
       const handleWrapUpMinimize = () => setIsWrapUpOpen(false);
 
-      const handleFinesseAuth = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!session?.user || !finessePassword.trim()) {
-          setFinesseError('Please enter your password.');
-          return;
-        }
-        const username =session.user.username != null ? String(session.user.username) : '';
-        const extension =  session.user.phone != null ? String(session.user.phone) : '';
-        if (!username || !extension) {
-          setFinesseError('User ID or extension is missing from your session.');
-          return;
-        }
-        setFinesseError(null);
-        setIsFinesseLoading(true);
-        try {
-          const response = await finesseLink({
-            finesseUserId: username,
-            finessePassword: finessePassword.trim(),
-            extension,
-          });
-          if (response?.status === 'success' && response?.responseData) {
-            const data = response.responseData;
-            setFinesseUserData(data);
-            if (response?.token) {
-              setFinesseToken(response.token);
-            }
-            const teamNames = data.teams?.map((t: { name: string }) => t.name) ?? [];
-            setTeams(teamNames);
-            setSelectedTeam(data.teamName ?? (teamNames[0] ?? ''));
-            setAgentStatus(data.state);
-            setIsFinesseAuthenticated(true);
-          } else {
-            setFinesseError(response?.message || response?.statusCode || 'authentication failed.');
-          }
-        } catch (err: any) {
-          setFinesseError(err?.response?.data?.message || err?.message || 'authentication failed.');
-        } finally {
-          setIsFinesseLoading(false);
-        }
-      };  
-
       const handleAgentStatusChange = async (newState: string) => {
         const { username } = getFinesseContext();
         if (!username) {
@@ -682,125 +628,16 @@ const LiveCallsCampaignsManagement = () => {
           toast.error(err?.response?.data?.message || err?.message || 'Failed to update agent state.');
         }
       };
-    
-      // Session loading
-      if (sessionStatus === 'loading') {
-        return (
+
+      const capabilityLoadingBlock =
+        capabilityUsername && capabilityLoading ? (
           <React.Fragment>
             <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Calls Campaigns Management" />
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
               <Loader size={40} className="text-primary" style={{ animation: 'spin 1s linear infinite' }} />
             </div>
           </React.Fragment>
-        );
-      }
-
-      // Not signed in
-      if (!session?.user) {
-        return (
-          <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Calls Campaigns Management" />
-            <div style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>
-              Please sign in to access Live Calls Campaigns.
-            </div>
-          </React.Fragment>
-        );
-      }
-
-      // Finesse authentication gate
-      if (!isFinesseAuthenticated) {
-        const userId = session.user.id != null ? String(session.user.id) : '';
-        const extension = session.user.phone != null ? String(session.user.phone) : '';
-        return (
-          <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Calls Campaigns Management" />
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '70vh', padding: '24px' }}>
-              <div className="card" style={{ maxWidth: '420px', width: '100%', padding: '32px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                  <Lock size={28} color="#667eea" />
-                  <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>Authentication Required</h2>
-                </div>
-                <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '24px' }}>
-                  Enter your password to access Live Calls Campaigns.
-                </p>
-                <form onSubmit={handleFinesseAuth}>
-                  {/* <div style={{ marginBottom: '16px' }}>
-                    <label htmlFor="finesse-user-id" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>User ID</label>
-                    <input
-                      id="finesse-user-id"
-                      type="text"
-                      value={userId}
-                      readOnly
-                      style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', background: '#f8fafc', color: '#64748b' }}
-                    />
-                  </div>
-                  <div style={{ marginBottom: '16px' }}>
-                    <label htmlFor="finesse-extension" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Extension (Phone)</label>
-                    <input
-                      id="finesse-extension"
-                      type="text"
-                      value={extension}
-                      readOnly
-                      style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px', background: '#f8fafc', color: '#64748b' }}
-                    />
-                  </div> */}
-                  <div style={{ marginBottom: '20px' }}>
-                    <label htmlFor="finesse-password" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Password</label>
-                    <input
-                      id="finesse-password"
-                      type="password"
-                      value={finessePassword}
-                      onChange={(e) => setFinessePassword(e.target.value)}
-                      placeholder="Enter your password"
-                      autoComplete="current-password"
-                      style={{ width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: '10px', fontSize: '14px' }}
-                    />
-                  </div>
-                  {finesseError && (
-                    <div style={{ marginBottom: '16px', padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#b91c1c', fontSize: '14px' }}>
-                      {finesseError}
-                    </div>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={isFinesseLoading}
-                    className="btn btn-primary"
-                    style={{ width: '100%', justifyContent: 'center', padding: '12px' }}
-                  >
-                    {isFinesseLoading ? (
-                      <>
-                        <Loader size={20} style={{ animation: 'spin 1s linear infinite' }} />
-                        Authenticating...
-                      </>
-                    ) : (
-                      <>
-                        <Lock size={20} />
-                        Authenticate
-                      </>
-                    )}
-                  </button>
-                </form>
-              </div>
-            </div>
-          </React.Fragment>
-        );
-      }
-
-      // Capability check loading (reference: CampaignMgmtGate loading)
-      if (isFinesseAuthenticated && capabilityUsername && capabilityLoading) {
-        return (
-          <React.Fragment>
-            <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Calls Campaigns Management" />
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-              <Loader size={40} className="text-primary" style={{ animation: 'spin 1s linear infinite' }} />
-            </div>
-          </React.Fragment>
-        );
-      }
-
-      // Capability gate (reference: CampaignMgmtGate) – require CAMPAIGN_MGMT
-      if (isFinesseAuthenticated && capabilityUsername && !capabilityLoading && !hasCampaignMgmt) {
-        return (
+        ) : capabilityUsername && !capabilityLoading && !hasCampaignMgmt ? (
           <React.Fragment>
             <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Calls Campaigns Management" />
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '70vh', padding: '24px' }}>
@@ -815,10 +652,11 @@ const LiveCallsCampaignsManagement = () => {
               </div>
             </div>
           </React.Fragment>
-        );
-      }
+        ) : null;
 
   return (
+    <FinesseAuthGate subTitle="Live Calls Campaigns Management" pageLabel="Live Calls Campaigns">
+      {capabilityLoadingBlock ? capabilityLoadingBlock : (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Calls Campaigns Management" />
 
@@ -2346,6 +2184,8 @@ const LiveCallsCampaignsManagement = () => {
     
 
     </React.Fragment>
+      )}
+    </FinesseAuthGate>
   );
 };
 

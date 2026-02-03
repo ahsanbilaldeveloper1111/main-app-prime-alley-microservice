@@ -6,7 +6,6 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 
-
 import  { useState, useEffect, useRef } from 'react';
 import {
   Users,
@@ -53,17 +52,84 @@ import { LineChart, Line, ResponsiveContainer, AreaChart, Area } from 'recharts'
 
 import CallWidget from '../CallWidget';
 import WrapUpModal from '../WrapUp';
-import { getFinesseUserTeam } from '@utils/finesse';
+import FinesseAuthGate from '../FinesseAuthGate';
+import { getFinesseUserTeam, getFinesseUserData } from '@utils/finesse';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 
+type TeamOption = { id: number; name: string };
+
+type TeamUser = {
+  loginId: string;
+  firstName?: string;
+  lastName?: string;
+  extension?: string;
+  state?: string;
+  stateChangeTime?: string;
+  reasonCode?: { label?: string };
+  uri?: string;
+  dialogsUri?: string;
+  mediaType?: number;
+  pendingState?: string;
+  wrapUpTimer?: number;
+};
+
+type TeamApiResponse = {
+  status?: string;
+  statusCode?: string;
+  responseData?: {
+    id?: number;
+    name?: string;
+    uri?: string;
+    users?: TeamUser[];
+  };
+};
+
+type DisplayAgent = {
+  id: string;
+  loginId: string;
+  name: string;
+  state: string;
+  stateColor: string;
+  timeInState: string;
+  extension: string;
+  label?: string;
+};
+
+const getStateColor = (state: string): string => {
+  if (state === 'READY') return '#10b981';
+  if (state === 'NOT_READY') return '#ef4444';
+  return '#6b7280';
+};
+
+const formatDuration = (stateChangeTime?: string): string => {
+  if (!stateChangeTime) return '00:00:00';
+  try {
+    const then = new Date(stateChangeTime).getTime();
+    const diffMs = Date.now() - then;
+    const totalSec = Math.max(0, Math.floor(diffMs / 1000));
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  } catch {
+    return '00:00:00';
+  }
+};
+
 const LiveCallsAgentsManagement = () => {
-      const [selectedTeam, setSelectedTeam] = useState('PRIMEALLEY-SALES');
+      const [teams, setTeams] = useState<TeamOption[]>([]);
+      const [selectedTeam, setSelectedTeam] = useState('');
       const [searchQuery, setSearchQuery] = useState('');
       const [includeLoggedOut, setIncludeLoggedOut] = useState(false);
-      const [selectedAgents, setSelectedAgents] = useState<number[]>([]);
+      const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
+      const [teamDataLoading, setTeamDataLoading] = useState(false);
+      const [teamData, setTeamData] = useState<TeamApiResponse['responseData'] | null>(null);
+      const [teamDataError, setTeamDataError] = useState<string | null>(null);
+      const [refreshTrigger, setRefreshTrigger] = useState(0);
+      const [, setLiveTimeTick] = useState(0);
       const [sidebarOpen, setSidebarOpen] = useState(true);
       const [viewMode, setViewMode] = useState('table');
       const [filterStatus, setFilterStatus] = useState('all');
@@ -71,7 +137,7 @@ const LiveCallsAgentsManagement = () => {
       const [isRefreshing, setIsRefreshing] = useState(false);
       const [showStatusDropdown, setShowStatusDropdown] = useState(false);
       const [showUserMenu, setShowUserMenu] = useState(false);
-      const [showActionMenu, setShowActionMenu] = useState<number | null>(null);
+      const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
       const [showCallWidget, setShowCallWidget] = useState(false);
       const [callTimer, setCallTimer] = useState(0);
       const [isMuted, setIsMuted] = useState(false);
@@ -113,167 +179,103 @@ const LiveCallsAgentsManagement = () => {
         };
       }, [showCallWidget, callStatus]);
 
-      // Fetch and log user team (finesse/users/{username}/teams/{eamId})
+      // Tick every second so "time in state" increases for each agent
       useEffect(() => {
-        const username = 'ali.bahadar';
-        const eamId = 1;
-        getFinesseUserTeam(username, eamId)
-          .then((data) => {
-            console.log('getFinesseUserTeam:', data);
+        const interval = setInterval(() => {
+          setLiveTimeTick((t) => t + 1);
+        }, 1000);
+        return () => clearInterval(interval);
+      }, []);
+
+      // Populate teams from finesseResponseData in storage (sessionStorage)
+      useEffect(() => {
+        const data = getFinesseUserData();
+        if (data?.teams?.length) {
+          setTeams(data.teams);
+          const initialTeam = data.teamName && data.teams.some((t) => t.name === data.teamName)
+            ? data.teamName
+            : data.teams[0].name;
+          setSelectedTeam(initialTeam);
+        } else {
+          setTeams([]);
+          setSelectedTeam('');
+        }
+      }, []);
+
+      // Fetch user team details when we have storage data, username, and a selected team
+      useEffect(() => {
+        const data = getFinesseUserData();
+        const username = data?.loginId ?? data?.loginName;
+        const teamId = teams.find((t) => t.name === selectedTeam)?.id;
+        if (!username || teamId === undefined) {
+          setTeamData(null);
+          setTeamDataError(null);
+          return;
+        }
+        setTeamDataLoading(true);
+        setTeamDataError(null);
+        getFinesseUserTeam(username, teamId, includeLoggedOut)
+          .then((res: TeamApiResponse) => {
+            const payload = res?.responseData ?? (res as unknown as { responseData?: TeamApiResponse['responseData'] })?.responseData;
+            setTeamData(payload ?? null);
           })
           .catch((err) => {
-            console.log('getFinesseUserTeam error:', err);
+            setTeamDataError(err?.message ?? 'Failed to load team');
+            setTeamData(null);
+          })
+          .finally(() => {
+            setTeamDataLoading(false);
           });
-      }, [selectedTeam]);
-    
-      const teams = [
-        'PRIMEALLEY-SALES',
-        'CUSTOMER-SUPPORT',
-        'TECHNICAL-TEAM',
-        'MARKETING-DEPT'
-      ];
+      }, [selectedTeam, teams, refreshTrigger, includeLoggedOut]);
     
       const statusOptions = [
         { value: 'READY', label: 'Ready', color: '#10b981', icon: CheckCircle },
         { value: 'NOT_READY', label: 'Not Ready', color: '#ef4444', icon: XCircle }
       ];
-    
-      // Active agents with different statuses
-      const [activeAgents, setActiveAgents] = useState([
-        {
-          id: 1,
-          name: 'Ali Riaz',
-          email: 'ali.riaz@company.com',
-          phone: '+92 300 1234567',
-          state: 'READY',
-          stateColor: '#10b981',
-          timeInState: '00:12:34',
-          extension: '101',
-          avatar: 'AR',
-          callsToday: 8,
-          avgCallTime: '4:32'
-        },
-        {
-          id: 2,
-          name: 'Sarah Khan',
-          email: 'sarah.khan@company.com',
-          phone: '+92 321 9876543',
-          state: 'NOT READY',
-          stateColor: '#ef4444',
-          timeInState: '00:05:20',
-          extension: '102',
-          avatar: 'SK',
-          callsToday: 12,
-          avgCallTime: '5:15'
-        },
-        {
-          id: 3,
-          name: 'Ahmed Hassan',
-          email: 'ahmed.hassan@company.com',
-          phone: '+92 333 4567890',
-          state: 'READY',
-          stateColor: '#10b981',
-          timeInState: '01:45:10',
-          extension: '103',
-          avatar: 'AH',
-          callsToday: 6,
-          avgCallTime: '3:48'
-        },
-        {
-          id: 4,
-          name: 'Fatima Malik',
-          email: 'fatima.malik@company.com',
-          phone: '+92 345 2345678',
-          state: 'NOT READY',
-          stateColor: '#ef4444',
-          timeInState: '00:15:45',
-          extension: '104',
-          avatar: 'FM',
-          callsToday: 9,
-          avgCallTime: '4:22'
-        }
-      ]);
-    
-      // Offline agents
-      const offlineAgents = [
-        {
-          id: 5,
-          name: 'Usman Ali',
-          email: 'usman.ali@company.com',
-          phone: '+92 312 8765432',
-          state: 'OFFLINE',
-          stateColor: '#6b7280',
-          timeInState: '00:55:30',
-          extension: '105',
-          avatar: 'UA',
-          callsToday: 0,
-          avgCallTime: '0:00'
-        },
-        {
-          id: 6,
-          name: 'Hassan Raza',
-          email: 'hassan.raza@company.com',
-          phone: '+92 300 9871234',
-          state: 'OFFLINE',
-          stateColor: '#6b7280',
-          timeInState: '04:20:15',
-          extension: '106',
-          avatar: 'HR',
-          callsToday: 0,
-          avgCallTime: '0:00'
-        },
-        {
-          id: 7,
-          name: 'Ayesha Siddiqui',
-          email: 'ayesha.siddiqui@company.com',
-          phone: '+92 321 5551234',
-          state: 'OFFLINE',
-          stateColor: '#6b7280',
-          timeInState: '01:10:25',
-          extension: '107',
-          avatar: 'AS',
-          callsToday: 0,
-          avgCallTime: '0:00'
-        }
-      ];
-    
-      // Show active agents and optionally offline agents
-      const agents = includeLoggedOut ? [...activeAgents, ...offlineAgents] : activeAgents;
-    
-      const chartData = [
-        { value: 30 }, { value: 35 }, { value: 32 }, { value: 38 }, { value: 42 },
-        { value: 45 }, { value: 48 }, { value: 52 }, { value: 55 }, { value: 53 },
-        { value: 58 }, { value: 62 }, { value: 65 }, { value: 68 }, { value: 72 }
-      ];
-    
-      const filteredAgents = agents.filter(agent => {
-        const matchesSearch = agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                             agent.email.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesLoggedOut = includeLoggedOut || agent.state !== 'OFFLINE';
-        const matchesStatus = filterStatus === 'all' || 
-                             (filterStatus === 'ready' && agent.state === 'READY') ||
-                             (filterStatus === 'notready' && agent.state === 'NOT READY') ||
-                             (filterStatus === 'offline' && agent.state === 'OFFLINE');
-        return matchesSearch && matchesLoggedOut && matchesStatus;
+
+      // Derive agents from API team response (no dummy data)
+      const agents: DisplayAgent[] = (teamData?.users ?? []).map((u) => ({
+        id: u.loginId,
+        loginId: u.loginId,
+        name: [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.loginId,
+        state: u.state ?? 'UNKNOWN',
+        stateColor: getStateColor(u.state ?? ''),
+        timeInState: formatDuration(u.stateChangeTime),
+        extension: u.extension ?? '—'
+      }));
+
+      const filteredAgents = agents.filter((agent) => {
+        const q = searchQuery.toLowerCase();
+        const matchesSearch =
+          agent.name.toLowerCase().includes(q) || agent.loginId.toLowerCase().includes(q);
+        const matchesStatus =
+          filterStatus === 'all' ||
+          (filterStatus === 'ready' && agent.state === 'READY') ||
+          (filterStatus === 'notready' && agent.state === 'NOT_READY') ||
+          (filterStatus === 'offline' && agent.state === 'OFFLINE');
+        return matchesSearch && matchesStatus;
       });
+
+      const teamDataAvailable = !teamDataLoading && teamData != null;
     
-      const handleSelectAgent = (id: number) => {
-        setSelectedAgents(prev => 
-          prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]
+      const handleSelectAgent = (id: string) => {
+        setSelectedAgents((prev) =>
+          prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
         );
       };
-    
+
       const handleSelectAll = () => {
         if (selectedAgents.length === filteredAgents.length) {
           setSelectedAgents([]);
         } else {
-          setSelectedAgents(filteredAgents.map(a => a.id));
+          setSelectedAgents(filteredAgents.map((a) => a.id));
         }
       };
-    
+
       const handleRefresh = () => {
         setIsRefreshing(true);
-        setTimeout(() => setIsRefreshing(false), 1000);
+        setRefreshTrigger((t) => t + 1);
+        setTimeout(() => setIsRefreshing(false), 800);
       };
     
       const formatTime = (seconds: number) => {
@@ -298,51 +300,43 @@ const LiveCallsAgentsManagement = () => {
           alert('Please select at least one agent to change status.');
           return;
         }
-    
-        const statusLabel = newStatus === 'READY' ? 'Ready' : 'Not Ready';
-        const newStateColor = newStatus === 'READY' ? '#10b981' : '#ef4444';
-        const newState = newStatus === 'READY' ? 'READY' : 'NOT READY';
-    
-        // Update active agents' status
-        setActiveAgents(prev => 
-          prev.map(agent => 
-            selectedAgents.includes(agent.id)
-              ? { ...agent, state: newState, stateColor: newStateColor, timeInState: '00:00:00' }
-              : agent
-          )
-        );
-    
-        // Show call widget when setting to READY
+        const newState = newStatus === 'READY' ? 'READY' : 'NOT_READY';
+        setTeamData((prev) => {
+          if (!prev?.users) return prev;
+          return {
+            ...prev,
+            users: prev.users.map((u) =>
+              selectedAgents.includes(u.loginId) ? { ...u, state: newState } : u
+            )
+          };
+        });
         if (newStatus === 'READY') {
           setShowCallWidget(true);
           setCallTimer(0);
           setCallStatus('Ringing');
         }
-    
+        const statusLabel = newStatus === 'READY' ? 'Ready' : 'Not Ready';
         alert(`✅ Changed status to ${statusLabel} for ${selectedAgents.length} agent(s)`);
         setSelectedAgents([]);
       };
-    
-      const handleSingleAgentStatusChange = (agentId: number, newStatus: string) => {
-        const statusLabel = newStatus === 'READY' ? 'Ready' : 'Not Ready';
-        const newStateColor = newStatus === 'READY' ? '#10b981' : '#ef4444';
-        const newState = newStatus === 'READY' ? 'READY' : 'NOT READY';
-    
-        setActiveAgents(prev => 
-          prev.map(agent => 
-            agent.id === agentId
-              ? { ...agent, state: newState, stateColor: newStateColor, timeInState: '00:00:00' }
-              : agent
-          )
-        );
-    
-        // Show call widget when setting to READY
+
+      const handleSingleAgentStatusChange = (agentLoginId: string, newStatus: string) => {
+        const newState = newStatus === 'READY' ? 'READY' : 'NOT_READY';
+        setTeamData((prev) => {
+          if (!prev?.users) return prev;
+          return {
+            ...prev,
+            users: prev.users.map((u) =>
+              u.loginId === agentLoginId ? { ...u, state: newState } : u
+            )
+          };
+        });
         if (newStatus === 'READY') {
           setShowCallWidget(true);
           setCallTimer(0);
           setCallStatus('Ringing');
         }
-    
+        const statusLabel = newStatus === 'READY' ? 'Ready' : 'Not Ready';
         alert(`✅ Changed status to ${statusLabel}`);
         setShowActionMenu(null);
       };
@@ -392,6 +386,7 @@ const LiveCallsAgentsManagement = () => {
     
 
   return (
+    <FinesseAuthGate subTitle="Live Calls Agents Management" pageLabel="Live Calls Agents">
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Calls Agents Management" />
 
@@ -1471,6 +1466,21 @@ const LiveCallsAgentsManagement = () => {
               </div>
               
               <div className="filters">
+                {teams.length > 0 && (
+                  <div className="team-selector">
+                    <select
+                      value={selectedTeam}
+                      onChange={(e) => setSelectedTeam(e.target.value)}
+                      aria-label="Select team"
+                    >
+                      {teams.map((t) => (
+                        <option key={t.id} value={t.name}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 {/* <div className="view-toggle">
                   <button
                     className={viewMode === 'table' ? 'active' : ''}
@@ -1522,11 +1532,42 @@ const LiveCallsAgentsManagement = () => {
               </div>
             </div>
 
+            {teamDataLoading && (
+              <div className="info-card" style={{ marginTop: 0 }}>
+                <div className="info-card-title">
+                  <RefreshCw size={20} className="refreshing" style={{ animation: 'spin 1s linear infinite' }} />
+                  Loading team agents…
+                </div>
+                <p className="info-card-text">Fetching agents for the selected team.</p>
+              </div>
+            )}
+
+            {!teamDataLoading && teamDataError && (
+              <div className="info-card" style={{ marginTop: 0, borderColor: '#fecaca' }}>
+                <div className="info-card-title" style={{ color: '#dc2626' }}>
+                  <AlertCircle size={20} />
+                  Unable to load team
+                </div>
+                <p className="info-card-text">{teamDataError}</p>
+              </div>
+            )}
+
+            {teamDataAvailable && !teamData?.users?.length && (
+              <div className="info-card" style={{ marginTop: 0 }}>
+                <div className="info-card-title">
+                  <AlertCircle size={20} color="#667eea" />
+                  No agents in this team
+                </div>
+                <p className="info-card-text">The selected team has no users. Choose another team or try again later.</p>
+              </div>
+            )}
+
+            {teamDataAvailable && (teamData?.users?.length ?? 0) > 0 && (
             <div className="table-container">
               <table>
                 <thead>
                   <tr>
-                    <th style={{ width: '50px' }}>
+                    {/* <th style={{ width: '50px' }}>
                       <div
                         className={`checkbox ${selectedAgents.length === filteredAgents.length && filteredAgents.length > 0 ? 'checked' : ''}`}
                         onClick={handleSelectAll}
@@ -1536,14 +1577,12 @@ const LiveCallsAgentsManagement = () => {
                           <CheckCircle size={14} color="white" />
                         )}
                       </div>
-                    </th>
+                    </th> */}
                     <th>Agent</th>
                     <th>Status</th>
-                    <th>Duration</th>
+                    <th >Duration</th>
                     <th>Extension</th>
-                    <th>Today's Calls</th>
-                    <th>Avg Time</th>
-                    <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
+                    {/* <th style={{ width: '80px', textAlign: 'center' }}>Actions</th> */}
                   </tr>
                 </thead>
                 <tbody>
@@ -1552,7 +1591,7 @@ const LiveCallsAgentsManagement = () => {
                       key={agent.id}
                       className={selectedAgents.includes(agent.id) ? 'selected' : ''}
                     >
-                      <td>
+                      {/* <td>
                         <div
                           className={`checkbox ${selectedAgents.includes(agent.id) ? 'checked' : ''}`}
                           onClick={() => handleSelectAgent(agent.id)}
@@ -1562,13 +1601,11 @@ const LiveCallsAgentsManagement = () => {
                             <CheckCircle size={14} color="white" />
                           )}
                         </div>
-                      </td>
+                      </td> */}
                       <td>
                         <div className="agent-info">
-                          {/* <div className="avatar">{agent.avatar}</div> */}
                           <div className="agent-details">
                             <h4>{agent.name}</h4>
-                            {/* <p>{agent.email}</p> */}
                           </div>
                         </div>
                       </td>
@@ -1588,7 +1625,7 @@ const LiveCallsAgentsManagement = () => {
                               background: agent.stateColor
                             }}
                           />
-                          {agent.state}
+                          {agent.state}{agent.label ? ` (${agent.label})` : ''}
                         </span>
                       </td>
                       <td>
@@ -1603,11 +1640,7 @@ const LiveCallsAgentsManagement = () => {
                           {agent.extension}
                         </div>
                       </td>
-                      <td>
-                        <strong style={{ color: '#1e293b' }}>{agent.callsToday}</strong>
-                      </td>
-                      <td>{agent.avgCallTime}</td>
-                      <td>
+                      {/* <td>
                         <div className="action-menu-container">
                           <button 
                             className="action-btn" 
@@ -1693,28 +1726,28 @@ const LiveCallsAgentsManagement = () => {
                             </div>
                           )}
                         </div>
-                      </td>
+                      </td> */}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            )}
             
-            {/* Info Card when showing few agents */}
-            {filteredAgents.length < 3 && (
+            {/* Info Card when showing few agents (only when team data is loaded) */}
+            {/* {teamDataAvailable && filteredAgents.length < 3 && (
               <div className="info-card">
                 <div className="info-card-title">
                   <AlertCircle size={20} color="#667eea" />
-                  {!includeLoggedOut ? 'Viewing Active Agents Only' : 'Limited Agent List'}
+                  Limited Agent List
                 </div>
                 <p className="info-card-text">
-                  {!includeLoggedOut 
-                    ? 'Enable "Show Offline Agents" to view all team members and their current status.'
-                    : `Team ${selectedTeam.replace(/-/g, ' ')} currently has ${filteredAgents.length} agent(s). Other agents may be assigned to different teams.`
-                  }
+                  {selectedTeam
+                    ? `Team ${selectedTeam.replace(/-/g, ' ')} currently has ${filteredAgents.length} agent(s). Other agents may be assigned to different teams.`
+                    : `Currently ${filteredAgents.length} agent(s). Log in to Finesse to load teams and see team-specific agents.`}
                 </p>
               </div>
-            )}
+            )} */}
           </div>
 
       {/* Call Widget */}
@@ -1732,7 +1765,7 @@ const LiveCallsAgentsManagement = () => {
         handleEndCall={handleEndCall}
         formatTime={formatTime}
         selectedTeam={selectedTeam}
-        activeAgentName={activeAgents.find(a => a.state === 'READY')?.name}
+        activeAgentName={agents.find((a) => a.state === 'READY')?.name}
       />
 
       <WrapUpModal
@@ -1744,6 +1777,7 @@ const LiveCallsAgentsManagement = () => {
   
 
     </React.Fragment>
+    </FinesseAuthGate>
   );
 };
 
