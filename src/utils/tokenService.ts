@@ -2,7 +2,6 @@ import { signOut } from 'next-auth/react';
 import { toast } from 'react-toastify';
 import { clearAllLocalStorage } from './localStorageUtils';
 import axiosInstance from './axios';
-import directApi from './directApi';
 
 interface TokenData {
   accessToken: string;

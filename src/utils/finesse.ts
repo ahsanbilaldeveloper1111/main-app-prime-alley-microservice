@@ -271,11 +271,17 @@ export const importFinesseCampaignContacts = async (
 
 /**
  * GET finesse/users/{username}/teams/{eamId} - Get user team by eamId
+ * @param includeLoggedOutAgents - when true, include offline/logged-out agents (default false)
  */
-export const getFinesseUserTeam = async (username: string, eamId: number | string) => {
-  const response = await axiosInstance.get(
-    `${prefix}/finesse/users/${encodeURIComponent(username)}/teams/${eamId}`
-  );
+export const getFinesseUserTeam = async (
+  username: string,
+  teamId: number | string,
+  includeLoggedOutAgents: boolean = false
+) => {
+  const baseUrl = `${prefix}/finesse/users/${encodeURIComponent(username)}/teams/${teamId}`;
+  const url = includeLoggedOutAgents
+    ? `${baseUrl}?includeLoggedOutAgents=true`
+    : baseUrl;
+  const response = await axiosInstance.get(url);
   return response.data;
 };
-
