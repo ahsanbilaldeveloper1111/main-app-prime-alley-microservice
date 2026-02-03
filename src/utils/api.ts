@@ -3,9 +3,9 @@ import { getCurrentAccessToken, isTokenExpired } from './tokenUtils';
 import { clearAllLocalStorage } from './localStorageUtils';
 import { signOut } from 'next-auth/react';
 
-// Create axios instance with default configuration
+// Same pattern as axios.ts: all requests go through Next.js proxy to avoid 431 (large cookies never sent to backend)
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_BACKEND_URL || '',
+  baseURL: '/api',
   timeout: 1000000,
   headers: {
     'Content-Type': 'application/json',

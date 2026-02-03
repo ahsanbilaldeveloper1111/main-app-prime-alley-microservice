@@ -95,9 +95,9 @@ export const ExportCallLogs = async (params: PaginationParams = {}) => {
       }
     });
 
-    const baseUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-    const exportUrl = `${baseUrl}call-logs/export?${queryParams.toString()}`;
-    
+    // Same-origin proxy to avoid 431 and keep same pattern as rest of app
+    const exportUrl = `/api/call-logs/export?${queryParams.toString()}`;
+
     window.open(exportUrl, '_blank');
     
     toast.success(`${exportType.toUpperCase()} export started`);
