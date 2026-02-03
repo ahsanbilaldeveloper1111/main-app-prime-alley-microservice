@@ -1,16 +1,16 @@
 import "@assets/scss/datatable-style.scss";
-import React, {
-  ReactElement,
-} from "react";
+import React, { ReactElement, useState, useCallback, useEffect } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-
-import  { useState } from 'react';
+import {
+  getFaqsInboundPaginated,
+  type OutboundCallItem,
+  type GetFaqsInboundPaginatedResponse,
+} from "@utils/aibot";
 import {
   Calendar,
   ChevronDown,
@@ -69,32 +69,91 @@ interface SessionDetail {
 }
 
 
-const AIMLCampaignReports = () => {
+const PAGE_SIZE = 50;
 
+function outboundToSession(call: OutboundCallItem): Session {
+  const durationSec = Math.round(call.stt_duration ?? 0);
+  return {
+    id: call.session_id,
+    contact: call.participant_identity ?? "",
+    status: "Connected",
+    attempts: 1,
+    duration: `${durationSec} sec`,
+    sentiment: "Unknown",
+    intent: "Play",
+  };
+}
+
+function outboundToSessionDetail(call: OutboundCallItem): SessionDetail {
+  const transcriptSnippets = (call.conversation ?? []).slice(0, 5).map((m) => ({
+    speaker: m.role === "assistant" ? "Bot" : "User",
+    text: m.content,
+  }));
+  const durationSec = Math.round(call.stt_duration ?? 0);
+  return {
+    id: call.session_id,
+    status: "Connected",
+    bot: call.voice_agent_name ?? "Gandalf Support Bot",
+    statusDuration: `${durationSec} secs`,
+    transcriptSnippets: transcriptSnippets.length ? transcriptSnippets : [{ speaker: "-", text: "No transcript" }],
+    sentiment: "Unknown",
+    audioWaveform: Array.from({ length: 100 }, () => Math.random() * 100),
+  };
+}
+
+const AIMLCampaignReports = () => {
   const [selectedSession, setSelectedSession] = useState<SessionDetail>({
-    id: '48cd7723-7ead-4892-9854321819598',
-    status: 'Connected',
-    bot: 'Gandalf Support Bot',
-    statusDuration: '51 secs',
-    transcriptSnippets: [
-      { speaker: 'NSIL', text: 'this is the RingEdge support bot, How can i assist you today?' },
-      { speaker: 'HSIL', text: 'Hi, my bill seems too high this month.' }
-    ],
-    sentiment: 'Negative',
-    audioWaveform: Array.from({ length: 100 }, () => Math.random() * 100)
+    id: "",
+    status: "Connected",
+    bot: "Gandalf Support Bot",
+    statusDuration: "0 secs",
+    transcriptSnippets: [],
+    sentiment: "Unknown",
+    audioWaveform: [],
   });
 
-  const [sessions] = useState<Session[]>([
-    { id: '486d7221-9ead-', contact: '+1977223930.10', status: 'Connected', attempts: 1, duration: '19 sec', sentiment: 'Dialing', intent: 'Play' },
-    { id: '486d7221-9ead-', contact: '+1977825530.20', status: 'Connected', attempts: 1, duration: '12 sec', sentiment: 'Negative', intent: 'Play' },
-    { id: '486d7221-9ead-', contact: '+18827233530.30', status: 'Qualing', attempts: 1, duration: '29 sec', sentiment: 'Negative', intent: 'Play' },
-    { id: '486d7221-7ead-', contact: '+19827835530.33', status: 'Connected', attempts: 1, duration: '19 sec', sentiment: 'Negative', intent: 'Play' },
-    { id: '486d7221-9ead-', contact: '+19827855530.33', status: 'Queued', attempts: 1, duration: '19 sec', sentiment: 'Unknown', intent: 'Play' }
-  ]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [outboundCalls, setOutboundCalls] = useState<OutboundCallItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
-  const [activeTab, setActiveTab] = useState<string>('outcomes');
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const totalPages = 5;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  const loadPage = useCallback(async (page: number) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getFaqsInboundPaginated({ page, page_size: PAGE_SIZE });
+      const data: GetFaqsInboundPaginatedResponse = res.data;
+      const list = data?.results?.OutBound_CALL ?? [];
+      setOutboundCalls(list);
+      setSessions(list.map(outboundToSession));
+      setTotalCount(data?.count ?? 0);
+      setCurrentPage(page);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load campaign data");
+      setSessions([]);
+      setOutboundCalls([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPage(1);
+  }, [loadPage]);
+
+  const handleNext = () => {
+    if (currentPage < totalPages) loadPage(currentPage + 1);
+  };
+
+  const handlePrevious = () => {
+    if (currentPage > 1) loadPage(currentPage - 1);
+  };
+
+  const [activeTab, setActiveTab] = useState<string>("outcomes");
 
   // Pie Chart Data
   const pieData = [
@@ -477,8 +536,14 @@ const AIMLCampaignReports = () => {
                 </div>
               </div>
 
+              {error && (
+                <div className="alert alert-danger py-2 mb-3" role="alert">
+                  {error}
+                </div>
+              )}
+
               {/* Sessions Table */}
-              <div className="table-responsive">
+              {/* <div className="table-responsive"> */}
                 <table className="table table-hover align-middle">
                   <thead className="table-light">
                     <tr>
@@ -495,58 +560,76 @@ const AIMLCampaignReports = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {sessions.map((session, index) => (
-                      <tr 
-                        key={index}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => setSelectedSession({
-                          ...selectedSession,
-                          id: session.id + session.contact
-                        })}
-                      >
-                        <td className="font-monospace small">{session.id}</td>
-                        <td className="font-monospace small">{session.contact}</td>
-                        <td>
-                          <span className={`badge bg-${getStatusBadgeColor(session.status)} bg-opacity-10 text-${getStatusBadgeColor(session.status)} fw-normal px-3`}>
-                            {session.status}
-                          </span>
-                        </td>
-                        <td>{session.attempts}</td>
-                        <td>{session.duration}</td>
-                        <td>
-                          <span className={`badge bg-${getSentimentBadgeColor(session.sentiment)} bg-opacity-10 text-${getSentimentBadgeColor(session.sentiment)} fw-normal px-3`}>
-                            {session.sentiment}
-                          </span>
-                        </td>
-                        <td>
-                          <button className="btn btn-sm btn-primary rounded-pill px-3">
-                            <Play size={12} className="me-1" fill="currentColor" />
-                            {session.intent}
-                          </button>
-                        </td>
-                        <td style={{ minWidth: 'auto' }}>
-                          <button className="btn btn-sm btn-light rounded-circle">
-                            <X size={16} />
-                          </button>
+                    {loading ? (
+                      <tr>
+                        <td colSpan={8} className="text-center py-4 text-muted">
+                          Loading...
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      sessions.map((session, index) => (
+                        <tr
+                          key={session.id + index}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => {
+                            const call = outboundCalls[index];
+                            if (call) setSelectedSession(outboundToSessionDetail(call));
+                            else setSelectedSession({ ...selectedSession, id: session.id, statusDuration: session.duration });
+                          }}
+                        >
+                          <td className="font-monospace small">{session.id}</td>
+                          <td className="font-monospace small">{session.contact}</td>
+                          <td>
+                            <span className={`badge bg-${getStatusBadgeColor(session.status)} bg-opacity-10 text-${getStatusBadgeColor(session.status)} fw-normal px-3`}>
+                              {session.status}
+                            </span>
+                          </td>
+                          <td>{session.attempts}</td>
+                          <td>{session.duration}</td>
+                          <td>
+                            <span className={`badge bg-${getSentimentBadgeColor(session.sentiment)} bg-opacity-10 text-${getSentimentBadgeColor(session.sentiment)} fw-normal px-3`}>
+                              {session.sentiment}
+                            </span>
+                          </td>
+                          <td>
+                            <button className="btn btn-sm btn-primary rounded-pill px-3">
+                              <Play size={12} className="me-1" fill="currentColor" />
+                              {session.intent}
+                            </button>
+                          </td>
+                          <td style={{ minWidth: 'auto' }}>
+                            <button className="btn btn-sm btn-light rounded-circle">
+                              <X size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
-              </div>
+              {/* </div> */}
 
               {/* Pagination */}
               <div className="d-flex justify-content-between align-items-center mt-3">
-                <button className="btn btn-light border d-flex align-items-center gap-2">
+                <button
+                  className="btn btn-light border d-flex align-items-center gap-2"
+                  onClick={handlePrevious}
+                  disabled={loading || currentPage <= 1}
+                >
                   <ChevronLeft size={16} />
                   Previous
                 </button>
                 <div className="d-flex gap-2 align-items-center">
-                  <button className="btn btn-primary">{currentPage}</button>
-                  <span className="text-muted">of {totalPages}</span>
-                  <button className="btn btn-light border">{totalPages}</button>
+                  <span className="text-muted">
+                    Page {currentPage} of {totalPages}
+                    {totalCount > 0 && ` (${totalCount} total)`}
+                  </span>
                 </div>
-                <button className="btn btn-light border">
+                <button
+                  className="btn btn-light border"
+                  onClick={handleNext}
+                  disabled={loading || currentPage >= totalPages}
+                >
                   <ChevronRight size={16} />
                 </button>
               </div>
@@ -685,6 +768,9 @@ const AIMLCampaignReports = () => {
         </div>
       </div>
     </div>
+
+
+    
 
     </React.Fragment>
   );
