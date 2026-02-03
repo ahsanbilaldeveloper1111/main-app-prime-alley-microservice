@@ -48,7 +48,7 @@ const Users = () => {
         setSelectedUsername('');
     }, []);
 
-    // Use custom hooks
+    // Use custom hooks (baseColumns first so useUsersData can use it)
     const { baseColumns } = useUserColumns(session, [], { onResetPassword: handleResetPasswordClick });
     
     const {
@@ -58,9 +58,16 @@ const Users = () => {
         fetchUsers,
         handleFiltersChange
     } = useUsersData(session, baseColumns, roleId);
-    
-    // Get columns with custom fields
-    const { columns } = useUserColumns(session, customFieldColumns, { onResetPassword: handleResetPasswordClick });
+
+    // Refresh list after status change (API is called in userColumns dropdown)
+    const handleAfterStatusChange = useCallback(() => {
+        fetchUsers();
+    }, [fetchUsers]);
+
+    const { columns } = useUserColumns(session, customFieldColumns, {
+        onResetPassword: handleResetPasswordClick,
+        onChangeStatus: handleAfterStatusChange
+    });
     
     const {
         growthChart,

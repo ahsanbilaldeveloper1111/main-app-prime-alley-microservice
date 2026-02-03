@@ -18,6 +18,7 @@ const STATUS_FAILED = 'failed';
 const STATUS_REFUNDED = 'refunded';
 const STATUS_PENDING = 'pending';
 
+import PrimeAlleyLogo from "@assets/images/Prime3.png";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
@@ -44,7 +45,7 @@ import {
   getCompanies
 } from "@utils/accountingOld";
 import { GetPaymentMethods,CompletePayment } from "@utils/accounting";
-import { formatNumber } from "@utils/Helper";
+import { formatNumber, GlobalDateFormat } from "@utils/Helper";
 
 import { Column } from "@components/CustomDataTable";
 import { Button, Modal, Row, Form, Alert, Card, Badge, Table } from "react-bootstrap";
@@ -996,20 +997,8 @@ const InvoiceList = () => {
                        
              {props.status === STATUS_PAID 
              && (
-              // <Button 
-              // variant="info" 
-              // size="sm"
-              // style={{ 
-              //   backgroundColor: '#5bc0de', 
-              //   borderColor: '#5bc0de', 
-              //   color: 'white',
-              //   fontSize: '0.85rem', 
-              //   padding: '0.375rem 0.75rem'
-              // }}
-              // onClick={() => handlePayInvoice(props)}
-              // >
-              // Pay Now
-              // </Button>
+              <>
+              
               <Button 
               variant="success" 
               size="sm"
@@ -1023,8 +1012,23 @@ const InvoiceList = () => {
             >
               Paid
             </Button> 
+              </>
              )}
                       
+                      <Button 
+              variant="info" 
+              size="sm"
+              style={{ 
+                backgroundColor: '#5bc0de', 
+                borderColor: '#5bc0de', 
+                color: 'white',
+                fontSize: '0.85rem', 
+                padding: '0.375rem 0.75rem'
+              }}
+              onClick={() => handleDownloadPDF(props)}
+              >
+              Download
+              </Button>
                         </div>
                        
             </>
@@ -1625,8 +1629,13 @@ const InvoiceList = () => {
   };
 
   // View invoice handler
-  const handleViewInvoice = useCallback((invoice: InvoiceData) => {
-    setSelectedInvoiceForView(invoice);
+  const handleViewInvoice = useCallback(async (invoice: InvoiceData) => {
+    // setSelectedInvoiceForView(invoice);
+    // setShowViewInvoiceModal(true);
+
+    const invoiceDetails = await getInvoice(invoice.id);
+    //console.log(invoiceDetails);
+    setSelectedInvoiceForView(invoiceDetails);
     setShowViewInvoiceModal(true);
   }, []);
 
@@ -2723,9 +2732,75 @@ const InvoiceList = () => {
           </Modal.Header>
           <Modal.Body>
             {selectedInvoiceForView ? (
+              <>
+
+              <Row>
+                <Col md={6}>
+                  <h3 className="mb-2">{selectedInvoiceForView?.company?.reseller?.name || ''}</h3>
+                  <h5 className="mb-3 fw-bold" style={{ color: '#14509e' }}>TAX INVOICE {selectedInvoiceForView?.company?.reseller?.profile?.tax_id || ''}</h5>
+                  <p className="mb-2">{selectedInvoiceForView?.company?.reseller?.profile?.address || ''}</p>
+                  <p className="mb-2">{selectedInvoiceForView?.company?.reseller?.profile?.city || ''}, {selectedInvoiceForView?.company?.reseller?.profile?.country || ''}</p>
+                  <p className="mb-2"><b>Phone:</b>{selectedInvoiceForView?.company?.reseller?.phone || ''}</p>
+                  <p className="mb-3"><b>Email:</b> {selectedInvoiceForView?.company?.reseller?.email || ''}</p>
+                </Col>
+                <Col md={6}>
+                  <img src={PrimeAlleyLogo.src} alt="Logo" className="img-fluid" style={{maxWidth: '60%',float:"right"}} />
+                </Col>
+              </Row>
+
+              <Row>
+                <Col md={6}>
+                <h5 className="mb-2 fw-bold" style={{ color: '#14509e' }}>Bill To</h5>
+                  <div className="border p-3 rounded bg-light mb-3">
+                    <p className="mb-2 fw-bold">{selectedInvoiceForView?.company?.name || ''}</p>
+                    <p className="mb-2">{selectedInvoiceForView?.company?.profile?.address || ''}</p>
+                    <p className="mb-3">{selectedInvoiceForView?.company?.country || ''}</p>
+                  
+                    <p className="mb-0 fw-bold"><b>TRN No:</b> {selectedInvoiceForView?.company?.profile?.tax_id || ''}</p>
+                  </div>
+                </Col>
+                <Col md={6}>
+                <table className="table table-borderless">
+                      <tbody>
+                        <tr>
+                          <td className="fw-bold p-2" style={{ verticalAlign: 'top', width: '40%' }}>Invoice Number:</td>
+                          <td className="p-2">{selectedInvoiceForView.invoice_number || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                          <td className="fw-bold p-2" style={{ verticalAlign: 'top' }}>Invoice Date:</td>
+                          <td className="p-2">
+                            {selectedInvoiceForView.invoice_date
+                              ? moment(selectedInvoiceForView.invoice_date).format('DD MMM YYYY')
+                              : 'N/A'}
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td className="fw-bold p-2" style={{ verticalAlign: 'top' }}>End Date:</td>
+                          <td className="p-2">{selectedInvoiceForView?.due_date ? moment(selectedInvoiceForView?.due_date).format(GlobalDateFormat) : ''}</td>
+                        </tr>
+                        
+                        <tr>
+                          <td className="fw-bold p-2" style={{ verticalAlign: 'top', width: '40%' }}>Terms:</td>
+                          <td className="p-2">{selectedInvoiceForView?.company?.reseller?.profile?.payment_terms+ ' days'}</td>
+                        </tr>
+                        
+                        
+
+                        <tr>
+                          <td className="fw-bold p-2" style={{ verticalAlign: 'top', width: '40%' }}>Due Date:</td>
+                          <td className="p-2">{selectedInvoiceForView?.due_date ? moment(selectedInvoiceForView?.due_date).format(GlobalDateFormat) : ''}</td>
+                        </tr>
+
+                      </tbody>
+                    </table>
+                </Col>
+              </Row>
+              
+              
               <div>
                 {/* Invoice Header */}
-                <div className="row mb-4">
+                {/* <div className="row mb-4">
                   <div className="col-md-6">
                     <h5 className="mb-3 alert alert-info">Invoice Information</h5>
                     <table className="table table-borderless">
@@ -2810,32 +2885,34 @@ const InvoiceList = () => {
                       <p className="text-muted">No company information available</p>
                     )}
                   </div>
-                </div>
+                </div> */}
 
                 {/* Invoice Items */}
                 <div className="mb-4">
-                  <h5 className="mb-3">Invoice Items</h5>
+                  {/* <h5 className="mb-3">Invoice Items</h5> */}
                   {selectedInvoiceForView.items && selectedInvoiceForView.items.length > 0 ? (
                     <div className="">
-                      <table className="table table-bordered">
-                        <thead className="table-light">
+                      <table className="table table-bordered table-sm">
+                        <thead className="table-dark" style={{backgroundColor: '#0f3b66', color: 'white'}}>
                           <tr>
-                            {/* <th>#</th> */}
-                            <th className="text-start">Product/Description</th>
-                            <th className="text-end">Quantity</th>
-                            <th className="text-end">Unit Price</th>
-                            <th className="text-end">Tax Rate (%)</th>
-                            <th className="text-end">Tax Amount</th>
-                            <th className="text-end">Total</th>
+                            <th className="text-uppercase">Product Name</th>
+                            <th className="text-uppercase text-start">Product Description</th>
+                            <th className="text-uppercase text-end">QTY</th>
+                            <th className="text-uppercase text-end">Unit Price</th>
+                            <th className="text-uppercase text-end">Tax</th>
+                            <th className="text-uppercase text-end">Total</th>
+                            <th className="text-uppercase text-end">Total Price</th>
                           </tr>
                         </thead>
                         <tbody>
                           {selectedInvoiceForView.items.map((item: any, index: number) => (
                             
                             <tr key={item.id || index}>
-                              {/* <td>{index + 1}</td> */}
-                              <td className="text-start">
-                                <div>
+                              <td className="text-capitalize">{item.product?.name}</td>
+                              <td className="text-start" style={{whiteSpace: 'wrap'}}>
+                              <strong className="text-capitalize">{item.product?.name }</strong>
+                              <p className="mb-0">{item.description}</p>
+                                {/* <div>
                                   <strong>{item.product?.name || item.description || 'N/A'}</strong>
                                   {(() => {
                                     // Use item.description if available, otherwise use item.product.description
@@ -2867,16 +2944,23 @@ const InvoiceList = () => {
                                     }
                                     return null;
                                   })()}
-                                </div>
+                                </div> */}
                               </td>
-                              <td className="text-end">{formatNumber(parseFloat(item.quantity || '0'))}</td>
+                              <td className="text-end">{item.quantity}</td>
                               <td className="text-end">
                                 {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.unit_price || '0'))}
                               </td>
-                              <td className="text-end">{formatNumber(parseFloat(item.tax_rate || '0'))}%</td>
+                              
+                              {/* <td className="text-end">{formatNumber(parseFloat(item.tax_rate || '0'))}%</td> */}
                               <td className="text-end">
                                 {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.tax_amount || '0'))}
                               </td>
+
+
+                              <td className="text-end">
+                                {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.line_total || '0'))}
+                              </td>
+                              
                               <td className="text-end">
                                 <strong>
                                   {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.tax_amount || '0') + parseFloat(item.line_total || '0'))}
@@ -2888,26 +2972,44 @@ const InvoiceList = () => {
                       </table>
                       <Row>
                         <Col md={6}>
-                          <Card>
+                          {/* <Card>
                             <Card.Body>
                               <Card.Title>Notes & Terms</Card.Title>
                               <p>{selectedInvoiceForView.notes}</p>
                               <p>{selectedInvoiceForView.terms_conditions}</p>
                               <p>{!selectedInvoiceForView.notes && !selectedInvoiceForView.terms_conditions && 'No notes or terms provided'}</p>
                             </Card.Body>
-                          </Card>
+                          </Card> */}
+                          <h5 className="mb-2 fw-bold" style={{ color: '#14509e' }}>Special Instructions</h5>
+                          <ol style={{paddingLeft: '15px'}}>
+                            <li><p className="mb-1 text-muted">Payment can be made as bank transfer or direct deposit</p></li>
+                            <li><p className="mb-1 text-muted">Cheque can be issued in favor of PRIME ALLEY TECHNOLOGY LLC.</p></li>
+                            <li><p className="mb-1 text-muted">Services may be disconnected after the due date without further notice.</p></li>
+                            <li><p className="mb-1 text-muted">Value Added Tax (VAT) 5% will be applicable to this invoice.</p></li>
+                          </ol>
                         </Col>
                         <Col md={6}>
-                          <Card>
-                            <Card.Body>
-                              <Card.Title>Financial Summary</Card.Title>
-                              <table className="table table-bordered">
-                                <tr> <td>Subtotal</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.subtotal || '0'))}</td> </tr>
-                                <tr> <td>Tax Amount</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.tax_amount || '0'))}</td> </tr>
-                                <tr> <td className="fw-bold">Total Amount</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.total_amount || '0'))}</td> </tr>
-                              </table>
-                            </Card.Body>
-                          </Card>
+                        <table className="table table-borderless table-sm">
+                                <tr> <td className="p-0 fw-bold">Subtotal</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.subtotal || '0'))}</td> </tr>
+                                <tr> <td className="p-0 fw-bold">Vat Total</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.tax_amount || '0'))}</td> </tr>
+                                <tr> <td className="p-0 fw-bold">Total</td> <td className="text-end fw-bold">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(selectedInvoiceForView.total_amount || '0'))}</td> </tr>
+                                
+
+                                {Number(selectedInvoiceForView.paid_amount) >= 0 && (
+                                <tr style={{borderTop: '2px #000 solid'}}>
+                                  <td className="p-0 fw-bold text-uppercase">Paid Amount</td>
+                                  <td className="text-end fw-bold text-success">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(String(selectedInvoiceForView.paid_amount ?? 0)))}</td>
+                                </tr>
+                                )}
+                                {Number(selectedInvoiceForView.amount_due) >= 0 && (
+                                <tr >
+                                  <td className="p-0 fw-bold text-uppercase">Due Amount</td>
+                                  <td className="text-end fw-bold text-danger">{selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(String(selectedInvoiceForView.amount_due ?? 0)))}</td>
+                                </tr>
+                                )}
+
+
+                           </table>
                         </Col>
                       </Row>
                     </div>
@@ -2915,6 +3017,36 @@ const InvoiceList = () => {
                     <Alert variant="info">No items found for this invoice</Alert>
                   )}
                 </div>
+
+                 {/* Notes */}
+                 <div className="mb-3 alert alert-info">
+                    <h6>Bank Accounts</h6>
+                    
+                   
+                 {selectedInvoiceForView?.company?.reseller?.bank_accounts && selectedInvoiceForView?.company?.reseller?.bank_accounts.length > 0 && (
+                   
+                      <>
+                      <Row>
+                        {selectedInvoiceForView?.company?.reseller?.bank_accounts?.map((bankAccount: any) => (
+                        
+                          <Col md={4}>
+                            <p className="mb-1"><b>Bank Name:</b> {bankAccount.bank_name}</p>
+                            <p className="mb-1"><b>Account Holder Name:</b> {bankAccount.account_holder_name}</p>
+                            <p className="mb-1"><b>Account Number:</b> {bankAccount.account_number}</p>
+                            <p className="mb-1"><b>Currency:</b> {bankAccount.currency}</p>
+                            <p className="mb-1"><b>Routing Number:</b> {bankAccount.routing_number}</p>
+                            <p className="mb-1"><b>Swift Code:</b> {bankAccount.swift_code}</p>
+                            <p className="mb-1"><b>IBAN:</b> {bankAccount.iban}</p>
+                          </Col>
+                          
+                        ))}
+                         </Row>
+                       
+                   </>
+                )}
+               
+                 
+                  </div>
 
                
 
@@ -2932,6 +3064,9 @@ const InvoiceList = () => {
                   </div>
                 )}
               </div>
+
+              </>
+
             ) : (
               <Alert variant="warning">No invoice data available</Alert>
             )}

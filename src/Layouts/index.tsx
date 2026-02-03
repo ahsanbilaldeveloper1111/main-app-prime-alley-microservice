@@ -11,7 +11,7 @@ import { HEADER_CONSTANTS} from "@constants/headerConstants";
 import ProfileSidebar from '@components/profile-sidebar';
 import { useDialerModal } from '../contexts/DialerModalContext';
 
-import CompanyLogo2 from "@assets/images/Prime3.png";
+import { getCurrentUserCompanyImage } from "@utils/company";
 import { 
 	Bell, ChevronLeft, ChevronRight, Users,
   Link,
@@ -68,6 +68,35 @@ const Layout = ({ children }: LayoutProps) => {
 	const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false);
 	const [availableDevices, setAvailableDevices] = useState<any[]>([]);
 	const [pendingDialedNumber, setPendingDialedNumber] = useState('');
+	const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
+	const headerLogoUrlRef = useRef<string | null>(null);
+
+	// Load current user's company logo for header
+	useEffect(() => {
+		let cancelled = false;
+		getCurrentUserCompanyImage()
+			.then((blob) => {
+				if (cancelled) return;
+				if (blob && blob.size > 0) {
+					const url = URL.createObjectURL(blob);
+					headerLogoUrlRef.current = url;
+					setHeaderLogoUrl(url);
+				} else {
+					setHeaderLogoUrl(null);
+				}
+			})
+			.catch(() => {
+				if (!cancelled) setHeaderLogoUrl(null);
+			});
+		return () => {
+			cancelled = true;
+			const url = headerLogoUrlRef.current;
+			if (url) {
+				URL.revokeObjectURL(url);
+				headerLogoUrlRef.current = null;
+			}
+		};
+	}, []);
 
 	// Format time ago helper
 	const formatTimeAgo = (date: Date) => {
@@ -700,7 +729,8 @@ const Layout = ({ children }: LayoutProps) => {
               {sidebarOpen ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
             </Button>
             <a className="navbar-brand fw-bold text-primary mb-0" href="#">
-			<img src={CompanyLogo2.src} alt="logo" className="img-fluid header-logo" /></a>
+              {headerLogoUrl ? <img src={headerLogoUrl} alt="logo" className="img-fluid header-logo" /> : null}
+            </a>
           </div>
 
           

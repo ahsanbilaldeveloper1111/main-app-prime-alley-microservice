@@ -143,6 +143,8 @@ export interface InvoiceData {
   reseller: ResellerData | null;
   items: InvoiceItemData[];
   payments: InvoicePaymentData[];
+  bank_accounts: string[];
+
 }
 
 export interface InvoiceCreateUpdatePayload {

@@ -57,7 +57,8 @@ import {
   Folder,
   UserPlus,
   CheckCheck,
-  Layers2
+  Layers2,
+  Map
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -335,8 +336,15 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
           url: '/ai-ml/campaign-reports'
-        }
+        },
         
+        {
+          id: 'ai-bot-faqs-management',
+          title: 'AI Bot FAQs',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/chat/ai-bot-faqs'
+        }
       ]
     },
 
@@ -411,46 +419,19 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: MENU_LABELS.AUTOMATION,
       url: '',
       subItems: [
-        // {
-        //   id: 'tms-dashboard',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.TMS_DASHBOARD,
-        //   icon: <LayoutDashboard size={16} />,
-        //   permission: PERMISSIONS.TMS_SERVICES,
-        //   url: '/tms/dashboard'
-        // },
-        // {
-        //   id: 'tms-user-management',
-        //   title: 'Users',
-        //   icon: <Users size={16} />,
-        //   permission: PERMISSIONS.TMS_SERVICES,
-        //   url: '/tms/management/users'
-        // },
-        // {
-        //   id: 'tms-user-create',
-        //   title: 'Create User',
-        //   icon: <Users size={16} />,
-        //   permission: PERMISSIONS.TMS_SERVICES,
-        //   url: '/tms/profiling/user/create'
-        // },
-        // {
-        //   id: 'tms-audit-logs',
-        //   title: 'Audit Logs',
-        //   icon: <FileText size={16} />,
-        //   permission: PERMISSIONS.TMS_SERVICES,
-        //   url: '/tms/audit-logs'
-        // },
+       
         {
           id: 'live-calls-campaigns-management',
           title: 'Campaigns Management',
           icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
+          permission: PERMISSIONS.VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT,
           url: '/live-calls/management/campaigns'
         },
         {
           id: 'live-calls-agent-management',
           title: 'Agent Management',
           icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
+          permission: PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT,
           url: '/live-calls/management/agents'
         },
         {
@@ -460,13 +441,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.TMS_SERVICES,
           url: '/chat/ai-faqs'
         },
-        {
-          id: 'ai-bot-faqs-management',
-          title: 'AI Bot FAQs',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/chat/ai-bot-faqs'
-        }
+        
       ]
       .filter(item => !item.permission || hasPermission(item.permission))
     },
@@ -572,6 +547,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <Languages size={16} />,
           permission: PERMISSIONS.TRANSLATE_AIML,
           url: '/ai-ml/translate'
+        },
+        {
+          id: 'ai-ml-manage-extensions',
+          title: 'Manage Extensions',
+          icon: <Settings size={16} />,
+          permission: PERMISSIONS.MANAGE_EXTENSIONS_AIML,
+          url: '/ai-ml/manage-extensions'
         },
         // {
         //   id: 'ai-ml-outbound-calls',
@@ -779,6 +761,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             url: '/staff-management/employees',
             permission: PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT 
           },
+          {
+            id: 'staff-management-attendence',
+            title: 'Attendence',
+            icon: <Clock size={16} />,
+            url: '/staff-management/attendences',
+            permission: PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT 
+          },
           
           { 
             id: 'staff-management-employees-onboarding', 
@@ -803,6 +792,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             url: '/staff-management/organizational-chart', 
             permission: PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT 
           },
+          {
+            id:'staff-management-request-categories',
+            title: 'Request Categories',
+            icon: <List size={16} />,
+            url: '/staff-management/request-categories',
+            permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT
+          },
+          {
+            id:'staff-management-locations',
+            title: 'Manage Locations',
+            icon: <Map size={16} />,
+            url: '/staff-management/locations',
+            permission: PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT
+          }
           
       ]
       .filter(item => !item.permission || hasPermission(item.permission))

@@ -213,13 +213,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     const text = editorRef.current.innerText || editorRef.current.textContent || '';
     
     // Check max length
-    if (text.length > maxLength) {
-      // Revert if exceeds max length
-      if (editorRef.current) {
-        editorRef.current.innerHTML = value;
-      }
-      return;
-    }
+    // if (text.length > maxLength) {
+    //   // Revert if exceeds max length
+    //   if (editorRef.current) {
+    //     editorRef.current.innerHTML = value;
+    //   }
+    //   return;
+    // }
     
     onChange(html, text);
   };
@@ -574,9 +574,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           </Button>
 
           {/* Character Count */}
-          <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6c757d' }}>
+          {/* <div style={{ marginLeft: 'auto', fontSize: '12px', color: '#6c757d' }}>
             {getTextLength()}/{maxLength}
-          </div>
+          </div> */}
         </div>
 
         {/* Rich Text Editor */}

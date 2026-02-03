@@ -568,6 +568,27 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                   </div>
                 </button>
               </li>
+
+
+{session?.user?.permissions?.includes('set-company-image-users') && (
+              <li className="profile-menu-item">
+                <button className="profile-menu-button"
+                  onClick={() => {
+                    router.push('/company');
+                    onClose?.();
+                  }}
+                >
+                  <div className="profile-menu-content">
+                      <div className="profile-menu-icon">
+                        <Settings size={20} />
+                    </div>
+                    <span className="profile-menu-text">Company Logo</span>
+                  </div>
+                </button>
+              </li>
+              )}
+
+              
             </div>
 
             {/* Section 5 */}
