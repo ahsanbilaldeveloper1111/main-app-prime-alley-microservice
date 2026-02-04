@@ -64,7 +64,6 @@ import {
   ArrowDown,
   Download,
   CheckSquare,
-  Layers,
   ArrowUpDown,
   ChevronsLeft,
   ChevronsRight,
@@ -81,9 +80,14 @@ import {
   History,
   FileText,
   Target,
+  Layers,
 } from "lucide-react";
+import ConvertToLeadModal from "@components/ConvertToLeadModal";
 import { Column } from "@components/CustomDataTable";
-
+import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
+import GenericSidebar from "@components/GenericSidebar";
+import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import {
   getCrmData,
   uploadCrmDataCsv,
@@ -368,25 +372,28 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
               return (
                 <Button
-                  key={filter.id}
-                  variant={
-                    hasCustomColor
-                      ? undefined
-                      : isActive
-                      ? filter.variant || "primary"
-                      : "outline-secondary"
-                  }
-                  onClick={() => onFilterChange && onFilterChange(filter.id)}
-                  className="d-flex align-items-center gap-2"
-                  style={hasCustomColor ? buttonStyle : undefined}
-                >
-                  {filter.icon && (
-                    <span className="d-flex align-items-center">
-                      {filter.icon}
-                    </span>
-                  )}
-                  {filter.label}
-                </Button>
+  key={filter.id}
+  variant={
+    hasCustomColor
+      ? undefined
+      : isActive
+      ? filter.variant || "primary"
+      : "outline-secondary"
+  }
+  onClick={() => onFilterChange && onFilterChange(filter.id)}
+  className="d-flex align-items-center gap-2 "
+  style={hasCustomColor ? buttonStyle : undefined}
+>
+  <span className="d-flex align-items-center gap-2">
+    {filter.icon && (
+      <span className="d-flex align-items-center">
+        {filter.icon}
+      </span>
+    )}
+    {filter.label}
+  </span>
+</Button>
+
               );
             })}
           </div>
@@ -517,6 +524,8 @@ const CrmProspectsManagement = () => {
   );
   const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
   const [assignToCampaignUsers, setAssignToCampaignUsers] = useState(false);
+  const [showConvertToLeadModal, setShowConvertToLeadModal] = useState(false);
+const [convertingProspectId, setConvertingProspectId] = useState<number | null>(null);
 
   // Data assignment modal states
   const [assignmentFilters, setAssignmentFilters] = useState({
@@ -586,6 +595,12 @@ const CrmProspectsManagement = () => {
   // History modal state
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
+  // Sidebar states
+  const [showProspectSidebar, setShowProspectSidebar] = useState(false);
+  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
+  const [selectedProspect, setSelectedProspect] = useState<any>(null);
+  const [showFilterBar, setShowFilterBar] = useState(false);
+
   // Call recordings state
   const [callRecordings, setCallRecordings] = useState<any[]>([]);
   const [callRecordingsLoading, setCallRecordingsLoading] = useState(false);
@@ -642,23 +657,19 @@ const CrmProspectsManagement = () => {
   });
 
   // Column customization and pagination states
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem("crmDataSelectedColumns");
-    return saved
-      ? JSON.parse(saved)
-      : [
-          "name",
-          "phone",
-          "source",
-          "user_extension",
-          "campaign",
-          "last_called_at",
-          "last_call_end_reason",
-          "disposition",
-          "scheduled_call_at",
-          "tags",
-        ];
-  });
+  const defaultSelectedColumns = [
+    "name",
+    "phone",
+    "source_file",
+    "user_extension",
+    "campaign",
+    "last_called_at",
+    "last_call_end_reason",
+    "disposition",
+    "scheduled_call_at",
+    "tags",
+  ];
+
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
@@ -1309,14 +1320,6 @@ const CrmProspectsManagement = () => {
   useEffect(() => {
     fetchCrmData();
   }, [fetchCrmData, refreshKey]);
-
-  // Save selected columns to localStorage
-  useEffect(() => {
-    localStorage.setItem(
-      "crmDataSelectedColumns",
-      JSON.stringify(selectedColumns)
-    );
-  }, [selectedColumns]);
 
   // CSV validation function
   const validateCsvFile = (
@@ -2093,7 +2096,272 @@ const CrmProspectsManagement = () => {
     setSelectedItems(selected.map((item) => item.id));
   }, []);
 
-  // Define columns for GenericListPage
+  // Handle prospect row click
+  const handleProspectClick = useCallback((prospect: any) => {
+    setSelectedProspect(prospect);
+    setShowProspectSidebar(true);
+  }, []);
+
+  // Handle close prospect sidebar
+  const handleCloseProspectSidebar = useCallback(() => {
+    setShowProspectSidebar(false);
+    setSelectedProspect(null);
+  }, []);
+
+  // Handle open filters sidebar
+  const handleOpenFiltersSidebar = useCallback(() => {
+    setShowFiltersSidebar(true);
+  }, []);
+
+  // Handle close filters sidebar
+  const handleCloseFiltersSidebar = useCallback(() => {
+    setShowFiltersSidebar(false);
+  }, []);
+
+  // Define columns for GenericTable - Clean declarative definitions
+ const prospectsColumns: TableColumn<any>[] = useMemo(
+    () => [
+      {
+        key: 'name',
+        label: 'Name',
+        sortable: true,
+        type: 'avatar',
+        avatar: {
+          getInitials: (row) => getInitials(row.name),
+          getColor: (row) => getRandomColor(row.name)
+        },
+        emptyValue: 'N/A'
+      },
+      {
+        key: 'phone',
+        label: 'Phone',
+        sortable: true,
+        type: 'custom',
+        align: 'left',
+        render: (row) => (
+          <PhoneContainer phone={row?.phone} onClick={() => handleCallClick(row)} />
+        )
+      },
+      {
+        key: 'source_file',
+        label: 'Source',
+        sortable: true,
+        type: 'badge',
+        badge: {
+          getVariant: () => 'secondary'
+        },
+        emptyValue: 'N/A'
+      },
+      {
+        key: 'user_extension',
+        label: 'Assigned To',
+        sortable: true,
+        type: 'badge',
+        accessor: (row) => {
+          const extension = extensions.find(
+            (ext: any) => ext.id.toString() === row.user_extension?.toString()
+          );
+          return row.user_extension 
+            ? (extension?.display_name || row.user_extension)
+            : 'Unassigned';
+        },
+        badge: {
+          getVariant: (row) => row.user_extension ? 'success' : 'secondary',
+          showDot: () => true
+        }
+      },
+      {
+        key: 'campaign',
+        label: 'Campaign',
+        sortable: true,
+        type: 'badge',
+        accessor: (row) => row.campaign?.name || 'No Campaign',
+        badge: {
+          getVariant: (row) => row.campaign ? 'primary' : 'info'
+        }
+      },
+      {
+        key: 'last_called_at',
+        label: 'Last Called',
+        sortable: true,
+        type: 'text',
+        accessor: (row) => row.last_called_at ? moment(row.last_called_at).format("MMM DD, HH:mm") : '-'
+      },
+      {
+        key: 'last_call_end_reason',
+        label: 'Last Call Status',
+        sortable: true,
+        type: 'badge',
+        accessor: (row) => {
+          if (!row.last_call_end_reason) return null;
+          const endReason = callEndReasons.find(r => r.value === row.last_call_end_reason);
+          return endReason?.label || row.last_call_end_reason;
+        },
+        badge: {
+          getVariant: (row) => {
+            if (!row.last_call_end_reason) return 'secondary';
+            const endReason = callEndReasons.find(r => r.value === row.last_call_end_reason);
+            return (endReason?.color as any) || 'secondary';
+          }
+        },
+        emptyValue: '-'
+      },
+      {
+        key: 'disposition',
+        label: 'Disposition',
+        sortable: true,
+        type: 'badge',
+        accessor: (row) => {
+          if (!row.disposition) return null;
+          const dispositions = [
+            { value: 'interested', label: 'Interested', color: 'success' },
+            { value: 'not_interested', label: 'Not Interested', color: 'danger' },
+            { value: 'callback_requested', label: 'Callback Requested', color: 'warning' },
+            { value: 'no_answer', label: 'No Answer', color: 'warning' },
+            { value: 'busy', label: 'Busy', color: 'info' },
+            { value: 'do_not_call', label: 'Do Not Call', color: 'danger' },
+            { value: 'wrong_number', label: 'Wrong Number', color: 'info' },
+            { value: 'follow_up', label: 'Follow Up', color: 'primary' }
+          ];
+          const disposition = dispositions.find(d => d.value === row.disposition);
+          if (disposition) return disposition.label;
+          // Fallback to random for demo
+          const randomDisposition = dispositions[Math.floor(Math.random() * dispositions.length)];
+          return randomDisposition.label;
+        },
+        badge: {
+          getVariant: (row) => {
+            if (!row.disposition) return 'secondary';
+            const dispositions = [
+              { value: 'interested', color: 'success' },
+              { value: 'not_interested', color: 'danger' },
+              { value: 'callback_requested', color: 'warning' },
+              { value: 'no_answer', color: 'warning' },
+              { value: 'busy', color: 'info' },
+              { value: 'do_not_call', color: 'danger' },
+              { value: 'wrong_number', color: 'info' },
+              { value: 'follow_up', color: 'primary' }
+            ];
+            const disposition = dispositions.find(d => d.value === row.disposition);
+            if (disposition) return disposition.color as any;
+            // Fallback to random for demo
+            const randomColors = ['success', 'danger', 'warning', 'info', 'primary'];
+            return randomColors[Math.floor(Math.random() * randomColors.length)] as any;
+          }
+        },
+        emptyValue: '-'
+      },
+      {
+        key: 'scheduled_call_at',
+        label: 'Next Call',
+        sortable: true,
+        type: 'badge',
+        accessor: (row) => {
+          if (!row.scheduled_call_at) return 'Not scheduled';
+          const isOverdue = moment(row.scheduled_call_at).isBefore(moment());
+          const isNextHour = moment(row.scheduled_call_at).isBefore(moment().add(1, 'hour'));
+          const formatted = moment(row.scheduled_call_at).format("MMM DD, HH:mm");
+          if (isOverdue) return `${formatted} (Overdue)`;
+          if (isNextHour) return `${formatted} (Soon)`;
+          return formatted;
+        },
+        badge: {
+          getVariant: (row) => {
+            if (!row.scheduled_call_at) return 'info';
+            const isOverdue = moment(row.scheduled_call_at).isBefore(moment());
+            const isNextHour = moment(row.scheduled_call_at).isBefore(moment().add(1, 'hour'));
+            return isOverdue ? 'danger' : isNextHour ? 'warning' : 'info';
+          }
+        }
+      },
+      {
+        key: 'tags',
+        label: 'Tags',
+        sortable: false,
+        type: 'custom',
+        render: (row) => (
+          <div className="d-flex gap-1 flex-wrap">
+            {(row.tags || []).map((tag: any, idx: number) => (
+              <span key={idx} className="gt-badge gt-badge-secondary">
+                {tag.name || tag}
+              </span>
+            ))}
+          </div>
+        )
+      }
+    ],
+    [extensions, callEndReasons, handleCallClick]
+  );
+
+  // Define table actions
+  const prospectsActions: TableAction<any>[] = useMemo(
+    () => [
+      ...(session?.user?.permissions?.includes('view-crm-data-management') ? [{
+        label: 'View',
+        icon: <Eye size={16} />,
+        onClick: (row: any) => handleViewData(row),
+        variant: 'link' as const
+      }] : []),
+      ...(session?.user?.permissions?.includes('call-service-crm-data-management') ? [{
+        label: 'Call',
+        icon: <PhoneIcon size={16} />,
+        onClick: (row: any) => handleCallClick(row),
+        variant: 'link' as const,
+        className: 'text-success'
+      }] : []),
+      ...(activeFilter !== 'has_leads' ? [{
+        label: 'More Actions',
+        icon: <MoreVertical size={16} />,
+        variant: 'link' as const,
+        dropdown: {
+          align: 'end' as const,
+          options: [
+            ...(session?.user?.permissions?.includes('call-service-crm-data-management') ? [
+              {
+                label: 'Schedule Call',
+                icon: <FiCalendar size={14} />,
+                onClick: (row: any) => handleScheduleCall(row),
+                show: (row: any) => !row.scheduled_call_at
+              },
+              {
+                label: 'Edit Scheduled Call',
+                icon: <FiCalendar size={14} />,
+                onClick: (row: any) => handleScheduleCall(row),
+                show: (row: any) => !!row.scheduled_call_at
+              },
+              {
+                label: 'Unschedule Call',
+                icon: <FiX size={14} />,
+                onClick: (row: any) => handleUnscheduleCallClick(row),
+                className: 'text-danger',
+                show: (row: any) => !!row.scheduled_call_at,
+                divider: true
+              }
+            ] : []),
+            {
+              label: 'Convert to Lead',
+              icon: <FiTarget size={14} />,
+              onClick: (row: any) => {
+                setConvertingProspectId(row.id);
+                setShowConvertToLeadModal(true);
+              }
+            },
+            {
+              label: 'Send Email',
+              icon: <Mail size={14} />,
+              onClick: (row: any) => {
+                window.location.href = `mailto:${row.email}`;
+              },
+              show: (row: any) => !!row.email
+            }
+          ]
+        }
+      }] : [])
+    ],
+    [session, activeFilter, handleViewData, handleCallClick, handleScheduleCall, handleUnscheduleCallClick]
+  );
+
+  // Define old columns for GenericListPage (keep for backward compatibility if needed)
   const columns: Column[] = useMemo(
     () => [
       {
@@ -2508,39 +2776,136 @@ const CrmProspectsManagement = () => {
       />
 
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-        <div>
-          <h2 className="mb-1 fw-bold">Prospects</h2>
-          <p className="text-muted mb-0">
-          Upload, manage, call, schedule, and convert your prospects into leads.
-          </p>
-        </div>
+        <div className="mb-3 mb-md-0">
+  <nav aria-label="breadcrumb">
+    <ol className="breadcrumb mb-0">
+      <li className="breadcrumb-item">
+        <a href="/dashboard" className="text-decoration-none">
+          CRM
+        </a>
+      </li>
+      <li className="breadcrumb-item active fw-bold" aria-current="page">
+        Prospects
+      </li>
+    </ol>
+  </nav>
+</div>
         <div className="d-flex flex-wrap gap-2">
-          <Button
+          {/* <Button
             variant={showProspectsAnalytics ? "primary" : "outline-secondary"}
             onClick={() => setShowProspectsAnalytics(!showProspectsAnalytics)}
           >
             <FiDatabase size={16} className="me-2" />
             {showProspectsAnalytics ? "Hide Analytics" : "Show Analytics"}
-          </Button>
+          </Button> */}
 
-          {session?.user?.permissions?.includes("add-crm-data-management") && (
-            <Button
-              variant="outline-primary"
-              onClick={() => setShowUploadModal(true)}
-            >
-              <Download size={16} className="me-2" />
-              Import Contacts
-            </Button>
-          )}
-          <Button
-            variant={showAdvancedFilters ? "secondary" : "outline-secondary"}
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-          >
-            <FiFilter size={16} className="me-2" />
-            {showAdvancedFilters ? "Hide Filters" : "Show Filters"}
-          </Button>
+{session?.user?.permissions?.includes("add-crm-data-management") && (
+  <Button
+    variant="outline-secondary"
+    className=""
+    onClick={() => setShowUploadModal(true)}
+  >
+    <span className="">
+      <Download size={16} className="me-2" />
+      Import Contacts
+    </span>
+  </Button>
+)}
+
+<Button
+  variant="outline-secondary"
+  className=""
+  onClick={() => setShowFilterBar(!showFilterBar)}
+>
+  <span className="">
+    <Layers size={16} className="me-2" />
+    {showFilterBar ? "Hide Tabs" : "Show Tabs"}
+  </span>
+</Button>
+
+<Button
+  variant="outline-secondary"
+  className=""
+  onClick={handleOpenFiltersSidebar}
+>
+  <span className="">
+    <FiFilter size={16} className="me-2" />
+    Filters
+  </span>
+</Button>
+
+
         </div>
       </div>
+        
+        {/* Stats Cards */}
+      <StatsCards 
+        data={[
+          {
+            title: 'All Prospects',
+            value: totalRecords,
+            icon: Users,
+            iconColor: '#6366F1',
+            iconBgColor: '#EEF2FF',
+            subtitle: `${metrics.assigned_records} Assigned / ${metrics.unassigned_records} Unassigned`
+          },
+          {
+            title: 'Scheduled',
+            value: metrics.scheduled_records,
+            icon: Calendar,
+            iconColor: '#10B981',
+            iconBgColor: '#D1FAE5',
+            metric: {
+              text: `${metrics.scheduled_next_hour_records} in next hour`,
+              dotColor: '#F59E0B'
+            }
+          },
+          {
+            title: 'Convert to Leads',
+            value: totalRecords > 0 ? `${((metrics.assigned_records / totalRecords) * 100).toFixed(1)}%` : '0%',
+            icon: Target,
+            iconColor: '#8B5CF6',
+            iconBgColor: '#EDE9FE',
+            badge: {
+              text: `${metrics.assigned_records} Ready`,
+              bgColor: '#FEF3C7',
+              textColor: '#92400E'
+            }
+          },
+          {
+            title: 'All Prospects',
+            value: totalRecords,
+            icon: Users,
+            iconColor: '#6366F1',
+            iconBgColor: '#EEF2FF',
+            subtitle: `${metrics.assigned_records} Assigned / ${metrics.unassigned_records} Unassigned`
+          },
+          {
+            title: 'Scheduled',
+            value: metrics.scheduled_records,
+            icon: Calendar,
+            iconColor: '#10B981',
+            iconBgColor: '#D1FAE5',
+            metric: {
+              text: `${metrics.scheduled_next_hour_records} in next hour`,
+              dotColor: '#F59E0B'
+            }
+          },
+          {
+            title: 'Convert to Leads',
+            value: totalRecords > 0 ? `${((metrics.assigned_records / totalRecords) * 100).toFixed(1)}%` : '0%',
+            icon: Target,
+            iconColor: '#8B5CF6',
+            iconBgColor: '#EDE9FE',
+            badge: {
+              text: `${metrics.assigned_records} Ready`,
+              bgColor: '#FEF3C7',
+              textColor: '#92400E'
+            }
+          }
+        ]}
+        gridMinWidth="180px"
+      />
 
       <div className="container-fluid">
         {/* Analytics Section - Collapsible */}
@@ -2634,7 +2999,7 @@ const CrmProspectsManagement = () => {
         )}
 
         {/* Filter Bar */}
-        {session?.user?.permissions?.includes("list-crm-data-management") && (
+        {showFilterBar && session?.user?.permissions?.includes("list-crm-data-management") && (
           <FilterBar
             quickFilters={[
               {
@@ -3015,13 +3380,12 @@ const CrmProspectsManagement = () => {
             </Card>
           )}
 
-        {/* Bulk Actions and Column Customization */}
-        <div className="d-flex justify-content-end gap-2 mb-3">
-          {/* Bulk Actions Dropdown - Only show when items are selected and user has delete permission */}
-          {selectedItems.length > 0 &&
-            session?.user?.permissions?.includes(
-              "delete-crm-data-management"
-            ) && (
+        {/* Bulk Actions */}
+        {selectedItems.length > 0 &&
+          session?.user?.permissions?.includes(
+            "delete-crm-data-management"
+          ) && (
+            <div className="d-flex justify-content-end gap-2 mb-3">
               <Dropdown>
                 <Dropdown.Toggle variant="outline-primary" size="sm">
                   <CheckSquare size={16} className="me-2" />
@@ -3037,689 +3401,49 @@ const CrmProspectsManagement = () => {
                   </Dropdown.Item>
                 </Dropdown.Menu>
               </Dropdown>
-            )}
-
-          {/* Column Customization */}
-          <Dropdown>
-            <Dropdown.Toggle variant="outline-secondary" size="sm">
-              <Layers size={16} className="me-2" />
-              Customize Table
-            </Dropdown.Toggle>
-            <Dropdown.Menu
-              align="end"
-              style={{ maxHeight: "300px", overflowY: "auto" }}
-            >
-              {[
-                { key: "name", label: "Name" },
-                { key: "phone", label: "Phone" },
-                { key: "source", label: "Source" },
-                { key: "user_extension", label: "Assigned To" },
-                { key: "campaign", label: "Campaign" },
-                { key: "last_called_at", label: "Last Called" },
-                { key: "last_call_end_reason", label: "Last Call Status" },
-                { key: "disposition", label: "Disposition" },
-                { key: "scheduled_call_at", label: "Next Call Scheduled" },
-                { key: "tags", label: "Tags" },
-              ].map((col) => (
-                <Dropdown.Item key={col.key} as="div">
-                  <Form.Check
-                    type="checkbox"
-                    label={col.label}
-                    checked={selectedColumns.includes(col.key)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedColumns([...selectedColumns, col.key]);
-                      } else {
-                        setSelectedColumns(
-                          selectedColumns.filter((c) => c !== col.key)
-                        );
-                      }
-                    }}
-                  />
-                </Dropdown.Item>
-              ))}
-              <Dropdown.Divider />
-              <Dropdown.Item
-                onClick={() =>
-                  setSelectedColumns([
-                    "name",
-                    "phone",
-                    "source",
-                    "user_extension",
-                    "campaign",
-                    "last_called_at",
-                    "last_call_end_reason",
-                    "disposition",
-                    "scheduled_call_at",
-                    "tags",
-                  ])
-                }
-              >
-                Select All
-              </Dropdown.Item>
-              <Dropdown.Item
-                onClick={() =>
-                  setSelectedColumns([
-                    "name",
-                    "phone",
-                    "source",
-                    "user_extension",
-                    "campaign",
-                    "last_called_at",
-                    "last_call_end_reason",
-                    "disposition",
-                    "scheduled_call_at",
-                    "tags",
-                  ])
-                }
-              >
-                Reset to Default
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
-        </div>
+            </div>
+          )}
 
         {/* Prospects Table */}
         {session?.user?.permissions?.includes("list-crm-data-management") && (
-          <Card
-            className="border-0 shadow-sm prospects-table-wrapper"
-            style={{ width: "100%" }}
-          >
-            <Card.Body className="p-0" style={{ width: "100%" }}>
-              {loading ? (
-                <div className="text-center py-5">
-                  <Spinner animation="border" variant="primary" />
-                  <p className="mt-3 text-muted">Loading prospects...</p>
-                </div>
-              ) : (
-                <>
-                  <div className="table-responsive">
-                    <Table
-                      hover
-                      className="mb-0"
-                      style={{ width: "100%", margin: 0, tableLayout: "auto" }}
-                    >
-                      <thead className="bg-light">
-                        <tr>
-                          {session?.user?.permissions?.includes(
-                            "delete-crm-data-management"
-                          ) && (
-                            <th
-                              style={{
-                                width: "20px",
-                                minWidth: "unset",
-                                paddingRight: "2px",
-                              }}
-                            >
-                              <Form.Check
-                                type="checkbox"
-                                checked={
-                                  selectedItems.length > 0 &&
-                                  selectedItems.length === dataList.length
-                                }
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedItems(
-                                      dataList.map((item) => item.id)
-                                    );
-                                  } else {
-                                    setSelectedItems([]);
-                                  }
-                                }}
-                              />
-                            </th>
-                          )}
-                          {selectedColumns.includes("name") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("name")}
-                            >
-                              Name {renderSortIcon("name")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("phone") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("phone")}
-                            >
-                              Phone {renderSortIcon("phone")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("source") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("source_file")}
-                            >
-                              Source {renderSortIcon("source_file")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("user_extension") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("user_extension")}
-                            >
-                              Assigned To {renderSortIcon("user_extension")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("campaign") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("campaign_id")}
-                            >
-                              Campaign {renderSortIcon("campaign_id")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("last_called_at") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("last_called_at")}
-                            >
-                              Last Called {renderSortIcon("last_called_at")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("last_call_end_reason") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("last_call_end_reason")}
-                            >
-                              Last Call Status{" "}
-                              {renderSortIcon("last_call_end_reason")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("disposition") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("disposition")}
-                            >
-                              Disposition {renderSortIcon("disposition")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("scheduled_call_at") && (
-                            <th
-                              style={{ cursor: "pointer", userSelect: "none" }}
-                              onClick={() => handleSort("scheduled_call_at")}
-                            >
-                              Next Call Scheduled{" "}
-                              {renderSortIcon("scheduled_call_at")}
-                            </th>
-                          )}
-                          {selectedColumns.includes("tags") && <th>Tags</th>}
-                          <th style={{ width: "120px", minWidth: "120px" }}>
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const sorted = sortData(
-                            dataList,
-                            pagination.sortColumn,
-                            pagination.sortDirection
-                          );
-
-                          if (sorted.length === 0) {
-                            return (
-                              <tr>
-                                <td
-                                  colSpan={
-                                    selectedColumns.length +
-                                    (session?.user?.permissions?.includes(
-                                      "delete-crm-data-management"
-                                    )
-                                      ? 2
-                                      : 1)
-                                  }
-                                  className="text-center py-4 text-muted"
-                                >
-                                  No prospects found matching your criteria
-                                </td>
-                              </tr>
-                            );
-                          }
-
-                          return sorted.map((item: any) => {
-                            const endReason =
-                              callEndReasons.find(
-                                (r) =>
-                                  r.value ===
-                                  ((item as any).last_call_end_reason ||
-                                    "answered")
-                              ) || callEndReasons[0];
-                            const dispositions = [
-                              {
-                                value: "interested",
-                                label: "Interested",
-                                color: "success",
-                              },
-                              {
-                                value: "not_interested",
-                                label: "Not Interested",
-                                color: "danger",
-                              },
-                              {
-                                value: "callback_requested",
-                                label: "Callback Requested",
-                                color: "warning",
-                              },
-                              {
-                                value: "no_answer",
-                                label: "No Answer",
-                                color: "warning",
-                              },
-                              { value: "busy", label: "Busy", color: "info" },
-                              {
-                                value: "do_not_call",
-                                label: "Do Not Call",
-                                color: "danger",
-                              },
-                              {
-                                value: "wrong_number",
-                                label: "Wrong Number",
-                                color: "info",
-                              },
-                              {
-                                value: "follow_up",
-                                label: "Follow Up",
-                                color: "primary",
-                              },
-                            ];
-                            const randomDisposition =
-                              dispositions[
-                                Math.floor(Math.random() * dispositions.length)
-                              ];
-
-                            return (
-                              <tr 
-                                key={item.id}
-                                onDoubleClick={() => {
-                                  if (session?.user?.permissions?.includes("view-crm-data-management")) {
-                                    handleViewData(item);
-                                  }
-                                }}
-                                style={{
-                                  cursor: session?.user?.permissions?.includes("view-crm-data-management") 
-                                    ? "pointer" 
-                                    : "default"
-                                }}
-                              >
-                                {session?.user?.permissions?.includes(
-                                  "delete-crm-data-management"
-                                ) && (
-                                  <td
-                                    style={{
-                                      width: "20px",
-                                      minWidth: "unset",
-                                      paddingRight: "2px",
-                                    }}
-                                  >
-                                    <Form.Check
-                                      type="checkbox"
-                                      checked={selectedItems.includes(item.id)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setSelectedItems([
-                                            ...selectedItems,
-                                            item.id,
-                                          ]);
-                                        } else {
-                                          setSelectedItems(
-                                            selectedItems.filter(
-                                              (id) => id !== item.id
-                                            )
-                                          );
-                                        }
-                                      }}
-                                    />
-                                  </td>
-                                )}
-                                {selectedColumns.includes("name") && (
-                                  <td className="fw-semibold">
-                                    <div className="d-flex align-items-center gap-2">
-                                      {item.name ? (
-                                        <>
-                                          <div
-                                            style={{
-                                              width: "30px",
-                                              height: "30px",
-                                              borderRadius: "50%",
-                                              backgroundColor: getRandomColor(
-                                                item.name
-                                              ),
-                                              color: "#fff",
-                                              display: "flex",
-                                              alignItems: "center",
-                                              justifyContent: "center",
-                                              fontSize: "10px",
-                                              fontWeight: "600",
-                                              flexShrink: 0,
-                                            }}
-                                          >
-                                            {getInitials(item.name)}
-                                          </div>
-                                          <span>{item.name}</span>
-                                        </>
-                                      ) : (
-                                        "N/A"
-                                      )}
-                                    </div>
-                                  </td>
-                                )}
-                                {selectedColumns.includes("phone") && (
-                                  <td>
-                                    <PhoneContainer 
-                                      phone={item?.phone} 
-                                      onClick={() => handleCallClick(item)}
-                                    />
-                                  </td>
-                                )}
-                                {selectedColumns.includes("source") && (
-                                  <td>
-                                    {(item as any).source_file ? (
-                                      <Badge
-                                        bg="secondary"
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        {(item as any).source_file}
-                                      </Badge>
-                                    ) : (
-                                      <span className="text-muted">N/A</span>
-                                    )}
-                                  </td>
-                                )}
-                                {selectedColumns.includes("user_extension") && (
-                                  <td>
-                                    {item.user_extension ? (
-                                      <Badge
-                                        bg="success"
-                                        className="bg-opacity-10 text-dark d-flex align-items-center gap-1"
-                                        style={{
-                                        }}
-                                      >
-                                        <span style={{
-                                          backgroundColor: '#1de9b6',
-                                          width: '5px',
-                                          height: '5px',
-                                          borderRadius: '50%',
-                                        }}>
-                                        </span>
-                                        {extensions.find(
-                                          (ext: any) =>
-                                            ext.id.toString() ===
-                                            item.user_extension?.toString()
-                                        )?.display_name || item.user_extension}
-                                      </Badge>
-                                    ) : (
-                                      <Badge
-                                        bg="secondary"
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        Unassigned
-                                      </Badge>
-                                    )}
-                                  </td>
-                                )}
-                                {selectedColumns.includes("campaign") && (
-                                  <td>
-                                    {(item as any).campaign ? (
-                                      <Badge
-                                        bg="primary"
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        {(item as any).campaign.name}
-                                      </Badge>
-                                    ) : (
-                                      <Badge
-                                        bg="info"
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        No Campaign
-                                      </Badge>
-                                    )}
-                                  </td>
-                                )}
-                                {selectedColumns.includes("last_called_at") && (
-                                  <td>
-                                    {(item as any).last_called_at
-                                      ? moment(
-                                          (item as any).last_called_at
-                                        ).format("MMM DD, HH:mm")
-                                      : "-"}
-                                  </td>
-                                )}
-                                {selectedColumns.includes(
-                                  "last_call_end_reason"
-                                ) && (
-                                  <td>
-                                    {(item as any).last_call_end_reason ? (
-                                      <Badge
-                                        bg={endReason.color as any}
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        {endReason.label}
-                                      </Badge>
-                                    ) : (
-                                      "-"
-                                    )}
-                                  </td>
-                                )}
-                                {selectedColumns.includes("disposition") && (
-                                  <td>
-                                    {(item as any).disposition ? (
-                                      <Badge
-                                        bg={randomDisposition.color as any}
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        {randomDisposition.label}
-                                      </Badge>
-                                    ) : (
-                                      "-"
-                                    )}
-                                  </td>
-                                )}
-                                {selectedColumns.includes(
-                                  "scheduled_call_at"
-                                ) && (
-                                  <td>
-                                    {(item as any).scheduled_call_at ? (
-                                      (() => {
-                                        const scheduledAt = (item as any)
-                                          .scheduled_call_at;
-                                        const isOverdue = moment(
-                                          scheduledAt
-                                        ).isBefore(moment());
-                                        const isNextHour = moment(
-                                          scheduledAt
-                                        ).isBefore(moment().add(1, "hour"));
-                                        return (
-                                          <Badge
-                                            bg={
-                                              isOverdue
-                                                ? "danger"
-                                                : isNextHour
-                                                ? "warning"
-                                                : "info"
-                                            }
-                                            className="bg-opacity-10 text-dark"
-                                          >
-                                            {moment(scheduledAt).format(
-                                              "MMM DD, HH:mm"
-                                            )}
-                                            {isOverdue && (
-                                              <span className="ms-1 fw-bold">
-                                                (Overdue)
-                                              </span>
-                                            )}
-                                            {isNextHour && !isOverdue && (
-                                              <span className="ms-1 fw-bold">
-                                                (Soon)
-                                              </span>
-                                            )}
-                                          </Badge>
-                                        );
-                                      })()
-                                    ) : (
-                                      <Badge
-                                        bg="info"
-                                        className="bg-opacity-10 text-dark"
-                                      >
-                                        Not scheduled
-                                      </Badge>
-                                    )}
-                                  </td>
-                                )}
-                                {selectedColumns.includes("tags") && (
-                                  <td>
-                                    <div className="d-flex gap-1 flex-wrap">
-                                      {((item as any).tags || []).map(
-                                        (tag: any, idx: number) => (
-                                          <Badge
-                                            key={idx}
-                                            bg="secondary"
-                                            className="bg-opacity-10 text-dark"
-                                          >
-                                            {tag.name || tag}
-                                          </Badge>
-                                        )
-                                      )}
-                                    </div>
-                                  </td>
-                                )}
-                                <td
-                                  style={{ width: "120px", minWidth: "120px" }}
-                                >
-                                  <div className="d-flex gap-1">
-                                    {session?.user?.permissions?.includes(
-                                      "view-crm-data-management"
-                                    ) && (
-                                      <Button
-                                        variant="link"
-                                        size="sm"
-                                        className="p-1"
-                                        title="View Details"
-                                        onClick={() => handleViewData(item)}
-                                      >
-                                        <Eye size={16} />
-                                      </Button>
-                                    )}
-                                    {session?.user?.permissions?.includes(
-                                      "call-service-crm-data-management"
-                                    ) && (
-                                      <Button
-                                        variant="link"
-                                        size="sm"
-                                        className="p-1 text-success"
-                                        title="Call Now"
-                                        onClick={() => handleCallClick(item)}
-                                      >
-                                        <PhoneIcon size={16} />
-                                      </Button>
-                                    )}
-                                  {
-                                    activeFilter !== 'has_leads' && (
-                                      <Dropdown className="d-inline">
-                                      <Dropdown.Toggle
-                                        as={Button}
-                                        variant="link"
-                                        size="sm"
-                                        className="p-1"
-                                        title="More Actions"
-                                      >
-                                        <MoreVertical size={16} />
-                                      </Dropdown.Toggle>
-                                      <Dropdown.Menu align="end">
-                                        {session?.user?.permissions?.includes(
-                                          "call-service-crm-data-management"
-                                        ) && (
-                                          <>
-                                            {(item as any).scheduled_call_at ? (
-                                              <>
-                                                <Dropdown.Item
-                                                  onClick={() =>
-                                                    handleScheduleCall(item)
-                                                  }
-                                                >
-                                                  <FiCalendar
-                                                    size={14}
-                                                    className="me-2"
-                                                  />
-                                                  Edit Scheduled Call
-                                                </Dropdown.Item>
-                                                <Dropdown.Item
-                                                  onClick={() =>
-                                                    handleUnscheduleCallClick(item)
-                                                  }
-                                                  className="text-danger"
-                                                >
-                                                  <FiX
-                                                    size={14}
-                                                    className="me-2"
-                                                  />
-                                                  Unschedule Call
-                                                </Dropdown.Item>
-                                              </>
-                                            ) : (
-                                              <Dropdown.Item
-                                                onClick={() =>
-                                                  handleScheduleCall(item)
-                                                }
-                                              >
-                                                <FiCalendar
-                                                  size={14}
-                                                  className="me-2"
-                                                />
-                                                Schedule Call
-                                              </Dropdown.Item>
-                                            )}
-                                            <Dropdown.Divider />
-                                          </>
-                                        )}
-                                        <Dropdown.Item
-                                          onClick={() => {
-                                            window.location.href = `/crm/leads/create?crm_data_id=${item.id}`;
-                                          }}
-                                        >
-                                          <FiTarget
-                                            size={14}
-                                            className="me-2"
-                                          />
-                                          Convert to Lead
-                                        </Dropdown.Item>
-                                        {/* <Dropdown.Item onClick={() => {
-                                          window.location.href = `tel:${item.phone}`;
-                                        }}>
-                                          <PhoneIcon size={14} className="me-2" />
-                                          Call Prospect
-                                        </Dropdown.Item> */}
-                                        {(item as any).email && (
-                                          <Dropdown.Item
-                                            onClick={() => {
-                                              window.location.href = `mailto:${
-                                                (item as any).email
-                                              }`;
-                                            }}
-                                          >
-                                            <Mail size={14} className="me-2" />
-                                            Send Email
-                                          </Dropdown.Item>
-                                        )}
-                                      </Dropdown.Menu>
-                                    </Dropdown>
-                                    )
-                                  }
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          });
-                        })()}
-                      </tbody>
-                    </Table>
-                  </div>
-                  <div className="p-3">{renderPaginationControls()}</div>
-                </>
-              )}
-            </Card.Body>
-          </Card>
+          <GenericTable
+            data={dataList}
+            columns={prospectsColumns}
+            actions={prospectsActions}
+            selectable={session?.user?.permissions?.includes("delete-crm-data-management")}
+            selectedRows={dataList.filter(item => selectedItems.includes(item.id))}
+            onSelectionChange={(selected) => setSelectedItems(selected.map(item => item.id))}
+            customizableColumns={true}
+            defaultSelectedColumns={defaultSelectedColumns}
+            columnStorageKey="crmDataSelectedColumns"
+            pagination={{
+              currentPage: pagination.currentPage,
+              rowsPerPage: pagination.rowsPerPage,
+              totalRows: totalRecords,
+              pageSizeOptions: [10, 25, 50, 100]
+            }}
+            onPaginationChange={(page, rowsPerPage) => {
+              setPagination({
+                ...pagination,
+                currentPage: page,
+                rowsPerPage
+              });
+            }}
+            sortable={true}
+            defaultSortColumn={pagination.sortColumn}
+            defaultSortDirection={pagination.sortDirection}
+            onRowClick={(row) => handleProspectClick(row)}
+            onRowDoubleClick={(row) => {
+              if (session?.user?.permissions?.includes("view-crm-data-management")) {
+                handleViewData(row);
+              }
+            }}
+            loading={loading}
+            emptyMessage="No prospects found matching your criteria"
+            loadingMessage="Loading prospects..."
+            hover={true}
+            uniqueKey="id"
+          />
         )}
       </div>
 
@@ -3839,495 +3563,950 @@ const CrmProspectsManagement = () => {
         </Modal>
       )}
 
-      {/* View Data Modal */}
+      {/* View Data Modal - Redesigned */}
       {selectedDataItem && (
-        <Modal
-          show={showViewModal}
-          onHide={() => setShowViewModal(false)}
-          size="xl"
-          centered
+      <Modal
+      show={showViewModal}
+      onHide={() => setShowViewModal(false)}
+      size="xl"
+      centered
+      className="prospect-view-modal"
+    >
+      {/* Modern Header with Gradient */}
+      <div
+        style={{
+          background: "#fff",
+          color: "black",
+          padding: "24px 32px",
+          position: "relative",
+          borderTopLeftRadius: "12px",
+          borderTopRightRadius: "12px",
+          boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+          borderBottom: "1px solid #ccc",
+        }}
+      >
+        <button
+          onClick={() => setShowViewModal(false)}
+          style={{
+            position: "absolute",
+            top: "16px",
+            right: "16px",
+            background: "rgba(255,255,255,0.15)",
+            backdropFilter: "blur(10px)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            color: "black",
+            width: "32px",
+            height: "32px",
+            borderRadius: "8px",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+            e.currentTarget.style.transform = "scale(1.05)";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
         >
-          {/* Custom Header */}
+          <X size={18} />
+        </button>
+        
+        {/* Header Content */}
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <div
             style={{
-              color: "black",
-              padding: "30px",
-              position: "relative",
-              borderTopLeftRadius: "8px",
-              borderTopRightRadius: "8px",
-              borderBottom: "1px solid #e5e7eb",
+              width: "64px",
+              height: "64px",
+              borderRadius: "16px",
+              background: "#2563eb",
+              backdropFilter: "blur(10px)",
+              border: "2px solid rgba(255,255,255,0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "28px",
+              fontWeight: "700",
+              flexShrink: 0,
+              color: "#fff",
             }}
           >
-            <button
-              onClick={() => setShowViewModal(false)}
-              style={{
-                position: "absolute",
-                top: "20px",
-                right: "20px",
-                background: "rgba(255,255,255,0.2)",
-                border: "none",
-                color: "black",
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                cursor: "pointer",
-                transition: "all 0.3s",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.3)";
-                e.currentTarget.style.transform = "rotate(90deg)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.2)";
-                e.currentTarget.style.transform = "rotate(0deg)";
-              }}
-            >
-              <X size={20} />
-            </button>
-            <h3 style={{ margin: 0, fontWeight: 600, fontSize: "24px" }}>
-              {selectedDataItem.name || `Prospect #${selectedDataItem.id}`}
-            </h3>
-            <p style={{ margin: "8px 0 0 0", opacity: 0.9, fontSize: "14px" }}>
-              Prospect Details
-            </p>
+            {selectedDataItem.name
+              ? selectedDataItem.name.charAt(0).toUpperCase()
+              : "P"}
           </div>
-
-          <Modal.Body style={{ padding: "30px" }}>
-            {/* Prospect Information Section */}
-            <div
-              style={{
-                fontSize: "16px",
-                fontWeight: 600,
-                color: "#1f2937",
-                marginBottom: "20px",
-                paddingBottom: "10px",
-                borderBottom: "2px solid #f8f9fa",
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-              }}
-            >
-              <Target size={18} style={{ color: "#4680ff" }} />
-              Prospect Information
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                gap: "20px",
-                marginBottom: "30px",
-              }}
-            >
-              <div
-                style={{
-                  background: "#f8f9fa",
-                  padding: "16px",
-                  borderRadius: "10px",
-                  transition: "all 0.3s",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "#e5e7eb";
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "#f8f9fa";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#6b7280",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Name
-                </div>
-                <div
-                  style={{
-                    fontSize: "15px",
-                    color: "#1f2937",
-                    fontWeight: 500,
-                  }}
-                >
-                  {selectedDataItem.name || "N/A"}
-                </div>
-              </div>
-              <div
-                style={{
-                  background: "#f8f9fa",
-                  padding: "16px",
-                  borderRadius: "10px",
-                  transition: "all 0.3s",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "#e5e7eb";
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "#f8f9fa";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#6b7280",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Phone
-                </div>
-                <div
-                  style={{
-                    fontSize: "15px",
-                    color: "#1f2937",
-                    fontWeight: 500,
-                  }}
-                >
-                  <PhoneIcon
-                    size={14}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ 
+              margin: 0, 
+              fontWeight: 700, 
+              fontSize: "26px",
+              textShadow: "0 2px 4px rgba(0,0,0,0.1)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}>
+              {selectedDataItem.name || `Prospect #${selectedDataItem.id}`}
+            </h2>
+            <div style={{ 
+              marginTop: "6px", 
+              opacity: 0.95, 
+              fontSize: "14px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              flexWrap: "wrap",
+              color: "#000",
+            }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <PhoneIcon size={14} />
+                {selectedDataItem.phone || "No phone"}
+              </span>
+              <span>•</span>
+              <span>
+                Added {selectedDataItem.created_at
+                  ? moment(selectedDataItem.created_at).format("MMM DD, YYYY")
+                  : "N/A"}
+              </span>
+              {selectedDataItem.is_viewed && (
+                <>
+                  <span>•</span>
+                  <Badge 
+                    bg="light" 
+                    text="dark"
                     style={{
-                      color: "#4680ff",
-                      marginRight: "6px",
-                      display: "inline",
-                    }}
-                  />
-                  {selectedDataItem.phone || "N/A"}
-                </div>
-              </div>
-              {/* <div style={{
-                background: '#f8f9fa',
-                padding: '16px',
-                borderRadius: '10px',
-                transition: 'all 0.3s'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = '#e5e7eb';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = '#f8f9fa';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}>
-                <div style={{
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: '#6b7280',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  marginBottom: '6px'
-                }}>Status</div>
-                <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
-                  <Badge bg={selectedDataItem.is_viewed ? 'success' : 'primary'}>
-                    {selectedDataItem.is_viewed ? 'Viewed' : 'New'}
-                  </Badge>
-                </div>
-              </div> */}
-              <div
-                style={{
-                  background: "#f8f9fa",
-                  padding: "16px",
-                  borderRadius: "10px",
-                  transition: "all 0.3s",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "#e5e7eb";
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "#f8f9fa";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#6b7280",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Assigned To
-                </div>
-                <div
-                  style={{
-                    fontSize: "15px",
-                    color: "#1f2937",
-                    fontWeight: 500,
-                  }}
-                >
-                  <User
-                    size={14}
-                    style={{
-                      color: "#4680ff",
-                      marginRight: "6px",
-                      display: "inline",
-                    }}
-                  />
-                  {selectedDataItem.user_extension
-                    ? extensions.find(
-                        (extension: any) =>
-                          extension.id.toString() ===
-                          selectedDataItem.user_extension?.toString()
-                      )?.display_name || selectedDataItem.user_extension
-                    : "Unassigned"}
-                </div>
-              </div>
-              <div
-                style={{
-                  background: "#f8f9fa",
-                  padding: "16px",
-                  borderRadius: "10px",
-                  transition: "all 0.3s",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "#e5e7eb";
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "#f8f9fa";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#6b7280",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Campaign
-                </div>
-                <div
-                  style={{
-                    fontSize: "15px",
-                    color: "#1f2937",
-                    fontWeight: 500,
-                  }}
-                >
-                  {availableCampaigns.find(
-                    (c) => c.value === selectedDataItem.campaign_id?.toString()
-                  )?.label || "No Campaign"}
-                </div>
-              </div>
-              <div
-                style={{
-                  background: "#f8f9fa",
-                  padding: "16px",
-                  borderRadius: "10px",
-                  transition: "all 0.3s",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "#e5e7eb";
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "#f8f9fa";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#6b7280",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Created Date
-                </div>
-                <div
-                  style={{
-                    fontSize: "15px",
-                    color: "#1f2937",
-                    fontWeight: 500,
-                  }}
-                >
-                  <Calendar
-                    size={14}
-                    style={{
-                      color: "#4680ff",
-                      marginRight: "6px",
-                      display: "inline",
-                    }}
-                  />
-                  {selectedDataItem.created_at
-                    ? moment(selectedDataItem.created_at).format("MMM DD, YYYY")
-                    : "N/A"}
-                </div>
-              </div>
-            </div>
-
-            {selectedDataItem?.scheduled_call_at && selectedDataItem?.note && (
-              <React.Fragment>
-                <div
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: 600,
-                    color: "#1f2937",
-                    marginBottom: "20px",
-                    paddingBottom: "10px",
-                    borderBottom: "2px solid #f8f9fa",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                  }}
-                >
-                  {/* <FileText size={18} style={{ color: '#4680ff' }} />
-                  Call Note */}
-                </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                    gap: "20px",
-                    marginBottom: "30px",
-                  }}
-                >
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
+                      background: "rgba(255,255,255,0.25)",
+                      border: "1px solid rgba(255,255,255,0.3)",
+                      color: "white",
+                      fontWeight: 500,
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Call Note
+                    Viewed
+                  </Badge>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Modal.Body style={{ padding: 0, maxHeight: "calc(90vh - 200px)", overflowY: "auto" }}>
+        {/* Main Content Grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", minHeight: "500px" }}>
+          
+          {/* Left Panel - Main Information */}
+          <div style={{ padding: "32px", borderRight: "1px solid #e5e7eb" }}>
+            
+            {/* Quick Info Cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px", marginBottom: "28px" }}>
+              <div
+                style={{
+                  background: "#f9fafb",
+                  border: "1px solid #e5e7eb",
+                  padding: "20px",
+                  borderRadius: "12px",
+                  transition: "all 0.3s ease",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = "translateY(-4px)";
+                  e.currentTarget.style.boxShadow = "0 8px 16px rgba(102, 126, 234, 0.15)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{
+                    width: "44px",
+                    height: "44px",
+                    borderRadius: "10px",
+                    background: "#2563eb",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <User size={20} style={{ color: "white" }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "#2563eb",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.8px",
+                      marginBottom: "4px",
+                    }}>
+                      Assigned Agent
                     </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {selectedDataItem.note}
+                    <div style={{
+                      fontSize: "15px",
+                      color: "#1f2937",
+                      fontWeight: 600,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {selectedDataItem.user_extension
+                        ? extensions.find(
+                            (extension: any) =>
+                              extension.id.toString() ===
+                              selectedDataItem.user_extension?.toString()
+                          )?.display_name || selectedDataItem.user_extension
+                        : "Unassigned"}
                     </div>
                   </div>
                 </div>
-              </React.Fragment>
+              </div>
+
+              <div
+                style={{
+                  background: "#f9fafb",
+                  border: "1px solid #f093fb30",
+                  padding: "20px",
+                  borderRadius: "12px",
+                  transition: "all 0.3s ease",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = "translateY(-4px)";
+                  e.currentTarget.style.boxShadow = "0 8px 16px rgba(240, 147, 251, 0.15)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{
+                    width: "44px",
+                    height: "44px",
+                    borderRadius: "10px",
+                    background: "#0284c7",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <Target size={20} style={{ color: "white" }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "#f5576c",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.8px",
+                      marginBottom: "4px",
+                    }}>
+                      Campaign
+                    </div>
+                    <div style={{
+                      fontSize: "15px",
+                      color: "#1f2937",
+                      fontWeight: 600,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {availableCampaigns.find(
+                        (c) => c.value === selectedDataItem.campaign_id?.toString()
+                      )?.label || "No Campaign"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Information Section */}
+            <div style={{ marginBottom: "28px" }}>
+              <h5 style={{
+                fontSize: "15px",
+                fontWeight: 700,
+                color: "#1f2937",
+                marginBottom: "16px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}>
+                <div style={{
+                  width: "4px",
+                  height: "18px",
+                  background: "linear-gradient(135deg, #f093fb15 0%, #f5576c15 100%)",
+                  borderRadius: "2px",
+                }} />
+                Contact Details
+              </h5>
+              <div style={{
+                background: "#f9fafb",
+                border: "1px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "20px",
+              }}>
+                <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
+                    <PhoneIcon size={16} style={{ color: "#2563eb" }} />
+                    Phone
+                  </div>
+                  <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
+                    {selectedDataItem.phone || "N/A"}
+                  </div>
+                  
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
+                    <Calendar size={16} style={{ color: "#2563eb" }} />
+                    Created
+                  </div>
+                  <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
+                    {selectedDataItem.created_at
+                      ? moment(selectedDataItem.created_at).format("MMMM DD, YYYY [at] hh:mm A")
+                      : "N/A"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Call Note Section */}
+            {selectedDataItem?.note && (
+              <div style={{ marginBottom: "28px" }}>
+                <h5 style={{
+                  fontSize: "15px",
+                  fontWeight: 700,
+                  color: "#1f2937",
+                  marginBottom: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}>
+                  <div style={{
+                    width: "4px",
+                    height: "18px",
+                    background: "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
+                    borderRadius: "2px",
+                  }} />
+                  Call Notes
+                </h5>
+                <div style={{
+                  background: "#fffbeb",
+                  border: "1px solid #fcd34d",
+                  borderRadius: "12px",
+                  padding: "16px 20px",
+                  fontSize: "14px",
+                  color: "#78350f",
+                  lineHeight: "1.6",
+                }}>
+                  {selectedDataItem.note}
+                </div>
+              </div>
             )}
 
             {/* Custom Data Fields Section */}
             {selectedDataItem.data &&
               Object.keys(selectedDataItem.data).length > 0 && (
-                <>
-                  <div
-                    style={{
-                      fontSize: "16px",
-                      fontWeight: 600,
-                      color: "#1f2937",
-                      marginBottom: "20px",
-                      paddingBottom: "10px",
-                      borderBottom: "2px solid #f8f9fa",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                    }}
-                  >
-                    <FileText size={18} style={{ color: "#4680ff" }} />
-                    Custom Data Fields
-                  </div>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fit, minmax(250px, 1fr))",
-                      gap: "20px",
-                      marginBottom: "30px",
-                    }}
-                  >
-                    {Object.entries(selectedDataItem.data).map(
-                      ([key, value]) => (
-                        <div
-                          key={key}
-                          style={{
-                            background: "#f8f9fa",
-                            padding: "16px",
-                            borderRadius: "10px",
-                            transition: "all 0.3s",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#e5e7eb";
-                            e.currentTarget.style.transform =
-                              "translateY(-2px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#f8f9fa";
-                            e.currentTarget.style.transform = "translateY(0)";
-                          }}
-                        >
-                          <div
-                            style={{
+                <div style={{ marginBottom: "28px" }}>
+                  <h5 style={{
+                    fontSize: "15px",
+                    fontWeight: 700,
+                    color: "#1f2937",
+                    marginBottom: "16px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}>
+                    <div style={{
+                      width: "4px",
+                      height: "18px",
+                      background: "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
+                      borderRadius: "2px",
+                    }} />
+                    Additional Information
+                  </h5>
+                  <div style={{
+                    background: "#f9fafb",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "12px",
+                    padding: "20px",
+                  }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                      {Object.entries(selectedDataItem.data).map(
+                        ([key, value]) => (
+                          <div key={key}>
+                            <div style={{
                               fontSize: "12px",
-                              fontWeight: 600,
+                              fontWeight: 700,
                               color: "#6b7280",
                               textTransform: "uppercase",
                               letterSpacing: "0.5px",
                               marginBottom: "6px",
-                            }}
-                          >
-                            {key
-                              .replace(/_/g, " ")
-                              .replace(/\b\w/g, (l) => l.toUpperCase())}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "15px",
+                            }}>
+                              {key
+                                .replace(/_/g, " ")
+                                .replace(/\b\w/g, (l) => l.toUpperCase())}
+                            </div>
+                            <div style={{
+                              fontSize: "14px",
                               color: "#1f2937",
                               fontWeight: 500,
-                            }}
-                          >
-                            {value !== null && value !== undefined
-                              ? typeof value === "object"
-                                ? JSON.stringify(value)
-                                : String(value)
-                              : "N/A"}
+                              wordBreak: "break-word",
+                            }}>
+                              {value !== null && value !== undefined
+                                ? typeof value === "object"
+                                  ? JSON.stringify(value)
+                                  : String(value)
+                                : "N/A"}
+                            </div>
                           </div>
-                        </div>
-                      )
-                    )}
+                        )
+                      )}
+                    </div>
                   </div>
-                </>
+                </div>
               )}
 
-            {/* Call History Timeline */}
-            {/* {getCallHistory(selectedDataItem.id).length > 0 && (
+
+
+            {/* Call Recordings Section */}
+            <div style={{ marginBottom: "20px" }}>
+              <h5 style={{
+                fontSize: "15px",
+                fontWeight: 700,
+                color: "#1f2937",
+                marginBottom: "16px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}>
+                <div style={{
+                  width: "4px",
+                  height: "18px",
+                  background: "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
+                  borderRadius: "2px",
+                }} />
+                Call Recordings
+                <Badge 
+                  bg="secondary"
+                  style={{
+                    marginLeft: "8px",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                  }}
+                >
+                  {callRecordingsTotal > 0 ? callRecordingsTotal : callRecordings.length}
+                </Badge>
+              </h5>
+
+              {callRecordingsLoading ? (
+                <div style={{
+                  padding: "48px 20px",
+                  background: "#f9fafb",
+                  borderRadius: "12px",
+                  textAlign: "center",
+                }}>
+                  <Spinner animation="border" variant="primary" size="sm" style={{ marginBottom: "12px" }} />
+                  <p className="mb-0" style={{ color: "#6b7280", fontSize: "14px" }}>Loading recordings...</p>
+                </div>
+              ) : callRecordings.length === 0 ? (
+                <div style={{
+                  padding: "48px 20px",
+                  background: "#f9fafb",
+                  border: "2px dashed #d1d5db",
+                  borderRadius: "12px",
+                  textAlign: "center",
+                }}>
+                  <History size={40} style={{ color: "#9ca3af", marginBottom: "12px" }} />
+                  <p className="mb-0" style={{ color: "#6b7280", fontSize: "14px", fontWeight: 500 }}>
+                    No call recordings found
+                  </p>
+                </div>
+              ) : (
+                <div style={{
+                  background: "white",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px",
+                  overflow: "hidden",
+                }}>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                          <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            Date & Time
+                          </th>
+                          <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            Extension
+                          </th>
+                          <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            Direction
+                          </th>
+                          <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            Duration
+                          </th>
+                          <th style={{ padding: "12px 16px", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", width: "100px" }}>
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {callRecordings.map((recording: any, index: number) => {
+                          const duration =
+                            parseInt(recording.Duration?.toString() || "0") / 10000000 || 0;
+                          const isDownloading = downloadingRecordings.has(recording.Id);
+                          const progress = downloadProgress[recording.Id] || 0;
+                          const isOutgoing = recording.Direction === "CALL_OUTGOING";
+                          
+                          return (
+                            <tr 
+                              key={recording.Id || index}
+                              style={{
+                                borderBottom: "1px solid #f3f4f6",
+                                transition: "background 0.2s ease",
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.background = "#f9fafb";
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.background = "white";
+                              }}
+                            >
+                              <td style={{ padding: "14px 16px" }}>
+                                <div style={{ fontSize: "13px", color: "#1f2937", fontWeight: 500 }}>
+                                  {formatDateTimeToLocal(
+                                    recording.DateTime,
+                                    GlobalDateFormat
+                                  )}
+                                </div>
+                                <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>
+                                  {formatDateTimeToLocal(
+                                    recording.DateTime,
+                                    GlobalTimeFormat,
+                                    "YYYY-MM-DD HH:mm:ss.SSSSSSS"
+                                  )}
+                                </div>
+                              </td>
+                              <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937", fontWeight: 500 }}>
+                                {recording.AgentExtension || "N/A"}
+                              </td>
+                              <td style={{ padding: "14px 16px" }}>
+                                <span style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  padding: "4px 10px",
+                                  borderRadius: "6px",
+                                  fontSize: "12px",
+                                  fontWeight: 600,
+                                  background: isOutgoing ? "#dbeafe" : "#d1fae5",
+                                  color: isOutgoing ? "#1e40af" : "#065f46",
+                                }}>
+                                  {isOutgoing ? "Outgoing" : "Incoming"}
+                                </span>
+                              </td>
+                              <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937", fontWeight: 500 }}>
+                                {formatDuration(duration)}
+                              </td>
+                              <td style={{ padding: "14px 16px" }}>
+                                <div style={{ display: "flex", gap: "8px", alignItems: "center", justifyContent: "center" }}>
+                                  <button
+                                    style={{
+                                      background: "transparent",
+                                      border: "none",
+                                      color: "#2563eb",
+                                      cursor: "pointer",
+                                      padding: "6px",
+                                      borderRadius: "6px",
+                                      transition: "all 0.2s ease",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
+                                    title="Play Recording"
+                                    onClick={() => handlePlayCallRecording(recording)}
+                                    onMouseOver={(e) => {
+                                      e.currentTarget.style.background = "#ede9fe";
+                                    }}
+                                    onMouseOut={(e) => {
+                                      e.currentTarget.style.background = "transparent";
+                                    }}
+                                  >
+                                    <FiPlay size={16} />
+                                  </button>
+                                  {isDownloading ? (
+                                    <CircularProgressCircle 
+                                      progress={progress}
+                                      size="small" 
+                                      color="#28a745"
+                                      backgroundColor="#e9ecef"
+                                      textColor="#495057"
+                                      showPercentage={false}
+                                      className="circular-progress-inline"
+                                    />
+                                  ) : (
+                                    <button
+                                      style={{
+                                        background: "transparent",
+                                        border: "none",
+                                        color: "#2563eb",
+                                        cursor: "pointer",
+                                        padding: "6px",
+                                        borderRadius: "6px",
+                                        transition: "all 0.2s ease",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                      }}
+                                      title="Download Recording"
+                                      onClick={() => handleDownloadCallRecording(recording)}
+                                      onMouseOver={(e) => {
+                                        e.currentTarget.style.background = "#ede9fe";
+                                      }}
+                                      onMouseOut={(e) => {
+                                        e.currentTarget.style.background = "transparent";
+                                      }}
+                                    >
+                                      <Download size={16} />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Panel - Quick Actions & Timeline */}
+          <div style={{ 
+            padding: "32px 24px", 
+            background: "#fafbfc",
+            display: "flex",
+            flexDirection: "column",
+            gap: "24px",
+          }}>
+            
+            {/* Quick Actions */}
+            <div>
+              <h6 style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#6b7280",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                marginBottom: "14px",
+              }}>
+                Quick Actions
+              </h6>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <button
+                  style={{
+                    background: "white",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "10px",
+                    padding: "12px 16px",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    fontSize: "14px",
+                    fontWeight: 500,
+                    color: "#1f2937",
+                  }}
+                  onClick={() => {
+                    // Handle call action
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.borderColor = "#2563eb";
+                    e.currentTarget.style.background = "#eff6ff";
+                    e.currentTarget.style.transform = "translateX(4px)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.borderColor = "#e5e7eb";
+                    e.currentTarget.style.background = "white";
+                    e.currentTarget.style.transform = "translateX(0)";
+                  }}
+                >
+                  <div style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "8px",
+                    background: "#2563eb",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <PhoneIcon size={16} style={{ color: "white" }} />
+                  </div>
+                  Call Prospect
+                </button>
+                
+                <button
+                  style={{
+                    background: "white",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "10px",
+                    padding: "12px 16px",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    fontSize: "14px",
+                    fontWeight: 500,
+                    color: "#1f2937",
+                  }}
+                  onClick={() => {
+                    // Handle message action
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.borderColor = "#2563eb";
+                    e.currentTarget.style.background = "#eff6ff";
+                    e.currentTarget.style.transform = "translateX(4px)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.borderColor = "#e5e7eb";
+                    e.currentTarget.style.background = "white";
+                    e.currentTarget.style.transform = "translateX(0)";
+                  }}
+                >
+                  <div style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "8px",
+                    background: "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <Mail size={16} style={{ color: "white" }} />
+                  </div>
+                  Send Message
+                </button>
+              </div>
+            </div>
+
+            {/* Status Overview */}
+            <div>
+              <h6 style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#6b7280",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                marginBottom: "14px",
+              }}>
+                Status Overview
+              </h6>
+              <div style={{
+                background: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: "10px",
+                padding: "16px",
+              }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                      Status
+                    </span>
+                    <Badge 
+                      bg={selectedDataItem.is_viewed ? "success" : "primary"}
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        padding: "4px 10px",
+                        borderRadius: "6px",
+                      }}
+                    >
+                      {selectedDataItem.is_viewed ? "Viewed" : "New"}
+                    </Badge>
+                  </div>
+                  
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
+                      Total Calls
+                    </span>
+                    <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
+                      {callRecordings.length}
+                    </span>
+                  </div>
+                  
+                  {selectedDataItem.scheduled_call_at && (
+                    <div style={{ 
+                      marginTop: "8px",
+                      paddingTop: "14px",
+                      borderTop: "1px solid #f3f4f6",
+                    }}>
+                      <div style={{ 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: "8px",
+                        marginBottom: "6px",
+                      }}>
+                        <Calendar size={14} style={{ color: "#2563eb" }} />
+                        <span style={{ fontSize: "12px", color: "#6b7280", fontWeight: 600 }}>
+                          Scheduled Call
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "13px", color: "#1f2937", fontWeight: 500, marginLeft: "22px" }}>
+                        {moment(selectedDataItem.scheduled_call_at).format("MMM DD, YYYY [at] hh:mm A")}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Activity Timeline */}
+            <div style={{ flex: 1 }}>
+              <h6 style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "#6b7280",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                marginBottom: "14px",
+              }}>
+                Recent Activity
+              </h6>
+              <div style={{
+                background: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: "10px",
+                padding: "16px",
+                maxHeight: "300px",
+                overflowY: "auto",
+              }}>
+                {callRecordings.length > 0 ? (
+                  <div style={{ position: "relative" }}>
+                    {/* Timeline line */}
+                    <div style={{
+                      position: "absolute",
+                      left: "7px",
+                      top: "8px",
+                      bottom: "8px",
+                      width: "2px",
+                      background: "#e5e7eb",
+                    }} />
+                    
+                    {callRecordings.slice(0, 5).map((recording: any, index: number) => {
+                      const isOutgoing = recording.Direction === "CALL_OUTGOING";
+                      return (
+                        <div 
+                          key={recording.Id || index}
+                          style={{ 
+                            position: "relative",
+                            paddingLeft: "28px",
+                            paddingBottom: index < Math.min(callRecordings.length, 5) - 1 ? "16px" : "0",
+                          }}
+                        >
+                          {/* Timeline dot */}
+                          <div style={{
+                            position: "absolute",
+                            left: "0",
+                            top: "4px",
+                            width: "16px",
+                            height: "16px",
+                            borderRadius: "50%",
+                            background: isOutgoing ? "#2563eb" : "#10b981",
+                            border: "3px solid white",
+                            boxShadow: "0 0 0 1px #e5e7eb",
+                          }} />
+                          
+                          <div>
+                            <div style={{ fontSize: "12px", color: "#1f2937", fontWeight: 600, marginBottom: "4px" }}>
+                              {isOutgoing ? "Outgoing Call" : "Incoming Call"}
+                            </div>
+                            <div style={{ fontSize: "11px", color: "#6b7280" }}>
+                              {moment(recording.DateTime).format("MMM DD, hh:mm A")}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {callRecordings.length > 5 && (
+                      <div style={{
+                        textAlign: "center",
+                        marginTop: "12px",
+                        paddingTop: "12px",
+                        borderTop: "1px solid #f3f4f6",
+                      }}>
+                        <span style={{ fontSize: "12px", color: "#2563eb", fontWeight: 600 }}>
+                          +{callRecordings.length - 5} more activities
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{
+                    textAlign: "center",
+                    padding: "20px",
+                    color: "#9ca3af",
+                  }}>
+                    <ClockIcon size={32} style={{ marginBottom: "8px", opacity: 0.5 }} />
+                    <div style={{ fontSize: "13px" }}>No activity yet</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Modal.Body>
+
+      {/* Footer */}
+      <div style={{
+        padding: "20px 32px",
+        borderTop: "1px solid #e5e7eb",
+        background: "white",
+        borderBottomLeftRadius: "12px",
+        borderBottomRightRadius: "12px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}>
+        <div style={{ fontSize: "13px", color: "#6b7280" }}>
+          Prospect ID: <strong>#{selectedDataItem.id}</strong>
+        </div>
+        <Button
+          variant="outline-secondary"
+          onClick={() => setShowViewModal(false)}
+          style={{
+            padding: "10px 24px",
+            borderRadius: "8px",
+            fontWeight: 600,
+            fontSize: "14px",
+            border: "2px solid #e5e7eb",
+            transition: "all 0.2s ease",
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.borderColor = "#2563eb";
+            e.currentTarget.style.color = "#2563eb";
+            e.currentTarget.style.background = "#eff6ff";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.borderColor = "#e5e7eb";
+            e.currentTarget.style.color = "#6c757d";
+            e.currentTarget.style.background = "white";
+          }}
+        >
+          Close
+        </Button>
+      </div>
+    </Modal>
+      )}
+
+      {/* Audio Player Modal */}
+      {/* {getCallHistory(selectedDataItem.id).length > 0 && (
               <>
                 <div style={{
                   fontSize: '16px',
@@ -4430,219 +4609,6 @@ const CrmProspectsManagement = () => {
                 </div>
               </>
             )} */}
-
-            {/* Call Recordings Section */}
-            <div
-              style={{
-                fontSize: "16px",
-                fontWeight: 600,
-                color: "#1f2937",
-                marginBottom: "20px",
-                paddingBottom: "10px",
-                borderBottom: "2px solid #f8f9fa",
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-              }}
-            >
-              <History size={18} style={{ color: "#4680ff" }} />
-              Call Recordings ({callRecordingsTotal > 0 ? callRecordingsTotal : callRecordings.length})
-              {callRecordingsTotal > callRecordings.length && (
-                <span className="text-muted" style={{ fontSize: "14px", fontWeight: 400 }}>
-                  {" "}(Showing first {callRecordings.length})
-                </span>
-              )}
-            </div>
-
-            {callRecordingsLoading ? (
-              <div
-                style={{
-                  marginBottom: "30px",
-                  padding: "20px",
-                  background: "#f8f9fa",
-                  borderRadius: "10px",
-                  textAlign: "center",
-                }}
-              >
-                <Spinner animation="border" variant="primary" size="sm" />
-                <p className="mt-2 mb-0 text-muted">Loading call recordings...</p>
-              </div>
-            ) : callRecordings.length === 0 ? (
-              <div
-                style={{
-                  marginBottom: "30px",
-                  padding: "20px",
-                  background: "#f8f9fa",
-                  borderRadius: "10px",
-                  textAlign: "center",
-                }}
-              >
-                <History size={32} style={{ color: "#9ca3af", marginBottom: "12px" }} />
-                <div style={{ fontSize: "14px", color: "#6b7280" }}>
-                  No call recordings found for this prospect
-                </div>
-              </div>
-            ) : (
-              <div style={{ marginBottom: "30px" }}>
-                <Table hover responsive className="mb-0">
-                  <thead style={{ background: "#f8f9fa" }}>
-                    <tr>
-                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>
-                        Date
-                      </th>
-                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>
-                        Time
-                      </th>
-                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>
-                        Extension
-                      </th>
-                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>
-                        Remote Number
-                      </th>
-                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>
-                        Direction
-                      </th>
-                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280" }}>
-                        Duration
-                      </th>
-                      <th style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", width: "120px" }}>
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {callRecordings.map((recording: any, index: number) => {
-                      const duration =
-                        parseInt(recording.Duration?.toString() || "0") / 10000000 || 0;
-                      const isDownloading = downloadingRecordings.has(recording.Id);
-                      const progress = downloadProgress[recording.Id] || 0;
-                      
-                      return (
-                        <tr key={recording.Id || index}>
-                          <td style={{ fontSize: "14px", color: "#1f2937" }}>
-                            {formatDateTimeToLocal(
-                              recording.DateTime,
-                              GlobalDateFormat
-                            )}
-                          </td>
-                          <td style={{ fontSize: "14px", color: "#1f2937" }}>
-                            {formatDateTimeToLocal(
-                              recording.DateTime,
-                              GlobalTimeFormat,
-                              "YYYY-MM-DD HH:mm:ss.SSSSSSS"
-                            )}
-                          </td>
-                          <td style={{ fontSize: "14px", color: "#1f2937" }}>
-                            {recording.AgentExtension || "N/A"}
-                          </td>
-                          <td style={{ fontSize: "14px", color: "#1f2937" }}>
-                            {recording.RemotePartyNumber || "N/A"}
-                          </td>
-                          <td>
-                            <Badge
-                              bg={
-                                recording.Direction === "CALL_OUTGOING"
-                                  ? "primary"
-                                  : "success"
-                              }
-                              className="bg-opacity-10 text-dark"
-                            >
-                              {recording.Direction === "CALL_OUTGOING"
-                                ? "Outgoing"
-                                : recording.Direction === "CALL_INCOMING"
-                                ? "Incoming"
-                                : recording.Direction || "N/A"}
-                            </Badge>
-                          </td>
-                          <td style={{ fontSize: "14px", color: "#1f2937" }}>
-                            {formatDuration(duration)}
-                          </td>
-                          <td>
-                            <div className="d-flex gap-2 align-items-center">
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="p-1"
-                                title="Play Recording"
-                                onClick={() => handlePlayCallRecording(recording)}
-                              >
-                                <FiPlay size={16} className="text-info" />
-                              </Button>
-                              <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                {isDownloading ? (
-                                  <CircularProgressCircle 
-                                    progress={progress}
-                                    size="small" 
-                                    color="#28a745"
-                                    backgroundColor="#e9ecef"
-                                    textColor="#495057"
-                                    showPercentage={false}
-                                    className="circular-progress-inline"
-                                  />
-                                ) : (
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="p-1"
-                                    title="Download Recording"
-                                    onClick={() => handleDownloadCallRecording(recording)}
-                                  >
-                                    <Download size={16} className="text-info" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </Table>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div
-              style={{
-                display: "flex",
-                gap: "12px",
-                flexWrap: "wrap",
-                paddingTop: "20px",
-                borderTop: "1px solid #e5e7eb",
-              }}
-            >
-              <Button
-                variant="outline-secondary"
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  fontWeight: 500,
-                  fontSize: "14px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  background: "white",
-                  color: "#6b7280",
-                  border: "2px solid #e5e7eb",
-                }}
-                onClick={() => setShowViewModal(false)}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.borderColor = "#4680ff";
-                  e.currentTarget.style.color = "#4680ff";
-                  e.currentTarget.style.background = "#f0f4ff";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.borderColor = "#e5e7eb";
-                  e.currentTarget.style.color = "#6b7280";
-                  e.currentTarget.style.background = "white";
-                }}
-              >
-                Close
-              </Button>
-            </div>
-          </Modal.Body>
-        </Modal>
-      )}
 
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
@@ -5692,6 +5658,341 @@ const CrmProspectsManagement = () => {
         }}
         recording={selectedRecording}
       />
+
+      {/* Prospect Detail Sidebar */}
+      <GenericSidebar
+        isOpen={showProspectSidebar}
+        onClose={handleCloseProspectSidebar}
+        title={selectedProspect?.name || 'Prospect Details'}
+        subtitle={selectedProspect?.phone || ''}
+        avatar={{
+          initials: getInitials(selectedProspect?.name || 'NA'),
+          name: selectedProspect?.name || 'NA',
+          gradient: getRandomColor(selectedProspect?.name || '')
+        }}
+        width="400px"
+        sections={[
+          {
+            id: 'prospect-info',
+            title: 'Prospect Information',
+            icon: Target,
+            fields: [
+              {
+                label: 'Name',
+                value: selectedProspect?.name || 'N/A'
+              },
+              {
+                label: 'Phone',
+                value: selectedProspect?.phone || 'N/A',
+                icon: Phone
+              },
+              {
+                label: 'Assigned To',
+                value: selectedProspect?.user_extension ? getNameByExtension(selectedProspect.user_extension) : 'Unassigned',
+                icon: User
+              },
+              {
+                label: 'Campaign',
+                value: selectedProspect?.campaign?.name || 'No Campaign',
+                show: !!selectedProspect?.campaign
+              },
+              {
+                label: 'Created Date',
+                value: selectedProspect?.created_at,
+                type: 'date',
+                icon: Calendar
+              }
+            ]
+          },
+          {
+            id: 'call-recordings',
+            title: 'Call Recordings',
+            icon: History,
+            badge: {
+              value: 0,
+              variant: 'secondary'
+            },
+            emptyState: {
+              icon: History,
+              message: 'No call recordings available yet'
+            }
+          }
+        ]}
+      />
+
+      {/* Filters Sidebar */}
+      <GenericFilterSidebar
+        isOpen={showFiltersSidebar}
+        onClose={handleCloseFiltersSidebar}
+        title="Filters"
+        subtitle="Filter prospects by various criteria"
+        width="400px"
+        filters={[
+          {
+            id: 'search',
+            label: 'Search',
+            type: 'text',
+            value: prospectsSearch,
+            onChange: (value) => setProspectsSearch(value),
+            placeholder: 'Search by name or phone...'
+          },
+          {
+            id: 'assignedTo',
+            label: 'Assigned To',
+            type: 'select',
+            value: prospectsFilters.assignedTo
+              ? (() => {
+                  const assignedToId = prospectsFilters.assignedTo;
+                  const ext = extensions.find(
+                    (e: any) => (e.id || e.extension) === assignedToId
+                  );
+                  return ext
+                    ? {
+                        value: assignedToId,
+                        label: ext.display_name || ext.name || assignedToId,
+                      }
+                    : { value: assignedToId, label: assignedToId };
+                })()
+              : null,
+            onChange: (selected) => {
+              const assignedToValue = selected ? selected.value : null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                assignedTo: assignedToValue,
+              }));
+              setActiveFilter("all");
+            },
+            options: extensions.map((ext: any) => ({
+              value: ext.id || ext.extension,
+              label: ext.display_name || ext.name || ext.id || ext.extension,
+            })),
+            placeholder: 'Select user...',
+            isClearable: true,
+            styles: customSelectStyles
+          },
+          {
+            id: 'campaigns',
+            label: 'Campaigns',
+            type: 'multi-select',
+            value: prospectsFilters.campaigns
+              ? prospectsFilters.campaigns.map((campaignId: string) => {
+                  const campaign = availableCampaigns.find((c: any) => c.value === campaignId);
+                  return campaign
+                    ? { value: campaignId, label: campaign.label }
+                    : { value: campaignId, label: campaignId };
+                })
+              : [],
+            onChange: (selected) => {
+              const campaignValues = selected ? selected.map((s: any) => s.value) : null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                campaigns: campaignValues,
+              }));
+              setActiveFilter("all");
+            },
+            options: availableCampaigns.map((c) => ({
+              value: c.value,
+              label: c.label,
+            })),
+            placeholder: 'Select campaigns...',
+            isClearable: true,
+            styles: customSelectStyles
+          },
+          {
+            id: 'nextCallScheduled',
+            label: 'Next Call Scheduled',
+            type: 'dropdown',
+            value: prospectsFilters.nextCallScheduled || '',
+            onChange: (value) => {
+              const selectedValue = value || null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                nextCallScheduled: selectedValue,
+                nextCallDateFrom: null,
+                nextCallDateTo: null,
+              }));
+              setActiveFilter("all");
+            },
+            options: [
+              { value: '', label: 'Select option...' },
+              { value: 'today', label: 'Today' },
+              { value: 'tomorrow', label: 'Tomorrow' },
+              { value: 'this_week', label: 'This Week' },
+              { value: 'next_week', label: 'Next Week' },
+              { value: 'overdue', label: 'Overdue Calls' },
+              { value: 'custom', label: 'Custom Date Range' }
+            ]
+          },
+          {
+            id: 'nextCallDateFrom',
+            label: 'Next Call Date (From)',
+            type: 'date',
+            value: prospectsFilters.nextCallDateFrom || '',
+            onChange: (value) => {
+              const dateValue = value || null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                nextCallDateFrom: dateValue,
+              }));
+            },
+            placeholder: 'From date'
+          },
+          {
+            id: 'nextCallDateTo',
+            label: 'Next Call Date (To)',
+            type: 'date',
+            value: prospectsFilters.nextCallDateTo || '',
+            onChange: (value) => {
+              const dateValue = value || null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                nextCallDateTo: dateValue,
+              }));
+            },
+            placeholder: 'To date'
+          },
+          {
+            id: 'sourceFile',
+            label: 'Source Name',
+            type: 'select',
+            value: prospectsFilters.sourceFile
+              ? { value: prospectsFilters.sourceFile, label: prospectsFilters.sourceFile }
+              : null,
+            onChange: (selected) => {
+              const sourceValue = selected ? selected.value : null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                sourceFile: sourceValue,
+              }));
+              setActiveFilter("all");
+            },
+            options: uniqueSources,
+            placeholder: 'Select source...',
+            isClearable: true,
+            styles: customSelectStyles
+          },
+          {
+            id: 'tags',
+            label: 'Tags',
+            type: 'multi-select',
+            value: prospectsFilters.tags
+              ? prospectsFilters.tags.map((tagValue: string) => {
+                  const tag = availableTags.find((t: any) => t.value === tagValue);
+                  return tag ? { value: tagValue, label: tag.label } : { value: tagValue, label: tagValue };
+                })
+              : [],
+            onChange: (selected) => {
+              const tagValues = selected ? selected.map((s: any) => s.value) : null;
+              setProspectsFilters((prev) => ({
+                ...prev,
+                tags: tagValues,
+              }));
+              setActiveFilter("all");
+            },
+            options: availableTags.map((tag) => ({
+              value: tag.value,
+              label: tag.label,
+            })),
+            placeholder: 'Select tags...',
+            isClearable: true,
+            styles: customSelectStyles
+          }
+        ]}
+        onApply={() => {
+          const filtersToApply: Record<string, any> = {};
+          
+          if (prospectsSearch) {
+            filtersToApply.search = prospectsSearch;
+          }
+          if (prospectsFilters.assignedTo) {
+            filtersToApply.user_extension = [prospectsFilters.assignedTo];
+          }
+          if (prospectsFilters.campaigns && prospectsFilters.campaigns.length > 0) {
+            filtersToApply.campaign_id = prospectsFilters.campaigns;
+          }
+          if (prospectsFilters.sourceFile) {
+            filtersToApply.source_file = prospectsFilters.sourceFile;
+          }
+          if (prospectsFilters.tags && prospectsFilters.tags.length > 0) {
+            filtersToApply.tags = prospectsFilters.tags;
+          }
+          
+          // Handle next call scheduled filters
+          const now = moment();
+          if (prospectsFilters.nextCallScheduled === 'today') {
+            const today = now.format('YYYY-MM-DD');
+            filtersToApply.scheduled_call_from = today;
+            filtersToApply.scheduled_call_to = today;
+          } else if (prospectsFilters.nextCallScheduled === 'tomorrow') {
+            const tomorrow = moment().add(1, 'day').format('YYYY-MM-DD');
+            filtersToApply.scheduled_call_from = tomorrow;
+            filtersToApply.scheduled_call_to = tomorrow;
+          } else if (prospectsFilters.nextCallScheduled === 'this_week') {
+            const startOfWeek = moment().startOf('week').format('YYYY-MM-DD');
+            const endOfWeek = moment().endOf('week').format('YYYY-MM-DD');
+            filtersToApply.scheduled_call_from = startOfWeek;
+            filtersToApply.scheduled_call_to = endOfWeek;
+          } else if (prospectsFilters.nextCallScheduled === 'next_week') {
+            const nextWeekStart = moment().add(1, 'week').startOf('week').format('YYYY-MM-DD');
+            const nextWeekEnd = moment().add(1, 'week').endOf('week').format('YYYY-MM-DD');
+            filtersToApply.scheduled_call_from = nextWeekStart;
+            filtersToApply.scheduled_call_to = nextWeekEnd;
+          } else if (prospectsFilters.nextCallScheduled === 'overdue') {
+            filtersToApply.scheduled_call_status = 'overdue';
+          } else if (prospectsFilters.nextCallScheduled === 'custom') {
+            if (prospectsFilters.nextCallDateFrom) {
+              filtersToApply.scheduled_call_from = prospectsFilters.nextCallDateFrom;
+            }
+            if (prospectsFilters.nextCallDateTo) {
+              filtersToApply.scheduled_call_to = prospectsFilters.nextCallDateTo;
+            }
+          }
+          
+          handleFiltersChange(filtersToApply);
+          setPagination((prev) => ({
+            ...prev,
+            currentPage: 1,
+          }));
+          setRefreshKey((prev) => prev + 1);
+          setShowFiltersSidebar(false);
+        }}
+        onReset={() => {
+          setProspectsSearch("");
+          setProspectsFilters({
+            assignedTo: null,
+            campaigns: null,
+            nextCallScheduled: null,
+            nextCallDateFrom: null,
+            nextCallDateTo: null,
+            sourceFile: null,
+            tags: null,
+          });
+          handleFiltersChange({});
+          setCurrentFilters({});
+          setActiveFilter("all");
+          setPagination((prev) => ({
+            ...prev,
+            currentPage: 1,
+          }));
+          setRefreshKey((prev) => prev + 1);
+        }}
+      />
+
+      {/* Convert to Lead Modal */}
+{convertingProspectId && (
+  <ConvertToLeadModal
+    show={showConvertToLeadModal}
+    onHide={() => {
+      setShowConvertToLeadModal(false);
+      setConvertingProspectId(null);
+    }}
+    prospectId={convertingProspectId}
+    onSuccess={() => {
+      setRefreshKey((prev) => prev + 1);
+      toast.success("Prospect converted to lead successfully!");
+    }}
+  />
+)}
     </React.Fragment>
   );
 };

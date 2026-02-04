@@ -10,13 +10,17 @@ import {
   Modal,
   Spinner
 } from 'react-bootstrap';
-import { Edit, Trash2, Plus, Calendar, Send } from 'lucide-react';
+import { Edit, Trash2, Plus, Calendar, Send, Upload, FileText, Download } from 'lucide-react';
 import {
   getTaskActivities,
   getTaskComments,
   createTaskComment,
   updateTaskComment,
-  deleteTaskComment
+  deleteTaskComment,
+  getTaskDocumentDownload,
+  getTaskDocuments,
+  postTaskDocuments,
+  deleteTaskDocument
 } from '@utils/tasks';
 
 export interface TaskDetailTask {
@@ -36,8 +40,8 @@ export interface TaskDetailOffcanvasProps {
   selectedTask: TaskDetailTask | null;
   taskActivities: any[];
   loadingActivities: boolean;
-  activeDetailTab: 'activity' | 'comments';
-  setActiveDetailTab: (tab: 'activity' | 'comments') => void;
+  activeDetailTab: 'activity' | 'comments' | 'documents';
+  setActiveDetailTab: (tab: 'activity' | 'comments' | 'documents') => void;
   taskComments: any[];
   setTaskComments: (comments: any[]) => void;
   loadingComments: boolean;
@@ -86,6 +90,10 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
   const [showAllActivitiesModal, setShowAllActivitiesModal] = useState(false);
   const [allActivities, setAllActivities] = useState<any[]>([]);
   const [loadingAllActivities, setLoadingAllActivities] = useState(false);
+  const [taskDocuments, setTaskDocuments] = useState<any[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const documentInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleViewAllActivities = async () => {
     if (!selectedTask?.rawData?.id) return;
@@ -123,6 +131,72 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
       } finally {
         setLoadingComments(false);
       }
+    }
+  };
+
+  const fetchTaskDocuments = async () => {
+    if (!selectedTask?.rawData?.id) return;
+    try {
+      setLoadingDocuments(true);
+      const data = await getTaskDocuments(selectedTask.rawData.id);
+      setTaskDocuments(Array.isArray(data) ? data : data?.data ?? []);
+    } catch (error) {
+      console.error('Error fetching task documents:', error);
+      setTaskDocuments([]);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  const handleDocumentsTabClick = async () => {
+    setActiveDetailTab('documents');
+    if (selectedTask?.rawData?.id) {
+      await fetchTaskDocuments();
+    }
+  };
+
+  const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length || !selectedTask?.rawData?.id) return;
+    try {
+      setUploadingDocument(true);
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append('documents[]', files[i]);
+      }
+      await postTaskDocuments(selectedTask.rawData.id, formData);
+      await fetchTaskDocuments();
+      if (documentInputRef.current) documentInputRef.current.value = '';
+    } catch (error) {
+      console.error('Error uploading document:', error);
+    } finally {
+      setUploadingDocument(false);
+    }
+  };
+
+  const handleDownloadDocument = async (doc: any) => {
+    if (!selectedTask?.rawData?.id || !doc?.id) return;
+    try {
+      const blob = await getTaskDocumentDownload(selectedTask.rawData.id, doc.id);
+      if (!blob) return;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.original_name || doc.name || doc.file_name || 'document';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading document:', error);
+    }
+  };
+
+  const handleDeleteDocument = async (doc: any) => {
+    if (!selectedTask?.rawData?.id || !doc?.id) return;
+    try {
+      await deleteTaskDocument(selectedTask.rawData.id, doc.id);
+      await fetchTaskDocuments();
+    } catch (error) {
+      console.error('Error deleting document:', error);
     }
   };
 
@@ -441,7 +515,7 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
               <div className="detail-section">
                 <div className="detail-label">Description</div>
                 <div
-                  style={{ fontSize: '0.875rem', color: '#475569', lineHeight: '1.6', margin: 0 }}
+                  style={{ fontSize: '0.875rem', color: '#475569', lineHeight: '1.6', margin: 0,overflowX: 'auto' }}
                   className="task-description-html"
                   dangerouslySetInnerHTML={{
                     __html:
@@ -453,13 +527,18 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
 
               <Nav variant="tabs" className="detail-tabs">
                 <Nav.Item>
-                  <Nav.Link active={activeDetailTab === 'activity'} onClick={() => setActiveDetailTab('activity')}>
+                  <Nav.Link className="p-2" active={activeDetailTab === 'activity'} onClick={() => setActiveDetailTab('activity')}>
                     Recent Activity
                   </Nav.Link>
                 </Nav.Item>
                 <Nav.Item>
-                  <Nav.Link active={activeDetailTab === 'comments'} onClick={handleCommentsTabClick}>
+                  <Nav.Link className="p-2" active={activeDetailTab === 'comments'} onClick={handleCommentsTabClick}>
                     Comments {taskComments.length > 0 && `(${taskComments.length})`}
+                  </Nav.Link>
+                </Nav.Item>
+                <Nav.Item>
+                  <Nav.Link className="p-2" active={activeDetailTab === 'documents'} onClick={handleDocumentsTabClick}>
+                    Documents
                   </Nav.Link>
                 </Nav.Item>
               </Nav>
@@ -705,6 +784,104 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
                   )}
                 </div>
               )}
+
+              {activeDetailTab === 'documents' && (
+                <div className="activity-section">
+                  {loadingDocuments ? (
+                    <div style={{ textAlign: 'center', padding: '2rem' }}>
+                      <Spinner animation="border" size="sm" />
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.875rem', color: '#64748b' }}>
+                          {taskDocuments.length} document{taskDocuments.length !== 1 ? 's' : ''}
+                        </span>
+                        <div className="d-flex align-items-center gap-2">
+                          <input
+                            ref={documentInputRef}
+                            type="file"
+                            accept="*/*"
+                            multiple
+                            style={{ display: 'none' }}
+                            onChange={handleUploadDocument}
+                            disabled={uploadingDocument}
+                          />
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            disabled={uploadingDocument}
+                            onClick={() => documentInputRef.current?.click()}
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                          >
+                            {uploadingDocument ? (
+                              <Spinner animation="border" size="sm" style={{ width: '14px', height: '14px' }} />
+                            ) : (
+                              <Upload size={14} />
+                            )}
+                            Upload
+                          </Button>
+                        </div>
+                      </div>
+                      {taskDocuments.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '0.875rem' }}>
+                          No documents yet. Upload a file to attach it to this task.
+                        </div>
+                      ) : (
+                        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                          {taskDocuments.map((doc: any, idx: number) => {
+                            const label = doc.original_name || doc.name || doc.file_name || `Document ${idx + 1}`;
+                            return (
+                              <li
+                                key={doc.id ?? idx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '0.6rem 0.75rem',
+                                  backgroundColor: '#f8fafc',
+                                  borderRadius: '6px',
+                                  marginBottom: '0.5rem'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
+                                  <FileText size={18} className="text-muted" style={{ flexShrink: 0 }} />
+                                  <span style={{ fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {label}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="p-0"
+                                    onClick={() => handleDownloadDocument(doc)}
+                                    title="Download"
+                                    style={{ minWidth: 'auto', padding: '0.25rem' }}
+                                  >
+                                    <Download size={16} />
+                                  </Button>
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="p-0"
+                                    onClick={() => handleDeleteDocument(doc)}
+                                    title="Delete"
+                                    style={{ minWidth: 'auto', padding: '0.25rem', color: '#dc3545' }}
+                                  >
+                                    <Trash2 size={16} />
+                                  </Button>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
             </>
           )}
         </Offcanvas.Body>

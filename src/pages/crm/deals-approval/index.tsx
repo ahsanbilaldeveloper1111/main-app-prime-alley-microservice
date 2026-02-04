@@ -14,7 +14,6 @@ import GenericTable, { TableColumn, TableAction } from "@components/GenericTable
 import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
-import ConvertToOrderModal from "@components/ConvertToOrderModal";
 import {
   FiUpload,
   FiDatabase,
@@ -50,6 +49,8 @@ import {
   markDealLost,
   getLead,
   updateDeal,
+  approveDeal,
+  rejectDeal,
   getCrmProducts,
   getCampaignById,
   getIndustries,
@@ -78,7 +79,7 @@ import {
   
 } from "react-bootstrap";
 import Select from 'react-select';
-import { GlobalDateFormat, ModuleSlug, formatDateForTable, checkRequiredFields } from "@utils/Helper";
+import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper";
 import {
   Target,
   CheckCircle,
@@ -129,6 +130,8 @@ import {
   Package,
   RefreshCw,
   ArrowLeft,
+  Check,
+  XCircle,
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -464,38 +467,15 @@ const CrmDeals = () => {
   const router = useRouter();
 
   const [stages, setStages] = useState<any[]>([]);
-  const [estimationItems, setEstimationItems] = useState<Array<{
-    product_id: number;
-    product_service: string;
-    description: string;
-    qty: number;
-    unit_price: number;
-    original_currency: string;
-    original_price: number;
-  }>>([]);
-  const [showAddItemModal, setShowAddItemModal] = useState(false);
-  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
-  const [itemFormData, setItemFormData] = useState({
-    product_id: null as number | null,
-    product_service: "",
-    description: "",
-    qty: 1,
-    unit_price: 0,
-  });
-  const [showRevisionHistoryModal, setShowRevisionHistoryModal] = useState(false);
-  const [convertingPrice, setConvertingPrice] = useState(false);
-  const [showAllIndustries, setShowAllIndustries] = useState(false);
   const [lostReasons, setLostReasons] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
+  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({ approval_status: 'pending' });
   const [dealsData, setDealsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalDeals, setTotalDeals] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
   
-  const [showConvertToOrderModal, setShowConvertToOrderModal] = useState(false);
-const [dealToConvert, setDealToConvert] = useState<number | null>(null);
   // Delete Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [dealToDelete, setDealToDelete] = useState<any>(null);
@@ -529,25 +509,6 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
   const [showDeleteAttachmentModal, setShowDeleteAttachmentModal] = useState(false);
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: number; name: string } | null>(null);
   
-  // Download file modal (table column)
-  const [showDownloadFileModal, setShowDownloadFileModal] = useState(false);
-  const [dealForDownload, setDealForDownload] = useState<any>(null);
-  
-  // Follow-up Modal
-  const [showAddFollowupModal, setShowAddFollowupModal] = useState(false);
-  const [followUpIdToEdit, setFollowUpIdToEdit] = useState<number | null>(null);
-  const [followupData, setFollowupData] = useState({
-    dealId: null as number | null,
-    dealName: "",
-    followUpDate: "",
-    followUpStatus: "Pending",
-    communicationChannel: "Phone Call",
-    communicationChannelOther: "",
-    notes: "",
-    userExtension: "",
-  });
-  const [loadingFollowUp, setLoadingFollowUp] = useState(false);
-
   // Meeting Modal
   const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
   const [meetingIdToEdit, setMeetingIdToEdit] = useState<number | null>(null);
@@ -644,29 +605,7 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
     qty: 1,
     unit_price: 0,
   });
-  // Add/Edit Revision modal (replaces Add Item for Estimation step)
-  const [editShowAddRevisionModal, setEditShowAddRevisionModal] = useState(false);
-  const [editEditingRevisionIndex, setEditEditingRevisionIndex] = useState<number | null>(null);
-  const [editRevisionProducts, setEditRevisionProducts] = useState<Array<{
-    product_id: number;
-    product_service: string;
-    description: string;
-    qty: number;
-    unit_price: number;
-    original_currency: string;
-    original_price: number;
-    tax_percentage: string;
-    standard_discount_percentage: string;
-    special_discount_percentage: string;
-  }>>([]);
-  const [editRevisionFormData, setEditRevisionFormData] = useState({
-    tax_percentage: "0",
-    standard_discount_percentage: "0",
-    special_discount_percentage: "0",
-  });
-  const [editRevisionProductsCatalog, setEditRevisionProductsCatalog] = useState<CrmProduct[]>([]);
-  const [editRevisionLoadingProducts, setEditRevisionLoadingProducts] = useState(false);
-  const [editRevisionSelectedProductIds, setEditRevisionSelectedProductIds] = useState<Array<{ value: number; label: string }>>([]);
+  const [editShowRevisionHistoryModal, setEditShowRevisionHistoryModal] = useState(false);
   const [editConvertingPrice, setEditConvertingPrice] = useState(false);
   const [editEstimates, setEditEstimates] = useState<any[]>([]);
   const [editAttachments, setEditAttachments] = useState<any[]>([]);
@@ -688,17 +627,18 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
   const [serverPaginationMeta, setServerPaginationMeta] = useState<{ total: number; current_page: number; per_page: number; last_page: number } | null>(null);
   const [dealsFilters, setDealsFilters] = useState({
     assignedTo: null as string | null,
-    approvalStatus: null as string | null,
     stage: null as string | null,
     followUpDateFrom: null as string | null,
     followUpDateTo: null as string | null,
     probabilityMin: null as string | null,
     probabilityMax: null as string | null,
     dealType: null as string | null,
+    approvalStatus: 'pending' as string | null,
     industry: null as string | null,
     expectedCloseDateFrom: null as string | null,
     expectedCloseDateTo: null as string | null,
   });
+
 
   // Fetch stages and extensions on component mount
   useEffect(() => {
@@ -762,7 +702,6 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
         if (currentFilters.expected_close_date_to) {
           params.expected_close_date_to = currentFilters.expected_close_date_to;
         }
-
         if (currentFilters.approval_status) {
           params.approval_status = currentFilters.approval_status;
         }
@@ -809,7 +748,6 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
       setCurrentFilters((prev) => {
         const newFilters = { ...prev };
         delete newFilters.stage_id;
-        delete newFilters.approval_status;
         delete newFilters.include_archived;
         delete newFilters.include_lost;
         return newFilters;
@@ -1085,6 +1023,7 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
           delete newFilters.approval_status;
         }
       }
+      
       // Handle industry filter
       if ('industry' in filters) {
         if (filters.industry) {
@@ -1380,110 +1319,6 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
     }
   }, [meetingToDelete, viewingDeal, handleViewDeal]);
 
-  const handleCreateFollowUp = useCallback(async () => {
-    const isValid = checkRequiredFields(followupData, [
-      { field: "dealId", name: "Deal" },
-      { field: "followUpDate", name: "Follow-up Date" },
-      { field: "communicationChannel", name: "Communication Channel" },
-    ]);
-    if (
-      followupData.communicationChannel === "Other" &&
-      !followupData.communicationChannelOther?.trim()
-    ) {
-      toast.error("Please specify the communication channel");
-      return;
-    }
-    if (!isValid) return;
-
-    setLoadingFollowUp(true);
-    try {
-      const dealId = followupData.dealId!;
-      await updateDeal(dealId, {
-        follow_up_date: followupData.followUpDate,
-      } as any);
-
-      if (viewingDeal?.id === dealId) {
-        await handleViewDeal(dealId);
-      }
-      if (selectedDeal?.id === dealId || selectedDeal?.rawData?.id === dealId) {
-        const fresh = await getDeal(dealId);
-        setSelectedDeal(fresh || selectedDeal);
-      }
-
-      setShowAddFollowupModal(false);
-      setFollowUpIdToEdit(null);
-      setFollowupData({
-        dealId: null,
-        dealName: "",
-        followUpDate: "",
-        followUpStatus: "Pending",
-        communicationChannel: "Phone Call",
-        communicationChannelOther: "",
-        notes: "",
-        userExtension: "",
-      });
-      setRefreshKey((oldKey) => oldKey + 1);
-      toast.success("Follow-up saved successfully!");
-    } catch (error) {
-      console.error("Failed to save follow-up:", error);
-      toast.error("Failed to save follow-up");
-    } finally {
-      setLoadingFollowUp(false);
-    }
-  }, [followupData, viewingDeal, selectedDeal, handleViewDeal]);
-
-  const handleUpdateFollowUp = useCallback(async () => {
-    const isValid = checkRequiredFields(followupData, [
-      { field: "dealId", name: "Deal" },
-      { field: "followUpDate", name: "Follow-up Date" },
-      { field: "communicationChannel", name: "Communication Channel" },
-    ]);
-    if (
-      followupData.communicationChannel === "Other" &&
-      !followupData.communicationChannelOther?.trim()
-    ) {
-      toast.error("Please specify the communication channel");
-      return;
-    }
-    if (!followUpIdToEdit || !isValid) return;
-
-    setLoadingFollowUp(true);
-    try {
-      const dealId = followupData.dealId!;
-      await updateDeal(dealId, {
-        follow_up_date: followupData.followUpDate,
-      } as any);
-
-      if (viewingDeal?.id === dealId) {
-        await handleViewDeal(dealId);
-      }
-      if (selectedDeal?.id === dealId || selectedDeal?.rawData?.id === dealId) {
-        const fresh = await getDeal(dealId);
-        setSelectedDeal(fresh || selectedDeal);
-      }
-
-      setShowAddFollowupModal(false);
-      setFollowUpIdToEdit(null);
-      setFollowupData({
-        dealId: null,
-        dealName: "",
-        followUpDate: "",
-        followUpStatus: "Pending",
-        communicationChannel: "Phone Call",
-        communicationChannelOther: "",
-        notes: "",
-        userExtension: "",
-      });
-      setRefreshKey((oldKey) => oldKey + 1);
-      toast.success("Follow-up updated successfully!");
-    } catch (error) {
-      console.error("Failed to update follow-up:", error);
-      toast.error("Failed to update follow-up");
-    } finally {
-      setLoadingFollowUp(false);
-    }
-  }, [followUpIdToEdit, followupData, viewingDeal, selectedDeal, handleViewDeal]);
-
   const confirmDeleteDeal = useCallback(async () => {
     if (!dealToDelete) return;
 
@@ -1545,6 +1380,31 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
     }
   }, [dealToMarkLost, lostReasonId, lostFeedback]);
 
+  const handleApproveDeal = useCallback(async (deal: any) => {
+    const dealId = deal?.id ?? deal?.rawData?.id;
+    if (!dealId) return;
+    try {
+      await approveDeal(dealId);
+      toast.success("Deal approved successfully!");
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to approve deal:", error);
+      toast.error("Failed to approve deal");
+    }
+  }, []);
+
+  const handleRejectDeal = useCallback(async (deal: any) => {
+    const dealId = deal?.id ?? deal?.rawData?.id;
+    if (!dealId) return;
+    try {
+      await rejectDeal(dealId);
+      toast.success("Deal rejected successfully!");
+      setRefreshKey((oldKey) => oldKey + 1);
+    } catch (error) {
+      console.error("Failed to reject deal:", error);
+      toast.error("Failed to reject deal");
+    }
+  }, []);
 
   // Edit Deal Handlers
 const handleEditDeal = useCallback(async (dealId: number) => {
@@ -1814,10 +1674,6 @@ const handleCloseEditModal = useCallback(() => {
   });
   setEditEstimationItems([]);
   setEditProducts([]);
-  setEditShowAddRevisionModal(false);
-  setEditEditingRevisionIndex(null);
-  setEditRevisionProducts([]);
-  setEditRevisionFormData({ tax_percentage: "0", standard_discount_percentage: "0", special_discount_percentage: "0" });
   setEditDealTemplate(null);
   setEditTemplateFieldsData({});
   setEditBusinessTypeId(null);
@@ -1979,6 +1835,7 @@ const handleCloseEditModal = useCallback(() => {
       stage: deal.stage?.name || 'No Stage',
       stageColor: deal.stage?.color || 'grey',
       dealType: deal.deal_type || '',
+      approvalStatus: deal.approval_status || '',
       value: deal.net_value || deal.grand_total || '0',
       currency: deal.currency || 'AED',
       probability: deal?.stage?.probability || 0,
@@ -2139,14 +1996,6 @@ const handleCloseEditModal = useCallback(() => {
         )
       },
       {
-        key: 'status',
-        label: 'Status',
-        sortable: true,
-        type: 'text',
-        accessor: () => 'pending',
-        emptyValue: 'pending'
-      },
-      {
         key: 'dealType',
         label: 'Deal Type',
         sortable: true,
@@ -2257,22 +2106,11 @@ const handleCloseEditModal = useCallback(() => {
           variant: 'link' as const,
           className: 'text-info'
         },
-        {
-          label: 'Download',
-          icon: <DownloadIcon size={16} />,
-          onClick: (row: any) => {
-            setDealForDownload(row.rawData || row);
-            setShowDownloadFileModal(true);
-          },
-          variant: 'link' as const,
-          className: 'text-secondary'
-        },
         ...(session?.user?.permissions?.includes('add-crm-orders') ? [{
           label: 'Convert to Order',
           icon: <ShoppingBag size={16} />,
           onClick: (row: any) => {
-            setDealToConvert(row.rawData?.id || row.id);
-            setShowConvertToOrderModal(true);
+            window.location.href = `/crm/orders/create?deal_id=${row.rawData?.id || row.id}`;
           },
           variant: 'link' as const,
           className: 'text-success'
@@ -2296,13 +2134,29 @@ const handleCloseEditModal = useCallback(() => {
                 icon: <X size={14} />,
                 onClick: (row: any) => handleMarkLost(row.rawData || row),
                 className: 'text-danger'
+              },
+
+              {
+                label: 'Approve',
+                icon: <CheckCircle size={14} />,
+                onClick: (row: any) => { void handleApproveDeal(row.rawData || row); },
+                className: 'text-success',
+                show: (row: any) => (row.rawData?.approval_status ?? row.approval_status) === 'pending'
+              },
+              {
+                label: 'Reject',
+                icon: <XCircle size={14} />,
+                onClick: (row: any) => { void handleRejectDeal(row.rawData || row); },
+                className: 'text-danger',
+                show: (row: any) => (row.rawData?.approval_status ?? row.approval_status) === 'pending'
               }
+              
             ]
           }
         }] : [])
       ];
     },
-    [session, activeFilter, handleViewDeal, handleRestoreDeal, handleDeleteDeal, handleMarkLost]
+    [session, activeFilter, handleViewDeal, handleRestoreDeal, handleDeleteDeal, handleMarkLost, handleApproveDeal, handleRejectDeal]
   );
  
   if (!session?.user?.permissions?.includes('list-crm-deals')) {
@@ -2350,7 +2204,7 @@ const handleCloseEditModal = useCallback(() => {
         </a>
       </li>
       <li className="breadcrumb-item active fw-bold" aria-current="page">
-        Deals
+        Deals Approval
       </li>
     </ol>
   </nav>
@@ -2776,6 +2630,24 @@ const handleCloseEditModal = useCallback(() => {
                   </Form.Select>
                 </Col>
                 <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Approval Status</Form.Label>
+                  <Form.Select
+                    value={dealsFilters.approvalStatus || ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        approvalStatus: value
+                      }));
+                    }}
+                  >
+                    <option value="">Select Approval Status</option>
+                    <option value="pending" selected>Pending</option>
+                    <option value="approved">Approved</option>  
+                    <option value="rejected">Rejected</option>
+                  </Form.Select>
+                </Col>
+                <Col md={4}> 
                   <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
                   <Form.Select
                     value={dealsFilters.industry || ''}
@@ -2862,6 +2734,8 @@ const handleCloseEditModal = useCallback(() => {
                         if (dealsFilters.dealType) {
                           filtersToApply.deal_type = dealsFilters.dealType;
                         }
+                        // Always pass approval_status so it can be set or cleared
+                        filtersToApply.approval_status = dealsFilters.approvalStatus || null;
                         if (dealsFilters.industry) {
                           filtersToApply.industry = dealsFilters.industry;
                         }
@@ -2892,10 +2766,10 @@ const handleCloseEditModal = useCallback(() => {
                           probabilityMin: null,
                           probabilityMax: null,
                           dealType: null,
+                          approvalStatus: null,
                           industry: null,
                           expectedCloseDateFrom: null,
                           expectedCloseDateTo: null,
-                          approvalStatus: null,
                         });
                         handleFiltersChange({});
                         setCurrentFilters({});
@@ -2919,7 +2793,7 @@ const handleCloseEditModal = useCallback(() => {
           columns={dealsColumns}
           actions={dealsActions}
           customizableColumns={true}
-          defaultSelectedColumns={['name', 'company', 'stage', 'status', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner']}
+          defaultSelectedColumns={['name', 'company', 'stage', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner']}
           columnStorageKey="dealsSelectedColumns"
           pagination={{
             currentPage: dealsPagination.currentPage,
@@ -5237,302 +5111,6 @@ const handleCloseEditModal = useCallback(() => {
         itemType="attachment"
       />
 
-      {/* Download File Modal */}
-      <Modal
-        show={showDownloadFileModal}
-        onHide={() => {
-          setShowDownloadFileModal(false);
-          setDealForDownload(null);
-        }}
-        centered
-        size="sm"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title className="d-flex align-items-center">
-            <DownloadIcon size={22} className="me-2" />
-            Download File
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="mb-0">
-            You can download a file for this deal. Click the button below to download a summary file (dummy file for now).
-          </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowDownloadFileModal(false);
-              setDealForDownload(null);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              const content = dealForDownload
-                ? `Deal: ${dealForDownload.name || 'N/A'}\nCompany: ${dealForDownload.company || dealForDownload.company_name || 'N/A'}\nValue: ${dealForDownload.currency || 'AED'} ${dealForDownload.value ?? 'N/A'}\n\nThis is a dummy file for download.`
-                : 'This is a dummy file for download.';
-              const blob = new Blob([content], { type: 'text/plain' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `deal-${dealForDownload?.name?.replace(/\s+/g, '-') || 'export'}-${new Date().toISOString().slice(0, 10)}.txt`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-              setShowDownloadFileModal(false);
-              setDealForDownload(null);
-              toast.success('File downloaded successfully');
-            }}
-          >
-            <DownloadIcon size={16} className="me-1" />
-            Download file
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Add/Edit Follow-up Modal */}
-      <Modal
-        show={showAddFollowupModal}
-        onHide={() => {
-          setShowAddFollowupModal(false);
-          setFollowUpIdToEdit(null);
-          setFollowupData({
-            dealId: null,
-            dealName: "",
-            followUpDate: "",
-            followUpStatus: "Pending",
-            communicationChannel: "Phone Call",
-            communicationChannelOther: "",
-            notes: "",
-            userExtension: "",
-          });
-        }}
-        size="lg"
-        centered
-      >
-        <Modal.Header
-          closeButton
-          style={{ color: "black", borderBottom: "1px solid #ccc" }}
-        >
-          <Modal.Title className="d-flex align-items-center">
-            <Calendar size={24} className="me-2" />
-            {followUpIdToEdit
-              ? "Update Follow up Activity"
-              : "Add Follow up Activity"}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="p-4">
-          {followupData.dealName && (
-            <div className="alert alert-info mb-4 d-flex align-items-center">
-              <Handshake size={20} className="me-2" />
-              <span>
-                <strong>Deal:</strong> {followupData.dealName}
-              </span>
-            </div>
-          )}
-
-          <Form>
-            <Row>
-              <Col md={12}>
-                <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold small">
-                    Follow-up Date <span className="text-danger">*</span>
-                  </Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={followupData.followUpDate}
-                    onChange={(e) =>
-                      setFollowupData({
-                        ...followupData,
-                        followUpDate: e.target.value,
-                      })
-                    }
-                    min={
-                      followUpIdToEdit
-                        ? getTodayDate(followupData.followUpDate)
-                        : new Date().toISOString().split("T")[0]
-                    }
-                    required
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
-
-            <Row>
-              <Col md={12}>
-                <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold small">Status</Form.Label>
-                  <Select
-                    value={{
-                      value: followupData.followUpStatus,
-                      label: followupData.followUpStatus,
-                    }}
-                    onChange={(option) =>
-                      setFollowupData({
-                        ...followupData,
-                        followUpStatus: option?.value || "Pending",
-                      })
-                    }
-                    options={[
-                      { value: "Pending", label: "Pending" },
-                      { value: "In Progress", label: "In Progress" },
-                      { value: "Completed", label: "Completed" },
-                      { value: "Cancelled", label: "Cancelled" },
-                    ]}
-                    styles={customSelectStyles}
-                    placeholder="Select status..."
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
-
-            <Row>
-              <Col md={12}>
-                <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold small">
-                    Communication Channel <span className="text-danger">*</span>
-                  </Form.Label>
-                  <Select
-                    value={{
-                      value: followupData.communicationChannel,
-                      label: followupData.communicationChannel,
-                    }}
-                    onChange={(option) =>
-                      setFollowupData({
-                        ...followupData,
-                        communicationChannel: option?.value || "Phone Call",
-                        communicationChannelOther: "",
-                      })
-                    }
-                    options={[
-                      { value: "Phone Call", label: "Phone Call" },
-                      { value: "Email", label: "Email" },
-                      { value: "Video Call", label: "Video Call" },
-                      {
-                        value: "In-Person Meeting",
-                        label: "In-Person Meeting",
-                      },
-                      { value: "SMS", label: "SMS" },
-                      { value: "WhatsApp", label: "WhatsApp" },
-                      { value: "Other", label: "Other" },
-                    ]}
-                    styles={customSelectStyles}
-                    placeholder="Select communication channel..."
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
-
-            {followupData.communicationChannel === "Other" && (
-              <Row>
-                <Col md={12}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="fw-semibold small">
-                      Communication Channel (Other){" "}
-                      <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={followupData.communicationChannelOther}
-                      onChange={(e) =>
-                        setFollowupData({
-                          ...followupData,
-                          communicationChannelOther: e.target.value,
-                        })
-                      }
-                      placeholder="Specify communication channel..."
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-            )}
-
-            <Row>
-              <Col md={12}>
-                <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold small">Notes</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={4}
-                    value={followupData.notes}
-                    onChange={(e) =>
-                      setFollowupData({
-                        ...followupData,
-                        notes: e.target.value,
-                      })
-                    }
-                    placeholder="Add notes, description, or specific action items for this follow-up..."
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
-
-            <div className="alert alert-info mb-0 d-flex align-items-center">
-              <AlertCircle size={18} className="me-2" />
-              <small>
-                Follow-up activities help track communication and next steps
-                with deals.
-              </small>
-            </div>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer className="border-top bg-light">
-          <Button
-            variant="outline-secondary"
-            onClick={() => {
-              setShowAddFollowupModal(false);
-              setFollowUpIdToEdit(null);
-              setFollowupData({
-                dealId: null,
-                dealName: "",
-                followUpDate: "",
-                followUpStatus: "Pending",
-                communicationChannel: "Phone Call",
-                communicationChannelOther: "",
-                notes: "",
-                userExtension: "",
-              });
-            }}
-          >
-            <X size={16} className="me-1" />
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            disabled={
-              !followupData.followUpDate ||
-              !followupData.communicationChannel ||
-              (followupData.communicationChannel === "Other" &&
-                !followupData.communicationChannelOther?.trim()) ||
-              loadingFollowUp
-            }
-            onClick={
-              followUpIdToEdit ? handleUpdateFollowUp : handleCreateFollowUp
-            }
-          >
-            {loadingFollowUp ? (
-              <>
-                <div
-                  className="spinner-border spinner-border-sm me-1"
-                  role="status"
-                />
-                {followUpIdToEdit ? "Updating..." : "Adding..."}
-              </>
-            ) : (
-              <>
-                <Plus size={16} className="me-1" />
-                {followUpIdToEdit ? "Update Follow up" : "Add Follow up"}
-              </>
-            )}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
       {/* Deal Sidebar */}
       <GenericSidebar
         isOpen={showDealSidebar}
@@ -5616,13 +5194,6 @@ const handleCloseEditModal = useCallback(() => {
                     badgeVariant: selectedDeal?.riskLevel === 'High' || selectedDeal?.risk_level === 'High' ? 'danger' : 
                                  selectedDeal?.riskLevel === 'Medium' || selectedDeal?.risk_level === 'Medium' ? 'warning' : 'success',
                     show: !!(selectedDeal?.riskLevel || selectedDeal?.risk_level)
-                  },
-                  {
-                    label: 'Follow-ups',
-                    value: `${selectedDeal?.follow_ups?.length ?? (selectedDeal?.follow_up_date ? 1 : 0)} follow-up(s)`,
-                    type: 'text' as const,
-                    icon: History,
-                    show: true
                   }
                 ]
               },
@@ -5676,39 +5247,6 @@ const handleCloseEditModal = useCallback(() => {
                 emptyState: {
                   icon: FileText,
                   message: 'No prospect fields available'
-                }
-              },
-              {
-                id: 'follow-ups',
-                title: 'Follow-ups',
-                icon: History,
-                badge: {
-                  value: selectedDeal?.follow_ups?.length ?? (selectedDeal?.follow_up_date ? 1 : 0),
-                  variant: 'secondary'
-                },
-                emptyState: {
-                  icon: History,
-                  message: 'No follow-ups yet',
-                  action: {
-                    label: 'Add Follow Up',
-                    onClick: () => {
-                      const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
-                      if (dealId) {
-                        setFollowupData({
-                          dealId: Number(dealId),
-                          dealName: selectedDeal?.name || '',
-                          followUpDate: '',
-                          followUpStatus: 'Pending',
-                          communicationChannel: 'Phone Call',
-                          communicationChannelOther: '',
-                          notes: '',
-                          userExtension: (session?.user as any)?.extension || '',
-                        });
-                        setFollowUpIdToEdit(null);
-                        setShowAddFollowupModal(true);
-                      }
-                    }
-                  }
                 }
               },
               {
@@ -5897,7 +5435,7 @@ const handleCloseEditModal = useCallback(() => {
             onChange: (value) => setDealsFilters(prev => ({ ...prev, approvalStatus: value })),
             options: [
               { value: '', label: 'Select Approval Status' },
-              { value: 'pending', label: 'Pending' },
+              { value: 'pending', label: 'Pending'},
               { value: 'approved', label: 'Approved' },
               { value: 'rejected', label: 'Rejected' }
             ]
@@ -5966,9 +5504,7 @@ const handleCloseEditModal = useCallback(() => {
           if (dealsFilters.dealType) {
             filtersToApply.deal_type = dealsFilters.dealType;
           }
-          if (dealsFilters.approvalStatus) {
-            filtersToApply.approval_status = dealsFilters.approvalStatus;
-          }
+          filtersToApply.approval_status = dealsFilters.approvalStatus || null;
           if (dealsFilters.industry) {
             filtersToApply.industry = dealsFilters.industry;
           }
@@ -5994,10 +5530,10 @@ const handleCloseEditModal = useCallback(() => {
             probabilityMin: null,
             probabilityMax: null,
             dealType: null,
+            approvalStatus: null,
             industry: null,
             expectedCloseDateFrom: null,
             expectedCloseDateTo: null,
-            approvalStatus: null,
           });
           handleFiltersChange({});
           setCurrentFilters({});
@@ -6474,10 +6010,10 @@ const handleCloseEditModal = useCallback(() => {
                 {editFormStep === 4 && (
                   <Card className="mb-3 border-0 bg-light">
                     <Card.Body>
-                      {/* <h5 className="fw-bold mb-4 text-success">ESTIMATION CHART</h5> */}
+                      <h5 className="fw-bold mb-4 text-success">ESTIMATION CHART</h5>
                       
                       {/* Deal-level settings */}
-                      {/* <Row className="mb-4">
+                      <Row className="mb-4">
                         <Col md={4}>
                           <Form.Group className="mb-3">
                             <Form.Label>Tax Percentage (%)</Form.Label>
@@ -6521,117 +6057,89 @@ const handleCloseEditModal = useCallback(() => {
                             />
                           </Form.Group>
                         </Col>}
-                      </Row> */}
+                      </Row>
 
-                      {/* Action Button - Add Revision/Quotation */}
-                      <div className="d-flex justify-content-end align-items-center mb-3">
+                      {/* Action Buttons */}
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <Button
+                          variant="outline-info"
+                          size="sm"
+                          onClick={() => setEditShowRevisionHistoryModal(true)}
+                        >
+                          <History size={14} className="me-1" />
+                          Revision History
+                        </Button>
                         <Button
                           variant="primary"
                           size="sm"
-                          onClick={async () => {
-                            setEditEditingRevisionIndex(null);
-                            setEditRevisionProducts([]);
-                            setEditRevisionFormData({
-                              tax_percentage: editFormData.tax_percentage || "0",
-                              standard_discount_percentage: editFormData.standard_discount_percentage || "0",
-                              special_discount_percentage: editFormData.special_discount_percentage || "0",
+                          onClick={() => {
+                            setEditEditingItemIndex(null);
+                            setEditItemFormData({
+                              product_id: null,
+                              product_service: "",
+                              description: "",
+                              qty: 1,
+                              unit_price: 0,
                             });
-                            setEditRevisionSelectedProductIds([]);
-                            setEditShowAddRevisionModal(true);
-                            setEditRevisionLoadingProducts(true);
-                            try {
-                              const res = await getCrmProducts({ per_page: 100 });
-                              setEditRevisionProductsCatalog(res?.data || []);
-                            } catch (_e) {
-                              setEditRevisionProductsCatalog([]);
-                            } finally {
-                              setEditRevisionLoadingProducts(false);
-                            }
+                            setEditShowAllIndustries(false);
+                            setEditShowAddItemModal(true);
                           }}
                         >
                           <Plus size={14} className="me-1" />
-                          Add Revision
+                          Add Item
                         </Button>
                       </div>
 
-                      {/* Revision History Table (replaces product listing) */}
+                      {/* Estimation Items Table */}
                       <div className="table-responsive">
-                        <Table hover className="align-middle">
+                        <Table hover>
                           <thead className="bg-light">
                             <tr>
-                              <th>Version</th>
-                              <th>Created</th>
-                              <th>Grand Total</th>
-                              <th>Net Value</th>
-                              <th>Items</th>
-                              <th style={{ minWidth: 'auto' }}>Actions</th>
+                              <th>#</th>
+                              <th>Product Name</th>
+                              <th>Qty</th>
+                              {editEstimationItems.some((item) => item.description) && <th>Description</th>}
+                              <th className="text-end">Unit Price</th>
+                              <th className="text-end">Total Price</th>
+                              <th className="text-center">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {editEstimates.map((estimate: any, index: number) => {
-                              const grandTotal = parseFloat(estimate.grand_total || "0");
-                              const netValue = parseFloat(estimate.net_value || "0");
-                              const itemCount = estimate.estimation_chart?.length || 0;
-
+                            {editEstimationItems.map((item, index) => {
+                              const subtotal = item.qty * item.unit_price;
+                              
                               return (
-                                <tr key={estimate.id || index}>
-                                  <td>
-                                    <Badge bg="secondary">
-                                      {estimate.version || `v${editEstimates.length - index}.0`}
-                                    </Badge>
+                                <tr key={index}>
+                                  <td>{index + 1}</td>
+                                  <td className="fw-semibold">{item.product_service || 'N/A'}</td>
+                                  <td className="text-center">{item.qty || '0'}</td>
+                                  {editEstimationItems.some((i) => i.description) && (
+                                    <td className="text-muted small">{item.description || '-'}</td>
+                                  )}
+                                  <td className="text-end">
+                                    {editFormData.currency || 'AED'} {parseFloat(String(item.unit_price || '0')).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="text-end fw-semibold">
+                                    {editFormData.currency || 'AED'} {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </td>
                                   <td>
-                                    <div className="d-flex align-items-center">
-                                      <Calendar size={14} className="me-2 text-muted" />
-                                      {new Date(estimate.created_at).toLocaleString()}
-                                    </div>
-                                  </td>
-                                  <td className="fw-bold text-success">
-                                    {grandTotal.toLocaleString()} {estimate.currency || editFormData.currency}
-                                  </td>
-                                  <td>
-                                    {netValue.toLocaleString()} {estimate.currency || editFormData.currency}
-                                  </td>
-                                  <td>
-                                    <Badge bg="secondary">{itemCount} items</Badge>
-                                  </td>
-                                  <td style={{ minWidth: 'auto' }}>
                                     <div className="d-flex gap-1 justify-content-center">
                                       <Button
                                         variant="link"
                                         size="sm"
                                         className="p-1"
-                                        title="Edit revision"
-                                        onClick={async () => {
-                                          setEditEditingRevisionIndex(index);
-                                          setEditRevisionProducts((estimate.estimation_chart || []).map((item: any) => ({
-                                            product_id: item.product_id || 0,
-                                            product_service: item.product_service || "",
-                                            description: item.description || "",
-                                            qty: item.qty || 1,
-                                            unit_price: item.unit_price || 0,
-                                            original_currency: item.original_currency || estimate.currency || editFormData.currency,
-                                            original_price: item.original_price || item.unit_price || 0,
-                                            tax_percentage: (item.tax_percentage != null ? String(item.tax_percentage) : estimate.tax_percentage != null ? String(estimate.tax_percentage) : "0"),
-                                            standard_discount_percentage: (item.standard_discount_percentage != null ? String(item.standard_discount_percentage) : estimate.standard_discount_percentage != null ? String(estimate.standard_discount_percentage) : "0"),
-                                            special_discount_percentage: (item.special_discount_percentage != null ? String(item.special_discount_percentage) : estimate.special_discount_percentage != null ? String(estimate.special_discount_percentage) : "0"),
-                                          })));
-                                          setEditRevisionFormData({
-                                            tax_percentage: estimate.tax_percentage?.toString() || "0",
-                                            standard_discount_percentage: estimate.standard_discount_percentage?.toString() || "0",
-                                            special_discount_percentage: estimate.special_discount_percentage?.toString() || "0",
+                                        title="Edit Item"
+                                        onClick={() => {
+                                          setEditEditingItemIndex(index);
+                                          setEditItemFormData({
+                                            product_id: item.product_id,
+                                            product_service: item.product_service,
+                                            description: item.description,
+                                            qty: item.qty,
+                                            unit_price: item.unit_price,
                                           });
-                                          setEditRevisionSelectedProductIds([]);
-                                          setEditShowAddRevisionModal(true);
-                                          setEditRevisionLoadingProducts(true);
-                                          try {
-                                            const res = await getCrmProducts({ per_page: 100 });
-                                            setEditRevisionProductsCatalog(res?.data || []);
-                                          } catch (_e) {
-                                            setEditRevisionProductsCatalog([]);
-                                          } finally {
-                                            setEditRevisionLoadingProducts(false);
-                                          }
+                                          setEditShowAllIndustries(false);
+                                          setEditShowAddItemModal(true);
                                         }}
                                       >
                                         <Edit size={16} />
@@ -6640,12 +6148,9 @@ const handleCloseEditModal = useCallback(() => {
                                         variant="link"
                                         size="sm"
                                         className="p-1 text-danger"
-                                        title="Delete revision"
+                                        title="Delete Item"
                                         onClick={() => {
-                                          if (window.confirm(`Are you sure you want to delete ${estimate.version || `v${editEstimates.length - index}.0`}?`)) {
-                                            setEditEstimates(editEstimates.filter((_, i) => i !== index));
-                                            toast.success("Revision removed");
-                                          }
+                                          setEditEstimationItems(editEstimationItems.filter((_, i) => i !== index));
                                         }}
                                       >
                                         <Trash2 size={16} />
@@ -6655,41 +6160,67 @@ const handleCloseEditModal = useCallback(() => {
                                 </tr>
                               );
                             })}
-
-                            {/* EMPTY STATE */}
-                            {editEstimates.length === 0 && (
+                            {editEstimationItems.length === 0 && (
                               <tr>
-                                <td colSpan={6} className="text-center text-muted py-5">
-                                  <History size={40} className="mb-3 text-muted d-block mx-auto" style={{ opacity: 0.5 }} />
-                                  <div>No revision history available</div>
-                                  <small>Revisions will appear here when estimates are created</small>
+                                <td colSpan={editEstimationItems.some((item) => item.description) ? 7 : 6} className="text-center text-muted py-5">
+                                  <Package size={40} className="text-muted mb-3" style={{ opacity: 0.5 }} />
+                                  <div>No items in estimation chart</div>
+                                  <small>Click "Add Item" to add products or services</small>
                                 </td>
                               </tr>
                             )}
                           </tbody>
+                          {editEstimationItems.length > 0 && (() => {
+                            const grandTotal = editEstimationItems.reduce((sum, item) => sum + (item.qty * item.unit_price), 0);
+                            const totalDiscountPercentage = parseFloat(editFormData.standard_discount_percentage || "0") + parseFloat(editFormData.special_discount_percentage || "0");
+                            const totalDiscount = (grandTotal * totalDiscountPercentage) / 100;
+                            const subtotalAfterDiscount = grandTotal - totalDiscount;
+                            const taxAmount = (subtotalAfterDiscount * parseFloat(editFormData.tax_percentage || "0")) / 100;
+                            const netValue = subtotalAfterDiscount + taxAmount;
+                            
+                            return (
+                              <tfoot className="bg-light">
+                                <tr>
+                                  <td colSpan={editEstimationItems.some((item) => item.description) ? 6 : 5} className="text-end">
+                                    <strong>Subtotal:</strong>
+                                  </td>
+                                  <td className="text-end fw-semibold">
+                                    {editFormData.currency || 'AED'} {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                                {totalDiscount > 0 && (
+                                  <tr>
+                                    <td colSpan={editEstimationItems.some((item) => item.description) ? 6 : 5} className="text-end text-muted">
+                                      Discount ({totalDiscountPercentage}%):
+                                    </td>
+                                    <td className="text-end text-danger">
+                                      - {editFormData.currency || 'AED'} {totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                  </tr>
+                                )}
+                                {parseFloat(editFormData.tax_percentage || "0") > 0 && (
+                                  <tr>
+                                    <td colSpan={editEstimationItems.some((item) => item.description) ? 6 : 5} className="text-end">
+                                      <strong>Tax ({editFormData.tax_percentage}%):</strong>
+                                    </td>
+                                    <td className="text-end fw-semibold">
+                                      {editFormData.currency || 'AED'} {taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                  </tr>
+                                )}
+                                <tr className="border-top border-2">
+                                  <td colSpan={editEstimationItems.some((item) => item.description) ? 6 : 5} className="text-end">
+                                    <strong className="fs-5">Total:</strong>
+                                  </td>
+                                  <td className="text-end fw-bold text-success fs-5">
+                                    {editFormData.currency || 'AED'} {netValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            );
+                          })()}
                         </Table>
                       </div>
-
-                      {/* Summary Card */}
-                      {editEstimates.length > 0 && (
-                        <Card className="border-0 bg-light mt-3">
-                          <Card.Body>
-                            <Row>
-                              <Col md={6}>
-                                <small className="text-muted">Total Revisions</small>
-                                <div className="fw-bold">{editEstimates.length}</div>
-                              </Col>
-                              <Col md={6}>
-                                <small className="text-muted">Latest Update</small>
-                                <div className="fw-bold">
-                                  {editEstimates.length > 0 ? new Date(editEstimates[0].created_at).toLocaleString() : 'N/A'}
-                                </div>
-                              </Col>
-                            </Row>
-                          </Card.Body>
-                        </Card>
-                      )}
-
                     </Card.Body>
                   </Card>
                 )}
@@ -6741,421 +6272,279 @@ const handleCloseEditModal = useCallback(() => {
         </Modal.Body>
       </Modal>
 
-      {/* Add/Edit Revision Modal (Quotation with multiple products) */}
+      {/* Add/Edit Item Modal (Sub-modal for Estimation) */}
       <Modal 
-        show={editShowAddRevisionModal} 
+        show={editShowAddItemModal} 
         onHide={() => {
-          setEditShowAddRevisionModal(false);
-          setEditEditingRevisionIndex(null);
-          setEditRevisionProducts([]);
-          setEditRevisionFormData({ tax_percentage: "0", standard_discount_percentage: "0", special_discount_percentage: "0" });
+          setEditShowAddItemModal(false);
+          setEditEditingItemIndex(null);
+          setEditItemFormData({
+            product_id: null,
+            product_service: "",
+            description: "",
+            qty: 1,
+            unit_price: 0,
+          });
         }} 
         size="lg" 
         centered
       >
         <Modal.Header closeButton>
-          <Modal.Title>{editEditingRevisionIndex !== null ? 'Edit Revision / Quotation' : 'Add Revision / Quotation'}</Modal.Title>
+          <Modal.Title>{editEditingItemIndex !== null ? 'Edit Item' : 'Add New Item'}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form>
-            {/* Default Tax & Discount (applied when adding new products) */}
-            {/* <Row className="g-3 mb-3">
+            <Row className="g-3">
               <Col md={12}>
-                <Form.Text className="text-muted small">Default Tax & Discount — used when you add new products below. Each product can then have its own values in the table.</Form.Text>
-              </Col>
-              <Col md={4}>
                 <Form.Group>
-                  <Form.Label>Default Tax (%)</Form.Label>
+                  <Form.Label>Product/Service Name <span className="text-danger">*</span></Form.Label>
                   <Form.Control
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={editRevisionFormData.tax_percentage}
-                    onChange={(e) => setEditRevisionFormData({ ...editRevisionFormData, tax_percentage: e.target.value })}
-                    placeholder="0"
+                    type="text"
+                    value={editItemFormData.product_service}
+                    onChange={(e) => setEditItemFormData({ ...editItemFormData, product_service: e.target.value })}
+                    placeholder="Enter product or service name"
+                    required
                   />
                 </Form.Group>
               </Col>
-              <Col md={4}>
+              <Col md={12}>
                 <Form.Group>
-                  <Form.Label>Default Standard Discount (%)</Form.Label>
-                  <Form.Select
-                    value={editRevisionFormData.standard_discount_percentage}
-                    onChange={(e) => setEditRevisionFormData({ ...editRevisionFormData, standard_discount_percentage: e.target.value })}
-                  >
-                    <option value="0">0%</option>
-                    <option value="5">5%</option>
-                    <option value="10">10%</option>
-                    <option value="15">15%</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Default Special Discount (%)</Form.Label>
+                  <Form.Label>Description</Form.Label>
                   <Form.Control
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={editRevisionFormData.special_discount_percentage}
-                    onChange={(e) => setEditRevisionFormData({ ...editRevisionFormData, special_discount_percentage: e.target.value })}
-                    placeholder="0"
+                    as="textarea"
+                    rows={3}
+                    placeholder="Enter product description or specifications"
+                    value={editItemFormData.description}
+                    onChange={(e) => setEditItemFormData({ ...editItemFormData, description: e.target.value })}
                   />
                 </Form.Group>
               </Col>
-            </Row> */}
-
-            {/* Product selection - multi-select */}
-            <Form.Group className="mb-3">
-              <Form.Label>Add Products</Form.Label>
-              <Select
-                isMulti
-                value={editRevisionSelectedProductIds}
-                onChange={(selected) => setEditRevisionSelectedProductIds(selected ? [...selected] : [])}
-                options={editRevisionProductsCatalog.map((p) => ({
-                  value: p.id,
-                  label: `${p.name} - ${editFormData.currency || 'AED'} ${p.price || 0}`,
-                }))}
-                placeholder={editRevisionLoadingProducts ? "Loading products..." : "Select products to add..."}
-                isDisabled={editRevisionLoadingProducts}
-                isSearchable
-              />
-              <div className="d-flex gap-2 mt-2 flex-wrap">
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  onClick={() => {
-                    const toAdd = editRevisionProductsCatalog.filter((p) =>
-                      editRevisionSelectedProductIds.some((s) => s.value === p.id) &&
-                      !editRevisionProducts.some((ep) => ep.product_id === p.id)
-                    );
-                    const newItems = toAdd.map((p) => ({
-                      product_id: p.id,
-                      product_service: p.name || "",
-                      description: "",
-                      qty: 1,
-                      unit_price: parseFloat(p.price || "0"),
-                      original_currency: editFormData.currency || "AED",
-                      original_price: parseFloat(p.price || "0"),
-                      tax_percentage: editRevisionFormData.tax_percentage,
-                      standard_discount_percentage: editRevisionFormData.standard_discount_percentage,
-                      special_discount_percentage: editRevisionFormData.special_discount_percentage,
-                    }));
-                    setEditRevisionProducts([...editRevisionProducts, ...newItems]);
-                    setEditRevisionSelectedProductIds([]);
-                  }}
-                  disabled={editRevisionSelectedProductIds.length === 0}
-                >
-                  <Plus size={14} className="me-1" />
-                  Add Selected Products
-                </Button>
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={() => {
-                    setEditRevisionProducts([...editRevisionProducts, {
-                      product_id: Date.now(),
-                      product_service: "",
-                      description: "",
-                      qty: 1,
-                      unit_price: 0,
-                      original_currency: editFormData.currency || "AED",
-                      original_price: 0,
-                      tax_percentage: editRevisionFormData.tax_percentage,
-                      standard_discount_percentage: editRevisionFormData.standard_discount_percentage,
-                      special_discount_percentage: editRevisionFormData.special_discount_percentage,
-                    }]);
-                  }}
-                >
-                  <Plus size={14} className="me-1" />
-                  Add Custom Product
-                </Button>
-              </div>
-            </Form.Group>
-
-            {/* Products in this revision - each product has its own Tax, Standard discount, Special discount */}
-            <Form.Label>Products in this revision</Form.Label>
-            <div className="table-responsive mb-3">
-              <Table size="sm" hover>
-                <thead className="bg-light">
-                  <tr>
-                    <th>Product</th>
-                    <th>Qty</th>
-                    <th>Unit Price</th>
-                    <th>Tax (%)</th>
-                    <th>Std Disc (%)</th>
-                    <th>Spec Disc (%)</th>
-                    <th>Line Total</th>
-                    <th style={{ minWidth: 'auto' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {editRevisionProducts.map((item, idx) => {
-                    const subtotal = (item.qty || 0) * (item.unit_price || 0);
-                    const taxPct = parseFloat(String(item.tax_percentage ?? "0")) || 0;
-                    const stdPct = parseFloat(String(item.standard_discount_percentage ?? "0")) || 0;
-                    const specPct = parseFloat(String(item.special_discount_percentage ?? "0")) || 0;
-                    const discPct = stdPct + specPct;
-                    const disc = (subtotal * discPct) / 100;
-                    const afterDisc = subtotal - disc;
-                    const tax = (afterDisc * taxPct) / 100;
-                    const lineTotal = afterDisc + tax;
-                    return (
-                      <tr key={idx}>
-                        <td>
-                          <Form.Control
-                            type="text"
-                            size="sm"
-                            placeholder="Product name"
-                            value={item.product_service}
-                            onChange={(e) => {
-                              const updated = [...editRevisionProducts];
-                              updated[idx] = { ...item, product_service: e.target.value };
-                              setEditRevisionProducts(updated);
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <Form.Control
-                            type="number"
-                            min="1"
-                            size="sm"
-                            style={{ width: 70 }}
-                            value={item.qty}
-                            onChange={(e) => {
-                              const v = parseInt(e.target.value) || 1;
-                              const updated = [...editRevisionProducts];
-                              updated[idx] = { ...item, qty: v };
-                              setEditRevisionProducts(updated);
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <Form.Control
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            size="sm"
-                            style={{ width: 90 }}
-                            value={item.unit_price}
-                            onChange={(e) => {
-                              const v = parseFloat(e.target.value) || 0;
-                              const updated = [...editRevisionProducts];
-                              updated[idx] = { ...item, unit_price: v, original_price: v };
-                              setEditRevisionProducts(updated);
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <Form.Control
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            size="sm"
-                            style={{ width: 70 }}
-                            value={item.tax_percentage ?? "0"}
-                            onChange={(e) => {
-                              const updated = [...editRevisionProducts];
-                              updated[idx] = { ...item, tax_percentage: e.target.value };
-                              setEditRevisionProducts(updated);
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <Form.Control
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            size="sm"
-                            style={{ width: 70 }}
-                            value={item.standard_discount_percentage ?? "0"}
-                            onChange={(e) => {
-                              const updated = [...editRevisionProducts];
-                              updated[idx] = { ...item, standard_discount_percentage: e.target.value };
-                              setEditRevisionProducts(updated);
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <Form.Control
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            size="sm"
-                            style={{ width: 70 }}
-                            value={item.special_discount_percentage ?? "0"}
-                            onChange={(e) => {
-                              const updated = [...editRevisionProducts];
-                              updated[idx] = { ...item, special_discount_percentage: e.target.value };
-                              setEditRevisionProducts(updated);
-                            }}
-                          />
-                        </td>
-                        <td>{editFormData.currency || 'AED'} {lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td style={{ minWidth: 'auto' }}>
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="p-0 text-danger"
-                            onClick={() => setEditRevisionProducts(editRevisionProducts.filter((_, i) => i !== idx))}
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-              {editRevisionProducts.length === 0 && (
-                <div className="text-center text-muted py-3 small">No products. Select products above and click "Add Selected Products".</div>
-              )}
-            </div>
-
-            {/* Grand total preview (sum of per-product line totals) */}
-            {editRevisionProducts.length > 0 && (() => {
-              const subtotalAll = editRevisionProducts.reduce((s, i) => s + (i.qty || 0) * (i.unit_price || 0), 0);
-              let totalDiscount = 0;
-              let totalTax = 0;
-              editRevisionProducts.forEach((i) => {
-                const st = (i.qty || 0) * (i.unit_price || 0);
-                const stdPct = parseFloat(String(i.standard_discount_percentage ?? "0")) || 0;
-                const specPct = parseFloat(String(i.special_discount_percentage ?? "0")) || 0;
-                const taxPct = parseFloat(String(i.tax_percentage ?? "0")) || 0;
-                const disc = (st * (stdPct + specPct)) / 100;
-                const afterDisc = st - disc;
-                totalDiscount += disc;
-                totalTax += (afterDisc * taxPct) / 100;
-              });
-              const grandTotal = subtotalAll - totalDiscount + totalTax;
-              return (
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Quantity <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="1"
+                    placeholder="Enter quantity"
+                    value={editItemFormData.qty}
+                    onChange={(e) => setEditItemFormData({ ...editItemFormData, qty: parseInt(e.target.value) || 1 })}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Unit Price <span className="text-danger">*</span></Form.Label>
+                  <Form.Control
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Enter unit price"
+                    value={editItemFormData.unit_price}
+                    onChange={(e) => setEditItemFormData({ ...editItemFormData, unit_price: parseFloat(e.target.value) || 0 })}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={12}>
                 <Card className="bg-light border-0">
-                  <Card.Body className="py-2">
-                    <div className="d-flex justify-content-between">
-                      <span className="text-muted">Subtotal:</span>
-                      <span>{editFormData.currency} {subtotalAll.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    {totalDiscount > 0 && (
-                      <div className="d-flex justify-content-between text-danger">
-                        <span>Total Discount:</span>
-                        <span>- {editFormData.currency} {totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    )}
-                    {totalTax > 0 && (
-                      <div className="d-flex justify-content-between">
-                        <span>Total Tax:</span>
-                        <span>{editFormData.currency} {totalTax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    )}
-                    <div className="d-flex justify-content-between fw-bold mt-1 pt-1 border-top">
-                      <span>Grand Total:</span>
-                      <span className="text-success">{editFormData.currency} {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <Card.Body>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <span className="text-muted">Sub Total:</span>
+                      <h5 className="mb-0 text-success">
+                        {editFormData.currency} {(editItemFormData.qty * editItemFormData.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </h5>
                     </div>
                   </Card.Body>
                 </Card>
-              );
-            })()}
+              </Col>
+            </Row>
           </Form>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-secondary" onClick={() => {
-            setEditShowAddRevisionModal(false);
-            setEditEditingRevisionIndex(null);
-            setEditRevisionProducts([]);
+            setEditShowAddItemModal(false);
+            setEditEditingItemIndex(null);
+            setEditItemFormData({
+              product_id: null,
+              product_service: "",
+              description: "",
+              qty: 1,
+              unit_price: 0,
+            });
           }}>
             Cancel
           </Button>
-          <Button
-            variant="primary"
-            disabled={editRevisionProducts.length === 0}
-            onClick={async () => {
-              if (!editingDealId || editRevisionProducts.length === 0) return;
-              try {
-                const payload = {
-                  deal_id: editingDealId,
-                  estimation_chart: editRevisionProducts.map((item) => ({
-                    product_id: item.product_id,
-                    product_service: item.product_service,
-                    description: item.description || "",
-                    qty: item.qty,
-                    unit_price: item.unit_price,
-                    original_currency: item.original_currency || editFormData.currency,
-                    original_price: item.original_price ?? item.unit_price,
-                    tax_percentage: parseFloat(String(item.tax_percentage ?? "0")),
-                    standard_discount_percentage: parseFloat(String(item.standard_discount_percentage ?? "0")),
-                    special_discount_percentage: parseFloat(String(item.special_discount_percentage ?? "0")),
-                  })),
-                  standard_discount_percentage: parseFloat(editRevisionFormData.standard_discount_percentage || "0"),
-                  special_discount_percentage: parseFloat(editRevisionFormData.special_discount_percentage || "0"),
-                  tax_percentage: parseFloat(editRevisionFormData.tax_percentage || "0"),
-                  currency: editFormData.currency,
-                };
-                await createEstimate(payload, false);
-                let netValue = 0;
-                editRevisionProducts.forEach((i) => {
-                  const st = (i.qty || 0) * (i.unit_price || 0);
-                  const stdPct = parseFloat(String(i.standard_discount_percentage ?? "0")) || 0;
-                  const specPct = parseFloat(String(i.special_discount_percentage ?? "0")) || 0;
-                  const taxPct = parseFloat(String(i.tax_percentage ?? "0")) || 0;
-                  const disc = (st * (stdPct + specPct)) / 100;
-                  const afterDisc = st - disc;
-                  netValue += afterDisc + (afterDisc * taxPct) / 100;
-                });
-                const subtotal = editRevisionProducts.reduce((s, i) => s + (i.qty || 0) * (i.unit_price || 0), 0);
-                const newEstimate = {
-                  id: Date.now(),
-                  estimation_chart: editRevisionProducts,
-                  grand_total: subtotal,
-                  net_value: netValue,
-                  tax_percentage: editRevisionFormData.tax_percentage,
-                  standard_discount_percentage: editRevisionFormData.standard_discount_percentage,
-                  special_discount_percentage: editRevisionFormData.special_discount_percentage,
-                  currency: editFormData.currency,
-                  created_at: new Date().toISOString(),
-                  version: `v${editEstimates.length + 1}.0`,
-                };
-                if (editEditingRevisionIndex !== null) {
-                  const updated = [...editEstimates];
-                  updated[editEditingRevisionIndex] = { ...updated[editEditingRevisionIndex], ...newEstimate };
-                  setEditEstimates(updated);
-                } else {
-                  setEditEstimates([newEstimate, ...editEstimates]);
-                }
-                toast.success(editEditingRevisionIndex !== null ? "Revision updated!" : "Revision added!");
-                setEditShowAddRevisionModal(false);
-                setEditEditingRevisionIndex(null);
-                setEditRevisionProducts([]);
-              } catch (err: any) {
-                toast.error(err?.message || "Failed to save revision");
+          <Button 
+            variant="primary" 
+            disabled={!editItemFormData.product_service || editItemFormData.qty < 1 || editItemFormData.unit_price <= 0}
+            onClick={() => {
+              const newItem = {
+                product_id: editItemFormData.product_id || Date.now(),
+                product_service: editItemFormData.product_service,
+                description: editItemFormData.description,
+                qty: editItemFormData.qty,
+                unit_price: editItemFormData.unit_price,
+                original_currency: editFormData.currency,
+                original_price: editItemFormData.unit_price,
+              };
+
+              if (editEditingItemIndex !== null) {
+                const updated = [...editEstimationItems];
+                updated[editEditingItemIndex] = newItem;
+                setEditEstimationItems(updated);
+              } else {
+                setEditEstimationItems([...editEstimationItems, newItem]);
               }
+
+              setEditShowAddItemModal(false);
+              setEditEditingItemIndex(null);
+              setEditItemFormData({
+                product_id: null,
+                product_service: "",
+                description: "",
+                qty: 1,
+                unit_price: 0,
+              });
             }}
           >
-            {editEditingRevisionIndex !== null ? 'Update Revision' : 'Save Revision'}
+            {editEditingItemIndex !== null ? 'Update Item' : 'Add Item'}
           </Button>
         </Modal.Footer>
       </Modal>
 
-     {/* Convert to Order Modal */}
-{dealToConvert && (
-  <ConvertToOrderModal
-    show={showConvertToOrderModal}
-    onHide={() => {
-      setShowConvertToOrderModal(false);
-      setDealToConvert(null);
-    }}
-    dealId={dealToConvert}
-    onSuccess={() => {
-      // Optionally refresh deals list or show success message
-      toast.success("Order created successfully!");
-      setRefreshKey((prev) => prev + 1);
-    }}
-  />
-)}
+      {/* Revision History Modal */}
+      <Modal 
+        show={editShowRevisionHistoryModal} 
+        onHide={() => setEditShowRevisionHistoryModal(false)} 
+        size="lg" 
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <History size={20} className="me-2" />
+            Revision History
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {editEstimates.length > 0 ? (
+            <>
+              <div className="table-responsive">
+                <Table hover>
+                  <thead className="bg-light">
+                    <tr>
+                      <th>Version</th>
+                      <th>Created</th>
+                      <th>Grand Total</th>
+                      <th>Net Value</th>
+                      <th>Items</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editEstimates.map((estimate: any, index: number) => {
+                      const grandTotal = parseFloat(estimate.grand_total || "0");
+                      const netValue = parseFloat(estimate.net_value || "0");
+                      const itemCount = estimate.estimation_chart?.length || 0;
+                      
+                      return (
+                        <tr key={estimate.id || index}>
+                          <td>
+                            <Badge bg="secondary">
+                              {estimate.version || `v${editEstimates.length - index}.0`}
+                            </Badge>
+                          </td>
+                          <td>
+                            <div className="d-flex align-items-center">
+                              <Calendar size={14} className="me-2 text-muted" />
+                              {new Date(estimate.created_at).toLocaleString()}
+                            </div>
+                          </td>
+                          <td className="fw-bold text-success">
+                            {grandTotal.toLocaleString()} {estimate.currency || editFormData.currency}
+                          </td>
+                          <td>
+                            {netValue.toLocaleString()} {estimate.currency || editFormData.currency}
+                          </td>
+                          <td>
+                            <Badge bg="secondary">{itemCount} items</Badge>
+                          </td>
+                          <td>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-1 text-info"
+                              title="Load Version"
+                              onClick={() => {
+                                if (estimate.estimation_chart && estimate.estimation_chart.length > 0) {
+                                  setEditEstimationItems(estimate.estimation_chart.map((item: any) => ({
+                                    product_id: item.product_id || 0,
+                                    product_service: item.product_service || "",
+                                    description: item.description || "",
+                                    qty: item.qty || 1,
+                                    unit_price: item.unit_price || 0,
+                                    original_currency: item.original_currency || estimate.currency || editFormData.currency,
+                                    original_price: item.original_price || item.unit_price || 0,
+                                  })));
+                                  
+                                  if (estimate.tax_percentage) {
+                                    setEditFormData(prev => ({ ...prev, tax_percentage: estimate.tax_percentage.toString() }));
+                                  }
+                                  if (estimate.standard_discount_percentage) {
+                                    setEditFormData(prev => ({ ...prev, standard_discount_percentage: estimate.standard_discount_percentage.toString() }));
+                                  }
+                                  if (estimate.special_discount_percentage) {
+                                    setEditFormData(prev => ({ ...prev, special_discount_percentage: estimate.special_discount_percentage.toString() }));
+                                  }
+                                  
+                                  setEditShowRevisionHistoryModal(false);
+                                  toast.success(`${estimate.version || `v${editEstimates.length - index}.0`} has been loaded successfully!`);
+                                } else {
+                                  toast.error("This revision has no items to load");
+                                }
+                              }}
+                            >
+                              <RefreshCw size={14} />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Table>
+              </div>
+              
+              <Card className="border-0 bg-light mt-3">
+                <Card.Body>
+                  <Row>
+                    <Col md={6}>
+                      <small className="text-muted">Total Revisions</small>
+                      <div className="fw-bold">{editEstimates.length}</div>
+                    </Col>
+                    <Col md={6}>
+                      <small className="text-muted">Latest Update</small>
+                      <div className="fw-bold">
+                        {editEstimates.length > 0 ? new Date(editEstimates[0].created_at).toLocaleString() : 'N/A'}
+                      </div>
+                    </Col>
+                  </Row>
+                </Card.Body>
+              </Card>
+            </>
+          ) : (
+            <div className="text-center text-muted p-5">
+              <History size={48} className="mb-3 text-muted" />
+              <p className="mb-0">No revision history available</p>
+              <small>Revisions will appear here when estimates are created</small>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setEditShowRevisionHistoryModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
     </React.Fragment>
   );

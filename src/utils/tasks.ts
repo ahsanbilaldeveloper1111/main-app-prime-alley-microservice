@@ -1003,3 +1003,75 @@ export const deleteLabel = async (labelId: string | number) => {
     throw error;
   }
 };
+
+
+
+// ==================== Task Documents API ====================
+
+/**
+ * Get documents for a task
+ */
+export const getTaskDocuments = async (taskId: string | number) => {
+  try {
+    const response = await axiosInstance.get(`${prefix}/tasks/${taskId}/documents`);
+    if (response?.data) {
+      const responseData = response.data;
+      if (responseData.success === false) {
+        toast.error(responseData.message || 'Failed to fetch task documents');
+        return null;
+      }
+      return responseData.data ?? responseData;
+    }
+    return null;
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to fetch task documents');
+    throw error;
+  }
+};
+
+/**
+ * Upload document(s) for a task
+ */
+export const postTaskDocuments = async (taskId: string | number, data: FormData) => {
+  try {
+    const response = await axiosInstance.post(`${prefix}/tasks/${taskId}/documents`, data);
+    return validateResponse(response, 'Failed to upload task document', 'Document uploaded successfully');
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to upload task document');
+    throw error;
+  }
+};
+
+/**
+ * Delete a task document
+ */
+export const deleteTaskDocument = async (taskId: string | number, documentId: string | number) => {
+  try {
+    const response = await axiosInstance.delete(`${prefix}/tasks/${taskId}/documents/${documentId}`);
+    return validateResponse(response, 'Failed to delete task document', 'Document deleted successfully', false);
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to delete task document');
+    throw error;
+  }
+};
+
+/**
+ * Download a task document
+ */
+export const getTaskDocumentDownload = async (taskId: string | number, documentId: string | number) => {
+  try {
+    const response = await axiosInstance.get(`${prefix}/tasks/${taskId}/documents/${documentId}/download`, {
+      responseType: 'blob',
+    });
+    return response?.data ?? null;
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to download task document');
+    throw error;
+  }
+};
+
+

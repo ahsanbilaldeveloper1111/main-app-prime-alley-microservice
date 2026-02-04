@@ -133,7 +133,7 @@ import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import FormModal from "../../partial/FormModal";
+import FormModal from "@pages/partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import moment from "moment";
@@ -437,30 +437,6 @@ const FilterBar: React.FC<FilterBarProps> = ({
 const CrmOrders = () => {
   const { data: session } = useSession();
   const router = useRouter();
-  const [isOrderEditModeAccount, setIsOrderEditModeAccount] = useState(false);
-  const [isOrderEditModeDelivery, setIsOrderEditModeDelivery] = useState(false);
-
-  const [isAccountRole, setIsAccountRole] = useState(true);
-  // useEffect(() => {
-  //   if ((session?.user as { role?: string })?.role === "account") {
-  //     setIsAccountRole(true);
-  //   } else {
-  //     setIsAccountRole(false);
-  //   }
-  // }, [(session?.user as { role?: string })?.role]);
-
-  const [isDeliveryRole, setIsDeliveryRole] = useState(true);
-  // useEffect(() => {
-  //   if ((session?.user as { role?: string })?.role === "delivery") {
-  //     setIsDeliveryRole(true);
-  //   } else {
-  //     setIsDeliveryRole(false);
-  //   }
-  // }, [(session?.user as { role?: string })?.role]);
-
-  // Which edit mode to show: root (full), account, or delivery — three separate modals
-
-  
 
   const [stages, setStages] = useState<any[]>([]);
   const [lostReasons, setLostReasons] = useState<any[]>([]);
@@ -1782,33 +1758,15 @@ const CrmOrders = () => {
           variant: 'link' as const
         },
       
-        ...(session?.user?.is_admin==="1" || isAccountRole
+        ...(session?.user?.permissions?.includes('edit-crm-orders')
           ? [{
-              label: 'Edit as Account',
+              label: 'Edit',
               icon: <Edit size={16} />,
               onClick: (row: any) => {
                 setEditingOrderId(row.rawData?.id || row.id);
-                setIsOrderEditModeAccount(true);
-                setIsOrderEditModeDelivery(false);
                 setShowEditModal(true);
               },
               variant: 'link' as const
-            }]
-          : []),
-
-
-          ...(session?.user?.is_admin==="1" || isDeliveryRole
-          ? [{
-              label: 'Edit as Delivery',
-              icon: <Edit size={16} />,
-              onClick: (row: any) => {
-                setEditingOrderId(row.rawData?.id || row.id);
-                setIsOrderEditModeDelivery(true);
-                setIsOrderEditModeAccount(false);
-                setShowEditModal(true);
-              },
-              variant: 'link' as const,
-              className: 'text-warning'
             }]
           : []),
       
@@ -1834,6 +1792,7 @@ const CrmOrders = () => {
             }]
           : []),
       
+
         // ✅ ALWAYS SHOW MORE ACTIONS
         {
           label: 'More Actions',
@@ -1897,7 +1856,7 @@ const CrmOrders = () => {
       />
       <BreadcrumbItem
         mainTitle="CRM"
-        mainLink="/crm/dashboard"
+        mainLink="/accounting/customer/dashboard"
         subTitle="Orders"
       />
       <div>
@@ -1908,11 +1867,11 @@ const CrmOrders = () => {
     <ol className="breadcrumb mb-0">
       <li className="breadcrumb-item">
         <a href="/dashboard" className="text-decoration-none">
-          CRM
+          Accounts
         </a>
       </li>
       <li className="breadcrumb-item active fw-bold" aria-current="page">
-        Orders
+        Order Management
       </li>
     </ol>
   </nav>
@@ -5603,11 +5562,9 @@ const CrmOrders = () => {
                 setEditingOrderId(null);
               }}
               orderId={editingOrderId}
-              isDeliveryRole={isOrderEditModeDelivery}
-              isAccountRole={isOrderEditModeAccount}
               onSuccess={() => {
                 setRefreshKey((prev) => prev + 1);
-                //toast.success("Order updated successfully!");
+                toast.success("Order updated successfully!");
               }}
             />
       )}

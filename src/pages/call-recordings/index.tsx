@@ -3,7 +3,7 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
 import { io, Socket } from "socket.io-client";
 import { Col, Button, Card, Modal, Row, Form } from 'react-bootstrap';
-import { BarChart3 } from 'lucide-react';
+
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import type { NextPage } from 'next';
@@ -13,7 +13,7 @@ import dynamic from 'next/dynamic';
 // Components
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
+import GenericTable, { TableAction, TableColumn } from '@components/GenericTable';
 import CallRecordingsFilters from '@components/filters/CallRecordingFilter';
 import BarFilters from '@components/BarFilters';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
@@ -21,13 +21,13 @@ import AnimatedNumber from '@components/AnimatedNumber';
 import StatCard from '@components/StatCard';
 import ChartBar from '@components/ChartBar';
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import { Column } from '@components/CustomDataTable';
-import CustomDataTable from '@components/CustomDataTable';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 import EmptyState from '@components/EmptyState';
 import { ModuleSlug } from '@utils/Helper';
 import SelectBox from '@components/SelectBox';
-
+import { BarChart3, Hash, Phone, PhoneIncoming, PhoneOutgoing, Filter, Calendar } from 'lucide-react';
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import GenericFilterSidebar, { FilterFieldType } from '@components/GenericFilterSidebar';
 
 import '@assets/scss/common.scss';
 
@@ -86,6 +86,20 @@ interface RecordingUpdate {
   };
 }
 
+/** Row shape from call-recordings API (dataList items) */
+interface RecordingRow {
+  Id?: string;
+  DateTime?: string;
+  AgentExtension?: string;
+  Username?: string;
+  Department?: string;
+  RemotePartyNumber?: string;
+  Direction?: string;
+  Duration?: string | number;
+  imagicle?: string;
+  [key: string]: any;
+}
+
 const SOCKET_URL = process.env.NEXT_PUBLIC_CALL_LOGS_SOCKET_URL;
 
 const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => React.ReactNode } = () => {
@@ -96,10 +110,17 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
   const [showPageLoader, setShowPageLoader] = useState(false);
 
-  const [showDateRange, setShowDateRange] = useState(false);
-  const [startDateTime, setStartDateTime] = useState<string>('');
-  const [endDateTime, setEndDateTime] = useState<string>('');
+  // const [showDateRange, setShowDateRange] = useState(false);
+  // const [startDateTime, setStartDateTime] = useState<string>('');
+  // const [endDateTime, setEndDateTime] = useState<string>('');
 
+  const [showDateRange, setShowDateRange] = useState(true);
+  const [startDateTime, setStartDateTime] = useState<string>(() =>
+    moment().clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z'
+  );
+  const [endDateTime, setEndDateTime] = useState<string>(() =>
+    moment().clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z'
+  );
   // Initialize filters with default values immediately to prevent first API call without dates
   const getDefaultFilters = () => {
     const now = moment();
@@ -127,7 +148,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>(defaultFilters.applied); // Filters that trigger API calls
   const [searchValue, setSearchValue] = useState<string>('');
   const [showAnalytics, setShowAnalytics] = useState<boolean>(false);
-  
+  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   // Refs to prevent duplicate API calls
   const appliedFiltersRef = useRef<Record<string, any>>(defaultFilters.applied);
   const isFetchingRef = useRef(false);
@@ -158,13 +179,20 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const [currentData, setCurrentData] = useState<any[]>([]);
   const [isDataModified, setIsDataModified] = useState(false);
   const modifiedDataRef = useRef<any[]>([]);
-  const [tableData, setTableData] = useState<any[]>([]);
-  const [paginationInfo, setPaginationInfo] = useState<any>({
+  const [tableData, setTableData] = useState<RecordingRow[]>([]);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [paginationInfo, setPaginationInfo] = useState<{
+    totalRows: number;
+    totalPages: number;
+    currentPage: number;
+    perPage: number;
+  }>({
     totalRows: 0,
     totalPages: 0,
     currentPage: 1,
     perPage: 15,
   });
+  const rowsPerPageRef = useRef(15);
   const [socketExtensions, setSocketExtensions] = useState<number[]>([]);
 
   const [summary, setSummary] = useState<Summary>({
@@ -173,6 +201,58 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     inbound: 0,
     outbound: 0
   });
+
+  // Stats cards data for StatsCards component
+  const statsCardsData = [
+    {
+      title: 'Extensions',
+      value: summary?.extensions || 0,
+      icon: Hash,
+      iconColor: '#8B5CF6',
+      iconBgColor: '#EDE9FE',
+      subtitle: 'Extensions in the system',
+    },
+    {
+      title: 'Remote Numbers',
+      value: summary?.numbers || 0,
+      icon: Phone,
+      iconColor: '#3B82F6',
+      iconBgColor: '#DBEAFE',
+      subtitle: 'Remote numbers in the system',
+    },
+    {
+      title: 'Inbound',
+      value: summary?.inbound || 0,
+      icon: PhoneIncoming,
+      iconColor: '#10B981',
+      iconBgColor: '#D1FAE5',
+      subtitle: 'Inbound calls in the system',
+    },
+    {
+      title: 'Outbound',
+      value: summary?.outbound || 0,
+      icon: PhoneOutgoing,
+      iconColor: '#0EA5E9',
+      iconBgColor: '#E0F2FE',
+      subtitle: 'Outbound calls in the system',
+    },
+    {
+      title: 'Inbound',
+      value: summary?.inbound || 0,
+      icon: PhoneIncoming,
+      iconColor: '#10B981',
+      iconBgColor: '#D1FAE5',
+      subtitle: 'Inbound calls in the system',
+    },
+    {
+      title: 'Outbound',
+      value: summary?.outbound || 0,
+      icon: PhoneOutgoing,
+      iconColor: '#0EA5E9',
+      iconBgColor: '#E0F2FE',
+      subtitle: 'Outbound calls in the system',
+    }
+  ];
 
   // Create cards data for PageSummaryGrid
   const summaryCards: SummaryCard[] = [
@@ -268,139 +348,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     },
   });
 
-  // Table columns configuration
-  const columns = [
-    {
-      key: 'DateTime',
-      name: 'Date',
-      selector: (row: any) => row.DateTime,
-      sortable: true,
-      cell: (props: any) => {
-        return (
-          <div>
-            {convertDateTimeWithOffsetToLocal(props.DateTime, undefined, GlobalDateFormat)}
-          </div>
-        )
-      }
-    },
-    {
-      key: 'DateTime',
-      name: 'Time',
-      selector: (row: any) => row.DateTime,
-      sortable: true,
-      cell: (props: any) => {
-        return (
-          <div>
-            {convertDateTimeWithOffsetToLocal(props.DateTime, undefined, GlobalTimeFormat)}
-          </div>
-        )
-      }
-    },
-    {
-      key: 'AgentExtension',
-      name: 'Extension',
-      selector: (row: any) => row.AgentExtension,
-      sortable: true
-    },
-    {
-      key: 'Username',
-      name: 'Username',
-      selector: (row: any) => row.Username,
-      sortable: true
-    },
-    {
-      key: 'Department',
-      name: 'Department',
-      selector: (row: any) => row.Department,
-      sortable: true,
-      cell: (props: any) => {
-        return props.Department || '---';
-      }
-    },
-    {
-      key: 'RemotePartyNumber',
-      name: 'Remote Number',
-      selector: (row: any) => row.RemotePartyNumber,
-      sortable: true
-    },
-    {
-      key: 'Direction',
-      name: 'Direction',
-      selector: (row: any) => row.Direction,
-      sortable: true
-    },
-    {
-      key: 'Duration',
-      name: 'Duration',
-      selector: (row: any) => row.Duration,
-      sortable: true,
-      cell: (props: any) => {
-        const duration = parseInt(props.Duration.toString())/10000000 || 0;
-        return (
-          <div>
-            {formatDuration(duration)}
-          </div>
-        );
-      }
-    },
-    {
-      key: 'Action',
-      name: 'Action',
-      selector: (row: any) => row.Action,
-      sortable: true,
-      cell: (props: any) => {
-        const isDownloading = downloadingRecordings.has(props.Id);
-        const progress = downloadProgress[props.Id] || 0;
-        
-        return (
-          <div className='d-flex gap-3 action-box'>
-            <i
-              data-tooltip-id="my-tooltip"
-              data-tooltip-content="Play"
-              className='ph-duotone ph-play text-info'
-              style={{ fontSize: '1rem', cursor: 'pointer' }}
-              onClick={() => handlePlayRecording(props)}
-            />
-            <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-              {isDownloading ? (
-                <CircularProgressCircle 
-                  progress={progress}
-                  size="small" 
-                  color="#28a745"
-                  backgroundColor="#e9ecef"
-                  textColor="#495057"
-                  showPercentage={false}
-                  className="circular-progress-inline"
-                />
-              ) : (
-                <i
-                  data-tooltip-id="my-tooltip"
-                  data-tooltip-content="Download"
-                  className='ph-duotone ph-arrow-line-down text-info'
-                  style={{ fontSize: '1rem', cursor: 'pointer' }}
-                  onClick={() => {
-                    handleDownload(props);
-                  }}
-                />
-              )}
-            </div>
-            {session?.user?.is_admin === "1" && (
-            <i
-              data-tooltip-id="my-tooltip"
-              data-tooltip-content="Call Analysis"
-              className='ph-duotone ph-chart-bar text-info'
-              style={{ fontSize: '1rem' }}
-              onClick={() => {
-                handleAnalysis(props);
-              }}
-            />
-            )}
-          </div>
-        )
-      }
-    }
-  ];
-
   // Functions
   const addNewRecord = () => {
     const newRecord = {
@@ -463,34 +410,53 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     isFetchingRef.current = true;
     lastFetchTimeRef.current = now;
     lastFetchParamsRef.current = paramsKey;
-    
+
     setShowPageLoader(true);
+    setTableLoading(true);
     try {
       const response = await ListCallLogs(
         { page, perPage, search, filters: appliedFiltersRef.current, reportType: 'recordings', moduleSlug: ModuleSlug.CALL_RECORDINGS },
         'call-logs/recordings'
       );
-    
 
     if (response?.summary) {
       setSummary(response.summary)
     }
 
-    // Store the original data from API
-    if (response?.dataList) {
-      setCurrentData(response.dataList);
-      setTableData(response.dataList);
-      modifiedDataRef.current = response.dataList;
-      setIsDataModified(false);
+    // Handle various API response structures for data (flat, nested, DataTables style)
+    const rawData = response?.data;
+    let rowsArray: RecordingRow[] = [];
+    if (Array.isArray(rawData)) {
+      rowsArray = rawData;
+    } else if (Array.isArray(rawData?.data)) {
+      rowsArray = rawData.data;
+    } else if (Array.isArray(response?.dataList)) {
+      rowsArray = response.dataList;
     }
 
-    // Update pagination info
+    setCurrentData(rowsArray);
+    setTableData(rowsArray);
+    modifiedDataRef.current = rowsArray;
+    setIsDataModified(false);
+
+    // Update pagination info - handle various API structures
     if (response) {
+      const paginationData = response?.data?.pagination ?? response?.pagination ?? response;
+      const total =
+        response?.recordsTotal ??
+        response?.total ??
+        rawData?.recordsTotal ??
+        rawData?.total ??
+        paginationData?.total ??
+        (rowsArray.length > 0 ? rowsArray.length : 0);
+      const currentPage = response?.current_page ?? paginationData?.current_page ?? page;
+      const perPageVal = response?.per_page ?? paginationData?.per_page ?? perPage;
+      rowsPerPageRef.current = perPageVal;
       setPaginationInfo({
-        totalRows: response.total || 0,
-        totalPages: response.last_page || 0,
-        currentPage: response.current_page || 1,
-        perPage: response.per_page || 15,
+        totalRows: Number(total) || 0,
+        totalPages: (response?.last_page ?? paginationData?.last_page ?? Math.ceil(Number(total) / perPageVal)) || 1,
+        currentPage,
+        perPage: perPageVal,
       });
     }
 
@@ -624,6 +590,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       return response;
     } finally {
       setShowPageLoader(false);
+      setTableLoading(false);
       isFetchingRef.current = false;
     }
   }, []);
@@ -951,11 +918,103 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     }
   };
 
-  // Initial data load is handled by GenericListPage component automatically
-  // No need for manual useEffect here to avoid double API calls
+  rowsPerPageRef.current = paginationInfo.perPage;
 
+  // Initial load and refetch when filters/refresh change
+  useEffect(() => {
+    setPaginationInfo((prev) => ({ ...prev, currentPage: 1 }));
+    fetchCallLogsOriginal(1, rowsPerPageRef.current, '');
+  }, [refreshKey, fetchCallLogsOriginal]);
 
+  // Table columns for GenericTable (defined after handlers so they are in scope)
+  const tableColumns: TableColumn<RecordingRow>[] = [
+    {
+      key: 'DateTime',
+      label: 'Date',
+      sortable: true,
+      render: (row) => (
+        <div>{convertDateTimeWithOffsetToLocal(row.DateTime ?? '', undefined, GlobalDateFormat)}</div>
+      ),
+    },
+    {
+      key: 'Time',
+      label: 'Time',
+      sortable: true,
+      render: (row) => (
+        <div>{convertDateTimeWithOffsetToLocal(row.DateTime ?? '', undefined, GlobalTimeFormat)}</div>
+      ),
+    },
+    { key: 'AgentExtension', label: 'Extension', sortable: true },
+    { key: 'Username', label: 'Username', sortable: true },
+    {
+      key: 'Department',
+      label: 'Department',
+      sortable: true,
+      render: (row) => row.Department || '---',
+    },
+    { key: 'RemotePartyNumber', label: 'Remote Number', sortable: true },
+    { key: 'Direction', label: 'Direction', sortable: true },
+    {
+      key: 'Duration',
+      label: 'Duration',
+      sortable: true,
+      render: (row) => {
+        const duration = parseInt(String(row.Duration), 10) / 10000000 || 0;
+        return <div>{formatDuration(duration)}</div>;
+      },
+    },
+  ];
 
+  const recordingActions: TableAction<RecordingRow>[] = [
+    {
+      label: 'Actions',
+      render: (row) => {
+        const isDownloading = downloadingRecordings.has(row.Id ?? '');
+        const progress = downloadProgress[row.Id ?? ''] || 0;
+        return (
+          <div className="d-flex gap-3 action-box">
+            <i
+              data-tooltip-id="my-tooltip"
+              data-tooltip-content="Play"
+              className="ph-duotone ph-play text-info"
+              style={{ fontSize: '1rem', cursor: 'pointer' }}
+              onClick={() => handlePlayRecording(row)}
+            />
+            <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+              {isDownloading ? (
+                <CircularProgressCircle
+                  progress={progress}
+                  size="small"
+                  color="#28a745"
+                  backgroundColor="#e9ecef"
+                  textColor="#495057"
+                  showPercentage={false}
+                  className="circular-progress-inline"
+                />
+              ) : (
+                <i
+                  data-tooltip-id="my-tooltip"
+                  data-tooltip-content="Download"
+                  className="ph-duotone ph-arrow-line-down text-info"
+                  style={{ fontSize: '1rem', cursor: 'pointer' }}
+                  onClick={() => handleDownload(row)}
+                />
+              )}
+            </div>
+            {session?.user?.is_admin === '1' && (
+              <i
+                data-tooltip-id="my-tooltip"
+                data-tooltip-content="Call Analysis"
+                className="ph-duotone ph-chart-bar text-info"
+                style={{ fontSize: '1rem', cursor: 'pointer' }}
+                onClick={() => handleAnalysis(row)}
+              />
+            )}
+          </div>
+        );
+      },
+    },
+  ];
 
   // Socket connection effect
   // useEffect(() => {
@@ -1065,22 +1124,27 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
                     <Col md={8} className="d-flex justify-content-end">
                       
-                    <div className="action-buttons">
+                    <div className="action-buttons d-flex align-items-center gap-2">
                       <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        onClick={() => setShowFiltersSidebar(true)}
+                        className="d-flex align-items-center"
+                        style={{ fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', padding: '0.5rem 1rem' }}
+                      >
+                        <Filter size={16} className="me-1" />
+                        Filters
+                      </Button>
+                      {/* <Button
                         variant={showAnalytics ? "primary" : "outline-secondary"}
                         size="sm"
                         onClick={() => setShowAnalytics(!showAnalytics)}
                         className="d-flex align-items-center"
-                        style={{ 
-                          fontSize: '0.875rem',
-                          fontWeight: 500,
-                          whiteSpace: 'nowrap',
-                          padding: '0.5rem 1rem'
-                        }}
+                        style={{ fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', padding: '0.5rem 1rem' }}
                       >
                         <BarChart3 size={16} className="me-1" />
                         <span>{showAnalytics ? 'Hide Analytics' : 'Show Analytics'}</span>
-                      </Button>
+                      </Button> */}
                     </div>
 
 
@@ -1095,8 +1159,50 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
     
 
-      <PageSummaryGrid cards={summaryCards} />
+      {/* <PageSummaryGrid cards={summaryCards} /> */}
+      <div className="mb-4">
+        <StatsCards data={statsCardsData} gridMinWidth="180px" />
+      </div>
 
+      {showDateRange && startDateTime && endDateTime && moment.utc(startDateTime).isValid() && moment.utc(endDateTime).isValid() && (
+        <div
+          className="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
+          style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '10px',
+            padding: '10px 12px',
+          }}
+        >
+          <div className="d-flex align-items-center gap-2">
+            <span
+              className="d-inline-flex align-items-center justify-content-center"
+              style={{
+                width: '30px',
+                height: '30px',
+                borderRadius: '8px',
+                background: '#eef2ff',
+                color: '#4f46e5',
+              }}
+            >
+              <Calendar size={16} />
+            </span>
+            <div className="d-flex align-items-center gap-2">
+              <span className="text-muted" style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '0.3px' }}>
+                Selected Date Range
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
+                {formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)} — {formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}
+              </span>
+            </div>
+          </div>
+          {/* <div className="d-flex align-items-center gap-2">
+            <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span>
+            <span className="text-muted" style={{ fontSize: '12px' }}>to</span>
+            <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+          </div> */}
+        </div>
+      )}
       {/* Charts */}
       {showAnalytics && (
       <Row className="mb-3">
@@ -1165,221 +1271,157 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
       
 
-      <BarFilters
-        searchValue={searchValue}
-        onSearchChange={(value) => setSearchValue(value)}
-        onSearch={() => {
-          handleFiltersChange({ ...currentFilters, search: searchValue });
-        }}
-        leftContent={
-          <>
-          {showDateRange && (
-                                      <>
-                                      <p className="mb-0">
-                                      Date Range : <span className="status-badge primary">
-                                        {formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}
-                                      </span> to <span className="status-badge primary">
-                                        {formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}
-                                        </span>
-                    </p>
-                  </>
-                )}
-              </>
-            }
-        searchPlaceholder="Search call recordings..."
-        showSearch={false}
-        filters={currentFilters}
-        onSubmit={() => {
-          handleFiltersChange(currentFilters);
-        }}
-        onReset={() => {
-          // Preserve current date filters, clear all other filters
-          const resetCurrentFilters: Record<string, any> = {
-            start_date: (currentFilters as any)?.start_date || defaultFilters.current.start_date,
-            end_date: (currentFilters as any)?.end_date || defaultFilters.current.end_date,
-          };
-          const resetAppliedFilters: Record<string, any> = {
-            start_date: (appliedFilters as any)?.start_date || defaultFilters.applied.start_date,
-            end_date: (appliedFilters as any)?.end_date || defaultFilters.applied.end_date,
-          };
-          setCurrentFilters(resetCurrentFilters);
-          setAppliedFilters(resetAppliedFilters);
-          appliedFiltersRef.current = resetAppliedFilters;
-          handleFiltersChange(resetCurrentFilters);
-        }}
-        filterContent={
-          <>
-            {/* Call Direction */}
-            <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Call Direction</Form.Label>
-                  <SelectBox
-                    isSearchable={false}
-                    value={(currentFilters as any)?.call_direction || null}
-                    onChange={(value) => {
-                      setCurrentFilters({ ...currentFilters, call_direction: value as string || '' });
-                    }}
-                    options={[
-                      { value: 'OUTGOING', label: 'Outgoing' },
-                      { value: 'INCOMING', label: 'Incoming' },
-                      { value: 'Both', label: 'Both' }
-                    ]}
-                    placeholder="Select call direction"
-                  />
-                </Form.Group>
-              </Col>
-
-              {/* Extension */}
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Extension</Form.Label>
-                  <SelectBox
-                    isMulti
-                    isSearchable={true}
-                    isDisabled={hierarchyLoading}
-                    value={(currentFilters as any)?.extension_number?.length > 0 ? (currentFilters as any)?.extension_number : null}
-                    onChange={(value) => {
-                      setCurrentFilters({ ...currentFilters, extension_number: value ? (value as string[]) : [] });
-                    }}
-                    options={(hierarchyDataExtensions as any)?.map((ext: any) => ({
-                      value: ext.id,
-                      label: ext.name
-                    })) || []}
-                    placeholder="Select extensions"
-                  />
-                </Form.Group>
-              </Col>
-
-              {/* Departments */}
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Departments</Form.Label>
-                  <SelectBox
-                    isMulti
-                    isSearchable={true}
-                    isDisabled={hierarchyLoading}
-                    value={(currentFilters as any)?.department?.length > 0 ? (currentFilters as any)?.department : null}
-                    onChange={(value) => {
-                      setCurrentFilters({ ...currentFilters, department: value ? (value as string[]) : [] });
-                    }}
-                    options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
-                      value: dept.id,
-                      label: dept.name
-                    })) || []}
-                    placeholder="Select departments"
-                  />
-                </Form.Group>
-              </Col>
-
-              {/* Users */}
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Username</Form.Label>
-                  <SelectBox
-                    isSearchable={true}
-                    isDisabled={hierarchyLoading}
-                    value={(currentFilters as any)?.username || null}
-                    onChange={(value) => {
-                      setCurrentFilters({ ...currentFilters, username: value as string || '' });
-                    }}
-                    options={(hierarchyDataUsers as any)?.map((user: any) => ({
-                      value: user.id,
-                      label: user.name
-                    })) || []}
-                    placeholder="Select username"
-                  />
-                </Form.Group>
-              </Col>
-
-              {/* Remote Party Number */}
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Remote Party Numbers</Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="Enter remote party numbers (comma separated)"
-                    value={((currentFilters as any)?.remote_party_number || []).join(', ')}
-                    onChange={(e) => {
-                      const values = e.target.value.split(',').map(v => v.trim()).filter(Boolean);
-                      setCurrentFilters({ ...currentFilters, remote_party_number: values });
-                    }}
-                  />
-                </Form.Group>
-            </Col>
-
-            {/* Date Range */}
-            <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Start Date & Time</Form.Label>
-                  <Form.Control
-                    type="datetime-local"
-                    value={(currentFilters as any)?.start_date || ''}
-                    max={moment().format('YYYY-MM-DDTHH:mm')}
-                    onChange={(e) => {
-                      const datetimeValue = e.target.value;
-                      const endDate = (currentFilters as any)?.end_date || '';
-                      
-                      // If start date is greater than end date, adjust end date to start date
-                      let updatedFilters: any = {
-                        ...currentFilters,
-                        start_date: datetimeValue
-                      };
-                      
-                      if (datetimeValue && endDate && moment(datetimeValue).isAfter(moment(endDate))) {
-                        updatedFilters.end_date = datetimeValue;
-                      }
-                      
-                      setCurrentFilters(updatedFilters);
-                    }}
-                  />
-                </Form.Group>
-              </Col>
-
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label>End Date & Time</Form.Label>
-                  <Form.Control
-                    type="datetime-local"
-                    value={(currentFilters as any)?.end_date || ''}
-                    min={(currentFilters as any)?.start_date || ''}
-                    max={moment().format('YYYY-MM-DDTHH:mm')}
-                    onChange={(e) => {
-                      const datetimeValue = e.target.value;
-                      const startDate = (currentFilters as any)?.start_date || '';
-                      
-                      // If end date is less than start date, adjust start date to end date
-                      let updatedFilters: any = {
-                        ...currentFilters,
-                        end_date: datetimeValue
-                      };
-                      
-                      if (datetimeValue && startDate && moment(datetimeValue).isBefore(moment(startDate))) {
-                        updatedFilters.start_date = datetimeValue;
-                      }
-                      
-                      setCurrentFilters(updatedFilters);
-                    }}
-                  />
-                </Form.Group>
-            </Col>
-          </>
-        }
-        
-      />
+      
 
 {session?.user?.permissions?.includes('list-call-recordings') && (
-                 <GenericListPage
-                 columns={columns}
-                 fetchData={fetchCallLogs}
-                 title="Call Logs"
-                 searchPlaceholder="Search call logs..."
-                 defaultPageSize={15}
-                 filters={appliedFilters}
-                 refreshKey={refreshKey}
-                 search={false}
-                 tableStyle='table-style-2'
-             />
+                 <GenericTable<RecordingRow>
+                   data={tableData}
+                   columns={tableColumns}
+                   actions={recordingActions}
+                   actionsLabel="Action"
+                   loading={tableLoading}
+                   emptyMessage="No call recordings found."
+                   loadingMessage="Loading call recordings..."
+                   pagination={{
+                     currentPage: paginationInfo.currentPage,
+                     rowsPerPage: paginationInfo.perPage,
+                     totalRows: paginationInfo.totalRows,
+                     pageSizeOptions: [10, 15, 25, 50, 100],
+                   }}
+                   onPaginationChange={(page, rowsPerPage) => {
+                     setPaginationInfo((prev) => ({ ...prev, currentPage: page, perPage: rowsPerPage }));
+                     fetchCallLogsOriginal(page, rowsPerPage, '');
+                   }}
+                   sortable={true}
+                   hover={true}
+                   striped={false}
+                   customizableColumns={true}
+                   defaultSelectedColumns={['DateTime', 'Time', 'AgentExtension', 'Username', 'Department', 'RemotePartyNumber', 'Direction', 'Duration']}
+                   columnStorageKey="call-recordings-columns"
+                   uniqueKey="Id"
+                 />
             )}
+
+<GenericFilterSidebar
+        isOpen={showFiltersSidebar}
+        onClose={() => setShowFiltersSidebar(false)}
+        title="Filters"
+        subtitle="Filter and refine call recordings"
+        width="400px"
+        filters={[
+          {
+            id: 'call_direction',
+            label: 'Call Direction',
+            type: 'select',
+            value: (currentFilters as any)?.call_direction
+              ? { value: (currentFilters as any).call_direction, label: (currentFilters as any).call_direction === 'OUTGOING' ? 'Outgoing' : (currentFilters as any).call_direction === 'INCOMING' ? 'Incoming' : 'Both' }
+              : null,
+            onChange: (selected: any) => setCurrentFilters({ ...currentFilters, call_direction: selected?.value ?? '' }),
+            options: [
+              { value: 'OUTGOING', label: 'Outgoing' },
+              { value: 'INCOMING', label: 'Incoming' },
+              { value: 'Both', label: 'Both' },
+            ],
+            placeholder: 'Select call direction',
+            isClearable: true,
+          },
+          {
+            id: 'extension_number',
+            label: 'Extension',
+            type: 'multi-select',
+            value: ((currentFilters as any)?.extension_number || []).map((id: string) => {
+              const ext = (hierarchyDataExtensions as any)?.find((e: any) => e.id === id);
+              return ext ? { value: ext.id, label: ext.name } : { value: id, label: id };
+            }).filter((o: { value: string; label: string }) => o.value),
+            onChange: (selected: any) => setCurrentFilters({ ...currentFilters, extension_number: selected ? selected.map((s: any) => s.value) : [] }),
+            options: (hierarchyDataExtensions as any)?.map((ext: any) => ({ value: ext.id, label: ext.name })) || [],
+            placeholder: 'Select extensions',
+            isClearable: true,
+          },
+          {
+            id: 'department',
+            label: 'Departments',
+            type: 'multi-select',
+            value: ((currentFilters as any)?.department || []).map((id: string) => {
+              const dept = (hierarchyDataDepartments as any)?.find((d: any) => d.id === id);
+              return dept ? { value: dept.id, label: dept.name } : { value: id, label: id };
+            }).filter((o: { value: string; label: string }) => o.value),
+            onChange: (selected: any) => setCurrentFilters({ ...currentFilters, department: selected ? selected.map((s: any) => s.value) : [] }),
+            options: (hierarchyDataDepartments as any)?.map((d: any) => ({ value: d.id, label: d.name })) || [],
+            placeholder: 'Select departments',
+            isClearable: true,
+          },
+          {
+            id: 'username',
+            label: 'Username',
+            type: 'select',
+            value: (currentFilters as any)?.username
+              ? (() => {
+                  const uid = (currentFilters as any).username;
+                  const user = (hierarchyDataUsers as any)?.find((u: any) => u.id === uid);
+                  return user ? { value: user.id, label: user.name } : { value: uid, label: uid };
+                })()
+              : null,
+            onChange: (selected: any) => setCurrentFilters({ ...currentFilters, username: selected?.value ?? '' }),
+            options: (hierarchyDataUsers as any)?.map((u: any) => ({ value: u.id, label: u.name })) || [],
+            placeholder: 'Select username',
+            isClearable: true,
+          },
+          {
+            id: 'remote_party_number',
+            label: 'Remote Party Numbers',
+            type: 'text',
+            value: ((currentFilters as any)?.remote_party_number || []).join(', '),
+            onChange: (v: string) => {
+              const values = v.split(',').map((s) => s.trim()).filter(Boolean);
+              setCurrentFilters({ ...currentFilters, remote_party_number: values });
+            },
+            placeholder: 'Enter remote party numbers (comma separated)',
+          },
+          {
+            id: 'start_date',
+            label: 'Start Date & Time',
+            type: 'datetime' as FilterFieldType,
+            value: (currentFilters as any)?.start_date || '',
+            onChange: (v: string | null) => {
+              const datetimeValue = v || '';
+              const endDate = (currentFilters as any)?.end_date || '';
+              let next: Record<string, any> = { ...currentFilters, start_date: datetimeValue };
+              if (datetimeValue && endDate && moment(datetimeValue).isAfter(moment(endDate))) next.end_date = datetimeValue;
+              setCurrentFilters(next);
+            },
+            placeholder: 'Start',
+          },
+          {
+            id: 'end_date',
+            label: 'End Date & Time',
+            type: 'datetime' as FilterFieldType,
+            value: (currentFilters as any)?.end_date || '',
+            onChange: (v: string | null) => {
+              const datetimeValue = v || '';
+              const startDate = (currentFilters as any)?.start_date || '';
+              let next: Record<string, any> = { ...currentFilters, end_date: datetimeValue };
+              if (datetimeValue && startDate && moment(datetimeValue).isBefore(moment(startDate))) next.start_date = datetimeValue;
+              setCurrentFilters(next);
+            },
+            placeholder: 'End',
+          },
+        ]}
+        onApply={() => {
+          handleFiltersChange(currentFilters);
+          setRefreshKey((prev) => prev + 1);
+        }}
+        onReset={() => {
+          const resetCurrent: Record<string, any> = {
+            start_date: (currentFilters as any)?.start_date ?? defaultFilters.current.start_date,
+            end_date: (currentFilters as any)?.end_date ?? defaultFilters.current.end_date,
+          };
+          setCurrentFilters(resetCurrent);
+          setSearchValue('');
+          handleFiltersChange(resetCurrent);
+          setRefreshKey((prev) => prev + 1);
+        }}
+      />
 
       {/* Media Player Modal */}
       <Modal

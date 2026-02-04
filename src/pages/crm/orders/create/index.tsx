@@ -449,7 +449,7 @@ const CreateOrder = () => {
       router.push("/crm/orders");
     } catch (error: any) {
       console.error("Failed to create order:", error);
-      toast.error(error?.response?.data?.message || "Failed to create order");
+     // toast.error(error?.response?.data?.message || "Failed to create order");
     } finally {
       setLoading(false);
     }

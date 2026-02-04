@@ -79,6 +79,7 @@ const DealTemplatesPage = () => {
     field_type: "text" | "dropdown";
     options: string[];
     is_required: boolean;
+    require_approval: boolean;
     sort_order: number;
   }>>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -159,6 +160,7 @@ const DealTemplatesPage = () => {
           field_type: field.field_type,
           options: field.options || [],
           is_required: field.is_required,
+          require_approval: field?.require_approval || false,
           sort_order: field.sort_order,
         }))
       );
@@ -185,6 +187,7 @@ const DealTemplatesPage = () => {
         field_type: "text",
         options: [],
         is_required: false,
+        require_approval: false,
         sort_order: fields.length,
       },
     ]);
@@ -203,6 +206,7 @@ const DealTemplatesPage = () => {
       field_type: "text" | "dropdown";
       options: string[];
       is_required: boolean;
+      require_approval: boolean;
     }>
   ) => {
     const newFields = [...fields];
@@ -260,6 +264,7 @@ const DealTemplatesPage = () => {
         field_type: f.field_type,
         options: f.field_type === "dropdown" ? f.options : null,
         is_required: f.is_required,
+        require_approval: f.require_approval,
         sort_order: f.sort_order,
       }));
 
@@ -700,18 +705,43 @@ const DealTemplatesPage = () => {
                               </Form.Text>
                             </div>
                           )}
-                          <Form.Check
-                            type="switch"
-                            id={`field-required-${index}`}
-                            label="Required"
-                            checked={field.is_required}
-                            onChange={(e) =>
-                              handleFieldChange(index, {
-                                is_required: e.target.checked,
-                              })
-                            }
-                            className="mt-3"
-                          />
+
+                          <Row>
+                            <Col md={6}>
+                            <Form.Check
+                              type="switch"
+                              id={`field-required-${index}`}
+                              label="Required"
+                              checked={field.is_required}
+                              onChange={(e) =>
+                                handleFieldChange(index, {
+                                  is_required: e.target.checked,
+                                })
+                              }
+                              className="mt-3"
+                            />
+                            </Col>
+                            <Col md={6}>
+                              <Form.Check
+                              type="switch"
+                              id={`field_require_approval-${index}`}
+                              label="Require Approval"
+                              checked={field.require_approval}
+                              onChange={(e) =>
+                                handleFieldChange(index, {
+                                  require_approval: e.target.checked,
+                                })
+                              }
+                              className="mt-3"
+                            />
+                            </Col>
+                          </Row>
+
+                         
+                          
+                          
+
+
                         </Card.Body>
                       </Card>
                     ))}
