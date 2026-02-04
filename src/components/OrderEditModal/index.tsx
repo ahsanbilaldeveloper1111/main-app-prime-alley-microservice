@@ -38,11 +38,11 @@ interface OrderEditModalProps {
   onHide: () => void;
   orderId: number;
   onSuccess?: () => void;
-  isDeliveryRole: boolean;
-  isAccountRole: boolean;
+  isDeliveryRole?: boolean;
+  isAccountRole?: boolean;
 }
 
-const OrderEditModal: React.FC<OrderEditModalProps> = ({ show, onHide, orderId, onSuccess, isDeliveryRole, isAccountRole }) => {
+const OrderEditModal: React.FC<OrderEditModalProps> = ({ show, onHide, orderId, onSuccess, isDeliveryRole = true, isAccountRole = true }) => {
   const { data: session } = useSession();
   //const isRootUser = Number((session?.user as { is_admin?: number | string })?.is_admin) === 1 || String((session?.user as { is_admin?: number | string })?.is_admin) === '1';
 
