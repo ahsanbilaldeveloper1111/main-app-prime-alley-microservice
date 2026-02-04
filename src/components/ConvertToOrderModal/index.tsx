@@ -405,37 +405,41 @@ const [contractDocumentPreview, setContractDocumentPreview] = useState<string | 
             ? `${formData.customer_phone_country_code} ${formData.customer_phone}`
             : formData.customer_phone;
       
-        const payload: any = {
-          customer_name: formData.customer_name,
-          customer_email: formData.customer_email,
-          customer_phone: formattedPhone,
-          customer_address: formData.customer_address || "",
-          order_date: formData.order_date,
-          expected_delivery_date: formData.expected_delivery_date || "",
-          order_stage_id: String(formData.order_stage_id),
-          notes: formData.notes || "",
-          tax_amount: totals.taxAmount.toFixed(2),
-          discount_amount: totals.totalDiscount.toFixed(2),
-          total_amount: totals.grandTotal.toFixed(2),
-          final_amount: totals.netValue.toFixed(2),
-          currency: formData.currency,
-          industry: formData.industry || "",
-          order_approval_status: formData.order_approval_status || "",
-          fulfillment_status: formData.fulfillment_status || "",
-          payment_status: formData.payment_status || "",
-          items: formData.items.map((item) => ({
-            product_id: String(item.product_id),
-            product_name: item.product_name,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            total_price: (parseFloat(item.quantity || "0") * item.unit_price).toFixed(2),
-            description: item.description || "",
-          })),
-          deal_id: String(dealId),
-        };
-      
-        // Create the order first
-        const createdOrder = await createOrder(payload);
+        const itemsPayload = formData.items.map((item) => ({
+          product_id: String(item.product_id),
+          product_name: item.product_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_price: (parseFloat(item.quantity || "0") * item.unit_price).toFixed(2),
+          description: item.description || "",
+        }));
+
+        const formDataPayload = new FormData();
+        formDataPayload.append("customer_name", formData.customer_name);
+        formDataPayload.append("customer_email", formData.customer_email);
+        formDataPayload.append("customer_phone", formattedPhone);
+        formDataPayload.append("customer_address", formData.customer_address || "");
+        formDataPayload.append("order_date", formData.order_date);
+        formDataPayload.append("expected_delivery_date", formData.expected_delivery_date || "");
+        formDataPayload.append("order_stage_id", String(formData.order_stage_id));
+        formDataPayload.append("notes", formData.notes || "");
+        formDataPayload.append("tax_amount", totals.taxAmount.toFixed(2));
+        formDataPayload.append("discount_amount", totals.totalDiscount.toFixed(2));
+        formDataPayload.append("total_amount", totals.grandTotal.toFixed(2));
+        formDataPayload.append("final_amount", totals.netValue.toFixed(2));
+        formDataPayload.append("currency", formData.currency);
+        formDataPayload.append("industry", formData.industry || "");
+        formDataPayload.append("order_approval_status", formData.order_approval_status || "");
+        formDataPayload.append("fulfillment_status", formData.fulfillment_status || "");
+        formDataPayload.append("payment_status", formData.payment_status || "");
+        formDataPayload.append("items", JSON.stringify(itemsPayload));
+        formDataPayload.append("deal_id", String(dealId));
+        if (contractDocument) {
+          formDataPayload.append("creation_attachment", contractDocument);
+        }
+
+        // Create the order with FormData (supports file upload)
+        const createdOrder = await createOrder(formDataPayload);
 
     //   const payload: any = {
     //     customer_name: formData.customer_name,
@@ -480,7 +484,7 @@ const [contractDocumentPreview, setContractDocumentPreview] = useState<string | 
       onHide();
     } catch (error: any) {
       console.error("Failed to create order:", error);
-      toast.error(error?.response?.data?.message || "Failed to create order");
+     // toast.error(error?.response?.data?.message || "Failed to create order");
     } finally {
       setLoading(false);
     }

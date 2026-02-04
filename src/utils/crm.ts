@@ -1709,6 +1709,40 @@ export const updateDeal = async (
   }
 };
 
+export const approveDeal = async (
+  id: number
+): Promise<DealData> => {
+  try {
+    const response = await axiosInstance.post(`/crm/deals/${id}/approve`);
+    const responseData: any = response.data?.data;
+    return responseData || response.data;
+  } catch (error: any) {
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to approve deal"
+    );
+    throw error;
+  }
+};
+
+export const rejectDeal = async (
+  id: number
+): Promise<DealData> => {
+  try {
+    const response = await axiosInstance.post(`/crm/deals/${id}/reject`);
+    const responseData: any = response.data?.data;
+    return responseData || response.data;
+  } catch (error: any) {
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to reject deal"
+    );
+    throw error;
+  }
+};
+
 export const deleteDeal = async (id: number): Promise<void> => {
   try {
     await axiosInstance.delete(`/crm/deals/${id}`);
@@ -2031,7 +2065,7 @@ export const restoreOrder = async (id: number): Promise<void> => {
 };
 
 export const createOrder = async (
-  data: Partial<OrderData>
+  data: Partial<OrderData> | FormData
 ): Promise<OrderData> => {
   try {
     const response = await axiosInstance.post("/crm/create-order", data);
@@ -2068,6 +2102,49 @@ export const updateOrder = async (
     throw error;
   }
 };
+
+export const updateOrderAccount = async (
+  id: number,
+  data: Partial<OrderData>
+): Promise<OrderData> => {
+  try {
+    data.id = id;
+    console.log("updateOrder data:", data);
+    const response = await axiosInstance.put(`/crm/orders/accounts/${id}`, data);
+    const responseData: any = response.data?.data;
+    toast.success("Order updated successfully");
+    return responseData || response.data;
+  } catch (error: any) {
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update order"
+    );
+    throw error;
+  }
+};
+
+export const updateOrderDelivery = async (
+  id: number,
+  data: Partial<OrderData>
+): Promise<OrderData> => {
+  try {
+    data.id = id;
+    console.log("updateOrder data:", data);
+    const response = await axiosInstance.put(`/crm/orders/delivery/${id}`, data);
+    const responseData: any = response.data?.data;
+    toast.success("Order updated successfully");
+    return responseData || response.data;
+  } catch (error: any) {
+    toast.error(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to update order"
+    );
+    throw error;
+  }
+};
+
 
 // Attachment interfaces
 export interface AttachmentData {
@@ -3361,6 +3438,7 @@ export interface DealTemplateField {
   field_type: "text" | "dropdown";
   options?: string[] | null;
   is_required: boolean;
+  require_approval?: boolean;
   sort_order: number;
 }
 
@@ -3386,6 +3464,7 @@ export interface CreateDealTemplatePayload {
     field_type: "text" | "dropdown";
     options?: string[] | null;
     is_required: boolean;
+    require_approval?: boolean;
     sort_order: number;
   }>;
 }
@@ -3398,6 +3477,7 @@ export interface UpdateDealTemplatePayload {
     field_type: "text" | "dropdown";
     options?: string[] | null;
     is_required: boolean;
+    require_approval?: boolean;
     sort_order: number;
   }>;
 }

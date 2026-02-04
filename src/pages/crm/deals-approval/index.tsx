@@ -49,6 +49,8 @@ import {
   markDealLost,
   getLead,
   updateDeal,
+  approveDeal,
+  rejectDeal,
   getCrmProducts,
   getCampaignById,
   getIndustries,
@@ -468,7 +470,7 @@ const CrmDeals = () => {
   const [lostReasons, setLostReasons] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
+  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({ approval_status: 'pending' });
   const [dealsData, setDealsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalDeals, setTotalDeals] = useState(0);
@@ -631,10 +633,12 @@ const CrmDeals = () => {
     probabilityMin: null as string | null,
     probabilityMax: null as string | null,
     dealType: null as string | null,
+    approvalStatus: 'pending' as string | null,
     industry: null as string | null,
     expectedCloseDateFrom: null as string | null,
     expectedCloseDateTo: null as string | null,
   });
+
 
   // Fetch stages and extensions on component mount
   useEffect(() => {
@@ -697,6 +701,9 @@ const CrmDeals = () => {
         }
         if (currentFilters.expected_close_date_to) {
           params.expected_close_date_to = currentFilters.expected_close_date_to;
+        }
+        if (currentFilters.approval_status) {
+          params.approval_status = currentFilters.approval_status;
         }
 
         const response: any = await getDeals(params);
@@ -1005,6 +1012,15 @@ const CrmDeals = () => {
           newFilters.deal_type = filters.deal_type;
         } else {
           delete newFilters.deal_type;
+        }
+      }
+
+      // Handle approval_status filter
+      if ('approval_status' in filters) {
+        if (filters.approval_status) {
+          newFilters.approval_status = filters.approval_status;
+        } else {
+          delete newFilters.approval_status;
         }
       }
       
@@ -1368,7 +1384,7 @@ const CrmDeals = () => {
     const dealId = deal?.id ?? deal?.rawData?.id;
     if (!dealId) return;
     try {
-      await updateDeal(dealId, { approval_status: "approved" } as any);
+      await approveDeal(dealId);
       toast.success("Deal approved successfully!");
       setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
@@ -1381,7 +1397,7 @@ const CrmDeals = () => {
     const dealId = deal?.id ?? deal?.rawData?.id;
     if (!dealId) return;
     try {
-      await updateDeal(dealId, { approval_status: "rejected" } as any);
+      await rejectDeal(dealId);
       toast.success("Deal rejected successfully!");
       setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
@@ -1819,6 +1835,7 @@ const handleCloseEditModal = useCallback(() => {
       stage: deal.stage?.name || 'No Stage',
       stageColor: deal.stage?.color || 'grey',
       dealType: deal.deal_type || '',
+      approvalStatus: deal.approval_status || '',
       value: deal.net_value || deal.grand_total || '0',
       currency: deal.currency || 'AED',
       probability: deal?.stage?.probability || 0,
@@ -2118,18 +2135,22 @@ const handleCloseEditModal = useCallback(() => {
                 onClick: (row: any) => handleMarkLost(row.rawData || row),
                 className: 'text-danger'
               },
+
               {
                 label: 'Approve',
                 icon: <CheckCircle size={14} />,
                 onClick: (row: any) => { void handleApproveDeal(row.rawData || row); },
-                className: 'text-success'
+                className: 'text-success',
+                show: (row: any) => (row.rawData?.approval_status ?? row.approval_status) === 'pending'
               },
               {
                 label: 'Reject',
                 icon: <XCircle size={14} />,
                 onClick: (row: any) => { void handleRejectDeal(row.rawData || row); },
-                className: 'text-danger'
+                className: 'text-danger',
+                show: (row: any) => (row.rawData?.approval_status ?? row.approval_status) === 'pending'
               }
+              
             ]
           }
         }] : [])
@@ -2609,6 +2630,24 @@ const handleCloseEditModal = useCallback(() => {
                   </Form.Select>
                 </Col>
                 <Col md={4}>
+                  <Form.Label className="small fw-bold mb-2">Approval Status</Form.Label>
+                  <Form.Select
+                    value={dealsFilters.approvalStatus || ''}
+                    onChange={(e) => {
+                      const value = e.target.value || null;
+                      setDealsFilters(prev => ({
+                        ...prev,
+                        approvalStatus: value
+                      }));
+                    }}
+                  >
+                    <option value="">Select Approval Status</option>
+                    <option value="pending" selected>Pending</option>
+                    <option value="approved">Approved</option>  
+                    <option value="rejected">Rejected</option>
+                  </Form.Select>
+                </Col>
+                <Col md={4}> 
                   <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
                   <Form.Select
                     value={dealsFilters.industry || ''}
@@ -2695,6 +2734,8 @@ const handleCloseEditModal = useCallback(() => {
                         if (dealsFilters.dealType) {
                           filtersToApply.deal_type = dealsFilters.dealType;
                         }
+                        // Always pass approval_status so it can be set or cleared
+                        filtersToApply.approval_status = dealsFilters.approvalStatus || null;
                         if (dealsFilters.industry) {
                           filtersToApply.industry = dealsFilters.industry;
                         }
@@ -2725,6 +2766,7 @@ const handleCloseEditModal = useCallback(() => {
                           probabilityMin: null,
                           probabilityMax: null,
                           dealType: null,
+                          approvalStatus: null,
                           industry: null,
                           expectedCloseDateFrom: null,
                           expectedCloseDateTo: null,
@@ -5386,6 +5428,19 @@ const handleCloseEditModal = useCallback(() => {
             ]
           },
           {
+            id: 'approvalStatus',
+            label: 'Approval Status',
+            type: 'dropdown' as const,
+            value: dealsFilters.approvalStatus || '',
+            onChange: (value) => setDealsFilters(prev => ({ ...prev, approvalStatus: value })),
+            options: [
+              { value: '', label: 'Select Approval Status' },
+              { value: 'pending', label: 'Pending'},
+              { value: 'approved', label: 'Approved' },
+              { value: 'rejected', label: 'Rejected' }
+            ]
+          },
+          {
             id: 'industry',
             label: 'Industry',
             type: 'dropdown' as const,
@@ -5449,6 +5504,7 @@ const handleCloseEditModal = useCallback(() => {
           if (dealsFilters.dealType) {
             filtersToApply.deal_type = dealsFilters.dealType;
           }
+          filtersToApply.approval_status = dealsFilters.approvalStatus || null;
           if (dealsFilters.industry) {
             filtersToApply.industry = dealsFilters.industry;
           }
@@ -5474,6 +5530,7 @@ const handleCloseEditModal = useCallback(() => {
             probabilityMin: null,
             probabilityMax: null,
             dealType: null,
+            approvalStatus: null,
             industry: null,
             expectedCloseDateFrom: null,
             expectedCloseDateTo: null,

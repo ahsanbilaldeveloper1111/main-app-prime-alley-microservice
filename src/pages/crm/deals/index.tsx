@@ -688,6 +688,7 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
   const [serverPaginationMeta, setServerPaginationMeta] = useState<{ total: number; current_page: number; per_page: number; last_page: number } | null>(null);
   const [dealsFilters, setDealsFilters] = useState({
     assignedTo: null as string | null,
+    approvalStatus: null as string | null,
     stage: null as string | null,
     followUpDateFrom: null as string | null,
     followUpDateTo: null as string | null,
@@ -762,6 +763,10 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
           params.expected_close_date_to = currentFilters.expected_close_date_to;
         }
 
+        if (currentFilters.approval_status) {
+          params.approval_status = currentFilters.approval_status;
+        }
+
         const response: any = await getDeals(params);
         console.log("Raw response from getDeals:", response);
 
@@ -804,6 +809,7 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
       setCurrentFilters((prev) => {
         const newFilters = { ...prev };
         delete newFilters.stage_id;
+        delete newFilters.approval_status;
         delete newFilters.include_archived;
         delete newFilters.include_lost;
         return newFilters;
@@ -1070,7 +1076,15 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
           delete newFilters.deal_type;
         }
       }
-      
+
+      // Handle approval_status filter
+      if ('approval_status' in filters) {
+        if (filters.approval_status) {
+          newFilters.approval_status = filters.approval_status;
+        } else {
+          delete newFilters.approval_status;
+        }
+      }
       // Handle industry filter
       if ('industry' in filters) {
         if (filters.industry) {
@@ -2881,6 +2895,7 @@ const handleCloseEditModal = useCallback(() => {
                           industry: null,
                           expectedCloseDateFrom: null,
                           expectedCloseDateTo: null,
+                          approvalStatus: null,
                         });
                         handleFiltersChange({});
                         setCurrentFilters({});
@@ -5875,6 +5890,19 @@ const handleCloseEditModal = useCallback(() => {
             ]
           },
           {
+            id: 'approvalStatus',
+            label: 'Approval Status',
+            type: 'dropdown' as const,
+            value: dealsFilters.approvalStatus || '',
+            onChange: (value) => setDealsFilters(prev => ({ ...prev, approvalStatus: value })),
+            options: [
+              { value: '', label: 'Select Approval Status' },
+              { value: 'pending', label: 'Pending' },
+              { value: 'approved', label: 'Approved' },
+              { value: 'rejected', label: 'Rejected' }
+            ]
+          },
+          {
             id: 'industry',
             label: 'Industry',
             type: 'dropdown' as const,
@@ -5938,6 +5966,9 @@ const handleCloseEditModal = useCallback(() => {
           if (dealsFilters.dealType) {
             filtersToApply.deal_type = dealsFilters.dealType;
           }
+          if (dealsFilters.approvalStatus) {
+            filtersToApply.approval_status = dealsFilters.approvalStatus;
+          }
           if (dealsFilters.industry) {
             filtersToApply.industry = dealsFilters.industry;
           }
@@ -5966,6 +5997,7 @@ const handleCloseEditModal = useCallback(() => {
             industry: null,
             expectedCloseDateFrom: null,
             expectedCloseDateTo: null,
+            approvalStatus: null,
           });
           handleFiltersChange({});
           setCurrentFilters({});
