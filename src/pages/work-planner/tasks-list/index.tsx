@@ -437,7 +437,7 @@ const TasksList = () => {
   const [editingTask, setEditingTask] = useState<any>(null);
   const [taskActivities, setTaskActivities] = useState<any[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
-  const [activeDetailTab, setActiveDetailTab] = useState<'activity' | 'comments'>('activity');
+  const [activeDetailTab, setActiveDetailTab] = useState<'activity' | 'comments' | 'documents'>('activity');
   const [taskComments, setTaskComments] = useState<any[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [newComment, setNewComment] = useState('');
