@@ -156,6 +156,14 @@ const CallDashboard = () => {
           iconBgColor: '#FEE2E2',
           subtitle: 'Missed outgoing calls in the system',
       },
+      {
+        title: 'Missed Outgoing',
+        value: generalStats.totalMissedOutgoing,
+        icon: PhoneOff,
+        iconColor: '#EF4444',
+        iconBgColor: '#FEE2E2',
+        subtitle: 'Missed outgoing calls in the system',
+    }
   ];
 
     // Create cards data for PageSummaryGrid

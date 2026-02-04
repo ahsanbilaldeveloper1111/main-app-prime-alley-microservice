@@ -588,7 +588,7 @@ const HistoryPage = () => {
             }
           }
         ]}
-        gridMinWidth="220px"
+        gridMinWidth="180px"
       />
       {/* Quick Filter Buttons */}
       {showFilterBar && (

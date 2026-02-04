@@ -2,16 +2,15 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
+import GenericTable, { TableColumn } from '@components/GenericTable';
 import { ListCallLogs, ExportCallLogs, DownloadStreamingExport, DownloadCallsExport } from '@utils/calls';
 import { GetHierarchyData } from '@utils/users';
-import { Column } from '@components/CustomDataTable';
 import { Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import StatsCards from '@components/GenericStatsCards';
-import { Phone, Hash, PhoneIncoming, PhoneOutgoing, Filter } from 'lucide-react';
+import { Phone, Hash, PhoneIncoming, PhoneOutgoing, Filter, Calendar } from 'lucide-react';
 import imgStatus1 from '@assets/images/widget/img-status-1.svg'
 import imgStatus2 from '@assets/images/widget/img-status-2.svg'
 import imgStatus3 from '@assets/images/widget/img-status-3.svg'
@@ -25,6 +24,21 @@ import '@assets/scss/common.scss';
 import { convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat, formatDateTimeToLocal, GlobalDateTimeFormat, ModuleSlug, getAutoTimezone } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import GenericFilterSidebar, { FilterFieldType } from '@components/GenericFilterSidebar';
+
+/** Row shape from call-logs API (data / dataList items) */
+interface CallLogRow {
+    id?: number | string;
+    Date?: string;
+    Time?: string;
+    username?: string;
+    department_name?: string;
+    call_type?: string;
+    is_answered?: string;
+    duration?: string | number;
+    extension?: string;
+    phone_number?: string;
+    [key: string]: any;
+}
 
 
 interface Summary {
@@ -45,45 +59,50 @@ const CallLogs = () => {
     const [startDateTime, setStartDateTime] = useState<string>('');
     const [endDateTime, setEndDateTime] = useState<string>('');
    
-    const columns: Column[] = [
-        { key: 'Date', name: 'Date', selector: (row: any) => row.Date, sortable: true,
-            cell: (props: any) => {
-                // Convert UTC date to user's timezone using separate date and time
-                const formattedDate = convertUTCSeparateDateTimeToUserDate(props.Date, props.Time, GlobalDateFormat);
-                return formattedDate;
-            }
-         },
-        { key: 'Time', name: 'Time', selector: (row: any) => row.Time, sortable: true,
-            cell: (props: any) => {
-                // Convert UTC time to user's timezone using separate date and time
-                const formattedTime = convertUTCSeparateDateTimeToUserTime(props.Date, props.Time, GlobalTimeFormat);
-                return formattedTime;
-            }
-         },
-        { key: 'username', name: 'Username', selector: (row: any) => row.username, sortable: true },
-        { key: 'department_name', name: 'Department', selector: (row: any) => row.department_name, sortable: true },
-        { key: 'call_type', name: 'Call Type', selector: (row: any) => row.call_type, sortable: true },
-        { key: 'is_answered', name: 'Call Result', selector: (row: any) => row.is_answered, sortable: true,
-            cell: (props: any) => {
-                return props.is_answered ==='Yes' ? <span className="status-badge success">Answered</span> : <span className="status-badge danger">Not Answered</span>;
-            }
-         },
+    // Table data and pagination state for GenericTable
+    const [callLogData, setCallLogData] = useState<CallLogRow[]>([]);
+    const [tablePagination, setTablePagination] = useState({
+        currentPage: 1,
+        rowsPerPage: 15,
+        totalRows: 0,
+        pageSizeOptions: [10, 15, 25, 50, 100] as number[],
+    });
+
+    const tableColumns: TableColumn<CallLogRow>[] = [
+        {
+            key: 'Date',
+            label: 'Date',
+            sortable: true,
+            render: (row) => convertUTCSeparateDateTimeToUserDate(row.Date ?? '', row.Time ?? '', GlobalDateFormat),
+        },
+        {
+            key: 'Time',
+            label: 'Time',
+            sortable: true,
+            render: (row) => convertUTCSeparateDateTimeToUserTime(row.Date ?? '', row.Time ?? '', GlobalTimeFormat),
+        },
+        { key: 'username', label: 'Username', sortable: true },
+        { key: 'department_name', label: 'Department', sortable: true },
+        { key: 'call_type', label: 'Call Type', sortable: true },
+        {
+            key: 'is_answered',
+            label: 'Call Result',
+            sortable: true,
+            render: (row) =>
+                row.is_answered === 'Yes' ? (
+                    <span className="status-badge success">Answered</span>
+                ) : (
+                    <span className="status-badge danger">Not Answered</span>
+                ),
+        },
         {
             key: 'Duration',
-            name: 'Duration',
-            selector: (row: any) => row.duration,
+            label: 'Duration',
             sortable: true,
-            cell: (props: any) => {
-              const duration = parseInt(props.duration) || 0;
-              return (
-                <div>
-                  {formatDuration(duration)}
-                </div>
-              );
-            }
-          },
-        { key: 'extension', name: 'Extension', selector: (row: any) => row.extension, sortable: true },
-        { key: 'phone_number', name: 'Phone Number', selector: (row: any) => row.phone_number, sortable: true },
+            render: (row) => formatDuration(parseInt(String(row.duration)) || 0),
+        },
+        { key: 'extension', label: 'Extension', sortable: true },
+        { key: 'phone_number', label: 'Phone Number', sortable: true },
     ];
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -117,6 +136,7 @@ const CallLogs = () => {
     const isFetchingRef = useRef(false);
     const lastFetchTimeRef = useRef(0);
     const lastFetchParamsRef = useRef<string>('');
+    const rowsPerPageRef = useRef(15);
     
     const [summary, setSummary] = useState<Summary>({
         users: 0,
@@ -172,52 +192,106 @@ const CallLogs = () => {
             iconBgColor: '#E0F2FE',
             subtitle: 'Total placed call count',
         },
+        {
+            title: 'Inbound',
+            value: summary?.inbound || 0,
+            icon: PhoneIncoming,
+            iconColor: '#10B981',
+            iconBgColor: '#D1FAE5',
+            subtitle: 'Total received call count',
+        },
+        {
+            title: 'Outbound',
+            value: summary?.outbound || 0,
+            icon: PhoneOutgoing,
+            iconColor: '#0EA5E9',
+            iconBgColor: '#E0F2FE',
+            subtitle: 'Total placed call count',
+        }
     ];
 
+    const [tableLoading, setTableLoading] = useState(false);
+
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
-        // Prevent duplicate calls
         const now = Date.now();
         const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(currentFiltersRef.current)}`;
-        
-        // Skip if already fetching with same params within 500ms
+
         if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
             return;
         }
-        
-        // Skip if same params were fetched recently (within 100ms)
         if (lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 100) {
             return;
         }
-        
+
         isFetchingRef.current = true;
         lastFetchTimeRef.current = now;
         lastFetchParamsRef.current = paramsKey;
-        
+
         setShowPageLoader(true);
+        setTableLoading(true);
         try {
-            const response = await ListCallLogs({ 
-                page, 
-                perPage, 
-                search, 
-                filters: currentFiltersRef.current, 
-                moduleSlug: ModuleSlug.CALL_LOGS 
+            const response = await ListCallLogs({
+                page,
+                perPage,
+                search,
+                filters: currentFiltersRef.current,
+                moduleSlug: ModuleSlug.CALL_LOGS,
             }, 'call-logs/list');
-            setTotalCalls(response?.recordsTotal || 0);
-            
-            if(response?.summary){
+
+            // Handle various API response structures (flat, nested, DataTables style)
+            const rawData = response?.data;
+            let rowsArray: CallLogRow[] = [];
+            if (Array.isArray(rawData)) {
+                rowsArray = rawData;
+            } else if (Array.isArray(rawData?.data)) {
+                rowsArray = rawData.data;
+            } else if (Array.isArray(response?.dataList)) {
+                rowsArray = response.dataList;
+            }
+
+            const paginationData = response?.data?.pagination ?? response?.pagination ?? response;
+            const total =
+                response?.recordsTotal ??
+                response?.total ??
+                rawData?.recordsTotal ??
+                rawData?.total ??
+                paginationData?.total ??
+                (rowsArray.length > 0 ? rowsArray.length : 0);
+            const currentPage = response?.current_page ?? paginationData?.current_page ?? page;
+            const perPageVal = response?.per_page ?? paginationData?.per_page ?? perPage;
+
+            setCallLogData(rowsArray);
+            setTablePagination((prev) => ({
+                ...prev,
+                currentPage,
+                rowsPerPage: perPageVal,
+                totalRows: Number(total) || 0,
+            }));
+            setTotalCalls(total);
+
+            if (response?.summary) {
                 setShowDateRange(true);
                 const dataFilters = response?.filters;
                 setStartDateTime(dataFilters?.start_datetime);
                 setEndDateTime(dataFilters?.end_datetime);
                 setSummary(response.summary);
             }
-            
+
             return response;
         } finally {
             setShowPageLoader(false);
+            setTableLoading(false);
             isFetchingRef.current = false;
         }
     }, []);
+
+    rowsPerPageRef.current = tablePagination.rowsPerPage;
+
+    // Initial load and refetch when filters/refresh change
+    useEffect(() => {
+        setTablePagination((prev) => ({ ...prev, currentPage: 1 }));
+        fetchCallLogs(1, rowsPerPageRef.current, '');
+    }, [refreshKey, fetchCallLogs]);
 
     const handleFiltersChange = (filters: any) => {
         // Format datetime values to include seconds and timezone offset (remove timezone key)
@@ -353,23 +427,67 @@ const CallLogs = () => {
             </div>
 
             {showDateRange && startDateTime && endDateTime && moment.utc(startDateTime).isValid() && moment.utc(endDateTime).isValid() && (
-                <p className="mb-3">
-                    Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
-                </p>
+                <div
+                    className="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
+                    style={{
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '10px 12px'
+                    }}
+                >
+                    <div className="d-flex align-items-center gap-2">
+                        <span
+                            className="d-inline-flex align-items-center justify-content-center"
+                            style={{
+                                width: '30px',
+                                height: '30px',
+                                borderRadius: '8px',
+                                background: '#eef2ff',
+                                color: '#4f46e5'
+                            }}
+                        >
+                            <Calendar size={16} />
+                        </span>
+                        <div className="d-flex align-items-center gap-2">
+                            <span className="text-muted" style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '0.3px' }}>
+                                Selected Date Range
+                            </span>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
+                                {formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)} — {formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}
+                            </span>
+                        </div>
+                    </div>
+                    {/* <div className="d-flex align-items-center gap-2">
+                        <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span>
+                        <span className="text-muted" style={{ fontSize: '12px' }}>to</span>
+                        <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
+                    </div> */}
+                </div>
             )}
 
 
             {session?.user?.permissions?.includes('list-call-logs') && (
-                <GenericListPage
-                    columns={columns}
-                    fetchData={fetchCallLogs}
-                    title="Call Logs"
-                    searchPlaceholder="Search call logs..."
-                    defaultPageSize={15}
-                    filters={currentFilters}
-                    refreshKey={refreshKey}
-                    search={false}
-                    tableStyle='table-style-2'
+                <GenericTable<CallLogRow>
+                    data={callLogData}
+                    columns={tableColumns}
+                    loading={tableLoading}
+                    emptyMessage="No call logs found."
+                    loadingMessage="Loading call logs..."
+                    pagination={{
+                        currentPage: tablePagination.currentPage,
+                        rowsPerPage: tablePagination.rowsPerPage,
+                        totalRows: tablePagination.totalRows,
+                        pageSizeOptions: tablePagination.pageSizeOptions,
+                    }}
+                    onPaginationChange={(page, rowsPerPage) => {
+                        setTablePagination((prev) => ({ ...prev, currentPage: page, rowsPerPage }));
+                        fetchCallLogs(page, rowsPerPage, '');
+                    }}
+                    sortable={true}
+                    hover={true}
+                    striped={false}
+                    uniqueKey="id"
                 />
             )}
 

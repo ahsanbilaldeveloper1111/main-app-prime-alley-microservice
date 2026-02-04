@@ -535,6 +535,10 @@
     background: transparent !important;
     color: #495057 !important;
   }
+
+  .generic-table-td .status-badge {
+    background: transparent !important;
+  }
  
   /* Text utilities */
   .gt-text-muted {

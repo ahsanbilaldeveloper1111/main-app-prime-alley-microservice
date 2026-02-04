@@ -3,43 +3,38 @@ import { X, LucideIcon, User, Phone, Mail, ChevronLeft, ChevronRight, MessageSqu
 import { Badge, Button } from 'react-bootstrap';
 import AICompose from '@components/aicompose';
 
-// Wrapper component to add close functionality to AICompose
+// Wrapper component to add close functionality to AICompose - fills flex container so it sticks with sidebar
 const AIComposeWrapper: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   return (
     <>
       <style>{`
         .ai-compose-container {
-          position: fixed;
-          top: 65px;
-          left: 177px;
-          right: 0;
-          bottom: 0;
-          z-index: 1049;
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          min-width: 0;
           overflow-y: auto;
           overflow-x: hidden;
           background-color: rgba(0, 0, 0, 0.02);
         }
 
-        @media (max-width: 1200px) {
-          .ai-compose-container {
-            left: 0 !important;
-            right: 0 !important;
-          }
-        }
-
         .ai-compose-wrapper {
           position: relative;
-          min-height: calc(100vh - 85px);
-          padding: 20px;
+          min-height: 100%;
+          padding: 20px 0 20px 20px;
+          flex: 1;
+          display: flex;
+          justify-content: flex-end;
         }
 
         .ai-compose-content {
           position: relative;
           max-width: 900px;
-          margin: 0 auto;
+          width: 100%;
+          margin-right: 0;
           background-color: #f8f9fa;
-          border-radius: 12px;
-          box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+          border-radius: 12px 0 0 12px;
+          box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
         }
 
         .ai-compose-close-btn {
@@ -509,7 +504,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         zIndex: 1050,
         display: 'flex',
+        flexDirection: 'row',
         justifyContent: 'flex-end',
+        overflowX: 'auto',
         animation: 'fadeIn 0.2s ease-out'
       }}
     >
@@ -539,6 +536,25 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           }
         `}
       </style>
+      {/* AI Compose panel - immediately to the left of sidebar, no gap, no overlap */}
+      {showAICompose && (
+        <div
+          style={{
+            flex: 1,
+            minWidth: 280,
+            height: `calc(100vh - ${headerHeight})`,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            flexShrink: 1,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAICompose(false);
+          }}
+        >
+          <AIComposeWrapper onClose={() => setShowAICompose(false)} />
+        </div>
+      )}
       <div 
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -549,7 +565,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          animation: 'slideIn 0.3s ease-out'
+          animation: 'slideIn 0.3s ease-out',
+          flexShrink: 0,
+          marginLeft: 0,
         }}
       >
         {/* Header Section */}
@@ -1122,11 +1140,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           )}
         </div>
       </div>
-
-      {/* AI Compose Component - Opens alongside sidebar */}
-      {showAICompose && (
-        <AIComposeWrapper onClose={() => setShowAICompose(false)} />
-      )}
     </div>
   );
 };
