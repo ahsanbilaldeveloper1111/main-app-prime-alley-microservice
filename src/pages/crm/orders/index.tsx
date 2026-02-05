@@ -1843,15 +1843,15 @@ const CrmOrders = () => {
             align: 'end' as const,
             options: [
               {
-                label: 'Mark as Lost',
+                label: 'Withdraw (with lost reason)',
                 icon: <X size={14} />,
                 onClick: (row: any) => handleMarkLost(row.rawData || row),
                 className: 'text-danger'
               },
               {
-                label: 'Withdraw',
+                label: 'Withdraw (For Further Changes)',
                 icon: <X size={14} />,
-                onClick: (row: any) => handleMarkLost(row.rawData || row),
+                onClick: (row: any) => handleDeleteOrder(row.rawData || row),
                 className: 'text-danger'
               }
             ]

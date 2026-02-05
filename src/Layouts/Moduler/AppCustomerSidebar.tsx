@@ -304,8 +304,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
       icon: <Workflow size={20} />,
       color: MENU_COLORS.AUTOMATION,
-      title: "AI Virtual Agent",
-      label: "AI Virtual Agent",
+      title: "Outbound AI Agent",
+      label: "Outbound AI Agent",
       url: '',
       subItems: [
         {
@@ -331,6 +331,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/ai-ml/campaigns'
         },
         {
+          id: 'ai-bot-campaigns-pitch-deck',
+          title: 'Pitch Deck',
+          icon: <User size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/ai-ml/campaigns'
+        },
+        {
           id: 'ai-bot-live-monitoring',
           title: 'Live Monitoring',
           icon: <MonitorCheck size={16} />,
@@ -344,14 +351,112 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
           url: '/ai-ml/campaign-reports'
         },
-        
         {
-          id: 'ai-bot-faqs-management',
-          title: 'AI Bot FAQs',
+          id: 'outbound-ai-bot-usage-reports',
+          title: 'Usage Reports',
           icon: <FileText size={16} />,
           permission: PERMISSIONS.TMS_SERVICES,
-          url: '/chat/ai-bot-faqs'
+          url: '/chat/ai-faqs'
         }
+      ]
+    },
+
+
+    {
+      id: 'inbound-ai-bot-and-analytics',
+      key: 'inbound-ai-bot-and-analytics',
+      permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+      icon: <Workflow size={20} />,
+      color: MENU_COLORS.AUTOMATION,
+      title: "Inbound AI Agent",
+      label: "Inbound AI Agent",
+      url: '',
+      subItems: [
+        {
+          id: 'inbound-ai-bot-trunk-profiles',
+          title: 'Trunk Profiles',
+          icon: <MonitorCheck size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/ai-ml/live-monitoring'
+        },
+        {
+          id: 'inbound-ai-bot-bot-profiles',
+          title: 'Bot Profiles',
+          icon: <MonitorCheck size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/ai-ml/live-monitoring'
+        },
+        {
+          id: 'inbound-ai-bot-live-monitoring',
+          title: 'Live Monitoring',
+          icon: <MonitorCheck size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/ai-ml/live-monitoring'
+        },
+        {
+          id: 'inbound-ai-bot-campaign-reports',
+          title: 'Reports',
+          icon: <BarChart3 size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/ai-ml/campaign-reports'
+        },
+        {
+          id: 'inbound-ai-bot-usage-reports',
+          title: 'Usage Reports',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/chat/ai-faqs'
+        }
+      ]
+    },
+
+
+    {
+      id: 'ai-chat-section',
+      key: 'ai-chat-section',
+      permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+      icon: <Workflow size={20} />,
+      color: MENU_COLORS.AUTOMATION,
+      title: "AI Chat",
+      label: "AI Chat",
+      url: '',
+      subItems: [
+        {
+          id: 'ai-chat-tools',
+          title: 'Tools Profiles',
+          icon: <MonitorCheck size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/chat/ai-faqs'
+        },
+        {
+          id: 'ai-chat-faqs',
+          title: 'FAQs Profiles',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/chat/ai-faqs'
+        },
+        {
+          id: 'ai-chat-tenant-profiles',
+          title: 'Tenant Profiles',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/chat/ai-faqs'
+        },
+        {
+          id: 'ai-chat-faqs-tenant',
+          title: 'Global Profiles',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/chat/ai-faqs'
+        },
+        {
+          id: 'ai-chat-usage-reports',
+          title: 'Usage Reports',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/chat/ai-faqs'
+        }
+
       ]
     },
 
@@ -441,13 +546,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT,
           url: '/live-calls/management/agents'
         },
-        {
-          id: 'ai-chat-faqs-management',
-          title: 'AI Chat FAQs',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/chat/ai-faqs'
-        },
+        // {
+        //   id: 'ai-chat-faqs-management',
+        //   title: 'AI Chat FAQs',
+        //   icon: <FileText size={16} />,
+        //   permission: PERMISSIONS.TMS_SERVICES,
+        //   url: '/chat/ai-faqs'
+        // },
         
       ]
       .filter(item => !item.permission || hasPermission(item.permission))
@@ -535,7 +640,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       subItems: [
         {
           id: 'ai-ml-analysis',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.ANALYSIS,
+          title: "Manual Analysis",
           icon: <CassetteTape size={16} />,
           permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML,
           url: '/ai-ml/analysis'
@@ -550,7 +655,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'ai-ml-translate',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.TRANSLATE,
+          title: 'Backend Operations',
           icon: <Languages size={16} />,
           permission: PERMISSIONS.TRANSLATE_AIML,
           url: '/ai-ml/translate'
@@ -562,6 +667,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.MANAGE_EXTENSIONS_AIML,
           url: '/ai-ml/manage-extensions'
         },
+        
         // {
         //   id: 'ai-ml-outbound-calls',
         //   title: HEADER_CONSTANTS.SUBMENU_LABELS.OUTBOUND_CALLS,

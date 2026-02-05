@@ -577,6 +577,20 @@ export const getMeetings = async (
   }
 };
 
+export const getDealMeetings = async (
+  params: { deal_id?: number; extension?: string; per_page?: number } = {}
+): Promise<{
+  data: MeetingData[];
+}> => {
+  try {
+    const response = await axiosInstance.get("/crm/meetings", { params });
+    return extractData<{ data: MeetingData[] }>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch meetings");
+    throw error;
+  }
+};
+
 export const getMeeting = async (id: number): Promise<MeetingData> => {
   try {
     const response = await axiosInstance.get(`/crm/meetings/${id}`);
@@ -3865,3 +3879,141 @@ export const getApprovalsByDealOrOrder = async (
     throw error;
   }
 };
+
+// ==================== Deal Follow-ups API ====================
+
+export interface DealFollowUpPayload {
+  follow_up_date: string;
+  follow_up_status?: string | null;
+  communication_channel?: string | null;
+  communication_channel_other?: string | null;
+  notes?: string | null;
+}
+
+/**
+ * Get follow-ups for a deal
+ */
+export const getDealFollowUps = async (dealId: string | number) => {
+  try {
+    const response = await axiosInstance.get(`/crm/deals/${dealId}/follow-ups`);
+   return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch follow-ups");
+    throw error;
+  }
+};
+
+export const getLeadFollowUps = async (leadId: string | number) => {
+  try {
+    const response = await axiosInstance.get(`/crm/leads/${leadId}/follow-ups/get`);
+   return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to fetch follow-ups");
+    throw error;
+  }
+};
+
+
+/**
+ * Create a follow-up for a deal
+ */
+export const createDealFollowUp = async (dealId: string | number, payload: DealFollowUpPayload) => {
+  try {
+    const response = await axiosInstance.post(`/crm/deals/${dealId}/follow-ups`, payload);
+    toast.success("Follow-up created successfully");
+    return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to create follow-up");
+    throw error;
+  }
+};
+
+/**
+ * Update a follow-up
+ */
+export const updateDealFollowUp = async (
+  dealId: string | number,
+  followUpId: string | number,
+  payload: DealFollowUpPayload
+) => {
+  try {
+    const response = await axiosInstance.put(`/crm/deals/${dealId}/follow-ups/${followUpId}`, payload);
+    toast.success("Follow-up updated successfully");
+    return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to update follow-up");
+    throw error;
+  }
+};
+
+/**
+ * Delete a follow-up
+ */
+export const deleteDealFollowUp = async (dealId: string | number, followUpId: string | number) => {
+  try {
+    const response = await axiosInstance.delete(`/crm/deals/${dealId}/follow-ups/${followUpId}`);
+    toast.success("Follow-up deleted successfully");
+    return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || error?.message || "Failed to delete follow-up");
+    throw error;
+  }
+};
+
+export const PDFDownloadDeal = async (
+  dealId: number,
+): Promise<void> => {
+  try {
+    const response = await axiosInstance.get(
+      `/crm/deals/${dealId}/download-pdf`,
+      {
+        responseType: "blob",
+        headers: {
+          Accept: "blob",
+        },
+      }
+    );
+
+    // Check if response is valid
+    if (!response.data || response.data.size === 0) {
+      throw new Error("Empty file response received");
+    }
+
+    // Extract filename from content-disposition header if available
+    let filename = `deal-${dealId}.pdf`;
+    const contentDisposition = response.headers["content-disposition"];
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(
+        /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
+      );
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, "");
+      }
+    }
+
+    // response.data is already a blob when responseType is "blob"
+    const blob = response.data;
+
+    // Verify blob type (optional check, as we support multiple file types)
+    if (!blob.type) {
+      console.warn("No blob type detected");
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    toast.success("Attachment downloaded successfully");
+  } catch (error: any) {
+    console.error("Attachment download error:", error);
+    toast.error(error?.message || "Failed to download deal");
+    throw error;
+  }
+};
+
