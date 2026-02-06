@@ -112,6 +112,16 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
   const [loadingListTasks, setLoadingListTasks] = useState(false);
   const [listPagination, setListPagination] = useState<any>(null);
   const [listSummary, setListSummary] = useState<any>(null);
+  const [listPage, setListPage] = useState(1);
+  const [listLimit, setListLimit] = useState(15);
+  const [listFilters, setListFilters] = useState<{
+    searchTerm: string;
+    filterAssignee: string[];
+    filterStatus: string;
+    filterPriority: string;
+    filterCreatedAtFrom: string;
+    filterCreatedAtTo: string;
+  } | null>(null);
   
   // Stats
   const [statusCards, setStatusCards] = useState([
@@ -343,16 +353,41 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
     }
   };
 
-  const fetchListTasks = async () => {
+  const fetchListTasks = async (filtersOverride?: typeof listFilters, pageOverride?: number, limitOverride?: number) => {
     if (!selectedProject?.id) return;
-    
+    const filters = filtersOverride !== undefined ? filtersOverride : listFilters;
+    const page = pageOverride !== undefined ? pageOverride : listPage;
+    const limit = limitOverride !== undefined ? limitOverride : listLimit;
     try {
       setLoadingListTasks(true);
       const withRelations = ['assignees', 'labels', 'status'];
-      const response = await listTasks({
+      const params: Parameters<typeof listTasks>[0] = {
         project_id: Number(selectedProject.id),
-        withRelations
-      });
+        withRelations,
+        order: { column: 'created_at', dir: 'desc' as const },
+        page,
+        limit
+      };
+      if (filters) {
+        if (filters.searchTerm?.trim()) params.search = filters.searchTerm.trim();
+        if (filters.filterStatus && filters.filterStatus !== 'All Status') {
+          const statusObj = statuses.find((s: any) => s.name === filters!.filterStatus);
+          if (statusObj?.id) params.status_id = statusObj.id;
+        }
+        if (filters.filterPriority && filters.filterPriority !== 'All Priority') {
+          const priorityMap: Record<string, string> = {
+            'Low': 'low',
+            'Medium': 'normal',
+            'High': 'high',
+            'Urgent': 'urgent'
+          };
+          params.priority = priorityMap[filters.filterPriority] || filters.filterPriority.toLowerCase();
+        }
+        if (filters.filterAssignee?.length) params.extension_numbers = filters.filterAssignee;
+        if (filters.filterCreatedAtFrom) params.created_at_from = filters.filterCreatedAtFrom;
+        if (filters.filterCreatedAtTo) params.created_at_to = filters.filterCreatedAtTo;
+      }
+      const response = await listTasks(params);
 
       if (response && response.success !== false) {
         setTasksList(response.data || []);
@@ -364,6 +399,33 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
     } finally {
       setLoadingListTasks(false);
     }
+  };
+
+  const handleListApplyFilters = (filters: {
+    searchTerm: string;
+    filterAssignee: string[];
+    filterStatus: string;
+    filterPriority: string;
+    filterCreatedAtFrom: string;
+    filterCreatedAtTo: string;
+  }) => {
+    setListFilters(filters);
+    setListPage(1);
+    fetchListTasks(filters, 1, listLimit);
+  };
+
+  const handleListClearFilters = () => {
+    setListFilters(null);
+    setListPage(1);
+    fetchListTasks(null, 1, listLimit);
+  };
+
+  const defaultListPagination = { page: 1, limit: listLimit, total: 0, last_page: 1, from: 0, to: 0 };
+  const handleListPaginationChange = (updater: React.SetStateAction<{ page: number; limit: number; total: number; last_page: number; from: number; to: number }>) => {
+    const next = typeof updater === 'function' ? updater(listPagination || defaultListPagination) : updater;
+    setListPage(next.page);
+    setListLimit(next.limit);
+    fetchListTasks(undefined, next.page, next.limit);
   };
   
   // Group tasks by status for board view
@@ -562,11 +624,15 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             tasksList={tasksList}
             loading={loadingListTasks}
             listSummary={listSummary}
+            listPagination={listPagination ?? { page: listPage, limit: listLimit, total: 0, last_page: 1, from: 0, to: 0 }}
+            setListPagination={handleListPaginationChange}
             styles={styles}
             selectedProject={selectedProject}
             extensions={hierarchyDataExtensions as any}
             labels={labels}
             statuses={statuses}
+            onApplyFilters={handleListApplyFilters}
+            onClearFilters={handleListClearFilters}
             onRefresh={() => {
               if (activeTab === 'list' && selectedProject?.id) {
                 fetchListTasks();

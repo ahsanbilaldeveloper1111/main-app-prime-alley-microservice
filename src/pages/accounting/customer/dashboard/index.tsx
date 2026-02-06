@@ -7,12 +7,20 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import { useState } from 'react';
-import { Card, Row, Col,Button,Badge, Form} from 'react-bootstrap';
-import {AlertCircle, Check, Clock, DollarSign, FileText,  Wallet, TrendingUp, Package} from 'lucide-react';
+import { Card, Row, Col, Button, Badge, Form } from 'react-bootstrap';
+import { AlertCircle, Check, Clock, DollarSign, FileText, Wallet, TrendingUp, Package } from 'lucide-react';
 import Link from 'next/link';
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import router from "next/router";
 import {BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,ResponsiveContainer,Legend} from 'recharts';
 import UAECurrencyLogo from "@assets/images/uae-currency-logo.jpg";
 import { formatNumber } from "@utils/Helper";
+
+const CURRENCY_SYMBOL = '';
+const formatWithOneDecimal = (value: number | string | undefined | null): string =>
+  (Number(value) || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const formatInteger = (value: number | string | undefined | null): string =>
+  (Number(value) || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
 
 import "@assets/scss/billing.scss";
 
@@ -22,7 +30,6 @@ import "@assets/scss/tabs.scss";
 
 import { GetDashboardCounters, GetProfitLossData, GetTopProducts, GetRecentActivity, GetAnalyticsByMonth, GetCompanyDetails } from "@utils/accounting";
 import { useSession } from "next-auth/react";
-import router from "next/router";
 
 
 const CustomerDashboard = () => {
@@ -48,18 +55,7 @@ const CustomerDashboard = () => {
     outstanding_amount: number;
   }>>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('Last 3 months');
-  const [summaryCards, setSummaryCards] = useState<Array<{
-    title: string;
-    value: any;
-    icon: React.ReactElement;
-    color: string;
-    change?: string;
-    isPositive?: boolean;
-    isImage?: boolean;
-    iconBg?: string;
-    iconColor?: string;
-    payNow?: boolean;
-  }>>([]);
+  const [summaryCards, setSummaryCards] = useState<StatsCardData[]>([]);
 
   useEffect(() => {
     getCompanyDetails();
@@ -80,17 +76,14 @@ const CustomerDashboard = () => {
   const getDashboardCounters = async () => {
     const response = await GetDashboardCounters() as any;
     setDashboardCounters(response);
-    setSummaryCards(
-      [
-        { title: 'Subscriptions', value: response?.products?.total || 0, icon: <Package size={24} />, color: 'primary', iconBg: 'rgba(59, 130, 246, 0.1)', iconColor: '#3b82f6' },
-        { title: 'Total Invoice Amount', value: currency + ' ' + formatNumber(response?.invoices?.total_amount), icon: <FileText size={24} />, color: 'primary', iconBg: 'rgba(59, 130, 246, 0.1)', iconColor: '#3b82f6' },
-        { title: 'Outstanding Amount', value: currency + ' ' + formatNumber(response?.invoices?.outstanding_amount), icon: <AlertCircle size={24} />, color: 'warning', iconBg: 'rgba(251, 191, 36, 0.1)', iconColor: '#fbbf24' },
-        //  { title: 'Est. Next Month', value: '0.00', icon: <Wallet size={24} />, color: 'info', iconBg: 'rgba(34, 211, 238, 0.1)', iconColor: '#22d3ee' },
-        { title: 'Overdue Invoices', value: response?.invoices?.overdue_invoices_count, icon: <Clock size={24} />, color: 'danger', iconBg: 'rgba(239, 68, 68, 0.1)', iconColor: '#ef4444', payNow: false },
-        { title: 'Overdue Amount', value: currency + ' ' + formatNumber(response?.invoices?.overdue_amount), icon: <AlertCircle size={24} />, color: 'warning', iconBg: 'rgba(251, 191, 36, 0.1)', iconColor: '#fbbf24', payNow: true }
-      ]
-    );
-  
+    setSummaryCards([
+      { title: 'Subscriptions', value: formatInteger(response?.products?.total ?? 0), icon: Package, iconColor: '#3b82f6', iconBgColor: 'rgba(59, 130, 246, 0.1)' },
+      { title: 'Total Invoice Amount', value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(response?.invoices?.total_amount)}`, icon: FileText, iconColor: '#3b82f6', iconBgColor: 'rgba(59, 130, 246, 0.1)' },
+      { title: 'Outstanding Amount', value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(response?.invoices?.outstanding_amount)}`, icon: AlertCircle, iconColor: '#fbbf24', iconBgColor: 'rgba(251, 191, 36, 0.1)' },
+      { title: 'Overdue Invoices', value: formatInteger(response?.invoices?.overdue_invoices_count ?? 0), icon: Clock, iconColor: '#ef4444', iconBgColor: 'rgba(239, 68, 68, 0.1)' },
+      { title: 'Overdue Amount', value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(response?.invoices?.overdue_amount)}`, icon: AlertCircle, iconColor: '#fbbf24', iconBgColor: 'rgba(251, 191, 36, 0.1)', link: { text: 'Pay Now', onClick: () => router.push('/accounting/customer/invoices') } },
+      { title: 'Paid This Month', value: `${CURRENCY_SYMBOL} ${formatWithOneDecimal(52340.5)}`, icon: Wallet, iconColor: '#10B981', iconBgColor: '#D1FAE5', subtitle: 'Last 30 days' }
+    ]);
   };
 
    // Helper function to get status badge color
@@ -290,50 +283,34 @@ const CustomerDashboard = () => {
 
 
 <div>
-                <div className="d-flex justify-content-between align-items-center mb-4">
+                {/* <div className="d-flex justify-content-between align-items-center mb-4">
                   <div>
                     <h2 className="mb-1">Welcome back, {session?.user?.name}!</h2>
                     <p className="text-muted mb-0">Here's what's happening with your account today.</p>
                   </div>
-                </div>
+                </div> */}
+
+                <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+        <div className="mb-3 mb-md-0">
+          <nav aria-label="breadcrumb">
+            <ol className="breadcrumb mb-0">
+              <li className="breadcrumb-item">
+                <a href="/dashboard" className="text-decoration-none">
+                  Accounting
+                </a>
+              </li>
+              <li className="breadcrumb-item active fw-bold" aria-current="page">
+                Dashboard
+              </li>
+            </ol>
+          </nav>
+        </div>
+
+      </div>
         
-                {/* Summary Cards - 6 boxes in one row */}
-      <Row className="mb-4">
-        {summaryCards.map((card, index) => (
-          <Col  key={index} className="mb-3">
-            <Card style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', position: 'relative' }}>
-              <Card.Body>
-                <div className="d-flex align-items-center gap-3">
-                  <div className="rounded p-2" style={{ backgroundColor: card.iconBg, flexShrink: 0 }}>
-                    <div style={{ color: card.iconColor }}>{card.icon}</div>
-                  </div>
-                  <div className="flex-grow-1">
-                    <h3 className="mb-1" style={{ fontSize: '1.1rem', fontWeight: '600' }}>{card.value}</h3>
-                    <p className="text-muted mb-0" style={{ fontSize: '0.7rem', lineHeight: '1.3' }}>{card.title}</p>
-                  </div>
-                </div>
-                {card.payNow && (
-                  <div className="d-flex justify-content-end mt-2" style={{ position: 'absolute', top: '-25px', right: '0px' }}>
-                    <Button 
-                    onClick={() => router.push('/accounting/customer/invoices')}
-                      variant="primary" 
-                      size="sm"
-                      style={{ 
-                        fontSize: '0.8rem', 
-                        padding: '0.35rem 0.9rem',
-                        fontWeight: '600'
-                      }}
-                    >
-                      Pay Now
-                    </Button>
-                  </div>
-                )}
-              </Card.Body>
-            </Card>
-          </Col>
-        ))}
-      </Row>
-                
+                {/* Summary Cards */}
+      {/* <StatsCards data={summaryCards} gridMinWidth="180px" /> */}
+      <StatsCards data={summaryCards} gridMinWidth="180px" valueFontSize="28px" />
         
                 <Row>
                   {/* Spending Overview */}

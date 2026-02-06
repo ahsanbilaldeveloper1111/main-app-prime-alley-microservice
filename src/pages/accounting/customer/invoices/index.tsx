@@ -20,8 +20,9 @@ const STATUS_PENDING = 'pending';
 
 import PrimeAlleyLogo from "@assets/images/Prime3.png";
 import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
+import GenericTable, { TableColumn, TableAction as GenericTableAction } from "@components/GenericTable";
+import GenericSidebar from "@components/GenericSidebar";
+import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import {
   getInvoices,
   createInvoice,
@@ -47,7 +48,6 @@ import {
 import { GetPaymentMethods,CompletePayment } from "@utils/accounting";
 import { formatNumber, GlobalDateFormat } from "@utils/Helper";
 
-import { Column } from "@components/CustomDataTable";
 import { Button, Modal, Row, Form, Alert, Card, Badge, Table } from "react-bootstrap";
 import { Col } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -65,11 +65,9 @@ import { FaShieldAlt, FaCreditCard } from "react-icons/fa";
 import "@assets/scss/common.scss";
 
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-
 import TableAction, { Action } from "@components/TableAction";
 import { Spinner } from "react-bootstrap";
-import { Divide, DollarSign, Download } from "lucide-react";
+import { Divide, DollarSign, Download, FileText, Calendar, Eye, Layers, Receipt, CheckCircle, Clock, AlertCircle, Ban, Filter } from "lucide-react";
 
 // Rich Text Editor Component for Terms and Conditions
 const RichTextEditor: React.FC<{
@@ -790,8 +788,25 @@ const InvoiceList = () => {
   const { data: session, status } = useSession();
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters, setCurrentFilters] = useState<{search?: string; status?: string}>({});
+  const [currentFilters, setCurrentFilters] = useState<{
+    search?: string;
+    status?: string;
+    invoice_date_from?: string;
+    invoice_date_to?: string;
+    due_date_from?: string;
+    due_date_to?: string;
+  }>({});
   const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
+  const [showFilterTabs, setShowFilterTabs] = useState<boolean>(false);
+  const [showFiltersSidebar, setShowFiltersSidebar] = useState<boolean>(false);
+  const [pendingFilters, setPendingFilters] = useState<{
+    search?: string;
+    status?: string;
+    invoice_date_from?: string;
+    invoice_date_to?: string;
+    due_date_from?: string;
+    due_date_to?: string;
+  }>({});
   const [showDescriptionModal, setShowDescriptionModal] = useState<boolean>(false);
   const [selectedDescription, setSelectedDescription] = useState<string>('');
 
@@ -825,220 +840,214 @@ const InvoiceList = () => {
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
   const [processedInvoiceItems, setProcessedInvoiceItems] = useState<any[]>([]);
 
-  const columns: Column[] = useMemo(
+  const getStatusBadgeVariant = (status: string): string => {
+    switch (status) {
+      case STATUS_DRAFT: return "secondary";
+      case STATUS_SENT: return "info";
+      case STATUS_PAID: return "success";
+      case STATUS_OVERDUE: return "danger";
+      case STATUS_CANCELLED: return "dark";
+      case STATUS_PARTIALLY_PAID: return "warning";
+      case STATUS_FAILED: return "danger";
+      case STATUS_REFUNDED: return "danger";
+      case STATUS_PENDING: return "warning";
+      default: return "secondary";
+    }
+  };
+  const getStatusLabel = (status: string): string => {
+    switch (status) {
+      case STATUS_DRAFT: return "Draft";
+      case STATUS_SENT: return "Sent";
+      case STATUS_PAID: return "Paid";
+      case STATUS_OVERDUE: return "Overdue";
+      case STATUS_CANCELLED: return "Cancelled";
+      case STATUS_PARTIALLY_PAID: return "Partially Paid";
+      case STATUS_FAILED: return "Failed";
+      case STATUS_REFUNDED: return "Refunded";
+      case STATUS_PENDING: return "Pending";
+      default: return status || "Draft";
+    }
+  };
+
+  const openInvoiceSidebar = useCallback((row: InvoiceData) => {
+    setSelectedInvoiceSidebar(row);
+    setShowInvoiceSidebar(true);
+  }, []);
+  const closeInvoiceSidebar = useCallback(() => {
+    setShowInvoiceSidebar(false);
+    setSelectedInvoiceSidebar(null);
+  }, []);
+
+  const handleViewInvoice = useCallback(async (invoice: InvoiceData) => {
+    const invoiceDetails = await getInvoice(invoice.id);
+    setSelectedInvoiceForView(invoiceDetails);
+    setShowViewInvoiceModal(true);
+  }, []);
+
+  const closeViewInvoiceModal = useCallback(() => {
+    setShowViewInvoiceModal(false);
+    setSelectedInvoiceForView(null);
+  }, []);
+
+  const handleOpenFiltersSidebar = useCallback(() => {
+    setPendingFilters({ ...currentFilters });
+    setShowFiltersSidebar(true);
+  }, [currentFilters]);
+  const handleCloseFiltersSidebar = useCallback(() => {
+    setShowFiltersSidebar(false);
+  }, []);
+
+  const tableColumns: TableColumn<InvoiceData>[] = useMemo(
     () => [
       {
         key: "invoice_number",
-        name: "Invoice Number",
-        selector: (row: InvoiceData) => row.invoice_number,
+        label: "Invoice Number",
         sortable: true,
-        cell: (props: InvoiceData) => (
-          <div>
-            #{props.invoice_number}
-          </div>
-        ),
+        render: (row) => <span>#{row.invoice_number}</span>,
       },
       {
         key: "status",
-        name: "Status",
-        selector: (row: InvoiceData) => row.status,
+        label: "Status",
         sortable: true,
-        cell: (props: InvoiceData) => {
-          const getStatusBadge = (status: string) => {
-            switch (status) {
-              case STATUS_DRAFT:
-                return <span className="badge bg-secondary">Draft</span>;
-              case STATUS_SENT:
-                return <span className="badge bg-info">Sent</span>;
-              case STATUS_PAID:
-                return <span className="badge bg-success">Paid</span>;
-              case STATUS_OVERDUE:
-                return <span className="badge bg-danger">Overdue</span>;
-              case STATUS_CANCELLED:
-                return <span className="badge bg-dark">Cancelled</span>;
-
-              case STATUS_PARTIALLY_PAID:
-                return <span className="badge bg-warning">Partially Paid</span>;
-              case STATUS_FAILED:
-                return <span className="badge bg-danger">Failed</span>;
-              case STATUS_REFUNDED:
-                return <span className="badge bg-danger">Refunded</span>;
-              case STATUS_PENDING:
-                return <span className="badge bg-warning">Pending</span>;
-              case STATUS_DRAFT:
-                return <span className="badge bg-secondary">Draft</span>;
-              default:
-                return <span className="badge bg-light text-dark">{status}</span>;
-            }
-          };
-          
-          return getStatusBadge(props.status || STATUS_DRAFT);
-        },
+        type: "badge",
+        accessor: (row) => getStatusLabel(row.status || STATUS_DRAFT),
+        badge: { getVariant: (row) => getStatusBadgeVariant(row.status || STATUS_DRAFT) as any },
       },
-     
-      // {
-      //   key: "subtotal",
-      //   name: "Subtotal",
-      //   selector: (row: InvoiceData) => row.subtotal,
-      //   sortable: true,
-      //   cell: (props: InvoiceData) => (
-      //     <span >
-      //       {props?.currency_code || "USD"} {" "} {formatNumber(parseFloat(props?.subtotal || "0"))}
-      //     </span>
-      //   ),
-      // },
-      // {
-      //   key: "tax_amount",
-      //   name: "VAT Amount",
-      //   selector: (row: InvoiceData) => row.tax_amount,
-      //   sortable: true,
-      //   cell: (props: InvoiceData) => (
-      //     <span >
-      //       {props?.currency_code || "AED"}{" "}
-      //       {formatNumber(parseFloat(props?.tax_amount || "0"))}
-      //     </span>
-      //   ),
-      // },
       {
         key: "total_amount",
-        name: "Total Amount",
-        selector: (row: InvoiceData) => row.total_amount,
+        label: "Total Amount",
         sortable: true,
-        cell: (props: InvoiceData) => (
-          <span >
-            {props.currency_code || "AED"} {" "} {formatNumber(parseFloat(props?.total_amount || "0"))}
+        render: (row) => (
+          <span>
+            {row.currency_code || "AED"} {formatNumber(parseFloat(row?.total_amount || "0"))}
           </span>
         ),
       },
-
       {
         key: "amount_due",
-        name: "Amount Due",
-        selector: (row: InvoiceData) => row?.amount_due,
+        label: "Amount Due",
         sortable: true,
-        cell: (props: InvoiceData) => (
-          <span >
-            {props.currency_code || "AED"} {" "} {formatNumber(parseFloat(props?.amount_due || "0"))}
+        render: (row) => (
+          <span>
+            {row.currency_code || "AED"} {formatNumber(parseFloat(row?.amount_due || "0"))}
           </span>
         ),
       },
-      
       {
         key: "invoice_date",
-        name: "Invoice Date",
-        selector: (row: InvoiceData) => row.invoice_date,
+        label: "Invoice Date",
         sortable: true,
-        cell: (props: InvoiceData) => (
-          <span >
-            {moment(props.invoice_date).format("DD-MMM-YYYY")}
-          </span>
-        ),
+        accessor: (row) => (row.invoice_date ? moment(row.invoice_date).format("DD-MMM-YYYY") : ""),
       },
       {
         key: "due_date",
-        name: "Due Date",
-        selector: (row: InvoiceData) => row.due_date,
+        label: "Due Date",
         sortable: true,
-        cell: (props: InvoiceData) => (
-          <span>
-            {props.due_date
-              ? moment(props.due_date).format("DD-MMM-YYYY")
-              : "No due date"}
-          </span>
-        ),
-      },
-      
-      {
-        key: "Action",
-        name: "ACTION",
-        selector: (row: InvoiceData) => row.id,
-        sortable: false,
-        cell: (props: InvoiceData) => {
-         
-          return (
-            <>
-          
-          <div className="d-flex gap-2"> 
-
-          <Button 
-              variant="primary" 
-              size="sm"
-              style={{ 
-               
-                fontSize: '0.85rem',
-                padding: '0.375rem 0.75rem',
-                fontWeight: '500'
-              }}
-              onClick={() => handleViewInvoice(props)}
-              title="View Invoice"
-            >
-              View
-            </Button> 
-            
-              {(props.status === STATUS_PENDING || props.status === STATUS_OVERDUE || props.status === STATUS_PARTIALLY_PAID) && session?.user?.permissions?.includes('pay-invoices-billing') && (
-
-              <Button 
-              variant="danger" 
-              size="sm"
-              style={{ 
-               
-                color: 'white',
-                fontSize: '0.85rem',
-                padding: '0.375rem 0.75rem'
-              }}
-              onClick={() => handlePayInvoice(props)}
-              >
-              Pay Now
-              </Button>
-
-                        
-              )}
-             
-                       
-             {props.status === STATUS_PAID 
-             && (
-              <>
-              
-              <Button 
-              variant="success" 
-              size="sm"
-              style={{ 
-               
-                fontSize: '0.85rem',
-                padding: '0.375rem 0.75rem',
-                fontWeight: '500'
-              }}
-              
-            >
-              Paid
-            </Button> 
-              </>
-             )}
-                      
-                      <Button 
-              variant="info" 
-              size="sm"
-              style={{ 
-                backgroundColor: '#5bc0de', 
-                borderColor: '#5bc0de', 
-                color: 'white',
-                fontSize: '0.85rem', 
-                padding: '0.375rem 0.75rem'
-              }}
-              onClick={() => handleDownloadPDF(props)}
-              >
-              Download
-              </Button>
-                        </div>
-                       
-            </>
-          );
-        },
+        accessor: (row) =>
+          row.due_date ? moment(row.due_date).format("DD-MMM-YYYY") : "No due date",
       },
     ],
-    [session?.user?.permissions]
+    []
   );
 
+  const invoiceTableActions: GenericTableAction<InvoiceData>[] = useMemo(
+    () => [
+      {
+        label: "View",
+        icon: <Eye size={16} />,
+        onClick: (row: InvoiceData) => handleViewInvoice(row),
+      },
+      {
+        label: "Pay Now",
+        icon: <DollarSign size={16} />,
+        // variant: "danger",
+        show: (row: InvoiceData) =>
+          (row.status === STATUS_PENDING || row.status === STATUS_OVERDUE || row.status === STATUS_PARTIALLY_PAID) &&
+          !!session?.user?.permissions?.includes("pay-invoices-billing"),
+        onClick: (row: InvoiceData) => handlePayInvoice(row),
+      },
+      {
+        label: "Download",
+        icon: <Download size={16} />,
+        onClick: (row: InvoiceData) => handleDownloadPDF(row),
+      },
+    ],
+    [session?.user?.permissions, handleViewInvoice]
+  );
+
+  const invoiceFilterFields: FilterField[] = useMemo(
+    () => [
+      {
+        id: "search",
+        label: "Search",
+        type: "text",
+        value: pendingFilters.search ?? "",
+        onChange: (value) =>
+          setPendingFilters((prev) => ({ ...prev, search: value || undefined })),
+        placeholder: "Search by invoice number...",
+      },
+      {
+        id: "status",
+        label: "Status",
+        type: "dropdown",
+        value: pendingFilters.status ?? "",
+        onChange: (value) =>
+          setPendingFilters((prev) => ({ ...prev, status: value || undefined })),
+        options: [
+          { value: "", label: "All Status" },
+          { value: STATUS_DRAFT, label: "Draft" },
+          { value: STATUS_SENT, label: "Sent" },
+          { value: STATUS_PAID, label: "Paid" },
+          { value: STATUS_PENDING, label: "Pending" },
+          { value: STATUS_OVERDUE, label: "Overdue" },
+          { value: STATUS_PARTIALLY_PAID, label: "Partially Paid" },
+          { value: STATUS_CANCELLED, label: "Cancelled" },
+          { value: STATUS_FAILED, label: "Failed" },
+          { value: STATUS_REFUNDED, label: "Refunded" },
+        ],
+      },
+      {
+        id: "invoice_date_from",
+        label: "Invoice Date From",
+        type: "date",
+        value: pendingFilters.invoice_date_from ?? "",
+        onChange: (value) =>
+          setPendingFilters((prev) => ({ ...prev, invoice_date_from: value || undefined })),
+      },
+      {
+        id: "invoice_date_to",
+        label: "Invoice Date To",
+        type: "date",
+        value: pendingFilters.invoice_date_to ?? "",
+        onChange: (value) =>
+          setPendingFilters((prev) => ({ ...prev, invoice_date_to: value || undefined })),
+      },
+      {
+        id: "due_date_from",
+        label: "Due Date From",
+        type: "date",
+        value: pendingFilters.due_date_from ?? "",
+        onChange: (value) =>
+          setPendingFilters((prev) => ({ ...prev, due_date_from: value || undefined })),
+      },
+      {
+        id: "due_date_to",
+        label: "Due Date To",
+        type: "date",
+        value: pendingFilters.due_date_to ?? "",
+        onChange: (value) =>
+          setPendingFilters((prev) => ({ ...prev, due_date_to: value || undefined })),
+      },
+    ],
+    [
+      pendingFilters.search,
+      pendingFilters.status,
+      pendingFilters.invoice_date_from,
+      pendingFilters.invoice_date_to,
+      pendingFilters.due_date_from,
+      pendingFilters.due_date_to,
+    ]
+  );
 
   // Load company-specific products
   const loadCompanyProducts = useCallback(async (companyId: number) => {
@@ -1442,6 +1451,53 @@ const InvoiceList = () => {
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
   const [summary, setSummary] = useState<any | null>(null);
 
+  const [invoiceList, setInvoiceList] = useState<InvoiceData[]>([]);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    rowsPerPage: 15,
+    totalRows: 0,
+  });
+  const [selectedInvoiceSidebar, setSelectedInvoiceSidebar] = useState<InvoiceData | null>(null);
+  const [showInvoiceSidebar, setShowInvoiceSidebar] = useState(false);
+  const invoiceRequestIdRef = React.useRef(0);
+
+  const loadInvoices = useCallback(async () => {
+    invoiceRequestIdRef.current += 1;
+    const currentRequestId = invoiceRequestIdRef.current;
+    setInvoiceLoading(true);
+    try {
+      const response = await getInvoices({
+        page: pagination.currentPage,
+        per_page: pagination.rowsPerPage,
+        search: memoizedFilters.search || "",
+        ...memoizedFilters,
+      });
+      if (currentRequestId !== invoiceRequestIdRef.current) return;
+      const data = response?.data || [];
+      const total = response?.pagination?.total ?? 0;
+      setInvoiceList(data);
+      setTotalRecords(total);
+      setPagination((prev) => ({ ...prev, totalRows: total }));
+      if (response?.summary) setSummary(response.summary);
+    } catch (error) {
+      if (currentRequestId !== invoiceRequestIdRef.current) return;
+      console.error("Error fetching invoices:", error);
+      setInvoiceList([]);
+      setTotalRecords(0);
+      setPagination((prev) => ({ ...prev, totalRows: 0 }));
+    } finally {
+      if (invoiceRequestIdRef.current === currentRequestId) {
+        setInvoiceLoading(false);
+      }
+    }
+  }, [pagination.currentPage, pagination.rowsPerPage, memoizedFilters, refreshKey]);
+
+  React.useEffect(() => {
+    loadInvoices();
+  }, [loadInvoices]);
+
   const fetchInvoices = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       try {
@@ -1627,22 +1683,6 @@ const InvoiceList = () => {
       processedItems // Return processed items with individual VAT calculations
     };
   };
-
-  // View invoice handler
-  const handleViewInvoice = useCallback(async (invoice: InvoiceData) => {
-    // setSelectedInvoiceForView(invoice);
-    // setShowViewInvoiceModal(true);
-
-    const invoiceDetails = await getInvoice(invoice.id);
-    //console.log(invoiceDetails);
-    setSelectedInvoiceForView(invoiceDetails);
-    setShowViewInvoiceModal(true);
-  }, []);
-
-  const closeViewInvoiceModal = useCallback(() => {
-    setShowViewInvoiceModal(false);
-    setSelectedInvoiceForView(null);
-  }, []);
 
   // Payment handlers
   const handlePayInvoice = useCallback(async (invoice: InvoiceData) => {
@@ -2362,154 +2402,266 @@ const InvoiceList = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Invoices" />
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+        <div className="mb-3 mb-md-0">
+          <nav aria-label="breadcrumb">
+            <ol className="breadcrumb mb-0">
+              <li className="breadcrumb-item">
+                <a href="/dashboard" className="text-decoration-none">
+                  Accounting
+                </a>
+              </li>
+              <li className="breadcrumb-item active fw-bold" aria-current="page">
+                Invoices
+              </li>
+            </ol>
+          </nav>
+        </div>
+        <div className="d-flex flex-wrap gap-2">
+          
+          <Button
+            variant={showFilterTabs ? "secondary" : "outline-secondary"}
+            onClick={() => setShowFilterTabs(!showFilterTabs)}
+          >
+            <Layers size={16} className="me-2" />
+            {showFilterTabs ? "Hide Tabs" : "Show Tabs"}
+          </Button>
+          <Button
+            variant="outline-secondary"
+            onClick={handleOpenFiltersSidebar}
+          >
+            <Filter size={16} className="me-2" />
+            Filters
+          </Button>
+        </div>
+      </div>
 
-      <PageHeader
-        title="Invoices"
-        description="Manage your recurring services & renewals."
-       
-      />
-
-        {/* Filter Tabs & Search */}
-        <Card className="mb-4" style={{ border: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        <Card.Body className="p-3">
-          <Row className="align-items-center">
-            <Col lg={9} className="mb-3 mb-lg-0">
-              <div className="d-flex gap-2 flex-wrap">
-                <Button
-                  variant={activeStatusTab === null ? 'light' : 'link'}
-                  className={` text-decoration-none ${activeStatusTab === null ? 'bg-light' : ''}`}
-                  onClick={() => {
-                    setActiveStatusTab(null);
-                    setCurrentFilters((prev) => {
-                      const { status, ...rest } = prev;
-                      return rest;
-                    });
-                    setRefreshKey(prev => prev + 1);
-                  }}
-                  style={{ 
-                    fontWeight: activeStatusTab === null ? '600' : '400',
-                    color: activeStatusTab === null ? '#212529' : '#6c757d',
-                    padding: '0.5rem 1rem'
-                  }}
-                >
-                  All 
-                  <Badge bg="secondary" className="ms-2" style={{ fontSize: '0.7rem' }}>
-                    {summary?.total || 0}
-                  </Badge>
-                </Button>
-
-                <Button
-                  variant={activeStatusTab === 'paid' ? 'light' : 'link'}
-                  className={` text-decoration-none ${activeStatusTab === 'paid' ? 'bg-light' : ''}`}
-                  onClick={() => {
-                    setActiveStatusTab('paid');
-                    setCurrentFilters((prev) => ({ ...prev, status: 'paid' }));
-                    setRefreshKey(prev => prev + 1);
-                  }}
-                  style={{ 
-                    fontWeight: activeStatusTab === 'paid' ? '600' : '400',
-                    color: activeStatusTab === 'paid' ? '#212529' : '#6c757d',
-                    padding: '0.5rem 1rem'
-                  }}
-                >
-                  Paid
-                  <Badge bg="success" className="ms-2" style={{ fontSize: '0.7rem' }}>
-                    {summary?.status_counts?.paid || 0}
-                  </Badge>
-                </Button>
-                
-                
-
-                <Button
-                  variant={activeStatusTab === 'pending' ? 'light' : 'link'}
-                  className={` text-decoration-none ${activeStatusTab === 'pending' ? 'bg-light' : ''}`}
-                  onClick={() => {
-                    setActiveStatusTab('pending');
-                    setCurrentFilters((prev) => ({ ...prev, status: 'pending' }));
-                    setRefreshKey(prev => prev + 1);
-                  }}
-                  style={{ 
-                    fontWeight: activeStatusTab === 'pending' ? '600' : '400',
-                    color: activeStatusTab === 'pending' ? '#212529' : '#6c757d',
-                    padding: '0.5rem 1rem'
-                  }}
-                >
-                  Pending 
-                  <Badge bg="warning" className="ms-2" style={{ fontSize: '0.7rem' }}>
-                    {summary?.status_counts?.pending || 0}
-                  </Badge>
-                </Button>
-
-                <Button
-                  variant={activeStatusTab === 'overdue' ? 'light' : 'link'}
-                  className={` text-decoration-none ${activeStatusTab === 'overdue' ? 'bg-light' : ''}`}
-                  onClick={() => {
-                    setActiveStatusTab('overdue');
-                    setCurrentFilters((prev) => ({ ...prev, status: 'overdue' }));
-                    setRefreshKey(prev => prev + 1);
-                  }}
-                  style={{ 
-                    fontWeight: activeStatusTab === 'overdue' ? '600' : '400',
-                    color: activeStatusTab === 'overdue' ? '#212529' : '#6c757d',
-                    padding: '0.5rem 1rem'
-                  }}
-                >
-                  Overdue 
-                  <Badge bg="danger" className="ms-2" style={{ fontSize: '0.7rem' }}>
-                    {summary?.status_counts?.overdue || 0}
-                  </Badge>
-                </Button>
-
-
-                <Button
-                  variant={activeStatusTab === 'cancelled' ? 'light' : 'link'}
-                  className={` text-decoration-none ${activeStatusTab === 'cancelled' ? 'bg-light' : ''}`}
-                  onClick={() => {
-                    setActiveStatusTab('cancelled');
-                    setCurrentFilters((prev) => ({ ...prev, status: 'cancelled' }));
-                    setRefreshKey(prev => prev + 1);
-                  }}
-                  style={{ 
-                    fontWeight: activeStatusTab === 'cancelled' ? '600' : '400',
-                    color: activeStatusTab === 'cancelled' ? '#212529' : '#6c757d',
-                    padding: '0.5rem 1rem'
-                  }}
-                >
-                  Cancelled 
-                  <Badge bg="secondary" className="ms-2" style={{ fontSize: '0.7rem' }}>
-                    {summary?.status_counts?.cancelled || 0}
-                  </Badge>
-                </Button>
-
-               
-              </div>
-            </Col>
-            <Col lg={3}>
-              <Form.Control 
-                type="search" 
-                placeholder="Search invoices..." 
-                onChange={(e) => setCurrentFilters({ ...currentFilters, search: e.target.value })}
+        {/* Filter Tabs & Search (styled like customer-billing-history via filter-bar-* classes) */}
+        {showFilterTabs && (
+        <Card className="filter-bar-card">
+          <Card.Body className="filter-bar-body">
+            <div className="filter-bar-tabs">
+              <Button
+                variant={activeStatusTab === null ? "primary" : "outline-secondary"}
+                className="filter-bar-tab"
+                onClick={() => {
+                  setActiveStatusTab(null);
+                  setCurrentFilters((prev) => {
+                    const { status, ...rest } = prev;
+                    return rest;
+                  });
+                  setRefreshKey((prev) => prev + 1);
+                }}
+              >
+                <Receipt size={16} />
+                All
+              </Button>
+              <Button
+                variant={activeStatusTab === "paid" ? "primary" : "outline-secondary"}
+                className="filter-bar-tab"
+                onClick={() => {
+                  setActiveStatusTab("paid");
+                  setCurrentFilters((prev) => ({ ...prev, status: "paid" }));
+                  setRefreshKey((prev) => prev + 1);
+                }}
+              >
+                <CheckCircle size={16} />
+                Paid
+              </Button>
+              <Button
+                variant={activeStatusTab === "pending" ? "primary" : "outline-secondary"}
+                className="filter-bar-tab"
+                onClick={() => {
+                  setActiveStatusTab("pending");
+                  setCurrentFilters((prev) => ({ ...prev, status: "pending" }));
+                  setRefreshKey((prev) => prev + 1);
+                }}
+              >
+                <Clock size={16} />
+                Pending
+              </Button>
+              <Button
+                variant={activeStatusTab === "overdue" ? "primary" : "outline-secondary"}
+                className="filter-bar-tab"
+                onClick={() => {
+                  setActiveStatusTab("overdue");
+                  setCurrentFilters((prev) => ({ ...prev, status: "overdue" }));
+                  setRefreshKey((prev) => prev + 1);
+                }}
+              >
+                <AlertCircle size={16} />
+                Overdue
+              </Button>
+              <Button
+                variant={activeStatusTab === "cancelled" ? "primary" : "outline-secondary"}
+                className="filter-bar-tab"
+                onClick={() => {
+                  setActiveStatusTab("cancelled");
+                  setCurrentFilters((prev) => ({ ...prev, status: "cancelled" }));
+                  setRefreshKey((prev) => prev + 1);
+                }}
+              >
+                <Ban size={16} />
+                Cancelled
+              </Button>
+            </div>
+            {/* <div className="filter-bar-actions">
+              <Form.Control
+                type="search"
+                placeholder="Search invoices..."
+                onChange={(e) =>
+                  setCurrentFilters({ ...currentFilters, search: e.target.value })
+                }
               />
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
-      
-      {/* {session?.user?.permissions?.includes('list-invoices-billing') && ( */}
-      <GenericListPage
-        columns={columns}
-        fetchData={fetchInvoices}
-        title="Invoices"
-        searchPlaceholder="Search invoices..."
-        defaultPageSize={15}
-        filters={memoizedFilters}
-        refreshKey={refreshKey}
-        search={false}
-        tableStyle="table-style-2"
-      />
-      {/* )} */}
+            </div> */}
+          </Card.Body>
+        </Card>
+        )}
 
+      <GenericTable<InvoiceData>
+        data={invoiceList}
+        columns={tableColumns}
+        actions={invoiceTableActions}
+        showActions={true}
+        actionsLabel="Actions"
+        customizableColumns={true}
+        defaultSelectedColumns={["invoice_number", "status", "total_amount", "amount_due", "invoice_date", "due_date"]}
+        columnStorageKey="customerInvoicesSelectedColumns"
+        pagination={{
+          currentPage: pagination.currentPage,
+          rowsPerPage: pagination.rowsPerPage,
+          totalRows: totalRecords,
+          pageSizeOptions: [10, 15, 25, 50],
+        }}
+        onPaginationChange={(page, rowsPerPage) => {
+          setPagination((prev) => ({ ...prev, currentPage: page, rowsPerPage }));
+        }}
+        sortable={true}
+        loading={invoiceLoading}
+        emptyMessage="No invoices found"
+        loadingMessage="Loading invoices..."
+        hover={true}
+        uniqueKey="id"
+        onRowClick={(row) => openInvoiceSidebar(row)}
+      />
+
+      <GenericSidebar
+        isOpen={showInvoiceSidebar}
+        onClose={closeInvoiceSidebar}
+        title={selectedInvoiceSidebar ? `Invoice #${selectedInvoiceSidebar.invoice_number}` : "Invoice Details"}
+        subtitle={selectedInvoiceSidebar?.company?.name ?? ""}
+        metadata={selectedInvoiceSidebar?.due_date ? `Due: ${moment(selectedInvoiceSidebar.due_date).format("DD-MMM-YYYY")}` : undefined}
+        width="400px"
+        sections={[
+          {
+            id: "invoice-info",
+            title: "Invoice Information",
+            icon: FileText,
+            fields: [
+              { label: "Invoice Number", value: selectedInvoiceSidebar ? `#${selectedInvoiceSidebar.invoice_number}` : "N/A" },
+              {
+                label: "Status",
+                value: selectedInvoiceSidebar ? getStatusLabel(selectedInvoiceSidebar.status || STATUS_DRAFT) : "N/A",
+                type: "badge",
+                badgeVariant: selectedInvoiceSidebar ? getStatusBadgeVariant(selectedInvoiceSidebar.status || STATUS_DRAFT) : "secondary",
+              },
+              {
+                label: "Total Amount",
+                value: selectedInvoiceSidebar
+                  ? `${selectedInvoiceSidebar.currency_code || "AED"} ${formatNumber(parseFloat(selectedInvoiceSidebar?.total_amount || "0"))}`
+                  : "N/A",
+              },
+              {
+                label: "Amount Due",
+                value: selectedInvoiceSidebar
+                  ? `${selectedInvoiceSidebar.currency_code || "AED"} ${formatNumber(parseFloat(selectedInvoiceSidebar?.amount_due || "0"))}`
+                  : "N/A",
+              },
+              {
+                label: "Invoice Date",
+                value: selectedInvoiceSidebar?.invoice_date ?? null,
+                type: "date",
+                icon: Calendar,
+              },
+              {
+                label: "Due Date",
+                value: selectedInvoiceSidebar?.due_date ?? null,
+                type: "date",
+                icon: Calendar,
+              },
+            ],
+          },
+          {
+            id: "company-info",
+            title: "Bill To",
+            icon: FileText,
+            fields: [
+              { label: "Company", value: selectedInvoiceSidebar?.company?.name ?? "N/A" },
+              { label: "Country", value: selectedInvoiceSidebar?.company?.country ?? "N/A" },
+            ].filter((f) => f.value !== "N/A" || f.label === "Company"),
+          },
+        ]}
+        actions={[
+          {
+            label: "View Full Invoice",
+            icon: FileText,
+            variant: "primary",
+            onClick: () => {
+              if (selectedInvoiceSidebar) {
+                setSelectedInvoiceForView(selectedInvoiceSidebar);
+                setShowViewInvoiceModal(true);
+                closeInvoiceSidebar();
+              }
+            },
+          },
+          {
+            label: "Pay Now",
+            icon: DollarSign,
+            variant: "success",
+            show: !!(selectedInvoiceSidebar && (selectedInvoiceSidebar.status === STATUS_PENDING || selectedInvoiceSidebar.status === STATUS_OVERDUE || selectedInvoiceSidebar.status === STATUS_PARTIALLY_PAID) && session?.user?.permissions?.includes("pay-invoices-billing")),
+            onClick: () => {
+              if (selectedInvoiceSidebar) {
+                handlePayInvoice(selectedInvoiceSidebar);
+                closeInvoiceSidebar();
+              }
+            },
+          },
+          {
+            label: "Download PDF",
+            icon: Download,
+            variant: "outline-primary",
+            onClick: () => {
+              if (selectedInvoiceSidebar) {
+                handleDownloadPDF(selectedInvoiceSidebar);
+              }
+            },
+          },
+        ]}
+      />
+
+      <GenericFilterSidebar
+        isOpen={showFiltersSidebar}
+        onClose={handleCloseFiltersSidebar}
+        title="Filters"
+        subtitle="Filter invoices by status, date range, and search"
+        width="400px"
+        filters={invoiceFilterFields}
+        onApply={() => {
+          setCurrentFilters({ ...pendingFilters });
+          setPagination((prev) => ({ ...prev, currentPage: 1 }));
+          setRefreshKey((prev) => prev + 1);
+          setActiveStatusTab(pendingFilters.status ?? null);
+          setShowFiltersSidebar(false);
+        }}
+        onReset={() => {
+          setPendingFilters({});
+          setCurrentFilters({});
+          setActiveStatusTab(null);
+          setPagination((prev) => ({ ...prev, currentPage: 1 }));
+          setRefreshKey((prev) => prev + 1);
+          setShowFiltersSidebar(false);
+        }}
+      />
 
       {/* Payment Modal */}
       {showPaymentModal && selectedInvoiceForPayment && (
