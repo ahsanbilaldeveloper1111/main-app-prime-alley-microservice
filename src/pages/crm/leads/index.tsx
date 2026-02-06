@@ -35,6 +35,8 @@ import {
   getCrmDataById,
   getIndustries,
   getBusinessTypes,
+  getLeadFollowUps,
+  getMeetings
 } from "@utils/crm";
 import type { StageData, CampaignData, CrmDataItem, IndustryData, BusinessTypeData } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
@@ -1077,6 +1079,51 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     setRefreshKey((prev) => prev + 1);
   }, []);
 
+
+  const [leadFollowUps, setLeadFollowUps] = useState<any[]>([]);
+  const [loadingLeadFollowUps, setLoadingLeadFollowUps] = useState(false);
+  const fetchLeadFollowUps = useCallback(async (leadId: number) => {
+
+    try {
+      setLoadingLeadFollowUps(true);
+      const leadFollowUps  = await getLeadFollowUps(leadId);
+      setLeadFollowUps(leadFollowUps || [] as any);
+      console.log("leadFollowUps", leadFollowUps);
+    } catch (error) {
+      console.error("Failed to fetch lead follow-ups:", error);
+    } finally {
+      setLoadingLeadFollowUps(false);
+    }
+  }, []);
+
+  const [leadMeetings, setLeadMeetings] = useState<any[]>([]);
+  const [loadingMeetings, setLoadingMeetings] = useState(false);
+  const fetchMeetings = useCallback(async (leadId: number) => {
+    try {
+      setLoadingMeetings(true);
+      const meetings  = await getMeetings({lead_id: leadId});
+      console.log("meetings", meetings);
+      setLeadMeetings(meetings?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch meetings:", error);
+    } finally {
+      setLoadingMeetings(false);
+    }
+  }, []);
+
+  const handleRowClicked = useCallback(async (leadId: number) => {
+    try {
+      const leadData: any = await getLead(leadId);
+      await fetchLeadFollowUps(leadId);
+      await fetchMeetings(leadId);
+      setSelectedLead(leadData);
+      setShowLeadSidebar(true);
+    } catch (error) {
+      console.error("Failed to fetch lead:", error);
+      toast.error("Failed to load lead details");
+    }
+  }, []);
+
   const fetchStages = async () => {
     try {
       const stagesData = await getStages("lead");
@@ -1401,6 +1448,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   const [meetingToDelete, setMeetingToDelete] = useState<{
     meetingId: number;
     meetingName?: string;
+    leadId?: number;
   } | null>(null);
 
   // Handle call button click
@@ -2083,11 +2131,9 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         await createLeadFollowUp(followupData.leadId, payload);
       }
 
-      // Refresh lead data
-      if (viewingLead?.id === followupData.leadId) {
-        if(followupData.leadId) {
-          await handleViewLead(followupData.leadId);
-        }
+      // Refresh lead data (sidebar or view modal)
+      if (followupData.leadId) {
+        await handleRowClicked(followupData.leadId);
       }
 
       // Reset form and close modal
@@ -2103,15 +2149,12 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         notes: "",
         userExtension: "",
       });
-
-      // Refresh leads list
-      setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       console.error("Failed to create follow-up:", error);
     } finally {
       setLoadingFollowUp(false);
     }
-  }, [followupData, session, viewingLead, handleViewLead]);
+  }, [followupData, session, handleRowClicked]);
 
   // Handle follow-up update
   const handleUpdateFollowUp = useCallback(async () => {
@@ -2156,9 +2199,9 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
 
       await updateLeadFollowUp(followupData.leadId!, followUpIdToEdit, payload);
 
-      // Refresh lead data
-      if (viewingLead?.id === followupData.leadId) {
-        await handleViewLead(followupData.leadId!);
+      // Refresh lead data (sidebar or view modal)
+      if (followupData.leadId) {
+        await handleRowClicked(followupData.leadId);
       }
 
       // Reset form and close modal
@@ -2174,15 +2217,12 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         notes: "",
         userExtension: "",
       });
-
-      // Refresh leads list
-      setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       console.error("Failed to update follow-up:", error);
     } finally {
       setLoadingFollowUp(false);
     }
-  }, [followUpIdToEdit, followupData, session, viewingLead, handleViewLead]);
+  }, [followUpIdToEdit, followupData, session, handleRowClicked]);
   const getTodayDate = useCallback((startDateParam: string = "") => {
     
     let today = new Date();
@@ -2288,9 +2328,9 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
 
       await createMeeting(payload);
 
-      // Refresh lead data
-      if (viewingLead?.id === meetingData.leadId) {
-        await handleViewLead(meetingData.leadId);
+      // Refresh lead data (sidebar or view modal)
+      if (meetingData.leadId) {
+        await handleRowClicked(meetingData.leadId);
       }
 
       // Reset form and close modal
@@ -2307,15 +2347,12 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         extensions: [],
       });
       setMeetingAttendees([]);
-
-      // Refresh leads list
-      setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       console.error("Failed to create meeting:", error);
     } finally {
       setLoadingMeeting(false);
     }
-  }, [meetingData, meetingAttendees, session, viewingLead, handleViewLead]);
+  }, [meetingData, meetingAttendees, session, handleRowClicked]);
 
   // Handle meeting update
   const handleUpdateMeeting = useCallback(async () => {
@@ -2346,9 +2383,9 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
 
       await updateMeeting(meetingIdToEdit!, payload);
 
-      // Refresh lead data
-      if (viewingLead?.id === meetingData.leadId && meetingData.leadId) {
-        await handleViewLead(meetingData.leadId);
+      // Refresh lead data (sidebar or view modal)
+      if (meetingData.leadId) {
+        await handleRowClicked(meetingData.leadId);
       }
 
       // Reset form and close modal
@@ -2365,9 +2402,6 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         extensions: [],
       });
       setMeetingAttendees([]);
-
-      // Refresh leads list
-      setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       console.error("Failed to update meeting:", error);
     } finally {
@@ -2377,8 +2411,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     meetingIdToEdit,
     meetingData,
     meetingAttendees,
-    viewingLead,
-    handleViewLead,
+    handleRowClicked,
   ]);
 
   // Handle edit meeting click
@@ -2438,8 +2471,8 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
 
   // Handle meeting deletion
   const handleDeleteMeeting = useCallback(
-    (meetingId: number, meetingName?: string) => {
-      setMeetingToDelete({ meetingId, meetingName });
+    (meetingId: number, meetingName?: string, leadId?: number) => {
+      setMeetingToDelete({ meetingId, meetingName, leadId });
       setShowDeleteMeetingModal(true);
     },
     []
@@ -2451,22 +2484,20 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     try {
       await deleteMeeting(meetingToDelete.meetingId);
 
-      // Refresh lead data
-      if (viewingLead?.id) {
-        await handleViewLead(viewingLead.id);
+      // Refresh lead data (sidebar or view modal)
+      const leadIdToRefresh = meetingToDelete.leadId ?? viewingLead?.id;
+      if (leadIdToRefresh) {
+        await handleRowClicked(leadIdToRefresh);
       }
-
-      // Refresh leads list
-      setRefreshKey((oldKey) => oldKey + 1);
 
       setShowDeleteMeetingModal(false);
       setMeetingToDelete(null);
-      
+      toast.success("Meeting deleted successfully");
     } catch (error) {
       console.error("Failed to delete meeting:", error);
       toast.error("Failed to delete meeting");
     }
-  }, [meetingToDelete, viewingLead, handleViewLead]);
+  }, [meetingToDelete, viewingLead, handleRowClicked]);
 
   // Calculate analytics data
   const analyticsData = useMemo(() => {
@@ -3496,8 +3527,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           columnStorageKey="leadsSelectedColumns"
           onColumnChange={(cols) => setSelectedLeadsColumns(cols)}
           onRowClick={(lead) => {
-            setSelectedLead(lead.rawData || lead);
-            setShowLeadSidebar(true);
+            handleRowClicked(lead.rawData?.id || lead.id);
           }}
           onRowDoubleClick={(lead) => {
             if (session?.user?.permissions?.includes("list-crm-leads")) {
@@ -7646,59 +7676,248 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                 title: 'Follow-ups',
                 icon: History,
                 badge: {
-                  value: selectedLead?.follow_ups?.length || 0,
+                  value: leadFollowUps?.length || 0,
                   variant: 'secondary'
                 },
-                emptyState: {
-                  icon: History,
-                  message: 'No follow-ups yet',
-                  action: {
-                    label: 'Add Follow Up',
-                    onClick: () => {
-                      setFollowupData({
-                        leadId: selectedLead?.id || selectedLead?.rawData?.id || null,
-                        leadName: selectedLead?.name || '',
-                        followUpDate: '',
-                        followUpStatus: 'Pending',
-                        communicationChannel: 'Phone Call',
-                        communicationChannelOther: '',
-                        notes: '',
-                        userExtension: ''
-                      });
-                      setShowAddFollowupModal(true);
+                ...(leadFollowUps?.length
+                  ? {
+                      customContent: (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {(leadFollowUps || []).map((fu: any) => (
+                            <div
+                              key={fu.id}
+                              style={{
+                                padding: '12px',
+                                backgroundColor: '#f8fafc',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0',
+                                fontSize: '13px'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                                  {fu.follow_up_date ? moment(fu.follow_up_date).format(GlobalDateFormat) : '-'}
+                                </span>
+                                <span style={{ color: '#64748b', fontSize: '12px' }}>
+                                  {fu.communication_channel || fu.communication_channel_other || '-'}
+                                </span>
+                              </div>
+                              {fu.follow_up_status && (
+                                <div style={{ marginBottom: '4px', color: '#475569' }}>
+                                  <span style={{ color: '#94a3b8' }}>Status: </span>{fu.follow_up_status}
+                                </div>
+                              )}
+                              {fu.notes && (
+                                <div style={{ color: '#475569', lineHeight: 1.4 }}>
+                                  {fu.notes.length > 120 ? `${fu.notes.slice(0, 120)}...` : fu.notes}
+                                </div>
+                              )}
+                              <div style={{ marginTop: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0"
+                                  style={{ fontSize: '12px', color: '#6366f1' }}
+                                  onClick={() => {
+                                    const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                                    if (leadId) {
+                                      const followUpDate = fu.follow_up_date ? new Date(fu.follow_up_date).toISOString().split('T')[0] : '';
+                                      setFollowUpIdToEdit(fu.id);
+                                      setFollowupData({
+                                        leadId: Number(leadId),
+                                        leadName: selectedLead?.name || '',
+                                        followUpDate,
+                                        followUpStatus: fu.follow_up_status || 'Pending',
+                                        communicationChannel: fu.communication_channel || 'Phone Call',
+                                        communicationChannelOther: fu.communication_channel_other || '',
+                                        notes: fu.notes || '',
+                                        userExtension: (session?.user as any)?.extension || ''
+                                      });
+                                      setShowAddFollowupModal(true);
+                                    }
+                                  }}
+                                >
+                                  <Edit size={14} className="me-1" /> Edit
+                                </Button>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 text-danger"
+                                  title="Delete"
+                                  onClick={() => {
+                                    const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                                    if (leadId) {
+                                      handleDeleteFollowUp(Number(leadId), fu.id, selectedLead?.name);
+                                    }
+                                  }}
+                                >
+                                  <Trash2 size={14} className="me-1" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline-primary"
+                            size="sm"
+                            style={{ alignSelf: 'flex-start', marginTop: '4px' }}
+                            onClick={() => {
+                              const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                              if (leadId) {
+                                setFollowupData({
+                                  leadId: Number(leadId),
+                                  leadName: selectedLead?.name || '',
+                                  followUpDate: '',
+                                  followUpStatus: 'Pending',
+                                  communicationChannel: 'Phone Call',
+                                  communicationChannelOther: '',
+                                  notes: '',
+                                  userExtension: ''
+                                });
+                                setShowAddFollowupModal(true);
+                              }
+                            }}
+                          >
+                            <Plus size={14} className="me-1" /> Add Follow Up
+                          </Button>
+                        </div>
+                      )
                     }
-                  }
-                }
+                  : {
+                      emptyState: {
+                        icon: History,
+                        message: 'No follow-ups yet',
+                        action: {
+                          label: 'Add Follow Up',
+                          onClick: () => {
+                            setFollowupData({
+                              leadId: selectedLead?.id || selectedLead?.rawData?.id || null,
+                              leadName: selectedLead?.name || '',
+                              followUpDate: '',
+                              followUpStatus: 'Pending',
+                              communicationChannel: 'Phone Call',
+                              communicationChannelOther: '',
+                              notes: '',
+                              userExtension: ''
+                            });
+                            setShowAddFollowupModal(true);
+                          }
+                        }
+                      }
+                    })
               },
               {
                 id: 'meetings',
                 title: 'Meetings',
                 icon: Calendar,
                 badge: {
-                  value: selectedLead?.meetings?.length || 0,
+                  value: leadMeetings?.length || 0,
                   variant: 'secondary'
                 },
-                emptyState: {
-                  icon: Calendar,
-                  message: 'No meetings scheduled yet',
-                  action: {
-                    label: 'Schedule Meeting',
-                    onClick: () => {
-                      setMeetingData({
-                        leadId: selectedLead?.id || selectedLead?.rawData?.id || null,
-                        leadName: selectedLead?.name || '',
-                        meetingName: '',
-                        meetingType: 'Online',
-                        meetingDate: '',
-                        meetingTime: '',
-                        meetingOutcome: '',
-                        extensions: []
-                      });
-                      setMeetingAttendees([]);
-                      setShowAddMeetingModal(true);
+                ...(leadMeetings?.length
+                  ? {
+                      customContent: (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {(leadMeetings || []).map((m: any) => (
+                            <div
+                              key={m.id}
+                              style={{
+                                padding: '12px',
+                                backgroundColor: '#f8fafc',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0',
+                                fontSize: '13px'
+                              }}
+                            >
+                              <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: '6px' }}>
+                                {m.name || 'Meeting'}
+                              </div>
+                              <div style={{ color: '#64748b', marginBottom: '4px' }}>
+                                {m.meeting_date ? moment(m.meeting_date).format(GlobalDateFormat) : '-'}
+                                {m.meeting_time && ` at ${m.meeting_time}`}
+                              </div>
+                              <div style={{ color: '#475569', marginBottom: '4px' }}>
+                                <span style={{ color: '#94a3b8' }}>Type: </span>
+                                {m.meeting_type || '-'}
+                              </div>
+                              {m.meeting_outcome && (
+                                <div style={{ color: '#475569', marginBottom: '4px' }}>
+                                  <span style={{ color: '#94a3b8' }}>Outcome: </span>
+                                  {m.meeting_outcome}
+                                </div>
+                              )}
+                              <div style={{ color: '#475569', marginBottom: '4px' }}>
+                                <span style={{ color: '#94a3b8' }}>Attendees: </span>
+                                {m.extensions?.map((ext: any) => {
+                                  const user = extensions.find((e: any) => String(e?.extension) === String(ext?.extension) || String(e?.id) === String(ext?.extension));
+                                  return user?.display_name || user?.name || ext?.extension || '';
+                                }).filter(Boolean).join(', ') || '-'}
+                              </div>
+                              <div style={{ marginTop: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 text-danger"
+                                  title="Delete"
+                                  onClick={() => {
+                                    const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                                    handleDeleteMeeting(m.id, m.name, leadId ? Number(leadId) : undefined);
+                                  }}
+                                >
+                                  <Trash2 size={14} className="me-1" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline-primary"
+                            size="sm"
+                            style={{ alignSelf: 'flex-start', marginTop: '4px' }}
+                            onClick={() => {
+                              const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                              if (leadId) {
+                                setMeetingData({
+                                  leadId: Number(leadId),
+                                  leadName: selectedLead?.name || '',
+                                  meetingName: '',
+                                  meetingType: 'Online',
+                                  meetingDate: '',
+                                  meetingTime: '',
+                                  meetingOutcome: '',
+                                  extensions: []
+                                });
+                                setMeetingAttendees([]);
+                                setShowAddMeetingModal(true);
+                              }
+                            }}
+                          >
+                            <Plus size={14} className="me-1" /> Schedule Meeting
+                          </Button>
+                        </div>
+                      )
                     }
-                  }
-                }
+                  : {
+                      emptyState: {
+                        icon: Calendar,
+                        message: 'No meetings scheduled yet',
+                        action: {
+                          label: 'Schedule Meeting',
+                          onClick: () => {
+                            setMeetingData({
+                              leadId: selectedLead?.id || selectedLead?.rawData?.id || null,
+                              leadName: selectedLead?.name || '',
+                              meetingName: '',
+                              meetingType: 'Online',
+                              meetingDate: '',
+                              meetingTime: '',
+                              meetingOutcome: '',
+                              extensions: []
+                            });
+                            setMeetingAttendees([]);
+                            setShowAddMeetingModal(true);
+                          }
+                        }
+                      }
+                    })
               }
             ]
           }

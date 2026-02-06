@@ -293,6 +293,8 @@ const [contractDocumentPreview, setContractDocumentPreview] = useState<string | 
       parseFloat(formData.standard_discount_percentage || "0") +
       parseFloat(formData.special_discount_percentage || "0");
     const totalDiscount = (grandTotal * totalDiscountPercentage) / 100;
+    const special_discount_percentage =
+      (grandTotal * parseFloat(formData.special_discount_percentage || "0")) / 100;
     const subtotalAfterDiscount = grandTotal - totalDiscount;
     const taxAmount =
       (subtotalAfterDiscount * parseFloat(formData.tax_percentage || "0")) / 100;
@@ -301,6 +303,7 @@ const [contractDocumentPreview, setContractDocumentPreview] = useState<string | 
     return {
       grandTotal,
       totalDiscount,
+      special_discount_percentage,
       subtotalAfterDiscount,
       taxAmount,
       netValue,
@@ -471,7 +474,7 @@ const [contractDocumentPreview, setContractDocumentPreview] = useState<string | 
     //   };
 
     //   await createOrder(payload);
-      toast.success("Order created successfully!");
+      //toast.success("Order created successfully!");
       
       // Reset form
       resetForm();
@@ -977,7 +980,7 @@ const resetForm = () => {
                       <h5 className="fw-bold mb-4 text-success">ORDER ITEMS</h5>
 
                       {/* Order-level settings */}
-                      <Row className="mb-4">
+                      {/* <Row className="mb-4">
                         <Col md={4}>
                           <Form.Group className="mb-3">
                             <Form.Label>Tax Percentage (%)</Form.Label>
@@ -1029,7 +1032,7 @@ const resetForm = () => {
                             />
                           </Form.Group>
                         </Col>
-                      </Row>
+                      </Row> */}
 
                       {/* Add Item Button */}
                       {/* <div className="d-flex justify-content-end mb-3">
@@ -1189,6 +1192,25 @@ const resetForm = () => {
               </td>
             </tr>
 
+            {totals.special_discount_percentage > 0 && (
+              <tr>
+                <td
+                  colSpan={hasDescription ? 5 : 4}
+                  className="text-end text-muted"
+                >
+                  Special Discount (
+                  {parseFloat(formData.special_discount_percentage || '0')}%):
+                </td>
+                <td className="text-end text-danger">
+                  - {formData.currency || 'AED'}{' '}
+                  {totals.special_discount_percentage.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </td>
+              </tr>
+            )}
+
             {totals.totalDiscount > 0 && (
               <tr>
                 <td
@@ -1339,6 +1361,7 @@ const resetForm = () => {
               <input
                 id="contract-file-input"
                 type="file"
+                required
                 accept=".pdf,.doc,.docx"
                 style={{ display: "none" }}
                 onChange={(e) => {
