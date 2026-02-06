@@ -543,56 +543,6 @@ const GenericTable = <T extends Record<string, any>>({
         </div>
       )}
 
-      {/* Column customizer bar (only when no Actions column) */}
-      {customizableColumns && (!showActions || actions.length === 0) && (
-        <div className="d-flex justify-content-end mb-2">
-          <Dropdown align="end" autoClose="outside">
-            <Dropdown.Toggle
-              variant="link"
-              size="sm"
-              className="d-inline-flex align-items-center p-1 text-secondary text-decoration-none border-0"
-              id="column-customizer-toggle"
-              style={{ minWidth: 'auto' }}
-            >
-              <Layers size={18} />
-            </Dropdown.Toggle>
-            <Dropdown.Menu align="end" className="column-selector-menu">
-              {columns.map((col) => (
-                <Dropdown.Item key={col.key} as="div">
-                  <Form.Check
-                    type="checkbox"
-                    label={col.label || col.key}
-                    checked={selectedColumns.includes(col.key)}
-                    onChange={() => handleColumnToggle(col.key)}
-                  />
-                </Dropdown.Item>
-              ))}
-              <Dropdown.Divider />
-              <Dropdown.Item
-                onClick={() => {
-                  const allKeys = columns.map(c => c.key);
-                  setSelectedColumns(allKeys);
-                  if (columnStorageKey) localStorage.setItem(columnStorageKey, JSON.stringify(allKeys));
-                  if (onColumnChange) onColumnChange(allKeys);
-                }}
-              >
-                Select All
-              </Dropdown.Item>
-              <Dropdown.Item
-                onClick={() => {
-                  const defaultKeys = defaultSelectedColumns || columns.map(c => c.key);
-                  setSelectedColumns(defaultKeys);
-                  if (columnStorageKey) localStorage.setItem(columnStorageKey, JSON.stringify(defaultKeys));
-                  if (onColumnChange) onColumnChange(defaultKeys);
-                }}
-              >
-                Reset to Default
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
-        </div>
-      )}
-
       {/* Table */}
       <Card className="border-0 shadow-sm generic-table-card">
         <Card.Body className="p-0">
@@ -615,19 +565,75 @@ const GenericTable = <T extends Record<string, any>>({
                       />
                     </th>
                   )}
-                  {visibleColumns.map((col) => (
-                    <th
-                      key={col.key}
-                      className={`generic-table-th ${col.sortable !== false && sortable ? 'sortable' : ''}`}
-                      style={{ textAlign: col.align || 'left' }}
-                      onClick={() => col.sortable !== false && sortable && handleSort(col.key)}
-                    >
-                      <div className="th-content">
-                        <span>{col.label}</span>
-                        {col.sortable !== false && sortable && renderSortIcon(col.key)}
-                      </div>
-                    </th>
-                  ))}
+                  {visibleColumns.map((col, colIndex) => {
+                    const isLastColumn = colIndex === visibleColumns.length - 1;
+                    const hasActionsColumn = showActions && actions.length > 0;
+                    const showCustomizerInHeader = customizableColumns && isLastColumn && !hasActionsColumn;
+                    return (
+                      <th
+                        key={col.key}
+                        className={`generic-table-th ${col.sortable !== false && sortable ? 'sortable' : ''}`}
+                        style={{ textAlign: col.align || 'left' }}
+                        onClick={(e) => {
+                          if (showCustomizerInHeader && (e.target as HTMLElement).closest('.dropdown')) return;
+                          col.sortable !== false && sortable && handleSort(col.key);
+                        }}
+                      >
+                        <div className="th-content d-flex align-items-center justify-content-between gap-1">
+                          <div className="d-flex align-items-center">
+                            <span>{col.label}</span>
+                            {col.sortable !== false && sortable && renderSortIcon(col.key)}
+                          </div>
+                          {showCustomizerInHeader && (
+                            <Dropdown align="end" autoClose="outside" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                              <Dropdown.Toggle
+                                variant="link"
+                                size="sm"
+                                className="d-inline-flex align-items-center p-1 text-secondary text-decoration-none border-0"
+                                id="column-customizer-toggle"
+                                style={{ minWidth: 'auto' }}
+                              >
+                                <Layers size={18} />
+                              </Dropdown.Toggle>
+                              <Dropdown.Menu align="end" className="column-selector-menu">
+                                {columns.map((c) => (
+                                  <Dropdown.Item key={c.key} as="div">
+                                    <Form.Check
+                                      type="checkbox"
+                                      label={c.label || c.key}
+                                      checked={selectedColumns.includes(c.key)}
+                                      onChange={() => handleColumnToggle(c.key)}
+                                    />
+                                  </Dropdown.Item>
+                                ))}
+                                <Dropdown.Divider />
+                                <Dropdown.Item
+                                  onClick={() => {
+                                    const allKeys = columns.map(c => c.key);
+                                    setSelectedColumns(allKeys);
+                                    if (columnStorageKey) localStorage.setItem(columnStorageKey, JSON.stringify(allKeys));
+                                    if (onColumnChange) onColumnChange(allKeys);
+                                  }}
+                                >
+                                  Select All
+                                </Dropdown.Item>
+                                <Dropdown.Item
+                                  onClick={() => {
+                                    const defaultKeys = defaultSelectedColumns || columns.map(c => c.key);
+                                    setSelectedColumns(defaultKeys);
+                                    if (columnStorageKey) localStorage.setItem(columnStorageKey, JSON.stringify(defaultKeys));
+                                    if (onColumnChange) onColumnChange(defaultKeys);
+                                  }}
+                                >
+                                  Reset to Default
+                                </Dropdown.Item>
+                              </Dropdown.Menu>
+                            </Dropdown>
+                          )}
+                        </div>
+                      </th>
+                    );
+                  })}
                   {showActions && actions.length > 0 && (
                     <th className="generic-table-th generic-table-actions-header">
                       <div className="d-flex align-items-center justify-content-center gap-1 w-100">
@@ -644,13 +650,13 @@ const GenericTable = <T extends Record<string, any>>({
                               <Layers size={18} />
                             </Dropdown.Toggle>
                             <Dropdown.Menu align="end" className="column-selector-menu">
-                              {columns.map((col) => (
-                                <Dropdown.Item key={col.key} as="div">
+                              {columns.map((c) => (
+                                <Dropdown.Item key={c.key} as="div">
                                   <Form.Check
                                     type="checkbox"
-                                    label={col.label || col.key}
-                                    checked={selectedColumns.includes(col.key)}
-                                    onChange={() => handleColumnToggle(col.key)}
+                                    label={c.label || c.key}
+                                    checked={selectedColumns.includes(c.key)}
+                                    onChange={() => handleColumnToggle(c.key)}
                                   />
                                 </Dropdown.Item>
                               ))}

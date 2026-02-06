@@ -228,11 +228,29 @@ const AccountOverview = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Account Overview" />
 
-      <PageHeader
+      {/* <PageHeader
         title="Account Overview"
         description="Here's what's happening with your account today."
         showSearch={false}
-      />
+      /> */}
+
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+        <div className="mb-3 mb-md-0">
+          <nav aria-label="breadcrumb">
+            <ol className="breadcrumb mb-0">
+              <li className="breadcrumb-item">
+                <a href="/dashboard" className="text-decoration-none">
+                  Accounting
+                </a>
+              </li>
+              <li className="breadcrumb-item active fw-bold" aria-current="page">
+                Overview
+              </li>
+            </ol>
+          </nav>
+        </div>
+
+        </div>
 
 <div>
          

@@ -27,11 +27,14 @@ export interface StatsCardData {
 interface StatsCardsProps {
   data: StatsCardData[];
   gridMinWidth?: string;
+  /** Font size for the stat value (e.g. '24px', '36px'). Defaults to '36px'. */
+  valueFontSize?: string;
 }
 
 const StatsCards: React.FC<StatsCardsProps> = ({ 
   data, 
-  gridMinWidth = '200px' 
+  gridMinWidth = '200px',
+  valueFontSize = '36px'
 }) => {
   return (
     <div style={{
@@ -74,7 +77,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                 <IconComponent size={24} color={iconColor} strokeWidth={2} />
               </div>
               <div style={{
-                fontSize: '36px',
+                fontSize: valueFontSize,
                 fontWeight: '700',
                 color: '#111827',
                 lineHeight: '1'
