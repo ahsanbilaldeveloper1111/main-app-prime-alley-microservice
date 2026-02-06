@@ -14,7 +14,10 @@ import "@assets/scss/tabs.scss";
 import { listTasks, getTask, updateTask, deleteTask, listProjects } from "@utils/tasks";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { ModuleSlug, formatDateForTable } from "@utils/Helper";
-import { Spinner, Button, Form, Dropdown, Table } from 'react-bootstrap';
+import { Spinner, Button, Form, Dropdown } from 'react-bootstrap';
+import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
+import GenericSidebar from '@components/GenericSidebar';
+import GenericFilterSidebar, { FilterField } from '@components/GenericFilterSidebar';
 import CreateRecurringTaskModal from '@components/work-planner/createrecurringtask-modal';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import {
@@ -39,7 +42,8 @@ import {
   Clock,
   X,
   Repeat,
-  FolderOpen
+  FolderOpen,
+  SlidersHorizontal
 } from 'lucide-react';
 
 
@@ -104,6 +108,7 @@ const RecurringReminders = () => {
     const [statusFilter, setStatusFilter] = useState('all');
     const [projectFilter, setProjectFilter] = useState('all');
     const [labelsFilter, setLabelsFilter] = useState('all');
+    const [showFilterSidebar, setShowFilterSidebar] = useState(false);
     const [projectsList, setProjectsList] = useState<ProjectOption[]>([]);
     const [loadingProjectsList, setLoadingProjectsList] = useState(false);
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -220,6 +225,45 @@ const RecurringReminders = () => {
       }
     };
 
+    const tableColumns: TableColumn<RecurringTask>[] = React.useMemo(() => [
+      { key: 'name', label: 'Task Name', sortable: true, accessor: (row) => row.name },
+      { key: 'recurrence', label: 'Recurrence', sortable: true, accessor: (row) => row.recurrence, render: (row) => <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Repeat size={14} />{row.recurrence}</div> },
+      { key: 'nextRun', label: 'Next Run', sortable: true, accessor: (row) => row.nextRun, render: (row) => <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={14} color="#64748b" />{row.nextRun}</div> },
+      { key: 'reminder', label: 'Reminder', sortable: true, accessor: (row) => row.reminder, render: (row) => <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Bell size={14} />{row.reminder}</div> },
+      {
+        key: 'labels',
+        label: 'Labels',
+        sortable: false,
+        render: (row) => (
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {(row.labels || []).map((label: { text: string; color: string; type?: string }, idx: number) => (
+              <span
+                key={idx}
+                style={{
+                  backgroundColor: label.color,
+                  color: 'white',
+                  padding: '5px 11px',
+                  fontWeight: '800',
+                  fontSize: '10px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  borderRadius: '8px',
+                  boxShadow: `0 3px 8px ${label.color}60`,
+                  border: 'none',
+                }}
+              >
+                {getLabelIcon(label.type)}
+                {label.text}
+              </span>
+            ))}
+          </div>
+        ),
+      },
+    ], []);
+    
     useEffect(() => {
       const fetchProjectsList = async () => {
         try {
@@ -264,6 +308,67 @@ const RecurringReminders = () => {
           return true;
         });
     }, [projectFilter, projectsList]);
+
+    const filterFields: FilterField[] = React.useMemo(() => [
+      {
+        id: 'search',
+        label: 'Search',
+        type: 'text',
+        value: todoSearchQuery,
+        onChange: (v: string) => setTodoSearchQuery(v ?? ''),
+        placeholder: 'Search recurring tasks...',
+      },
+      {
+        id: 'frequency',
+        label: 'Frequency',
+        type: 'dropdown',
+        value: frequencyFilter,
+        onChange: (v) => setFrequencyFilter(v ?? 'all'),
+        options: [
+          { value: 'all', label: 'All Frequencies' },
+          { value: 'daily', label: 'Daily' },
+          { value: 'weekly', label: 'Weekly' },
+          { value: 'monthly', label: 'Monthly' },
+        ],
+      },
+      {
+        id: 'status',
+        label: 'Status',
+        type: 'dropdown',
+        value: statusFilter,
+        onChange: (v) => setStatusFilter(v ?? 'all'),
+        options: [
+          { value: 'all', label: 'All Status' },
+          { value: 'active', label: 'Active' },
+          { value: 'paused', label: 'Paused' },
+        ],
+      },
+      {
+        id: 'project',
+        label: 'Project',
+        type: 'dropdown',
+        value: projectFilter,
+        onChange: (v) => {
+          setProjectFilter(v ?? 'all');
+          setLabelsFilter('all');
+        },
+        options: [
+          { value: 'all', label: 'All Projects' },
+          ...projectsList.map((p) => ({ value: String(p.id), label: p.name })),
+        ],
+      },
+      {
+        id: 'labels',
+        label: 'Labels',
+        type: 'dropdown',
+        value: labelsFilter,
+        onChange: (v) => setLabelsFilter(v ?? 'all'),
+        options: [
+          { value: 'all', label: 'All Labels' },
+          ...labelOptions.map((l) => ({ value: l.type, label: l.name })),
+        ],
+      },
+    ], [todoSearchQuery, frequencyFilter, statusFilter, projectFilter, labelsFilter, projectsList, labelOptions]);
 
     // Map API task to RecurringTask format
     const mapApiTaskToRecurringTask = (apiTask: ApiRecurringTask): RecurringTask => {
@@ -492,6 +597,21 @@ const RecurringReminders = () => {
     const upcomingRuns: any[] = selectedTaskRaw?.upcoming_runs || [];
     const recentEvents: any[] = selectedTaskRaw?.recent_events || [];
 
+    const tableActions: TableAction<RecurringTask>[] = React.useMemo(() => [
+      {
+        label: 'Actions',
+        icon: <MoreVertical size={16} />,
+        dropdown: {
+          options: [
+            { label: 'Edit Task', icon: <Settings size={14} />, onClick: (row) => handleEditTask(row) },
+            { label: 'Pause Task', icon: <Lock size={14} />, show: (row) => row.status === 'active', onClick: (row) => handleTogglePause(row) },
+            { label: 'Resume Task', icon: <Check size={14} />, show: (row) => row.status === 'paused', onClick: (row) => handleTogglePause(row) },
+            { label: 'Delete Task', icon: <X size={14} />, onClick: (row) => { setSelectedTask(row.id); setShowDeleteModal(true); }, className: 'text-danger', divider: true },
+          ],
+        },
+      },
+    ], []);
+
     const safeFormatDate = (value: any): string => {
       if (!value) return '';
       try {
@@ -549,8 +669,49 @@ const RecurringReminders = () => {
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Recurring Reminders" />
-      
-      <style>{`
+
+      {/* Page Header: title left, actions (Add + Filter) right - like leads.tsx */}
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+        <div className="mb-3 mb-md-0">
+          <h1 className="h4 mb-0 fw-bold">Recurring Reminders</h1>
+        </div>
+        <div className="d-flex flex-wrap gap-2">
+          <button
+            onClick={() => {
+              setEditingTask(null);
+              setShowCreateTaskModal(true);
+            }}
+            style={{
+              backgroundColor: '#5b8fd8',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '8px 16px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+            }}
+          >
+            <Plus size={16} /> Add Recurring
+          </button>
+          <Button
+            variant={frequencyFilter !== 'all' || statusFilter !== 'all' || projectFilter !== 'all' || labelsFilter !== 'all' || (todoSearchQuery && todoSearchQuery.trim() !== '') ? 'primary' : 'outline-secondary'}
+            onClick={() => setShowFilterSidebar(true)}
+            className="d-flex align-items-center gap-2"
+          >
+            <SlidersHorizontal size={16} />
+            Filters
+            {(frequencyFilter !== 'all' || statusFilter !== 'all' || projectFilter !== 'all' || labelsFilter !== 'all' || (todoSearchQuery && todoSearchQuery.trim() !== '')) && (
+              <span className="badge bg-light text-dark ms-1">Active</span>
+            )}
+          </Button>
+        </div>
+      </div>
+
+           <style>{`
    .table-responsive .table th:last-child, .table-responsive .table td:last-child {
           min-width: initial !important;
         }
@@ -931,49 +1092,13 @@ const RecurringReminders = () => {
       <div style={{ 
        
       }}>
-        {/* Action Bar */}
+        {/* Action Bar: tabs only (Add Recurring + Filters are in page header top right) */}
         <div style={{ 
           display: 'flex', 
           gap: '10px', 
           marginBottom: '16px',
           flexWrap: 'wrap'
         }}>
-          {/* {session?.user?.permissions?.includes('add-recurring-tasks') && ( */}
-          <button
-            onClick={() => {
-              setEditingTask(null);
-              setShowCreateTaskModal(true);
-            }}
-            style={{
-              backgroundColor: '#5b8fd8',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '9px 18px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: '600',
-              boxShadow: '0 2px 4px rgba(91,143,216,0.3)',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#4a7dc0';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 4px 8px rgba(91,143,216,0.4)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#5b8fd8';
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 2px 4px rgba(91,143,216,0.3)';
-            }}
-          >
-            <Plus size={16} /> Add Recurring
-          </button>
-          {/* )} */}
-
           <button
             onClick={() => setActiveTab('active')}
             style={{
@@ -1086,896 +1211,175 @@ const RecurringReminders = () => {
               boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
               border: '1px solid #e8eef5'
             }}>
-              {/* Filters */}
-              <div style={{ 
-                display: 'flex', 
-                gap: '10px', 
-                marginBottom: '16px',
-                paddingBottom: '14px',
-                borderBottom: '1px solid #f0f4f8',
-                flexWrap: 'wrap',
-                alignItems: 'center'
-              }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Calendar size={16} style={{ color: '#6c757d' }} />
-                    <Form.Select
-                      value={frequencyFilter}
-                      onChange={(e) => setFrequencyFilter(e.target.value)}
-                      size="sm"
-                      style={{
-                        padding: '7px 28px 7px 10px',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '6px',
-                        fontSize: '13px',
-                        backgroundColor: 'white',
-                        color: '#4a5568'
-                      }}
-                    >
-                      <option value="all">All Frequencies</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                    </Form.Select>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Settings size={16} style={{ color: '#6c757d' }} />
-                    <Form.Select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      size="sm"
-                      style={{
-                        padding: '7px 28px 7px 10px',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '6px',
-                        fontSize: '13px',
-                        backgroundColor: 'white',
-                        color: '#4a5568'
-                      }}
-                    >
-                      <option value="all">All Status</option>
-                      <option value="active">Active</option>
-                      <option value="paused">Paused</option>
-                    </Form.Select>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <FolderOpen size={16} style={{ color: '#6c757d' }} />
-                    <Form.Select
-                      value={projectFilter}
-                      onChange={(e) => {
-                        setProjectFilter(e.target.value);
-                        setLabelsFilter('all');
-                      }}
-                      size="sm"
-                      style={{
-                        padding: '7px 28px 7px 10px',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '6px',
-                        fontSize: '13px',
-                        backgroundColor: 'white',
-                        color: '#4a5568'
-                      }}
-                      disabled={loadingProjectsList}
-                    >
-                      <option value="all">All Projects</option>
-                      {projectsList.map(p => (
-                        <option key={p.id} value={String(p.id)}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </Form.Select>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Target size={16} style={{ color: '#6c757d' }} />
-                    <Form.Select
-                      value={labelsFilter}
-                      onChange={(e) => setLabelsFilter(e.target.value)}
-                      size="sm"
-                      style={{
-                        padding: '7px 28px 7px 10px',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '6px',
-                        fontSize: '13px',
-                        backgroundColor: 'white',
-                        color: '#4a5568'
-                      }}
-                    >
-                      <option value="all">All Labels</option>
-                      {labelOptions.map(l => (
-                        <option key={`${l.id}-${l.type}`} value={l.type}>
-                          {l.name}
-                        </option>
-                      ))}
-                    </Form.Select>
-                  </div>
-                  
-                  {(frequencyFilter !== 'all' || statusFilter !== 'all' || projectFilter !== 'all' || labelsFilter !== 'all') && (
-                    <Button
-                      variant="link"
-                      size="sm"
-                      onClick={() => {
-                        setFrequencyFilter('all');
-                        setStatusFilter('all');
-                        setProjectFilter('all');
-                        setLabelsFilter('all');
-                      }}
-                      style={{ padding: '7px', fontSize: '13px', textDecoration: 'none' }}
-                    >
-                      <X size={16} /> Clear
-                    </Button>
-                  )}
-                </div>
-
-              {/* Quick Search */}
-              <div style={{ marginBottom: '18px', position: 'relative' }}>
-                <div style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                  <Search size={16} color="#a0aec0" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search recurring tasks..."
-                  value={todoSearchQuery}
-                  onChange={(e) => setTodoSearchQuery(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px 10px 38px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    backgroundColor: '#f8fafc',
-                    transition: 'all 0.2s'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white';
-                    e.currentTarget.style.borderColor = '#5b8fd8';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f8fafc';
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                  }}
-                />
-              </div>
-
-                  {/* Table */}
-                  
-                    <div className="table-responsive">
-                      <Table hover className="tasks-table">
-                        <thead>
-                          <tr>
-                            <th style={{ width: '50px' }}></th>
-                            <th>Task Name</th>
-                            <th>Recurrence</th>
-                            <th>Next Run</th>
-                            <th>Reminder</th>
-                            <th style={{ width: '50px' }}>Labels</th>
-                            <th style={{ width: '50px' }}></th>
-                          </tr>
-                        </thead>
-                      <tbody>
-                        {loading ? (
-                          <tr>
-                            <td colSpan={7} className="text-center" style={{ padding: '3rem' }}>
-                              <Spinner animation="border" />
-                            </td>
-                          </tr>
-                        ) : filteredTasks.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="text-center" style={{ padding: '3rem', color: '#718096', fontSize: '14px' }}>
-                              No recurring tasks found
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredTasks.map((task, taskIdx) => (
-                            <tr
-                              key={task.id}
-                              onClick={() => {
-                                handleTaskClick(task);
-                              }}
-                              style={{
-                                backgroundColor: selectedTask === task.id ? '#eff6ff' : undefined
-                              }}
-                            >
-                              <td onClick={(e) => e.stopPropagation()}>
-                                <Form.Check 
-                                  type="checkbox" 
-                                  style={{ accentColor: '#3b82f6' }}
-                                />
-                              </td>
-                              <td className="task-name">
-                                {task.name}
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Repeat size={14} />
-                                  {task.recurrence}
-                                </div>
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Clock size={14} color="#64748b" />
-                                  {task.nextRun}
-                                </div>
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Bell size={14} />
-                                  {task.reminder}
-                                </div>
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-                                  {task.labels.map((label, idx) => (
-                                    <span
-                                      key={idx}
-                                      style={{
-                                        backgroundColor: label.color,
-                                        color: 'white',
-                                        padding: '5px 11px',
-                                        fontWeight: '800',
-                                        fontSize: '10px',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '0.6px',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '5px',
-                                        borderRadius: '8px',
-                                        boxShadow: `0 3px 8px ${label.color}60`,
-                                        border: 'none',
-                                        transition: 'all 0.2s',
-                                        cursor: 'default'
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        e.currentTarget.style.transform = 'translateY(-2px)';
-                                        e.currentTarget.style.boxShadow = `0 5px 12px ${label.color}80`;
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                        e.currentTarget.style.boxShadow = `0 3px 8px ${label.color}60`;
-                                      }}
-                                    >
-                                      {getLabelIcon(label.type)}
-                                      {label.text}
-                                    </span>
-                                  ))}
-                                </div>
-                              </td>
-                                <td onClick={(e) => e.stopPropagation()}>
-                                <Dropdown
-                                  show={openDropdown === task.id}
-                                  onToggle={(isOpen) => setOpenDropdown(isOpen ? task.id : null)}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <Dropdown.Toggle
-                                    as="button"
-                                    bsPrefix="custom-dropdown-toggle"
-                                    className="p-0 border-0 bg-transparent"
-                                    style={{ color: '#718096', opacity: 0.6, cursor: 'pointer' }}
-                                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
-                                  >
-                                    <MoreVertical size={16} />
-                                  </Dropdown.Toggle>
-
-                                  <Dropdown.Menu align="end" style={{ fontSize: '13px', minWidth: '180px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', border: '1px solid #e2e8f0' }}>
-                                    <Dropdown.Item 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleEditTask(task);
-                                      }}
-                                      style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}
-                                    >
-                                      <Settings size={14} />
-                                      <span>Edit Task</span>
-                                    </Dropdown.Item>
-                                    <Dropdown.Item 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleTogglePause(task);
-                                      }}
-                                      style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}
-                                    >
-                                      {task.status === 'active' ? (
-                                        <>
-                                          <Lock size={14} />
-                                          <span>Pause Task</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Check size={14} />
-                                          <span>Resume Task</span>
-                                        </>
-                                      )}
-                                    </Dropdown.Item>
-                                    <Dropdown.Divider style={{ margin: '4px 0' }} />
-                                    <Dropdown.Item 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedTask(task.id);
-                                        setShowDeleteModal(true);
-                                      }}
-                                      style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', color: '#dc3545' }}
-                                    >
-                                      <X size={14} />
-                                      <span>Delete Task</span>
-                                    </Dropdown.Item>
-                                  </Dropdown.Menu>
-                                </Dropdown>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </Table>
-                    </div>
-                    
-                    {/* Pagination Controls */}
-                    {!loading && pagination.last_page > 1 && filteredTasks.length > 0 && (
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginTop: '20px',
-                        paddingTop: '16px',
-                        borderTop: '1px solid #e8eef5'
-                      }}>
-                        <div style={{ fontSize: '13px', color: '#718096' }}>
-                          Showing {pagination.from || 0} to {pagination.to || 0} of {pagination.total || 0} tasks
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <button
-                            onClick={() => {
-                              if (pagination.page > 1 && !loading) {
-                                setPagination(prev => ({ ...prev, page: prev.page - 1 }));
-                              }
-                            }}
-                            disabled={pagination.page === 1 || loading}
-                            style={{
-                              padding: '6px 12px',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '6px',
-                              backgroundColor: (pagination.page === 1 || loading) ? '#f8fafc' : 'white',
-                              color: (pagination.page === 1 || loading) ? '#cbd5e0' : '#4a5568',
-                              cursor: (pagination.page === 1 || loading) ? 'not-allowed' : 'pointer',
-                              fontSize: '13px',
-                              fontWeight: '500',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (pagination.page > 1 && !loading) {
-                                e.currentTarget.style.backgroundColor = '#f8fafc';
-                                e.currentTarget.style.borderColor = '#cbd5e0';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (pagination.page > 1 && !loading) {
-                                e.currentTarget.style.backgroundColor = 'white';
-                                e.currentTarget.style.borderColor = '#e2e8f0';
-                              }
-                            }}
-                          >
-                            Previous
-                          </button>
-                          
-                          <div style={{ display: 'flex', gap: '4px' }}>
-                            {Array.from({ length: Math.min(5, pagination.last_page) }, (_, i) => {
-                              let pageNum;
-                              if (pagination.last_page <= 5) {
-                                pageNum = i + 1;
-                              } else if (pagination.page <= 3) {
-                                pageNum = i + 1;
-                              } else if (pagination.page >= pagination.last_page - 2) {
-                                pageNum = pagination.last_page - 4 + i;
-                              } else {
-                                pageNum = pagination.page - 2 + i;
-                              }
-                              
-                              return (
-                                <button
-                                  key={pageNum}
-                                  onClick={() => {
-                                    if (!loading && pagination.page !== pageNum) {
-                                      setPagination(prev => ({ ...prev, page: pageNum }));
-                                    }
-                                  }}
-                                  disabled={loading}
-                                  style={{
-                                    minWidth: '32px',
-                                    height: '32px',
-                                    padding: '0 8px',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '6px',
-                                    backgroundColor: pagination.page === pageNum ? '#5b8fd8' : (loading ? '#f8fafc' : 'white'),
-                                    color: pagination.page === pageNum ? 'white' : (loading ? '#cbd5e0' : '#4a5568'),
-                                    cursor: loading ? 'not-allowed' : 'pointer',
-                                    fontSize: '13px',
-                                    fontWeight: pagination.page === pageNum ? '600' : '500',
-                                    transition: 'all 0.2s'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    if (pagination.page !== pageNum && !loading) {
-                                      e.currentTarget.style.backgroundColor = '#f8fafc';
-                                      e.currentTarget.style.borderColor = '#cbd5e0';
-                                    }
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    if (pagination.page !== pageNum && !loading) {
-                                      e.currentTarget.style.backgroundColor = 'white';
-                                      e.currentTarget.style.borderColor = '#e2e8f0';
-                                    }
-                                  }}
-                                >
-                                  {pageNum}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          
-                          <button
-                            onClick={() => {
-                              if (pagination.page < pagination.last_page && !loading) {
-                                setPagination(prev => ({ ...prev, page: prev.page + 1 }));
-                              }
-                            }}
-                            disabled={pagination.page >= pagination.last_page || loading}
-                            style={{
-                              padding: '6px 12px',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '6px',
-                              backgroundColor: (pagination.page >= pagination.last_page || loading) ? '#f8fafc' : 'white',
-                              color: (pagination.page >= pagination.last_page || loading) ? '#cbd5e0' : '#4a5568',
-                              cursor: (pagination.page >= pagination.last_page || loading) ? 'not-allowed' : 'pointer',
-                              fontSize: '13px',
-                              fontWeight: '500',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (pagination.page < pagination.last_page && !loading) {
-                                e.currentTarget.style.backgroundColor = '#f8fafc';
-                                e.currentTarget.style.borderColor = '#cbd5e0';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (pagination.page < pagination.last_page && !loading) {
-                                e.currentTarget.style.backgroundColor = 'white';
-                                e.currentTarget.style.borderColor = '#e2e8f0';
-                              }
-                            }}
-                          >
-                            Next
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  
+              <GenericTable<RecurringTask>
+                    data={filteredTasks}
+                    columns={tableColumns}
+                    actions={tableActions}
+                    showActions={true}
+                    actionsLabel="Actions"
+                    pagination={{
+                      currentPage: pagination.page,
+                      rowsPerPage: pagination.limit,
+                      totalRows: pagination.total,
+                      pageSizeOptions: [10, 15, 25, 50],
+                    }}
+                    onPaginationChange={(page, rowsPerPage) => {
+                      setPagination(prev => ({ ...prev, page, limit: rowsPerPage }));
+                    }}
+                    sortable={true}
+                    loading={loading}
+                    emptyMessage="No recurring tasks found"
+                    loadingMessage="Loading..."
+                    hover={true}
+                    uniqueKey="id"
+                    onRowClick={(row) => handleTaskClick(row)}
+                    customizableColumns={true}
+                    columnStorageKey="planner-recurring-reminders-columns"
+                  />
+              
               </div>
           </div>
 
-          {/* Right Sidebar (only when a task is selected) */}
-          {showTaskDetail && selectedTaskDetails ? (
-            <div
-              style={{
-                width: '340px',
-                backgroundColor: 'white',
-                borderRadius: '12px',
-                overflow: 'hidden',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                border: '1px solid #e2e8f0',
-                alignSelf: 'flex-start',
-                position: 'sticky',
-                top: '20px',
-                maxHeight: 'calc(100vh - 100px)',
-                overflowY: 'auto',
-              }}
-            >
-              <div
-                style={{
-                  backgroundColor: '#f8fafc',
-                  padding: '18px 20px',
-                  marginBottom: '0',
-                  borderBottom: '2px solid #e2e8f0',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    marginBottom: '8px',
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <h2
-                      style={{
-                        fontSize: '16px',
-                        fontWeight: '700',
-                        margin: '0 0 10px 0',
-                        color: '#1e293b',
-                        lineHeight: '1.3',
-                      }}
-                    >
-                      {selectedTaskDetails.name}
-                    </h2>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        backgroundColor: selectedTaskDetails.status === 'active' ? '#d1fae5' : '#e2e8f0',
-                        color: selectedTaskDetails.status === 'active' ? '#065f46' : '#475569',
-                        fontSize: '10px',
-                        fontWeight: '700',
-                        padding: '5px 12px',
-                        borderRadius: '12px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.8px',
-                      }}
-                    >
-                      {selectedTaskDetails.status === 'active' ? '✓ ACTIVE' : 'PAUSED'}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setSelectedTask(null);
-                      setShowTaskDetail(false);
-                    }}
-                    style={{
-                      background: '#e2e8f0',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '6px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      color: '#64748b',
-                      borderRadius: '6px',
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = '#cbd5e1';
-                      e.currentTarget.style.color = '#475569';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = '#e2e8f0';
-                      e.currentTarget.style.color = '#64748b';
-                    }}
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ padding: '18px 20px' }}>
-                {loadingTaskDetail && (
-                  <div
-                    style={{
-                      marginBottom: '12px',
-                      padding: '10px 12px',
-                      borderRadius: '8px',
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      fontSize: '13px',
-                      color: '#64748b',
-                      fontWeight: '600',
-                    }}
-                  >
-                    Loading task details...
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    padding: '14px 16px',
-                    backgroundColor: '#f0f9ff',
-                    borderRadius: '8px',
-                    marginBottom: '14px',
-                    border: '1px solid #bae6fd',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: '11px',
-                      color: '#075985',
-                      marginBottom: '6px',
-                      fontWeight: '700',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <Repeat size={13} color="#0369a1" />
-                    Recurrence Pattern
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '14px',
-                      color: '#0c4a6e',
-                      fontWeight: '600',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    {selectedTaskDetails.recurrence}
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    marginBottom: '16px',
-                    padding: '14px 16px',
-                    backgroundColor: '#fef9c3',
-                    borderRadius: '8px',
-                    border: '1px solid #fde047',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px' }}>
-                    <span style={{ color: '#713f12', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Clock size={15} color="#a16207" /> Next Run
-                    </span>
-                    <span style={{ fontWeight: '700', color: '#713f12' }}>{selectedTaskDetails.nextRun}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                    <span style={{ color: '#713f12', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Bell size={15} color="#a16207" /> Reminder
-                    </span>
-                    <span style={{ fontWeight: '700', color: '#713f12' }}>{selectedTaskDetails.reminder}</span>
-                  </div>
-                </div>
-
-                {/* More Information */}
-                {selectedTaskRaw && (
-                  <>
-                    {descriptionText && (
-                      <div
+          <GenericSidebar
+            isOpen={!!(showTaskDetail && selectedTaskDetails)}
+            onClose={() => { setShowTaskDetail(false); setSelectedTask(null); }}
+            title={selectedTaskDetails?.name ?? 'Task Details'}
+            subtitle={selectedTaskDetails?.status === 'active' ? 'Active' : 'Paused'}
+            metadata={selectedTaskDetails?.recurrence}
+            avatar={{
+              initials: (selectedTaskDetails?.name ?? 'T').slice(0, 2).toUpperCase(),
+              name: selectedTaskDetails?.name ?? 'Task',
+              gradient: selectedTaskDetails?.status === 'active' ? '#10b981' : '#64748b',
+            }}
+            width="400px"
+            sections={[
+              {
+                id: 'task-info',
+                title: 'Task Information',
+                icon: Repeat,
+                fields: [
+                  { label: 'Recurrence', value: selectedTaskDetails?.recurrence ?? '—' },
+                  { label: 'Next Run', value: selectedTaskDetails?.nextRun ?? '—' },
+                  { label: 'Reminder', value: selectedTaskDetails?.reminder ?? '—' },
+                  { label: 'Status', value: selectedTaskDetails?.status === 'active' ? 'Active' : 'Paused', type: 'badge', badgeVariant: selectedTaskDetails?.status === 'active' ? 'success' : 'secondary' },
+                ],
+              },
+              ...(descriptionText ? [{
+                id: 'description',
+                title: 'Description',
+                icon: FolderOpen,
+                fields: [{ label: '', value: descriptionText }],
+              }] : []),
+              ...(selectedTaskRaw ? [{
+                id: 'details',
+                title: 'Details',
+                icon: Settings,
+                fields: [
+                  { label: 'Project', value: selectedTaskRaw?.project?.name },
+                  { label: 'Status', value: selectedTaskRaw?.status?.name },
+                  { label: 'Priority', value: selectedTaskRaw?.priority },
+                  { label: 'Frequency', value: selectedTaskRaw?.frequency },
+                  { label: 'Start Date', value: selectedTaskRaw?.start_date ? safeFormatDate(selectedTaskRaw.start_date) : undefined },
+                  { label: 'End Date', value: selectedTaskRaw?.end_date ? safeFormatDate(selectedTaskRaw.end_date) : undefined },
+                  { label: 'Due Time', value: dueTimeText || undefined },
+                  { label: 'Task ID', value: selectedTaskRaw?.task_id || selectedTaskRaw?.id },
+                ].filter((f: { value: any }) => f.value != null && f.value !== ''),
+              }] : []),
+              ...(assigneesText.length > 0 || selectedTaskRaw?.assignees ? [{
+                id: 'assignees',
+                title: 'Assignees',
+                icon: UsersIcon,
+                fields: [{ label: '', value: assigneesText.length > 0 ? assigneesText.join(', ') : 'Unassigned' }],
+              }] : []),
+              ...(Array.isArray(selectedTaskDetails?.labels) && selectedTaskDetails.labels.length > 0 ? [{
+                id: 'labels',
+                title: 'Labels',
+                icon: Target,
+                customContent: (
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {selectedTaskDetails!.labels.map((label: { text: string; color: string; type?: string }, idx: number) => (
+                      <span
+                        key={idx}
                         style={{
-                          marginBottom: '16px',
-                          padding: '14px 16px',
-                          backgroundColor: '#f8fafc',
-                          borderRadius: '8px',
-                          border: '1px solid #e2e8f0',
+                          backgroundColor: label.color,
+                          color: 'white',
+                          padding: '6px 10px',
+                          fontWeight: '800',
+                          fontSize: '10px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.6px',
+                          borderRadius: '999px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
                         }}
                       >
-                        <div style={{ fontSize: '11px', fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-                          Description
-                        </div>
-                        <div style={{ fontSize: '13px', color: '#1e293b', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
-                          {descriptionText}
-                        </div>
-                      </div>
-                    )}
-
-                    <div
-                      style={{
-                        marginBottom: '16px',
-                        padding: '14px 16px',
-                        backgroundColor: '#ffffff',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                      }}
-                    >
-                      <div style={{ fontSize: '11px', fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
-                        Details
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {[
-                          { label: 'Project', value: selectedTaskRaw?.project?.name },
-                          { label: 'Status', value: selectedTaskRaw?.status?.name },
-                          { label: 'Priority', value: selectedTaskRaw?.priority },
-                          { label: 'Frequency', value: selectedTaskRaw?.frequency },
-                          { label: 'Repeat Interval', value: selectedTaskRaw?.repeat_interval },
-                          { label: 'Repeat On', value: selectedTaskRaw?.repeat_on },
-                          { label: 'Start Date', value: selectedTaskRaw?.start_date },
-                          { label: 'End Date', value: selectedTaskRaw?.end_date },
-                          { label: 'Due Time', value: dueTimeText },
-                          { label: 'Occurrences', value: selectedTaskRaw?.occurrences },
-                          { label: 'Timezone', value: selectedTaskRaw?.timezone },
-                          { label: 'Task ID', value: selectedTaskRaw?.task_id || selectedTaskRaw?.id || selectedTaskDetails.id },
-                        ]
-                          .filter(item => item.value !== null && item.value !== undefined && String(item.value).trim() !== '')
-                          .map((item, idx) => (
-                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-                              <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '700' }}>{item.label}</span>
-                              <span style={{ fontSize: '12px', color: '#1e293b', fontWeight: '700', textAlign: 'right' }}>
-                                {item.label.includes('Date') ? safeFormatDate(item.value) : String(item.value)}
-                              </span>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-
-                    {(assigneesText.length > 0 || selectedTaskRaw?.assignees || selectedTaskRaw?.extension_numbers) && (
-                      <div
-                        style={{
-                          marginBottom: '16px',
-                          padding: '14px 16px',
-                          backgroundColor: '#f8fafc',
-                          borderRadius: '8px',
-                          border: '1px solid #e2e8f0',
-                        }}
-                      >
-                        <div style={{ fontSize: '11px', fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
-                          Assignees
-                        </div>
-                        {assigneesText.length === 0 ? (
-                          <div style={{ fontSize: '13px', color: '#64748b', fontWeight: '600' }}>Unassigned</div>
-                        ) : (
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {assigneesText.map((a, idx) => (
-                              <span
-                                key={idx}
-                                style={{
-                                  backgroundColor: '#edf6ff',
-                                  border: '1px solid #bfdbfe',
-                                  color: '#1e293b',
-                                  fontSize: '12px',
-                                  fontWeight: '700',
-                                  padding: '6px 10px',
-                                  borderRadius: '999px',
-                                }}
-                              >
-                                {a}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {Array.isArray(selectedTaskDetails.labels) && selectedTaskDetails.labels.length > 0 && (
-                      <div
-                        style={{
-                          marginBottom: '16px',
-                          padding: '14px 16px',
-                          backgroundColor: '#ffffff',
-                          borderRadius: '8px',
-                          border: '1px solid #e2e8f0',
-                        }}
-                      >
-                        <div style={{ fontSize: '11px', fontWeight: '800', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
-                          Labels
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          {selectedTaskDetails.labels.map((label, idx) => (
-                            <span
-                              key={idx}
-                              style={{
-                                backgroundColor: label.color,
-                                color: 'white',
-                                padding: '6px 10px',
-                                fontWeight: '800',
-                                fontSize: '10px',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.6px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                borderRadius: '999px',
-                                border: 'none',
-                              }}
-                            >
-                              {getLabelIcon(label.type)}
-                              {label.text}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* Upcoming Runs (only when provided by API) */}
-                {Array.isArray(upcomingRuns) && upcomingRuns.length > 0 && (
-                  <div style={{ marginBottom: '18px' }}>
-                    <h3
-                      style={{
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        marginBottom: '12px',
-                        color: '#1e293b',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                      }}
-                    >
-                      Upcoming Runs
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {upcomingRuns.slice(0, 4).map((run: any, idx: number) => (
-                        <div
-                          key={idx}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            padding: '10px 12px',
-                            backgroundColor: '#f8fafc',
-                            borderRadius: '6px',
-                            border: '1px solid #e2e8f0',
-                            transition: 'all 0.2s',
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '6px',
-                              backgroundColor: '#3b82f6',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'white',
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Calendar size={16} />
-                          </div>
-                          <span style={{ color: '#1e293b', fontSize: '13px', fontWeight: '500', flex: 1 }}>
-                            {run?.date || run?.run_at || run?.next_run_at || ''}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                        {getLabelIcon(label.type)}
+                        {label.text}
+                      </span>
+                    ))}
                   </div>
-                )}
-
-                {/* Recent Activity (only when provided by API) */}
-                {Array.isArray(recentEvents) && recentEvents.length > 0 && (
-                  <div>
-                    <h3
-                      style={{
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        marginBottom: '12px',
-                        color: '#1e293b',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                      }}
-                    >
-                      Recent Activity
-                    </h3>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {recentEvents.map((event: any, idx: number) => (
-                        <div
-                          key={idx}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            padding: '10px 12px',
-                            backgroundColor: '#f8fafc',
-                            borderRadius: '6px',
-                            border: '1px solid #e2e8f0',
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '6px',
-                              backgroundColor: '#64748b',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'white',
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Check size={16} />
-                          </div>
-                          <span style={{ color: '#1e293b', fontSize: '13px', fontWeight: '500', flex: 1 }}>
-                            {event?.date || event?.created_at || event?.message || ''}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                ),
+              }] : []),
+              ...(Array.isArray(upcomingRuns) && upcomingRuns.length > 0 ? [{
+                id: 'upcoming-runs',
+                title: 'Upcoming Runs',
+                icon: Calendar,
+                customContent: (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {upcomingRuns.slice(0, 4).map((run: any, idx: number) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                        <Calendar size={16} color="#3b82f6" />
+                        <span style={{ fontSize: '13px', fontWeight: '500' }}>{run?.date || run?.run_at || run?.next_run_at || ''}</span>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
-            </div>
-          ) : null}
+                ),
+              }] : []),
+              ...(Array.isArray(recentEvents) && recentEvents.length > 0 ? [{
+                id: 'recent-activity',
+                title: 'Recent Activity',
+                icon: Check,
+                customContent: (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {recentEvents.map((event: any, idx: number) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                        <Check size={16} color="#64748b" />
+                        <span style={{ fontSize: '13px', fontWeight: '500' }}>{event?.date || event?.created_at || event?.message || ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                ),
+              }] : []),
+            ]}
+            actions={[
+              { label: 'Edit Task', icon: Settings, variant: 'primary', onClick: () => selectedTaskDetails && handleEditTask(selectedTaskDetails) },
+              { label: selectedTaskDetails?.status === 'active' ? 'Pause Task' : 'Resume Task', icon: selectedTaskDetails?.status === 'active' ? Lock : Check, variant: 'secondary', show: !!selectedTaskDetails, onClick: () => selectedTaskDetails && handleTogglePause(selectedTaskDetails) },
+              { label: 'Delete Task', icon: X, variant: 'danger', onClick: () => { setShowDeleteModal(true); } },
+            ]}
+          />
+
         </div>
       </div>
+
+      <GenericFilterSidebar
+        isOpen={showFilterSidebar}
+        onClose={() => setShowFilterSidebar(false)}
+        title="Filters"
+        subtitle="Filter and refine recurring tasks"
+        filters={filterFields}
+        onApply={() => setShowFilterSidebar(false)}
+        onReset={() => {
+          setTodoSearchQuery('');
+          setFrequencyFilter('all');
+          setStatusFilter('all');
+          setProjectFilter('all');
+          setLabelsFilter('all');
+        }}
+        width="400px"
+        showApplyButton
+        showResetButton
+      />
 
       {/* Create/Edit Task Modal */}
       <CreateRecurringTaskModal

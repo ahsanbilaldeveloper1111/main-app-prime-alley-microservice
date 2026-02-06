@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Spinner, Row, Col } from 'react-bootstrap';
 import { FileText, Calendar, CheckCircle2, AlertCircle, Clock, Edit, Trash2 } from 'lucide-react';
 import StatsCard from '@components/work-planner/stats-cards';
@@ -7,16 +7,31 @@ import CreateTaskModal from '@components/work-planner/createtask-modal';
 import { deleteTask, getTask, getTaskActivities } from '@utils/tasks';
 import TaskDetailOffcanvas from '@pages/work-planner/partials/TaskDetailOffcanvas';
 import TasksTable, { type TaskRow } from '@pages/work-planner/partials/TasksTable';
+import TaskFilterSection from '@pages/work-planner/partials/TaskFilterSection';
+import type { PaginationState } from '@pages/work-planner/partials/TasksTable';
+
+export interface ListTabFilters {
+  searchTerm: string;
+  filterAssignee: string[];
+  filterStatus: string;
+  filterPriority: string;
+  filterCreatedAtFrom: string;
+  filterCreatedAtTo: string;
+}
 
 interface ListTabProps {
   tasksList: any[];
   loading: boolean;
   listSummary: any;
+  listPagination?: PaginationState | null;
+  setListPagination?: React.Dispatch<React.SetStateAction<PaginationState>>;
   styles: any;
   selectedProject?: any;
   extensions?: any[];
   labels?: any[];
   statuses?: any[];
+  onApplyFilters?: (filters: ListTabFilters) => void;
+  onClearFilters?: () => void;
   onRefresh?: () => void;
 }
 
@@ -24,11 +39,15 @@ const ListTab: React.FC<ListTabProps> = ({
   tasksList, 
   loading, 
   listSummary, 
+  listPagination: listPaginationProp,
+  setListPagination,
   styles,
   selectedProject,
   extensions = [],
   labels = [],
   statuses = [],
+  onApplyFilters,
+  onClearFilters,
   onRefresh
 }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -46,6 +65,14 @@ const ListTab: React.FC<ListTabProps> = ({
   const [submittingComment, setSubmittingComment] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editingCommentText, setEditingCommentText] = useState('');
+
+  // Filter form state (user can change without triggering search; API is called on Filter click)
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterAssignee, setFilterAssignee] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState('All Status');
+  const [filterPriority, setFilterPriority] = useState('All Priority');
+  const [filterCreatedAtFrom, setFilterCreatedAtFrom] = useState('');
+  const [filterCreatedAtTo, setFilterCreatedAtTo] = useState('');
   
   const getPriorityColor = (priority: string) => {
     switch (priority?.toLowerCase()) {
@@ -243,6 +270,53 @@ const ListTab: React.FC<ListTabProps> = ({
     });
   };
 
+  // Assignee options from extensions (value: extension id/number, label: name)
+  const assigneeOptions = useMemo(() => {
+    if (!extensions?.length) return [];
+    return extensions.map((ext: any) => ({
+      value: String(ext.id ?? ext.extension_number ?? ext),
+      label: ext.user?.name ?? ext.name ?? ext.extension_number ?? String(ext.id ?? 'Unknown')
+    }));
+  }, [extensions]);
+
+  const statusOptionsList = useMemo(() => {
+    const base = [{ value: 'All Status', label: 'All Status' }];
+    if (!statuses?.length) return base;
+    const fromStatuses = statuses.map((s: any) => ({ value: s.name, label: s.name }));
+    return [...base, ...fromStatuses];
+  }, [statuses]);
+
+  const priorityOptionsList = [
+    { value: 'All Priority', label: 'All Priority' },
+    { value: 'Low', label: 'Low' },
+    { value: 'Medium', label: 'Medium' },
+    { value: 'High', label: 'High' },
+    { value: 'Urgent', label: 'Urgent' }
+  ];
+
+  const handleApplyFiltersList = () => {
+    if (onApplyFilters) {
+      onApplyFilters({
+        searchTerm,
+        filterAssignee,
+        filterStatus,
+        filterPriority,
+        filterCreatedAtFrom,
+        filterCreatedAtTo
+      });
+    }
+  };
+
+  const handleClearFiltersList = () => {
+    setSearchTerm('');
+    setFilterAssignee([]);
+    setFilterStatus('All Status');
+    setFilterPriority('All Priority');
+    setFilterCreatedAtFrom('');
+    setFilterCreatedAtTo('');
+    onClearFilters?.();
+  };
+
   // Prepare summary cards data
   const summaryCards = listSummary ? [
     {
@@ -307,6 +381,31 @@ const ListTab: React.FC<ListTabProps> = ({
           <h5 style={styles.cardTitle}>Tasks List</h5>
         </div>
 
+        <TaskFilterSection
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+          filterProject=""
+          onFilterProjectChange={() => {}}
+          filterAssignee={filterAssignee}
+          onFilterAssigneeChange={setFilterAssignee}
+          filterStatus={filterStatus}
+          onFilterStatusChange={setFilterStatus}
+          filterPriority={filterPriority}
+          onFilterPriorityChange={setFilterPriority}
+          filterCreatedAtFrom={filterCreatedAtFrom}
+          onFilterCreatedAtFromChange={setFilterCreatedAtFrom}
+          filterCreatedAtTo={filterCreatedAtTo}
+          onFilterCreatedAtToChange={setFilterCreatedAtTo}
+          projectOptions={[]}
+          assigneeOptions={assigneeOptions}
+          statusOptions={statusOptionsList}
+          priorityOptions={priorityOptionsList}
+          onApplyFilters={handleApplyFiltersList}
+          onClearFilters={handleClearFiltersList}
+          hideProjectFilter
+          searchPlaceholder="Search tasks..."
+        />
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem' }}>
           <Spinner animation="border" />
@@ -330,14 +429,14 @@ const ListTab: React.FC<ListTabProps> = ({
             }))}
             loading={loading}
             pagination={{
-              page: 1,
-              limit: tasksList.length,
-              total: tasksList.length,
-              last_page: 1,
-              from: tasksList.length > 0 ? 1 : 0,
-              to: tasksList.length
+              page: listPaginationProp?.page ?? 1,
+              limit: listPaginationProp?.limit ?? tasksList.length,
+              total: listPaginationProp?.total ?? tasksList.length,
+              last_page: listPaginationProp?.last_page ?? 1,
+              from: listPaginationProp?.from ?? (tasksList.length > 0 ? 1 : 0),
+              to: listPaginationProp?.to ?? tasksList.length
             }}
-            setPagination={() => {}}
+            setPagination={setListPagination ?? (() => {})}
             onTaskClick={(task) => handleTaskClick(task.rawData || task)}
             hierarchyDataExtensions={extensions?.map((e: any) => ({ id: e.id, extension_number: e.id, name: e.name })) ?? []}
             getStatusVariant={(s) => getStatusVariant(s)}

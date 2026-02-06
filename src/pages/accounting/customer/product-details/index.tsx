@@ -3,310 +3,481 @@ import React, {
   ReactElement,
   useEffect,
   useCallback,
+  useMemo,
+  useRef,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
-import { useState } from 'react';
-import {  Row, Col, Badge, Form, Button, Card} from 'react-bootstrap';
-
+import { useState } from "react";
+import { Button } from "react-bootstrap";
 
 import "@assets/scss/billing.scss";
-
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 
-import '@assets/scss/datatable-style.scss';
+import "@assets/scss/datatable-style.scss";
 import { GetProducts, GetProductCategories } from "@utils/accounting";
-import GenericListPage from '@components/GenericListPage';
-import { useSession } from 'next-auth/react';
-import { Column } from "@components/CustomDataTable";
+import { useSession } from "next-auth/react";
 import moment from "moment";
-import FormModal from "@pages/partial/FormModal";
 import { formatNumber, GlobalDateFormat } from "@utils/Helper";
-import { Filter } from "lucide-react";
+import { Filter, Package, FileText, Calendar } from "lucide-react";
+
+import GenericTable, { TableColumn } from "@components/GenericTable";
+import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
+import GenericSidebar from "@components/GenericSidebar";
 
 interface Product {
-      id: number;
-      name: string;
-      category: string;
-      price: string;
-      type: string;
-      totalAmount: string;
-      status: string;
-      created: string;
-    }
-  
+  id: number;
+  name: string;
+  category: string;
+  price: string;
+  type: string;
+  totalAmount: string;
+  status: string;
+  created: string;
+}
+
 const ProductDetails = () => {
+  const { data: session } = useSession();
 
+  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [currentFilters, setCurrentFilters] = useState<{
+    search?: string;
+    status?: string;
+    billing_cycle?: string;
+  }>({});
 
-  const { data:session, status } = useSession();
-   
-    const columns: Column[] = [
-        { key: 'name', name: 'Subscription Name', selector: (row: any) => row.product?.name, sortable: true,
-          cell: (row: any) => {
-            return <div>
-              <p className="fw-semibold">{row?.product?.name}</p>
-            </div>
-          }
-         },
+  const [dataList, setDataList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    rowsPerPage: 15,
+    totalRows: 0,
+  });
 
-         { key: 'status', name: 'Status', selector: (row: any) => row.product?.status, sortable: true,
-          cell: (row: any) => {
-            return <div>
-              <Badge className={`badge bg-${row?.product?.is_active ? 'success' : 'danger'}`}>{row?.product?.is_active ? 'Active' : 'Suspended'}</Badge>
-            </div>
-          }
-         },
+  const requestIdRef = useRef(0);
 
-         { key: 'billing_cycle', name: 'Billing Cycle', selector: (row: any) => row?.billing_cycle, sortable: true,
-          cell: (row: any) => {
-            return <div className="text-capitalize">
-              {row?.billing_cycle || ''}
-            </div>
-          }
-         },
+  const handleOpenFiltersSidebar = useCallback(() => {
+    setShowFiltersSidebar(true);
+  }, []);
 
+  const handleCloseFiltersSidebar = useCallback(() => {
+    setShowFiltersSidebar(false);
+  }, []);
 
-         { key: 'renewal_start_date', name: 'Current Period Start', selector: (row: any) => row?.renewal_start_date, sortable: true,
-          cell: (row: any) => {
-            return <div className="text-uppercase">
-              {row?.renewal_start_date ? moment(row?.renewal_start_date).format(GlobalDateFormat) : ''}
-            </div>
-          }
-         },
+  const fetchProducts = useCallback(async () => {
+    requestIdRef.current += 1;
+    const currentRequestId = requestIdRef.current;
+    setLoading(true);
+    try {
+      const response = await GetProducts({
+        page: pagination.currentPage,
+        per_page: pagination.rowsPerPage,
+        search: currentFilters.search || "",
+        status: currentFilters.status || undefined,
+        billing_cycle: currentFilters.billing_cycle || undefined,
+      }) as any;
 
+      if (currentRequestId !== requestIdRef.current) return;
 
-         { key: 'renewal_end_date', name: 'Current Period End', selector: (row: any) => row?.renewal_end_date, sortable: true,
-          cell: (row: any) => {
-            return <div className="text-uppercase">
-               {row?.renewal_end_date ? moment(row?.renewal_end_date).format(GlobalDateFormat) : ''}
-            </div>
-          }
-         },
+      const list = response?.dataList ?? response?.data ?? [];
+      const total = response?.meta?.total ?? response?.recordsTotal ?? response?.recordsFiltered ?? 0;
+      setDataList(list);
+      setTotalRecords(total);
+      setPagination((prev) => ({ ...prev, totalRows: total }));
+    } catch (error) {
+      if (currentRequestId !== requestIdRef.current) return;
+      console.error("Error fetching products:", error);
+      setDataList([]);
+      setTotalRecords(0);
+      setPagination((prev) => ({ ...prev, totalRows: 0 }));
+    } finally {
+      if (currentRequestId === requestIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [pagination.currentPage, pagination.rowsPerPage, currentFilters, refreshKey]);
 
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
-         { key: 'subscriptions', name: 'Quantity', selector: (row: any) => row?.subscriptions || 0, sortable: true,
-          cell: (row: any) => {
-            return <div>
-              {row?.subscriptions || '0'}
-            </div>
-          }
-         },
+  const tableColumns: TableColumn<any>[] = useMemo(
+    () => [
+      {
+        key: "name",
+        label: "Subscription Name",
+        sortable: true,
+        type: "text",
+        accessor: (row) => row?.product?.name ?? "",
+        render: (row) => (
+          <div>
+            <span className="fw-semibold">{row?.product?.name ?? "-"}</span>
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        label: "Status",
+        sortable: true,
+        type: "badge",
+        accessor: (row) =>
+          row?.product?.is_active ? "Active" : "Suspended",
+        badge: {
+          getVariant: (row) =>
+            row?.product?.is_active ? "success" : "danger",
+        },
+      },
+      {
+        key: "billing_cycle",
+        label: "Billing Cycle",
+        sortable: true,
+        type: "text",
+        accessor: (row) => row?.billing_cycle ?? "",
+        render: (row) => (
+          <span className="text-capitalize">
+            {row?.billing_cycle || "-"}
+          </span>
+        ),
+      },
+      {
+        key: "renewal_start_date",
+        label: "Current Period Start",
+        sortable: true,
+        type: "text",
+        accessor: (row) =>
+          row?.renewal_start_date
+            ? moment(row.renewal_start_date).format(GlobalDateFormat)
+            : "",
+        emptyValue: "-",
+      },
+      {
+        key: "renewal_end_date",
+        label: "Current Period End",
+        sortable: true,
+        type: "text",
+        accessor: (row) =>
+          row?.renewal_end_date
+            ? moment(row.renewal_end_date).format(GlobalDateFormat)
+            : "",
+        emptyValue: "-",
+      },
+      {
+        key: "subscriptions",
+        label: "Quantity",
+        sortable: true,
+        type: "text",
+        accessor: (row) => row?.subscriptions ?? "0",
+        emptyValue: "0",
+      },
+      {
+        key: "selling_price",
+        label: "Price",
+        sortable: true,
+        type: "custom",
+        render: (row) => (
+          <span>
+            {row?.company?.profile?.currency ||
+              row?.product?.currency ||
+              "USD"}{" "}
+            {formatNumber(row?.selling_price)}
+          </span>
+        ),
+      },
+    ],
+    []
+  );
 
+  const [selectedProductView, setSelectedProductView] = useState<any | null>(
+    null
+  );
+  const [showProductSidebar, setShowProductSidebar] = useState(false);
 
-        // { key: 'category', name: 'Category', selector: (row: any) => row.product?.category?.name, sortable: true,
-        //   cell: (row: any) => {
-        //     return <div>
-        //       <p>{row?.product?.category?.name}</p>
-        //     </div>
-        //   }
-        //  },
+  const getInitials = (name: string) => {
+    if (!name || typeof name !== "string") return "NA";
+    return name
+      .trim()
+      .split(/\s+/)
+      .map((s) => s[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
-        //  { key: 'base_price', name: 'Base Price', selector: (row: any) => row.product?.base_price, sortable: true,
-        //   cell: (row: any) => {
-        //     return <div>
-        //       <p className="text-primary fw-semibold">{row?.company?.profile?.currency || row?.product?.currency || 'USD'} {formatNumber(row?.product?.base_price)}</p>
-        //     </div>
-        //   }
-        //  },
-
-         { key: 'selling_price', name: 'Price', selector: (row: any) => row?.selling_price, sortable: true,
-          cell: (row: any) => {
-            return <div>
-              <p className="">{row?.company?.profile?.currency || row?.product?.currency || 'USD'} {formatNumber(row?.selling_price)}</p>
-            </div>
-          }
-         },
-       
-        
-        // { key: 'is_active', name: 'Status', selector: (row: any) => row.product?.is_active, sortable: true,
-        //   cell: (row: any) => {
-        //     return <div>
-        //       <p className={`bg-opacity-10 text-dark badge bg-${row?.product?.is_active ? 'success' : 'danger'}`}>{row?.product?.is_active ? 'Active' : 'Inactive'}</p>
-        //     </div>
-        //   }
-        //  },
-        // { key: 'created_at', name: 'Created', selector: (row: any) => row.product?.created_at, sortable: true,
-        //   cell: (row: any) => {
-        //     return <div>
-        //       <p className="text-muted">{moment(row?.product?.created_at).format('DD-MMM-YYYY')}</p>
-        //     </div>
-        //   }
-        //  },
-
-        // ...(session?.user?.permissions?.includes('edit-groups') || session?.user?.permissions?.includes('delete-groups') ? [
-        //     {
-        //         key: 'Action',
-        //         name: 'Actions',
-        //         selector: (row: any) => row.id,
-        //         sortable: false,
-        //         cell: (props: any) => (
-        //             <div className="d-flex gap-2">
-        //                {/* <Button variant="light" className="btn-action-style-2 p-1 text-primary" title="View" onClick={() => handleViewProduct(props)}>
-        //                     <Eye size={16} />
-        //                 </Button> */}
-                        
-        //             </div>
-        //         )
-        //     }
-        // ] : [])
+  const getRandomColor = (seed: string) => {
+    const colors = [
+      "#6366f1", "#8b5cf6", "#ec4899", "#ef4444", "#f59e0b",
+      "#10b981", "#06b6d4", "#3b82f6",
     ];
+    let n = 0;
+    for (let i = 0; i < (seed || "").length; i++) n += seed.charCodeAt(i);
+    return colors[n % colors.length];
+  };
 
-    const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [currentFilters, setCurrentFilters] = useState({});
+  const handleViewProduct = useCallback((row: any) => {
+    setSelectedProductView(row);
+    setShowProductSidebar(true);
+  }, []);
 
-    const fetchProducts = useCallback(async (page = 1, perPage = 15, search = "") => {
-        const response = await GetProducts({ page, perPage, search, ...currentFilters });
-        console.log('response', response);
-        return response;
-    }, [currentFilters]);
+  const handleCloseProductSidebar = useCallback(() => {
+    setShowProductSidebar(false);
+    setSelectedProductView(null);
+  }, []);
 
-    const [selectedProductView, setSelectedProductView] = useState<any | null>(null);
-    const [showViewProductModal, setShowViewProductModal] = useState(false);
-    const handleViewProduct = (props: any) => {
-      setSelectedProductView(props);
-      setShowViewProductModal(true);
-    };
-
-    const [selectedProductDelete, setSelectedProductDelete] = useState<any | null>(null);
-    const [showDeleteProductModal, setShowDeleteProductModal] = useState(false);
-    const handleDeleteProduct = (props: any) => {
-      setSelectedProductDelete(props?.id);
-      setShowDeleteProductModal(true);
-    };
-
-    const [productCategories, setProductCategories] = useState<any[]>([]);
-    const fetchProductCategories = async () => {
+  const [productCategories, setProductCategories] = useState<any[]>([]);
+  useEffect(() => {
+    const load = async () => {
       const response = await GetProductCategories();
-      setProductCategories(response);
+      setProductCategories(response || []);
     };
-    useEffect(() => {
-      fetchProductCategories();
-    }, []);
+    load();
+  }, []);
 
-  const [showProductModal, setShowProductModal] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [showViewModal, setShowViewModal] = useState(false);
+  const filterFields: FilterField[] = useMemo(
+    () => [
+      {
+        id: "search",
+        label: "Search",
+        type: "text",
+        value: currentFilters.search ?? "",
+        onChange: (value) =>
+          setCurrentFilters((prev) => ({ ...prev, search: value })),
+        placeholder: "Search products...",
+      },
+      {
+        id: "status",
+        label: "Status",
+        type: "dropdown",
+        value: currentFilters.status ?? "",
+        onChange: (value) =>
+          setCurrentFilters((prev) => ({ ...prev, status: value || undefined })),
+        options: [
+          { value: "", label: "All Status" },
+          { value: "Active", label: "Active" },
+          { value: "Trial", label: "Trial" },
+          { value: "Inactive", label: "Inactive" },
+        ],
+      },
+      {
+        id: "billing_cycle",
+        label: "Billing Cycle",
+        type: "dropdown",
+        value: currentFilters.billing_cycle ?? "",
+        onChange: (value) =>
+          setCurrentFilters((prev) => ({
+            ...prev,
+            billing_cycle: value || undefined,
+          })),
+        options: [
+          { value: "", label: "All Types" },
+          { value: "monthly", label: "Monthly" },
+          { value: "quarterly", label: "Quarterly" },
+          { value: "yearly", label: "Yearly" },
+          { value: "one time", label: "One-time" },
+        ],
+      },
+    ],
+    [currentFilters.search, currentFilters.status, currentFilters.billing_cycle]
+  );
 
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
 
-      <PageHeader
+      {/* <PageHeader
         title="Subscriptions"
         description="Manage your recurring services & renewals."
         showSearch={false}
         buttons={
           <>
-          
+            <Button
+              variant="outline-secondary"
+              onClick={handleOpenFiltersSidebar}
+            >
+              <Filter size={16} className="me-2" />
+              Filters
+            </Button>
           </>
         }
+      /> */}
+
+<div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+        <div className="mb-3 mb-md-0">
+          <nav aria-label="breadcrumb">
+            <ol className="breadcrumb mb-0">
+              <li className="breadcrumb-item">
+                <a href="/dashboard" className="text-decoration-none">
+                  Accounting
+                </a>
+              </li>
+              <li className="breadcrumb-item active fw-bold" aria-current="page">
+                Subscriptions
+              </li>
+            </ol>
+          </nav>
+        </div>
+
+        <div className="d-flex flex-wrap gap-2">
+          <Button
+            variant="outline-secondary"
+            onClick={handleOpenFiltersSidebar}
+          >
+            <Filter size={16} className="me-2" />
+            Filters
+          </Button>
+        </div>
+
+      </div>
+      <GenericTable
+        data={dataList}
+        columns={tableColumns}
+        pagination={{
+          currentPage: pagination.currentPage,
+          rowsPerPage: pagination.rowsPerPage,
+          totalRows: totalRecords,
+          pageSizeOptions: [10, 15, 25, 50],
+        }}
+        onPaginationChange={(page, rowsPerPage) => {
+          setPagination((prev) => ({
+            ...prev,
+            currentPage: page,
+            rowsPerPage,
+          }));
+        }}
+        sortable={true}
+        loading={loading}
+        emptyMessage="No subscriptions found"
+        loadingMessage="Loading subscriptions..."
+        hover={true}
+        uniqueKey="id"
+        onRowClick={(row) => handleViewProduct(row)}
+        customizableColumns={true}
+        columnStorageKey="customer-product-details-columns"
       />
 
-       {/* Filters */}
-       <Card className="mb-4">
-           <Card.Body>
-           <Row className="align-items-center">
-               <Col md={4}>
-                 <Form.Control type="search" placeholder="Search products..." onChange={(e) => setCurrentFilters({ ...currentFilters, search: e.target.value })} />
-               </Col>
-               
-               <Col md={2}>
-               <Form.Select onChange={(e) => setCurrentFilters({ ...currentFilters, status: e.target.value })}>
-                   <option value="">All Status</option>
-                   <option value="Active">Active</option>
-                   <option value="Trial">Trial</option>
-                  <option value="Inactive">Inactive</option>
-             </Form.Select>
-              </Col>
-             <Col md={2}>
-                <Form.Select onChange={(e) => setCurrentFilters({ ...currentFilters, billing_cycle: e.target.value })}>
-                   <option value="">All Types</option>
-                   <option value="monthly">Monthly</option>
-                   <option value="quarterly">Quarterly</option>
-                   <option value="yearly">Yearly</option>
-                   <option value="one time">One-time</option>
-                 </Form.Select>
-               </Col>
-               <Col md={2} className="ms-auto">
-  <Button variant="outline-primary" className="w-100" onClick={() => setRefreshKey(refreshKey + 1)}>
-    <Filter size={16} className="me-2" />
-    Apply
-  </Button>
-</Col>
-             </Row>
-           </Card.Body>
-         </Card>
+      <GenericFilterSidebar
+        isOpen={showFiltersSidebar}
+        onClose={handleCloseFiltersSidebar}
+        title="Filters"
+        subtitle="Filter subscriptions by status and billing cycle"
+        width="400px"
+        filters={filterFields}
+        onApply={() => {
+          setPagination((prev) => ({ ...prev, currentPage: 1 }));
+          setRefreshKey((k) => k + 1);
+          setShowFiltersSidebar(false);
+        }}
+        onReset={() => {
+          setCurrentFilters({});
+          setPagination((prev) => ({ ...prev, currentPage: 1 }));
+          setRefreshKey((k) => k + 1);
+        }}
+      />
 
-   
-
-            <GenericListPage
-                 columns={columns}
-                 fetchData={fetchProducts}
-                 title="Products"
-                 searchPlaceholder="Search products..."
-                 defaultPageSize={15}
-                 filters={currentFilters}
-                 refreshKey={refreshKey}
-                 search={false}
-                 tableStyle="table-style-2"
-             />
-
-
-             <FormModal
-              show={showViewProductModal}
-              size="lg"
-              onHide={() => setShowViewProductModal(false)}
-              title="Product Details"
-              desc="View the product details"
-              onSubmit={() => setShowViewProductModal(false)}
-              submitButtonText="Close"
-              cancelButtonText="Cancel"
-              onCancel={() => setShowViewProductModal(false)}
-              formHtml={
-                <>
-                <div className="mb-4 pb-4 border-bottom">
-                <div className="d-flex justify-content-between align-items-start">
-                  <div>
-                    <h4 className="mb-2">{selectedProductView?.name}</h4>
-                    <p className="text-muted mb-0">Product ID: #{selectedProductView?.id}</p>
-                  </div>
-                  <Badge bg={selectedProductView?.is_active ? 'success' : 'danger'} className="px-3 py-2">
-                    {selectedProductView?.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
-                </div>
-              </div>
-  
-              <Row>
-                <Col md={6} className="mb-3">
-                  <div className="p-3 bg-light rounded">
-                    <p className="text-muted mb-1 small">Category</p>
-                    <p className="mb-0 fw-semibold">{selectedProductView?.category?.name}</p>
-                  </div>
-                </Col>
-                
-                
-
-                <Col md={6} className="mb-3">
-                  <div className="p-3 bg-light rounded">
-                    <p className="text-muted mb-1 small">Base Price</p>
-                    <p className="mb-0 fw-semibold text-primary">{selectedProductView?.currency} {selectedProductView?.base_price}</p>
-                  </div>
-                </Col>
-                
-                
-              </Row>
-                </>
-              }
-              submitButtonVariant="primary"
-              cancelButtonVariant="secondary"
-              ShowSubmitButton={false}
-            />
-            
-      
-
+      <GenericSidebar
+        isOpen={showProductSidebar}
+        onClose={handleCloseProductSidebar}
+        title={selectedProductView?.product?.name ?? "Subscription Details"}
+        subtitle={
+          selectedProductView?.product?.is_active ? "Active" : "Suspended"
+        }
+        metadata={
+          selectedProductView?.product?.id
+            ? `Product ID: #${selectedProductView.product.id}`
+            : undefined
+        }
+        avatar={{
+          initials: getInitials(
+            selectedProductView?.product?.name ?? "NA"
+          ),
+          name: selectedProductView?.product?.name ?? "NA",
+          gradient: getRandomColor(
+            selectedProductView?.product?.name ?? ""
+          ),
+        }}
+        width="400px"
+        sections={[
+          {
+            id: "subscription-info",
+            title: "Subscription Information",
+            icon: Package,
+            fields: [
+              {
+                label: "Subscription Name",
+                value: selectedProductView?.product?.name ?? "N/A",
+              },
+              {
+                label: "Status",
+                value: selectedProductView?.product?.is_active
+                  ? "Active"
+                  : "Suspended",
+                type: "badge",
+                badgeVariant: selectedProductView?.product?.is_active
+                  ? "success"
+                  : "danger",
+              },
+              {
+                label: "Billing Cycle",
+                value: selectedProductView?.billing_cycle
+                  ? String(selectedProductView.billing_cycle)
+                  : "N/A",
+              },
+              {
+                label: "Current Period Start",
+                value: selectedProductView?.renewal_start_date ?? null,
+                type: "date",
+                icon: Calendar,
+              },
+              {
+                label: "Current Period End",
+                value: selectedProductView?.renewal_end_date ?? null,
+                type: "date",
+                icon: Calendar,
+              },
+              {
+                label: "Quantity",
+                value: selectedProductView?.subscriptions ?? "0",
+              },
+              {
+                label: "Price",
+                value:
+                  (selectedProductView?.company?.profile?.currency ||
+                    selectedProductView?.product?.currency ||
+                    "USD") +
+                  " " +
+                  formatNumber(selectedProductView?.selling_price ?? 0),
+              },
+            ],
+          },
+          {
+            id: "product-details",
+            title: "Product Details",
+            icon: FileText,
+            fields: [
+              {
+                label: "Category",
+                value:
+                  selectedProductView?.product?.category?.name ?? "N/A",
+              },
+              {
+                label: "Base Price",
+                value:
+                  (selectedProductView?.company?.profile?.currency ||
+                    selectedProductView?.product?.currency ||
+                    "USD") +
+                  " " +
+                  formatNumber(
+                    selectedProductView?.product?.base_price ?? 0
+                  ),
+              },
+            ],
+          },
+        ]}
+      />
     </React.Fragment>
   );
 };

@@ -7545,6 +7545,17 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           name: selectedLead?.name || 'Lead',
           useIcon: true
         }}
+        contextPayload={
+          selectedLead
+            ? (() => {
+                const { follow_ups, meetings, audit_trail, ...leadRest } = selectedLead ?? {};
+                const leadForPayload = selectedLead ? { ...leadRest } : undefined;
+                return {
+                  lead: leadForPayload,
+                };
+              })()
+            : undefined
+        }
         width="420px"
         tabs={[
           {

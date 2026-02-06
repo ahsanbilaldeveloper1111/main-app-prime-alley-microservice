@@ -5671,6 +5671,15 @@ const handleCloseEditModal = useCallback(() => {
           name: selectedDeal?.name || 'Deal',
           useIcon: true
         }}
+        contextPayload={
+          selectedDeal
+            ? (() => {
+                const { follow_ups, meetings, audit_trail, ...dealRest } = selectedDeal ?? {};
+                const dealForPayload = selectedDeal ? { ...dealRest } : undefined;
+                return { deal: dealForPayload };
+              })()
+            : undefined
+        }
         width="420px"
         tabs={[
           {

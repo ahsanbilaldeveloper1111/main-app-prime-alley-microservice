@@ -1535,7 +1535,7 @@ export default function useCtiStomp(
                   groupDevicesByDnAndDeviceNameRef.current &&
                   updateSummaryDataRef.current
                 ) {
-                  console.log("complete_state", data.data);
+                 // console.log("complete_state", data.data);
                   const grouped = groupDevicesByDnAndDeviceNameRef.current(
                     data.data
                   );

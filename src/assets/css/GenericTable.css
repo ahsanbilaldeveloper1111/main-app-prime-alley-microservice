@@ -564,6 +564,52 @@
     font-size: 13px;
   }
   
+  .filter-bar-card {
+    border: none !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+    margin-bottom: 1rem;
+  }
+  
+  .filter-bar-card .card-body {
+    padding: 0.75rem;
+  }
+  
+  .filter-bar-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  
+  @media (min-width: 992px) {
+    .filter-bar-body {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+    }
+  }
+  
+  .filter-bar-tabs {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+    flex-grow: 1;
+  }
+  
+  .filter-bar-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .filter-bar-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  
   /* Responsive Adjustments */
   @media (max-width: 768px) {
     .generic-table-pagination {
