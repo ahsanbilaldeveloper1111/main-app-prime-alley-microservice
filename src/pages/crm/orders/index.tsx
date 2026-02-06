@@ -2635,6 +2635,15 @@ const CrmOrders = () => {
           name: viewingOrder?.customer_name || 'Order',
           useIcon: true
         }}
+        contextPayload={
+          viewingOrder
+            ? (() => {
+                const { follow_ups, meetings, audit_trail, ...orderRest } = viewingOrder ?? {};
+                const orderForPayload = viewingOrder ? { ...orderRest } : undefined;
+                return { order: orderForPayload };
+              })()
+            : undefined
+        }
         width="420px"
         tabs={[
           {
