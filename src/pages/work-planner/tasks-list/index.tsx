@@ -51,17 +51,13 @@ import {
   Edit,
   Trash2,
   MessageSquare,
-  Send,
-  SlidersHorizontal,
-  Pencil
+  Send
 } from 'lucide-react';
 import SelectBox from '@components/SelectBox';
-import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
-import GenericFilterSidebar, { FilterField } from '@components/GenericFilterSidebar';
-import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 import CreateTaskModal from '@components/work-planner/createtask-modal';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import TaskDetailOffcanvas from '@pages/work-planner/partials/TaskDetailOffcanvas';
+import TasksTable from '@pages/work-planner/partials/TasksTable';
 import moment from 'moment';
 
 interface Task {
@@ -135,7 +131,6 @@ const TasksList = () => {
   const [filterDueDate, setFilterDueDate] = useState('All Dates');
   const [filterCreatedAtFrom, setFilterCreatedAtFrom] = useState('');
   const [filterCreatedAtTo, setFilterCreatedAtTo] = useState('');
-  const [showFilterSidebar, setShowFilterSidebar] = useState(false);
   
   // Use refs to store latest filter values to avoid recreating fetchTasks on filter changes
   const filtersRef = useRef({ searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate, filterCreatedAtFrom, filterCreatedAtTo });
@@ -660,47 +655,6 @@ const TasksList = () => {
     { value: 'Overdue', label: 'Overdue' }
   ];
 
-  const filterFields: FilterField[] = React.useMemo(() => [
-    { id: 'search', label: 'Search', type: 'text', value: searchTerm, onChange: (v: string) => setSearchTerm(v ?? ''), placeholder: 'Search tasks...' },
-    { id: 'project', label: 'Project', type: 'dropdown', value: filterProject, onChange: (v) => setFilterProject(v ?? 'All Projects'), options: projectOptions },
-    { id: 'assignee', label: 'Assignee', type: 'multi-select', value: filterAssignee.map(ext => ({ value: ext, label: assigneesList.find((a: any) => (a.extension_number || a.id) === ext)?.name || ext })), onChange: (opts: any) => setFilterAssignee(opts?.length ? opts.map((o: { value: string }) => o.value) : []), options: assigneeOptions },
-    { id: 'status', label: 'Status', type: 'dropdown', value: filterStatus, onChange: (v) => setFilterStatus(v ?? 'All Status'), options: statusOptions },
-    { id: 'priority', label: 'Priority', type: 'dropdown', value: filterPriority, onChange: (v) => setFilterPriority(v ?? 'All Priority'), options: priorityOptions },
-    { id: 'createdFrom', label: 'Created From', type: 'date', value: filterCreatedAtFrom, onChange: (v) => setFilterCreatedAtFrom(v ?? '') },
-    { id: 'createdTo', label: 'Created To', type: 'date', value: filterCreatedAtTo, onChange: (v) => setFilterCreatedAtTo(v ?? '') },
-  ], [searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterCreatedAtFrom, filterCreatedAtTo, projectOptions, assigneeOptions, statusOptions, priorityOptions, assigneesList]);
-
-  const tableColumns: TableColumn<Task>[] = React.useMemo(() => [
-    { key: 'id', label: 'Task ID', sortable: true, accessor: (row) => row.id, render: (row) => <span className="text-muted small">{row.id}</span> },
-    { key: 'title', label: 'Task', sortable: true, accessor: (row) => row.title, render: (row) => <span className="fw-semibold">{row.title}</span> },
-    { key: 'status', label: 'Status', sortable: true, accessor: (row) => row.status, render: (row) => <Badge bg={getStatusVariant(row.status)}>{row.status}</Badge> },
-    { key: 'priority', label: 'Priority', sortable: true, accessor: (row) => row.priority, render: (row) => <Badge bg={getPriorityVariant(row.priority)}>{row.priority}</Badge> },
-    { key: 'project', label: 'Project', sortable: true, accessor: (row) => row.project },
-    { key: 'assignee', label: 'Assignee', sortable: true, accessor: (row) => row.assignee },
-    { key: 'assignees', label: 'Assignees', sortable: false, accessor: (row) => (row.assignees ?? []).map((a: any) => a.name).join(', '), render: (row) => ((row.assignees?.length ?? 0) > 0 ? <span className="small">{(row.assignees ?? []).map((a: any) => a.name).join(', ')}</span> : <span className="text-muted">—</span>) },
-    { key: 'dueDate', label: 'Due Date', sortable: true, accessor: (row) => row.dueDate },
-    { key: 'dueTime', label: 'Due Time', sortable: false, accessor: (row) => (row.rawData as any)?.due_time, render: (row) => (row.rawData as any)?.due_time ? <span className="small">{(row.rawData as any).due_time}</span> : <span className="text-muted">—</span>, emptyValue: '—' },
-    { key: 'description', label: 'Description', sortable: false, accessor: (row) => row.description, render: (row) => row.description ? <span className="text-muted small text-truncate d-inline-block" style={{ maxWidth: '200px' }} title={row.description}>{row.description}</span> : <span className="text-muted">—</span>, emptyValue: '—' },
-    { key: 'comments', label: 'Comments', sortable: true, accessor: (row) => row.comments ?? 0, render: (row) => <span>{(row.comments ?? 0)}</span>, emptyValue: '0' },
-    { key: 'labels', label: 'Labels', sortable: false, accessor: (row) => (row.rawData as any)?.labels, render: (row) => { const labels = (row.rawData as any)?.labels; if (!Array.isArray(labels) || labels.length === 0) return <span className="text-muted">—</span>; return <span className="d-flex flex-wrap gap-1">{labels.map((l: any, i: number) => <Badge key={i} bg="secondary" className="me-1">{l?.name ?? l?.label ?? (typeof l === 'string' ? l : '')}</Badge>)}</span>; }, emptyValue: '—' },
-    { key: 'is_completed', label: 'Completed', sortable: true, accessor: (row) => (row.rawData as any)?.is_completed, render: (row) => (row.rawData as any)?.is_completed ? <Badge bg="success">Yes</Badge> : <Badge bg="light" text="dark">No</Badge>, emptyValue: '—' },
-  ], []);
-
-  const tableActions: TableAction<Task>[] = React.useMemo(() => [
-    {
-      label: 'Actions',
-      icon: <MoreVertical size={16} />,
-      dropdown: {
-        options: [
-          { label: 'Edit Task', icon: <Pencil size={14} />, onClick: (row) => { setSelectedTask(row); setShowTaskDetail(false); setEditingTask(row.rawData); setShowCreateTask(true); } },
-          { label: 'Delete Task', icon: <Trash2 size={14} />, onClick: (row) => { setSelectedTask(row); setShowDeleteModal(true); }, className: 'text-danger', divider: true },
-        ],
-      },
-    },
-  ], []);
-
-  const hasActiveFilters = searchTerm !== '' || filterProject !== 'All Projects' || filterAssignee.length > 0 || filterStatus !== 'All Status' || filterPriority !== 'All Priority' || filterCreatedAtFrom !== '' || filterCreatedAtTo !== '';
-
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Customer Dashboard" />
@@ -1027,7 +981,7 @@ const TasksList = () => {
                 </div>
               </Col>
               <Col xs="auto">
-                <div className="d-flex gap-2 flex-wrap">
+                <div className="d-flex gap-2">
                   <Button 
                     variant="primary" 
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
@@ -1036,30 +990,82 @@ const TasksList = () => {
                     <Plus size={18} />
                     <span>Create Task</span>
                   </Button>
-                  <Button
-                    variant={hasActiveFilters ? 'primary' : 'outline-secondary'}
-                    onClick={() => setShowFilterSidebar(true)}
-                    className="d-flex align-items-center gap-2"
-                  >
-                    <SlidersHorizontal size={18} />
-                    Filters
-                    {hasActiveFilters && <span className="badge bg-light text-dark ms-1">Active</span>}
-                  </Button>
+                  
+                  {/* <Button variant="outline-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <FolderPlus size={18} />
+                    <span>Create Project</span>
+                  </Button> */}
                 </div>
               </Col>
             </Row>
 
-            <StatsCards
-              data={[
-                { title: 'Open Tasks', value: summary.openTasks, icon: CheckSquare, iconColor: '#059669', iconBgColor: '#d1fae5' },
-                { title: 'Overdue', value: summary.overdue, icon: AlertCircle, iconColor: '#dc2626', iconBgColor: '#fee2e2' },
-                { title: 'Due This Week', value: summary.dueThisWeek, icon: CalendarDays, iconColor: '#2563eb', iconBgColor: '#dbeafe' },
-                { title: 'Unassigned', value: summary.unassigned, icon: Users, iconColor: '#ea580c', iconBgColor: '#ffedd5' },
-                { title: 'High Priority', value: summary.highPriority, icon: Star, iconColor: '#9333ea', iconBgColor: '#f3e8ff' },
-              ] as StatsCardData[]}
-              gridMinWidth="180px"
-            //   valueFontSize="28px"
-            />
+            <Row className="g-3">
+              <Col xs={12} sm={6} lg className="d-flex">
+                <Card className="stat-card open-tasks w-100">
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div>
+                      <h6 className="stat-label">Open Tasks</h6>
+                      <h2 className="stat-number" style={{ color: '#059669' }}>{summary.openTasks}</h2>
+                    </div>
+                    <div className="stat-icon open-tasks">
+                      <CheckSquare />
+                    </div>
+                  </div>
+                </Card>
+              </Col>
+              <Col xs={12} sm={6} lg className="d-flex">
+                <Card className="stat-card overdue w-100">
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div>
+                      <h6 className="stat-label">Overdue</h6>
+                      <h2 className="stat-number" style={{ color: '#dc2626' }}>{summary.overdue}</h2>
+                    </div>
+                    <div className="stat-icon overdue">
+                      <AlertCircle />
+                    </div>
+                  </div>
+                </Card>
+              </Col>
+              <Col xs={12} sm={6} lg className="d-flex">
+                <Card className="stat-card due-week w-100">
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div>
+                      <h6 className="stat-label">Due This Week</h6>
+                      <h2 className="stat-number" style={{ color: '#2563eb' }}>{summary.dueThisWeek}</h2>
+                    </div>
+                    <div className="stat-icon due-week">
+                      <CalendarDays />
+                    </div>
+                  </div>
+                </Card>
+              </Col>
+              <Col xs={12} sm={6} lg className="d-flex">
+                <Card className="stat-card unassigned w-100">
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div>
+                      <h6 className="stat-label">Unassigned</h6>
+                      <h2 className="stat-number" style={{ color: '#ea580c' }}>{summary.unassigned}</h2>
+                    </div>
+                    <div className="stat-icon unassigned">
+                      <Users />
+                    </div>
+                  </div>
+                </Card>
+              </Col>
+              <Col xs={12} sm={6} lg className="d-flex">
+                <Card className="stat-card high-priority w-100">
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div>
+                      <h6 className="stat-label">High Priority</h6>
+                      <h2 className="stat-number" style={{ color: '#9333ea' }}>{summary.highPriority}</h2>
+                    </div>
+                    <div className="stat-icon high-priority">
+                      <Star />
+                    </div>
+                  </div>
+                </Card>
+              </Col>
+            </Row>
           </Container>
         </div>
 
@@ -1071,47 +1077,175 @@ const TasksList = () => {
             marginBottom: '1.5rem',
             boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
           }}>
-            <GenericTable<Task>
-              data={filteredTasks}
-              columns={tableColumns}
-              actions={tableActions}
-              showActions={true}
-              actionsLabel="Actions"
-              pagination={{
-                currentPage: pagination.page,
-                rowsPerPage: pagination.limit,
-                totalRows: pagination.total,
-                pageSizeOptions: [10, 15, 25, 50],
-              }}
-              onPaginationChange={(page, rowsPerPage) => {
-                setPagination(prev => ({ ...prev, page, limit: rowsPerPage }));
-              }}
-              sortable={true}
-              loading={loading}
-              emptyMessage="No tasks found"
-              loadingMessage="Loading..."
-              hover={true}
-              uniqueKey="id"
-              onRowClick={(row) => handleTaskClick(row)}
-              customizableColumns={true}
-              columnStorageKey="planner-taskslist-columns"
-            />
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap' as const,
+              gap: '1rem'
+            }}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '1 1 150px' }}>
+                <Search size={16} color="#6B7280" style={{ position: 'absolute', left: '0.75rem', pointerEvents: 'none' }} />
+                <input
+                  type="text"
+                  placeholder="Search tasks..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    paddingLeft: '2.5rem',
+                    border: '1px solid #E5E9F2',
+                    borderRadius: '6px',
+                    fontSize: '0.9rem',
+                    outline: 'none',
+                    fontFamily: 'inherit'
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#4680FF'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#E5E9F2'}
+                />
+              </div>
+
+              <div style={{ flex: '1 1 130px' }}>
+                <SelectBox
+                  value={filterProject === 'All Projects' ? null : filterProject}
+                  onChange={(value) => {
+                    const val = Array.isArray(value) ? value[0] : value;
+                    setFilterProject(val ? String(val) : 'All Projects');
+                  }}
+                  options={projectOptions}
+                  placeholder="Project"
+                  isSearchable
+                />
+              </div>
+
+              <div style={{ flex: '1 1 130px' }}>
+                <SelectBox
+                  value={filterAssignee.length > 0 ? filterAssignee : null}
+                  onChange={(value) => {
+                    if (Array.isArray(value)) {
+                      setFilterAssignee(value.map(v => String(v)));
+                    } else if (value) {
+                      setFilterAssignee([String(value)]);
+                    } else {
+                      setFilterAssignee([]);
+                    }
+                  }}
+                  options={assigneeOptions}
+                  placeholder="Assignee"
+                  isSearchable
+                  isMulti
+                />
+              </div>
+
+              <div style={{ flex: '1 1 120px' }}>
+                <SelectBox
+                  value={filterStatus === 'All Status' ? null : filterStatus}
+                  onChange={(value) => {
+                    const val = Array.isArray(value) ? value[0] : value;
+                    setFilterStatus(val ? String(val) : 'All Status');
+                  }}
+                  options={statusOptions}
+                  placeholder="Status"
+                  isSearchable
+                />
+              </div>
+
+              <div style={{ flex: '1 1 120px' }}>
+                <SelectBox
+                  value={filterPriority === 'All Priority' ? null : filterPriority}
+                  onChange={(value) => {
+                    const val = Array.isArray(value) ? value[0] : value;
+                    setFilterPriority(val ? String(val) : 'All Priority');
+                  }}
+                  options={priorityOptions}
+                  placeholder="Priority"
+                  isSearchable
+                />
+              </div>
+
+              <div style={{ flex: '1 1 140px' }}>
+                <Form.Control
+                  type="date"
+                  value={filterCreatedAtFrom}
+                  onChange={(e) => setFilterCreatedAtFrom(e.target.value)}
+                  placeholder="Start date"
+                  style={{ fontSize: '0.875rem', minHeight: '38px' }}
+                />
+              </div>
+              <div style={{ flex: '1 1 140px' }}>
+                <Form.Control
+                  type="date"
+                  value={filterCreatedAtTo}
+                  onChange={(e) => setFilterCreatedAtTo(e.target.value)}
+                  placeholder="End date"
+                  style={{ fontSize: '0.875rem', minHeight: '38px' }}
+                />
+              </div>
+
+              <button
+                onClick={handleApplyFilters}
+                style={{
+                  flex: '0 1 auto',
+                  padding: '0.625rem 1rem',
+                  backgroundColor: '#4680FF',
+                  color: 'white',
+                  border: '1px solid #4680FF',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Search size={16} />
+                Filter
+              </button>
+
+              <button
+                onClick={clearFilters}
+                style={{
+                  flex: '0 1 auto',
+                  padding: '0.625rem 1rem',
+                  backgroundColor: 'white',
+                  color: '#4680FF',
+                  border: '1px solid #4680FF',
+                  borderRadius: '6px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.9rem',
+                  transition: 'all 0.2s',
+                  fontFamily: 'inherit',
+                  whiteSpace: 'nowrap' as const
+                }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
+              >
+                Clear
+                <X size={16} />
+              </button>
+            </div>
           </div>
+
+            <TasksTable
+              tasks={filteredTasks}
+              loading={loading}
+              pagination={pagination}
+              setPagination={setPagination}
+              onTaskClick={(task) => handleTaskClick(task as Task)}
+              hierarchyDataExtensions={hierarchyDataExtensions}
+              getStatusVariant={getStatusVariant}
+              getPriorityVariant={getPriorityVariant}
+              itemLabel="tasks"
+            />
+          
         </Container>
       </div>
-
-      <GenericFilterSidebar
-        isOpen={showFilterSidebar}
-        onClose={() => setShowFilterSidebar(false)}
-        title="Filters"
-        subtitle="Filter and refine tasks"
-        filters={filterFields}
-        onApply={() => { handleApplyFilters(); setShowFilterSidebar(false); }}
-        onReset={clearFilters}
-        width="400px"
-        showApplyButton
-        showResetButton
-      />
 
       <TaskDetailOffcanvas
         show={showTaskDetail}
