@@ -1,0 +1,330 @@
+import axiosInstance from './axios';
+
+const prefix = 'communications';
+const meetingsPrefix = 'meetings';
+
+// ==================== Types ====================
+
+/** Request payload for send-email. */
+export interface SendEmailPayload {
+  /** Recipient email(s). Array of strings, or single string (accepted for backward compatibility). */
+  to: string[] | string;
+  /** Subject line (max 255 chars). */
+  subject: string;
+  /** Body (HTML or plain text). */
+  content: string;
+  /** `text/html` (default) or `text/plain`. */
+  content_type?: 'text/html' | 'text/plain';
+  /** Sender/extension identifier (default: `unknown`). */
+  created_by?: string;
+  /** CC addresses; each must be email. */
+  cc?: string[];
+  /** BCC addresses; each must be email. */
+  bcc?: string[];
+  /** Reply-to email. */
+  reply_to?: string;
+  /** Array of file path strings. */
+  attachments?: string[];
+}
+
+/** Success response (200) for send-email. */
+export interface SendEmailSuccessData {
+  status_code: number;
+  to: string[];
+}
+
+export interface SendEmailSuccessResponse {
+  status: 'success';
+  message: string;
+  data: SendEmailSuccessData;
+}
+
+/** Error response (e.g. 422 validation) for send-email. */
+export interface SendEmailErrorResponse {
+  status: 'error';
+  message: string;
+  errors?: Record<string, string[]>;
+}
+
+/** Request payload for send-whatsapp. */
+export interface SendWhatsAppPayload {
+  /** Recipient phone (E.164, e.g. `+15551234567`). */
+  number: string;
+  /** Sender/extension (default: `unknown`). */
+  created_by?: string;
+  /** Body text (max 1600). Required for chat; ignored when using template only. */
+  message?: string;
+  /** Twilio Content Template SID (for template messages). */
+  content_sid?: string;
+  /** Key-value variables for the template (e.g. `{"1":"John","2":"Doe"}`). */
+  content_variables?: Record<string, string>;
+}
+
+/** Success response (200) for send-whatsapp. */
+export interface SendWhatsAppSuccessData {
+  message_sid: string;
+  status: string;
+  to: string;
+  message?: Record<string, unknown>;
+}
+
+export interface SendWhatsAppSuccessResponse {
+  status: 'success';
+  message: string;
+  data: SendWhatsAppSuccessData;
+}
+
+/** Error response (e.g. 400 window expired) for send-whatsapp. */
+export interface SendWhatsAppErrorResponse {
+  status: 'error';
+  message: string;
+  window_expired?: boolean;
+  window_started_at?: string;
+}
+
+/** Request payload for POST meetings/instant. */
+export interface CreateInstantMeetingPayload {
+  /** Meeting title (max 255 chars). */
+  summary?: string;
+  /** Meeting description. */
+  description?: string;
+  /** Email addresses of attendees. */
+  attendees?: string[];
+  /** Creator/extension (default: `unknown`). */
+  created_by?: string;
+}
+
+/** Request payload for POST meetings/scheduled. */
+export interface CreateScheduledMeetingPayload {
+  /** Start time (ISO 8601 or strtotime-compatible). */
+  start_time: string;
+  /** End time (defaults to 1 hour after start). */
+  end_time?: string;
+  /** Meeting title (max 255 chars). */
+  summary?: string;
+  /** Meeting description. */
+  description?: string;
+  /** Email addresses. */
+  attendees?: string[];
+  /** Timezone (max 50 chars; defaults to app timezone). */
+  timezone?: string;
+  /** Creator/extension (default: `unknown`). */
+  created_by?: string;
+}
+
+/** Success response (200) for instant or scheduled meeting. */
+export interface MeetingSuccessData {
+  event_id: string;
+  meeting_link: string;
+  html_link: string;
+  start_time: string;
+  end_time: string;
+  summary?: string;
+}
+
+export interface MeetingSuccessResponse {
+  status: 'success';
+  message: string;
+  data: MeetingSuccessData;
+}
+
+/** Request payload for POST generate-email. */
+export interface GenerateEmailPayload {
+  /** Natural-language prompt (e.g. subject + context). */
+  query: string;
+  /** Existing draft to refine. */
+  previous_content?: string;
+  /** Sender context (optional). */
+  user?: { name: string; extension: number };
+}
+
+/** Success response (200) for generate-email. */
+export interface GenerateEmailSuccessResponse {
+  result: string;
+}
+
+/** Request payload for POST generate-whatsapp. */
+export interface GenerateWhatsAppPayload {
+  /** Natural-language prompt. */
+  query: string;
+  /** Existing draft to refine. */
+  previous_content?: string;
+  /** Tone of the message. */
+  tone?: 'professional' | 'casual' | 'friendly' | 'empathetic' | 'urgent' | 'persuasive';
+  /** Language of the message. */
+  language?: 'en' | 'es' | 'hi' | 'ur' | 'it' | 'pt' | 'ru' | 'zh';
+  /** Urgency of the message. */
+  urgency?: 'low' | 'normal' | 'high' | 'critical';
+}
+
+/** Success response (200) for generate-whatsapp. */
+export interface GenerateWhatsAppSuccessResponse {
+  result: string;
+}
+
+// ==================== APIs ====================
+
+/**
+ * POST send-email
+ * Sends an email with the given payload.
+ */
+export const sendEmail = async (
+  data: SendEmailPayload
+): Promise<SendEmailSuccessResponse> => {
+  const response = await axiosInstance.post<SendEmailSuccessResponse>(
+    `${prefix}/send-email`,
+    data
+  );
+  return response.data;
+};
+
+/**
+ * POST send-whatsapp
+ * Sends a WhatsApp message (chat within 24h window, or template).
+ * Chat: send `message` (and optionally `content_sid`).
+ * Template / outside 24h: send `content_sid`; use `content_variables` if the template has placeholders.
+ */
+export const sendWhatsApp = async (
+  data: SendWhatsAppPayload
+): Promise<SendWhatsAppSuccessResponse> => {
+  const response = await axiosInstance.post<SendWhatsAppSuccessResponse>(
+    `${prefix}/send-whatsapp`,
+    data
+  );
+  return response.data;
+};
+
+/**
+ * POST meetings/instant
+ * Creates an instant meeting.
+ */
+export const createInstantMeeting = async (
+  data: CreateInstantMeetingPayload = {}
+): Promise<MeetingSuccessResponse> => {
+  const response = await axiosInstance.post<MeetingSuccessResponse>(
+    `${meetingsPrefix}/instant`,
+    data
+  );
+  return response.data;
+};
+
+/**
+ * POST meetings/scheduled
+ * Creates a scheduled meeting.
+ */
+export const createScheduledMeeting = async (
+  data: CreateScheduledMeetingPayload
+): Promise<MeetingSuccessResponse> => {
+  const response = await axiosInstance.post<MeetingSuccessResponse>(
+    `${meetingsPrefix}/scheduled`,
+    data
+  );
+  return response.data;
+};
+
+/**
+ * POST generate-email
+ * Generates email content from a natural-language prompt.
+ */
+export const generateEmail = async (
+  data: GenerateEmailPayload
+): Promise<GenerateEmailSuccessResponse> => {
+  const response = await axiosInstance.post<GenerateEmailSuccessResponse>(
+    `${prefix}/generate-email`,
+    data
+  );
+  return response.data;
+};
+
+/**
+ * POST generate-whatsapp
+ * Generates WhatsApp message content from a natural-language prompt.
+ */
+export const generateWhatsApp = async (
+  data: GenerateWhatsAppPayload
+): Promise<GenerateWhatsAppSuccessResponse> => {
+  const response = await axiosInstance.post<GenerateWhatsAppSuccessResponse>(
+    `${prefix}/generate-whatsapp`,
+    data
+  );
+  return response.data;
+};
+
+// ==================== GET APIs ====================
+
+/**
+ * GET meetings/test-connection
+ * Tests the meetings/calendar connection.
+ */
+export const getMeetingsTestConnection = async (): Promise<unknown> => {
+  const response = await axiosInstance.get(`${meetingsPrefix}/test-connection`);
+  return response.data;
+};
+
+/**
+ * GET meetings/{eventId}
+ * Fetches a single meeting by event ID.
+ */
+export const getMeetingByEventId = async (
+  eventId: string
+): Promise<unknown> => {
+  const response = await axiosInstance.get(
+    `${meetingsPrefix}/${encodeURIComponent(eventId)}`
+  );
+  return response.data;
+};
+
+/**
+ * GET emails
+ * Fetches emails list.
+ */
+export const getEmails = async (params?: Record<string, string>): Promise<unknown> => {
+  const response = await axiosInstance.get(`${prefix}/emails`, { params });
+  return response.data;
+};
+
+/**
+ * GET chats
+ * Fetches chats list.
+ */
+export const getChats = async (params?: Record<string, string>): Promise<unknown> => {
+  const response = await axiosInstance.get(`${prefix}/chats`, { params });
+  return response.data;
+};
+
+/**
+ * GET meetings
+ * Fetches meetings list.
+ */
+export const getMeetings = async (params?: Record<string, string>): Promise<unknown> => {
+  const response = await axiosInstance.get(meetingsPrefix, { params });
+  return response.data;
+};
+
+/**
+ * GET whatsapp/chat-messages
+ * Fetches WhatsApp chat messages.
+ */
+export const getWhatsAppChatMessages = async (
+  params?: Record<string, string>
+): Promise<unknown> => {
+  const response = await axiosInstance.get(
+    `${prefix}/whatsapp/chat-messages`,
+    { params }
+  );
+  return response.data;
+};
+
+/**
+ * GET whatsapp/message-status
+ * Fetches WhatsApp message status (e.g. by message_sid).
+ */
+export const getWhatsAppMessageStatus = async (
+  params?: Record<string, string>
+): Promise<unknown> => {
+  const response = await axiosInstance.get(
+    `${prefix}/whatsapp/message-status`,
+    { params }
+  );
+  return response.data;
+};

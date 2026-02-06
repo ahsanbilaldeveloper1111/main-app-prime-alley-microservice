@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, LucideIcon, User, Phone, Mail, ChevronLeft, ChevronRight, MessageSquare, Video, Calendar } from 'lucide-react';
+import { X, Maximize2, Minimize2, LucideIcon, User, Phone, Mail, ChevronLeft, ChevronRight, MessageSquare, Video, Calendar } from 'lucide-react';
 import { Badge, Button } from 'react-bootstrap';
-import AICompose from '@components/aicompose';
+import AICompose, { type AIComposeOpenedFrom } from '@components/aicompose';
 
 // Wrapper component to add close functionality to AICompose - fills flex container so it sticks with sidebar
-const AIComposeWrapper: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+const AIComposeWrapper: React.FC<{
+  onClose: () => void;
+  openedFrom?: AIComposeOpenedFrom;
+  contextPayload?: Record<string, unknown>;
+}> = ({ onClose, openedFrom = 'whatsapp', contextPayload }) => {
+  const [isFullScreen, setIsFullScreen] = useState(false);
   return (
     <>
       <style>{`
@@ -62,6 +67,22 @@ const AIComposeWrapper: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           transform: scale(1.1);
           background-color: #e5e7eb;
         }
+
+        .ai-compose-content.full-screen {
+          position: fixed;
+          inset: 0;
+          max-width: none;
+          width: 100%;
+          height: 100%;
+          border-radius: 0;
+          z-index: 9999;
+        }
+
+        .ai-compose-content.full-screen .ai-compose-toolbar-btns {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+        }
       `}</style>
       
       <div 
@@ -73,14 +94,31 @@ const AIComposeWrapper: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         }}
       >
         <div className="ai-compose-wrapper">
-          <div className="ai-compose-content">
-            <button
-              className="ai-compose-close-btn"
-              onClick={onClose}
-            >
-              <X size={16} color="#374151" />
-            </button>
-            <AICompose />
+          <div
+            className={`ai-compose-content ${isFullScreen ? 'full-screen' : ''}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="ai-compose-toolbar-btns d-flex gap-1" style={{ position: 'sticky', top: 43, float: 'right', zIndex: 1000, marginRight: 20, marginBottom: -48 }}>
+              <button
+                type="button"
+                className="ai-compose-close-btn"
+                onClick={() => setIsFullScreen(!isFullScreen)}
+                title={isFullScreen ? 'Exit full screen' : 'Full screen'}
+                aria-label={isFullScreen ? 'Exit full screen' : 'Full screen'}
+              >
+                {isFullScreen ? <Minimize2 size={16} color="#374151" /> : <Maximize2 size={16} color="#374151" />}
+              </button>
+              <button
+                className="ai-compose-close-btn"
+                onClick={onClose}
+                title="Close"
+                aria-label="Close"
+              >
+                <X size={16} color="#374151" />
+              </button>
+            </div>
+
+            <AICompose key={openedFrom} openedFrom={openedFrom} contextPayload={contextPayload} />
           </div>
         </div>
       </div>
@@ -147,13 +185,15 @@ export interface GenericSidebarProps {
   email?: string;
   phone?: string;
   avatar?: SidebarAvatar;
-  // Quick Action Handlers
+  // Quick Action Handlers (receive context payload when provided)
   onCall?: () => void;
-  onWhatsApp?: () => void;
-  onEmail?: () => void;
-  onSMS?: () => void;
-  onMeetNow?: () => void;
+  onWhatsApp?: (payload?: Record<string, unknown>) => void;
+  onEmail?: (payload?: Record<string, unknown>) => void;
+  onSMS?: (payload?: Record<string, unknown>) => void;
+  onMeetNow?: (payload?: Record<string, unknown>) => void;
   onSchedule?: () => void;
+  /** Context payload (e.g. lead, deal, order) passed to AI Compose and to action handlers */
+  contextPayload?: Record<string, unknown>;
   sections?: SidebarSection[];
   tabs?: SidebarTab[];
   actions?: SidebarAction[];
@@ -175,6 +215,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   onSMS = () => console.log('SMS action clicked'),
   onMeetNow = () => console.log('Meet Now action clicked'),
   onSchedule = () => console.log('Schedule action clicked'),
+  contextPayload,
   sections,
   tabs,
   actions,
@@ -184,6 +225,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
   const [showAICompose, setShowAICompose] = useState(false);
+  const [aiComposeOpenedFrom, setAiComposeOpenedFrom] = useState<AIComposeOpenedFrom>('whatsapp');
   const tabsContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-select first tab when sidebar opens or tabs change
@@ -552,7 +594,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             if (e.target === e.currentTarget) setShowAICompose(false);
           }}
         >
-          <AIComposeWrapper onClose={() => setShowAICompose(false)} />
+          <AIComposeWrapper
+            openedFrom={aiComposeOpenedFrom}
+            onClose={() => setShowAICompose(false)}
+            contextPayload={contextPayload}
+          />
         </div>
       )}
       <div 
@@ -758,8 +804,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                setAiComposeOpenedFrom('whatsapp');
                 setShowAICompose(true);
-                onWhatsApp();
+                if (contextPayload) console.log('[GenericSidebar] Payload from page (WhatsApp):', contextPayload);
+                onWhatsApp(contextPayload);
               }}
               style={{
                 display: 'flex',
@@ -801,7 +849,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onEmail();
+                setAiComposeOpenedFrom('email');
+                setShowAICompose(true);
+                console.log('[GenericSidebar] Payload from page (Email):', contextPayload ?? '(none)');
+                onEmail(contextPayload);
               }}
               style={{
                 display: 'flex',
@@ -843,7 +894,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onSMS();
+                setAiComposeOpenedFrom('sms');
+                setShowAICompose(true);
+                console.log('[GenericSidebar] Payload from page (SMS):', contextPayload ?? '(none)');
+                onSMS(contextPayload);
               }}
               style={{
                 display: 'flex',
@@ -885,7 +939,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onMeetNow();
+                setAiComposeOpenedFrom('meet-now');
+                setShowAICompose(true);
+                console.log('[GenericSidebar] Payload from page (Meet Now):', contextPayload ?? '(none)');
+                onMeetNow(contextPayload);
               }}
               style={{
                 display: 'flex',

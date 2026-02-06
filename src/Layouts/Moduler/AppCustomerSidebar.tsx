@@ -172,7 +172,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/crm/deals'
         },
         {
-          id: 'crm-deals',
+          id: 'crm-deals-approval',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS_APPROVAL,
           icon: <Handshake size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DEALS,
