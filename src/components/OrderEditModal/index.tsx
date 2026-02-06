@@ -200,8 +200,8 @@ const OrderEditModal: React.FC<OrderEditModalProps> = ({ show, onHide, orderId, 
         items: transformedItems,
         contract_type: order.contract_type || "",
         contract_length: order.contract_length || "",
-        contract_start_date: order.contract_start_date || "",
-        contract_end_date: order.contract_end_date || "",
+        contract_start_date: order.contract_start_date ? String(order.contract_start_date).split("T")[0] : "",
+        contract_end_date: order.contract_end_date ? String(order.contract_end_date).split("T")[0] : "",
         auto_renewal: (() => {
           const v = order?.auto_renewal;
           const s = v != null ? String(v).toLowerCase().trim() : "";
@@ -886,14 +886,14 @@ const OrderEditModal: React.FC<OrderEditModalProps> = ({ show, onHide, orderId, 
                         <Col md={6}>
                           <Form.Group className="mb-3">
                             <Form.Label>Contract Start Date</Form.Label>
-                            <Form.Control type="date" value={formData.contract_start_date} onChange={(e) => setFormData({ ...formData, contract_start_date: e.target.value })} />
+                            <Form.Control type="date" value={formData.contract_start_date ? String(formData.contract_start_date).split("T")[0] : ""} onChange={(e) => setFormData({ ...formData, contract_start_date: e.target.value })} />
                           </Form.Group>
                         </Col>
 
                         <Col md={6}>
                           <Form.Group className="mb-3">
                             <Form.Label>Contract End Date</Form.Label>
-                            <Form.Control type="date" value={formData.contract_end_date} onChange={(e) => setFormData({ ...formData, contract_end_date: e.target.value })} />
+                            <Form.Control type="date" value={formData.contract_end_date ? String(formData.contract_end_date).split("T")[0] : ""} onChange={(e) => setFormData({ ...formData, contract_end_date: e.target.value })} />
                           </Form.Group>
                         </Col>
 
@@ -951,7 +951,7 @@ const OrderEditModal: React.FC<OrderEditModalProps> = ({ show, onHide, orderId, 
 
                    
                       <h5 className="fw-bold mb-4 text-success">ORDER ITEMS</h5>
-                      <Row className="mb-4">
+                      {/* <Row className="mb-4">
                         <Col md={4}>
                           <Form.Group className="mb-3">
                             <Form.Label>Tax Percentage (%)</Form.Label>
@@ -994,12 +994,12 @@ const OrderEditModal: React.FC<OrderEditModalProps> = ({ show, onHide, orderId, 
                             />
                           </Form.Group>
                         </Col>}
-                      </Row>
+                      </Row> */}
                       
 
                       <div className="d-flex justify-content-end mb-3">
                         
-                        <Button
+                        {/* <Button
                           variant="primary"
                           size="sm"
                           onClick={() => {
@@ -1016,7 +1016,7 @@ const OrderEditModal: React.FC<OrderEditModalProps> = ({ show, onHide, orderId, 
                         >
                           <Plus size={14} className="me-1" />
                           Add Item
-                        </Button>
+                        </Button> */}
                         
                       </div>
 
