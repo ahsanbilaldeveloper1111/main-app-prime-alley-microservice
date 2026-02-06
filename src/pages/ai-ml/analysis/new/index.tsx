@@ -660,7 +660,10 @@ const CallAnalysis = () => {
       }
       if (decodedPhone) {
         setLocalPartyNumber(decodedPhone);
-        setRemotePartyNumber(decodedPhone);
+      }
+
+      if(decodedRemotePartyNumber){
+        setRemotePartyNumber(decodedRemotePartyNumber);
       }
 
       if (decodedImagicle) {
@@ -685,7 +688,7 @@ const CallAnalysis = () => {
         setDate(decodedDateOnly);
         
         // Trigger analysis
-        handleGetCallAnalysisWithData(decodedDateOnly, decodedLocalPartyNumber, decodedOwnerUsername, decodedId, decodedImagicle,decodedDateTime,decodedDuration,decodedDirection,decodedPhone);
+        handleGetCallAnalysisWithData(decodedDateOnly, decodedLocalPartyNumber, decodedOwnerUsername, decodedId, decodedImagicle,decodedDateTime,decodedDuration,decodedDirection,decodedPhone,decodedRemotePartyNumber);
       
     } catch (error) {
       console.error('Error parsing URL data:', error);
@@ -726,7 +729,7 @@ const CallAnalysis = () => {
     }
   };
 
-  const handleGetCallAnalysisWithData = async (dateParam: string, localPartyNumberParam: string, ownerUsernameParam: string, uuidParam: string, imagicleParam: string, dateTimeParam: string, durationParam: string, directionParam: string, phoneParam: string) => {
+  const handleGetCallAnalysisWithData = async (dateParam: string, localPartyNumberParam: string, ownerUsernameParam: string, uuidParam: string, imagicleParam: string, dateTimeParam: string, durationParam: string, directionParam: string, phoneParam: string, remotePartyNumberParam: string) => {
     // Set the parameters
     setUuid(uuidParam);
     setDate(dateParam);
@@ -743,8 +746,8 @@ const CallAnalysis = () => {
     if (directionParam) {
       setCallType(directionParam);
     }
-    if (phoneParam) {
-      setRemotePartyNumber(phoneParam);
+    if (remotePartyNumberParam) {
+      setRemotePartyNumber(remotePartyNumberParam);
     }
     // Set loading state
     setLoading(true);
