@@ -58,6 +58,7 @@ import CreateTaskModal from '@components/work-planner/createtask-modal';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import TaskDetailOffcanvas from '@pages/work-planner/partials/TaskDetailOffcanvas';
 import TasksTable from '@pages/work-planner/partials/TasksTable';
+import TaskFilterSection from '@pages/work-planner/partials/TaskFilterSection';
 import moment from 'moment';
 
 interface Task {
@@ -131,15 +132,27 @@ const TasksList = () => {
   const [filterDueDate, setFilterDueDate] = useState('All Dates');
   const [filterCreatedAtFrom, setFilterCreatedAtFrom] = useState('');
   const [filterCreatedAtTo, setFilterCreatedAtTo] = useState('');
-  
-  // Use refs to store latest filter values to avoid recreating fetchTasks on filter changes
-  const filtersRef = useRef({ searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate, filterCreatedAtFrom, filterCreatedAtTo });
-  const tasksRef = useRef<Task[]>([]);
 
-  // Update refs when filters change
-  useEffect(() => {
-    filtersRef.current = { searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate, filterCreatedAtFrom, filterCreatedAtTo };
-  }, [searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterDueDate, filterCreatedAtFrom, filterCreatedAtTo]);
+  // Applied filters: only these are used for API and table; updated only when user clicks Filter
+  const [appliedFilters, setAppliedFilters] = useState({
+    searchTerm: '',
+    filterProject: 'All Projects',
+    filterAssignee: [] as string[],
+    filterStatus: 'All Status',
+    filterPriority: 'All Priority',
+    filterCreatedAtFrom: '',
+    filterCreatedAtTo: ''
+  });
+  const appliedFiltersRef = useRef({
+    searchTerm: '',
+    filterProject: 'All Projects',
+    filterAssignee: [] as string[],
+    filterStatus: 'All Status',
+    filterPriority: 'All Priority',
+    filterCreatedAtFrom: '',
+    filterCreatedAtTo: ''
+  });
+  const tasksRef = useRef<Task[]>([]);
   
   // Update tasks ref when tasks change
   useEffect(() => {
@@ -248,8 +261,8 @@ const TasksList = () => {
     try {
       setLoading(true);
       
-      // Read current filter values from ref
-      const currentFilters = filtersRef.current;
+      // Use applied filters only (set when user clicks Filter or Clear), not live form state
+      const currentFilters = appliedFiltersRef.current;
       
       const params: any = {
         page: pagination.page,
@@ -327,7 +340,7 @@ const TasksList = () => {
         params.created_at_to = currentFilters.filterCreatedAtTo;
       }
 
-      const response = await listTasks(params);
+      const response: any = await listTasks(params);
       
       if (response && response.data) {
         const mappedTasks = response.data.map(mapApiTaskToTask);
@@ -406,13 +419,22 @@ const TasksList = () => {
     fetchTasks();
   }, [hierarchyLoading]); // Only trigger on initial load, not on filter changes
 
-  // Handler to apply filters (called when filter button is clicked)
+  // Handler to apply filters (called when filter button is clicked) - only then do we search via API
   const handleApplyFilters = useCallback(() => {
+    const toApply = {
+      searchTerm,
+      filterProject,
+      filterAssignee,
+      filterStatus,
+      filterPriority,
+      filterCreatedAtFrom,
+      filterCreatedAtTo
+    };
+    setAppliedFilters(toApply);
+    appliedFiltersRef.current = toApply;
     setPagination(prev => ({ ...prev, page: 1 }));
-    // Call fetchTasks directly with current filter values
-    // The pagination useEffect will also trigger, but fetchTasks has loading state to prevent issues
     fetchTasks();
-  }, [fetchTasks]);
+  }, [fetchTasks, searchTerm, filterProject, filterAssignee, filterStatus, filterPriority, filterCreatedAtFrom, filterCreatedAtTo]);
 
   // Fetch tasks when pagination changes (page navigation)
   useEffect(() => {
@@ -615,23 +637,37 @@ const TasksList = () => {
     setFilterDueDate(cleared.filterDueDate);
     setFilterCreatedAtFrom(cleared.filterCreatedAtFrom);
     setFilterCreatedAtTo(cleared.filterCreatedAtTo);
-
-    // Keep pagination unchanged; just refresh with cleared filters
-    filtersRef.current = cleared;
+    setAppliedFilters({
+      searchTerm: cleared.searchTerm,
+      filterProject: cleared.filterProject,
+      filterAssignee: cleared.filterAssignee,
+      filterStatus: cleared.filterStatus,
+      filterPriority: cleared.filterPriority,
+      filterCreatedAtFrom: cleared.filterCreatedAtFrom,
+      filterCreatedAtTo: cleared.filterCreatedAtTo
+    });
+    appliedFiltersRef.current = {
+      searchTerm: cleared.searchTerm,
+      filterProject: cleared.filterProject,
+      filterAssignee: cleared.filterAssignee,
+      filterStatus: cleared.filterStatus,
+      filterPriority: cleared.filterPriority,
+      filterCreatedAtFrom: cleared.filterCreatedAtFrom,
+      filterCreatedAtTo: cleared.filterCreatedAtTo
+    };
     fetchTasks();
   }, [fetchTasks]);
 
+  // Table uses applied filters only (updated when user clicks Filter), not live form state
   const filteredTasks = tasks.filter(task => {
-    const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         task.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesProject = filterProject === 'All Projects' || task.project === filterProject;
-    // Assignee filtering is now done server-side via extension_numbers, so skip client-side filtering
-    const matchesAssignee = filterAssignee.length === 0 || filterAssignee.some(extNum => 
+    const matchesSearch = task.title.toLowerCase().includes(appliedFilters.searchTerm.toLowerCase()) ||
+                         task.id.toLowerCase().includes(appliedFilters.searchTerm.toLowerCase());
+    const matchesProject = appliedFilters.filterProject === 'All Projects' || task.project === appliedFilters.filterProject;
+    const matchesAssignee = appliedFilters.filterAssignee.length === 0 || appliedFilters.filterAssignee.some(extNum =>
       task.rawData?.assignees?.some((assignee: any) => assignee.extension_number === extNum)
     );
-    const matchesStatus = filterStatus === 'All Status' || task.status === filterStatus;
-    const matchesPriority = filterPriority === 'All Priority' || task.priority === filterPriority;
-    
+    const matchesStatus = appliedFilters.filterStatus === 'All Status' || task.status === appliedFilters.filterStatus;
+    const matchesPriority = appliedFilters.filterPriority === 'All Priority' || task.priority === appliedFilters.filterPriority;
     return matchesProject && matchesAssignee && matchesStatus && matchesPriority;
   });
 
@@ -1070,167 +1106,28 @@ const TasksList = () => {
         </div>
 
         <Container fluid>
-          <div style={{
-            backgroundColor: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            marginBottom: '1.5rem',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-          }}>
-            <div style={{
-              display: 'flex',
-              flexWrap: 'wrap' as const,
-              gap: '1rem'
-            }}>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '1 1 150px' }}>
-                <Search size={16} color="#6B7280" style={{ position: 'absolute', left: '0.75rem', pointerEvents: 'none' }} />
-                <input
-                  type="text"
-                  placeholder="Search tasks..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    paddingLeft: '2.5rem',
-                    border: '1px solid #E5E9F2',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem',
-                    outline: 'none',
-                    fontFamily: 'inherit'
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#4680FF'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#E5E9F2'}
-                />
-              </div>
-
-              <div style={{ flex: '1 1 130px' }}>
-                <SelectBox
-                  value={filterProject === 'All Projects' ? null : filterProject}
-                  onChange={(value) => {
-                    const val = Array.isArray(value) ? value[0] : value;
-                    setFilterProject(val ? String(val) : 'All Projects');
-                  }}
-                  options={projectOptions}
-                  placeholder="Project"
-                  isSearchable
-                />
-              </div>
-
-              <div style={{ flex: '1 1 130px' }}>
-                <SelectBox
-                  value={filterAssignee.length > 0 ? filterAssignee : null}
-                  onChange={(value) => {
-                    if (Array.isArray(value)) {
-                      setFilterAssignee(value.map(v => String(v)));
-                    } else if (value) {
-                      setFilterAssignee([String(value)]);
-                    } else {
-                      setFilterAssignee([]);
-                    }
-                  }}
-                  options={assigneeOptions}
-                  placeholder="Assignee"
-                  isSearchable
-                  isMulti
-                />
-              </div>
-
-              <div style={{ flex: '1 1 120px' }}>
-                <SelectBox
-                  value={filterStatus === 'All Status' ? null : filterStatus}
-                  onChange={(value) => {
-                    const val = Array.isArray(value) ? value[0] : value;
-                    setFilterStatus(val ? String(val) : 'All Status');
-                  }}
-                  options={statusOptions}
-                  placeholder="Status"
-                  isSearchable
-                />
-              </div>
-
-              <div style={{ flex: '1 1 120px' }}>
-                <SelectBox
-                  value={filterPriority === 'All Priority' ? null : filterPriority}
-                  onChange={(value) => {
-                    const val = Array.isArray(value) ? value[0] : value;
-                    setFilterPriority(val ? String(val) : 'All Priority');
-                  }}
-                  options={priorityOptions}
-                  placeholder="Priority"
-                  isSearchable
-                />
-              </div>
-
-              <div style={{ flex: '1 1 140px' }}>
-                <Form.Control
-                  type="date"
-                  value={filterCreatedAtFrom}
-                  onChange={(e) => setFilterCreatedAtFrom(e.target.value)}
-                  placeholder="Start date"
-                  style={{ fontSize: '0.875rem', minHeight: '38px' }}
-                />
-              </div>
-              <div style={{ flex: '1 1 140px' }}>
-                <Form.Control
-                  type="date"
-                  value={filterCreatedAtTo}
-                  onChange={(e) => setFilterCreatedAtTo(e.target.value)}
-                  placeholder="End date"
-                  style={{ fontSize: '0.875rem', minHeight: '38px' }}
-                />
-              </div>
-
-              <button
-                onClick={handleApplyFilters}
-                style={{
-                  flex: '0 1 auto',
-                  padding: '0.625rem 1rem',
-                  backgroundColor: '#4680FF',
-                  color: 'white',
-                  border: '1px solid #4680FF',
-                  borderRadius: '6px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                <Search size={16} />
-                Filter
-              </button>
-
-              <button
-                onClick={clearFilters}
-                style={{
-                  flex: '0 1 auto',
-                  padding: '0.625rem 1rem',
-                  backgroundColor: 'white',
-                  color: '#4680FF',
-                  border: '1px solid #4680FF',
-                  borderRadius: '6px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.9rem',
-                  transition: 'all 0.2s',
-                  fontFamily: 'inherit',
-                  whiteSpace: 'nowrap' as const
-                }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
-              >
-                Clear
-                <X size={16} />
-              </button>
-            </div>
-          </div>
+          <TaskFilterSection
+            searchTerm={searchTerm}
+            onSearchTermChange={setSearchTerm}
+            filterProject={filterProject}
+            onFilterProjectChange={setFilterProject}
+            filterAssignee={filterAssignee}
+            onFilterAssigneeChange={setFilterAssignee}
+            filterStatus={filterStatus}
+            onFilterStatusChange={setFilterStatus}
+            filterPriority={filterPriority}
+            onFilterPriorityChange={setFilterPriority}
+            filterCreatedAtFrom={filterCreatedAtFrom}
+            onFilterCreatedAtFromChange={setFilterCreatedAtFrom}
+            filterCreatedAtTo={filterCreatedAtTo}
+            onFilterCreatedAtToChange={setFilterCreatedAtTo}
+            projectOptions={projectOptions}
+            assigneeOptions={assigneeOptions}
+            statusOptions={statusOptions}
+            priorityOptions={priorityOptions}
+            onApplyFilters={handleApplyFilters}
+            onClearFilters={clearFilters}
+          />
 
             <TasksTable
               tasks={filteredTasks}
