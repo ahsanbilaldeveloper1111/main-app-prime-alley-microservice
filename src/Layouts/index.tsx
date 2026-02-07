@@ -675,7 +675,7 @@ const Layout = ({ children }: LayoutProps) => {
 
         @media (min-width: 992px) {
           .main-content-wrapper.sidebar-open {
-            margin-left: 280px !important;
+            margin-left: 70px !important;
           }
           
           .main-content-wrapper.sidebar-closed {

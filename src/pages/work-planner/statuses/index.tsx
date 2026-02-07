@@ -10,10 +10,11 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import { Container, Row, Col, Card, Table, Button, Form, Modal, Badge, Spinner } from 'react-bootstrap';
-import { Plus, Edit, Trash2, AlertCircle } from 'lucide-react';
+import { Container, Row, Col, Card, Button, Form, Modal, Badge, Spinner } from 'react-bootstrap';
+import { Plus, Edit, Trash2, AlertCircle, MoreVertical } from 'lucide-react';
 import { listStatuses, createStatus, updateStatus, deleteStatus } from '@utils/work-planner';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
+import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 import { toast } from 'react-toastify';
 
 interface Status {
@@ -184,123 +185,123 @@ const WorkPlannerStatuses = () => {
     '#A855F7', '#EC4899', '#14B8A6', '#F59E0B', '#EF4444'
   ];
 
+  const statusColumns: TableColumn<Status>[] = [
+    { key: 'name', label: 'Name', sortable: true, accessor: (row) => row.name, render: (row) => <span className="fw-semibold">{row.name}</span> },
+    { key: 'color', label: 'Color', sortable: true, accessor: (row) => row.color, render: (row) => (
+      <Badge style={{ backgroundColor: row.color, color: '#fff', padding: '6px 12px', borderRadius: '4px' }}>
+        {row.color}
+      </Badge>
+    ) },
+    { key: 'order', label: 'Order', sortable: true, accessor: (row) => row.order ?? 0 },
+    { key: 'is_default', label: 'Default', sortable: true, accessor: (row) => row.is_default, render: (row) => (
+      row.is_default ? <Badge bg="success">Yes</Badge> : <Badge bg="secondary">No</Badge>
+    ) },
+    { key: 'is_completed', label: 'Completed', sortable: true, accessor: (row) => row.is_completed, render: (row) => (
+      row.is_completed ? <Badge bg="success">Yes</Badge> : <Badge bg="secondary">No</Badge>
+    ) },
+  ];
+
+  const statusActions: TableAction<Status>[] = [
+    {
+      label: 'Actions',
+      icon: <MoreVertical size={16} />,
+      dropdown: {
+        options: [
+          { label: 'Edit', icon: <Edit size={14} />, onClick: (row) => openEditModal(row) },
+          { label: 'Delete', icon: <Trash2 size={14} />, onClick: (row) => openDeleteModal(row), className: 'text-danger', divider: true },
+        ],
+        align: 'end',
+      },
+    },
+  ];
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Work Planner Statuses" />
 
-      <PageHeader
+      {/* <PageHeader
         title="Work Planner Statuses"
         showSearch={false}
-      />
+      /> */}
+
+<div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+        <div className="mb-3 mb-md-0">
+  <nav aria-label="breadcrumb">
+    <ol className="breadcrumb mb-0">
+      <li className="breadcrumb-item">
+        <a href="/dashboard" className="text-decoration-none">
+          Work Planner
+        </a>
+      </li>
+      <li className="breadcrumb-item active fw-bold" aria-current="page">
+      Statuses
+      </li>
+    </ol>
+  </nav>
+</div>
+<div className="d-flex flex-wrap gap-2">
+<Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowCreateModal(true)}
+              className="d-flex align-items-center gap-2"
+            >
+              <Plus size={16} />
+              Add Status
+            </Button>
+        </div>
+</div>
 
       <Container fluid className="py-4">
+        {/* <Row className="d-flex justify-content-between align-items-center mb-3">
+          <Col xs="auto">
+            <h5 className="mb-0 fw-bold">Statuses</h5>
+          </Col>
+          <Col xs="auto">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowCreateModal(true)}
+              className="d-flex align-items-center gap-2"
+            >
+              <Plus size={16} />
+              Add Status
+            </Button>
+          </Col>
+        </Row> */}
         <Row>
           <Col>
-            <Card className="border-0 shadow-sm">
-              <Card.Header className="bg-white border-bottom d-flex justify-content-between align-items-center">
-                <h5 className="mb-0 fw-bold">Statuses</h5>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setShowCreateModal(true)}
-                  className="d-flex align-items-center gap-2"
-                >
-                  <Plus size={16} />
-                  Add Status
-                </Button>
-              </Card.Header>
-              <Card.Body>
-                {loading ? (
-                  <div className="text-center py-5">
-                    <Spinner animation="border" variant="primary" />
-                    <p className="mt-3 text-muted">Loading statuses...</p>
-                  </div>
-                ) : statuses.length === 0 ? (
-                  <div className="text-center py-5">
-                    <AlertCircle size={48} className="text-muted mb-3" />
-                    <p className="text-muted">No statuses found</p>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => setShowCreateModal(true)}
-                      className="mt-3"
-                    >
-                      <Plus size={16} className="me-2" />
-                      Create First Status
-                    </Button>
-                  </div>
-                ) : (
-                  <Table hover responsive>
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>Color</th>
-                        <th>Order</th>
-                        <th>Default</th>
-                        <th>Completed</th>
-                        <th style={{ width: '150px' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {statuses.map((status) => (
-                        <tr key={status.id}>
-                          <td className="fw-semibold">{status.name}</td>
-                          <td>
-                            <Badge
-                              style={{
-                                backgroundColor: status.color,
-                                color: '#fff',
-                                padding: '6px 12px',
-                                borderRadius: '4px'
-                              }}
-                            >
-                              {status.color}
-                            </Badge>
-                          </td>
-                          <td>{status.order || 0}</td>
-                          <td>
-                            {status.is_default ? (
-                              <Badge bg="success">Yes</Badge>
-                            ) : (
-                              <Badge bg="secondary">No</Badge>
-                            )}
-                          </td>
-                          <td>
-                            {status.is_completed ? (
-                              <Badge bg="success">Yes</Badge>
-                            ) : (
-                              <Badge bg="secondary">No</Badge>
-                            )}
-                          </td>
-                          <td>
-                            <div className="d-flex gap-2">
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="p-1"
-                                onClick={() => openEditModal(status)}
-                                title="Edit"
-                              >
-                                <Edit size={16} />
-                              </Button>
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="p-1 text-danger"
-                                onClick={() => openDeleteModal(status)}
-                                title="Delete"
-                              >
-                                <Trash2 size={16} />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                )}
-              </Card.Body>
-            </Card>
+            
+                <GenericTable<Status>
+                  data={statuses}
+                  columns={statusColumns}
+                  actions={statusActions}
+                  showActions={true}
+                  actionsLabel="Actions"
+                  sortable={true}
+                  loading={loading}
+                  emptyMessage={
+                    <div className="text-center py-5">
+                      <AlertCircle size={48} className="text-muted mb-3" />
+                      <p className="text-muted">No statuses found</p>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => setShowCreateModal(true)}
+                        className="mt-3"
+                      >
+                        <Plus size={16} className="me-2" />
+                        Create First Status
+                      </Button>
+                    </div>
+                  }
+                  loadingMessage="Loading statuses..."
+                  hover={true}
+                  uniqueKey="id"
+                  customizableColumns={true}
+                  columnStorageKey="planner-status-columns"
+                />
+             
           </Col>
         </Row>
       </Container>
