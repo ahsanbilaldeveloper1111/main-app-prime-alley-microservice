@@ -1,4 +1,5 @@
 import axios from "axios";
+import * as Sentry from "@sentry/nextjs";
 import { signOut } from 'next-auth/react';
 import { toast } from "react-toastify";
 import tokenService from "./tokenService";
@@ -146,7 +147,26 @@ axiosInstance.interceptors.response.use(
         toast.error('Forbidden');
       } else if (error.response.status === 429) {
         toast.error('Too many requests. Please try again in a few moments.');
+      } else {
+        // Send unhandled API errors to Sentry (not 401, 403, 429)
+        Sentry.captureException(error, {
+          extra: {
+            url: originalRequest?.url,
+            method: originalRequest?.method,
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+          },
+        });
       }
+    } else {
+      // Network error, timeout, or no response - send to Sentry
+      Sentry.captureException(error, {
+        extra: {
+          url: originalRequest?.url,
+          method: originalRequest?.method,
+          message: error.message,
+        },
+      });
     }
     return Promise.reject(error);
   }
