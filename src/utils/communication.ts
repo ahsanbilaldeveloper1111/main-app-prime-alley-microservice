@@ -1,7 +1,8 @@
+import { toast } from 'react-toastify';
 import axiosInstance from './axios';
 
 const prefix = 'communications';
-const meetingsPrefix = 'meetings';
+const meetingsPrefix = prefix + '/meetings';
 
 // ==================== Types ====================
 
@@ -136,6 +137,26 @@ export interface GenerateEmailPayload {
   previous_content?: string;
   /** Sender context (optional). */
   user?: { name: string; extension: number };
+  /** Lead context (when opened from leads). */
+  lead?: unknown;
+  /** Deal context (when opened from deals). */
+  deal?: unknown;
+  /** Order context (when opened from orders). */
+  order?: unknown;
+  /** Tone of the message. */
+  tone?: string;
+  /** Urgency of the message. */
+  urgency?: string;
+  /** Industry (or custom industry name). */
+  industry?: string;
+  /** CTA type (or custom CTA). */
+  cta_type?: string;
+  /** Language of the message. */
+  language?: string;
+  /** Email style (e.g. formal, casual). */
+  email_style?: string;
+  /** Desired email length. */
+  email_length?: string;
 }
 
 /** Success response (200) for generate-email. */
@@ -150,11 +171,17 @@ export interface GenerateWhatsAppPayload {
   /** Existing draft to refine. */
   previous_content?: string;
   /** Tone of the message. */
-  tone?: 'professional' | 'casual' | 'friendly' | 'empathetic' | 'urgent' | 'persuasive';
+  tone?: string;
   /** Language of the message. */
-  language?: 'en' | 'es' | 'hi' | 'ur' | 'it' | 'pt' | 'ru' | 'zh';
+  language?: string;
   /** Urgency of the message. */
-  urgency?: 'low' | 'normal' | 'high' | 'critical';
+  urgency?: string;
+  /** Industry (or custom industry name when "custom" is selected). */
+  industry?: string;
+  /** CTA type (or custom CTA when "custom" is selected). */
+  cta_type?: string;
+  /** Emoji level. */
+  emoji_level?: string;
 }
 
 /** Success response (200) for generate-whatsapp. */
@@ -191,7 +218,13 @@ export const sendWhatsApp = async (
     `${prefix}/send-whatsapp`,
     data
   );
+ if(response?.status ===200){
+  toast.success(response.data.message || 'WhatsApp message sent successfully');
   return response.data;
+ } else {
+  toast.error(response.data.message || 'Failed to send WhatsApp message');
+  throw new Error(response.data.message || 'Failed to send WhatsApp message');
+ }
 };
 
 /**
@@ -297,7 +330,7 @@ export const getChats = async (params?: Record<string, string>): Promise<unknown
  * Fetches meetings list.
  */
 export const getMeetings = async (params?: Record<string, string>): Promise<unknown> => {
-  const response = await axiosInstance.get(meetingsPrefix, { params });
+  const response = await axiosInstance.get(`${meetingsPrefix}`, { params });
   return response.data;
 };
 

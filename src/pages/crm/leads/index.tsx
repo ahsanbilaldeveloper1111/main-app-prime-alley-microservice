@@ -1478,6 +1478,29 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     }
   }, [dialNumber, isInitialized]);
 
+  /** Sidebar Call button: when completePhone is passed, dial via CTI (same as dialer API) */
+  const handleSidebarCall = useCallback(async (phone?: string) => {
+    if (!phone?.trim()) {
+      toast.error("No phone number available to call");
+      return;
+    }
+    if (!isInitialized) {
+      toast.error("CTI not initialized. Please wait...");
+      return;
+    }
+    try {
+      const result = await dialNumber(phone.trim());
+      if (result.success) {
+        // toast.success(`Calling ${phone}...`);
+      } else {
+        toast.error(result.error || "Failed to make call");
+      }
+    } catch (error) {
+      console.error("Call error:", error);
+      toast.error("Failed to make call");
+    }
+  }, [dialNumber, isInitialized]);
+
   const handleDeleteLead = useCallback((leadId: number, leadName?: string) => {
     setLeadToDelete({ id: leadId, name: leadName });
     setShowDeleteModal(true);
@@ -7536,11 +7559,31 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           setShowLeadSidebar(false);
           setSelectedLead(null);
         }}
+        onCall={handleSidebarCall}
         title={selectedLead?.name || 'Lead Details'}
         subtitle={selectedLead?.company_name || selectedLead?.company || ''}
         metadata={selectedLead?.id ? `Lead ID: ${selectedLead.id}` : ''}
         email={selectedLead?.email || selectedLead?.rawData?.email || ''}
         phone={selectedLead?.phone || selectedLead?.rawData?.phone || ''}
+        completePhone={(() => {
+          const raw = selectedLead?.contact_persons;
+          if (!raw) return '';
+          let arr: Array<{ phone_country_code?: string; phone?: string }> = [];
+          if (typeof raw === 'string') {
+            try {
+              arr = JSON.parse(raw);
+            } catch {
+              return '';
+            }
+          } else if (Array.isArray(raw)) {
+            arr = raw;
+          }
+          const first = arr[0];
+          if (!first) return '';
+          const code = first.phone_country_code ?? '';
+          const num = first.phone ?? '';
+          return `${code}${num}`.trim();
+        })()}
         avatar={{
           name: selectedLead?.name || 'Lead',
           useIcon: true

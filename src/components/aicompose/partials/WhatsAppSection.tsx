@@ -4,6 +4,11 @@ import { Star, MessageCircle, Clock, Sparkles } from 'lucide-react';
 import type { RegisterFooter, ChannelSectionContext } from '../types';
 import { getContextSource } from '../types';
 import { generateWhatsApp, getWhatsAppChatMessages, getChats, sendWhatsApp } from '@utils/communication';
+import type { GenerateWhatsAppPayload } from '@utils/communication';
+import parsePhoneNumber from 'libphonenumber-js';
+import moment from 'moment-timezone';
+import { GlobalDateTimeFormat } from '@utils/Helper';
+import CommonOptionsFields from './CommonOptionsFields';
 
 /** Chat item from GET chats response (data array item) */
 interface WhatsAppChatItem {
@@ -43,20 +48,26 @@ const SUGGESTIONS = [
   { id: '2', title: 'Short & direct', rating: 4, content: 'Hi Ms. Shilpa — can we book a quick 10-minute call today or tomorrow?' },
 ];
 
-const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionContext> = ({ registerFooter, contextPayload }) => {
+const DEFAULT_COMMON_OPTIONS = {
+  industry: '',
+  customIndustry: '',
+  tone: 'professional',
+  language: 'en',
+  customLanguage: '',
+  urgency: 'normal',
+  ctaType: '',
+  customCtaType: '',
+};
+
+const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionContext> = ({ registerFooter, contextPayload, commonOptions: commonOptionsProp, setCommonOptions }) => {
+  const commonOptions = commonOptionsProp ?? DEFAULT_COMMON_OPTIONS;
   const [draftContent, setDraftContent] = useState(DEFAULT_DRAFT);
   const [objective, setObjective] = useState('Book a meeting');
-  const [tone, setTone] = useState('professional');
-  const [language, setLanguage] = useState('en');
-  const [customLanguage, setCustomLanguage] = useState('');
-  const [urgency, setUrgency] = useState('normal');
-  const [ctaType, setCtaType] = useState('');
-  const [customCtaType, setCustomCtaType] = useState('');
-  const [industry, setIndustry] = useState('');
-  const [customIndustry, setCustomIndustry] = useState('');
   const [description, setDescription] = useState('');
   const [generatedContent, setGeneratedContent] = useState('');
   const [generateLoading, setGenerateLoading] = useState(false);
+  const [emojiLevel, setEmojiLevel] = useState('moderate');
+  const [descriptionSuggestLoading, setDescriptionSuggestLoading] = useState(false);
 
   const source = getContextSource(contextPayload);
 
@@ -66,6 +77,24 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
 
   const handleRegen = () => {
     console.log('WhatsApp: Regenerating suggestions...');
+  };
+
+  const handleSuggestDescription = async () => {
+    setDescriptionSuggestLoading(true);
+    try {
+      const res = await generateWhatsApp({
+        query: 'Suggest a brief one-line description or prompt for a WhatsApp message to this contact. Reply with only that description, no other text.',
+        ...(source === 'leads' && { lead: contextPayload?.lead }),
+        ...(source === 'deals' && { deal: contextPayload?.deal }),
+        ...(source === 'orders' && { order: contextPayload?.order }),
+      });
+      const suggested = (res.result ?? '').trim();
+      if (suggested) setDescription(suggested);
+    } catch (err) {
+      console.error('WhatsApp suggest description failed:', err);
+    } finally {
+      setDescriptionSuggestLoading(false);
+    }
   };
 
   const handleAutoGenerate = async () => {
@@ -79,9 +108,12 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
         ...(source === 'leads' && { lead: contextPayload?.lead }),
         ...(source === 'deals' && { deal: contextPayload?.deal }),
         ...(source === 'orders' && { order: contextPayload?.order }),
-        tone: tone as 'professional' | 'casual' | 'friendly' | 'empathetic' | 'urgent' | 'persuasive',
-        language: language as 'en' | 'es' | 'hi' | 'ur' | 'it' | 'pt' | 'ru' | 'zh',
-        urgency: urgency as 'low' | 'normal' | 'high' | 'critical',
+        tone: commonOptions.tone,
+        urgency: commonOptions.urgency,
+        industry: commonOptions.industry === 'custom' ? commonOptions.customIndustry : commonOptions.industry,
+        cta_type: commonOptions.ctaType === 'custom' ? commonOptions.customCtaType : commonOptions.ctaType,
+        language: commonOptions.language === 'custom' ? commonOptions.customLanguage : commonOptions.language,
+        emoji_level: emojiLevel,
       });
       setGeneratedContent(res.result ?? '');
     } catch (err) {
@@ -97,7 +129,7 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
     if (typeof navigator !== 'undefined' && navigator.clipboard) navigator.clipboard.writeText(draftContent);
   };
   const handleLater = () => console.log('WhatsApp: Later');
-  const handleSend = () => console.log('WhatsApp: Send', { draftContent, objective, tone, contextPayload, source });
+  const handleSend = () => console.log('WhatsApp: Send', { draftContent, objective, contextPayload, source });
 
   // useEffect(() => {
   //   registerFooter?.({ cancel: handleCancel, copy: handleCopy, later: handleLater, send: handleSend });
@@ -214,13 +246,61 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
   const [templateValue, setTemplateValue] = useState('');
   const [sendMessageText, setSendMessageText] = useState('');
   const [sendLoading, setSendLoading] = useState(false);
+  const [customSendPrompt, setCustomSendPrompt] = useState('');
+  const [sendGenerateLoading, setSendGenerateLoading] = useState(false);
+  const [sendPhoneError, setSendPhoneError] = useState<string | null>(null);
   useEffect(() => {
     if (contactPhone) setSendPhone(contactPhone);
   }, [contactPhone]);
 
+  const isSendPhoneE164 = (value: string): boolean => {
+    if (!value.trim()) return false;
+    const parsed = parsePhoneNumber(value.trim());
+    return parsed?.isValid() ?? false;
+  };
+
+  const sanitizePhoneInput = (value: string): string => {
+    const hasPlus = value.startsWith('+');
+    const digits = value.replace(/\D/g, '');
+    return hasPlus ? `+${digits}` : digits;
+  };
+
+  const handleSendSectionGenerate = async () => {
+    const query = customSendPrompt.trim();
+    if (!query) return;
+    setSendGenerateLoading(true);
+    try {
+      const res = await generateWhatsApp({
+        query,
+        ...(source === 'leads' && { lead: contextPayload?.lead }),
+        ...(source === 'deals' && { deal: contextPayload?.deal }),
+        ...(source === 'orders' && { order: contextPayload?.order }),
+        tone: commonOptions.tone,
+        urgency: commonOptions.urgency,
+        industry: commonOptions.industry === 'custom' ? commonOptions.customIndustry : commonOptions.industry,
+        cta_type: commonOptions.ctaType === 'custom' ? commonOptions.customCtaType : commonOptions.ctaType,
+        language: commonOptions.language === 'custom' ? commonOptions.customLanguage : commonOptions.language,
+        emoji_level: emojiLevel,
+      });
+      setSendMessageText(res.result ?? '');
+    } catch (err) {
+      console.error('WhatsApp generate for send failed:', err);
+    } finally {
+      setSendGenerateLoading(false);
+    }
+  };
+
   const handleSendMessage = async () => {
     const phone = sendPhone.trim();
-    if (!phone) return;
+    if (!phone) {
+      setSendPhoneError('Phone number is required.');
+      return;
+    }
+    if (!isSendPhoneE164(phone)) {
+      setSendPhoneError('Please enter a valid phone number in E.164 format (e.g. +97143035555).');
+      return;
+    }
+    setSendPhoneError(null);
     setSendLoading(true);
     try {
       if (sendMode === 'two-way') {
@@ -277,19 +357,36 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
   };
 
   return (
-    <>
-    <Row className="mb-4">
-          <Col md={3} className="border-end" style={{ maxHeight: '320px', overflowY: 'auto'}}>
+    <div className="h-100 d-flex flex-column min-h-0">
+      
+    <Row className="mb-4 flex-grow-1 min-h-0" style={{ flexWrap: 'nowrap' }}>
+          <Col md={3} className="border-end d-flex flex-column min-h-0" style={{ overflowY: 'auto' }}>
             {chatsLoading ? (
-              <div className="small text-muted">Loading...</div>
+              <div className="d-flex flex-column align-items-center justify-content-center gap-2 py-4">
+                <span className="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true" />
+                <span className="small text-muted">Loading chats...</span>
+              </div>
             ) : chats.length === 0 ? (
-              <div className="small text-muted">No chats yet</div>
+              <div className="d-flex flex-column align-items-center justify-content-center py-4 px-3 text-center">
+                <MessageCircle size={40} className="text-muted mb-2" strokeWidth={1.2} />
+                <h6 className="fw-semibold text-muted mb-1">No chats yet</h6>
+                <p className="small text-muted mb-0" style={{ maxWidth: '240px' }}>
+                  WhatsApp chats will appear here. Start a new message below to send.
+                </p>
+              </div>
             ) : (
               <div className="d-flex flex-column gap-1">
+                {selectedChat != null && (
+                  <Button  className="mb-2" variant="outline-primary" onClick={() => setSelectedChat(null)}>
+                    <MessageCircle size={16} className="me-1" />
+                    New message
+                  </Button>
+                )}
+
                 {chats.map((chat) => (
                   <Card
                     key={chat.id}
-                    className={`cursor-pointer ${selectedChat === chat.id ? 'border-primary bg-light' : ''}`}
+                    className={`cursor-pointer mb-2 ${selectedChat === chat.id ? 'border-primary bg-light' : ''}`}
                     onClick={() => setSelectedChat(chat.id)}
                   >
                     <Card.Body className="py-2 px-3">
@@ -298,7 +395,7 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                         {chat.last_message_preview || 'No messages'}
                       </div>
                       {chat.last_message_at && (
-                        <small className="text-muted">{new Date(chat.last_message_at).toLocaleString()}</small>
+                        <small className="text-muted text-nowrap">{chat.last_message_at? moment(chat.last_message_at).format(GlobalDateTimeFormat) : ''}</small>
                       )}
                     </Card.Body>
                   </Card>
@@ -328,119 +425,85 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                     </Form.Group>
                   )}
                   {sendMode === 'two-way' && (
-                  <Row className="mb-4">
-
-                  <Col md={6}>
-            <Form.Group>
-              <Form.Label className="fw-semibold">Industry</Form.Label>
-              <Form.Select value={industry} onChange={(e) => setIndustry(e.target.value)}>
-                <option value="real_estate">Real Estate</option>
-                <option value="sass">Banking</option>
-                <option value="health_care">Education</option>
-                <option value="ecommerce">Ecommerce</option>
-                <option value="healthcare">Healthcare</option>
-                <option value="retail">Retail</option>
-                <option value="technology">Technology</option>
-                <option value="custom">Custom</option>
-              </Form.Select>
-              {industry === 'custom' && (
-                <Form.Control
-                  className="mt-1"
-                  size="sm"
-                  value={customIndustry}
-                  onChange={(e) => setCustomIndustry(e.target.value)}
-                  placeholder="Enter industry"
-                />
-              )}
-            </Form.Group>
-          </Col>
-          
-          <Col md={6}>
-            <Form.Group>
-              <Form.Label className="fw-semibold">Tone</Form.Label>
-              <Form.Select value={tone} onChange={(e) => setTone(e.target.value)}>
-                <option value="professional">Professional</option>
-                <option value="casual">Casual</option>
-                <option value="friendly">Friendly</option>
-                <option value="empathetic">Empathetic</option>
-                <option value="urgent">Urgent</option>
-                <option value="persuasive">Persuasive</option>
-              </Form.Select>
-            </Form.Group>
-          </Col>
-          <Col md={6}>
-            <Form.Group>
-              <Form.Label className="fw-semibold">Language</Form.Label>
-              <Form.Select value={language} onChange={(e) => setLanguage(e.target.value)}>
-                <option value="en">English</option>
-                <option value="es">Spanish</option>
-                <option value="hi">Hindi</option>
-                <option value="ur">Urdu</option>
-                <option value="it">Italian</option>
-                <option value="pt">Japanese</option>
-                <option value="ru">Russian</option>
-                <option value="zh">Chinese</option>
-                <option value="custom">Custom</option>
-              </Form.Select>
-              {language === 'custom' && (
-                <Form.Control
-                  className="mt-1"
-                  size="sm"
-                  value={customLanguage}
-                  onChange={(e) => setCustomLanguage(e.target.value)}
-                  placeholder="Enter language code (e.g. en, ar)"
-                />
-              )}
-            </Form.Group>
-          </Col>
-          <Col md={6}>
-            <Form.Group>
-              <Form.Label className="fw-semibold">Urgency</Form.Label>
-              <Form.Select value={urgency} onChange={(e) => setUrgency(e.target.value)}>
-                <option value="low">Low</option>
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </Form.Select>
-            </Form.Group>
-          </Col>
-
-          <Col md={6}>
-            <Form.Group>
-              <Form.Label className="fw-semibold">CTA Type</Form.Label>
-              <Form.Select value={ctaType} onChange={(e) => setCtaType(e.target.value)}>
-                <option value="schedule_call">Schedule call</option>
-                <option value="visit_website">Visit website</option>
-                <option value="book_demo">Book demo</option>
-                <option value="start_trial">Start trial</option>
-                <option value="make_payment">Make payment</option>
-                <option value="custom">Custom</option>
-              </Form.Select>
-              {ctaType === 'custom' && (
-                <Form.Control
-                  className="mt-1"
-                  size="sm"
-                  value={customCtaType}
-                  onChange={(e) => setCustomCtaType(e.target.value)}
-                  placeholder="Enter CTA type"
-                />
-              )}
-            </Form.Group>
-          </Col>
-
-
-        </Row>
-        )}
-
+                  <>
                   <Form.Group className="mb-3">
                     <Form.Label className="fw-semibold">Phone number (E.164)</Form.Label>
                     <Form.Control
+                      type="tel"
                       value={sendPhone}
-                      onChange={(e) => setSendPhone(e.target.value)}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const sanitized = sanitizePhoneInput(raw);
+                        setSendPhone(sanitized);
+                        if (sendPhoneError) setSendPhoneError(null);
+                      }}
+                      onBlur={() => {
+                        if (sendPhone.trim() && !isSendPhoneE164(sendPhone)) {
+                          setSendPhoneError('Please enter a valid phone number in E.164 format (e.g. +97143035555).');
+                        } else {
+                          setSendPhoneError(null);
+                        }
+                      }}
                       placeholder="+97143035555"
+                      isInvalid={!!sendPhoneError}
                     />
+                    {sendPhoneError && (
+                      <Form.Control.Feedback type="invalid">{sendPhoneError}</Form.Control.Feedback>
+                    )}
                   </Form.Group>
                   {sendMode === 'two-way' && (
+                    <>
+
+{commonOptions != null && setCommonOptions != null && (
+        <>
+        <Row>
+        <CommonOptionsFields commonOptions={commonOptions} setCommonOptions={setCommonOptions} />
+        <Col md={6}>
+        <Form.Group className="mb-3">
+          <Form.Label className="fw-semibold">Emoji Level</Form.Label>
+          <Form.Select
+          value={emojiLevel}
+          onChange={(e) => setEmojiLevel(e.target.value)}
+          >
+          <option value="none">None</option>
+          <option value="minimal">Minimal</option>
+          <option value="moderate">Moderate</option>
+          <option value="high">High</option>
+          </Form.Select>
+        </Form.Group>
+        </Col>
+        </Row>
+        </>
+      )}
+                    <Form.Group className="mb-3">
+                      <Form.Label className="fw-semibold">Custom message (prompt for AI)</Form.Label>
+                      <Form.Control
+                        as="textarea"
+                        rows={1}
+                        value={customSendPrompt}
+                        onChange={(e) => setCustomSendPrompt(e.target.value)}
+                        placeholder="Describe what you want to say..."
+                      />
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        className="mt-2"
+                        onClick={handleSendSectionGenerate}
+                        disabled={sendGenerateLoading || !customSendPrompt.trim()}
+                      >
+                        {sendGenerateLoading ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={16} className="me-1" />
+                            Generate from AI
+                          </>
+                        )}
+                      </Button>
+                    </Form.Group>
                     <Form.Group className="mb-3">
                       <Form.Label className="fw-semibold">Message</Form.Label>
                       <Form.Control
@@ -451,14 +514,17 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                         placeholder="Type message or use generated content above"
                       />
                     </Form.Group>
+                    <Button
+                      variant="primary"
+                      onClick={handleSendMessage}
+                      disabled={sendLoading || !sendPhone.trim() || !isSendPhoneE164(sendPhone)}
+                    >
+                      {sendLoading ? 'Sending...' : 'Send'}
+                    </Button>
+                    </>
                   )}
-                  <Button
-                    variant="primary"
-                    onClick={handleSendMessage}
-                    disabled={sendLoading || !sendPhone.trim()}
-                  >
-                    {sendLoading ? 'Sending...' : 'Send'}
-                  </Button>
+                  </>
+                  )}
                 </Card.Body>
               </Card>
             ) : (
@@ -476,7 +542,7 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                       </div>
                     </div>
                     <div className="d-flex align-items-center gap-2">
-                      <Button size="sm" variant="outline-secondary" onClick={() => setSelectedChat(null)}>New message</Button>
+                      
                       <div className="d-flex align-items-center gap-1 small text-muted">
                       {chatWindowInfo?.is_within_24h_window !== false && (() => {
                         let minutesRemaining = chatWindowInfo?.window_minutes_remaining;
@@ -512,13 +578,13 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                           className={`d-flex ${msg.direction === 'outbound' ? 'justify-content-end' : 'justify-content-start'}`}
                         >
                           <div
-                            className={`rounded-3 px-3 py-2 small ${msg.direction === 'outbound' ? 'bg-dark text-white' : 'bg-light text-dark border'}`}
+                            className={`rounded-3 px-3 py-2  ${msg.direction === 'outbound' ? 'bg-primary text-white' : 'bg-light text-dark border'}`}
                             style={{ maxWidth: '85%' }}
                           >
                             <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>
                             <div className={`d-flex align-items-center gap-2 mt-1 ${msg.direction === 'outbound' ? 'justify-content-end' : 'justify-content-start'}`}>
                               <small className={msg.direction === 'outbound' ? 'text-white-50' : 'text-muted'}>
-                                {new Date(msg.created_at).toLocaleString()}
+                                {msg.created_at? moment(msg.created_at).format(GlobalDateTimeFormat) : ''}
                               </small>
                               {msg.status && (
                                 <small className={msg.direction === 'outbound' ? 'text-success' : 'text-muted'}>{msg.status}</small>
@@ -545,14 +611,14 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                           placeholder="e.g. Write a WhatsApp message to confirm the meeting time."
                         />
                         <Button
-                          size="sm"
-                          variant="outline-primary"
-                          onClick={handleReplyAutoGenerate}
-                          style={{ minWidth: '120px' }}
-                          disabled={replyGenerateLoading || !replyQuery.trim()}
-                        >
-                          {replyGenerateLoading ? 'Generating...' : 'Auto Generate'}
-                        </Button>
+                        size="sm"
+                        variant="outline-primary"
+                        onClick={handleReplyAutoGenerate}
+                        style={{ minWidth: '120px' }}
+                        disabled={replyGenerateLoading || !replyQuery.trim()}
+                      >
+                        {replyGenerateLoading ? 'Generating...' : 'Auto Generate'}
+                      </Button>
                       </div>
                     </Form.Group>
                     <Form.Group className="mb-2">
@@ -578,23 +644,16 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                     <div className="d-flex gap-2 justify-content-end">
                       {replyMessage && 
                       <Button
-                        size="sm"
+                       
                         variant="outline-primary"
                         onClick={() => setReplyMessage('')}
                       >
                         Clear
                       </Button>
                       }
-                      {/* <Button
-                        size="sm"
-                        variant="outline-primary"
-                        onClick={handleReplyAutoGenerate}
-                        disabled={replyGenerateLoading || !replyQuery.trim()}
-                      >
-                        {replyGenerateLoading ? 'Generating...' : 'Auto Generate'}
-                      </Button> */}
+                     
                       <Button
-                        size="sm"
+                        
                         variant="primary"
                         onClick={handleReplySend}
                         disabled={replySendLoading || (!replyMessage.trim() && !replyContentSid.trim())}
@@ -684,8 +743,30 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
           ))}
         </div> */}
 
+        <div className="mb-3 d-flex align-items-center gap-2 flex-wrap">
+          <Button
+            variant="outline-primary"
+            size="sm"
+            onClick={handleSuggestDescription}
+            disabled={descriptionSuggestLoading || generateLoading}
+          >
+            {descriptionSuggestLoading ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" />
+                Getting suggestion...
+              </>
+            ) : (
+              <>
+                <Sparkles size={16} className="me-1" />
+                Suggest description with AI
+              </>
+            )}
+          </Button>
+          <span className="text-muted small">AI will generate a prompt and fill it in Description below.</span>
+        </div>
+
         <div className="mb-3">
-          <Form.Label className="fw-semibold">Description</Form.Label>
+          <Form.Label className="fw-semibold">Description sss</Form.Label>
           <Form.Control
             as="textarea"
             rows={2}
@@ -765,7 +846,7 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
         </div>
       </Col>
     </Row>
-    </>
+    </div>
   );
 };
 
