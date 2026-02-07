@@ -118,9 +118,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'crm',                 // 2. CRM Workspace
     'live-calls',          // 3. Live Wallboards
     'call-history',        // 4. Call Details
-    'accounts',            // 5. Billing & Payments
-    'work-planner',        // 6. Work Planner
-    'reports',             // 7. Unified Reports
+    'ai-bot-and-analytics', // 5. Outbound AI Agent
+    'inbound-ai-bot-and-analytics', // 6. Inbound AI Agent
+    'ai-chat-section', // 7. AI Chat
+    'gsm', // 8. GSM
+    'tms', // 9. TMS
+    'netops', // 10. NetOps
+    'ai-ml', // 11. AI ML
+    'dncr', // 12. DNCR
+    'accounts',            // 10. Billing & Payments
+    'work-planner',        // 11. Work Planner
+    'staff-management', // 12. Staff Management
+    'reports',             // 12. Unified Reports
+    'settings',
+    'resources',
   ];
 
   const mainMenuItems: MainMenuItem[] = [
@@ -1027,6 +1038,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       padding: 12px 8px;
       display: flex;
       flex-direction: column;
+      overflow-y: auto;
     }
 
     .sidebar-menu::-webkit-scrollbar {
