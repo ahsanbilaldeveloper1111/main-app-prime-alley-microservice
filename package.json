@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 4000",
     "build": "next build",
     "build:no-lint": "next build --no-lint",
     "build:silent": "next build",
@@ -24,6 +24,7 @@
     "@fullcalendar/list": "^6.1.17",
     "@fullcalendar/react": "^6.1.17",
     "@reduxjs/toolkit": "^2.8.2",
+    "@sentry/nextjs": "^10.38.0",
     "@south-paw/react-vector-maps": "^3.2.0",
     "@stomp/stompjs": "^7.1.1",
     "@stripe/react-stripe-js": "^4.0.2",
