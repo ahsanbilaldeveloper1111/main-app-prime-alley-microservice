@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { 
-  Search, Plus, MoreVertical, Calendar,
-  X
+  Plus, MoreVertical, Calendar,
+  SlidersHorizontal
 } from 'lucide-react';
 import { formatDateForTable } from '@utils/Helper';
 import { updateTask, deleteTask, getTask, getTaskActivities } from '@utils/tasks';
@@ -9,6 +9,7 @@ import { toast } from 'react-toastify';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import CreateTaskModal from '@components/work-planner/createtask-modal';
 import TaskDetailOffcanvas from '@pages/work-planner/partials/TaskDetailOffcanvas';
+import GenericFilterSidebar, { FilterField } from '@components/GenericFilterSidebar';
 
 interface BoardViewProps {
   selectedProject: any;
@@ -78,6 +79,7 @@ const BoardView: React.FC<BoardViewProps> = ({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [loadingTaskForEdit, setLoadingTaskForEdit] = useState(false);
+  const [showFilterSidebar, setShowFilterSidebar] = useState(false);
 
   const extensionNameByNumber = useMemo(() => {
     const map = new Map<string, string>();
@@ -310,6 +312,13 @@ const BoardView: React.FC<BoardViewProps> = ({
         return 'secondary';
     }
   };
+
+  const boardFilterFields: FilterField[] = useMemo(() => [
+    { id: 'search', label: 'Search', type: 'text', value: boardSearchTerm, onChange: (v: string) => setBoardSearchTerm(v ?? ''), placeholder: 'Search tasks...' },
+    { id: 'assignee', label: 'Assignee', type: 'dropdown', value: boardSelectedAssignee, onChange: (v) => setBoardSelectedAssignee(v ?? 'All Assignees'), options: [{ value: 'All Assignees', label: 'All Assignees' }, ...getAllBoardAssignees().map((a) => ({ value: a, label: a }))] },
+    { id: 'priority', label: 'Priority', type: 'dropdown', value: boardSelectedPriority, onChange: (v) => setBoardSelectedPriority(v ?? 'All Priorities'), options: [{ value: 'All Priorities', label: 'All Priorities' }, ...getAllBoardPriorities().map((p) => ({ value: p, label: p }))] },
+    { id: 'label', label: 'Label', type: 'dropdown', value: boardSelectedLabel, onChange: (v) => setBoardSelectedLabel(v ?? 'All Labels'), options: [{ value: 'All Labels', label: 'All Labels' }, ...(labels || []).map((l: any) => ({ value: l.name, label: l.name }))] },
+  ], [boardSearchTerm, boardSelectedAssignee, boardSelectedPriority, boardSelectedLabel, labels, getAllBoardAssignees, getAllBoardPriorities]);
 
   const styles = {
     card: {
@@ -616,66 +625,62 @@ const BoardView: React.FC<BoardViewProps> = ({
         }
       `}</style>
 
-      {/* Filters */}
-      <div style={styles.card}>
-        <div style={styles.filterRow}>
-          <div style={styles.inputGroup}>
-            <Search size={16} color="#6B7280" style={styles.inputIcon} />
-            <input 
-              type="text" 
-              placeholder="Search tasks..."
-              value={boardSearchTerm}
-              onChange={(e) => setBoardSearchTerm(e.target.value)}
-              style={{...styles.input, ...styles.inputWithIcon}}
-              onFocus={(e) => e.target.style.borderColor = '#4680FF'}
-              onBlur={(e) => e.target.style.borderColor = '#E5E9F2'}
-            />
-          </div>
-          
-          <select 
-            style={styles.select}
-            value={boardSelectedAssignee}
-            onChange={(e) => setBoardSelectedAssignee(e.target.value)}
-          >
-            <option>All Assignees</option>
-            {getAllBoardAssignees().map((assignee) => (
-              <option key={assignee} value={assignee}>{assignee}</option>
-            ))}
-          </select>
-          
-          <select 
-            style={styles.select}
-            value={boardSelectedPriority}
-            onChange={(e) => setBoardSelectedPriority(e.target.value)}
-          >
-            <option>All Priorities</option>
-            {getAllBoardPriorities().map((priority) => (
-              <option key={priority} value={priority}>{priority}</option>
-            ))}
-          </select>
-          
-          <select 
-            style={styles.select}
-            value={boardSelectedLabel}
-            onChange={(e) => setBoardSelectedLabel(e.target.value)}
-          >
-            <option>All Labels</option>
-            {labels.map((label) => (
-              <option key={label.id} value={label.name}>{label.name}</option>
-            ))}
-          </select>
-          
-          <button 
-            style={{...styles.buttonOutline, justifyContent: 'center'}}
-            onClick={onClearFilters}
-            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
-            onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
-          >
-            <X size={16} />
-            Clear Filters
-          </button>
+      {/* Page header with Filters button */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '1rem',
+        flexWrap: 'wrap',
+        gap: '0.75rem'
+      }}>
+        <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1F2937' }}>
+          {selectedProject?.name ? `${selectedProject.name} – Board` : 'Board'}
         </div>
+        <button
+          type="button"
+          onClick={() => setShowFilterSidebar(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.5rem 1rem',
+            backgroundColor: 'white',
+            color: '#4680FF',
+            border: '1px solid #4680FF',
+            borderRadius: '6px',
+            fontWeight: '500',
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.backgroundColor = '#F9FAFB';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.backgroundColor = 'white';
+          }}
+        >
+          <SlidersHorizontal size={18} />
+          Filters
+        </button>
       </div>
+
+      <GenericFilterSidebar
+        isOpen={showFilterSidebar}
+        onClose={() => setShowFilterSidebar(false)}
+        title="Filters"
+        subtitle="Filter board tasks"
+        filters={boardFilterFields}
+        onApply={() => setShowFilterSidebar(false)}
+        onReset={() => {
+          onClearFilters();
+          setShowFilterSidebar(false);
+        }}
+        width="400px"
+        showApplyButton
+        showResetButton
+      />
 
       {/* Kanban Board */}
       <div style={styles.board}>

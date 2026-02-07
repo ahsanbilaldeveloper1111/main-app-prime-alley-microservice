@@ -12,6 +12,9 @@ import { listProjects, createProject, updateProject, deleteProject, getProject, 
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import { ModuleSlug } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
+import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
+import GenericFilterSidebar, { FilterField } from '@components/GenericFilterSidebar';
+import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 import { Spinner, Modal } from 'react-bootstrap';
 import Select, { SingleValue, StylesConfig } from 'react-select';
 import { 
@@ -45,6 +48,7 @@ import {
   Bell,
   ChevronUp,
   Settings,
+  SlidersHorizontal,
   Palette,
   Smartphone,
   Megaphone,
@@ -115,6 +119,7 @@ const WorkPlannerProjects = () => {
     // Fetch extensions for getting user names
     const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
     const [showProjectModal, setShowProjectModal] = useState(false);
+    const [showFilterSidebar, setShowFilterSidebar] = useState(false);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
@@ -653,6 +658,55 @@ const WorkPlannerProjects = () => {
         { value: 'completed', label: 'Completed' },
         { value: 'archived', label: 'Archived' }
       ];
+
+      const statusFilterOptions = statuses.map(s => ({ value: s.value, label: s.label }));
+      const filterFields: FilterField[] = [
+        { id: 'search', label: 'Search', type: 'text', value: searchTerm, onChange: (v: string) => setSearchTerm(v ?? ''), placeholder: 'Search projects...' },
+        { id: 'status', label: 'Status', type: 'dropdown', value: filterStatus, onChange: (v) => setFilterStatus((v ?? 'active') as 'active' | 'completed' | 'archived' | 'all'), options: statusFilterOptions },
+        { id: 'owner', label: 'Owner / PM', type: 'dropdown', value: filterOwner, onChange: (v) => setFilterOwner(v ?? 'All Owners'), options: ownerSelectOptions },
+      ];
+
+      const statsCardsData: StatsCardData[] = [
+        { title: 'Active Projects', value: stats.activeProjects, icon: FolderOpen, iconColor: '#0ea5e9', iconBgColor: '#e0f2fe' },
+        { title: 'Total Projects', value: stats.totalProjects, icon: Folder, iconColor: '#3b82f6', iconBgColor: '#dbeafe' },
+        { title: 'Tasks Due This Week', value: stats.tasksDueThisWeek, icon: CalendarDays, iconColor: '#3b82f6', iconBgColor: '#eff6ff' },
+        { title: 'Overdue Across Projects', value: stats.overdueAcrossProjects, icon: AlertCircle, iconColor: '#ef4444', iconBgColor: '#fef2f2' },
+      ];
+
+      const projectTableColumns: TableColumn<Project>[] = [
+        { key: 'name', label: 'Project Name', sortable: true, accessor: (row) => row.name, render: (row) => (
+          <div className="d-flex align-items-center gap-2">
+            <div style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: row.iconColor + '20', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <row.icon size={20} style={{ color: row.iconColor }} />
+            </div>
+            <span className="fw-semibold">{row.name}</span>
+          </div>
+        ) },
+        { key: 'members', label: 'Members', sortable: true, accessor: (row) => row.members?.length ?? 0, render: (row) => (
+          <div className="d-flex align-items-center">
+            <div className="member-avatar bg-primary">{row?.members?.length || 0}</div>
+          </div>
+        ) },
+        { key: 'open', label: 'Open', sortable: true, accessor: (row) => row.open },
+        { key: 'overdue', label: 'Overdue', sortable: true, accessor: (row) => row.overdue, render: (row) => (
+          <span className={row.overdue > 0 ? 'overdue-count' : ''}>{row.overdue}</span>
+        ) },
+        { key: 'lastUpdate', label: 'Last Update', sortable: true, accessor: (row) => row.lastUpdate },
+      ];
+
+      const projectTableActions: TableAction<Project>[] = [
+        {
+          label: 'Actions',
+          icon: <MoreVertical size={16} />,
+          dropdown: {
+            options: [
+              { label: 'Edit Project', icon: <Settings size={14} />, onClick: (row) => handleEditProject(row) },
+              { label: 'Delete Project', icon: <Trash2 size={14} />, onClick: (row) => handleDeleteProject(row), className: 'text-danger', divider: true },
+            ],
+            align: 'end',
+          },
+        },
+      ];
     
       const styles = {
         container: { backgroundColor: '#F4F7FA', minHeight: '100vh', paddingBottom: '2rem' },
@@ -722,81 +776,7 @@ const WorkPlannerProjects = () => {
           box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
         
-        .stat-card {
-          border: none;
-          border-radius: 12px;
-          padding: 1.25rem 1.5rem;
-          height: 100%;
-          transition: transform 0.2s, box-shadow 0.2s;
-          cursor: pointer;
-          min-height: 120px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-        }
         
-        .stat-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        
-        .stat-card.active-projects {
-          background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
-        }
-        
-        .stat-card.total-projects {
-          background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 100%);
-        }
-        
-        .stat-card.due-week {
-          background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-        }
-        
-        .stat-card.overdue {
-          background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-        }
-        
-        .stat-icon {
-          width: 60px;
-          height: 60px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.5rem;
-        }
-        
-        .stat-icon.active-projects {
-          background-color: #0ea5e9;
-          color: #ffffff;
-        }
-        
-        .stat-icon.total-projects {
-          background-color: #3b82f6;
-          color: #ffffff;
-        }
-        
-        .stat-icon.due-week {
-          background-color: #3b82f6;
-          color: #ffffff;
-        }
-        
-        .stat-icon.overdue {
-          background-color: #ef4444;
-          color: #ffffff;
-        }
-        
-        .stat-number {
-          font-size: 2rem;
-          font-weight: 700;
-          margin: 0.5rem 0 0.25rem 0;
-        }
-        
-        .stat-label {
-          font-size: 0.875rem;
-          opacity: 0.8;
-          margin: 0;
-        }
         
         .tabs-section {
           background-color: white;
@@ -824,43 +804,7 @@ const WorkPlannerProjects = () => {
           border-bottom: 3px solid #3b82f6;
         }
         
-        .table-container {
-          background-color: white;
-          border-radius: 0 0 12px 12px;
-          overflow: hidden;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-          max-height: inherit !important;
-        }
         
-        .projects-table {
-          margin: 0;
-        }
-        
-        .projects-table thead th {
-          background-color: #f8fafc;
-          border-bottom: 2px solid #e2e8f0;
-          color: #475569;
-          font-weight: 600;
-          font-size: 0.875rem;
-          padding: 1rem;
-          white-space: nowrap;
-          border-top: none;
-        }
-        
-        .projects-table tbody td {
-          padding: 1rem;
-          vertical-align: middle;
-          border-bottom: 1px solid #f1f5f9;
-        }
-        
-        .projects-table tbody tr {
-          cursor: pointer;
-          transition: background-color 0.2s;
-        }
-        
-        .projects-table tbody tr:hover {
-          background-color: #f8fafc;
-        }
         
         .project-name {
           font-weight: 600;
@@ -997,10 +941,45 @@ const WorkPlannerProjects = () => {
         }
       `}</style>
 
-      
+<div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+        <div className="mb-3 mb-md-0">
+  <nav aria-label="breadcrumb">
+    <ol className="breadcrumb mb-0">
+      <li className="breadcrumb-item">
+        <a href="/dashboard" className="text-decoration-none">
+          Work Planner
+        </a>
+      </li>
+      <li className="breadcrumb-item active fw-bold" aria-current="page">
+      Projects
+      </li>
+    </ol>
+  </nav>
+</div>
+<div className="d-flex flex-wrap gap-2">
+<Button 
+                  variant="primary" 
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  onClick={handleCreateProject}
+                >
+                  <Plus size={18} />
+                  <span>Create Project</span>
+                </Button>
+          <Button
+              variant="outline-primary"
+              onClick={() => setShowFilterSidebar(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <SlidersHorizontal size={18} />
+              Filters
+            </Button>
+        </div>
+</div>
+
+
 
       <div className="project-dashboard">
-        <div className="header-section">
+        {/* <div className="header-section">
           <Container fluid>
             <Row className="align-items-center mb-4">
               <Col>
@@ -1018,500 +997,101 @@ const WorkPlannerProjects = () => {
                   <Plus size={18} />
                   <span>Create Project</span>
                 </Button>
+                <Button
+              variant="outline-primary"
+              onClick={() => setShowFilterSidebar(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <SlidersHorizontal size={18} />
+              Filters
+            </Button>
               </Col>
             </Row>
 
             <Row className="g-3">
-              <Col xs={12} sm={6} lg={3}>
-                <Card className="stat-card active-projects">
-                  <div className="d-flex justify-content-between align-items-start">
-                    <div>
-                      <p className="stat-number">{stats.activeProjects}</p>
-                      <p className="stat-label">Active Projects</p>
-                    </div>
-                    <div className="stat-icon active-projects">
-                      <FolderOpen />
-                    </div>
-                  </div>
-                </Card>
-              </Col>
-              <Col xs={12} sm={6} lg={3}>
-                <Card className="stat-card total-projects">
-                  <div className="d-flex justify-content-between align-items-start">
-                    <div>
-                      <p className="stat-number">{stats.totalProjects}</p>
-                      <p className="stat-label">Total Projects</p>
-                    </div>
-                    <div className="stat-icon total-projects">
-                      <Folder />
-                    </div>
-                  </div>
-                </Card>
-              </Col>
-              <Col xs={12} sm={6} lg={3}>
-                <Card className="stat-card due-week">
-                  <div className="d-flex justify-content-between align-items-start">
-                    <div>
-                      <p className="stat-number">{stats.tasksDueThisWeek}</p>
-                      <p className="stat-label">Tasks Due This Week</p>
-                    </div>
-                    <div className="stat-icon due-week">
-                      <CalendarDays />
-                    </div>
-                  </div>
-                </Card>
-              </Col>
-              <Col xs={12} sm={6} lg={3}>
-                <Card className="stat-card overdue">
-                  <div className="d-flex justify-content-between align-items-start">
-                    <div>
-                      <p className="stat-number">{stats.overdueAcrossProjects}</p>
-                      <p className="stat-label">Overdue Across Projects</p>
-                    </div>
-                    <div className="stat-icon overdue">
-                      <AlertCircle />
-                    </div>
-                  </div>
-                </Card>
+              <Col xs={12}>
+                <StatsCards data={statsCardsData} gridMinWidth="180px" />
               </Col>
             </Row>
           </Container>
-        </div>
+        </div> */}
 
         <Container fluid>
-          <div style={{
+          {/* <div style={{
             backgroundColor: 'white',
-            padding: '1.5rem',
+            padding: '1rem 1.5rem',
             borderRadius: '12px',
             marginBottom: '1.5rem',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end'
           }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: '1rem'
-            }}>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <Search size={16} color="#6B7280" style={{ position: 'absolute', left: '0.75rem', pointerEvents: 'none' }} />
-                <input
-                  type="text"
-                  placeholder="Search projects..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    paddingLeft: '2.5rem',
-                    border: '1px solid #E5E9F2',
-                    borderRadius: '6px',
-                    fontSize: '0.9rem',
-                    outline: 'none',
-                    fontFamily: 'inherit'
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#4680FF'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#E5E9F2'}
-                />
-              </div>
-
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as any)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #E5E9F2',
-                  borderRadius: '6px',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  backgroundColor: 'white'
-                }}
-              >
-                {statuses.map(status => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-
-              <Select<SelectOption, false>
-                options={ownerSelectOptions}
-                value={ownerSelectOptions.find(o => o.value === filterOwner) || ownerSelectOptions[0]}
-                onChange={(opt: SingleValue<SelectOption>) => setFilterOwner(opt?.value || 'All Owners')}
-                styles={selectStyles}
-                isSearchable
-                placeholder="Owner / PM"
-              />
-
-              {/* <Select<SelectOption, false>
-                options={teamSelectOptions}
-                value={teamSelectOptions.find(o => o.value === filterTeam) || teamSelectOptions[0]}
-                onChange={(opt: SingleValue<SelectOption>) => setFilterTeam(opt?.value || 'All Teams')}
-                styles={selectStyles}
-                isSearchable
-                placeholder="Team"
-              /> */}
-
-              <button
-                onClick={handleApplyFilters}
-                style={{
-                  padding: '0.625rem 1.25rem',
-                  backgroundColor: '#4680FF',
-                  color: 'white',
-                  border: '1px solid #4680FF',
-                  borderRadius: '6px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.9rem'
-                }}
-              >
-                Filters
-              </button>
-
-              <button
-                onClick={clearFilters}
-                style={{
-                  padding: '0.625rem 1.25rem',
-                  backgroundColor: 'white',
-                  color: '#4680FF',
-                  border: '1px solid #4680FF',
-                  borderRadius: '6px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.9rem',
-                  transition: 'all 0.2s',
-                  fontFamily: 'inherit'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
-              >
-                Clear Filters
-                <X size={16} />
-              </button>
-            </div>
-          </div>
-
-          {/* <div className="tabs-section">
-            <Nav variant="tabs">
-              <Nav.Item>
-                <Nav.Link 
-                  active={activeTab === 'All Tasks'}
-                  onClick={() => setActiveTab('All Tasks')}
-                >
-                  All Tasks ({projects.length})
-                </Nav.Link>
-              </Nav.Item>
-              <Nav.Item>
-                <Nav.Link 
-                  active={activeTab === 'My Work'}
-                  onClick={() => setActiveTab('My Work')}
-                >
-                  My Work ({getTabFilteredProjects().filter(p => p.owner === currentUser || p.members.some(m => m.name === currentUser)).length})
-                </Nav.Link>
-              </Nav.Item>
-              <Nav.Item>
-                <Nav.Link 
-                  active={activeTab === 'Activity'}
-                  onClick={() => setActiveTab('Activity')}
-                >
-                  Activity
-                </Nav.Link>
-              </Nav.Item>
-            </Nav>
+            <Button
+              variant="outline-primary"
+              onClick={() => setShowFilterSidebar(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <SlidersHorizontal size={18} />
+              Filters
+            </Button>
           </div> */}
 
-          <div className="table-container">
-            <div className="table-responsive">
-              {loading ? (
-                <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
-                  <Spinner animation="border" role="status" className="me-2">
-                    <span className="visually-hidden">Loading...</span>
-                  </Spinner>
-                  <p style={{ marginTop: '1rem' }}>Loading projects...</p>
-                </div>
-              ) : filteredProjects.length === 0 ? (
-                <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+          <GenericFilterSidebar
+            isOpen={showFilterSidebar}
+            onClose={() => setShowFilterSidebar(false)}
+            title="Filters"
+            subtitle="Filter and refine projects"
+            filters={filterFields}
+            onApply={() => { handleApplyFilters(); setShowFilterSidebar(false); }}
+            onReset={clearFilters}
+            width="400px"
+            showApplyButton
+            showResetButton
+          />
+
+          
+            <GenericTable<Project>
+              data={filteredProjects}
+              columns={projectTableColumns}
+              actions={projectTableActions}
+              showActions={true}
+              actionsLabel="Actions"
+              selectable={true}
+              selectedRows={filteredProjects.filter(p => selectedProjects.has(p.id))}
+              onSelectionChange={(selected) => setSelectedProjects(new Set(selected.map(p => p.id)))}
+              pagination={{
+                currentPage: pagination.page,
+                rowsPerPage: pagination.limit,
+                totalRows: pagination.total,
+                pageSizeOptions: [10, 15, 25, 50],
+              }}
+              onPaginationChange={(page, rowsPerPage) => {
+                setPagination(prev => ({ ...prev, page, limit: rowsPerPage }));
+              }}
+              sortable={true}
+              loading={loading}
+              emptyMessage={
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
                   <FolderOpen size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
                   <p style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
                     {activeTab === 'My Work' ? 'No projects assigned to you' : 'No projects found'}
                   </p>
                   <p style={{ fontSize: '0.875rem', marginBottom: 0 }}>
-                    {activeTab === 'My Work' 
+                    {activeTab === 'My Work'
                       ? 'You are not currently assigned to any projects matching the filters.'
                       : 'Try adjusting your filters or search criteria.'}
                   </p>
                 </div>
-              ) : (
-              <Table className="projects-table" hover>
-                <thead>
-                  <tr>
-                    <th style={{ width: '50px' }}>
-                      <Form.Check 
-                        type="checkbox"
-                        onChange={handleSelectAll}
-                        checked={selectedProjects.size === filteredProjects.length && filteredProjects.length > 0}
-                      />
-                    </th>
-                    <th>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        Project Name
-                        <ChevronUp size={14} />
-                      </div>
-                    </th>
-                    <th>Members</th>
-                    <th>Open</th>
-                    <th>Overdue</th>
-                    <th>Last Update</th>
-                    <th style={{ width: '100px' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProjects.map(project => (
-                    <tr
-                      key={project.id}
-                      onClick={() => handleProjectClick(project)}
-                    >
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <Form.Check 
-                          type="checkbox"
-                          checked={selectedProjects.has(project.id)}
-                          onChange={() => handleSelectProject(project.id)}
-                        />
-                      </td>
-                      <td>
-                        <div className="project-name">
-                          <div className="project-icon" style={{ backgroundColor: project.iconColor + '20' }}>
-                            <project.icon size={20} style={{ color: project.iconColor }} />
-                          </div>
-                          <span>{project.name}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                          <div className="member-avatar bg-primary">
-                                {project?.members?.length || 0}
-                          </div>
-                          </div>
-                      </td>
-                      <td>{project.open}</td>
-                      <td>
-                        <span className={project.overdue > 0 ? 'overdue-count' : ''}>
-                          {project.overdue}
-                        </span>
-                      </td>
-                      <td>{project.lastUpdate}</td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                          <Button 
-                            variant="primary" 
-                            size="sm"
-                            style={{ fontSize: '0.8125rem', padding: '0.375rem 0.75rem' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleProjectClick(project);
-                            }}
-                          >
-                            Open
-                          </Button>
-                          <Dropdown>
-                            <Dropdown.Toggle
-                              as="button"
-                              bsPrefix="custom-dropdown-toggle"
-                              className="p-0 border-0 bg-transparent"
-                              style={{ color: '#718096', cursor: 'pointer' }}
-                            >
-                              <MoreVertical size={16} />
-                            </Dropdown.Toggle>
-
-                            <Dropdown.Menu align="end" style={{ fontSize: '0.875rem' }}>
-                              <Dropdown.Item 
-                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditProject(project);
-                                }}
-                              >
-                                <Settings size={14} />
-                                <span>Edit Project</span>
-                              </Dropdown.Item>
-                              {/* <Dropdown.Item style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Users size={14} />
-                                <span>Manage Team</span>
-                              </Dropdown.Item> */}
-                              <Dropdown.Divider />
-                              <Dropdown.Item 
-                                className="text-danger" 
-                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteProject(project);
-                                }}
-                              >
-                                <Trash2 size={14} />
-                                <span>Delete Project</span>
-                              </Dropdown.Item>
-                            </Dropdown.Menu>
-                          </Dropdown>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-              )}
-              
-              {/* Pagination Controls */}
-              {!loading && pagination.last_page > 1 && filteredProjects.length > 0 && (
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginTop: '20px',
-                  paddingTop: '16px',
-                  paddingBottom: '16px',
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                  borderTop: '1px solid #e8eef5'
-                }}>
-                  <div style={{ fontSize: '13px', color: '#718096' }}>
-                    Showing {pagination.from || 0} to {pagination.to || 0} of {pagination.total || 0} projects
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button
-                      onClick={() => {
-                        if (pagination.page > 1 && !loading) {
-                          setPagination(prev => ({ ...prev, page: prev.page - 1 }));
-                        }
-                      }}
-                      disabled={pagination.page === 1 || loading}
-                      style={{
-                        padding: '6px 12px',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '6px',
-                        backgroundColor: (pagination.page === 1 || loading) ? '#f8fafc' : 'white',
-                        color: (pagination.page === 1 || loading) ? '#cbd5e0' : '#4a5568',
-                        cursor: (pagination.page === 1 || loading) ? 'not-allowed' : 'pointer',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (pagination.page > 1 && !loading) {
-                          e.currentTarget.style.backgroundColor = '#f8fafc';
-                          e.currentTarget.style.borderColor = '#cbd5e0';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (pagination.page > 1 && !loading) {
-                          e.currentTarget.style.backgroundColor = 'white';
-                          e.currentTarget.style.borderColor = '#e2e8f0';
-                        }
-                      }}
-                    >
-                      Previous
-                    </button>
-                    
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      {Array.from({ length: Math.min(5, pagination.last_page) }, (_, i) => {
-                        let pageNum;
-                        if (pagination.last_page <= 5) {
-                          pageNum = i + 1;
-                        } else if (pagination.page <= 3) {
-                          pageNum = i + 1;
-                        } else if (pagination.page >= pagination.last_page - 2) {
-                          pageNum = pagination.last_page - 4 + i;
-                        } else {
-                          pageNum = pagination.page - 2 + i;
-                        }
-                        
-                        return (
-                          <button
-                            key={pageNum}
-                            onClick={() => {
-                              if (!loading && pagination.page !== pageNum) {
-                                setPagination(prev => ({ ...prev, page: pageNum }));
-                              }
-                            }}
-                            disabled={loading}
-                            style={{
-                              minWidth: '32px',
-                              height: '32px',
-                              padding: '0 8px',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '6px',
-                              backgroundColor: pagination.page === pageNum ? '#5b8fd8' : (loading ? '#f8fafc' : 'white'),
-                              color: pagination.page === pageNum ? 'white' : (loading ? '#cbd5e0' : '#4a5568'),
-                              cursor: loading ? 'not-allowed' : 'pointer',
-                              fontSize: '13px',
-                              fontWeight: pagination.page === pageNum ? '600' : '500',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (pagination.page !== pageNum && !loading) {
-                                e.currentTarget.style.backgroundColor = '#f8fafc';
-                                e.currentTarget.style.borderColor = '#cbd5e0';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (pagination.page !== pageNum && !loading) {
-                                e.currentTarget.style.backgroundColor = 'white';
-                                e.currentTarget.style.borderColor = '#e2e8f0';
-                              }
-                            }}
-                          >
-                            {pageNum}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    
-                    <button
-                      onClick={() => {
-                        if (pagination.page < pagination.last_page && !loading) {
-                          setPagination(prev => ({ ...prev, page: prev.page + 1 }));
-                        }
-                      }}
-                      disabled={pagination.page >= pagination.last_page || loading}
-                      style={{
-                        padding: '6px 12px',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '6px',
-                        backgroundColor: (pagination.page >= pagination.last_page || loading) ? '#f8fafc' : 'white',
-                        color: (pagination.page >= pagination.last_page || loading) ? '#cbd5e0' : '#4a5568',
-                        cursor: (pagination.page >= pagination.last_page || loading) ? 'not-allowed' : 'pointer',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (pagination.page < pagination.last_page && !loading) {
-                          e.currentTarget.style.backgroundColor = '#f8fafc';
-                          e.currentTarget.style.borderColor = '#cbd5e0';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (pagination.page < pagination.last_page && !loading) {
-                          e.currentTarget.style.backgroundColor = 'white';
-                          e.currentTarget.style.borderColor = '#e2e8f0';
-                        }
-                      }}
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+              }
+              loadingMessage="Loading projects..."
+              hover={true}
+              uniqueKey="id"
+              onRowClick={(row) => handleProjectClick(row)}
+              customizableColumns={true}
+              columnStorageKey="planner-projects-columns"
+            />
+          
         </Container>
       </div>
 
@@ -2041,6 +1621,7 @@ const WorkPlannerProjects = () => {
                   editingProject ? 'Update Project' : 'Create Project'
                 )}
               </Button>
+           
             </div>
           </Form>
         </Modal.Body>
