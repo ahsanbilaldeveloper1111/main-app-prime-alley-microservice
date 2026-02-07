@@ -184,9 +184,12 @@ export interface GenericSidebarProps {
   metadata?: string;
   email?: string;
   phone?: string;
+  /** Full phone number with country code (e.g. for Call action); optional */
+  completePhone?: string;
   avatar?: SidebarAvatar;
   // Quick Action Handlers (receive context payload when provided)
-  onCall?: () => void;
+  /** When completePhone is available, Call button passes it so parent can dial via CTI/dialer */
+  onCall?: (phone?: string) => void;
   onWhatsApp?: (payload?: Record<string, unknown>) => void;
   onEmail?: (payload?: Record<string, unknown>) => void;
   onSMS?: (payload?: Record<string, unknown>) => void;
@@ -208,6 +211,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   metadata,
   email,
   phone,
+  completePhone,
   avatar,
   onCall = () => console.log('Call action clicked'),
   onWhatsApp = () => console.log('WhatsApp action clicked'),
@@ -758,11 +762,15 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             gridTemplateColumns: 'repeat(3, 1fr)',
             gap: '10px'
           }}>
-            {/* Call Button - Always Visible */}
+            {/* Call Button - Always Visible; optional completePhone shown when provided */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onCall();
+                if (completePhone != null && completePhone.trim() !== '') {
+                  onCall(completePhone.trim());
+                } else {
+                  onCall();
+                }
               }}
               style={{
                 display: 'flex',
@@ -798,6 +806,18 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               }}>
                 Call
               </span>
+              {completePhone != null && completePhone !== '' && (
+                <span style={{
+                  fontSize: '10px',
+                  color: '#6b7280',
+                  textAlign: 'center',
+                  lineHeight: '1.2',
+                  marginTop: '2px',
+                  wordBreak: 'break-all'
+                }}>
+                  {completePhone}
+                </span>
+              )}
             </button>
 
             {/* WhatsApp Button - Always Visible */}
@@ -980,10 +1000,12 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               </span>
             </button>
 
-            {/* Schedule Button - Always Visible */}
+            {/* Schedule Button - Same as Meet Now but opens with meeting type "scheduled" */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                setAiComposeOpenedFrom('schedule');
+                setShowAICompose(true);
                 onSchedule();
               }}
               style={{
