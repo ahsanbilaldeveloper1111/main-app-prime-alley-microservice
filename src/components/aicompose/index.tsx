@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Container, Card, Button } from 'react-bootstrap';
+import { Container, Card } from 'react-bootstrap';
 import { MessageSquare, Mail, MessageCircle, Video } from 'lucide-react';
-import type { AIComposeChannel, AIComposeOpenedFrom, AIComposeProps, FooterHandlers } from './types';
+import type { AIComposeChannel, AIComposeOpenedFrom, AIComposeProps, FooterHandlers, CommonChannelOptions } from './types';
 import WhatsAppSection from './partials/WhatsAppSection';
 import EmailSection from './partials/EmailSection';
 import SmsSection from './partials/SmsSection';
@@ -10,7 +10,10 @@ import MeetingsSection from './partials/MeetingsSection';
 export type { AIComposeChannel, AIComposeOpenedFrom, AIComposeProps } from './types';
 
 const getChannelFromOpenedFrom = (from: AIComposeOpenedFrom): AIComposeChannel =>
-  from === 'meet-now' ? 'meetings' : from;
+  from === 'meet-now' || from === 'schedule' ? 'meetings' : from;
+
+const getInitialMeetingType = (from: AIComposeOpenedFrom): 'instant' | 'scheduled' | undefined =>
+  from === 'meet-now' ? 'instant' : from === 'schedule' ? 'scheduled' : undefined;
 
 const CHANNEL_ORDER: Record<AIComposeChannel, number> = {
   whatsapp: 0,
@@ -42,10 +45,21 @@ const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextP
     setFooterHandlers(() => handlers);
   }, []);
 
+  const [commonOptions, setCommonOptions] = useState<CommonChannelOptions>({
+    industry: '',
+    customIndustry: '',
+    tone: 'professional',
+    language: 'en',
+    customLanguage: '',
+    urgency: 'normal',
+    ctaType: '',
+    customCtaType: '',
+  });
+
   return (
     <Container fluid className="p-0" style={{ backgroundColor: 'transparent', minHeight: 'min-content' }}>
       <style>{`
-        .ai-compose-tab-slide-holder { overflow: hidden; min-height: 320px; }
+        .ai-compose-tab-slide-holder { overflow: hidden; min-height: 320px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
         .ai-compose-tab-slide-content {
           animation-duration: 0.3s;
           animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -66,17 +80,17 @@ const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextP
           to { transform: translateX(0); opacity: 1; }
         }
       `}</style>
-      <Card className="border-0" style={{ boxShadow: 'none', backgroundColor: 'white', minHeight: 'min-content' }}>
-        <Card.Header className="bg-white border-bottom d-flex justify-content-between align-items-center py-3 px-4">
+      <Card className="border-0 d-flex flex-column flex-grow-1" style={{ boxShadow: 'none', backgroundColor: 'white', minHeight: 0 }}>
+        <Card.Header className="bg-white border-bottom d-flex justify-content-between align-items-center py-3 px-4 flex-shrink-0">
           <div>
             <h4 className="mb-1 fw-bold">AI Compose</h4>
             <small className="text-muted">Channel-ready copy with instant preview</small>
           </div>
         </Card.Header>
 
-        <Card.Body className="p-4" style={{ overflowY: 'visible' }}>
+        <Card.Body className="p-4 flex-grow-1 d-flex flex-column min-h-0" style={{ overflowY: 'visible' }}>
           {/* Channel tabs */}
-          <div className="mb-4">
+          <div className="mb-2">
                 <div className="d-flex gap-2 mb-3">
                   <button
                     onClick={(e) => handleTabChange(e, 'whatsapp')}
@@ -210,18 +224,18 @@ const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextP
                 </div>
               </div>
 
-          {/* Tab content: one section per channel (slide animation); each partial has its own content + preview */}
-          <div className="ai-compose-tab-slide-holder rounded-3 border mb-3" style={{ borderColor: 'var(--bs-border-color)' }}>
+          {/* Tab content: one section per channel (slide animation); common options rendered inside each section */}
+          <div className="ai-compose-tab-slide-holder rounded-3 border mb-3 flex-grow-1" style={{ borderColor: 'var(--bs-border-color)' }}>
             <div
               key={selectedChannel}
-              className={`ai-compose-tab-slide-content rounded-3 p-4 ${slideDirection === 1 ? 'slide-next' : 'slide-prev'}`}
+              className={`ai-compose-tab-slide-content rounded-3 p-3 d-flex flex-column flex-grow-1 min-h-0 ${slideDirection === 1 ? 'slide-next' : 'slide-prev'}`}
               style={{ minHeight: '320px' }}
               onClick={(e) => e.stopPropagation()}
             >
-              {selectedChannel === 'whatsapp' && <WhatsAppSection registerFooter={registerFooter} contextPayload={contextPayload} />}
-              {selectedChannel === 'email' && <EmailSection registerFooter={registerFooter} contextPayload={contextPayload} />}
-              {selectedChannel === 'sms' && <SmsSection registerFooter={registerFooter} contextPayload={contextPayload} />}
-              {selectedChannel === 'meetings' && <MeetingsSection registerFooter={registerFooter} contextPayload={contextPayload} />}
+              {selectedChannel === 'whatsapp' && <WhatsAppSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} />}
+              {selectedChannel === 'email' && <EmailSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} />}
+              {selectedChannel === 'sms' && <SmsSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} />}
+              {selectedChannel === 'meetings' && <MeetingsSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} initialMeetingType={getInitialMeetingType(openedFrom)} />}
             </div>
           </div>
         </Card.Body>

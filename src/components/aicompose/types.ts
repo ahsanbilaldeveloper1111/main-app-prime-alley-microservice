@@ -12,7 +12,7 @@ export interface Suggestion {
 }
 
 export type AIComposeChannel = 'whatsapp' | 'sms' | 'email' | 'meetings';
-export type AIComposeOpenedFrom = AIComposeChannel | 'meet-now';
+export type AIComposeOpenedFrom = AIComposeChannel | 'meet-now' | 'schedule';
 
 export interface AIComposeProps {
   openedFrom?: AIComposeOpenedFrom;
@@ -29,9 +29,24 @@ export interface FooterHandlers {
 
 export type RegisterFooter = (handlers: FooterHandlers | null) => void;
 
+/** Common options shared across all channels (Industry, Tone, Language, Urgency, CTA Type) */
+export interface CommonChannelOptions {
+  industry: string;
+  customIndustry: string;
+  tone: string;
+  language: string;
+  customLanguage: string;
+  urgency: string;
+  ctaType: string;
+  customCtaType: string;
+}
+
 /** Optional context payload passed to each channel section (e.g. lead, deal, order) */
 export interface ChannelSectionContext {
   contextPayload?: Record<string, unknown>;
+  /** Shared options for all channels; when provided, sections use these instead of local state */
+  commonOptions?: CommonChannelOptions;
+  setCommonOptions?: React.Dispatch<React.SetStateAction<CommonChannelOptions>>;
 }
 
 /** Source page when opening AI Compose from CRM (leads, deals, orders) */

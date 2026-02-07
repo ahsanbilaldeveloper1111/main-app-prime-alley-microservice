@@ -1,195 +1,549 @@
 import React, { useState, useEffect } from 'react';
-import { Row, Col, Form, Button, Card, Badge } from 'react-bootstrap';
-import { Star, Video, Clock } from 'lucide-react';
+import { Row, Col, Form, Button, Card, Modal, Badge, Pagination } from 'react-bootstrap';
+import { Video, Clock, Sparkles } from 'lucide-react';
 import type { RegisterFooter, ChannelSectionContext } from '../types';
 import { getContextSource } from '../types';
+import {
+  getMeetings,
+  getMeetingByEventId,
+  createInstantMeeting,
+  createScheduledMeeting,
+} from '@utils/communication';
+import { generateEmail } from '@utils/communication';
+import moment from 'moment-timezone';
+import { GlobalDateTimeFormat } from '@utils/Helper';
 
-const DEFAULT_DRAFT = `Quick sync – 10 min
+/** Pagination meta from GET meetings response */
+interface MeetingsMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  from?: number;
+  to?: number;
+}
 
-Agenda:
-• Review requirements
-• Next steps
+/** Meeting item from GET meetings response (list or detail) */
+interface MeetingItem {
+  event_id?: string;
+  id?: string | number;
+  summary?: string;
+  description?: string;
+  start_time?: string;
+  end_time?: string;
+  meeting_link?: string;
+  html_link?: string;
+  created_by?: string;
+  created_at?: string;
+  meeting_type?: 'instant' | 'scheduled' | string;
+  attendees?: string[];
+}
 
-— PrimeAlley`;
+const DEFAULT_COMMON_OPTIONS = {
+  industry: '',
+  customIndustry: '',
+  tone: 'professional',
+  language: 'en',
+  customLanguage: '',
+  urgency: 'normal',
+  ctaType: '',
+  customCtaType: '',
+};
 
-const KEY_POINTS = [
-  { id: '1', label: 'Duration', value: '10 min' },
-  { id: '2', label: 'Type', value: 'quick sync' },
-  { id: '3', label: 'Add', value: 'meeting link' },
-];
-
-const SUGGESTIONS = [
-  { id: '1', title: 'Instant meeting', rating: 5, content: 'Start an instant meeting now with Ms. Shilpa.' },
-  { id: '2', title: 'Scheduled', rating: 4, content: 'Schedule for later this week — pick a time.' },
-];
-
-const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionContext> = ({ registerFooter, contextPayload }) => {
-  const [draftContent, setDraftContent] = useState(DEFAULT_DRAFT);
-  const [objective, setObjective] = useState('Book a meeting');
-  const [tone, setTone] = useState('Professional + Friendly');
-
+const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter; initialMeetingType?: 'instant' | 'scheduled' } & ChannelSectionContext> = ({
+  registerFooter,
+  contextPayload,
+  commonOptions: commonOptionsProp,
+  setCommonOptions,
+  initialMeetingType,
+}) => {
+  const commonOptions = commonOptionsProp ?? DEFAULT_COMMON_OPTIONS;
   const source = getContextSource(contextPayload);
 
-  const handleInsert = (content: string) => {
-    setDraftContent(content);
-  };
+  const [meetingType, setMeetingType] = useState<'instant' | 'scheduled'>(initialMeetingType ?? 'instant');
+  useEffect(() => {
+    if (initialMeetingType != null) setMeetingType(initialMeetingType);
+  }, [initialMeetingType]);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [attendeesStr, setAttendeesStr] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [timezone, setTimezone] = useState(moment.tz.guess());
+  const [createLoading, setCreateLoading] = useState(false);
+  const [generateLoading, setGenerateLoading] = useState(false);
 
-  const handleRegen = () => {
-    console.log('Meetings: Regenerating suggestions...');
-  };
+  const [meetings, setMeetings] = useState<MeetingItem[]>([]);
+  const [meetingsLoading, setMeetingsLoading] = useState(false);
+  const [meetingsMeta, setMeetingsMeta] = useState<MeetingsMeta | null>(null);
+  const [meetingsPage, setMeetingsPage] = useState(1);
+  const [meetingsPerPage, setMeetingsPerPage] = useState(15);
 
-  const handleMeetNow = () => {
-    console.log('Meetings: Meet Now clicked');
-  };
+  const fetchMeetings = React.useCallback(async (page: number, perPage: number) => {
+    setMeetingsLoading(true);
+    try {
+      const res = (await getMeetings({
+        page: String(page),
+        per_page: String(perPage),
+      })) as { data?: MeetingItem[]; events?: MeetingItem[]; meta?: MeetingsMeta };
+      const list = Array.isArray(res?.data) ? res.data : Array.isArray(res?.events) ? res.events : [];
+      setMeetings(list);
+      if (res?.meta) setMeetingsMeta(res.meta);
+      else setMeetingsMeta(null);
+    } catch (e) {
+      console.error('Failed to fetch meetings', e);
+      setMeetings([]);
+      setMeetingsMeta(null);
+    } finally {
+      setMeetingsLoading(false);
+    }
+  }, []);
 
-  const handleSchedule = () => {
-    console.log('Meetings: Schedule clicked');
+  useEffect(() => {
+    fetchMeetings(meetingsPage, meetingsPerPage);
+  }, [meetingsPage, meetingsPerPage, fetchMeetings]);
+
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [meetingDetail, setMeetingDetail] = useState<MeetingItem | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  useEffect(() => {
+    if (!selectedEventId) {
+      setMeetingDetail(null);
+      return;
+    }
+    const fetchDetail = async () => {
+      setDetailLoading(true);
+      try {
+        const res = (await getMeetingByEventId(selectedEventId)) as { data?: MeetingItem; status?: string } | MeetingItem;
+        const detail = res && typeof res === 'object' && 'data' in res && res.data != null ? res.data : (res as MeetingItem);
+        setMeetingDetail(detail || null);
+      } catch (e) {
+        console.error('Failed to fetch meeting detail', e);
+        setMeetingDetail(null);
+      } finally {
+        setDetailLoading(false);
+      }
+    };
+    fetchDetail();
+  }, [selectedEventId]);
+
+ 
+  const handleCreateMeeting = async () => {
+    const attendees = attendeesStr
+      ? attendeesStr.split(',').map((e) => e.trim()).filter(Boolean)
+      : undefined;
+
+    if (meetingType === 'instant') {
+      setCreateLoading(true);
+      try {
+        const res = await createInstantMeeting({
+          summary: title.trim() || undefined,
+          description: description.trim() || undefined,
+          attendees,
+        });
+        setTitle('');
+        setDescription('');
+        setAttendeesStr('');
+        if (res?.data) {
+          const newMeeting: MeetingItem = {
+            event_id: res.data.event_id,
+            meeting_link: res.data.meeting_link,
+            html_link: res.data.html_link,
+            summary: res.data.summary,
+            start_time: res.data.start_time,
+            end_time: res.data.end_time,
+          };
+          setMeetings((prev) => [newMeeting, ...prev]);
+        } 
+      } catch (e) {
+        console.error('Create instant meeting failed', e);
+      } finally {
+        setCreateLoading(false);
+      }
+      return;
+    }
+
+    if (!startTime.trim()) return;
+    setCreateLoading(true);
+    try {
+      const res = await createScheduledMeeting({
+        start_time: startTime.trim(),
+        end_time: endTime.trim() || undefined,
+        summary: title.trim() || undefined,
+        description: description.trim() || undefined,
+        attendees,
+        timezone: timezone || undefined,
+      });
+      setTitle('');
+      setDescription('');
+      setAttendeesStr('');
+      setStartTime('');
+      setEndTime('');
+      await fetchMeetings(meetingsPage, meetingsPerPage);
+    } catch (e) {
+      console.error('Create scheduled meeting failed', e);
+    } finally {
+      setCreateLoading(false);
+    }
   };
 
   const handleCancel = () => console.log('Meetings: Cancel');
   const handleCopy = () => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) navigator.clipboard.writeText(draftContent);
+    const text = `${title || '(No title)'}\n\n${description || ''}\n\nAttendees: ${attendeesStr || '—'}`;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) navigator.clipboard.writeText(text);
   };
   const handleLater = () => console.log('Meetings: Later');
-  const handleSend = () => console.log('Meetings: Send / create meeting', { draftContent, objective, tone, contextPayload, source });
+  const handleSend = () => handleCreateMeeting();
 
   useEffect(() => {
     registerFooter?.({ cancel: handleCancel, copy: handleCopy, later: handleLater, send: handleSend });
     return () => registerFooter?.(null);
-  }, [registerFooter, draftContent, objective, tone, contextPayload]);
+  }, [registerFooter, title, description, attendeesStr]);
+
+  const [contactEmail, setContactEmail] = useState('');
+  useEffect(() => {
+    const payload = contextPayload ?? ({} as Record<string, unknown>);
+    if (source === 'leads' && payload?.lead) {
+      const lead = payload.lead as Record<string, unknown>;
+      const raw = lead?.contact_persons;
+      let persons: Array<{ email?: string }> = [];
+      if (raw != null) {
+        if (typeof raw === 'string') {
+          try {
+            persons = JSON.parse(raw) as typeof persons;
+          } catch {
+            persons = [];
+          }
+        } else if (Array.isArray(raw)) {
+          persons = raw as typeof persons;
+        }
+      }
+      const first = persons[0];
+      setContactEmail((first?.email as string) ?? '');
+    } else {
+      setContactEmail('');
+    }
+  }, [source, contextPayload]);
+
+  useEffect(() => {
+    if (contactEmail && !attendeesStr) setAttendeesStr(contactEmail);
+  }, [contactEmail]);
+
+  const eventId = (m: MeetingItem) => m.event_id ?? (m as { id?: string }).id;
 
   return (
-    <Row className="g-4">
-      <Col lg={7}>
-        <div className="small text-muted text-uppercase fw-semibold mb-3">Meetings section</div>
-        {source && (
-          <div className="mb-3">
-            <Badge bg="secondary" className="px-2 py-1">
-              From: {source === 'leads' ? 'Leads' : source === 'deals' ? 'Deals' : 'Orders'}
-            </Badge>
-          </div>
-        )}
-        {contextPayload && Object.keys(contextPayload).length > 0 && (
-          <div className="mb-3 p-2 rounded border bg-light">
-            <div className="small fw-semibold text-muted mb-1">Context payload</div>
-            <pre className="mb-0 small" style={{ fontSize: '11px', maxHeight: '120px', overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-              {JSON.stringify(contextPayload, null, 2)}
-            </pre>
-          </div>
-        )}
-        <div className="d-flex flex-wrap gap-2 mb-4">
-          <Badge bg="light" text="dark" className="px-3 py-2">Ms. Shilpa</Badge>
-          <Badge bg="light" text="dark" className="px-3 py-2">Stage: Contacted</Badge>
-          <Badge bg="light" text="dark" className="px-3 py-2">Timezone: UAE</Badge>
-        </div>
+    <div className="h-100 d-flex flex-column min-h-0">
+      
+      <Row className="mb-4 flex-grow-1 min-h-0">
+        <Col xs={12}>
+          <>
+              <Row className="g-4">
+                <Col lg={7}>
+                  <Card className="border">
+                    <Card.Body>
+                      <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                        <div>
+                          <h5 className="fw-bold mb-1">Create Google Meet</h5>
+                          <p className="text-muted small mb-0">
+                            Create instant or scheduled Google Meet meetings
+                          </p>
+                        </div>
+                        
+                      </div>
 
-        <div className="d-flex gap-2 mb-4">
-          <Button variant="warning" onClick={handleMeetNow}>
-            <Video size={18} className="me-1" />
-            Meet Now
-          </Button>
-          <Button variant="outline-warning" onClick={handleSchedule}>
-            Schedule
-          </Button>
-        </div>
+                      <Form.Group className="mb-3">
+                        <Form.Label className="fw-semibold">Meeting Type</Form.Label>
+                        <Form.Select
+                          value={meetingType}
+                          onChange={(e) => setMeetingType(e.target.value as 'instant' | 'scheduled')}
+                        >
+                          <option value="instant">Instant Meeting</option>
+                          <option value="scheduled">Scheduled Meeting</option>
+                        </Form.Select>
+                      </Form.Group>
 
-        <Row className="mb-4">
-          <Col md={6} className="mb-3 mb-md-0">
-            <Form.Group>
-              <Form.Label className="fw-semibold">Objective</Form.Label>
-              <Form.Select value={objective} onChange={(e) => setObjective(e.target.value)}>
-                <option>Book a meeting</option>
-                <option>Quick sync</option>
-                <option>Demo</option>
-              </Form.Select>
-            </Form.Group>
-          </Col>
-          <Col md={6}>
-            <Form.Group>
-              <Form.Label className="fw-semibold">Tone</Form.Label>
-              <Form.Select value={tone} onChange={(e) => setTone(e.target.value)}>
-                <option>Professional + Friendly</option>
-                <option>Casual</option>
-                <option>Formal</option>
-              </Form.Select>
-            </Form.Group>
-          </Col>
-        </Row>
+                      
 
-        <div className="mb-4">
-          <Form.Label className="fw-semibold">Key points</Form.Label>
-          <div className="d-flex flex-wrap gap-2">
-            {KEY_POINTS.map((point) => (
-              <Badge key={point.id} bg="light" text="dark" className="px-3 py-2 border" style={{ fontSize: '0.875rem' }}>
-                {point.label}: {point.value}
-              </Badge>
-            ))}
-          </div>
-        </div>
+                      <Form.Group className="mb-3">
+                        <Form.Label className="fw-semibold">Title</Form.Label>
+                        <Form.Control
+                          value={title}
+                          onChange={(e) => setTitle(e.target.value)}
+                          placeholder="Meeting title"
+                        />
+                      </Form.Group>
 
-        <div className="mb-4">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <Form.Label className="fw-semibold mb-0">Best suggestions</Form.Label>
-            <small className="text-muted">1-click insert • regen per card</small>
-          </div>
-          {SUGGESTIONS.map((suggestion) => (
-            <Card key={suggestion.id} className="mb-3 border">
-              <Card.Body>
-                <div className="d-flex justify-content-between align-items-start mb-2">
-                  <div className="d-flex align-items-center gap-2">
-                    <span className="fw-semibold">{suggestion.title}</span>
-                    <div className="d-flex gap-1">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} size={14} fill={i < suggestion.rating ? '#ffc107' : 'none'} stroke={i < suggestion.rating ? '#ffc107' : '#dee2e6'} />
-                      ))}
-                    </div>
+                      <Form.Group className="mb-3">
+                        <Form.Label className="fw-semibold">Description</Form.Label>
+                        <Form.Control
+                          as="textarea"
+                          rows={3}
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="Meeting description"
+                        />
+                      </Form.Group>
+
+                      <Form.Group className="mb-3">
+                        <Form.Label className="fw-semibold">Attendees (comma-separated emails)</Form.Label>
+                        <Form.Control
+                          type="email"
+                          value={attendeesStr}
+                          onChange={(e) => setAttendeesStr(e.target.value)}
+                          placeholder="email1@example.com, email2@example.com"
+                        />
+                      </Form.Group>
+
+                      {meetingType === 'scheduled' && (
+                        <>
+                          <Form.Group className="mb-3">
+                            <Form.Label className="fw-semibold">Start time</Form.Label>
+                            <Form.Control
+                              type="datetime-local"
+                              value={startTime}
+                              onChange={(e) => setStartTime(e.target.value)}
+                            />
+                          </Form.Group>
+                          <Form.Group className="mb-3">
+                            <Form.Label className="fw-semibold">End time (optional)</Form.Label>
+                            <Form.Control
+                              type="datetime-local"
+                              value={endTime}
+                              onChange={(e) => setEndTime(e.target.value)}
+                            />
+                          </Form.Group>
+                          {/* <Form.Group className="mb-3">
+                            <Form.Label className="fw-semibold">Timezone</Form.Label>
+                            <Form.Control
+                              value={timezone}
+                              onChange={(e) => setTimezone(e.target.value)}
+                              placeholder="e.g. America/New_York"
+                            />
+                          </Form.Group> */}
+                        </>
+                      )}
+
+                      <div className="d-flex gap-2">
+                       
+                        <Button
+                          variant="dark"
+                          onClick={handleCreateMeeting}
+                          disabled={
+                            createLoading ||
+                            (meetingType === 'scheduled' && !startTime.trim())
+                          }
+                        >
+                          {createLoading ? 'Creating...' : 'Create Meeting'}
+                        </Button>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                <Col lg={5}>
+                  <div style={{ position: 'sticky', top: '20px' }} onClick={(e) => e.stopPropagation()}>
+                    <Form.Label className="fw-semibold mb-3">Preview — Meeting</Form.Label>
+                    <Card className="border-0 shadow-sm" style={{ maxWidth: '400px', backgroundColor: '#fff8e1' }}>
+                      <Card.Body>
+                        <div className="d-flex align-items-start gap-2 mb-2">
+                          <Video size={20} className="text-warning mt-1" />
+                          <div className="flex-grow-1">
+                            <div className="fw-semibold small">
+                              {meetingType === 'instant' ? 'Instant' : 'Scheduled'} Meeting
+                            </div>
+                            <span className="badge bg-warning text-dark small">Draft</span>
+                          </div>
+                        </div>
+                        <Card className="mt-3 border-0 shadow-sm">
+                          <Card.Body className="bg-white">
+                            <div className="fw-semibold small mb-2">{title}</div>
+                            {description ? (
+                              <p className="mb-0 small" style={{ whiteSpace: 'pre-line' }}>{description}</p>
+                            ) : (
+                              <p className="mb-0 text-muted small">No description yet.</p>
+                            )}
+                            {attendeesStr && (
+                              <p className="mb-0 small text-muted mt-2">
+                                Attendees: {attendeesStr}
+                              </p>
+                            )}
+                            <div className="text-end mt-2">
+                              <small className="text-muted d-flex align-items-center justify-content-end gap-1">
+                                <Clock size={12} /> Preview
+                              </small>
+                            </div>
+                          </Card.Body>
+                        </Card>
+                      </Card.Body>
+                    </Card>
                   </div>
-                  <div className="d-flex gap-2">
-                    <Button size="sm" variant="outline-primary" onClick={() => handleInsert(suggestion.content)}>Insert</Button>
-                    <Button size="sm" variant="outline-secondary" onClick={handleRegen}>Regen</Button>
-                  </div>
+                </Col>
+              </Row>
+            </>
+        </Col>
+      </Row>
+
+      <Modal show={showMeetingModal && selectedEventId != null} onHide={() => { setShowMeetingModal(false); setSelectedEventId(null); }} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>{meetingDetail?.summary ?? 'Meeting Details'}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {detailLoading ? (
+            <div className="d-flex align-items-center gap-2 py-3">
+              <span className="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true" />
+              <span className="small text-muted">Loading meeting...</span>
+            </div>
+          ) : meetingDetail != null ? (
+            <>
+              <div className="small text-muted mb-2">
+                {meetingDetail.start_time
+                  ? moment(meetingDetail.start_time).format(GlobalDateTimeFormat)
+                  : '—'}
+                {meetingDetail.end_time && ` – ${moment(meetingDetail.end_time).format(GlobalDateTimeFormat)}`}
+              </div>
+              
+              {meetingDetail.meeting_link && (
+                <a href={meetingDetail.meeting_link} target="_blank" rel="noopener noreferrer" className="d-block mb-2 text-primary">
+                  {meetingDetail.meeting_link}
+                </a>
+              )}
+              {meetingDetail.html_link && (
+                <a href={meetingDetail.html_link} target="_blank" rel="noopener noreferrer" className="d-block mb-2">
+                  Open in Calendar
+                </a>
+              )}
+              {meetingDetail.description && (
+                <div className="mt-2 pt-2 border-top">
+                  <div className="small fw-semibold text-muted mb-1">Description</div>
+                  <p className="mb-0 small" style={{ whiteSpace: 'pre-line' }}>{meetingDetail.description}</p>
                 </div>
-                <p className="mb-0 text-muted small">{suggestion.content}</p>
+              )}
+              {meetingDetail.attendees && meetingDetail.attendees.length > 0 && (
+                <div className="mt-2 pt-2 border-top">
+                  <div className="small fw-semibold text-muted mb-1">Attendees</div>
+                  <p className="mb-0 small">{meetingDetail.attendees.join(', ')}</p>
+                </div>
+              )}
+            </>
+          ) : null}
+        </Modal.Body>
+      </Modal>
+
+        <Row className="mt-3">
+          <Col xs={12}>
+            <Card className="border">
+              <Card.Body>
+                <h6 className="fw-semibold mb-3">Meetings</h6>
+                {meetingsLoading ? (
+                  <div className="d-flex flex-column align-items-center justify-content-center gap-2 py-4">
+                    <span className="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true" />
+                    <span className="small text-muted">Loading meetings...</span>
+                  </div>
+                ) : meetings.length === 0 ? (
+                  <div className="d-flex flex-column align-items-center justify-content-center py-5 px-3 text-center">
+                    <Video size={48} className="text-muted mb-3" strokeWidth={1.2} />
+                    <h6 className="fw-semibold text-muted mb-1">No meetings yet</h6>
+                    <p className="small text-muted mb-0" style={{ maxWidth: '280px' }}>
+                      Meetings you create will appear here. Use the form above to create a new meeting.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="d-flex flex-column gap-2">
+                    {meetings.map((m) => {
+                      const id = eventId(m);
+                      if (!id) return null;
+                      return (
+                        <Card
+                          key={id}
+                          className={`cursor-pointer mb-2 position-relative ${selectedEventId === id ? 'border-primary bg-light' : ''}`}
+                          onClick={() => {
+                            setSelectedEventId(id);
+                            setShowMeetingModal(true);
+                          }}
+                        >
+                          <Card.Body className="py-3 px-3">
+                            {m.meeting_type != null && (
+                              <Badge bg="info" className="position-absolute top-0 end-0 m-2 text-capitalize">
+                                {String(m.meeting_type)}
+                              </Badge>
+                            )}
+                            <div className="fw-semibold mb-1">{m.summary ?? 'Meeting Details'}</div>
+                            {m.meeting_link && (
+                              <a
+                                href={m.meeting_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className=" small text-primary text-truncate mb-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {m.meeting_link}
+                              </a>
+                            )}
+                            <div className="small text-muted">
+                              {/* By: {m.created_by ?? '—'} |  */}
+                              {m.created_at ? moment(m.created_at).format(GlobalDateTimeFormat) : '—'}
+                            </div>
+                          </Card.Body>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+                {meetingsMeta && (meetingsMeta.total > 0 || meetings.length > 0) && (
+                  <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 pt-3 border-top">
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="small text-muted">
+                        Per page:
+                      </span>
+                      <Form.Select
+                        size="sm"
+                        style={{ width: 'auto' }}
+                        value={meetingsPerPage}
+                        onChange={(e) => {
+                          setMeetingsPerPage(Number(e.target.value));
+                          setMeetingsPage(1);
+                        }}
+                      >
+                        {[5, 10, 15, 25, 50].map((n) => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </Form.Select>
+                      <span className="small text-muted">
+                        {meetingsMeta.from != null && meetingsMeta.to != null
+                          ? `Showing ${meetingsMeta.from}–${meetingsMeta.to} of ${meetingsMeta.total}`
+                          : `Total ${meetingsMeta.total}`}
+                      </span>
+                    </div>
+                    {meetingsMeta.last_page > 1 && (
+                      <Pagination className="mb-0 flex-wrap gap-1">
+                        <Pagination.Prev
+                          disabled={meetingsPage <= 1}
+                          onClick={(e) => { e.preventDefault(); setMeetingsPage((p) => Math.max(1, p - 1)); }}
+                        />
+                        {Array.from({ length: meetingsMeta.last_page }, (_, i) => i + 1).map((p) => (
+                          <Pagination.Item
+                            key={p}
+                            active={p === meetingsPage}
+                            onClick={(e) => { e.preventDefault(); setMeetingsPage(p); }}
+                          >
+                            {p}
+                          </Pagination.Item>
+                        ))}
+                        <Pagination.Next
+                          disabled={meetingsPage >= meetingsMeta.last_page}
+                          onClick={(e) => { e.preventDefault(); setMeetingsPage((p) => Math.min(meetingsMeta.last_page, p + 1)); }}
+                        />
+                      </Pagination>
+                    )}
+                  </div>
+                )}
               </Card.Body>
             </Card>
-          ))}
-        </div>
-
-        <div className="mb-3">
-          <Form.Label className="fw-semibold">Draft / agenda</Form.Label>
-          <Form.Control as="textarea" rows={6} value={draftContent} onChange={(e) => setDraftContent(e.target.value)} className="font-monospace" />
-        </div>
-
-        <Form.Check type="switch" id="activity-tracker-meetings" label="Log to Activity Tracker" className="mb-3" />
-      </Col>
-
-      <Col lg={5}>
-        <div style={{ position: 'sticky', top: '20px' }} onClick={(e) => e.stopPropagation()}>
-          <Form.Label className="fw-semibold mb-3">Live preview — Meetings</Form.Label>
-          <Card className="border-0 shadow-sm" style={{ maxWidth: '400px', backgroundColor: '#fff8e1' }}>
-            <Card.Body>
-              <div className="d-flex align-items-start gap-2 mb-2">
-                <Video size={20} className="text-warning mt-1" />
-                <div className="flex-grow-1">
-                  <div className="fw-semibold small">Meetings • Ms. Shilpa</div>
-                  <Badge bg="warning" text="dark" className="small">Online</Badge>
-                </div>
-              </div>
-              <Card className="mt-3 border-0 shadow-sm">
-                <Card.Body className="bg-white">
-                  <p className="mb-0" style={{ whiteSpace: 'pre-line', fontSize: '0.95rem' }}>{draftContent}</p>
-                  <div className="text-end mt-2">
-                    <small className="text-muted d-flex align-items-center justify-content-end gap-1">
-                      <Clock size={12} /> 11:02
-                    </small>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Card.Body>
-          </Card>
-        </div>
-      </Col>
-    </Row>
+          </Col>
+        </Row>
+      
+    </div>
   );
 };
 
