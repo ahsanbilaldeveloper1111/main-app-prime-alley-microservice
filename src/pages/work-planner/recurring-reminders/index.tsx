@@ -673,6 +673,56 @@ const RecurringReminders = () => {
       {/* Page Header: title left, actions (Add + Filter) right - like leads.tsx */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
         <div className="mb-3 mb-md-0">
+  <nav aria-label="breadcrumb">
+    <ol className="breadcrumb mb-0">
+      <li className="breadcrumb-item">
+        <a href="/dashboard" className="text-decoration-none">
+          Work Planner
+        </a>
+      </li>
+      <li className="breadcrumb-item active fw-bold" aria-current="page">
+      Recurring Reminders
+      </li>
+    </ol>
+  </nav>
+</div>
+<div className="d-flex flex-wrap gap-2">
+          <button
+            onClick={() => {
+              setEditingTask(null);
+              setShowCreateTaskModal(true);
+            }}
+            style={{
+              backgroundColor: '#5b8fd8',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '8px 16px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '600',
+            }}
+          >
+            <Plus size={16} /> Add Recurring
+          </button>
+          <Button
+            variant={frequencyFilter !== 'all' || statusFilter !== 'all' || projectFilter !== 'all' || labelsFilter !== 'all' || (todoSearchQuery && todoSearchQuery.trim() !== '') ? 'primary' : 'outline-secondary'}
+            onClick={() => setShowFilterSidebar(true)}
+            className="d-flex align-items-center gap-2"
+          >
+            <SlidersHorizontal size={16} />
+            Filters
+            {(frequencyFilter !== 'all' || statusFilter !== 'all' || projectFilter !== 'all' || labelsFilter !== 'all' || (todoSearchQuery && todoSearchQuery.trim() !== '')) && (
+              <span className="badge bg-light text-dark ms-1">Active</span>
+            )}
+          </Button>
+        </div>
+</div>
+      {/* <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+        <div className="mb-3 mb-md-0">
           <h1 className="h4 mb-0 fw-bold">Recurring Reminders</h1>
         </div>
         <div className="d-flex flex-wrap gap-2">
@@ -709,7 +759,7 @@ const RecurringReminders = () => {
             )}
           </Button>
         </div>
-      </div>
+      </div> */}
 
            <style>{`
    .table-responsive .table th:last-child, .table-responsive .table td:last-child {
@@ -1203,14 +1253,7 @@ const RecurringReminders = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1', minWidth: '320px' }}>
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '8px',
-              padding: '20px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-              border: '1px solid #e8eef5'
-            }}>
+          
               <GenericTable<RecurringTask>
                     data={filteredTasks}
                     columns={tableColumns}
@@ -1237,8 +1280,8 @@ const RecurringReminders = () => {
                     columnStorageKey="planner-recurring-reminders-columns"
                   />
               
-              </div>
-          </div>
+             
+         
 
           <GenericSidebar
             isOpen={!!(showTaskDetail && selectedTaskDetails)}

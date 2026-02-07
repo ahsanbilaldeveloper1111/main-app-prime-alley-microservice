@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Spinner, Row, Col } from 'react-bootstrap';
+import { Spinner } from 'react-bootstrap';
 import { FileText, Calendar, CheckCircle2, AlertCircle, Clock, Edit, Trash2 } from 'lucide-react';
-import StatsCard from '@components/work-planner/stats-cards';
+import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import CreateTaskModal from '@components/work-planner/createtask-modal';
 import { deleteTask, getTask, getTaskActivities } from '@utils/tasks';
@@ -317,69 +317,30 @@ const ListTab: React.FC<ListTabProps> = ({
     onClearFilters?.();
   };
 
-  // Prepare summary cards data
-  const summaryCards = listSummary ? [
-    {
-      title: 'Total',
-      value: listSummary.total || 0,
-      icon: FileText,
-      iconColor: '#4680FF',
-      iconBgColor: '#E3F2FD'
-    },
-    {
-      title: 'Open',
-      value: listSummary.open || 0,
-      icon: FileText,
-      iconColor: '#4680FF',
-      iconBgColor: '#E3F2FD'
-    },
-    {
-      title: 'Overdue',
-      value: listSummary.overdue || 0,
-      icon: AlertCircle,
-      iconColor: '#DC2626',
-      iconBgColor: '#FFEBEE'
-    },
-    {
-      title: 'Due This Week',
-      value: listSummary.dueThisWeek || 0,
-      icon: Clock,
-      iconColor: '#FFB64D',
-      iconBgColor: '#FFF3E0'
-    },
-    {
-      title: 'Completed',
-      value: listSummary.completed || 0,
-      icon: CheckCircle2,
-      iconColor: '#2CA87F',
-      iconBgColor: '#E8F5E9'
-    }
-  ] : [];
+  // Prepare summary cards data for GenericStatsCards
+  const summaryCardsData: StatsCardData[] = listSummary
+    ? [
+        { title: 'Total', value: listSummary.total || 0, icon: FileText, iconColor: '#4680FF', iconBgColor: '#E3F2FD' },
+        { title: 'Open', value: listSummary.open || 0, icon: FileText, iconColor: '#4680FF', iconBgColor: '#E3F2FD' },
+        { title: 'Overdue', value: listSummary.overdue || 0, icon: AlertCircle, iconColor: '#DC2626', iconBgColor: '#FFEBEE' },
+        { title: 'Due This Week', value: listSummary.dueThisWeek || 0, icon: Clock, iconColor: '#FFB64D', iconBgColor: '#FFF3E0' },
+        { title: 'Completed', value: listSummary.completed || 0, icon: CheckCircle2, iconColor: '#2CA87F', iconBgColor: '#E8F5E9' }
+      ]
+    : [];
 
   return (
     <>
       {/* Summary Cards */}
-      {listSummary && (
-        <Row className="g-3" style={{ marginBottom: '1.5rem' }}>
-          {summaryCards.map((card, index) => (
-            <Col xs={12} sm={6} lg key={index} className="d-flex">
-              <StatsCard
-                title={card.title}
-                value={card.value}
-                icon={card.icon}
-                iconColor={card.iconColor}
-                iconBgColor={card.iconBgColor}
-                valueColor="#1F2937"
-              />
-            </Col>
-          ))}
-        </Row>
+      {listSummary && summaryCardsData.length > 0 && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <StatsCards data={summaryCardsData} gridMinWidth="160px" />
+        </div>
       )}
 
       <div style={styles.card}>
-        <div style={styles.cardHeader}>
+        {/* <div style={styles.cardHeader}>
           <h5 style={styles.cardTitle}>Tasks List</h5>
-        </div>
+        </div> */}
 
         <TaskFilterSection
           searchTerm={searchTerm}

@@ -5,7 +5,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, 
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip 
 } from 'recharts';
-import StatsCard from '@components/work-planner/stats-cards';
+import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
 import RecentActivitySection from './RecentActivitySection';
 import OverdueTasksSection from './OverdueTasksSection';
 
@@ -52,20 +52,18 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
           </Col>
         </Row>
       ) : (
-        <Row className="g-3" style={{ marginBottom: '1.5rem' }}>
-          {statusCards.map((card, index) => (
-            <Col xs={12} sm={6} lg key={index} className="d-flex">
-              <StatsCard
-                title={card.title}
-                value={card.count}
-                icon={card.icon}
-                iconColor={card.color}
-                iconBgColor={card.bgLight}
-                valueColor="#1F2937"
-              />
-            </Col>
-          ))}
-        </Row>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <StatsCards
+            data={statusCards.map((card): StatsCardData => ({
+              title: card.title,
+              value: card.count,
+              icon: card.icon,
+              iconColor: card.color,
+              iconBgColor: card.bgLight,
+            }))}
+            gridMinWidth="160px"
+          />
+        </div>
       )}
 
       {/* Filters */}
