@@ -1,4 +1,5 @@
 import { toast } from "react-toastify";
+import { reportApiErrorFromCatch } from "./sentryLogger";
 import axiosInstance from "./axios";
 import tokenService from "./tokenService";
 import axios from "axios";
@@ -22,6 +23,7 @@ export const DashboardData = async (filters: any = {}) => {
     });
     return response.data?.data;
   } catch (error) {
+    reportApiErrorFromCatch(error, "tickets");
     throw error;
   }
 };
@@ -62,6 +64,7 @@ export const ListTickets = async (params: PaginationParams = {}) => {
   
     return response?.data?.data;
   } catch (error) {
+    reportApiErrorFromCatch(error, "tickets");
     console.error('API Error:', error);
     throw error;
   }
@@ -79,6 +82,7 @@ export const GetAllTickets = async () => {
       }
       
     } catch (error) {
+      reportApiErrorFromCatch(error, "tickets");
       throw error;
     }
   };
@@ -109,6 +113,7 @@ export const UpdateTicket = async (id: string, name: string, color: string) => {
       }
       
     } catch (error) {
+      reportApiErrorFromCatch(error, "tickets");
       throw error;
     }
   };
@@ -200,6 +205,7 @@ export const UpdateTicketDetails = async (
     }
     
   } catch (error) {
+    reportApiErrorFromCatch(error, "tickets");
     throw error;
   }
 };
@@ -230,6 +236,7 @@ export const UpdateTicketDetails = async (
       }
       
     } catch (error) {
+      reportApiErrorFromCatch(error, "tickets");
       throw error;
     }
   };
@@ -277,6 +284,7 @@ export const UpdateTicketDetails = async (
       }
       
     } catch (error: any) {
+      reportApiErrorFromCatch(error, "tickets");
       console.error('Error creating ticket:', error);
       // Log more details about the error
       if (error.response) {
@@ -336,6 +344,7 @@ export const UpdateTicketDetails = async (
       }
       
     } catch (error: any) {
+      reportApiErrorFromCatch(error, "tickets");
       console.error('Error creating user ticket:', error);
       const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to create ticket';
       toast.error(errorMessage);
@@ -355,6 +364,7 @@ export const GetTicket = async (id: string) => {
     }
     
   } catch (error) {
+    reportApiErrorFromCatch(error, "tickets");
     throw error;
   }
 };
@@ -369,6 +379,7 @@ export const GetTicketsByStatus = async (statusId: string) => {
     }
     
   } catch (error) {
+    reportApiErrorFromCatch(error, "tickets");
     throw error;
   }
 };
@@ -399,6 +410,7 @@ export const AddComment = async (ticketId: string, content: string, userExtensio
     }
     
   } catch (error) {
+    reportApiErrorFromCatch(error, "tickets");
     throw error;
   }
 };
@@ -429,6 +441,7 @@ export const AddAssigneeComment = async (ticketId: string, content: string, user
       }
     
   } catch (error) {
+    reportApiErrorFromCatch(error, "tickets");
     throw error;
   }
 };
@@ -443,6 +456,7 @@ export const GetComments = async (ticketId: string) => {
     }
     
   } catch (error) {
+    reportApiErrorFromCatch(error, "tickets");
     throw error;
   }
 };
@@ -457,6 +471,7 @@ export const GetAssigneeComments = async (ticketId: string) => {
     }
     
   } catch (error) {
+    reportApiErrorFromCatch(error, "tickets");
     throw error;
   }
 };
@@ -474,6 +489,7 @@ export const loadImage = async (image: string) => {
       toast.error('Failed to load image');
     }
   } catch (error) {
+    reportApiErrorFromCatch(error, "tickets");
     throw error;
   }
 };

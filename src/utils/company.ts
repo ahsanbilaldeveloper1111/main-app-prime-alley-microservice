@@ -1,4 +1,5 @@
 import axiosInstance from '@utils/axios';
+import { reportApiErrorFromCatch } from './sentryLogger';
 
 const PREFIX = '/users/companies';
 
@@ -13,7 +14,8 @@ export async function getCurrentUserCompanyImage(): Promise<Blob | null> {
     });
     console.log('data', data);
     return data;
-  } catch {
+  } catch (error) {
+    reportApiErrorFromCatch(error, 'company');
     return null;
   }
 }

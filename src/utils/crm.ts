@@ -1,4 +1,5 @@
 import { toast } from "react-toastify";
+import { reportApiError } from "./sentryLogger";
 import axiosInstance from "./axios";
 import { ModuleSlug } from "./Helper";
 
@@ -188,9 +189,13 @@ function extractData<T>(response: any): T {
 
   console.error("Failed to extract data from response:", response);
 
-  throw new Error(
-    response?.data?.message || response?.message || "API request failed"
-  );
+  const errorMessage = response?.data?.message || response?.message || "API request failed";
+  reportApiError("crm", errorMessage, {
+    apiResponse: response,
+    responseCode: response?.code,
+    responseDataSuccess: response?.data?.success,
+  });
+  throw new Error(errorMessage);
 }
 
 // CRM Dashboard - construct from available APIs
