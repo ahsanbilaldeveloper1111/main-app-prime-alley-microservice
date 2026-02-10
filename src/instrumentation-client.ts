@@ -5,13 +5,9 @@
 import * as Sentry from "@sentry/nextjs";
 
 Sentry.init({
-  dsn: "http://1ac2e06e89bdd4144a6946332d1bede4@sentry.primealley.com:7800/3",
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-  environment:
-    (typeof window !== "undefined" && (window as unknown as { __SENTRY_ENVIRONMENT__?: string }).__SENTRY_ENVIRONMENT__) ||
-    process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ||
-    process.env.SENTRY_ENV ||
-    process.env.NODE_ENV,
+  environment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT || process.env.SENTRY_ENVIRONMENT || process.env.SENTRY_ENV || process.env.NODE_ENV,
 
   // Add optional integrations for additional features
   integrations: [Sentry.replayIntegration()],

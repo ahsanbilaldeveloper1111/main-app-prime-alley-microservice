@@ -1,4 +1,5 @@
 import { toast } from "react-toastify";
+import { reportApiError } from "./sentryLogger";
 import axiosInstance from "./axios";
 
 // NetOps API Response Types
@@ -173,9 +174,13 @@ function extractData<T>(response: NetOpsApiResponse<T>): T {
 
   console.error("Failed to extract data from response:", response);
 
-  throw new Error(
-    response?.message || "API request failed"
-  );
+  const errorMessage = response?.message || "API request failed";
+  reportApiError("netops", errorMessage, {
+    apiResponse: response,
+    responseCode: response?.code,
+    responseDataSuccess: response?.data?.success,
+  });
+  throw new Error(errorMessage);
 }
 
 // Device Management APIs

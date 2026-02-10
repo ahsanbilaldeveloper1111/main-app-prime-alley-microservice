@@ -1,4 +1,5 @@
 import { toast } from "react-toastify";
+import { reportApiError } from "./sentryLogger";
 import axiosInstance from "./axios";
 
 interface PaginationParams {
@@ -22,6 +23,7 @@ const handleAPIResponse = (
   showSuccessToast: boolean = false
 ): any => {
   if (!response?.data) {
+    reportApiError('faqs', defaultErrorMessage, { apiResponse: response?.data });
     toast.error(defaultErrorMessage);
     return null;
   }
@@ -31,12 +33,14 @@ const handleAPIResponse = (
   // Check if code is 200
   if (code !== 200) {
     const errorMessage = message || data?.message || defaultErrorMessage;
+    reportApiError('faqs', errorMessage, { apiResponse: response.data, responseCode: code });
     toast.error(errorMessage);
     return null;
   }
 
   // Check if data exists
   if (!data) {
+    reportApiError('faqs', defaultErrorMessage, { apiResponse: response.data });
     toast.error(defaultErrorMessage);
     return null;
   }
@@ -52,6 +56,7 @@ const handleAPIResponse = (
     } else {
       // Success is false
       const errorMessage = data.message || message || defaultErrorMessage;
+      reportApiError('faqs', errorMessage, { apiResponse: response.data });
       toast.error(errorMessage);
       return null;
     }
@@ -64,6 +69,7 @@ const handleAPIResponse = (
   }
 
   // Fallback: no data found
+  reportApiError('faqs', defaultErrorMessage, { apiResponse: response?.data });
   toast.error(defaultErrorMessage);
   return null;
 };
