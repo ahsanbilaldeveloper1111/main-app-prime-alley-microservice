@@ -16,10 +16,10 @@ import {
 import { toast } from "react-toastify";
 import { Button, Spinner } from "react-bootstrap";
 import moment from "moment";
-import { GlobalDateTimeFormat, ModuleSlug } from "@utils/Helper";
-import { useHierarchyData } from "@components/filters/useHierarchyData";
+import { GlobalDateTimeFormat } from "@utils/Helper";
+import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { useSession } from "next-auth/react";
-import { Calendar, ChevronLeft, ChevronRight, Clock, LogIn, LogOut, Trash2, User } from "lucide-react";
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, Clock, LogIn, LogOut, Trash2, User } from "lucide-react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -28,35 +28,21 @@ const ITEMS_PER_PAGE = 15;
 
 const Attendences = () => {
   const { data: session } = useSession();
-  const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+  const { mainAppUsers } = useMainAppLookups();
 
-  /** Resolve display name from extensions by user_id (or extension_number / id) */
   const getDisplayName = useCallback(
     (userId: string | number | null | undefined): string => {
       if (userId == null || userId === "") return "—";
       const idStr = String(userId);
-      if (!hierarchyDataExtensions || !Array.isArray(hierarchyDataExtensions)) {
-        return idStr;
-      }
-      const ext = (
-        hierarchyDataExtensions as {
-          id?: string | number;
-          extension_number?: string;
-          name?: string;
-          user?: { name?: string };
-          user_id?: string;
-        }[]
-      ).find(
-        (e) =>
-          String(e.user_id ?? e.extension_number ?? e.id ?? "") === idStr
-      );
-      if (ext) {
-        return String(ext.user?.name ?? ext.name ?? ext.extension_number ?? ext.user_id ?? idStr);
-      }
-      return idStr;
+      const u = mainAppUsers?.find((x) => String(x.id) === idStr);
+      return u?.name ?? idStr;
     },
-    [hierarchyDataExtensions]
+    [mainAppUsers]
   );
+
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [userSearchTerm, setUserSearchTerm] = useState("");
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,10 +65,12 @@ const Attendences = () => {
   const loadAttendance = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const { data, pagination: p } = await getAttendance({
+      const params: { page: number; limit: number; user_id?: string } = {
         page,
         limit: ITEMS_PER_PAGE,
-      });
+      };
+      if (selectedUserId != null && selectedUserId.trim()) params.user_id = selectedUserId.trim();
+      const { data, pagination: p } = await getAttendance(params);
       setRecords(data ?? []);
       if (p) {
         setPagination({
@@ -100,7 +88,7 @@ const Attendences = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedUserId]);
 
   const loadStatus = useCallback(async () => {
     setStatusLoading(true);
@@ -119,13 +107,18 @@ const Attendences = () => {
   }, [currentPage, loadAttendance]);
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedUserId]);
+
+  useEffect(() => {
     loadStatus();
   }, [loadStatus]);
 
   const handleCheckIn = async () => {
     setCheckInOutLoading(true);
     try {
-      await attendanceCheckIn({});
+      const payload = selectedUserId != null && selectedUserId.trim() ? { user_id: selectedUserId.trim() } : {};
+      await attendanceCheckIn(payload);
       toast.success("Checked in successfully");
       await loadStatus();
       await loadAttendance(currentPage);
@@ -137,7 +130,8 @@ const Attendences = () => {
   const handleCheckOut = async () => {
     setCheckInOutLoading(true);
     try {
-      await attendanceCheckOut({});
+      const payload = selectedUserId != null && selectedUserId.trim() ? { user_id: selectedUserId.trim() } : {};
+      await attendanceCheckOut(payload);
       toast.success("Checked out successfully");
       await loadStatus();
       await loadAttendance(currentPage);
@@ -273,6 +267,129 @@ const Attendences = () => {
 
         </div>
       </div>
+
+      {/* User filter dropdown */}
+      <div style={{ marginBottom: "16px" }}>
+        <div style={{ position: "relative", display: "inline-block" }}>
+          <button
+            type="button"
+            onClick={() => setShowUserDropdown(!showUserDropdown)}
+            style={{
+              padding: "10px 16px",
+              border: "1px solid #e5e7eb",
+              borderRadius: "8px",
+              backgroundColor: "white",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              cursor: "pointer",
+              fontSize: "14px",
+              minWidth: "180px",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <User size={16} />
+              <span>
+                {selectedUserId != null
+                  ? (mainAppUsers?.find((u) => String(u.id) === selectedUserId)?.name ?? selectedUserId)
+                  : "All Users"}
+              </span>
+            </div>
+            <ChevronDown size={16} />
+          </button>
+          {showUserDropdown && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                marginTop: "4px",
+                backgroundColor: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: "8px",
+                boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+                zIndex: 10,
+                minWidth: "220px",
+                maxHeight: "280px",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <div style={{ padding: "8px", borderBottom: "1px solid #e5e7eb" }}>
+                <input
+                  type="text"
+                  placeholder="Search user..."
+                  value={userSearchTerm}
+                  onChange={(e) => setUserSearchTerm(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "6px",
+                    fontSize: "14px",
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+              <div style={{ maxHeight: "220px", overflowY: "auto" }}>
+                <div
+                  onClick={() => {
+                    setSelectedUserId(null);
+                    setShowUserDropdown(false);
+                    setUserSearchTerm("");
+                  }}
+                  style={{
+                    padding: "10px 16px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: "500",
+                    color: "#6366f1",
+                    backgroundColor: selectedUserId === null ? "#f3f4f6" : "white",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = selectedUserId === null ? "#f3f4f6" : "white")}
+                >
+                  All Users
+                </div>
+                {(mainAppUsers ?? [])
+                  .filter((u) => !userSearchTerm.trim() || (u.name?.toLowerCase().includes(userSearchTerm.trim().toLowerCase()) ?? false))
+                  .map((u) => {
+                    const uid = String(u.id);
+                    const isSelected = selectedUserId != null && uid === selectedUserId;
+                    return (
+                      <div
+                        key={u.id}
+                        onClick={() => {
+                          setSelectedUserId(uid);
+                          setShowUserDropdown(false);
+                          setUserSearchTerm("");
+                        }}
+                        style={{
+                          padding: "10px 16px",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          backgroundColor: isSelected ? "#f3f4f6" : "white",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isSelected ? "#f3f4f6" : "white")}
+                      >
+                        {u.name}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+
+      
 
       {/* Table header */}
       <div

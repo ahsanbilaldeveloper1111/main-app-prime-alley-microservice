@@ -166,6 +166,13 @@ export interface UserProfile extends UserProfilePayload {
   [key: string]: unknown;
 }
 
+export interface UserProfileMinified {
+  id: number;
+  user_id: string;
+  parent_id: string | null;
+  department_id: string;
+}
+
 export const getUserProfiles = async (params?: {
   page?: number;
   limit?: number;
@@ -179,6 +186,18 @@ export const getUserProfiles = async (params?: {
     return extractDataWithPagination(response);
   } catch (error: unknown) {
     handleApiError(error, "Failed to fetch user profiles");
+  }
+};
+
+export const getUserProfilesMinified = async (): Promise<UserProfileMinified[]> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<UserProfileMinified[]>>(
+      `${PREFIX}/user-profiles?minified_data=true`
+    );
+    const raw = extractData(response);
+    return Array.isArray(raw) ? raw : [];
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch user profiles minified");
   }
 };
 
@@ -241,10 +260,17 @@ export const getUserProfilesOrgChart = async (): Promise<unknown> => {
   }
 };
 
-export const getUserProfilesOrgChartTree = async (): Promise<unknown> => {
+export const getUserProfilesOrgChartTree = async (params?: {
+  department_id?: string;
+  user_ids?: string[];
+}): Promise<unknown> => {
   try {
+    const requestParams: Record<string, string | string[] | undefined> = {};
+    if (params?.department_id != null && params.department_id !== "") requestParams.department_id = params.department_id;
+    if (params?.user_ids != null && params.user_ids.length > 0) requestParams.user_ids = params.user_ids;
     const response = await axiosInstance.get<ApiResponse<unknown>>(
-      `${PREFIX}/user-profiles/org-chart-tree`
+      `${PREFIX}/user-profiles/org-chart-tree`,
+      { params: Object.keys(requestParams).length ? requestParams : undefined }
     );
     return extractData(response);
   } catch (error: unknown) {
@@ -534,7 +560,7 @@ export interface UserRequest {
 }
 
 export interface UserRequestCreatePayload {
-  tenant_id: string;
+  tenant_id?: string | null;
   user_request_category_id: number;
   user_id?: string;
   subject: string;
@@ -597,7 +623,8 @@ function buildUserRequestFormData(
   }
 ): FormData {
   const form = new FormData();
-  form.append("tenant_id", payload.tenant_id);
+  if (payload.tenant_id != null && payload.tenant_id !== "")
+    form.append("tenant_id", payload.tenant_id);
   form.append("user_request_category_id", String(payload.user_request_category_id));
   if (payload.user_id) form.append("user_id", payload.user_id);
   form.append("subject", payload.subject);
@@ -985,6 +1012,20 @@ export const getEmployeeDashboardGraphAttendanceTrend = async (
   }
 };
 
+export const getEmployeeDashboardLeaveCalendar = async (
+  params?: EmployeeDashboardParams
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<unknown>>(
+      `${PREFIX}/analytics/employee-dashboard/leave-calendar`,
+      { params: params ?? {} }
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch leave calendar");
+  }
+};
+
 // --- Journeys ---
 
 export const getJourneys = async (params?: {
@@ -1177,4 +1218,6 @@ export const deleteCompanyImage = async (companyId: string): Promise<void> => {
     handleApiError(error, "Failed to delete company image");
   }
 };
+
+
 

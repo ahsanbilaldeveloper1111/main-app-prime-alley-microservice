@@ -12,8 +12,10 @@ import PageHeader from "@components/PageHeader";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { getUserProfilesOrgChart, getUserProfilesOrgChartTree } from "@utils/staffManagement";
+import { getUserProfilesOrgChartTree } from "@utils/staffManagement";
+import { useSession } from "next-auth/react";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
+import { useUserProfilesMinified } from "@hooks/useUserProfilesMinified";
 import { 
   Search, 
   ChevronDown, 
@@ -32,6 +34,7 @@ import {
 } from 'lucide-react';
 import styled from 'styled-components';
 import OrgEmployeeSidebar from './sidebar';
+import router from "next/router";
 
 // Dynamically import react-organizational-chart to avoid SSR issues
 const Tree = dynamic(
@@ -97,11 +100,14 @@ const Tree = dynamic(
   `;
 
 const OrganizationalChart = () => {
+    const { data: session } = useSession();
     const { mainAppDepartments, mainAppUsers } = useMainAppLookups();
     const [activeTab, setActiveTab] = useState<'All Department' | 'Org Chart' | 'My Team'>('Org Chart');
     const [searchTerm, setSearchTerm] = useState('');
     const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
     const [selectedDepartment, setSelectedDepartment] = useState('All Department');
+    const [selectedUserId, setSelectedUserId] = useState<string>('');
+    const [showUserDropdown, setShowUserDropdown] = useState(false);
     const [zoomLevel, setZoomLevel] = useState(100);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showAddDialog, setShowAddDialog] = useState(false);
@@ -117,10 +123,16 @@ const OrganizationalChart = () => {
     const [orgChartTreeRaw, setOrgChartTreeRaw] = useState<ApiOrgChartNode[] | null>(null);
     const [loadingOrgChart, setLoadingOrgChart] = useState(true);
 
-    const refetchOrgChart = useCallback(async () => {
+
+    const { userProfilesMinified } = useUserProfilesMinified();
+
+    const refetchOrgChart = useCallback(async (departmentId?: string, userIds?: string[]) => {
       setLoadingOrgChart(true);
       try {
-        const raw = await getUserProfilesOrgChartTree();
+        const params: { department_id?: string; user_ids?: string[] } = {};
+        if (departmentId != null && departmentId !== '') params.department_id = departmentId;
+        if (userIds != null && userIds.length > 0) params.user_ids = userIds;
+        const raw = await getUserProfilesOrgChartTree(Object.keys(params).length ? params : undefined);
         const list: ApiOrgChartNode[] =
           Array.isArray(raw)
             ? (raw as ApiOrgChartNode[])
@@ -135,6 +147,30 @@ const OrganizationalChart = () => {
         setLoadingOrgChart(false);
       }
     }, []);
+
+    const handleDepartmentChange = useCallback(
+      (dept: string, selectedUserId?: string) => {
+        const departmentId =
+          dept === 'All Department' || !dept
+            ? undefined
+            : mainAppDepartments?.find((d) => d.name === dept)?.id;
+        const userIds = selectedUserId ? [selectedUserId] : undefined;
+        refetchOrgChart(departmentId != null ? String(departmentId) : undefined, userIds);
+      },
+      [mainAppDepartments, refetchOrgChart]
+    );
+
+    const handleUserChange = useCallback(
+      (userId: string, selectedDept: string) => {
+        const departmentId =
+          selectedDept === 'All Department' || !selectedDept
+            ? undefined
+            : mainAppDepartments?.find((d) => d.name === selectedDept)?.id;
+        const userIds = userId ? [userId] : undefined;
+        refetchOrgChart(departmentId != null ? String(departmentId) : undefined, userIds);
+      },
+      [mainAppDepartments, refetchOrgChart]
+    );
 
     useEffect(() => {
       refetchOrgChart();
@@ -178,12 +214,13 @@ const OrganizationalChart = () => {
         };
       };
       const roots = orgChartTreeRaw.map(apiNodeToEmployee);
+      const companyName = (session?.user as { company_name?: string } | undefined)?.company_name ?? 'Organization';
       const built: Employee =
         roots.length === 1
           ? roots[0]
           : {
               id: 'root',
-              name: 'Organization',
+              name: companyName,
               title: '',
               department: '',
               avatar: '',
@@ -191,7 +228,7 @@ const OrganizationalChart = () => {
               children: roots,
             };
       setOrgData(built);
-    }, [orgChartTreeRaw, mainAppUsers, mainAppDepartments]);
+    }, [orgChartTreeRaw, mainAppUsers, mainAppDepartments, session?.user]);
 
     const rawProfileById = useMemo(() => {
       const map: Record<string, ApiOrgChartNode> = {};
@@ -222,10 +259,10 @@ const OrganizationalChart = () => {
   
     // Render org chart node
     const renderNode = (employee: Employee) => {
+      const isRoot = employee.id === 'root';
       return (
         <div
-          onClick={() => {
-            console.log('Clicked:', employee.name);
+          onClick={isRoot ? undefined : () => {
             setSelectedEmployee(employee);
             setShowEmployeeSidebar(true);
           }}
@@ -239,13 +276,13 @@ const OrganizationalChart = () => {
             minWidth: '200px',
             textAlign: 'center',
             transition: 'all 0.3s ease',
-            cursor: 'pointer'
+            cursor: isRoot ? 'default' : 'pointer',
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={isRoot ? undefined : (e) => {
             e.currentTarget.style.transform = 'translateY(-4px)';
             e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={isRoot ? undefined : (e) => {
             e.currentTarget.style.transform = 'translateY(0)';
             e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
           }}
@@ -326,6 +363,27 @@ const OrganizationalChart = () => {
               ● Active
             </span>
           )}
+          {(() => {
+            if (employee.id === 'root') return null;
+            const rawNode = rawProfileById[employee.id];
+            const attendance = rawNode?.attendance as { status?: string; check_in_at?: string | null; check_out_at?: string | null } | undefined;
+            const attStatus = attendance?.status;
+            const label =
+              !attStatus || attStatus === 'none'
+                ? 'No Attendance'
+                : attStatus === 'checked_in'
+                  ? 'Checked in'
+                  : attStatus === 'checked_out'
+                    ? 'Checked out'
+                    : attStatus.replace(/_/g, ' ');
+            const time = attStatus === 'checked_out' ? attendance?.check_out_at : attendance?.check_in_at;
+            const timeStr = time ? new Date(time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+            return (
+              <div style={{ marginTop: '8px', fontSize: '11px', color: '#6b7280' }}>
+                {label}{timeStr ? ` · ${timeStr}` : ''}
+              </div>
+            );
+          })()}
         </div>
       );
     };
@@ -498,6 +556,7 @@ const OrganizationalChart = () => {
                       onClick={() => {
                         setSelectedDepartment(dept);
                         setShowDepartmentDropdown(false);
+                        handleDepartmentChange(dept, selectedUserId || undefined);
                       }}
                       style={{
                         padding: '10px 16px',
@@ -511,6 +570,87 @@ const OrganizationalChart = () => {
                       {dept}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                style={{
+                  padding: '10px 16px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  backgroundColor: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                }}
+              >
+                {selectedUserId ? (mainAppUsers?.find((u) => String(u.id) === selectedUserId)?.name ?? selectedUserId) : 'All Users'}
+                <ChevronDown size={16} />
+              </button>
+              {showUserDropdown && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '4px',
+                    backgroundColor: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                    zIndex: 10,
+                    minWidth: '200px',
+                    maxHeight: '280px',
+                    overflowY: 'auto',
+                  }}
+                >
+                  <div
+                    onClick={() => {
+                      setSelectedUserId('');
+                      setShowUserDropdown(false);
+                      handleUserChange('', selectedDepartment);
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      backgroundColor: !selectedUserId ? '#f3f4f6' : 'white',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedUserId ? '#f3f4f6' : 'white'}
+                  >
+                    All Users
+                  </div>
+                  {(mainAppUsers ?? []).map((u) => {
+                    const uid = String(u.id);
+                    const isSelected = selectedUserId === uid;
+                    return (
+                      <div
+                        key={u.id}
+                        onClick={() => {
+                          setSelectedUserId(uid);
+                          setShowUserDropdown(false);
+                          handleUserChange(uid, selectedDepartment);
+                        }}
+                        style={{
+                          padding: '10px 16px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          backgroundColor: isSelected ? '#f3f4f6' : 'white',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#f3f4f6' : 'white'}
+                      >
+                        {u.name}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -549,7 +689,7 @@ const OrganizationalChart = () => {
           </div>
 
           <div style={{ position: 'relative', minWidth: '300px' }}>
-            <Search 
+            {/* <Search 
               size={18} 
               style={{ 
                 position: 'absolute', 
@@ -573,7 +713,7 @@ const OrganizationalChart = () => {
                 outline: 'none',
                 backgroundColor: 'white'
               }}
-            />
+            /> */}
             {/* <ChevronDown 
               size={18} 
               style={{ 
@@ -588,7 +728,7 @@ const OrganizationalChart = () => {
         </div>
 
         {/* Alert Banner */}
-        <div style={{
+        {/* <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -643,7 +783,7 @@ const OrganizationalChart = () => {
             View Details
             <ChevronRight size={14} />
           </button>
-        </div>
+        </div> */}
 
         {activeTab === 'Org Chart' && (
           <>
@@ -738,7 +878,7 @@ const OrganizationalChart = () => {
                   {isFullscreen ? 'Exit' : 'Fullscreen'}
                 </button>
                 <button
-                  onClick={handleAddEmployee}
+                  onClick={() => router.push('/staff-management/employees')}
                   style={{
                     padding: '8px 16px',
                     border: 'none',
@@ -758,7 +898,7 @@ const OrganizationalChart = () => {
                   title="Add New Employee"
                 >
                   <Plus size={16} />
-                  Add Employee
+                  View Employee
                 </button>
               </div>
             </div>
@@ -827,10 +967,10 @@ const OrganizationalChart = () => {
                   <span style={{ fontSize: '14px', fontWeight: '500', color: '#1f2937' }}>{myTeam.filter((m) => m.status === 'On Leave').length}</span>
                   <span style={{ fontSize: '14px', color: '#6b7280' }}>On Leave Today</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {/* <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ fontSize: '14px', fontWeight: '500', color: '#1f2937' }}>0</span>
                   <span style={{ fontSize: '14px', color: '#6b7280' }}>Pending Approvals</span>
-                </div>
+                </div> */}
               </div>
             </div>
 
@@ -919,222 +1059,7 @@ const OrganizationalChart = () => {
         )}
       </div>
 
-      {/* Add Employee Modal */}
-      {showAddDialog && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-          onClick={() => setShowAddDialog(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              padding: '32px',
-              maxWidth: '500px',
-              width: '90%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            }}
-          >
-            <div style={{ marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: '600', color: '#1f2937', margin: '0 0 8px 0' }}>
-                Add New Employee
-              </h2>
-              <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
-                Fill in the details to add a new employee to the organizational chart
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Employee Name */}
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
-                  Employee Name <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newEmployee.name}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })}
-                  placeholder="Enter employee name"
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#8b5cf6'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
-                />
-              </div>
-
-              {/* Job Title */}
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
-                  Job Title <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newEmployee.title}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, title: e.target.value })}
-                  placeholder="Enter job title"
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#8b5cf6'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
-                />
-              </div>
-
-              {/* Department */}
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
-                  Department <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <select
-                  value={newEmployee.department}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, department: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    backgroundColor: 'white',
-                    cursor: 'pointer'
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#8b5cf6'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
-                >
-                  <option value="">Select a department</option>
-                  {departments.filter(d => d !== 'All Department').map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Reports To (Parent) */}
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
-                  Reports To <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <select
-                  value={newEmployee.parentId}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, parentId: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    backgroundColor: 'white',
-                    cursor: 'pointer'
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#8b5cf6'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
-                >
-                  <option value="">Select reporting manager</option>
-                  {(orgData ? getAllEmployees(orgData) : []).map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.name} - {emp.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
-                  Status
-                </label>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      value="Active"
-                      checked={newEmployee.status === 'Active'}
-                      onChange={(e) => setNewEmployee({ ...newEmployee, status: 'Active' })}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span style={{ fontSize: '14px', color: '#374151' }}>Active</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      value="On Leave"
-                      checked={newEmployee.status === 'On Leave'}
-                      onChange={(e) => setNewEmployee({ ...newEmployee, status: 'On Leave' })}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span style={{ fontSize: '14px', color: '#374151' }}>On Leave</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setShowAddDialog(false)}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: 'white',
-                  color: '#6b7280',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitEmployee}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#8b5cf6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#7c3aed'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#8b5cf6'}
-              >
-                Add Employee
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+     
 
       {/* Employee Detail Sidebar */}
       {showEmployeeSidebar && selectedEmployee && (
@@ -1168,6 +1093,7 @@ const OrganizationalChart = () => {
               rawProfile={selectedEmployee ? rawProfileById[selectedEmployee.id] : undefined}
               users={mainAppUsers}
               onRefresh={refetchOrgChart}
+              userProfilesMinified={userProfilesMinified}
               onClose={() => {
                 setShowEmployeeSidebar(false);
                 setSelectedEmployee(null);
