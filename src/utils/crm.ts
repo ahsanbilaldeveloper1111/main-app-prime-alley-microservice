@@ -3330,8 +3330,8 @@ export const downloadExampleCsv = (): void => {
   
   // Example data with E.164 format phone numbers
   const exampleData = [
-    ['John Doe', '+1234567890', 'john.doe@example.com', 'Sample Value 1', 'Sample Value 2'],
-    ['Jane Smith', '+1987654321', 'jane.smith@example.com', 'Another Value', 'Different Value']
+    ['John Doe', '+971 50 1234567', 'john.doe@example.com', 'Sample Value 1', 'Sample Value 2'],
+    ['Jane Smith', '+971 50 7654321', 'jane.smith@example.com', 'Another Value', 'Different Value']
   ];
   
   // Create CSV content
