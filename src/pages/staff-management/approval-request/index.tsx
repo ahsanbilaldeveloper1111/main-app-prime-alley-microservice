@@ -10,7 +10,6 @@ import {
   getUserRequestCategories,
   getUserRequestCategoryFields,
   getUserRequests,
-  createUserRequest,
   updateUserRequest,
   deleteUserRequest,
   downloadUserRequestAttachment,
@@ -41,6 +40,7 @@ import {
 } from "lucide-react";
 import ApprovalDetailSidebar from "./sidebar";
 import DeleteConfirmationModal from "../../partial/DeleteConfirmationModal";
+import NewRequestModal from "@pages/staff-management/NewRequestModal";
 
 const TAB_TO_STATUS: Record<string, string> = {
   Pending: "pending",
@@ -125,22 +125,6 @@ const ApprovalRequest = () => {
   } | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createForm, setCreateForm] = useState<{
-    user_request_category_id: number | "";
-    subject: string;
-    reason: string;
-    dynamic_fields: Record<string, unknown>;
-    dynamic_files: Record<string, File | null>;
-    attachments: File[];
-  }>({
-    user_request_category_id: "",
-    subject: "",
-    reason: "",
-    dynamic_fields: {},
-    dynamic_files: {},
-    attachments: [],
-  });
-  const [createSubmitting, setCreateSubmitting] = useState(false);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [requestToDelete, setRequestToDelete] = useState<UserRequest | null>(null);
@@ -254,14 +238,6 @@ const ApprovalRequest = () => {
   );
 
   const openCreateModal = useCallback(() => {
-    setCreateForm({
-      user_request_category_id: "",
-      subject: "",
-      reason: "",
-      dynamic_fields: {},
-      dynamic_files: {},
-      attachments: [],
-    });
     setShowCreateModal(true);
   }, []);
 
@@ -314,40 +290,6 @@ const ApprovalRequest = () => {
       }
     },
     [editingRequest, editForm, refreshRequests]
-  );
-
-  const handleCreateSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      const categoryId = createForm.user_request_category_id;
-      if (categoryId === "" || !createForm.subject.trim()) {
-        toast.error("Category and subject are required");
-        return;
-      }
-      setCreateSubmitting(true);
-      try {
-        const dynamic_files: Record<string, File> = {};
-        Object.entries(createForm.dynamic_files).forEach(([key, file]) => {
-          if (file) dynamic_files[key] = file;
-        });
-        await createUserRequest({
-          user_request_category_id: Number(categoryId),
-          subject: createForm.subject.trim(),
-          reason: createForm.reason.trim() || null,
-          dynamic_fields: Object.keys(createForm.dynamic_fields).length > 0 ? createForm.dynamic_fields : undefined,
-          ...(Object.keys(dynamic_files).length > 0 ? { dynamic_files } : {}),
-          ...(createForm.attachments.length > 0 ? { files: createForm.attachments } : {}),
-        });
-        toast.success("Request created");
-        setShowCreateModal(false);
-        refreshRequests();
-      } catch {
-        // toast handled in API
-      } finally {
-        setCreateSubmitting(false);
-      }
-    },
-    [createForm, categories, refreshRequests]
   );
 
   const typeOptionsFromCategories = useMemo(() => categories.map((c) => c.name ?? c.code ?? String(c.id)), [categories]);
@@ -1128,225 +1070,13 @@ const ApprovalRequest = () => {
         </div>
       </div>
 
-      {/* Create Request Modal */}
-      <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>New Request</Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleCreateSubmit}>
-          <Modal.Body>
-            <Form.Group className="mb-3">
-              <Form.Label>Category *</Form.Label>
-              <Form.Select
-                value={createForm.user_request_category_id === "" ? "" : String(createForm.user_request_category_id)}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setCreateForm((f) => ({
-                    ...f,
-                    user_request_category_id: val === "" ? "" : Number(val),
-                    dynamic_fields: {},
-                    dynamic_files: {},
-                  }));
-                }}
-                required
-              >
-                <option value="">Select category</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name ?? c.code ?? `Category ${c.id}`}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Subject *</Form.Label>
-              <Form.Control
-                type="text"
-                value={createForm.subject}
-                onChange={(e) => setCreateForm((f) => ({ ...f, subject: e.target.value }))}
-                placeholder="Request subject"
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Reason</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                value={createForm.reason}
-                onChange={(e) => setCreateForm((f) => ({ ...f, reason: e.target.value }))}
-                placeholder="Optional reason or description"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Attachments</Form.Label>
-              <Form.Control
-                type="file"
-                multiple
-                onChange={(e) => {
-                  const files = (e.target as HTMLInputElement).files;
-                  setCreateForm((f) => ({
-                    ...f,
-                    attachments: files ? Array.from(files) : [],
-                  }));
-                }}
-              />
-              {createForm.attachments.length > 0 && (
-                <Form.Text className="d-block mt-1 text-muted">
-                  {createForm.attachments.length} file(s) selected: {createForm.attachments.map((f) => f.name).join(", ")}
-                </Form.Text>
-              )}
-            </Form.Group>
-            {createForm.user_request_category_id !== "" &&
-              (categoryFields[Number(createForm.user_request_category_id)] ?? []).length > 0 && (
-              <Form.Group className="mb-3">
-                <Form.Label>Additional fields</Form.Label>
-                <div className="border rounded p-3 bg-light">
-                  {(categoryFields[Number(createForm.user_request_category_id)] ?? []).map((field) => (
-                    <div key={field.id} className="mb-2">
-                      <Form.Label className="small mb-1">
-                        {field.label ?? field.key}
-                        {field.required && " *"}
-                      </Form.Label>
-                      {field.type === "textarea" ? (
-                        <Form.Control
-                          as="textarea"
-                          rows={2}
-                          value={(createForm.dynamic_fields[field.key ?? ""] as string) ?? ""}
-                          onChange={(e) =>
-                            setCreateForm((f) => ({
-                              ...f,
-                              dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: e.target.value },
-                            }))
-                          }
-                          placeholder={field.config?.placeholder ?? undefined}
-                        />
-                      ) : (field.type === "file" || (field as { type: string }).type === "attachment") ? (
-                        <Form.Control
-                          type="file"
-                          onChange={(e) => {
-                            const file = (e.target as HTMLInputElement).files?.[0] ?? null;
-                            setCreateForm((f) => ({
-                              ...f,
-                              dynamic_files: { ...f.dynamic_files, [field.key ?? ""]: file },
-                            }));
-                          }}
-                        />
-                      ) : field.type === "select" ? (
-                        <Form.Select
-                          value={(createForm.dynamic_fields[field.key ?? ""] as string) ?? ""}
-                          onChange={(e) =>
-                            setCreateForm((f) => ({
-                              ...f,
-                              dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: e.target.value },
-                            }))
-                          }
-                        >
-                          <option value="">Select...</option>
-                          {(field.options ?? []).map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </Form.Select>
-                      ) : field.type === "multiselect" ? (
-                        <Form.Select
-                          multiple
-                          value={
-                            Array.isArray(createForm.dynamic_fields[field.key ?? ""])
-                              ? (createForm.dynamic_fields[field.key ?? ""] as string[])
-                              : typeof createForm.dynamic_fields[field.key ?? ""] === "string"
-                                ? (createForm.dynamic_fields[field.key ?? ""] as string).split(",").filter(Boolean)
-                                : []
-                          }
-                          onChange={(e) => {
-                            const selected = Array.from((e.target as HTMLSelectElement).selectedOptions, (o) => o.value);
-                            setCreateForm((f) => ({
-                              ...f,
-                              dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: selected },
-                            }));
-                          }}
-                        >
-                          {(field.options ?? []).map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </Form.Select>
-                      ) : field.type === "radio" ? (
-                        <div className="d-flex flex-wrap gap-2">
-                          {(field.options ?? []).map((opt) => (
-                            <Form.Check
-                              key={opt.value}
-                              type="radio"
-                              id={`${field.key}-${opt.value}`}
-                              name={field.key ?? ""}
-                              label={opt.label}
-                              value={opt.value}
-                              checked={(createForm.dynamic_fields[field.key ?? ""] as string) === opt.value}
-                              onChange={() =>
-                                setCreateForm((f) => ({
-                                  ...f,
-                                  dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: opt.value },
-                                }))
-                              }
-                            />
-                          ))}
-                        </div>
-                      ) : field.type === "checkbox" ? (
-                        <div className="d-flex flex-wrap gap-2">
-                          {(field.options ?? []).map((opt) => {
-                            const arr = (Array.isArray(createForm.dynamic_fields[field.key ?? ""])
-                              ? (createForm.dynamic_fields[field.key ?? ""] as string[])
-                              : []) as string[];
-                            const checked = arr.includes(opt.value);
-                            return (
-                              <Form.Check
-                                key={opt.value}
-                                type="checkbox"
-                                id={`${field.key}-${opt.value}`}
-                                label={opt.label}
-                                checked={checked}
-                                onChange={() => {
-                                  const next = checked ? arr.filter((v) => v !== opt.value) : [...arr, opt.value];
-                                  setCreateForm((f) => ({
-                                    ...f,
-                                    dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: next },
-                                  }));
-                                }}
-                              />
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <Form.Control
-                          type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
-                          value={(createForm.dynamic_fields[field.key ?? ""] as string) ?? ""}
-                          onChange={(e) =>
-                            setCreateForm((f) => ({
-                              ...f,
-                              dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: e.target.value },
-                            }))
-                          }
-                          placeholder={field.config?.placeholder ?? undefined}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </Form.Group>
-            )}
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowCreateModal(false)} type="button">
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" disabled={createSubmitting}>
-              {createSubmitting ? "Creating…" : "Create Request"}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
+      <NewRequestModal
+        show={showCreateModal}
+        onHide={() => setShowCreateModal(false)}
+        onSuccess={refreshRequests}
+        title="New Request"
+        submitLabel="Create Request"
+      />
 
       {/* Edit Request Modal */}
       <Modal show={showEditModal} onHide={() => { setShowEditModal(false); setEditingRequest(null); }} centered>

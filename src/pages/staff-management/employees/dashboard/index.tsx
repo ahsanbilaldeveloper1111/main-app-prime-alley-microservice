@@ -19,6 +19,8 @@ import {
 } from "@utils/staffManagement";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import DashboardStats from "./partials/DashboardStats";
+import AddEmployeeModal from "@pages/staff-management/AddEmployeeModal";
+import NewRequestModal from "@pages/staff-management/NewRequestModal";
 
 import { useState, useEffect, useCallback } from "react";
 import { 
@@ -64,7 +66,9 @@ export interface LeaveCalendarDay {
 }
 
 const EmployeesDashboard = () => {
-    const { mainAppUsers } = useMainAppLookups();
+    const { mainAppUsers, companyIdentifier } = useMainAppLookups();
+    const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+    const [showNewRequestModal, setShowNewRequestModal] = useState(false);
 
     const getDisplayName = useCallback(
       (userId: string | number | null | undefined, fallback?: string): string => {
@@ -90,6 +94,8 @@ const EmployeesDashboard = () => {
     const [showDocumentUpload, setShowDocumentUpload] = useState(false);
     const [leaveCalendarData, setLeaveCalendarData] = useState<LeaveCalendarDay[]>([]);
     const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+    const [departmentHeadcountData, setDepartmentHeadcountData] = useState<{ name: string; count: number }[]>([]);
+    const [approvalsAgingData, setApprovalsAgingData] = useState<{ "0_3_days"?: number; "4_7_days"?: number; "8_plus_days"?: number }>({});
 
     const dashboardParams: EmployeeDashboardParams = (() => {
       const base: EmployeeDashboardParams = { days: selectedDays };
@@ -125,6 +131,14 @@ const EmployeesDashboard = () => {
           console.log("[EmployeesDashboard] attendanceTrend", attendanceTrend);
           console.log("[EmployeesDashboard] leaveCalendar", leaveCalendar);
           setLeaveCalendarData(Array.isArray(leaveCalendar) ? (leaveCalendar as LeaveCalendarDay[]) : []);
+          setDepartmentHeadcountData(
+            Array.isArray(departmentHeadcount)
+              ? (departmentHeadcount as { name?: string; count?: number }[]).map((d) => ({
+                  name: String(d?.name ?? "—"),
+                  count: Number(d?.count ?? 0),
+                }))
+              : []
+          );
         } catch (e) {
           console.error("[EmployeesDashboard] fetchDashboardData error", e);
         }
@@ -177,26 +191,31 @@ const EmployeesDashboard = () => {
     }, [leaveCalendarData]);
 
     const selectedDayLeave = leaveByDate[selectedCalendarDate];
+
+    const DEPARTMENT_CHART_COLORS = ['#6366F1', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899', '#06B6D4', '#84CC16', '#F97316'];
+
+    const departmentData = React.useMemo(() => {
+      const list = departmentHeadcountData;
+      if (!list.length) return [];
+      const total = list.reduce((sum, d) => sum + d.count, 0);
+      return list.map((d, idx) => ({
+        name: d.name,
+        value: d.count,
+        color: DEPARTMENT_CHART_COLORS[idx % DEPARTMENT_CHART_COLORS.length],
+        percentage: total > 0 ? Math.round((d.count / total) * 1000) / 10 : 0,
+      }));
+    }, [departmentHeadcountData]);
   
-    const departmentData = [
-      { name: 'Engineering', value: 18, color: '#6366F1', percentage: 34.6 },
-      { name: 'Sales', value: 15, color: '#10B981', percentage: 28.8 },
-      { name: 'Marketing', value: 8, color: '#8B5CF6', percentage: 15.4 },
-      { name: 'Finance', value: 6, color: '#F59E0B', percentage: 11.5 },
-      { name: 'HR', value: 5, color: '#EC4899', percentage: 9.6 }
-    ];
-  
-    const approvalsData = [
-      { day: 'Jan 15', value: 12 },
-      { day: 'Jan 16', value: 14 },
-      { day: 'Jan 17', value: 13 },
-      { day: 'Jan 18', value: 16 },
-      { day: 'Jan 19', value: 15 },
-      { day: 'Jan 20', value: 18 },
-      { day: 'Jan 21', value: 17 },
-      { day: 'Jan 22', value: 19 },
-      { day: 'Jan 23', value: 21 }
-    ];
+    const approvalsAgingChartData = React.useMemo(() => {
+      const d = approvalsAgingData;
+      return [
+        { name: "0-3 days", value: d["0_3_days"] ?? 0, fill: "#10B981" },
+        { name: "4-7 days", value: d["4_7_days"] ?? 0, fill: "#F59E0B" },
+        { name: "8+ days", value: d["8_plus_days"] ?? 0, fill: "#EF4444" },
+      ];
+    }, [approvalsAgingData]);
+
+    const approvalsAgingTotal = (approvalsAgingData["0_3_days"] ?? 0) + (approvalsAgingData["4_7_days"] ?? 0) + (approvalsAgingData["8_plus_days"] ?? 0);
   
     const documents = [
       { 
@@ -227,11 +246,15 @@ const EmployeesDashboard = () => {
   
     // Handler functions
     const handleAddEmployee = () => {
-      setShowEmployeeForm(true);
+      setShowAddEmployeeModal(true);
     };
   
     const handleRequestLeave = () => {
       setShowLeaveForm(true);
+    };
+
+    const handleNewRequest = () => {
+      setShowNewRequestModal(true);
     };
   
     const handleUploadDocument = () => {
@@ -681,7 +704,7 @@ const EmployeesDashboard = () => {
         }}>
           {[
             { icon: Plus, color: '#6366F1', text: 'Add Employee', onClick: handleAddEmployee },
-            { icon: Calendar, color: '#10B981', text: 'Request Leave', onClick: handleRequestLeave },
+            { icon: Calendar, color: '#10B981', text: 'New Request', onClick: handleNewRequest },
             { icon: Upload, color: '#8B5CF6', text: 'Upload Document', onClick: handleUploadDocument }
           ].map((action, idx) => (
             <button 
@@ -759,56 +782,64 @@ const EmployeesDashboard = () => {
             </div>
             
             <div style={{ marginBottom: '16px' }}>
-              {departmentData.map((dept, idx) => (
-                <div key={idx} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  marginBottom: '10px',
-                  fontSize: '14px'
-                }}>
-                  <Circle size={12} fill={dept.color} color={dept.color} />
-                  <span style={{ flex: 1, color: '#374151', fontWeight: '500' }}>{dept.name}</span>
-                  <span style={{ fontWeight: '700', color: '#111827', fontSize: '15px' }}>{dept.value}</span>
-                  <span style={{ fontSize: '12px', color: '#9CA3AF', minWidth: '45px', textAlign: 'right' }}>({dept.percentage}%)</span>
-                </div>
-              ))}
+              {departmentData.length === 0 ? (
+                <div style={{ fontSize: '14px', color: '#9CA3AF', padding: '12px 0' }}>No department data for the selected period.</div>
+              ) : (
+                departmentData.map((dept, idx) => (
+                  <div key={idx} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginBottom: '10px',
+                    fontSize: '14px'
+                  }}>
+                    <Circle size={12} fill={dept.color} color={dept.color} />
+                    <span style={{ flex: 1, color: '#374151', fontWeight: '500' }}>{dept.name}</span>
+                    <span style={{ fontWeight: '700', color: '#111827', fontSize: '15px' }}>{dept.value}</span>
+                    <span style={{ fontSize: '12px', color: '#9CA3AF', minWidth: '45px', textAlign: 'right' }}>({dept.percentage}%)</span>
+                  </div>
+                ))
+              )}
             </div>
 
             <div style={{ height: '160px', marginTop: '12px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={departmentData}
-                  margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
-                >
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                  />
-                  <YAxis 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                    domain={[0, 20]}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      background: '#FFFFFF', 
-                      border: '1px solid #E5E7EB', 
-                      borderRadius: '8px',
-                      fontSize: '12px'
-                    }}
-                    formatter={(value: any, name: any, props: any) => [`${value} employees (${props.payload.percentage}%)`, 'Count']}
-                  />
-                  <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={45}>
-                    {departmentData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              {departmentData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart 
+                    data={departmentData}
+                    margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
+                  >
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                    />
+                    <YAxis 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                      domain={[0, departmentData.length ? Math.max(...departmentData.map((d) => d.value), 0) + 1 : 5]}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        background: '#FFFFFF', 
+                        border: '1px solid #E5E7EB', 
+                        borderRadius: '8px',
+                        fontSize: '12px'
+                      }}
+                      formatter={(value: number, _name: unknown, props: { payload?: { percentage?: number } }) => [`${value} employees${props.payload?.percentage != null ? ` (${props.payload.percentage}%)` : ''}`, 'Count']}
+                    />
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={45}>
+                      {departmentData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF', fontSize: '14px' }}>No chart data</div>
+              )}
             </div>
 
             {/* Department Insights */}
@@ -825,15 +856,36 @@ const EmployeesDashboard = () => {
                   color: '#111827',
                   margin: 0
                 }}>Department Insights</h4>
-                
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* Insight 1 */}
-               
+                {departmentData.length > 0 && (
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: '#EFF6FF',
+                    border: '1px solid #DBEAFE'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '4px'
+                    }}>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#1E40AF' }}>
+                        Total headcount
+                      </span>
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#2563EB' }}>
+                        {departmentData.reduce((sum, d) => sum + d.value, 0)} employees
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#1E40AF', lineHeight: '1.4' }}>
+                      {departmentData.length} department{departmentData.length !== 1 ? 's' : ''} in scope
+                    </div>
+                  </div>
+                )}
 
-                {/* Insight 2 */}
-                <div style={{
+                {/* <div style={{
                   padding: '12px',
                   borderRadius: '8px',
                   background: '#F0FDF4',
@@ -855,10 +907,9 @@ const EmployeesDashboard = () => {
                   <div style={{ fontSize: '12px', color: '#15803D', lineHeight: '1.4' }}>
                     Top performing team this quarter
                   </div>
-                </div>
+                </div> */}
 
-                {/* Insight 3 */}
-                <div style={{
+                {/* <div style={{
                   padding: '12px',
                   borderRadius: '8px',
                   background: '#FEF3C7',
@@ -880,7 +931,7 @@ const EmployeesDashboard = () => {
                   <div style={{ fontSize: '12px', color: '#92400E', lineHeight: '1.4' }}>
                     Consider hiring support staff
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>
@@ -905,7 +956,7 @@ const EmployeesDashboard = () => {
                 margin: 0
               }}>Approvals Aging</h3>
               <div style={{ position: 'relative' }}>
-                <button 
+                {/* <button 
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleDropdown('chartPeriod');
@@ -923,8 +974,8 @@ const EmployeesDashboard = () => {
                   }}>
                   <span>{selectedChartPeriod}</span>
                   <ChevronDown size={14} color="#9CA3AF" />
-                </button>
-                {openDropdown === 'chartPeriod' && (
+                </button> */}
+                {/* {openDropdown === 'chartPeriod' && (
                   <div onClick={(e) => e.stopPropagation()} style={{
                     position: 'absolute',
                     top: '100%',
@@ -969,7 +1020,7 @@ const EmployeesDashboard = () => {
                       </div>
                     ))}
                   </div>
-                )}
+                )} */}
               </div>
             </div>
 
@@ -980,55 +1031,55 @@ const EmployeesDashboard = () => {
                   fontWeight: '700',
                   color: '#111827',
                   lineHeight: '1'
-                }}>21</div>
+                }}>{approvalsAgingTotal}</div>
                 <span style={{
                   fontSize: '14px',
                   color: '#6366F1',
                   fontWeight: '500'
-                }}>This Week</span>
+                }}>Pending</span>
               </div>
             </div>
 
             <div style={{ height: '180px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={approvalsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
-                  <XAxis 
-                    dataKey="day" 
-                    stroke="#E5E7EB" 
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                    axisLine={{ stroke: '#E5E7EB' }}
-                  />
-                  <YAxis 
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    domain={[0, 25]}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      background: '#FFFFFF', 
-                      border: '1px solid #E5E7EB', 
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      padding: '8px 12px'
-                    }}
-                    formatter={(value: any) => [`${value} approvals`, 'Count']}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="#6366F1" 
-                    strokeWidth={3} 
-                    dot={{ fill: '#6366F1', r: 4 }}
-                    activeDot={{ r: 6, fill: '#6366F1', stroke: '#FFFFFF', strokeWidth: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {approvalsAgingChartData.some((d) => d.value > 0) || approvalsAgingTotal === 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={approvalsAgingChartData} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                      domain={[0, Math.max(...approvalsAgingChartData.map((d) => d.value), 0) + 1]}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: '#FFFFFF',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        padding: '8px 12px'
+                      }}
+                      formatter={(value: number) => [`${value} pending`, 'Count']}
+                    />
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={48}>
+                      {approvalsAgingChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF', fontSize: '14px' }}>No aging data</div>
+              )}
             </div>
 
             {/* Recently Uploaded Docs */}
-            <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #F3F4F6' }}>
+            {/* <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #F3F4F6' }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -1103,7 +1154,7 @@ const EmployeesDashboard = () => {
                   </div>
                 </div>
               ))}
-            </div>
+            </div> */}
           </div>
         </div>
 
@@ -1114,7 +1165,7 @@ const EmployeesDashboard = () => {
           gap: '16px'
         }}>
           {/* More Actions */}
-          <div style={{
+          {/* <div style={{
             background: '#FFFFFF',
             borderRadius: '12px',
             padding: '24px',
@@ -1179,10 +1230,10 @@ const EmployeesDashboard = () => {
                 </button>
               ))}
             </div>
-          </div>
+          </div> */}
 
           {/* AI Insights */}
-          <div style={{
+          {/* <div style={{
             background: '#FFFFFF',
             borderRadius: '12px',
             padding: '24px',
@@ -1256,7 +1307,7 @@ const EmployeesDashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
 
@@ -1458,6 +1509,17 @@ const EmployeesDashboard = () => {
           </div>
         </div>
       )}
+
+      <AddEmployeeModal
+        show={showAddEmployeeModal}
+        onHide={() => setShowAddEmployeeModal(false)}
+        tenantId={companyIdentifier ?? undefined}
+      />
+
+      <NewRequestModal
+        show={showNewRequestModal}
+        onHide={() => setShowNewRequestModal(false)}
+      />
 
       {/* Leave Request Form Modal */}
       {showLeaveForm && (
