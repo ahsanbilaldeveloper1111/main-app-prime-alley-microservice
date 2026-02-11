@@ -1,5 +1,6 @@
 import { Session } from 'next-auth';
 import { toast } from "react-toastify";
+import { reportApiError } from "./sentryLogger";
 import axiosInstance from "./axios";
 
 const prefix = 'work-planner';
@@ -24,6 +25,10 @@ interface UpdateStatusData {
 
 // ==================== Helper Functions ====================
 
+const reportWorkPlannerApiError = (response: any, errorMessage: string) => {
+  reportApiError("work-planner", errorMessage, { apiResponse: response, responseData: response?.data });
+};
+
 /**
  * Helper function to validate API response
  */
@@ -36,6 +41,7 @@ const validateResponse = (
   if (response?.data) {
     const responseData = response.data;
     if (responseData.success === false) {
+      reportWorkPlannerApiError(response, responseData.message || errorMessage);
       toast.error(responseData.message || errorMessage);
       return null;
     }
@@ -44,6 +50,7 @@ const validateResponse = (
     }
     return responseData.data || responseData;
   }
+  reportWorkPlannerApiError(response, errorMessage);
   return null;
 };
 
@@ -133,6 +140,7 @@ export const listStatuses = async () => {
     if (response?.data) {
       const responseData = response.data;
       if (responseData.success === false) {
+        reportWorkPlannerApiError(response, responseData.message || 'Failed to fetch statuses');
         toast.error(responseData.message || 'Failed to fetch statuses');
         return null;
       }
@@ -173,6 +181,7 @@ export const getStatus = async (id: string | number) => {
     if (response?.data) {
       const responseData = response.data;
       if (responseData.success === false) {
+        reportWorkPlannerApiError(response, responseData.message || 'Failed to fetch status');
         toast.error(responseData.message || 'Failed to fetch status');
         return null;
       }
