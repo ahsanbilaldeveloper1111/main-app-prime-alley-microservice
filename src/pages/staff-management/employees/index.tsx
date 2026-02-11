@@ -12,13 +12,16 @@ import {
   deleteUserProfile,
   getMainAppCompanies,
   getMainAppDepartments,
-  getMainAppUsers,
+  getEmployeeDashboardCounters,
   getLocations,
+  getEmployeeDashboardGraphDepartmentHeadcount,
+  createJourney,
   type UserProfile,
   type UserProfileAddress,
   type UserProfilePayload,
   type Location,
 } from "@utils/staffManagement";
+import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
 import { Button, Form, Modal } from "react-bootstrap";
 
@@ -27,14 +30,32 @@ import "@assets/scss/tabs.scss";
 
 import { Search, ChevronDown, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Plus, Pencil, Trash2, User } from "lucide-react";
 import moment from "moment";
-import { GlobalDateTimeFormat, ModuleSlug } from "@utils/Helper";
-import { useHierarchyData } from "@components/filters/useHierarchyData";
+import { GlobalDateTimeFormat } from "@utils/Helper";
 import Select, { SingleValue } from "react-select";
 
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
 const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
+
+/** Dashboard counters API response shape */
+interface EmployeeDashboardCountersData {
+  employees?: { total?: number; active?: number; inactive?: number };
+  approvals?: {
+    pending?: number;
+    aging?: { "0_3_days"?: number; "4_7_days"?: number; "8_plus_days"?: number };
+    avg_aging?: number;
+    pending_leave?: number;
+    pending_other?: number;
+  };
+  leave?: { on_leave_today?: number; upcoming_7_days?: number };
+  journey?: { total?: number; in_progress?: number; on_track?: number; overdue?: number; completed?: number };
+  attendance?: {
+    today?: { with_record?: number; checked_in?: number; checked_out?: number; no_record_estimate?: number };
+  };
+  compliance_alerts?: { high?: number; medium?: number; low?: number; total?: number };
+}
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useSession } from "next-auth/react";
+import { Country, State, City } from "country-state-city";
 
 interface Document {
   id: string;
@@ -62,11 +83,86 @@ interface MainAppUser {
   [key: string]: unknown;
 }
 
+/** Address form row with country-state-city cascade fields */
+type AddressFormItem = UserProfileAddress & { state?: string; countryCode?: string; stateCode?: string };
+
 function displayProfileName(p: UserProfile): string {
   return String((p as UserProfile & { name?: string }).name ?? p.user_id ?? p.employee_code ?? p.id ?? "—");
 }
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
+
+const E164_MAX_DIGITS = 15;
+
+/** Format phone input to E.164: optional leading +, then digits only, max 15 digits */
+function toE164Phone(value: string): string {
+  const hasPlus = value.trimStart().startsWith("+");
+  const digits = value.replace(/\D/g, "").slice(0, E164_MAX_DIGITS);
+  const prefix = hasPlus ? "+" : "";
+  return digits.length ? prefix + digits : prefix;
+}
+
+// Custom styles to match Bootstrap form control height and styling (same as UserProfileTab)
+const selectStyles = {
+  control: (provided: Record<string, unknown>, state: { isFocused?: boolean }) => ({
+    ...provided,
+    minHeight: "48px",
+    height: "48px",
+    fontSize: "0.875rem",
+    borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
+    boxShadow: state.isFocused ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)" : "none",
+    borderRadius: "0.375rem",
+    "&:hover": {
+      borderColor: state.isFocused ? "#86b7fe" : "#DBE0E5",
+    },
+  }),
+  valueContainer: (provided: Record<string, unknown>) => ({
+    ...provided,
+    height: "48px",
+    padding: "0 8px",
+  }),
+  input: (provided: Record<string, unknown>) => ({
+    ...provided,
+    margin: "0px",
+    padding: "0px",
+  }),
+  indicatorSeparator: () => ({
+    display: "none",
+  }),
+  indicatorsContainer: (provided: Record<string, unknown>) => ({
+    ...provided,
+    height: "48px",
+  }),
+  placeholder: (provided: Record<string, unknown>) => ({
+    ...provided,
+    color: "#6c757d",
+    fontSize: "0.875rem",
+  }),
+  singleValue: (provided: Record<string, unknown>) => ({
+    ...provided,
+    fontSize: "0.875rem",
+    lineHeight: "1.5",
+  }),
+  multiValue: (provided: Record<string, unknown>) => ({
+    ...provided,
+    backgroundColor: "#e7f1ff",
+    borderRadius: "0.25rem",
+  }),
+  multiValueLabel: (provided: Record<string, unknown>) => ({
+    ...provided,
+    color: "#0d6efd",
+    fontSize: "0.875rem",
+    padding: "2px 6px",
+  }),
+  multiValueRemove: (provided: Record<string, unknown>) => ({
+    ...provided,
+    color: "#0d6efd",
+    "&:hover": {
+      backgroundColor: "#b6d4fe",
+      color: "#0d6efd",
+    },
+  }),
+};
 
 /** Normalize hierarchy list item to string for display (handles both string and { name?, id? } shapes) */
 function hierarchyLabel(item: unknown): string {
@@ -81,28 +177,24 @@ function hierarchyLabel(item: unknown): string {
 
 const Employees = () => {
   const { data: session } = useSession();
-  const { hierarchyDataUsers, hierarchyDataDepartments, hierarchyDataCompanies, hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+  const { mainAppDepartments, mainAppUsers, loadingDepartments, loadingUsers, companyIdentifier } = useMainAppLookups();
 
-  /** Resolve display name from extensions (user_id/extension_number) then fallback to profile fields */
-  const getDisplayName = useCallback((p: UserProfile): string => {
-    const extId = (p as UserProfile & { extension_number?: string }).extension_number ?? p.user_id ?? p.employee_code;
-    if (extId != null && hierarchyDataExtensions && Array.isArray(hierarchyDataExtensions)) {
-      const ext = (hierarchyDataExtensions as { id?: string; extension_number?: string; name?: string; user?: { name?: string }; user_id?: string }[]).find(
-        (e) => String(e.extension_number ?? e.id ?? e.user_id) === String(extId)
-      );
-      if (ext) return String(ext.user?.name ?? ext.name ?? ext.extension_number ?? extId);
-    }
-    return String((p as UserProfile & { name?: string }).name ?? p.user_id ?? p.employee_code ?? p.id ?? "—");
-  }, [hierarchyDataExtensions]);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchTermApi, setSearchTermApi] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
   const [selectedStatus, setSelectedStatus] = useState("");
-  const [selectedManager, setSelectedManager] = useState("");
+  const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([]);
   const [selectedEmploymentType, setSelectedEmploymentType] = useState("");
   const [selectedContract, setSelectedContract] = useState("");
+  /** Applied filter values (sent to API) – only updated when Apply is clicked */
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [appliedDepartment, setAppliedDepartment] = useState("");
+  const [appliedLocationId, setAppliedLocationId] = useState<number | null>(null);
+  const [appliedStatus, setAppliedStatus] = useState("");
+  const [appliedEmploymentType, setAppliedEmploymentType] = useState("");
+  const [appliedContract, setAppliedContract] = useState("");
+  const [appliedManagerIds, setAppliedManagerIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
@@ -124,6 +216,11 @@ const Employees = () => {
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
+  const [showJourneyModal, setShowJourneyModal] = useState(false);
+  const [journeyModalProfile, setJourneyModalProfile] = useState<UserProfile | null>(null);
+  const [journeyForm, setJourneyForm] = useState<{ startDate: string; status: string }>({ startDate: "", status: "in_progress" });
+  const [journeySubmitting, setJourneySubmitting] = useState(false);
+
   const [createForm, setCreateForm] = useState<Partial<UserProfilePayload>>({
     user_id: "",
     employee_code: "",
@@ -137,26 +234,68 @@ const Employees = () => {
     status: "active",
   });
   /** Addresses for create form kept in separate state to avoid update loops when editing address fields */
-  const [createFormAddresses, setCreateFormAddresses] = useState<NonNullable<UserProfilePayload["addresses"]>>([]);
+  const [createFormAddresses, setCreateFormAddresses] = useState<AddressFormItem[]>([]);
+  const [addressCountries, setAddressCountries] = useState<{ isoCode: string; name: string }[]>([]);
 
   const [createModalCompanyUuid, setCreateModalCompanyUuid] = useState<string>("");
+
+  useEffect(() => {
+    try {
+      setAddressCountries(Country.getAllCountries());
+    } catch {
+      setAddressCountries([]);
+    }
+  }, []);
+
+  const DEPARTMENT_CHART_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4", "#84cc16", "#f97316"];
+
+  useEffect(() => {
+    const fetchDepartmentHeadcount = async () => {
+      try {
+        const data = await getEmployeeDashboardGraphDepartmentHeadcount();
+        console.log("[Employees] department headcount graph", data);
+        const raw = Array.isArray(data) ? data : (data && typeof data === "object" && Array.isArray((data as { data?: unknown[] }).data) ? (data as { data: unknown[] }).data : []);
+        const list = (raw as { name?: string; count?: number }[]).map((item, i) => ({
+          name: String(item.name ?? "—"),
+          count: Number(item.count ?? 0),
+          color: DEPARTMENT_CHART_COLORS[i % DEPARTMENT_CHART_COLORS.length],
+        }));
+        setDepartmentHeadcountData(list);
+      } catch (e) {
+        console.error("[Employees] getEmployeeDashboardGraphDepartmentHeadcount error", e);
+        setDepartmentHeadcountData([]);
+      }
+    };
+    fetchDepartmentHeadcount();
+  }, []);
+
+  useEffect(() => {
+    const fetchCounters = async () => {
+      try {
+        const data = await getEmployeeDashboardCounters();
+        console.log("[Employees] dashboard counters", data);
+        setDashboardCounters((data as EmployeeDashboardCountersData) ?? null);
+      } catch (e) {
+        console.error("[Employees] getEmployeeDashboardCounters error", e);
+        setDashboardCounters(null);
+      }
+    };
+    fetchCounters();
+  }, []);
+
   const [createModalCompanies, setCreateModalCompanies] = useState<{ id?: string; uuid?: string; name?: string; [key: string]: unknown }[]>([]);
-  const [createModalDepartments, setCreateModalDepartments] = useState<MainAppDepartment[]>([]);
-  const [createModalUsers, setCreateModalUsers] = useState<MainAppUser[]>([]);
   const [locationsList, setLocationsList] = useState<Location[]>([]);
   const [filterLocations, setFilterLocations] = useState<Location[]>([]);
   const [loadingFilterLocations, setLoadingFilterLocations] = useState(false);
-  const [loadingDepartments, setLoadingDepartments] = useState(false);
-  const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingLocations, setLoadingLocations] = useState(false);
+  const [departmentHeadcountData, setDepartmentHeadcountData] = useState<{ name: string; count: number; color: string }[]>([]);
+  const [dashboardCounters, setDashboardCounters] = useState<EmployeeDashboardCountersData | null>(null);
 
   const [editModalCompanyUuid, setEditModalCompanyUuid] = useState<string>("");
   const [editModalCompanies, setEditModalCompanies] = useState<{ id?: string; uuid?: string; name?: string; [key: string]: unknown }[]>([]);
   const [editModalDepartments, setEditModalDepartments] = useState<MainAppDepartment[]>([]);
-  const [editModalUsers, setEditModalUsers] = useState<MainAppUser[]>([]);
   const [loadingEditDepartments, setLoadingEditDepartments] = useState(false);
-  const [loadingEditUsers, setLoadingEditUsers] = useState(false);
-  const [editFormAddresses, setEditFormAddresses] = useState<NonNullable<UserProfilePayload["addresses"]>>([]);
+  const [editFormAddresses, setEditFormAddresses] = useState<AddressFormItem[]>([]);
 
   const [editForm, setEditForm] = useState<Partial<UserProfilePayload>>({
     user_id: "",
@@ -174,16 +313,17 @@ const Employees = () => {
   const loadProfiles = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params: { page: number; limit: number; employment_type?: string; contract_type?: string; status?: string; location_id?: number; department?: string; search?: string } = {
+      const params: { page: number; limit: number; employment_type?: string; contract_type?: string; status?: string; location_id?: number; department?: string; search?: string; user_ids?: string[] } = {
         page,
         limit: ITEMS_PER_PAGE,
       };
-      if (selectedEmploymentType?.trim()) params.employment_type = selectedEmploymentType.trim();
-      if (selectedContract?.trim()) params.contract_type = selectedContract.trim();
-      if (selectedStatus?.trim()) params.status = selectedStatus.trim().toLowerCase();
-      if (selectedLocationId != null) params.location_id = selectedLocationId;
-      if (selectedDepartment?.trim()) params.department = selectedDepartment.trim();
-      if (searchTermApi?.trim()) params.search = searchTermApi.trim();
+      if (appliedEmploymentType?.trim()) params.employment_type = appliedEmploymentType.trim();
+      if (appliedContract?.trim()) params.contract_type = appliedContract.trim();
+      if (appliedStatus?.trim()) params.status = appliedStatus.trim().toLowerCase();
+      if (appliedLocationId != null) params.location_id = appliedLocationId;
+      if (appliedDepartment?.trim()) params.department = appliedDepartment.trim();
+      if (appliedSearch?.trim()) params.search = appliedSearch.trim();
+      if (appliedManagerIds.length > 0) params.user_ids = appliedManagerIds;
       const { data, pagination: p } = await getUserProfiles(params);
       setProfiles(data ?? []);
       if (p) setPagination({ page: p.page, limit: p.limit, total: p.total, last_page: p.last_page });
@@ -194,7 +334,7 @@ const Employees = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedEmploymentType, selectedContract, selectedStatus, selectedLocationId, selectedDepartment, searchTermApi]);
+  }, [appliedEmploymentType, appliedContract, appliedStatus, appliedLocationId, appliedDepartment, appliedSearch, appliedManagerIds]);
 
   useEffect(() => {
     loadProfiles(currentPage);
@@ -202,10 +342,6 @@ const Employees = () => {
 
   const loadProfilesRef = useRef(loadProfiles);
   loadProfilesRef.current = loadProfiles;
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedEmploymentType, selectedContract, selectedStatus, selectedLocationId, selectedDepartment, searchTermApi]);
 
   const loadFilterLocations = useCallback(async () => {
     setLoadingFilterLocations(true);
@@ -223,11 +359,6 @@ const Employees = () => {
     loadFilterLocations();
   }, [loadFilterLocations]);
 
-  useEffect(() => {
-    const t = setTimeout(() => setSearchTermApi(searchTerm), 400);
-    return () => clearTimeout(t);
-  }, [searchTerm]);
-
   const toggleDropdown = (dropdown: string) => {
     setOpenDropdown(openDropdown === dropdown ? null : dropdown);
   };
@@ -236,8 +367,14 @@ const Employees = () => {
     setOpenDropdown(null);
   };
 
-  const handleProfileClick = (profile: UserProfile) => {
-    setSelectedProfile(profile);
+  const handleProfileClick = async (profile: UserProfile) => {
+    try {
+      const fullProfile = await getUserProfile(profile.id);
+      console.log(fullProfile);
+      setSelectedProfile(fullProfile);
+    } catch {
+      setSelectedProfile(profile);
+    }
   };
 
   const closeSidebar = () => {
@@ -254,56 +391,6 @@ const Employees = () => {
     }
   }, []);
 
-  const loadDepartmentsForCreate = useCallback(async (companyUuid: string) => {
-    if (!companyUuid) {
-      setCreateModalDepartments([]);
-      return;
-    }
-    setLoadingDepartments(true);
-    // try {
-    //   const data = await getMainAppDepartments(companyUuid);
-    //   setCreateModalDepartments(Array.isArray(data) ? (data as MainAppDepartment[]) : []);
-    // } catch {
-    //   setCreateModalDepartments([]);
-    // } finally {
-    //   setLoadingDepartments(false);
-    // }
-  }, []);
-
-  const loadUsersForCreate = useCallback(async (companyUuid: string, departmentId?: number | null) => {
-    if (!companyUuid) {
-      setCreateModalUsers([]);
-      return;
-    }
-    setLoadingUsers(true);
-    try {
-      const data = await getMainAppUsers(
-        companyUuid,
-        departmentId != null ? { department_id: departmentId } : undefined
-      );
-      const rawList: unknown[] = Array.isArray(data)
-        ? data
-        : data && typeof data === "object" && Array.isArray((data as { users?: unknown[] }).users)
-          ? (data as { users: unknown[] }).users
-          : data && typeof data === "object" && Array.isArray((data as { data?: unknown[] }).data)
-            ? (data as { data: unknown[] }).data
-            : [];
-      const list: MainAppUser[] = rawList.map((raw: unknown) => {
-        const r = raw as { id?: number; ldap_uid?: string; name?: string; email?: string; username?: string; phone?: string; department?: { id?: number; name?: string }; company?: { id?: number; name?: string }; user_id?: string; department_id?: number; [key: string]: unknown };
-        return {
-          ...r,
-          id: r.id ?? r.user_id,
-          user_id: r.ldap_uid ?? r.user_id ?? String(r.id ?? ""),
-          department_id: r.department_id ?? r.department?.id,
-        } as MainAppUser;
-      });
-      setCreateModalUsers(list);
-    } catch {
-      setCreateModalUsers([]);
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, []);
 
   const loadLocationsForModal = useCallback(async () => {
     setLoadingLocations(true);
@@ -332,32 +419,74 @@ const Employees = () => {
       addresses: [],
     });
     setCreateModalCompanyUuid("");
-    setCreateModalDepartments([]);
-    setCreateModalUsers([]);
     loadCompaniesForCreate();
     loadLocationsForModal();
     setShowCreateModal(true);
   };
 
-  const createModalUsersByDepartment = useMemo(() => {
-    if (createForm.department_id == null) return createModalUsers;
-    return createModalUsers.filter((u) => Number(u.department_id) === Number(createForm.department_id));
-  }, [createModalUsers, createForm.department_id]);
-
-  /** Extensions list for create-modal User dropdown; option value is extension id (sent as user_id) */
-  const createModalExtensionsList = useMemo(() => {
-    if (!hierarchyDataExtensions || !Array.isArray(hierarchyDataExtensions)) return [];
-    return hierarchyDataExtensions as { id?: string | number; extension_number?: string; name?: string; user?: { name?: string }; user_id?: string }[];
-  }, [hierarchyDataExtensions]);
-
-  /** React Select options for create-modal User (extensions); value is extension id (user_id) */
-  const createModalUserOptions = useMemo(() => {
-    return createModalExtensionsList.map((ext) => {
-      const value = String(ext.id ?? ext.extension_number ?? ext.user_id ?? "");
-      const label = String(ext.user?.name ?? ext.name ?? ext.extension_number ?? ext.user_id ?? "—");
-      return { value, label };
+  const openJourneyModal = (profile: UserProfile, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setJourneyModalProfile(profile);
+    setJourneyForm({
+      startDate: moment().format("YYYY-MM-DD"),
+      status: "in_progress",
     });
-  }, [createModalExtensionsList]);
+    setShowJourneyModal(true);
+  };
+
+  const closeJourneyModal = () => {
+    setShowJourneyModal(false);
+    setJourneyModalProfile(null);
+    setJourneyForm({ startDate: "", status: "in_progress" });
+  };
+
+  const handleCreateJourney = async () => {
+    if (!journeyModalProfile) return;
+    if (!journeyForm.startDate.trim()) {
+      toast.warning("Please select a start date.");
+      return;
+    }
+    const departmentName =
+      journeyModalProfile.department_id != null
+        ? (mainAppDepartments.find((d) => Number(d.id) === Number(journeyModalProfile.department_id))?.name ?? "")
+        : "";
+    const payload = {
+      user_profile_id: journeyModalProfile.id,
+      user_id: String(journeyModalProfile.user_id ?? ""),
+      job_title: journeyModalProfile.job_title ?? "",
+      department_name: departmentName,
+      start_date: journeyForm.startDate,
+      status: journeyForm.status,
+ 
+    };
+    setJourneySubmitting(true);
+    try {
+      await createJourney(payload);
+      toast.success("Journey created successfully.");
+      closeJourneyModal();
+    } catch {
+      // createJourney handles error toast via handleApiError
+    } finally {
+      setJourneySubmitting(false);
+    }
+  };
+
+  /** Single list of user options for both Create and Edit modals; value is user id (stored as user_id in form) */
+  const mainAppUserOptions = useMemo(
+    () => mainAppUsers.map((u) => ({ value: String(u.id), label: u.name })),
+    [mainAppUsers]
+  );
+
+  /** Resolve display name from MainAppUser (by user_id), then profile fields */
+  const getDisplayName = useCallback((p: UserProfile): string => {
+    const userId = p.user_id ?? (p as UserProfile & { extension_number?: string }).extension_number ?? p.employee_code;
+    if (userId != null && mainAppUsers.length > 0) {
+      const mainUser = mainAppUsers.find((u) => String(u.id) === String(userId));
+      if (mainUser?.name) return mainUser.name;
+    }
+    return String((p as UserProfile & { name?: string }).name ?? p.user_id ?? p.employee_code ?? p.id ?? "—");
+  }, [mainAppUsers]);
+
 
   const loadEditCompanies = useCallback(async () => {
     try {
@@ -384,46 +513,6 @@ const Employees = () => {
     }
   }, []);
 
-  const loadEditUsers = useCallback(async (companyUuid: string, departmentId?: number | null) => {
-    if (!companyUuid) {
-      setEditModalUsers([]);
-      return;
-    }
-    setLoadingEditUsers(true);
-    try {
-      const data = await getMainAppUsers(
-        companyUuid,
-        departmentId != null ? { department_id: departmentId } : undefined
-      );
-      const rawList: unknown[] = Array.isArray(data)
-        ? data
-        : data && typeof data === "object" && Array.isArray((data as { users?: unknown[] }).users)
-          ? (data as { users: unknown[] }).users
-          : data && typeof data === "object" && Array.isArray((data as { data?: unknown[] }).data)
-            ? (data as { data: unknown[] }).data
-            : [];
-      const list: MainAppUser[] = rawList.map((raw: unknown) => {
-        const r = raw as { id?: number; ldap_uid?: string; name?: string; email?: string; username?: string; phone?: string; department?: { id?: number; name?: string }; company?: { id?: number; name?: string }; user_id?: string; department_id?: number; [key: string]: unknown };
-        return {
-          ...r,
-          id: r.id ?? r.user_id,
-          user_id: r.ldap_uid ?? r.user_id ?? String(r.id ?? ""),
-          department_id: r.department_id ?? r.department?.id,
-        } as MainAppUser;
-      });
-      setEditModalUsers(list);
-    } catch {
-      setEditModalUsers([]);
-    } finally {
-      setLoadingEditUsers(false);
-    }
-  }, []);
-
-  const editModalUsersByDepartment = useMemo(() => {
-    if (editForm.department_id == null) return editModalUsers;
-    return editModalUsers.filter((u) => Number(u.department_id) === Number(editForm.department_id));
-  }, [editModalUsers, editForm.department_id]);
-
   const openEditModal = async (profile: UserProfile, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setEditingProfile(profile);
@@ -442,14 +531,12 @@ const Employees = () => {
       status: profile.status ?? "active",
     });
     const addrs = (profile as UserProfile & { addresses?: UserProfileAddress[] }).addresses;
-    setEditFormAddresses(Array.isArray(addrs) && addrs.length > 0 ? addrs.map((a) => ({ name: a.name ?? "", zip_code: a.zip_code ?? "", city: a.city ?? "", country: a.country ?? "", address: a.address ?? "" })) : [{ name: "", zip_code: "", city: "", country: "", address: "" }]);
+    setEditFormAddresses(Array.isArray(addrs) && addrs.length > 0 ? addrs.map((a) => ({ name: a.name ?? "", zip_code: a.zip_code ?? "", city: a.city ?? "", country: a.country ?? "", address: a.address ?? "", state: (a as AddressFormItem).state ?? "", countryCode: "", stateCode: "" })) : [{ name: "", zip_code: "", city: "", country: "", address: "", state: "", countryCode: "", stateCode: "" }]);
     loadEditCompanies();
     if (tenantId) {
       loadEditDepartments(tenantId);
-      loadEditUsers(tenantId);
     } else {
       setEditModalDepartments([]);
-      setEditModalUsers([]);
     }
     loadLocationsForModal();
     setShowEditModal(true);
@@ -457,7 +544,7 @@ const Employees = () => {
       const full = await getUserProfile(profile.id);
       const fullAddrs = (full as UserProfile & { addresses?: UserProfileAddress[] }).addresses;
       if (Array.isArray(fullAddrs) && fullAddrs.length > 0) {
-        setEditFormAddresses(fullAddrs.map((a) => ({ name: a.name ?? "", zip_code: a.zip_code ?? "", city: a.city ?? "", country: a.country ?? "", address: a.address ?? "" })));
+        setEditFormAddresses(fullAddrs.map((a) => ({ name: a.name ?? "", zip_code: a.zip_code ?? "", city: a.city ?? "", country: a.country ?? "", address: a.address ?? "", state: (a as AddressFormItem).state ?? "", countryCode: "", stateCode: "" })));
       }
     } catch {
       // keep initial editFormAddresses
@@ -484,7 +571,9 @@ const Employees = () => {
         contract_type: createForm.contract_type?.toString().trim() || null,
         phone: createForm.phone?.toString().trim() || null,
         status: createForm.status?.toString().trim() || null,
-        addresses: (createFormAddresses?.length ? createFormAddresses : undefined) as UserProfileAddress[] | undefined,
+        addresses: createFormAddresses?.length
+          ? createFormAddresses.map(({ name, zip_code, city, country, address }) => ({ name, zip_code, city, country, address }))
+          : undefined,
       });
       toast.success("Employee created");
       setShowCreateModal(false);
@@ -517,7 +606,9 @@ const Employees = () => {
         contract_type: editForm.contract_type?.toString().trim() || null,
         phone: editForm.phone?.toString().trim() || null,
         status: editForm.status?.toString().trim() || null,
-        addresses: (editFormAddresses?.length ? editFormAddresses : undefined) as UserProfileAddress[] | undefined,
+        addresses: editFormAddresses?.length
+          ? editFormAddresses.map(({ name, zip_code, city, country, address }) => ({ name, zip_code, city, country, address }))
+          : undefined,
       });
       toast.success("Employee updated");
       setShowEditModal(false);
@@ -580,43 +671,29 @@ const Employees = () => {
       }
     ];
   
-    const departmentData = [
-      { name: 'Engineering', count: 18, color: '#6366f1' },
-      { name: 'Marketing', count: 12, color: '#10b981' },
-      { name: 'Sales', count: 9, color: '#f59e0b' },
-      { name: 'HR', count: 7, color: '#ec4899' },
-      { name: 'Finance', count: 6, color: '#8b5cf6' }
-    ];
-
-  const filteredProfiles = useMemo(() => {
-    return profiles.filter((p) => {
-      const name = getDisplayName(p).toLowerCase();
-      const idNum = String(p.identification_number ?? "").toLowerCase();
-      const title = String(p.job_title ?? "").toLowerCase();
-      const dept = String(p.department_id ?? "").toLowerCase();
-      const status = String(p.status ?? "").toLowerCase();
-      const search = searchTerm.toLowerCase().trim();
-      const matchesSearch =
-        !search || name.includes(search) || idNum.includes(search) || title.includes(search);
-      const matchesDepartment = !selectedDepartment || dept.includes(selectedDepartment.toLowerCase());
-      const matchesLocation = selectedLocationId == null || p.location_id === selectedLocationId;
-      const matchesStatus = !selectedStatus || status.includes(selectedStatus.toLowerCase());
-      return matchesSearch && matchesDepartment && matchesLocation && matchesStatus;
-    });
-  }, [profiles, searchTerm, selectedDepartment, selectedLocationId, selectedStatus]);
+  /** API returns data for applied filters; no extra client-side filter */
+  const filteredProfiles = profiles;
 
   const totalPages = pagination?.last_page ?? 1;
   const totalCount = pagination?.total ?? filteredProfiles.length;
-  const departments = Array.isArray(hierarchyDataDepartments) && hierarchyDataDepartments.length > 0
-    ? hierarchyDataDepartments
-    : ["Engineering", "Marketing", "Sales", "HR", "Finance"];
+  const departments = mainAppDepartments ?? [];
   const statuses = ["Active", "Inactive"];
   const selectedLocationName = selectedLocationId != null
     ? (filterLocations.find((l) => l.id === selectedLocationId)?.name ?? String(selectedLocationId))
     : "";
-  const managers = Array.isArray(hierarchyDataUsers) && hierarchyDataUsers.length > 0
-    ? hierarchyDataUsers
-    : ["Hassan Mir", "Apr 15 ago"];
+  const appliedLocationName = appliedLocationId != null
+    ? (filterLocations.find((l) => l.id === appliedLocationId)?.name ?? String(appliedLocationId))
+    : "";
+  const managers = mainAppUsers ?? [];
+
+  
+  /** Single list of department options for both Create and Edit modals; value is department id */
+  const mainAppDepartmentOptions = useMemo(() => {
+    return (mainAppDepartments ?? []).map((d) => ({
+      value: String(d.id),
+      label: String(d.name ?? "—"),
+    }));
+  }, [mainAppDepartments]);
 
   const handleExport = () => {
       console.log('Exporting data...');
@@ -624,21 +701,34 @@ const Employees = () => {
     };
   
     const handleApply = () => {
-      console.log('Applying filters...');
-      alert('Filters applied successfully');
-    };
-  
-    const resetFilters = () => {
-      setSelectedDepartment('');
-      setSelectedLocationId(null);
-      setSelectedStatus('');
-      setSelectedManager('');
-      setSelectedEmploymentType('');
-      setSelectedContract('');
-      setSearchTerm('');
-      setSearchTermApi('');
+      setAppliedSearch(searchTerm);
+      setAppliedDepartment(selectedDepartment);
+      setAppliedLocationId(selectedLocationId);
+      setAppliedStatus(selectedStatus);
+      setAppliedEmploymentType(selectedEmploymentType);
+      setAppliedContract(selectedContract);
+      setAppliedManagerIds(selectedManagerIds);
       setCurrentPage(1);
-      setTimeout(() => loadProfilesRef.current(1), 0);
+      loadProfilesRef.current(1);
+    };
+
+    const resetFilters = () => {
+      setSelectedDepartment("");
+      setSelectedLocationId(null);
+      setSelectedStatus("");
+      setSelectedManagerIds([]);
+      setSelectedEmploymentType("");
+      setSelectedContract("");
+      setSearchTerm("");
+      setAppliedSearch("");
+      setAppliedDepartment("");
+      setAppliedLocationId(null);
+      setAppliedStatus("");
+      setAppliedEmploymentType("");
+      setAppliedContract("");
+      setAppliedManagerIds([]);
+      setCurrentPage(1);
+      loadProfilesRef.current(1);
     };
 
   return (
@@ -715,7 +805,7 @@ const Employees = () => {
             />
             <input
               type="text"
-              placeholder="Search name, ID, email..."
+              placeholder="Search by phone, cnic/id, title, designation "
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
@@ -798,7 +888,7 @@ const Employees = () => {
                       const label = hierarchyLabel(dept);
                       return (
                         <div
-                          key={typeof dept === "object" && dept !== null && "id" in (dept as object) ? (dept as { id?: string }).id ?? idx : label}
+                          key={typeof dept === "object" && dept !== null && "id" in (dept as object) ? String((dept as { id?: number }).id ?? idx) : label}
                           onClick={() => {
                             setSelectedDepartment(label);
                             setOpenDropdown(null);
@@ -946,7 +1036,7 @@ const Employees = () => {
             )}
           </div>
 
-          {/* Manager Filter */}
+          {/* Manager Filter (multi-select); API receives user_ids: ["id1", "id2"] */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={(e) => {
@@ -965,7 +1055,7 @@ const Employees = () => {
                 fontSize: '14px'
               }}
             >
-              <span>Manager</span>
+              <span>{selectedManagerIds.length > 0 ? `Users (${selectedManagerIds.length})` : 'Users'}</span>
               <ChevronDown size={16} />
             </button>
             {openDropdown === 'manager' && (
@@ -988,7 +1078,7 @@ const Employees = () => {
                 <div style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>
                   <input
                     type="text"
-                    placeholder="Search manager..."
+                    placeholder="Search user..."
                     value={managerSearchTerm}
                     onChange={(e) => setManagerSearchTerm(e.target.value)}
                     onKeyDown={(e) => e.stopPropagation()}
@@ -1011,22 +1101,28 @@ const Employees = () => {
                     })
                     .map((mgr, idx) => {
                       const label = hierarchyLabel(mgr);
+                      const idStr = String((mgr as { id?: number }).id ?? idx);
+                      const isSelected = selectedManagerIds.includes(idStr);
                       return (
                         <div
-                          key={typeof mgr === "object" && mgr !== null && "id" in (mgr as object) ? (mgr as { id?: string }).id ?? idx : label}
+                          key={idStr}
                           onClick={() => {
-                            setSelectedManager(label);
-                            setOpenDropdown(null);
-                            setManagerSearchTerm('');
+                            setSelectedManagerIds((prev) =>
+                              isSelected ? prev.filter((id) => id !== idStr) : [...prev, idStr]
+                            );
                           }}
                           style={{
                             padding: '10px 16px',
                             cursor: 'pointer',
-                            backgroundColor: selectedManager === label ? '#f3f4f6' : 'white'
+                            backgroundColor: isSelected ? '#e0e7ff' : 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedManager === label ? '#f3f4f6' : 'white'}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#c7d2fe' : '#f3f4f6'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#e0e7ff' : 'white'}
                         >
+                          {isSelected && <span style={{ color: '#6366f1', fontWeight: 600 }}>✓</span>}
                           {label}
                         </div>
                       );
@@ -1218,11 +1314,11 @@ const Employees = () => {
           </div>
         </div>
 
-        {/* Active Filters */}
-        {(selectedDepartment || selectedLocationId != null || selectedStatus || selectedManager) && (
+        {/* Active Filters - show when any applied filter is set */}
+        {(appliedSearch.trim() || appliedDepartment || appliedLocationId != null || appliedStatus || appliedEmploymentType || appliedContract || appliedManagerIds.length > 0) && (
           <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: '14px', color: '#6b7280' }}>Active filters:</span>
-            {selectedDepartment && (
+            {appliedSearch.trim() && (
               <span style={{
                 padding: '4px 12px',
                 backgroundColor: '#e0e7ff',
@@ -1232,16 +1328,16 @@ const Employees = () => {
                 alignItems: 'center',
                 gap: '6px'
               }}>
-                {selectedDepartment}
+                Search: {appliedSearch}
                 <button
-                  onClick={() => setSelectedDepartment('')}
+                  onClick={() => { setSearchTerm(''); setAppliedSearch(''); setCurrentPage(1); loadProfilesRef.current(1); }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
                 >
                   ×
                 </button>
               </span>
             )}
-            {selectedLocationId != null && (
+            {appliedDepartment && (
               <span style={{
                 padding: '4px 12px',
                 backgroundColor: '#e0e7ff',
@@ -1251,16 +1347,16 @@ const Employees = () => {
                 alignItems: 'center',
                 gap: '6px'
               }}>
-                {selectedLocationName}
+                {appliedDepartment}
                 <button
-                  onClick={() => setSelectedLocationId(null)}
+                  onClick={() => { setSelectedDepartment(''); setAppliedDepartment(''); setCurrentPage(1); loadProfilesRef.current(1); }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
                 >
                   ×
                 </button>
               </span>
             )}
-            {selectedStatus && (
+            {appliedLocationId != null && (
               <span style={{
                 padding: '4px 12px',
                 backgroundColor: '#e0e7ff',
@@ -1270,16 +1366,16 @@ const Employees = () => {
                 alignItems: 'center',
                 gap: '6px'
               }}>
-                {selectedStatus}
+                {appliedLocationName}
                 <button
-                  onClick={() => setSelectedStatus('')}
+                  onClick={() => { setSelectedLocationId(null); setAppliedLocationId(null); setCurrentPage(1); loadProfilesRef.current(1); }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
                 >
                   ×
                 </button>
               </span>
             )}
-            {selectedManager && (
+            {appliedStatus && (
               <span style={{
                 padding: '4px 12px',
                 backgroundColor: '#e0e7ff',
@@ -1289,9 +1385,69 @@ const Employees = () => {
                 alignItems: 'center',
                 gap: '6px'
               }}>
-                {selectedManager}
+                {appliedStatus}
                 <button
-                  onClick={() => setSelectedManager('')}
+                  onClick={() => { setSelectedStatus(''); setAppliedStatus(''); setCurrentPage(1); loadProfilesRef.current(1); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {appliedEmploymentType && (
+              <span style={{
+                padding: '4px 12px',
+                backgroundColor: '#e0e7ff',
+                borderRadius: '16px',
+                fontSize: '13px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                {appliedEmploymentType}
+                <button
+                  onClick={() => { setSelectedEmploymentType(''); setAppliedEmploymentType(''); setCurrentPage(1); loadProfilesRef.current(1); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {appliedContract && (
+              <span style={{
+                padding: '4px 12px',
+                backgroundColor: '#e0e7ff',
+                borderRadius: '16px',
+                fontSize: '13px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                {appliedContract}
+                <button
+                  onClick={() => { setSelectedContract(''); setAppliedContract(''); setCurrentPage(1); loadProfilesRef.current(1); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            {appliedManagerIds.length > 0 && (
+              <span
+                title={appliedManagerIds.map((id) => mainAppUsers.find((u) => String(u.id) === id)?.name ?? id).join(", ")}
+                style={{
+                  padding: '4px 12px',
+                  backgroundColor: '#e0e7ff',
+                  borderRadius: '16px',
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                Managers: {appliedManagerIds.map((id) => mainAppUsers.find((u) => String(u.id) === id)?.name ?? id).join(", ")}
+                <button
+                  onClick={() => { setSelectedManagerIds([]); setAppliedManagerIds([]); setCurrentPage(1); loadProfilesRef.current(1); }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
                 >
                   ×
@@ -1416,7 +1572,9 @@ const Employees = () => {
                         {profile.job_title ?? "—"}
                       </td>
                       <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>
-                        {profile.department_id != null ? String(profile.department_id) : "—"}
+                        {profile.department_id != null
+                          ? (mainAppDepartments.find((d) => Number(d.id) === Number(profile.department_id))?.name ?? String(profile.department_id))
+                          : "—"}
                       </td>
                       <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>{profile.phone ?? "—"}</td>
                       {/* <td style={{ padding: "16px", fontSize: "14px", color: "#1f2937" }}>
@@ -1427,8 +1585,8 @@ const Employees = () => {
                         <span
                           style={{
                             padding: "4px 12px",
-                            backgroundColor: "#d1fae5",
-                            color: "#065f46",
+                            backgroundColor: String(profile.status ?? "").toLowerCase() === "active" ? "#d1fae5" : "#fee2e2",
+                            color: String(profile.status ?? "").toLowerCase() === "active" ? "#065f46" : "#991b1b",
                             borderRadius: "16px",
                             fontSize: "13px",
                             fontWeight: "500",
@@ -1443,12 +1601,10 @@ const Employees = () => {
                               width: "6px",
                               height: "6px",
                               borderRadius: "50%",
-                              backgroundColor: "#10b981",
-                              
+                              backgroundColor: String(profile.status ?? "").toLowerCase() === "active" ? "#10b981" : "#ef4444",
                             }}
                           />
-                          {String(profile.status ?? "Active")}
-                          
+                          {String(profile.status ?? "")}
                         </span>
                       </td>
                       <td style={{ padding: "16px", fontSize: "14px", color: "#6b7280" }}>
@@ -1477,6 +1633,28 @@ const Employees = () => {
                             <Pencil size={16} color="#6366f1" />
                           </button>
                           )}
+
+{session?.user?.permissions?.includes('update-employee-staff-management') && (
+                          <button
+                            type="button"
+                            onClick={(e) => openJourneyModal(profile, e)}
+                            style={{
+                              padding: "6px",
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "6px",
+                              background: "white",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                            title="Create Journey"
+                          >
+                             OB
+                          </button>
+                          )}
+
+
                           {session?.user?.permissions?.includes('delete-employee-staff-management') && (
                           <button
                             type="button"
@@ -1634,7 +1812,7 @@ const Employees = () => {
               <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937', margin: 0 }}>
                 Department Headcount
               </h2>
-              <button
+              {/* <button
                 onClick={() => console.log('Export chart')}
                 style={{
                   padding: '6px 12px',
@@ -1650,7 +1828,7 @@ const Employees = () => {
               >
                 <Download size={14} />
                 Export
-              </button>
+              </button> */}
             </div>
 
             {/* Legend */}
@@ -1660,7 +1838,7 @@ const Employees = () => {
               marginBottom: '20px',
               flexWrap: 'wrap'
             }}>
-              {departmentData.map(dept => (
+              {departmentHeadcountData.map(dept => (
                 <div key={dept.name} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{
                     width: '12px',
@@ -1675,7 +1853,7 @@ const Employees = () => {
 
             {/* Chart */}
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={departmentData}>
+              <BarChart data={departmentHeadcountData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis 
                   dataKey="name" 
@@ -1698,7 +1876,7 @@ const Employees = () => {
                   dataKey="count" 
                   radius={[8, 8, 0, 0]}
                 >
-                  {departmentData.map((entry, index) => (
+                  {departmentHeadcountData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Bar>
@@ -1736,7 +1914,7 @@ const Employees = () => {
             </div> */}
           </div>
 
-          {/* Recently Uploaded Docs */}
+          {/* Dashboard counters */}
           <div style={{ 
             backgroundColor: 'white', 
             borderRadius: '12px', 
@@ -1744,128 +1922,96 @@ const Employees = () => {
             boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
           }}>
             <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937', marginBottom: '20px' }}>
-              Recently Uploaded Docs
+              Dashboard overview
             </h2>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {documents.map(doc => (
-                <div 
-                  key={doc.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '12px',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    border: '1px solid #f3f4f6',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f9fafb';
-                    e.currentTarget.style.borderColor = '#e5e7eb';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'white';
-                    e.currentTarget.style.borderColor = '#f3f4f6';
-                  }}
-                >
-                  <div style={{
-                    width: '36px',
-                    height: '36px',
-                    backgroundColor: '#dbeafe',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <FileText size={18} color="#3b82f6" />
-                  </div>
-                  
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ 
-                      fontSize: '14px', 
-                      fontWeight: '500', 
-                      color: '#1f2937',
-                      marginBottom: '4px'
-                    }}>
-                      {doc.name}
-                    </div>
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center',
-                      gap: '8px',
-                      flexWrap: 'wrap'
-                    }}>
-                      {doc.tags.map((tag, idx) => (
-                        <span 
-                          key={idx}
-                          style={{
-                            fontSize: '11px',
-                            padding: '2px 8px',
-                            backgroundColor: '#f3f4f6',
-                            color: '#6b7280',
-                            borderRadius: '12px'
-                          }}
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                      {doc.role && (
-                        <span style={{
-                          fontSize: '11px',
-                          padding: '2px 8px',
-                          backgroundColor: '#fef3c7',
-                          color: '#92400e',
-                          borderRadius: '12px',
-                          fontWeight: '500'
-                        }}>
-                          Role-Based
-                        </span>
-                      )}
-                      {doc.location && (
-                        <span style={{
-                          fontSize: '11px',
-                          padding: '2px 8px',
-                          backgroundColor: '#fef3c7',
-                          color: '#92400e',
-                          borderRadius: '12px',
-                          fontWeight: '500'
-                        }}>
-                          Role-Based
-                        </span>
-                      )}
-                      {doc.role && (
-                        <span style={{
-                          fontSize: '11px',
-                          color: '#9ca3af'
-                        }}>
-                          {doc.role}
-                        </span>
-                      )}
-                      {doc.location && (
-                        <span style={{
-                          fontSize: '11px',
-                          color: '#9ca3af'
-                        }}>
-                          {doc.location} →
-                        </span>
-                      )}
+            {dashboardCounters == null ? (
+              <div style={{ fontSize: '14px', color: '#6b7280' }}>Loading…</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Employees */}
+                {dashboardCounters.employees && (
+                  <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Employees</div>
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>Total: <strong style={{ color: '#1f2937' }}>{dashboardCounters.employees.total ?? 0}</strong></span>
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>Active: <strong style={{ color: '#059669' }}>{dashboardCounters.employees.active ?? 0}</strong></span>
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>Inactive: <strong style={{ color: '#dc2626' }}>{dashboardCounters.employees.inactive ?? 0}</strong></span>
                     </div>
                   </div>
+                )}
 
-                  <div style={{ 
-                    fontSize: '12px', 
-                    color: '#9ca3af',
-                    whiteSpace: 'nowrap',
-                    textAlign: 'right'
-                  }}>
-                    {doc.uploadedDate}
+                {/* Approvals */}
+                {dashboardCounters.approvals && (
+                  <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', backgroundColor: '#fffbeb' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Approvals</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>Pending: <strong style={{ color: '#1f2937' }}>{dashboardCounters.approvals.pending ?? 0}</strong></span>
+                      {dashboardCounters.approvals.aging && (
+                        <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                          Aging: 0–3d: {dashboardCounters.approvals.aging["0_3_days"] ?? 0}, 4–7d: {dashboardCounters.approvals.aging["4_7_days"] ?? 0}, 8+d: {dashboardCounters.approvals.aging["8_plus_days"] ?? 0}
+                        </span>
+                      )}
+                      {typeof dashboardCounters.approvals.avg_aging === 'number' && (
+                        <span style={{ fontSize: '12px', color: '#6b7280' }}>Avg aging: <strong>{dashboardCounters.approvals.avg_aging.toFixed(1)}</strong> days</span>
+                      )}
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>Pending leave: {dashboardCounters.approvals.pending_leave ?? 0}, Pending other: {dashboardCounters.approvals.pending_other ?? 0}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                )}
+
+                {/* Leave */}
+                {dashboardCounters.leave && (
+                  <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', backgroundColor: '#f0fdf4' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Leave</div>
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>On leave today: <strong style={{ color: '#1f2937' }}>{dashboardCounters.leave.on_leave_today ?? 0}</strong></span>
+                      <span style={{ fontSize: '12px', color: '#6b7280' }}>Upcoming 7 days: <strong style={{ color: '#1f2937' }}>{dashboardCounters.leave.upcoming_7_days ?? 0}</strong></span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Journey */}
+                {dashboardCounters.journey && (
+                  <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', backgroundColor: '#eff6ff' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Journey</div>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: '#6b7280' }}>
+                      <span>Total: <strong style={{ color: '#1f2937' }}>{dashboardCounters.journey.total ?? 0}</strong></span>
+                      <span>In progress: <strong style={{ color: '#2563eb' }}>{dashboardCounters.journey.in_progress ?? 0}</strong></span>
+                      <span>On track: {dashboardCounters.journey.on_track ?? 0}</span>
+                      <span>Overdue: <strong style={{ color: '#dc2626' }}>{dashboardCounters.journey.overdue ?? 0}</strong></span>
+                      <span>Completed: {dashboardCounters.journey.completed ?? 0}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Attendance */}
+                {dashboardCounters.attendance?.today && (
+                  <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', backgroundColor: '#faf5ff' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Attendance (today)</div>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: '#6b7280' }}>
+                      <span>With record: {dashboardCounters.attendance.today.with_record ?? 0}</span>
+                      <span>Checked in: {dashboardCounters.attendance.today.checked_in ?? 0}</span>
+                      <span>Checked out: {dashboardCounters.attendance.today.checked_out ?? 0}</span>
+                      <span>No record (est.): {dashboardCounters.attendance.today.no_record_estimate ?? 0}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Compliance alerts */}
+                {dashboardCounters.compliance_alerts && (
+                  <div style={{ padding: '12px', borderRadius: '8px', border: '1px solid #e5e7eb', backgroundColor: '#fef2f2' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Compliance alerts</div>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: '#6b7280' }}>
+                      <span>High: <strong style={{ color: '#dc2626' }}>{dashboardCounters.compliance_alerts.high ?? 0}</strong></span>
+                      <span>Medium: <strong style={{ color: '#d97706' }}>{dashboardCounters.compliance_alerts.medium ?? 0}</strong></span>
+                      <span>Low: <strong style={{ color: '#059669' }}>{dashboardCounters.compliance_alerts.low ?? 0}</strong></span>
+                      <span>Total: <strong style={{ color: '#1f2937' }}>{dashboardCounters.compliance_alerts.total ?? 0}</strong></span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1877,63 +2023,44 @@ const Employees = () => {
         </Modal.Header>
         <Form onSubmit={handleCreateSubmit}>
           <Modal.Body>
-            <Form.Group className="mb-3">
-              <Form.Label>Company *</Form.Label>
-              <Form.Select
-                value={createModalCompanyUuid}
-                onChange={(e) => {
-                  const uuid = e.target.value;
-                  setCreateModalCompanyUuid(uuid);
-                  setCreateForm((f) => ({ ...f, department_id: null, user_id: "" }));
-                  loadDepartmentsForCreate(uuid);
-                  //loadUsersForCreate(uuid);
-                }}
-                required
-              >
-                <option value="">Select company</option>
-                {createModalCompanies.map((c) => (
-                  <option key={String(c.identifier ?? c.uuid ?? c.id)} value={String(c.identifier ?? c.uuid ?? c.id ?? "")}>
-                    {String(c.name ?? c.uuid ?? c.id ?? "—")}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
+            
             <Form.Group className="mb-3">
               <Form.Label>Department</Form.Label>
-              <Form.Select
-                value={createForm.department_id ?? ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  const deptId = val === "" ? null : Number(val);
+              <Select<{ value: string; label: string }>
+                className="basic-single"
+                classNamePrefix="select"
+                placeholder={loadingDepartments ? "Loading departments…" : "Select department"}
+                isClearable
+                isDisabled={loadingDepartments}
+                isLoading={loadingDepartments}
+                options={mainAppDepartmentOptions}
+                value={mainAppDepartmentOptions.find((o) => o.value === String(createForm.department_id ?? "")) ?? null}
+                onChange={(opt) => {
+                  const deptId = opt?.value == null || opt.value === "" ? null : (Number(opt.value) || opt.value) as number;
                   setCreateForm((f) => ({ ...f, department_id: deptId, user_id: "" }));
                 }}
-                
-                disabled={!createModalCompanyUuid || loadingDepartments}
-              >
-                <option value="">Select department</option>
-                {createModalDepartments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name ?? `Department ${d.id}`}
-                  </option>
-                ))}
-              </Form.Select>
+                styles={selectStyles}
+              />
               {loadingDepartments && <Form.Text className="text-muted">Loading…</Form.Text>}
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>User *</Form.Label>
               <Select<{ value: string; label: string }>
-                placeholder="Select user"
+                className="basic-single"
+                classNamePrefix="select"
+                placeholder={loadingUsers ? "Loading users…" : "Select user"}
                 isClearable
-                isDisabled={hierarchyLoading}
-                options={createModalUserOptions}
-                value={createModalUserOptions.find((o) => o.value === (createForm.user_id ?? "")) ?? null}
+                isDisabled={loadingUsers}
+                isLoading={loadingUsers}
+                options={mainAppUserOptions}
+                value={mainAppUserOptions.find((o) => o.value === (createForm.user_id ?? "")) ?? null}
                 onChange={(opt) =>
                   setCreateForm((f) => ({ ...f, user_id: opt?.value ?? "" }))
                 }
+                styles={selectStyles}
               />
-              {hierarchyLoading && <Form.Text className="text-muted">Loading…</Form.Text>}
-              {createModalCompanyUuid && createModalExtensionsList.length === 0 && !hierarchyLoading && (
-                <Form.Text className="text-muted">No extensions available.</Form.Text>
+              {!loadingUsers && mainAppUserOptions.length === 0 && (
+                <Form.Text className="text-muted">No users available.</Form.Text>
               )}
             </Form.Group>
             <Form.Group className="mb-3">
@@ -1960,7 +2087,7 @@ const Employees = () => {
                 placeholder="Job title"
               />
             </Form.Group>
-            <Form.Group className="mb-3">
+            {/* <Form.Group className="mb-3">
               <Form.Label>Location</Form.Label>
               <Form.Select
                 value={createForm.location_id ?? ""}
@@ -1981,7 +2108,7 @@ const Employees = () => {
                 ))}
               </Form.Select>
               {loadingLocations && <Form.Text className="text-muted">Loading locations…</Form.Text>}
-            </Form.Group>
+            </Form.Group> */}
             <Form.Group className="mb-3">
               <Form.Label>Employment Type</Form.Label>
               <Form.Select
@@ -2007,12 +2134,14 @@ const Employees = () => {
               </Form.Select>
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Phone</Form.Label>
+              <Form.Label>Phone (E.164)</Form.Label>
               <Form.Control
+                type="tel"
                 value={createForm.phone ?? ""}
-                onChange={(e) => setCreateForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="Phone"
+                onChange={(e) => setCreateForm((f) => ({ ...f, phone: toE164Phone(e.target.value) }))}
+                placeholder="+1234567890"
               />
+              <Form.Text className="text-muted">E.164 format: optional + followed by digits, e.g. +923001234567</Form.Text>
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Status</Form.Label>
@@ -2037,7 +2166,7 @@ const Employees = () => {
                     onClick={() =>
                       setCreateFormAddresses((prev) => [
                         ...prev,
-                        { name: "", zip_code: "", city: "", country: "", address: "" },
+                        { name: "", zip_code: "", city: "", country: "", address: "", state: "", countryCode: "", stateCode: "" },
                       ])
                     }
                   >
@@ -2049,7 +2178,11 @@ const Employees = () => {
                   {createFormAddresses.length === 0 ? (
                     <div className="text-muted small">No addresses added. Click &quot;Add Address&quot; to add one.</div>
                   ) : (
-                    createFormAddresses.map((addr, idx) => (
+                    createFormAddresses.map((addr, idx) => {
+                      const countryOptions = addressCountries.map((c) => ({ value: c.isoCode, label: c.name }));
+                      const stateOptions = (addr.countryCode ? State.getStatesOfCountry(addr.countryCode) : []).map((s) => ({ value: s.isoCode, label: s.name }));
+                      const cityOptions = (addr.countryCode && addr.stateCode ? City.getCitiesOfState(addr.countryCode, addr.stateCode) : []).map((c) => ({ value: c.name, label: c.name }));
+                      return (
                       <div key={idx} className="p-3 bg-light rounded">
                         <div className="d-flex justify-content-between align-items-center mb-2">
                           <div className="fw-semibold">Address #{idx + 1}</div>
@@ -2096,32 +2229,73 @@ const Employees = () => {
                           </div>
                           <div className="col-md-6">
                             <Form.Group>
-                              <Form.Label>City</Form.Label>
-                              <Form.Control
-                                value={addr.city ?? ""}
-                                onChange={(e) =>
+                              <Form.Label>Country</Form.Label>
+                              <Select<{ value: string; label: string }>
+                                className="basic-single"
+                                classNamePrefix="select"
+                                isClearable
+                                isSearchable
+                                options={countryOptions}
+                                placeholder="Select Country"
+                                value={addr.countryCode ? countryOptions.find((o) => o.value === addr.countryCode) ?? null : null}
+                                onChange={(opt) =>
                                   setCreateFormAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, city: e.target.value } : a))
+                                    prev.map((a, i) =>
+                                      i === idx
+                                        ? { ...a, country: opt?.label ?? "", countryCode: opt?.value ?? "", state: "", stateCode: "", city: "" }
+                                        : a
+                                    )
                                   )
                                 }
-                                placeholder="City"
+                                styles={selectStyles}
                               />
                             </Form.Group>
                           </div>
                           <div className="col-md-6">
                             <Form.Group>
-                              <Form.Label>Country</Form.Label>
-                              <Form.Control
-                                value={addr.country ?? ""}
-                                onChange={(e) =>
+                              <Form.Label>State</Form.Label>
+                              <Select<{ value: string; label: string }>
+                                className="basic-single"
+                                classNamePrefix="select"
+                                isClearable
+                                isSearchable
+                                options={stateOptions}
+                                placeholder="Select State"
+                                isDisabled={!addr.countryCode}
+                                value={addr.stateCode ? stateOptions.find((o) => o.value === addr.stateCode) ?? null : null}
+                                onChange={(opt) =>
                                   setCreateFormAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, country: e.target.value } : a))
+                                    prev.map((a, i) =>
+                                      i === idx ? { ...a, state: opt?.label ?? "", stateCode: opt?.value ?? "", city: "" } : a
+                                    )
                                   )
                                 }
-                                placeholder="Country"
+                                styles={selectStyles}
                               />
                             </Form.Group>
                           </div>
+                          <div className="col-md-6">
+                            <Form.Group>
+                              <Form.Label>City</Form.Label>
+                              <Select<{ value: string; label: string }>
+                                className="basic-single"
+                                classNamePrefix="select"
+                                isClearable
+                                isSearchable
+                                options={cityOptions}
+                                placeholder="Select City"
+                                isDisabled={!addr.stateCode}
+                                value={addr.city ? cityOptions.find((o) => o.value === addr.city) ?? null : null}
+                                onChange={(opt) =>
+                                  setCreateFormAddresses((prev) =>
+                                    prev.map((a, i) => (i === idx ? { ...a, city: opt?.value ?? "" } : a))
+                                  )
+                                }
+                                styles={selectStyles}
+                              />
+                            </Form.Group>
+                          </div>
+                          <div className="col-md-6" />
                           <div className="col-12">
                             <Form.Group>
                               <Form.Label>Address</Form.Label>
@@ -2140,7 +2314,8 @@ const Employees = () => {
                           </div>
                         </div>
                       </div>
-                    ))
+                    );
+                    })
                   )}
                 </div>
                 <div className="text-muted small mt-2">
@@ -2160,6 +2335,61 @@ const Employees = () => {
         </Form>
       </Modal>
 
+      {/* Create Journey Modal */}
+      <Modal show={showJourneyModal} onHide={closeJourneyModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Create Journey</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {journeyModalProfile && (
+            <>
+              <Form.Group className="mb-3">
+                {/* <Form.Label className="text-muted small">Employee</Form.Label> */}
+                <div style={{ fontWeight: 600, color: "#1f2937", marginBottom: "2px" }}>
+                  {getDisplayName(journeyModalProfile)}
+                </div>
+                <div className="text-muted small">
+                  Phone: {journeyModalProfile.extension_number ?? journeyModalProfile.phone ?? "—"}
+                </div>
+                <div className="text-muted small">
+                  Department: {mainAppDepartments.find((d) => Number(d.id) === Number(journeyModalProfile.department_id))?.name ?? "—"}
+                </div>
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Start Date</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={journeyForm.startDate}
+                  onChange={(e) => setJourneyForm((f) => ({ ...f, startDate: e.target.value }))}
+                  
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Status</Form.Label>
+                <Form.Select
+                  value={journeyForm.status}
+                  onChange={(e) => setJourneyForm((f) => ({ ...f, status: e.target.value }))}
+                 
+                >
+                  <option value="in_progress">In Progress</option>
+                  <option value="on_track">On Track</option>
+                  <option value="overdue">Overdue</option>
+                  <option value="completed">Completed</option>
+                </Form.Select>
+              </Form.Group>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeJourneyModal} type="button">
+            Cancel
+          </Button>
+          <Button variant="primary" type="button" onClick={handleCreateJourney} disabled={journeySubmitting}>
+            {journeySubmitting ? "Creating…" : "Create"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
       {/* Edit Employee Modal - same structure as Add */}
       <Modal size="lg" show={showEditModal} onHide={() => { setShowEditModal(false); setEditingProfile(null); }} centered>
         <Modal.Header closeButton>
@@ -2167,27 +2397,7 @@ const Employees = () => {
         </Modal.Header>
         <Form onSubmit={handleEditSubmit}>
           <Modal.Body>
-            <Form.Group className="mb-3">
-              <Form.Label>Company *</Form.Label>
-              <Form.Select
-                value={editModalCompanyUuid}
-                onChange={(e) => {
-                  const uuid = e.target.value;
-                  setEditModalCompanyUuid(uuid);
-                  setEditForm((f) => ({ ...f, department_id: null, user_id: "" }));
-                  loadEditDepartments(uuid);
-                 // loadEditUsers(uuid);
-                }}
-                required
-              >
-                <option value="">Select company</option>
-                {editModalCompanies.map((c) => (
-                  <option key={String(c.identifier ?? c.uuid ?? c.id)} value={String(c.identifier ?? c.uuid ?? c.id ?? "")}>
-                    {String(c.name ?? c.uuid ?? c.id ?? "—")}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
+            
             <Form.Group className="mb-3">
               <Form.Label>Department</Form.Label>
               <Form.Select
@@ -2197,12 +2407,12 @@ const Employees = () => {
                   const deptId = val === "" ? null : Number(val);
                   setEditForm((f) => ({ ...f, department_id: deptId, user_id: "" }));
                 }}
-                disabled={!editModalCompanyUuid || loadingEditDepartments}
+                disabled={loadingEditDepartments}
               >
                 <option value="">Select department</option>
                 {editModalDepartments.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {d.name ?? `Department ${d.id}`}
+                    {d.name ?? "—"}
                   </option>
                 ))}
               </Form.Select>
@@ -2211,18 +2421,21 @@ const Employees = () => {
             <Form.Group className="mb-3">
               <Form.Label>User *</Form.Label>
               <Select<{ value: string; label: string }>
-                placeholder="Select user"
+                className="basic-single"
+                classNamePrefix="select"
+                placeholder={loadingUsers ? "Loading users…" : "Select user"}
                 isClearable
-                isDisabled={hierarchyLoading}
-                options={createModalUserOptions}
-                value={createModalUserOptions.find((o) => o.value === (editForm.user_id ?? "")) ?? null}
+                isDisabled={loadingUsers}
+                isLoading={loadingUsers}
+                options={mainAppUserOptions}
+                value={mainAppUserOptions.find((o) => o.value === (editForm.user_id ?? "")) ?? null}
                 onChange={(opt) =>
                   setEditForm((f) => ({ ...f, user_id: opt?.value ?? "" }))
                 }
+                styles={selectStyles}
               />
-              {hierarchyLoading && <Form.Text className="text-muted">Loading…</Form.Text>}
-              {editModalCompanyUuid && createModalExtensionsList.length === 0 && !hierarchyLoading && (
-                <Form.Text className="text-muted">No extensions available.</Form.Text>
+              {!loadingUsers && mainAppUserOptions.length === 0 && (
+                <Form.Text className="text-muted">No users available.</Form.Text>
               )}
             </Form.Group>
             <Form.Group className="mb-3">
@@ -2249,7 +2462,7 @@ const Employees = () => {
                 placeholder="Job title"
               />
             </Form.Group>
-            <Form.Group className="mb-3">
+            {/* <Form.Group className="mb-3">
               <Form.Label>Location</Form.Label>
               <Form.Select
                 value={editForm.location_id ?? ""}
@@ -2270,7 +2483,7 @@ const Employees = () => {
                 ))}
               </Form.Select>
               {loadingLocations && <Form.Text className="text-muted">Loading locations…</Form.Text>}
-            </Form.Group>
+            </Form.Group> */}
             <Form.Group className="mb-3">
               <Form.Label>Employment Type</Form.Label>
               <Form.Select
@@ -2296,11 +2509,12 @@ const Employees = () => {
               </Form.Select>
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Phone</Form.Label>
+              <Form.Label>Phone (E.164)</Form.Label>
               <Form.Control
+                type="tel"
                 value={editForm.phone ?? ""}
-                onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="Phone"
+                onChange={(e) => setEditForm((f) => ({ ...f, phone: toE164Phone(e.target.value) }))}
+                placeholder="+1234567890"
               />
             </Form.Group>
             <Form.Group className="mb-3">
@@ -2326,7 +2540,7 @@ const Employees = () => {
                     onClick={() =>
                       setEditFormAddresses((prev) => [
                         ...prev,
-                        { name: "", zip_code: "", city: "", country: "", address: "" },
+                        { name: "", zip_code: "", city: "", country: "", address: "", state: "", countryCode: "", stateCode: "" },
                       ])
                     }
                   >
@@ -2338,7 +2552,11 @@ const Employees = () => {
                   {editFormAddresses.length === 0 ? (
                     <div className="text-muted small">No addresses added. Click &quot;Add Address&quot; to add one.</div>
                   ) : (
-                    editFormAddresses.map((addr, idx) => (
+                    editFormAddresses.map((addr, idx) => {
+                      const countryOptionsEdit = addressCountries.map((c) => ({ value: c.isoCode, label: c.name }));
+                      const stateOptionsEdit = (addr.countryCode ? State.getStatesOfCountry(addr.countryCode) : []).map((s) => ({ value: s.isoCode, label: s.name }));
+                      const cityOptionsEdit = (addr.countryCode && addr.stateCode ? City.getCitiesOfState(addr.countryCode, addr.stateCode) : []).map((c) => ({ value: c.name, label: c.name }));
+                      return (
                       <div key={idx} className="p-3 bg-light rounded">
                         <div className="d-flex justify-content-between align-items-center mb-2">
                           <div className="fw-semibold">Address #{idx + 1}</div>
@@ -2385,32 +2603,73 @@ const Employees = () => {
                           </div>
                           <div className="col-md-6">
                             <Form.Group>
-                              <Form.Label>City</Form.Label>
-                              <Form.Control
-                                value={addr.city ?? ""}
-                                onChange={(e) =>
+                              <Form.Label>Country</Form.Label>
+                              <Select<{ value: string; label: string }>
+                                className="basic-single"
+                                classNamePrefix="select"
+                                isClearable
+                                isSearchable
+                                options={countryOptionsEdit}
+                                placeholder="Select Country"
+                                value={addr.countryCode ? countryOptionsEdit.find((o) => o.value === addr.countryCode) ?? null : null}
+                                onChange={(opt) =>
                                   setEditFormAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, city: e.target.value } : a))
+                                    prev.map((a, i) =>
+                                      i === idx
+                                        ? { ...a, country: opt?.label ?? "", countryCode: opt?.value ?? "", state: "", stateCode: "", city: "" }
+                                        : a
+                                    )
                                   )
                                 }
-                                placeholder="City"
+                                styles={selectStyles}
                               />
                             </Form.Group>
                           </div>
                           <div className="col-md-6">
                             <Form.Group>
-                              <Form.Label>Country</Form.Label>
-                              <Form.Control
-                                value={addr.country ?? ""}
-                                onChange={(e) =>
+                              <Form.Label>State</Form.Label>
+                              <Select<{ value: string; label: string }>
+                                className="basic-single"
+                                classNamePrefix="select"
+                                isClearable
+                                isSearchable
+                                options={stateOptionsEdit}
+                                placeholder="Select State"
+                                isDisabled={!addr.countryCode}
+                                value={addr.stateCode ? stateOptionsEdit.find((o) => o.value === addr.stateCode) ?? null : null}
+                                onChange={(opt) =>
                                   setEditFormAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, country: e.target.value } : a))
+                                    prev.map((a, i) =>
+                                      i === idx ? { ...a, state: opt?.label ?? "", stateCode: opt?.value ?? "", city: "" } : a
+                                    )
                                   )
                                 }
-                                placeholder="Country"
+                                styles={selectStyles}
                               />
                             </Form.Group>
                           </div>
+                          <div className="col-md-6">
+                            <Form.Group>
+                              <Form.Label>City</Form.Label>
+                              <Select<{ value: string; label: string }>
+                                className="basic-single"
+                                classNamePrefix="select"
+                                isClearable
+                                isSearchable
+                                options={cityOptionsEdit}
+                                placeholder="Select City"
+                                isDisabled={!addr.stateCode}
+                                value={addr.city ? cityOptionsEdit.find((o) => o.value === addr.city) ?? null : null}
+                                onChange={(opt) =>
+                                  setEditFormAddresses((prev) =>
+                                    prev.map((a, i) => (i === idx ? { ...a, city: opt?.value ?? "" } : a))
+                                  )
+                                }
+                                styles={selectStyles}
+                              />
+                            </Form.Group>
+                          </div>
+                          <div className="col-md-6" />
                           <div className="col-12">
                             <Form.Group>
                               <Form.Label>Address</Form.Label>
@@ -2429,7 +2688,8 @@ const Employees = () => {
                           </div>
                         </div>
                       </div>
-                    ))
+                    );
+                    })
                   )}
                 </div>
                 <div className="text-muted small mt-2">
@@ -2476,7 +2736,12 @@ const Employees = () => {
           }}
         >
           <div onClick={(e) => e.stopPropagation()}>
-            <EmployeeDetailSidebar />
+            <EmployeeDetailSidebar
+              profile={selectedProfile}
+              departments={mainAppDepartments}
+              users={mainAppUsers}
+              onClose={closeSidebar}
+            />
           </div>
         </div>
       )}

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'react-toastify';
 import { 
   X, 
   User,
@@ -14,6 +15,7 @@ import {
   Building2,
   UserCheck
 } from 'lucide-react';
+import { putUserProfileParent } from '@utils/staffManagement';
 
 interface Employee {
   id: string;
@@ -21,18 +23,48 @@ interface Employee {
   title: string;
   department: string;
   avatar: string;
-  status?: 'On Leave' | 'Active';
+  status?: 'On Leave' | 'Active' | 'Inactive';
   children?: Employee[];
+}
+
+/** Full API profile from org-chart-tree (optional, for real phone, employee_code, etc.) */
+interface RawOrgChartProfile {
+  id?: number;
+  user_id?: string;
+  employee_code?: string;
+  identification_number?: string;
+  job_title?: string;
+  phone?: string;
+  employment_type?: string;
+  contract_type?: string;
+  status?: string;
+  created_at?: string;
+  attendance?: { status?: string; check_in_at?: string | null; check_out_at?: string | null };
+  [key: string]: unknown;
+}
+
+interface UserOption {
+  id: number;
+  name: string;
 }
 
 interface OrganizationEmployeeSidebarProps {
   employee: Employee;
   onClose: () => void;
   allEmployees: Employee;
+  rawProfile?: RawOrgChartProfile | null;
+  /** List of users for "Reports to" dropdown (excluding current employee). */
+  users?: UserOption[];
+  /** Called after parent is updated successfully (e.g. to refetch org chart). */
+  onRefresh?: () => void | Promise<void>;
 }
 
-const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = ({ employee, onClose, allEmployees }) => {
+const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = ({ employee, onClose, allEmployees, rawProfile, users = [], onRefresh }) => {
   const [activeTab, setActiveTab] = useState<'Overview' | 'Team' | 'Performance'>('Overview');
+  const [parentId, setParentId] = useState<string>('');
+  const [updatingParent, setUpdatingParent] = useState(false);
+
+  const dropdownUsers = users.filter((u) => String(u.id) !== String(rawProfile?.user_id));
 
   // Find parent (manager) of current employee
   const findParent = (tree: Employee, targetId: string, parent: Employee | null = null): Employee | null => {
@@ -52,15 +84,20 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
   const directReports = employee.children || [];
   const totalTeamSize = directReports.length;
 
-  // Mock data - in real app, this would come from props or API
+  const joinDateFormatted = rawProfile?.created_at
+    ? new Date(rawProfile.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    : '—';
+
   const employeeDetails = {
-    email: `${employee.name.toLowerCase().replace(' ', '.')}@company.com`,
-    phone: '+1 (555) 123-4567',
-    location: 'New York, USA',
-    employeeId: `EMP-${employee.id.padStart(5, '0')}`,
-    joinDate: 'Jan 15, 2022',
-    employmentType: 'Full-time',
-    workSchedule: 'Mon - Fri, 9:00 AM - 5:00 PM'
+    email: rawProfile?.user_id ? `${rawProfile.user_id}@company.com` : `${employee.name.toLowerCase().replace(/\s+/g, '.')}@company.com`,
+    phone: rawProfile?.phone ?? '—',
+    location: '—',
+    employeeId: rawProfile?.employee_code ?? (employee.id ? `EMP-${String(employee.id).padStart(5, '0')}` : '—'),
+    joinDate: joinDateFormatted,
+    employmentType: rawProfile?.employment_type ?? '—',
+    workSchedule: rawProfile?.contract_type ? `${rawProfile.contract_type}` : 'Mon - Fri, 9:00 AM - 5:00 PM',
+    identificationNumber: rawProfile?.identification_number ?? '—',
+    attendance: rawProfile?.attendance,
   };
 
   const renderOverviewTab = () => (
@@ -202,7 +239,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
           >
-            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px', fontWeight: '500' }}>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px', fontWeight: '500',marginTop: '10px' }}>
               Reports to
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -230,6 +267,51 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
             </div>
           </div>
         )}
+
+        {/* Reports to (manager) dropdown */}
+      {dropdownUsers.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', margin: '0 0 12px 0' }}>
+            Reports to
+          </h3>
+          <select
+            value={parentId}
+            onChange={async (e) => {
+              const value = e.target.value;
+              setParentId(value);
+              if (!value) return;
+              setUpdatingParent(true);
+              try {
+                await putUserProfileParent(employee.id, { parent_id: value });
+                toast.success('Reporting manager updated');
+                await onRefresh?.();
+              } catch (err) {
+                toast.error('Failed to update reporting manager');
+                setParentId(parentId);
+              } finally {
+                setUpdatingParent(false);
+              }
+            }}
+            disabled={updatingParent}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              fontSize: '14px',
+              backgroundColor: 'white',
+              cursor: updatingParent ? 'wait' : 'pointer',
+            }}
+          >
+            <option value="">Select manager</option>
+            {dropdownUsers.map((u) => (
+              <option key={u.id} value={String(u.id)}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
         {/* Direct Reports */}
         {totalTeamSize > 0 && (
@@ -299,6 +381,18 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
                       On Leave
                     </div>
                   )}
+                  {report.status === 'Inactive' && (
+                    <div style={{
+                      padding: '2px 8px',
+                      backgroundColor: '#f3f4f6',
+                      borderRadius: '12px',
+                      fontSize: '10px',
+                      fontWeight: '500',
+                      color: '#6b7280'
+                    }}>
+                      Inactive
+                    </div>
+                  )}
                 </div>
               ))}
               {totalTeamSize > 3 && (
@@ -344,7 +438,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
         
         <div style={{
           padding: '16px',
-          backgroundColor: employee.status === 'On Leave' ? '#fef3c7' : '#d1fae5',
+          backgroundColor: employee.status === 'On Leave' ? '#fef3c7' : employee.status === 'Inactive' ? '#f3f4f6' : '#d1fae5',
           borderRadius: '8px',
           display: 'flex',
           alignItems: 'center',
@@ -354,7 +448,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
             width: '40px',
             height: '40px',
             borderRadius: '50%',
-            backgroundColor: employee.status === 'On Leave' ? '#fbbf24' : '#10b981',
+            backgroundColor: employee.status === 'On Leave' ? '#fbbf24' : employee.status === 'Inactive' ? '#9ca3af' : '#10b981',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -366,19 +460,21 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
             <div style={{ 
               fontSize: '14px', 
               fontWeight: '600', 
-              color: employee.status === 'On Leave' ? '#92400e' : '#065f46'
+              color: employee.status === 'On Leave' ? '#92400e' : employee.status === 'Inactive' ? '#6b7280' : '#065f46'
             }}>
               {employee.status || 'Active'}
             </div>
             <div style={{ 
               fontSize: '13px', 
-              color: employee.status === 'On Leave' ? '#92400e' : '#065f46'
+              color: employee.status === 'On Leave' ? '#92400e' : employee.status === 'Inactive' ? '#6b7280' : '#065f46'
             }}>
-              {employee.status === 'On Leave' ? 'Currently away from office' : 'Available and working'}
+              {employee.status === 'On Leave' ? 'Currently away from office' : employee.status === 'Inactive' ? 'No longer active' : 'Available and working'}
             </div>
           </div>
         </div>
       </div>
+
+      
     </>
   );
 
@@ -479,24 +575,24 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {/* <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Mail size={14} color="#9ca3af" />
                 <span style={{ fontSize: '13px', color: '#6b7280' }}>
                   {employeeDetails.email}
                 </span>
-              </div>
+              </div> */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Phone size={14} color="#9ca3af" />
                 <span style={{ fontSize: '13px', color: '#6b7280' }}>
                   {employeeDetails.phone}
                 </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {/* <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <MapPin size={14} color="#9ca3af" />
                 <span style={{ fontSize: '13px', color: '#6b7280' }}>
                   {employeeDetails.location}
                 </span>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>
@@ -542,6 +638,13 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
         {activeTab === 'Team' && renderTeamTab()}
         {activeTab === 'Performance' && renderPerformanceTab()}
       </div>
+
+
+      
+
+
+
+
     </div>
   );
 };

@@ -18,12 +18,58 @@ interface RequestItem {
   timestamp: string;
 }
 
-const EmployeeDetailSidebar: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('Personal');
+/** Profile from API (getUserProfile) – may include address_locations */
+export interface EmployeeSidebarProfile {
+  id: number;
+  tenant_id?: string | null;
+  user_id?: string | null;
+  department_id?: string | number | null;
+  employee_code?: string | null;
+  identification_number?: string | null;
+  job_title?: string | null;
+  employment_type?: string | null;
+  contract_type?: string | null;
+  location_id?: number | null;
+  phone?: string | null;
+  status?: string | null;
+  designation?: string | null;
+  parent_id?: number | null;
+  address_locations?: Array<{
+    id: number;
+    name?: string;
+    zip_code?: string;
+    city?: string;
+    country?: string;
+    address?: string;
+    [key: string]: unknown;
+  }>;
+  [key: string]: unknown;
+}
+
+interface DepartmentOption {
+  id: number;
+  name?: string;
+  [key: string]: unknown;
+}
+
+interface UserOption {
+  id: number;
+  name: string;
+}
+
+export interface EmployeeDetailSidebarProps {
+  profile: EmployeeSidebarProfile | null;
+  departments: DepartmentOption[];
+  users: UserOption[];
+  onClose?: () => void;
+}
+
+const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, departments, users, onClose }) => {
+  const [activeTab, setActiveTab] = useState('Job');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [show360Dropdown, setShow360Dropdown] = useState(false);
 
-  const tabs = ['Personal', 'Job', 'Location & Employment'];
+  const tabs = ['Job', 'Location & Employment'];//'Personal', 
 
   const requestItems: RequestItem[] = [
     {
@@ -522,27 +568,74 @@ const EmployeeDetailSidebar: React.FC = () => {
       
       case 'Job':
         return (
-          <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
-            <FileText size={48} color="#9ca3af" style={{ margin: '0 auto 16px' }} />
-            <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
+          <div style={{ padding: '20px' }}>
+            <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', marginBottom: '16px' }}>
               Job Information
             </h4>
-            <p style={{ fontSize: '14px', margin: 0 }}>
-              Job details and history will be displayed here
-            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {profile?.job_title != null && profile.job_title !== '' && (
+                <div>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Job title</span>
+                  <div style={{ fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>{String(profile.job_title)}</div>
+                </div>
+              )}
+              {profile?.department_id != null && (
+                <div>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Department</span>
+                  <div style={{ fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>
+                    {departments.find((d) => String(d.id) === String(profile.department_id))?.name ?? String(profile.department_id)}
+                  </div>
+                </div>
+              )}
+              {profile?.employment_type != null && profile.employment_type !== '' && (
+                <div>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Employment type</span>
+                  <div style={{ fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>{String(profile.employment_type)}</div>
+                </div>
+              )}
+              {profile?.contract_type != null && profile.contract_type !== '' && (
+                <div>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Contract type</span>
+                  <div style={{ fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>{String(profile.contract_type)}</div>
+                </div>
+              )}
+              {!profile?.job_title && profile?.department_id == null && !profile?.employment_type && !profile?.contract_type && (
+                <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>No job details</p>
+              )}
+            </div>
           </div>
         );
-      
+
       case 'Location & Employment':
         return (
-          <div style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
-            <MapPin size={48} color="#9ca3af" style={{ margin: '0 auto 16px' }} />
-            <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
-              Location & Employment Details
+          <div style={{ padding: '20px' }}>
+            <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', marginBottom: '16px' }}>
+              Location & Employment
             </h4>
-            <p style={{ fontSize: '14px', margin: 0 }}>
-              Location and employment information will be displayed here
-            </p>
+            {profile?.address_locations && profile.address_locations.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {profile.address_locations.map((loc) => (
+                  <div
+                    key={loc.id}
+                    style={{
+                      padding: '16px',
+                      backgroundColor: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb',
+                    }}
+                  >
+                    {loc.name && <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>{loc.name}</div>}
+                    {loc.address && <div style={{ fontSize: '14px', color: '#374151', marginBottom: '4px' }}>{loc.address}</div>}
+                    <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                      {[loc.city, loc.country].filter(Boolean).join(', ')}
+                      {loc.zip_code ? ` ${loc.zip_code}` : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>No address locations</p>
+            )}
           </div>
         );
       
@@ -550,6 +643,9 @@ const EmployeeDetailSidebar: React.FC = () => {
         return null;
     }
   };
+
+  const displayName = profile ? (users.find((u) => String(u.id) === String(profile.user_id))?.name ?? String(profile.user_id ?? profile.employee_code ?? profile.id ?? "—")) : "—";
+  const departmentName = profile?.department_id != null ? (departments.find((d) => String(d.id) === String(profile.department_id))?.name ?? String(profile.department_id)) : null;
 
   return (
     <div style={{
@@ -575,42 +671,43 @@ const EmployeeDetailSidebar: React.FC = () => {
               color: '#1f2937',
               margin: '0 0 4px 0'
             }}>
-              Zohaib Rehman
+              {displayName}
             </h2>
-            <p style={{ 
-              fontSize: '15px', 
-              color: '#6b7280',
-              margin: '0 0 8px 0'
-            }}>
-              Marketing Specialist
-            </p>
-            <p style={{ 
-              fontSize: '14px', 
-              color: '#9ca3af',
-              margin: '0 0 16px 0'
-            }}>
-              42001-5884853
-            </p>
+            {profile?.job_title != null && profile.job_title !== '' && (
+              <p style={{ fontSize: '15px', color: '#6b7280', margin: '0 0 8px 0' }}>
+                {String(profile.job_title)}
+              </p>
+            )}
+            {departmentName != null && (
+              <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 8px 0' }}>
+                {departmentName}
+              </p>
+            )}
+            {profile?.employee_code != null && profile.employee_code !== '' && (
+              <p style={{ fontSize: '14px', color: '#9ca3af', margin: '0 0 16px 0' }}>
+                {String(profile.employee_code)}
+              </p>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Phone size={16} color="#6b7280" />
-                <span style={{ fontSize: '14px', color: '#6b7280' }}>
-                  +1 416-789-2547
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Mail size={16} color="#6b7280" />
-                <span style={{ fontSize: '14px', color: '#6b7280' }}>
-                  zohaib@primealley.com
-                </span>
-              </div>
+              {profile?.phone != null && profile.phone !== '' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Phone size={16} color="#6b7280" />
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>{String(profile.phone)}</span>
+                </div>
+              )}
+              {(profile as { email?: string })?.email != null && (profile as { email?: string }).email !== '' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Mail size={16} color="#6b7280" />
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>{(profile as { email?: string }).email}</span>
+                </div>
+              )}
             </div>
           </div>
 
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <button
-              onClick={() => console.log('Close sidebar')}
+              onClick={onClose}
               style={{
                 position: 'absolute',
                 top: '-4px',
