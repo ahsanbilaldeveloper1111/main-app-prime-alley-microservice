@@ -809,13 +809,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/staff-management/request-categories',
           permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT
         },
-        {
-          id:'staff-management-locations',
-          title: 'Manage Locations',
-          icon: <Map size={16} />,
-          url: '/staff-management/locations',
-          permission: PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT
-        }
+        // {
+        //   id:'staff-management-locations',
+        //   title: 'Manage Locations',
+        //   icon: <Map size={16} />,
+        //   url: '/staff-management/locations',
+        //   permission: PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT
+        // }
       ].filter(item => !item.permission || hasPermission(item.permission))
     }, 
 

@@ -4,14 +4,13 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import EmployeeDetailSidebar from "@components/employee-sidebar";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import AddEmployeeModal from "@pages/staff-management/AddEmployeeModal";
+import EditEmployeeModal from "@pages/staff-management/EditEmployeeModal";
 import {
   getUserProfiles,
   getUserProfile,
-  createUserProfile,
   updateUserProfile,
   deleteUserProfile,
-  getMainAppCompanies,
-  getMainAppDepartments,
   getEmployeeDashboardCounters,
   getLocations,
   getEmployeeDashboardGraphDepartmentHeadcount,
@@ -28,7 +27,7 @@ import { Button, Form, Modal } from "react-bootstrap";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-import { Search, ChevronDown, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Plus, Pencil, Trash2, User } from "lucide-react";
+import { Search, ChevronDown, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Plus, Pencil, Trash2, User, Calendar } from "lucide-react";
 import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import Select, { SingleValue } from "react-select";
@@ -213,31 +212,13 @@ const Employees = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [profileToDelete, setProfileToDelete] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [createSubmitting, setCreateSubmitting] = useState(false);
-  const [editSubmitting, setEditSubmitting] = useState(false);
 
   const [showJourneyModal, setShowJourneyModal] = useState(false);
   const [journeyModalProfile, setJourneyModalProfile] = useState<UserProfile | null>(null);
   const [journeyForm, setJourneyForm] = useState<{ startDate: string; status: string }>({ startDate: "", status: "in_progress" });
   const [journeySubmitting, setJourneySubmitting] = useState(false);
 
-  const [createForm, setCreateForm] = useState<Partial<UserProfilePayload>>({
-    user_id: "",
-    employee_code: "",
-    identification_number: "",
-    job_title: "",
-    department_id: null,
-    location_id: null,
-    employment_type: "",
-    contract_type: "",
-    phone: "",
-    status: "active",
-  });
-  /** Addresses for create form kept in separate state to avoid update loops when editing address fields */
-  const [createFormAddresses, setCreateFormAddresses] = useState<AddressFormItem[]>([]);
   const [addressCountries, setAddressCountries] = useState<{ isoCode: string; name: string }[]>([]);
-
-  const [createModalCompanyUuid, setCreateModalCompanyUuid] = useState<string>("");
 
   useEffect(() => {
     try {
@@ -283,7 +264,6 @@ const Employees = () => {
     fetchCounters();
   }, []);
 
-  const [createModalCompanies, setCreateModalCompanies] = useState<{ id?: string; uuid?: string; name?: string; [key: string]: unknown }[]>([]);
   const [locationsList, setLocationsList] = useState<Location[]>([]);
   const [filterLocations, setFilterLocations] = useState<Location[]>([]);
   const [loadingFilterLocations, setLoadingFilterLocations] = useState(false);
@@ -291,24 +271,6 @@ const Employees = () => {
   const [departmentHeadcountData, setDepartmentHeadcountData] = useState<{ name: string; count: number; color: string }[]>([]);
   const [dashboardCounters, setDashboardCounters] = useState<EmployeeDashboardCountersData | null>(null);
 
-  const [editModalCompanyUuid, setEditModalCompanyUuid] = useState<string>("");
-  const [editModalCompanies, setEditModalCompanies] = useState<{ id?: string; uuid?: string; name?: string; [key: string]: unknown }[]>([]);
-  const [editModalDepartments, setEditModalDepartments] = useState<MainAppDepartment[]>([]);
-  const [loadingEditDepartments, setLoadingEditDepartments] = useState(false);
-  const [editFormAddresses, setEditFormAddresses] = useState<AddressFormItem[]>([]);
-
-  const [editForm, setEditForm] = useState<Partial<UserProfilePayload>>({
-    user_id: "",
-    employee_code: "",
-    identification_number: "",
-    job_title: "",
-    department_id: null,
-    location_id: null,
-    employment_type: "",
-    contract_type: "",
-    phone: "",
-    status: "active",
-  });
 
   const loadProfiles = useCallback(async (page = 1) => {
     setLoading(true);
@@ -382,16 +344,6 @@ const Employees = () => {
     setActiveTab("Personal");
   };
 
-  const loadCompaniesForCreate = useCallback(async () => {
-    try {
-      const data = await getMainAppCompanies();
-      setCreateModalCompanies(Array.isArray(data) ? (data as { id?: string; uuid?: string; name?: string; [key: string]: unknown }[]) : []);
-    } catch {
-      setCreateModalCompanies([]);
-    }
-  }, []);
-
-
   const loadLocationsForModal = useCallback(async () => {
     setLoadingLocations(true);
     try {
@@ -405,22 +357,6 @@ const Employees = () => {
   }, []);
 
   const openCreateModal = () => {
-    setCreateForm({
-      user_id: "",
-      employee_code: "",
-      identification_number: "",
-      job_title: "",
-      department_id: null,
-      location_id: null,
-      employment_type: "",
-      contract_type: "",
-      phone: "",
-      status: "active",
-      addresses: [],
-    });
-    setCreateModalCompanyUuid("");
-    loadCompaniesForCreate();
-    loadLocationsForModal();
     setShowCreateModal(true);
   };
 
@@ -488,138 +424,10 @@ const Employees = () => {
   }, [mainAppUsers]);
 
 
-  const loadEditCompanies = useCallback(async () => {
-    try {
-      const data = await getMainAppCompanies();
-      setEditModalCompanies(Array.isArray(data) ? (data as { id?: string; uuid?: string; name?: string; [key: string]: unknown }[]) : []);
-    } catch {
-      setEditModalCompanies([]);
-    }
-  }, []);
-
-  const loadEditDepartments = useCallback(async (companyUuid: string) => {
-    if (!companyUuid) {
-      setEditModalDepartments([]);
-      return;
-    }
-    setLoadingEditDepartments(true);
-    try {
-      const data = await getMainAppDepartments(companyUuid);
-      setEditModalDepartments(Array.isArray(data) ? (data as MainAppDepartment[]) : []);
-    } catch {
-      setEditModalDepartments([]);
-    } finally {
-      setLoadingEditDepartments(false);
-    }
-  }, []);
-
-  const openEditModal = async (profile: UserProfile, e?: React.MouseEvent) => {
+  const openEditModal = (profile: UserProfile, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setEditingProfile(profile);
-    const tenantId = (profile as UserProfile & { tenant_id?: string }).tenant_id ?? "";
-    setEditModalCompanyUuid(tenantId);
-    setEditForm({
-      user_id: profile.user_id ?? "",
-      employee_code: profile.employee_code ?? "",
-      identification_number: profile.identification_number ?? "",
-      job_title: profile.job_title ?? "",
-      department_id: profile.department_id ?? null,
-      location_id: profile.location_id ?? null,
-      employment_type: profile.employment_type ?? "",
-      contract_type: profile.contract_type ?? "",
-      phone: profile.phone ?? "",
-      status: profile.status ?? "active",
-    });
-    const addrs = (profile as UserProfile & { addresses?: UserProfileAddress[] }).addresses;
-    setEditFormAddresses(Array.isArray(addrs) && addrs.length > 0 ? addrs.map((a) => ({ name: a.name ?? "", zip_code: a.zip_code ?? "", city: a.city ?? "", country: a.country ?? "", address: a.address ?? "", state: (a as AddressFormItem).state ?? "", countryCode: "", stateCode: "" })) : [{ name: "", zip_code: "", city: "", country: "", address: "", state: "", countryCode: "", stateCode: "" }]);
-    loadEditCompanies();
-    if (tenantId) {
-      loadEditDepartments(tenantId);
-    } else {
-      setEditModalDepartments([]);
-    }
-    loadLocationsForModal();
     setShowEditModal(true);
-    try {
-      const full = await getUserProfile(profile.id);
-      const fullAddrs = (full as UserProfile & { addresses?: UserProfileAddress[] }).addresses;
-      if (Array.isArray(fullAddrs) && fullAddrs.length > 0) {
-        setEditFormAddresses(fullAddrs.map((a) => ({ name: a.name ?? "", zip_code: a.zip_code ?? "", city: a.city ?? "", country: a.country ?? "", address: a.address ?? "", state: (a as AddressFormItem).state ?? "", countryCode: "", stateCode: "" })));
-      }
-    } catch {
-      // keep initial editFormAddresses
-    }
-  };
-
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!createForm.user_id?.toString().trim()) {
-      toast.error("User ID is required");
-      return;
-    }
-    setCreateSubmitting(true);
-    try {
-      await createUserProfile({
-        tenant_id: createModalCompanyUuid ? String(createModalCompanyUuid).trim() : undefined,
-        user_id: String(createForm.user_id).trim(),
-        employee_code: createForm.employee_code?.toString().trim() || null,
-        identification_number: createForm.identification_number?.toString().trim() || null,
-        job_title: createForm.job_title?.toString().trim() || null,
-        department_id: createForm.department_id ?? null,
-        location_id: createForm.location_id ?? null,
-        employment_type: createForm.employment_type?.toString().trim() || null,
-        contract_type: createForm.contract_type?.toString().trim() || null,
-        phone: createForm.phone?.toString().trim() || null,
-        status: createForm.status?.toString().trim() || null,
-        addresses: createFormAddresses?.length
-          ? createFormAddresses.map(({ name, zip_code, city, country, address }) => ({ name, zip_code, city, country, address }))
-          : undefined,
-      });
-      toast.success("Employee created");
-      setShowCreateModal(false);
-      loadProfiles(currentPage);
-    } catch {
-      // toast handled in API
-    } finally {
-      setCreateSubmitting(false);
-    }
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingProfile) return;
-    if (!editForm.user_id?.toString().trim()) {
-      toast.error("User ID is required");
-      return;
-    }
-    setEditSubmitting(true);
-    try {
-      await updateUserProfile(editingProfile.id, {
-        tenant_id: editModalCompanyUuid ? String(editModalCompanyUuid).trim() : undefined,
-        user_id: editForm.user_id?.toString().trim() || null,
-        employee_code: editForm.employee_code?.toString().trim() || null,
-        identification_number: editForm.identification_number?.toString().trim() || null,
-        job_title: editForm.job_title?.toString().trim() || null,
-        department_id: editForm.department_id ?? null,
-        location_id: editForm.location_id ?? null,
-        employment_type: editForm.employment_type?.toString().trim() || null,
-        contract_type: editForm.contract_type?.toString().trim() || null,
-        phone: editForm.phone?.toString().trim() || null,
-        status: editForm.status?.toString().trim() || null,
-        addresses: editFormAddresses?.length
-          ? editFormAddresses.map(({ name, zip_code, city, country, address }) => ({ name, zip_code, city, country, address }))
-          : undefined,
-      });
-      toast.success("Employee updated");
-      setShowEditModal(false);
-      setEditingProfile(null);
-      loadProfiles(currentPage);
-      if (selectedProfile?.id === editingProfile.id) setSelectedProfile(null);
-    } catch {
-      // toast handled in API
-    } finally {
-      setEditSubmitting(false);
-    }
   };
 
   const handleDeleteClick = (profile: UserProfile, e: React.MouseEvent) => {
@@ -709,7 +517,9 @@ const Employees = () => {
       setAppliedContract(selectedContract);
       setAppliedManagerIds(selectedManagerIds);
       setCurrentPage(1);
-      loadProfilesRef.current(1);
+      // Don't call loadProfilesRef.current(1) here: the useEffect([currentPage, loadProfiles])
+      // will run once after state updates, using the new applied filters. Calling it here would
+      // use the old filters and cause a duplicate API call.
     };
 
     const resetFilters = () => {
@@ -728,7 +538,7 @@ const Employees = () => {
       setAppliedContract("");
       setAppliedManagerIds([]);
       setCurrentPage(1);
-      loadProfilesRef.current(1);
+      // loadProfilesRef.current(1);
     };
 
   return (
@@ -840,7 +650,7 @@ const Employees = () => {
               }}
             >
               <span>📋</span>
-              <span>Department</span>
+              <span>{selectedDepartment || 'Department'}</span>
               <ChevronDown size={16} />
             </button>
             {openDropdown === 'department' && (
@@ -879,6 +689,23 @@ const Employees = () => {
                   />
                 </div>
                 <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  <div
+                    onClick={() => {
+                      setSelectedDepartment('');
+                      setOpenDropdown(null);
+                      setDepartmentSearchTerm('');
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      cursor: 'pointer',
+                      backgroundColor: !selectedDepartment ? '#f3f4f6' : 'white',
+                      borderBottom: '1px solid #e5e7eb',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedDepartment ? '#f3f4f6' : 'white'}
+                  >
+                    All departments
+                  </div>
                   {departments
                     .filter((dept) => {
                       const label = hierarchyLabel(dept);
@@ -949,9 +776,27 @@ const Employees = () => {
               }}>
                 {loadingFilterLocations ? (
                   <div style={{ padding: '12px 16px', color: '#6b7280', fontSize: '14px' }}>Loading locations…</div>
-                ) : filterLocations.length === 0 ? (
-                  <div style={{ padding: '12px 16px', color: '#6b7280', fontSize: '14px' }}>No locations</div>
                 ) : (
+                  <>
+                    <div
+                      onClick={() => {
+                        setSelectedLocationId(null);
+                        setOpenDropdown(null);
+                      }}
+                      style={{
+                        padding: '10px 16px',
+                        cursor: 'pointer',
+                        backgroundColor: selectedLocationId === null ? '#f3f4f6' : 'white',
+                        borderBottom: '1px solid #e5e7eb',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedLocationId === null ? '#f3f4f6' : 'white'}
+                    >
+                      All locations
+                    </div>
+                    {filterLocations.length === 0 ? (
+                      <div style={{ padding: '12px 16px', color: '#6b7280', fontSize: '14px' }}>No locations</div>
+                    ) : (
                   filterLocations.map((loc) => {
                     const label = loc.name ?? String(loc.id);
                     const isSelected = selectedLocationId === loc.id;
@@ -974,6 +819,8 @@ const Employees = () => {
                       </div>
                     );
                   })
+                )}
+                  </>
                 )}
               </div>
             )}
@@ -998,7 +845,7 @@ const Employees = () => {
                 fontSize: '14px'
               }}
             >
-              <span>Status</span>
+              <span>{selectedStatus || 'Status'}</span>
               <ChevronDown size={16} />
             </button>
             {openDropdown === 'status' && (
@@ -1014,6 +861,22 @@ const Employees = () => {
                 zIndex: 10,
                 minWidth: '150px'
               }}>
+                <div
+                  onClick={() => {
+                    setSelectedStatus('');
+                    setOpenDropdown(null);
+                  }}
+                  style={{
+                    padding: '10px 16px',
+                    cursor: 'pointer',
+                    backgroundColor: !selectedStatus ? '#f3f4f6' : 'white',
+                    borderBottom: '1px solid #e5e7eb',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedStatus ? '#f3f4f6' : 'white'}
+                >
+                  All Statuses
+                </div>
                 {statuses.map(status => (
                   <div
                     key={status}
@@ -1094,6 +957,22 @@ const Employees = () => {
                   />
                 </div>
                 <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  <div
+                    onClick={() => {
+                      setSelectedManagerIds([]);
+                      setOpenDropdown(null);
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      cursor: 'pointer',
+                      backgroundColor: selectedManagerIds.length === 0 ? '#f3f4f6' : 'white',
+                      borderBottom: '1px solid #e5e7eb',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedManagerIds.length === 0 ? '#f3f4f6' : 'white'}
+                  >
+                    All users
+                  </div>
                   {managers
                     .filter((mgr) => {
                       const label = hierarchyLabel(mgr);
@@ -1181,7 +1060,7 @@ const Employees = () => {
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedEmploymentType ? '#f3f4f6' : 'white'}
                 >
-                  All
+                  All employment types
                 </div>
                 {EMPLOYMENT_TYPES.map(type => (
                   <div
@@ -1254,7 +1133,7 @@ const Employees = () => {
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedContract ? '#f3f4f6' : 'white'}
                 >
-                  All
+                  All contract types
                 </div>
                 {CONTRACT_TYPES.map(type => (
                   <div
@@ -1650,7 +1529,7 @@ const Employees = () => {
                             }}
                             title="Create Journey"
                           >
-                             OB
+                            <Calendar size={16} color="#6366f1" /> Create Journey
                           </button>
                           )}
 
@@ -2016,324 +1895,12 @@ const Employees = () => {
         </div>
       </div>
 
-      {/* Create Employee Modal */}
-      <Modal size="lg" show={showCreateModal} onHide={() => setShowCreateModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Add Employee</Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleCreateSubmit}>
-          <Modal.Body>
-            
-            <Form.Group className="mb-3">
-              <Form.Label>Department</Form.Label>
-              <Select<{ value: string; label: string }>
-                className="basic-single"
-                classNamePrefix="select"
-                placeholder={loadingDepartments ? "Loading departments…" : "Select department"}
-                isClearable
-                isDisabled={loadingDepartments}
-                isLoading={loadingDepartments}
-                options={mainAppDepartmentOptions}
-                value={mainAppDepartmentOptions.find((o) => o.value === String(createForm.department_id ?? "")) ?? null}
-                onChange={(opt) => {
-                  const deptId = opt?.value == null || opt.value === "" ? null : (Number(opt.value) || opt.value) as number;
-                  setCreateForm((f) => ({ ...f, department_id: deptId, user_id: "" }));
-                }}
-                styles={selectStyles}
-              />
-              {loadingDepartments && <Form.Text className="text-muted">Loading…</Form.Text>}
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>User *</Form.Label>
-              <Select<{ value: string; label: string }>
-                className="basic-single"
-                classNamePrefix="select"
-                placeholder={loadingUsers ? "Loading users…" : "Select user"}
-                isClearable
-                isDisabled={loadingUsers}
-                isLoading={loadingUsers}
-                options={mainAppUserOptions}
-                value={mainAppUserOptions.find((o) => o.value === (createForm.user_id ?? "")) ?? null}
-                onChange={(opt) =>
-                  setCreateForm((f) => ({ ...f, user_id: opt?.value ?? "" }))
-                }
-                styles={selectStyles}
-              />
-              {!loadingUsers && mainAppUserOptions.length === 0 && (
-                <Form.Text className="text-muted">No users available.</Form.Text>
-              )}
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Employee Code</Form.Label>
-              <Form.Control
-                value={createForm.employee_code ?? ""}
-                onChange={(e) => setCreateForm((f) => ({ ...f, employee_code: e.target.value }))}
-                placeholder="Employee code"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Identification Number (CNIC)</Form.Label>
-              <Form.Control
-                value={createForm.identification_number ?? ""}
-                onChange={(e) => setCreateForm((f) => ({ ...f, identification_number: e.target.value }))}
-                placeholder="CNIC / ID"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Job Title</Form.Label>
-              <Form.Control
-                value={createForm.job_title ?? ""}
-                onChange={(e) => setCreateForm((f) => ({ ...f, job_title: e.target.value }))}
-                placeholder="Job title"
-              />
-            </Form.Group>
-            {/* <Form.Group className="mb-3">
-              <Form.Label>Location</Form.Label>
-              <Form.Select
-                value={createForm.location_id ?? ""}
-                onChange={(e) =>
-                  setCreateForm((f) => ({
-                    ...f,
-                    location_id: e.target.value === "" ? null : Number(e.target.value),
-                  }))
-                }
-                disabled={loadingLocations}
-              >
-                <option value="">Select location</option>
-                {locationsList.map((loc) => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name ?? `Location ${loc.id}`}
-                    {loc.city || loc.country ? ` — ${[loc.city, loc.country].filter(Boolean).join(", ")}` : ""}
-                  </option>
-                ))}
-              </Form.Select>
-              {loadingLocations && <Form.Text className="text-muted">Loading locations…</Form.Text>}
-            </Form.Group> */}
-            <Form.Group className="mb-3">
-              <Form.Label>Employment Type</Form.Label>
-              <Form.Select
-                value={createForm.employment_type ?? ""}
-                onChange={(e) => setCreateForm((f) => ({ ...f, employment_type: e.target.value }))}
-              >
-                <option value="">Select employment type</option>
-                {EMPLOYMENT_TYPES.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Contract Type</Form.Label>
-              <Form.Select
-                value={createForm.contract_type ?? ""}
-                onChange={(e) => setCreateForm((f) => ({ ...f, contract_type: e.target.value }))}
-              >
-                <option value="">Select contract type</option>
-                {CONTRACT_TYPES.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Phone (E.164)</Form.Label>
-              <Form.Control
-                type="tel"
-                value={createForm.phone ?? ""}
-                onChange={(e) => setCreateForm((f) => ({ ...f, phone: toE164Phone(e.target.value) }))}
-                placeholder="+1234567890"
-              />
-              <Form.Text className="text-muted">E.164 format: optional + followed by digits, e.g. +923001234567</Form.Text>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Status</Form.Label>
-              <Form.Select
-                value={createForm.status ?? "active"}
-                onChange={(e) => setCreateForm((f) => ({ ...f, status: e.target.value }))}
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </Form.Select>
-            </Form.Group>
-
-            {/* Addresses */}
-            <div className="card em-card mb-3">
-              <div className="card-body">
-                <div className="d-flex align-items-center justify-content-between gap-2 mb-2">
-                  <div className="em-section-title mb-0">Addresses</div>
-                  <Button
-                    type="button"
-                    variant="outline-primary"
-                    size="sm"
-                    onClick={() =>
-                      setCreateFormAddresses((prev) => [
-                        ...prev,
-                        { name: "", zip_code: "", city: "", country: "", address: "", state: "", countryCode: "", stateCode: "" },
-                      ])
-                    }
-                  >
-                    <Plus className="me-1" size={14} />
-                    Add Address
-                  </Button>
-                </div>
-                <div className="d-flex flex-column gap-3">
-                  {createFormAddresses.length === 0 ? (
-                    <div className="text-muted small">No addresses added. Click &quot;Add Address&quot; to add one.</div>
-                  ) : (
-                    createFormAddresses.map((addr, idx) => {
-                      const countryOptions = addressCountries.map((c) => ({ value: c.isoCode, label: c.name }));
-                      const stateOptions = (addr.countryCode ? State.getStatesOfCountry(addr.countryCode) : []).map((s) => ({ value: s.isoCode, label: s.name }));
-                      const cityOptions = (addr.countryCode && addr.stateCode ? City.getCitiesOfState(addr.countryCode, addr.stateCode) : []).map((c) => ({ value: c.name, label: c.name }));
-                      return (
-                      <div key={idx} className="p-3 bg-light rounded">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <div className="fw-semibold">Address #{idx + 1}</div>
-                          <Button
-                            type="button"
-                            variant="outline-danger"
-                            size="sm"
-                            disabled={createFormAddresses.length <= 1}
-                            onClick={() =>
-                              setCreateFormAddresses((prev) => prev.filter((_, i) => i !== idx))
-                            }
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
-                        <div className="row g-3">
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>Name</Form.Label>
-                              <Form.Control
-                                value={addr.name ?? ""}
-                                onChange={(e) =>
-                                  setCreateFormAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, name: e.target.value } : a))
-                                  )
-                                }
-                                placeholder="e.g. Head Office"
-                              />
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>Zip / Postal Code</Form.Label>
-                              <Form.Control
-                                value={addr.zip_code ?? ""}
-                                onChange={(e) =>
-                                  setCreateFormAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, zip_code: e.target.value } : a))
-                                  )
-                                }
-                                placeholder="Zip / Postal Code"
-                              />
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>Country</Form.Label>
-                              <Select<{ value: string; label: string }>
-                                className="basic-single"
-                                classNamePrefix="select"
-                                isClearable
-                                isSearchable
-                                options={countryOptions}
-                                placeholder="Select Country"
-                                value={addr.countryCode ? countryOptions.find((o) => o.value === addr.countryCode) ?? null : null}
-                                onChange={(opt) =>
-                                  setCreateFormAddresses((prev) =>
-                                    prev.map((a, i) =>
-                                      i === idx
-                                        ? { ...a, country: opt?.label ?? "", countryCode: opt?.value ?? "", state: "", stateCode: "", city: "" }
-                                        : a
-                                    )
-                                  )
-                                }
-                                styles={selectStyles}
-                              />
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>State</Form.Label>
-                              <Select<{ value: string; label: string }>
-                                className="basic-single"
-                                classNamePrefix="select"
-                                isClearable
-                                isSearchable
-                                options={stateOptions}
-                                placeholder="Select State"
-                                isDisabled={!addr.countryCode}
-                                value={addr.stateCode ? stateOptions.find((o) => o.value === addr.stateCode) ?? null : null}
-                                onChange={(opt) =>
-                                  setCreateFormAddresses((prev) =>
-                                    prev.map((a, i) =>
-                                      i === idx ? { ...a, state: opt?.label ?? "", stateCode: opt?.value ?? "", city: "" } : a
-                                    )
-                                  )
-                                }
-                                styles={selectStyles}
-                              />
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>City</Form.Label>
-                              <Select<{ value: string; label: string }>
-                                className="basic-single"
-                                classNamePrefix="select"
-                                isClearable
-                                isSearchable
-                                options={cityOptions}
-                                placeholder="Select City"
-                                isDisabled={!addr.stateCode}
-                                value={addr.city ? cityOptions.find((o) => o.value === addr.city) ?? null : null}
-                                onChange={(opt) =>
-                                  setCreateFormAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, city: opt?.value ?? "" } : a))
-                                  )
-                                }
-                                styles={selectStyles}
-                              />
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6" />
-                          <div className="col-12">
-                            <Form.Group>
-                              <Form.Label>Address</Form.Label>
-                              <Form.Control
-                                as="textarea"
-                                rows={2}
-                                value={addr.address ?? ""}
-                                onChange={(e) =>
-                                  setCreateFormAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, address: e.target.value } : a))
-                                  )
-                                }
-                                placeholder="Street address"
-                              />
-                            </Form.Group>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                    })
-                  )}
-                </div>
-                <div className="text-muted small mt-2">
-                  Addresses are stored as multiple Location records linked to this employee profile.
-                </div>
-              </div>
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowCreateModal(false)} type="button">
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" disabled={createSubmitting}>
-              {createSubmitting ? "Creating…" : "Create"}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
+      <AddEmployeeModal
+        show={showCreateModal}
+        onHide={() => setShowCreateModal(false)}
+        onSuccess={() => loadProfiles(currentPage)}
+        tenantId={companyIdentifier ?? undefined}
+      />
 
       {/* Create Journey Modal */}
       <Modal show={showJourneyModal} onHide={closeJourneyModal} centered>
@@ -2390,324 +1957,15 @@ const Employees = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* Edit Employee Modal - same structure as Add */}
-      <Modal size="lg" show={showEditModal} onHide={() => { setShowEditModal(false); setEditingProfile(null); }} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Edit Employee</Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleEditSubmit}>
-          <Modal.Body>
-            
-            <Form.Group className="mb-3">
-              <Form.Label>Department</Form.Label>
-              <Form.Select
-                value={editForm.department_id ?? ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  const deptId = val === "" ? null : Number(val);
-                  setEditForm((f) => ({ ...f, department_id: deptId, user_id: "" }));
-                }}
-                disabled={loadingEditDepartments}
-              >
-                <option value="">Select department</option>
-                {editModalDepartments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name ?? "—"}
-                  </option>
-                ))}
-              </Form.Select>
-              {loadingEditDepartments && <Form.Text className="text-muted">Loading…</Form.Text>}
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>User *</Form.Label>
-              <Select<{ value: string; label: string }>
-                className="basic-single"
-                classNamePrefix="select"
-                placeholder={loadingUsers ? "Loading users…" : "Select user"}
-                isClearable
-                isDisabled={loadingUsers}
-                isLoading={loadingUsers}
-                options={mainAppUserOptions}
-                value={mainAppUserOptions.find((o) => o.value === (editForm.user_id ?? "")) ?? null}
-                onChange={(opt) =>
-                  setEditForm((f) => ({ ...f, user_id: opt?.value ?? "" }))
-                }
-                styles={selectStyles}
-              />
-              {!loadingUsers && mainAppUserOptions.length === 0 && (
-                <Form.Text className="text-muted">No users available.</Form.Text>
-              )}
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Employee Code</Form.Label>
-              <Form.Control
-                value={editForm.employee_code ?? ""}
-                onChange={(e) => setEditForm((f) => ({ ...f, employee_code: e.target.value }))}
-                placeholder="Employee code"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Identification Number (CNIC)</Form.Label>
-              <Form.Control
-                value={editForm.identification_number ?? ""}
-                onChange={(e) => setEditForm((f) => ({ ...f, identification_number: e.target.value }))}
-                placeholder="CNIC / ID"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Job Title</Form.Label>
-              <Form.Control
-                value={editForm.job_title ?? ""}
-                onChange={(e) => setEditForm((f) => ({ ...f, job_title: e.target.value }))}
-                placeholder="Job title"
-              />
-            </Form.Group>
-            {/* <Form.Group className="mb-3">
-              <Form.Label>Location</Form.Label>
-              <Form.Select
-                value={editForm.location_id ?? ""}
-                onChange={(e) =>
-                  setEditForm((f) => ({
-                    ...f,
-                    location_id: e.target.value === "" ? null : Number(e.target.value),
-                  }))
-                }
-                disabled={loadingLocations}
-              >
-                <option value="">Select location</option>
-                {locationsList.map((loc) => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name ?? `Location ${loc.id}`}
-                    {loc.city || loc.country ? ` — ${[loc.city, loc.country].filter(Boolean).join(", ")}` : ""}
-                  </option>
-                ))}
-              </Form.Select>
-              {loadingLocations && <Form.Text className="text-muted">Loading locations…</Form.Text>}
-            </Form.Group> */}
-            <Form.Group className="mb-3">
-              <Form.Label>Employment Type</Form.Label>
-              <Form.Select
-                value={editForm.employment_type ?? ""}
-                onChange={(e) => setEditForm((f) => ({ ...f, employment_type: e.target.value }))}
-              >
-                <option value="">Select employment type</option>
-                {EMPLOYMENT_TYPES.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Contract Type</Form.Label>
-              <Form.Select
-                value={editForm.contract_type ?? ""}
-                onChange={(e) => setEditForm((f) => ({ ...f, contract_type: e.target.value }))}
-              >
-                <option value="">Select contract type</option>
-                {CONTRACT_TYPES.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Phone (E.164)</Form.Label>
-              <Form.Control
-                type="tel"
-                value={editForm.phone ?? ""}
-                onChange={(e) => setEditForm((f) => ({ ...f, phone: toE164Phone(e.target.value) }))}
-                placeholder="+1234567890"
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Status</Form.Label>
-              <Form.Select
-                value={editForm.status ?? "active"}
-                onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))}
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </Form.Select>
-            </Form.Group>
-
-            {/* Addresses - same as Add */}
-            <div className="card em-card mb-3">
-              <div className="card-body">
-                <div className="d-flex align-items-center justify-content-between gap-2 mb-2">
-                  <div className="em-section-title mb-0">Addresses</div>
-                  <Button
-                    type="button"
-                    variant="outline-primary"
-                    size="sm"
-                    onClick={() =>
-                      setEditFormAddresses((prev) => [
-                        ...prev,
-                        { name: "", zip_code: "", city: "", country: "", address: "", state: "", countryCode: "", stateCode: "" },
-                      ])
-                    }
-                  >
-                    <Plus className="me-1" size={14} />
-                    Add Address
-                  </Button>
-                </div>
-                <div className="d-flex flex-column gap-3">
-                  {editFormAddresses.length === 0 ? (
-                    <div className="text-muted small">No addresses added. Click &quot;Add Address&quot; to add one.</div>
-                  ) : (
-                    editFormAddresses.map((addr, idx) => {
-                      const countryOptionsEdit = addressCountries.map((c) => ({ value: c.isoCode, label: c.name }));
-                      const stateOptionsEdit = (addr.countryCode ? State.getStatesOfCountry(addr.countryCode) : []).map((s) => ({ value: s.isoCode, label: s.name }));
-                      const cityOptionsEdit = (addr.countryCode && addr.stateCode ? City.getCitiesOfState(addr.countryCode, addr.stateCode) : []).map((c) => ({ value: c.name, label: c.name }));
-                      return (
-                      <div key={idx} className="p-3 bg-light rounded">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <div className="fw-semibold">Address #{idx + 1}</div>
-                          <Button
-                            type="button"
-                            variant="outline-danger"
-                            size="sm"
-                            disabled={editFormAddresses.length <= 1}
-                            onClick={() =>
-                              setEditFormAddresses((prev) => prev.filter((_, i) => i !== idx))
-                            }
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
-                        <div className="row g-3">
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>Name</Form.Label>
-                              <Form.Control
-                                value={addr.name ?? ""}
-                                onChange={(e) =>
-                                  setEditFormAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, name: e.target.value } : a))
-                                  )
-                                }
-                                placeholder="e.g. Head Office"
-                              />
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>Zip / Postal Code</Form.Label>
-                              <Form.Control
-                                value={addr.zip_code ?? ""}
-                                onChange={(e) =>
-                                  setEditFormAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, zip_code: e.target.value } : a))
-                                  )
-                                }
-                                placeholder="Zip / Postal Code"
-                              />
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>Country</Form.Label>
-                              <Select<{ value: string; label: string }>
-                                className="basic-single"
-                                classNamePrefix="select"
-                                isClearable
-                                isSearchable
-                                options={countryOptionsEdit}
-                                placeholder="Select Country"
-                                value={addr.countryCode ? countryOptionsEdit.find((o) => o.value === addr.countryCode) ?? null : null}
-                                onChange={(opt) =>
-                                  setEditFormAddresses((prev) =>
-                                    prev.map((a, i) =>
-                                      i === idx
-                                        ? { ...a, country: opt?.label ?? "", countryCode: opt?.value ?? "", state: "", stateCode: "", city: "" }
-                                        : a
-                                    )
-                                  )
-                                }
-                                styles={selectStyles}
-                              />
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>State</Form.Label>
-                              <Select<{ value: string; label: string }>
-                                className="basic-single"
-                                classNamePrefix="select"
-                                isClearable
-                                isSearchable
-                                options={stateOptionsEdit}
-                                placeholder="Select State"
-                                isDisabled={!addr.countryCode}
-                                value={addr.stateCode ? stateOptionsEdit.find((o) => o.value === addr.stateCode) ?? null : null}
-                                onChange={(opt) =>
-                                  setEditFormAddresses((prev) =>
-                                    prev.map((a, i) =>
-                                      i === idx ? { ...a, state: opt?.label ?? "", stateCode: opt?.value ?? "", city: "" } : a
-                                    )
-                                  )
-                                }
-                                styles={selectStyles}
-                              />
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>City</Form.Label>
-                              <Select<{ value: string; label: string }>
-                                className="basic-single"
-                                classNamePrefix="select"
-                                isClearable
-                                isSearchable
-                                options={cityOptionsEdit}
-                                placeholder="Select City"
-                                isDisabled={!addr.stateCode}
-                                value={addr.city ? cityOptionsEdit.find((o) => o.value === addr.city) ?? null : null}
-                                onChange={(opt) =>
-                                  setEditFormAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, city: opt?.value ?? "" } : a))
-                                  )
-                                }
-                                styles={selectStyles}
-                              />
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6" />
-                          <div className="col-12">
-                            <Form.Group>
-                              <Form.Label>Address</Form.Label>
-                              <Form.Control
-                                as="textarea"
-                                rows={2}
-                                value={addr.address ?? ""}
-                                onChange={(e) =>
-                                  setEditFormAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, address: e.target.value } : a))
-                                  )
-                                }
-                                placeholder="Street address"
-                              />
-                            </Form.Group>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                    })
-                  )}
-                </div>
-                <div className="text-muted small mt-2">
-                  Addresses are stored as multiple Location records linked to this employee profile.
-                </div>
-              </div>
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => { setShowEditModal(false); setEditingProfile(null); }} type="button">
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" disabled={editSubmitting}>
-              {editSubmitting ? "Saving…" : "Save"}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
+      <EditEmployeeModal
+        show={showEditModal}
+        onHide={() => { setShowEditModal(false); setEditingProfile(null); }}
+        profile={editingProfile}
+        onSuccess={(id) => {
+          loadProfiles(currentPage);
+          if (id != null && selectedProfile?.id === id) setSelectedProfile(null);
+        }}
+      />
 
       {/* Delete confirmation */}
       <DeleteConfirmationModal
