@@ -1971,6 +1971,10 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       toast.error("Lead name is required");
       return false;
     }
+    if (editFormData.user_extension == null || !editFormData.user_extension) {
+      toast.error("Assigned To is required");
+      return false;
+    }
     if (!editFormData.stage_id) {
       toast.error("Stage is required");
       return false;
@@ -2067,7 +2071,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     try {
       const payload: any = {
         name: editFormData.name,
-        user_extension: editFormData.user_extension || (session?.user as any)?.extension || "admin",
+        user_extension: String(editFormData.user_extension) || String((session?.user as any)?.extension) || "admin",
         type: editFormData.type,
         description: editFormData.description,
         source: editFormData.source,
@@ -2083,7 +2087,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         crm_data_id: editFormData.crm_data_id,
         lead_potential: editFormData.lead_potential,
         campaign_field_values: editFormData.campaign_field_values,
-        contact_persons: JSON.stringify(editFormData.contact_persons),
+        contact_persons: editFormData.contact_persons,
       };
 
       // Handle business type
@@ -6958,7 +6962,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                           >
                             <option value="">Select User</option>
                             {editExtensions.map((ext: any) => (
-                              <option key={ext.extension} value={ext.extension}>
+                              <option key={ext.id} value={ext.id}>
                                 {ext.display_name || ext.name}
                               </option>
                             ))}
