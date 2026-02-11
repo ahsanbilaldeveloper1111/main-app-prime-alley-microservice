@@ -323,10 +323,10 @@ const [contractDocumentPreview, setContractDocumentPreview] = useState<string | 
       return;
     }
   
-    // Validate file size (10MB max)
-    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
     if (file.size > maxSize) {
-      toast.error("File size exceeds 10MB. Please upload a smaller file.");
+      toast.error("File size exceeds 5MB. Please upload a smaller file.");
       return;
     }
   
@@ -1294,7 +1294,7 @@ const resetForm = () => {
               <span className="text-muted ms-2">(Optional)</span>
             </Form.Label>
             <p className="text-muted small mb-3">
-              Upload the contract document for this order. Accepted formats: PDF, DOC, DOCX (Max 10MB)
+              Upload the contract document for this order. Accepted formats: PDF, DOC, DOCX (Max 5MB)
             </p>
             
             {/* File Upload Area */}
@@ -1331,7 +1331,7 @@ const resetForm = () => {
                   <Upload size={48} className="text-muted mb-3" style={{ opacity: 0.5 }} />
                   <h6 className="mb-2">Drop your contract document here or click to browse</h6>
                   <p className="text-muted small mb-0">
-                    Supported formats: PDF, DOC, DOCX • Maximum file size: 10MB
+                    Supported formats: PDF, DOC, DOCX • Maximum file size: 5MB
                   </p>
                 </>
               ) : (
