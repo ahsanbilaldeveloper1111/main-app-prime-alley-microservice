@@ -1,8 +1,7 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { Button, Modal } from "react-bootstrap";
-import { ModuleSlug } from "@utils/Helper";
-import { useHierarchyData } from "@components/filters/useHierarchyData";
+import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { useSession } from "next-auth/react";
 import {
   X,
@@ -58,6 +57,114 @@ function formatEventDate(iso: string | null | undefined): string {
   }
 }
 
+function isImageMime(mime: string | null | undefined): boolean {
+  return Boolean(mime?.startsWith("image/"));
+}
+
+function AttachmentPreview({
+  att,
+  downloadAttachment,
+}: {
+  att: UserRequestAttachment;
+  downloadAttachment: (id: number) => Promise<Blob>;
+}) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const isImage = isImageMime(att.mime_type);
+
+  useEffect(() => {
+    if (!isImage) return;
+    let revoked = false;
+    downloadAttachment(att.id)
+      .then((blob) => {
+        if (revoked) return;
+        const url = URL.createObjectURL(blob);
+        setImageUrl(url);
+      })
+      .catch(() => {});
+    return () => {
+      revoked = true;
+      setImageUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, [isImage, att.id, downloadAttachment]);
+
+  if (isImage && imageUrl) {
+    return (
+      <>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setShowImageModal(true)}
+          onKeyDown={(e) => e.key === "Enter" && setShowImageModal(true)}
+          style={{
+            width: "56px",
+            height: "56px",
+            borderRadius: "8px",
+            overflow: "hidden",
+            flexShrink: 0,
+            backgroundColor: "#f3f4f6",
+            cursor: "pointer",
+          }}
+        >
+          <img
+            src={imageUrl}
+            alt={att.original_name || "Attachment"}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+            }}
+          />
+        </div>
+        <Modal
+          show={showImageModal}
+          onHide={() => setShowImageModal(false)}
+          centered
+          size="lg"
+          style={{ maxWidth: "90vw",zIndex: 99999 }}
+        >
+          <Modal.Header closeButton style={{ borderBottom: "1px solid #e5e7eb" }}>
+            <Modal.Title style={{ fontSize: "16px", fontWeight: "600" }}>
+              {att.original_name || "Attachment"}
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body style={{ padding: "16px", textAlign: "center", backgroundColor: "#f9fafb" }}>
+            <img
+              src={imageUrl}
+              alt={att.original_name || "Attachment"}
+              style={{
+                maxWidth: "100%",
+                maxHeight: "70vh",
+                objectFit: "contain",
+                display: "block",
+                margin: "0 auto",
+              }}
+            />
+          </Modal.Body>
+        </Modal>
+      </>
+    );
+  }
+
+  return (
+    <div style={{
+      width: "40px",
+      height: "40px",
+      backgroundColor: "#dbeafe",
+      borderRadius: "8px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    }}>
+      <FileText size={20} color="#3b82f6" />
+    </div>
+  );
+}
+
 const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
   request,
   categoryName = "—",
@@ -68,26 +175,16 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
   downloadAttachment,
 }) => {
   const { data: session } = useSession();
-  const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+  const { mainAppUsers } = useMainAppLookups();
 
   const getDisplayName = useCallback(
     (userId: string | number | null | undefined): string => {
       if (userId == null || userId === "") return "—";
       const idStr = String(userId);
-      if (!hierarchyDataExtensions || !Array.isArray(hierarchyDataExtensions)) return idStr;
-      const ext = (
-        hierarchyDataExtensions as {
-          id?: string | number;
-          extension_number?: string;
-          name?: string;
-          user?: { name?: string };
-          user_id?: string;
-        }[]
-      ).find((e) => String(e.user_id ?? e.extension_number ?? e.id ?? "") === idStr);
-      if (ext) return String(ext.user?.name ?? ext.name ?? ext.extension_number ?? ext.user_id ?? idStr);
-      return idStr;
+      const u = mainAppUsers?.find((x) => String(x.id) === idStr);
+      return u?.name ?? idStr;
     },
-    [hierarchyDataExtensions]
+    [mainAppUsers]
   );
 
   const [comment, setComment] = useState("");
@@ -525,18 +622,11 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1 }}>
-                    <div style={{
-                      width: "40px",
-                      height: "40px",
-                      backgroundColor: "#dbeafe",
-                      borderRadius: "8px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}>
-                      <FileText size={20} color="#3b82f6" />
-                    </div>
-                    <div style={{ flex: 1 }}>
+                    <AttachmentPreview
+                      att={att}
+                      downloadAttachment={downloadAttachment}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: "14px", fontWeight: "500", color: "#1f2937" }}>
                         {att.original_name || "Attachment"}
                       </div>
@@ -547,7 +637,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: "8px" }}>
-                    <button
+                    {/* <button
                       type="button"
                       onClick={() => handleOpenAttachment(att)}
                       style={{
@@ -563,7 +653,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
                       title="Open / Download"
                     >
                       <ExternalLink size={16} color="#6b7280" />
-                    </button>
+                    </button> */}
                     <button
                       type="button"
                       onClick={() => handleDownloadAttachment(att)}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import { 
   X, 
@@ -8,14 +8,13 @@ import {
   Calendar,
   Briefcase,
   MapPin,
-  Users,
   ChevronRight,
   Clock,
-  Shield,
   Building2,
-  UserCheck
+  UserCheck,
+  Search
 } from 'lucide-react';
-import { putUserProfileParent } from '@utils/staffManagement';
+import { putUserProfileParent, putUserProfileBulkReports, type UserProfileMinified } from '@utils/staffManagement';
 
 interface Employee {
   id: string;
@@ -55,16 +54,24 @@ interface OrganizationEmployeeSidebarProps {
   rawProfile?: RawOrgChartProfile | null;
   /** List of users for "Reports to" dropdown (excluding current employee). */
   users?: UserOption[];
+  /** Minified user profiles; only these users are shown in the Reports to dropdown. */
+  userProfilesMinified?: UserProfileMinified[];
   /** Called after parent is updated successfully (e.g. to refetch org chart). */
   onRefresh?: () => void | Promise<void>;
 }
 
-const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = ({ employee, onClose, allEmployees, rawProfile, users = [], onRefresh }) => {
-  const [activeTab, setActiveTab] = useState<'Overview' | 'Team' | 'Performance'>('Overview');
+const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = ({ employee, onClose, allEmployees, rawProfile, users = [], userProfilesMinified = [], onRefresh }) => {
+  const [activeTab, setActiveTab] = useState<'Overview' | 'Reporting'>('Overview');
   const [parentId, setParentId] = useState<string>('');
   const [updatingParent, setUpdatingParent] = useState(false);
+  const [childUserIds, setChildUserIds] = useState<string[]>([]);
+  const [updatingBulkReports, setUpdatingBulkReports] = useState(false);
+  const [directReportSearch, setDirectReportSearch] = useState('');
 
-  const dropdownUsers = users.filter((u) => String(u.id) !== String(rawProfile?.user_id));
+  const allowedUserIds = useMemo(() => new Set((userProfilesMinified ?? []).map((p) => String(p.user_id))), [userProfilesMinified]);
+  const dropdownUsers = users.filter(
+    (u) => String(u.id) !== String(rawProfile?.user_id) && allowedUserIds.has(String(u.id))
+  );
 
   // Find parent (manager) of current employee
   const findParent = (tree: Employee, targetId: string, parent: Employee | null = null): Employee | null => {
@@ -83,6 +90,30 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
   const manager = findParent(allEmployees, employee.id);
   const directReports = employee.children || [];
   const totalTeamSize = directReports.length;
+
+  const managerUserId = useMemo(
+    () => (manager ? userProfilesMinified.find((p) => String(p.id) === String(manager.id))?.user_id : undefined),
+    [manager, userProfilesMinified]
+  );
+  const directReportOptionUsers = useMemo(
+    () =>
+      users.filter(
+        (u) =>
+          allowedUserIds.has(String(u.id)) &&
+          String(u.id) !== String(rawProfile?.user_id) &&
+          String(u.id) !== String(managerUserId)
+      ),
+    [users, allowedUserIds, rawProfile?.user_id, managerUserId]
+  );
+
+  const initialChildUserIds = useMemo(
+    () =>
+      (userProfilesMinified ?? []).filter((p) => String(p.parent_id) === String(rawProfile?.user_id)).map((p) => String(p.user_id)),
+    [userProfilesMinified, rawProfile?.user_id]
+  );
+  useEffect(() => {
+    setChildUserIds(initialChildUserIds);
+  }, [initialChildUserIds]);
 
   const joinDateFormatted = rawProfile?.created_at
     ? new Date(rawProfile.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
@@ -215,216 +246,6 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
         </div>
       </div>
 
-      {/* Reporting Structure */}
-      <div style={{ marginBottom: '24px' }}>
-        <h3 style={{ 
-          fontSize: '16px', 
-          fontWeight: '600', 
-          color: '#1f2937',
-          margin: '0 0 16px 0'
-        }}>
-          Reporting Structure
-        </h3>
-
-        {/* Manager */}
-        {manager && (
-          <div style={{
-            padding: '12px',
-            backgroundColor: '#f9fafb',
-            borderRadius: '8px',
-            marginBottom: '12px',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-          >
-            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px', fontWeight: '500',marginTop: '10px' }}>
-              Reports to
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0
-              }}>
-                <User size={20} color="white" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
-                  {manager.name}
-                </div>
-                <div style={{ fontSize: '13px', color: '#6b7280' }}>
-                  {manager.title}
-                </div>
-              </div>
-              <ChevronRight size={16} color="#9ca3af" />
-            </div>
-          </div>
-        )}
-
-        {/* Reports to (manager) dropdown */}
-      {dropdownUsers.length > 0 && (
-        <div style={{ marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', margin: '0 0 12px 0' }}>
-            Reports to
-          </h3>
-          <select
-            value={parentId}
-            onChange={async (e) => {
-              const value = e.target.value;
-              setParentId(value);
-              if (!value) return;
-              setUpdatingParent(true);
-              try {
-                await putUserProfileParent(employee.id, { parent_id: value });
-                toast.success('Reporting manager updated');
-                await onRefresh?.();
-              } catch (err) {
-                toast.error('Failed to update reporting manager');
-                setParentId(parentId);
-              } finally {
-                setUpdatingParent(false);
-              }
-            }}
-            disabled={updatingParent}
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              fontSize: '14px',
-              backgroundColor: 'white',
-              cursor: updatingParent ? 'wait' : 'pointer',
-            }}
-          >
-            <option value="">Select manager</option>
-            {dropdownUsers.map((u) => (
-              <option key={u.id} value={String(u.id)}>
-                {u.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-        {/* Direct Reports */}
-        {totalTeamSize > 0 && (
-          <div style={{
-            padding: '12px',
-            backgroundColor: '#f9fafb',
-            borderRadius: '8px'
-          }}>
-            <div style={{ 
-              fontSize: '12px', 
-              color: '#6b7280', 
-              marginBottom: '8px',
-              fontWeight: '500',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <span>Direct Reports ({totalTeamSize})</span>
-              <ChevronRight size={14} color="#9ca3af" />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {directReports.slice(0, 3).map(report => (
-                <div 
-                  key={report.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '8px',
-                    backgroundColor: 'white',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                >
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <User size={16} color="white" />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '13px', fontWeight: '500', color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {report.name}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {report.title}
-                    </div>
-                  </div>
-                  {report.status === 'On Leave' && (
-                    <div style={{
-                      padding: '2px 8px',
-                      backgroundColor: '#fef3c7',
-                      borderRadius: '12px',
-                      fontSize: '10px',
-                      fontWeight: '500',
-                      color: '#92400e'
-                    }}>
-                      On Leave
-                    </div>
-                  )}
-                  {report.status === 'Inactive' && (
-                    <div style={{
-                      padding: '2px 8px',
-                      backgroundColor: '#f3f4f6',
-                      borderRadius: '12px',
-                      fontSize: '10px',
-                      fontWeight: '500',
-                      color: '#6b7280'
-                    }}>
-                      Inactive
-                    </div>
-                  )}
-                </div>
-              ))}
-              {totalTeamSize > 3 && (
-                <div style={{
-                  padding: '8px',
-                  textAlign: 'center',
-                  fontSize: '13px',
-                  color: '#6366f1',
-                  fontWeight: '500',
-                  cursor: 'pointer'
-                }}>
-                  View all {totalTeamSize} reports
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {!manager && totalTeamSize === 0 && (
-          <div style={{
-            padding: '20px',
-            backgroundColor: '#f9fafb',
-            borderRadius: '8px',
-            textAlign: 'center',
-            color: '#6b7280',
-            fontSize: '13px'
-          }}>
-            No reporting structure information available
-          </div>
-        )}
-      </div>
-
       {/* Status */}
       <div>
         <h3 style={{ 
@@ -478,28 +299,257 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
     </>
   );
 
-  const renderTeamTab = () => (
-    <div style={{ textAlign: 'center', padding: '40px 20px', color: '#6b7280' }}>
-      <Users size={48} color="#9ca3af" style={{ margin: '0 auto 16px' }} />
-      <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
-        Team Information
-      </h4>
-      <p style={{ fontSize: '14px', margin: 0 }}>
-        Detailed team structure and collaboration info
-      </p>
-    </div>
-  );
+  const renderReportingTab = () => (
+    <>
+      <div style={{ marginBottom: '24px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', margin: '0 0 16px 0' }}>
+          Reporting Structure
+        </h3>
 
-  const renderPerformanceTab = () => (
-    <div style={{ textAlign: 'center', padding: '40px 20px', color: '#6b7280' }}>
-      <Shield size={48} color="#9ca3af" style={{ margin: '0 auto 16px' }} />
-      <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
-        Performance Metrics
-      </h4>
-      <p style={{ fontSize: '14px', margin: 0 }}>
-        Performance reviews and achievements
-      </p>
-    </div>
+        {manager && (
+          <div style={{
+            padding: '12px',
+            backgroundColor: '#f9fafb',
+            borderRadius: '8px',
+            marginBottom: '12px',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+          >
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px', fontWeight: '500', marginTop: '10px' }}>
+              Reports to
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <User size={20} color="white" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
+                  {manager.name}
+                </div>
+                <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                  {manager.title}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+
+        
+
+        {dropdownUsers.length > 0 && (
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', margin: '0 0 12px 0' }}>
+              {rawProfile?.parent_id ? 'Change Report To' : 'Set Report To'}
+            </h3>
+            <select
+              value={rawProfile?.parent_id != null ? String(rawProfile.parent_id) : ''}
+              onChange={async (e) => {
+                const value = e.target.value;
+                setParentId(value);
+                // if (!value) return;
+                setUpdatingParent(true);
+                try {
+                  await putUserProfileParent(employee.id, { parent_id: value });
+                  toast.success('Reporting manager updated');
+                  await onRefresh?.();
+                } catch (err) {
+                  toast.error('Failed to update reporting manager');
+                  setParentId(parentId);
+                } finally {
+                  setUpdatingParent(false);
+                }
+              }}
+              disabled={updatingParent}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                fontSize: '14px',
+                backgroundColor: 'white',
+                cursor: updatingParent ? 'wait' : 'pointer',
+              }}
+            >
+              <option value="">Select manager</option>
+              {dropdownUsers.map((u) => (
+                <option key={u.id} value={String(u.id)}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {directReportOptionUsers.length > 0 && (
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', margin: '0 0 12px 0' }}>
+              Direct report to
+            </h3>
+            <div style={{ position: 'relative', marginBottom: '10px' }}>
+              <Search
+                size={18}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#9ca3af',
+                  pointerEvents: 'none',
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Search users..."
+                value={directReportSearch}
+                onChange={(e) => setDirectReportSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px 10px 38px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  backgroundColor: 'white',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+              {directReportOptionUsers
+                .filter((u) => !directReportSearch.trim() || u.name.toLowerCase().includes(directReportSearch.trim().toLowerCase()))
+                .map((u) => {
+                const uid = String(u.id);
+                const checked = childUserIds.includes(uid);
+                return (
+                  <label
+                    key={u.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 12px',
+                      backgroundColor: 'white',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      cursor: updatingBulkReports ? 'wait' : 'pointer',
+                      fontSize: '14px',
+                    }}
+                  >
+                    
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={updatingBulkReports}
+                      onChange={async () => {
+                        const prevIds = childUserIds;
+                        const newIds = checked ? prevIds.filter((id) => id !== uid) : [...prevIds, uid];
+                        setChildUserIds(newIds);
+                        setUpdatingBulkReports(true);
+                        try {
+                          await putUserProfileBulkReports(employee.id, { child_user_ids: newIds });
+                          toast.success('Direct reports updated');
+                          await onRefresh?.();
+                        } catch (err) {
+                          toast.error('Failed to update direct reports');
+                          setChildUserIds(prevIds);
+                        } finally {
+                          setUpdatingBulkReports(false);
+                        }
+                      }}
+                      style={{ cursor: updatingBulkReports ? 'wait' : 'pointer' }}
+                    />
+                    <span style={{ color: '#1f2937' }}>{u.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {totalTeamSize > 0 && (
+          <div style={{ padding: '12px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>Direct Reports ({totalTeamSize})</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {directReports.slice(0, 3).map((report) => (
+                <div
+                  key={report.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '8px',
+                    backgroundColor: 'white',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                >
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <User size={16} color="white" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '500', color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {report.name}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {report.title}
+                    </div>
+                  </div>
+                  {report.status === 'On Leave' && (
+                    <div style={{ padding: '2px 8px', backgroundColor: '#fef3c7', borderRadius: '12px', fontSize: '10px', fontWeight: '500', color: '#92400e' }}>
+                      On Leave
+                    </div>
+                  )}
+                  {report.status === 'Inactive' && (
+                    <div style={{ padding: '2px 8px', backgroundColor: '#f3f4f6', borderRadius: '12px', fontSize: '10px', fontWeight: '500', color: '#6b7280' }}>
+                      Inactive
+                    </div>
+                  )}
+                </div>
+              ))}
+              {totalTeamSize > 3 && (
+                <div style={{ padding: '8px', textAlign: 'center', fontSize: '13px', color: '#6366f1', fontWeight: '500', cursor: 'pointer' }}>
+                  View all {totalTeamSize} reports
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!manager && totalTeamSize === 0 && (
+          <div style={{ padding: '20px', backgroundColor: '#f9fafb', borderRadius: '8px', textAlign: 'center', color: '#6b7280', fontSize: '13px' }}>
+            No reporting structure information available
+          </div>
+        )}
+      </div>
+    </>
   );
 
   return (
@@ -606,7 +656,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
         borderBottom: '1px solid #e5e7eb',
         overflowX: 'auto'
       }}>
-        {(['Overview', 'Team', 'Performance'] as const).map(tab => (
+        {(['Overview', 'Reporting'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -635,8 +685,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
         padding: '24px'
       }}>
         {activeTab === 'Overview' && renderOverviewTab()}
-        {activeTab === 'Team' && renderTeamTab()}
-        {activeTab === 'Performance' && renderPerformanceTab()}
+        {activeTab === 'Reporting' && renderReportingTab()}
       </div>
 
 

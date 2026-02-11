@@ -6,7 +6,6 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { useSession } from "next-auth/react";
-import axiosInstance from "@utils/axios";
 import {
   getUserRequestCategories,
   getUserRequestCategoryFields,
@@ -19,9 +18,7 @@ import {
   type UserRequestCategoryField,
   type UserRequest,
 } from "@utils/staffManagement";
-import ThemeSelect from "@components/ThemeSelect";
-import { ModuleSlug } from "@utils/Helper";
-import { useHierarchyData } from "@components/filters/useHierarchyData";
+import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
 import { Button, Modal, Form } from "react-bootstrap";
 
@@ -40,31 +37,10 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Download,
 } from "lucide-react";
 import ApprovalDetailSidebar from "./sidebar";
 import DeleteConfirmationModal from "../../partial/DeleteConfirmationModal";
-
-interface CompanyOption {
-  id?: string | number;
-  uuid?: string;
-  name?: string;
-  tenant_id?: string | null;
-  [key: string]: unknown;
-}
-
-async function getCompanies(): Promise<CompanyOption[]> {
-  const { data } = await axiosInstance.get<{ success?: boolean; data?: CompanyOption[] }>("users/getCompanies");
-  const body = data?.data ?? data;
-  return Array.isArray(body) ? body : [];
-}
-
-function getCompanyTenantId(c: CompanyOption): string {
-  return String(c?.tenant_id ?? c?.uuid ?? c?.id ?? "").trim();
-}
-
-function getCompanyName(c: CompanyOption): string {
-  return String(c?.name ?? "—");
-}
 
 const TAB_TO_STATUS: Record<string, string> = {
   Pending: "pending",
@@ -107,67 +83,24 @@ function getAgingLabel(iso: string | null | undefined): string {
   }
 }
 
-type ExtensionLike = {
-  extension_number?: string | number;
-  extensionNumber?: string | number;
-  user_id?: string | number;
-  userId?: string | number;
-  name?: string;
-  user?: { name?: string };
-  id?: string | number;
-  [key: string]: unknown;
-};
-
-function getExtensionDisplayName(ext: ExtensionLike): string {
-  return String(ext?.user?.name ?? ext?.name ?? ext?.extension_number ?? ext?.extensionNumber ?? ext?.user_id ?? ext?.userId ?? "—");
-}
-
-function getExtensionNumber(ext: ExtensionLike): string | null {
-  const num = ext?.extension_number ?? ext?.extensionNumber ?? ext?.user_id ?? ext?.userId ?? ext?.id;
-  if (num == null || num === "") return null;
-  return String(num);
-}
-
-function getExtensionOptionLabel(ext: ExtensionLike): string {
-  const displayName = getExtensionDisplayName(ext);
-  return displayName;
-  const extNum = getExtensionNumber(ext);
-  return extNum ? `${displayName} (${extNum})` : displayName;
-}
-
 const ApprovalRequest = () => {
   const { data: session } = useSession();
-  const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+  const { mainAppUsers } = useMainAppLookups();
 
   const getDisplayName = useCallback(
     (userId: string | number | null | undefined): string => {
       if (userId == null || userId === "") return "—";
       const idStr = String(userId);
-      if (!hierarchyDataExtensions || !Array.isArray(hierarchyDataExtensions)) return idStr;
-      const ext = (
-        hierarchyDataExtensions as {
-          id?: string | number;
-          extension_number?: string;
-          name?: string;
-          user?: { name?: string };
-          user_id?: string;
-        }[]
-      ).find((e) => String(e.user_id ?? e.extension_number ?? e.id ?? "") === idStr);
-      if (ext) return String(ext.user?.name ?? ext.name ?? ext.extension_number ?? ext.user_id ?? idStr);
-      return idStr;
+      const u = mainAppUsers?.find((x) => String(x.id) === idStr);
+      return u?.name ?? idStr;
     },
-    [hierarchyDataExtensions]
+    [mainAppUsers]
   );
-
-  const isAdmin =
-    session?.user &&
-    (Number((session.user as { is_admin?: number | string }).is_admin) === 1 ||
-      String((session.user as { is_admin?: number | string }).is_admin) === "1");
 
   const [activeTab, setActiveTab] = useState<"Pending" | "Approved" | "Rejected">("Pending");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState("");
-  const [selectedRequestedByExtensionNumber, setSelectedRequestedByExtensionNumber] = useState<string | null>(null);
+  const [selectedRequestedByUserId, setSelectedRequestedByUserId] = useState<string | null>(null);
   const [requestedBySearchTerm, setRequestedBySearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedAging, setSelectedAging] = useState("");
@@ -178,9 +111,6 @@ const ApprovalRequest = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRequest, setSelectedRequest] = useState<UserRequest | null>(null);
 
-  const [companies, setCompanies] = useState<CompanyOption[]>([]);
-  const [selectedTenantId, setSelectedTenantId] = useState<string>("");
-  const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [categories, setCategories] = useState<UserRequestCategory[]>([]);
   const [categoryFields, setCategoryFields] = useState<Record<number, UserRequestCategoryField[]>>({});
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -227,29 +157,11 @@ const ApprovalRequest = () => {
   }>({ subject: "", reason: "", dynamic_fields: {}, dynamic_files: {}, attachments: [] });
   const [editSubmitting, setEditSubmitting] = useState(false);
 
-  const loadCompanies = useCallback(async () => {
-    setLoadingCompanies(true);
-    try {
-      const data = await getCompanies();
-      setCompanies(data ?? []);
-      if (data?.length && !selectedTenantId) {
-        const firstId = getCompanyTenantId(data[0]);
-        if (firstId) setSelectedTenantId(firstId);
-      }
-    } catch {
-      setCompanies([]);
-    } finally {
-      setLoadingCompanies(false);
-    }
-  }, [selectedTenantId]);
-
   const loadCategories = useCallback(
-    async (tenantId?: string) => {
+    async () => {
       setLoadingCategories(true);
       try {
-        const params: { limit: number; tenant_id?: string } = { limit: 1000 };
-        if (tenantId) params.tenant_id = tenantId;
-        const { data } = await getUserRequestCategories(params);
+        const { data } = await getUserRequestCategories({ limit: 1000 });
         setCategories(data ?? []);
         setCategoryFields({});
         if (data?.length) {
@@ -280,20 +192,8 @@ const ApprovalRequest = () => {
   );
 
   useEffect(() => {
-    if (isAdmin) loadCompanies();
-  }, [isAdmin, loadCompanies]);
-
-  useEffect(() => {
-    if (isAdmin) {
-      if (selectedTenantId) loadCategories(selectedTenantId);
-      else {
-        setCategories([]);
-        setCategoryFields({});
-      }
-    } else {
-      loadCategories();
-    }
-  }, [isAdmin, selectedTenantId, loadCategories]);
+    loadCategories();
+  }, [loadCategories]);
 
   const loadRequests = useCallback(
     async (page = 1) => {
@@ -305,12 +205,11 @@ const ApprovalRequest = () => {
           limit: 10,
           status,
         };
-        if (isAdmin && selectedTenantId) params.tenant_id = selectedTenantId;
         if (searchTerm?.trim()) params.search = searchTerm.trim();
         const category = selectedType ? categories.find((c) => (c.name ?? c.code ?? String(c.id)) === selectedType) : undefined;
         if (category?.id != null) params.user_request_category_id = category.id;
-        const extNumForApi = selectedRequestedByExtensionNumber != null ? String(selectedRequestedByExtensionNumber).trim() : "";
-        if (extNumForApi) params.user_id = extNumForApi;
+        if (selectedRequestedByUserId != null && selectedRequestedByUserId.trim())
+          params.assignees = [selectedRequestedByUserId.trim()];
         if (selectedDate?.trim()) params.created_at = selectedDate.trim();
         const { data, pagination: p } = await getUserRequests(params);
         setRequests(data ?? []);
@@ -323,7 +222,7 @@ const ApprovalRequest = () => {
         setLoadingRequests(false);
       }
     },
-    [activeTab, isAdmin, selectedTenantId, searchTerm, selectedType, selectedRequestedByExtensionNumber, selectedDate, categories]
+    [activeTab, searchTerm, selectedType, selectedRequestedByUserId, selectedDate, categories]
   );
 
   useEffect(() => {
@@ -332,7 +231,7 @@ const ApprovalRequest = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedRequestedByExtensionNumber, selectedDate]);
+  }, [selectedRequestedByUserId, selectedDate]);
 
   const refreshRequests = useCallback(() => {
     loadRequests(currentPage);
@@ -425,14 +324,6 @@ const ApprovalRequest = () => {
         toast.error("Category and subject are required");
         return;
       }
-      const category = categories.find((c) => c.id === categoryId);
-      const tenant_id =
-        (category as UserRequestCategory & { tenant_id?: string | null })?.tenant_id ??
-        (isAdmin ? selectedTenantId : (session?.user as { tenant_id?: string } | undefined)?.tenant_id ?? "");
-      if (!tenant_id) {
-        toast.error("Tenant/company is required. Select a company (admin) or ensure your account has a tenant.");
-        return;
-      }
       setCreateSubmitting(true);
       try {
         const dynamic_files: Record<string, File> = {};
@@ -440,7 +331,6 @@ const ApprovalRequest = () => {
           if (file) dynamic_files[key] = file;
         });
         await createUserRequest({
-          tenant_id: String(tenant_id),
           user_request_category_id: Number(categoryId),
           subject: createForm.subject.trim(),
           reason: createForm.reason.trim() || null,
@@ -457,28 +347,16 @@ const ApprovalRequest = () => {
         setCreateSubmitting(false);
       }
     },
-    [createForm, categories, isAdmin, selectedTenantId, session?.user, refreshRequests]
-  );
-
-  const companyOptions = useMemo(
-    () =>
-      companies.map((c) => ({
-        value: getCompanyTenantId(c),
-        label: getCompanyName(c),
-      })),
-    [companies]
+    [createForm, categories, refreshRequests]
   );
 
   const typeOptionsFromCategories = useMemo(() => categories.map((c) => c.name ?? c.code ?? String(c.id)), [categories]);
 
   const types = typeOptionsFromCategories.length > 0 ? typeOptionsFromCategories : ["Leave", "Document", "Onboarding", "Profile"];
-  const requestedByExtensions = (Array.isArray(hierarchyDataExtensions) ? hierarchyDataExtensions : []) as unknown as ExtensionLike[];
-  const selectedRequestedByExtension = requestedByExtensions.find(
-    (ext) => getExtensionNumber(ext) !== null && getExtensionNumber(ext) === selectedRequestedByExtensionNumber
-  );
+  const requestedByUsers = Array.isArray(mainAppUsers) ? mainAppUsers : [];
   const selectedRequestedByName =
-    selectedRequestedByExtensionNumber != null
-      ? (selectedRequestedByExtension ? getExtensionOptionLabel(selectedRequestedByExtension) : selectedRequestedByExtensionNumber)
+    selectedRequestedByUserId != null
+      ? (requestedByUsers.find((u) => String(u.id) === selectedRequestedByUserId)?.name ?? selectedRequestedByUserId)
       : "";
   const dateOptions = ["Last 7 days", "Last 30 days", "Last 3 months", "All time"];
   const agingOptions = ["Less than 1 day", "1-3 days", "3-7 days", "More than 7 days"];
@@ -558,13 +436,13 @@ const ApprovalRequest = () => {
               alignItems: "center",
               gap: "8px",
               padding: "10px 20px",
-              backgroundColor: categories.length === 0 || (isAdmin && !selectedTenantId) ? "#e5e7eb" : "#6366f1",
-              color: categories.length === 0 || (isAdmin && !selectedTenantId) ? "#9ca3af" : "white",
+              backgroundColor: categories.length === 0 ? "#e5e7eb" : "#6366f1",
+              color: categories.length === 0 ? "#9ca3af" : "white",
               border: "none",
               borderRadius: "8px",
               fontSize: "14px",
               fontWeight: "600",
-              cursor: categories.length === 0 || (isAdmin && !selectedTenantId) ? "not-allowed" : "pointer",
+              cursor: categories.length === 0 ? "not-allowed" : "pointer",
             }}
           >
             <Plus size={18} />
@@ -603,24 +481,6 @@ const ApprovalRequest = () => {
           ))}
         </div>
 
-        {/* Admin: Company select → request-categories by tenant_id */}
-        {isAdmin && (
-          <div style={{ marginBottom: "24px", maxWidth: "320px" }}>
-            <span style={{ display: "block", fontSize: "14px", fontWeight: "500", color: "#374151", marginBottom: "8px" }}>
-              Company
-            </span>
-            <ThemeSelect
-              inputId="approval-request-company-select"
-              options={companyOptions}
-              value={companyOptions.find((o) => o.value === selectedTenantId) ?? null}
-              onChange={(opt: unknown) => setSelectedTenantId((opt as { value?: string } | null)?.value ?? "")}
-              placeholder="Select company"
-              isDisabled={loadingCompanies}
-              isLoading={loadingCompanies}
-            />
-          </div>
-        )}
-
         {/* Filters */}
         <div style={{
           display: "flex",
@@ -643,7 +503,7 @@ const ApprovalRequest = () => {
             />
             <input
               type="text"
-              placeholder="Search name, ID, email..."
+              placeholder="Search keyword ..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
@@ -797,7 +657,7 @@ const ApprovalRequest = () => {
                 <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   <div
                     onClick={() => {
-                      setSelectedRequestedByExtensionNumber(null);
+                      setSelectedRequestedByUserId(null);
                       setShowRequestedByDropdown(false);
                       setRequestedBySearchTerm('');
                     }}
@@ -807,33 +667,25 @@ const ApprovalRequest = () => {
                       fontSize: '14px',
                       fontWeight: '500',
                       color: '#6366f1',
-                      backgroundColor: selectedRequestedByExtensionNumber === null ? '#f3f4f6' : 'white'
+                      backgroundColor: selectedRequestedByUserId === null ? '#f3f4f6' : 'white'
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedRequestedByExtensionNumber === null ? '#f3f4f6' : 'white'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedRequestedByUserId === null ? '#f3f4f6' : 'white'}
                   >
                     All Users
                   </div>
-                  {requestedByExtensions
-                    .filter((ext) => getExtensionNumber(ext) != null)
-                    .filter((ext) => {
-                      const label = getExtensionOptionLabel(ext);
-                      return !requestedBySearchTerm.trim() || label.toLowerCase().includes(requestedBySearchTerm.trim().toLowerCase());
-                    })
-                    .map((ext, idx) => {
-                      const label = getExtensionOptionLabel(ext);
-                      const extNum = getExtensionNumber(ext);
-                      const key = extNum ?? `ext-${idx}`;
-                      const isSelected = selectedRequestedByExtensionNumber != null && extNum === selectedRequestedByExtensionNumber;
+                  {requestedByUsers
+                    .filter((u) => !requestedBySearchTerm.trim() || (u.name?.toLowerCase().includes(requestedBySearchTerm.trim().toLowerCase()) ?? false))
+                    .map((u) => {
+                      const uid = String(u.id);
+                      const isSelected = selectedRequestedByUserId != null && uid === selectedRequestedByUserId;
                       return (
                         <div
-                          key={key}
+                          key={u.id}
                           onClick={() => {
-                            if (extNum != null) {
-                              setSelectedRequestedByExtensionNumber(extNum);
-                              setShowRequestedByDropdown(false);
-                              setRequestedBySearchTerm('');
-                            }
+                            setSelectedRequestedByUserId(uid);
+                            setShowRequestedByDropdown(false);
+                            setRequestedBySearchTerm('');
                           }}
                           style={{
                             padding: '10px 16px',
@@ -844,7 +696,7 @@ const ApprovalRequest = () => {
                           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
                           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#f3f4f6' : 'white'}
                         >
-                          {label}
+                          {u.name}
                         </div>
                       );
                     })}
@@ -1560,6 +1412,70 @@ const ApprovalRequest = () => {
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Attachments</Form.Label>
+              {editingRequest && (editingRequest.attachments ?? []).length > 0 && (
+                <div className="mb-2 p-2 border rounded bg-light">
+                  <div className="small text-muted mb-2">Current attachments</div>
+                  {(editingRequest.attachments ?? []).map((att) => (
+                    <div
+                      key={att.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "6px 8px",
+                        backgroundColor: "white",
+                        borderRadius: "6px",
+                        marginBottom: "4px",
+                        border: "1px solid #e5e7eb",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
+                        <FileText size={16} color="#6b7280" />
+                        <span className="text-truncate" style={{ fontSize: "13px" }}>
+                          {att.original_name || "Attachment"}
+                        </span>
+                        {(att.mime_type ?? att.size_bytes) && (
+                          <span className="text-muted" style={{ fontSize: "12px" }}>
+                            {att.mime_type ?? ""}
+                            {att.size_bytes != null && ` • ${(att.size_bytes / 1024).toFixed(1)} KB`}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const blob = await downloadUserRequestAttachment(att.id);
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = att.original_name || "attachment";
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            toast.success("Download started");
+                          } catch {
+                            toast.error("Download failed");
+                          }
+                        }}
+                        style={{
+                          padding: "4px 8px",
+                          border: "none",
+                          borderRadius: "4px",
+                          backgroundColor: "#f3f4f6",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                        title="Download"
+                      >
+                        <Download size={14} color="#6b7280" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <Form.Control
                 type="file"
                 multiple
@@ -1573,7 +1489,7 @@ const ApprovalRequest = () => {
               />
               {editForm.attachments.length > 0 && (
                 <Form.Text className="d-block mt-1 text-muted">
-                  {editForm.attachments.length} file(s) selected: {editForm.attachments.map((f) => f.name).join(", ")}
+                  {editForm.attachments.length} new file(s) selected: {editForm.attachments.map((f) => f.name).join(", ")}
                 </Form.Text>
               )}
             </Form.Group>
@@ -1752,6 +1668,7 @@ const ApprovalRequest = () => {
               onClose={() => setSelectedRequest(null)}
               onSuccess={refreshRequests}
               onEditClick={openEditModal}
+              
               onDeleteClick={(request) => {
                 setRequestToDelete(request);
                 setSelectedRequest(null);

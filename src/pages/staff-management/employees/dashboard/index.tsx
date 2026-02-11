@@ -14,11 +14,13 @@ import {
   getEmployeeDashboardGraphApprovalsAging,
   getEmployeeDashboardGraphJourneyStatus,
   getEmployeeDashboardGraphAttendanceTrend,
+  getEmployeeDashboardLeaveCalendar,
   type EmployeeDashboardParams,
 } from "@utils/staffManagement";
+import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import DashboardStats from "./partials/DashboardStats";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   Users, 
   Send, 
@@ -48,7 +50,31 @@ import {
   Cell
 } from 'recharts';
 
+export interface LeaveCalendarEmployee {
+  user_id: string;
+  employee_name: string;
+  leave_type: string;
+  request_id: number;
+}
+
+export interface LeaveCalendarDay {
+  date: string;
+  on_leave_count: number;
+  employees: LeaveCalendarEmployee[];
+}
+
 const EmployeesDashboard = () => {
+    const { mainAppUsers } = useMainAppLookups();
+
+    const getDisplayName = useCallback(
+      (userId: string | number | null | undefined, fallback?: string): string => {
+        if (userId == null || userId === "") return fallback ?? "—";
+        const u = mainAppUsers?.find((x) => String(x.id) === String(userId));
+        return u?.name ?? fallback ?? String(userId);
+      },
+      [mainAppUsers]
+    );
+
     const [selectedTimeframe, setSelectedTimeframe] = useState('Last 7 Days');
     const [selectedDays, setSelectedDays] = useState('30');
     const [selectedChartPeriod, setSelectedChartPeriod] = useState('Last 14 Days');
@@ -62,6 +88,8 @@ const EmployeesDashboard = () => {
     const [showEmployeeForm, setShowEmployeeForm] = useState(false);
     const [showLeaveForm, setShowLeaveForm] = useState(false);
     const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+    const [leaveCalendarData, setLeaveCalendarData] = useState<LeaveCalendarDay[]>([]);
+    const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
 
     const dashboardParams: EmployeeDashboardParams = (() => {
       const base: EmployeeDashboardParams = { days: selectedDays };
@@ -83,17 +111,20 @@ const EmployeesDashboard = () => {
     useEffect(() => {
       const fetchDashboardData = async () => {
         try {
-          const [departmentHeadcount, approvalsAging, journeyStatus, attendanceTrend] =
+          const [departmentHeadcount, approvalsAging, journeyStatus, attendanceTrend, leaveCalendar] =
             await Promise.all([
               getEmployeeDashboardGraphDepartmentHeadcount(dashboardParams),
               getEmployeeDashboardGraphApprovalsAging(dashboardParams),
               getEmployeeDashboardGraphJourneyStatus(dashboardParams),
-              getEmployeeDashboardGraphAttendanceTrend(dashboardParams),
+              getEmployeeDashboardGraphAttendanceTrend(),
+              getEmployeeDashboardLeaveCalendar(),
             ]);
           console.log("[EmployeesDashboard] departmentHeadcount", departmentHeadcount);
           console.log("[EmployeesDashboard] approvalsAging", approvalsAging);
           console.log("[EmployeesDashboard] journeyStatus", journeyStatus);
           console.log("[EmployeesDashboard] attendanceTrend", attendanceTrend);
+          console.log("[EmployeesDashboard] leaveCalendar", leaveCalendar);
+          setLeaveCalendarData(Array.isArray(leaveCalendar) ? (leaveCalendar as LeaveCalendarDay[]) : []);
         } catch (e) {
           console.error("[EmployeesDashboard] fetchDashboardData error", e);
         }
@@ -101,8 +132,8 @@ const EmployeesDashboard = () => {
       fetchDashboardData();
     }, [selectedDays, periodType, selectedDate, rangeStartDate, rangeEndDate]);
   
-    const timeframeOptions = ['Today', '7', '14', '30', '90'];
-    const daysOptions = ['7', '30', '60', '90', '180', 'Year'];
+    const timeframeOptions = ['Today', '7', '14', '30', '60'];
+    const daysOptions = ['7', '30', '60'];
     const chartPeriodOptions = ['7', '14', '30', '60', '90'];
     const roleOptions = ['HR Admin', 'Manager', 'Employee', 'Admin'];
   
@@ -113,6 +144,39 @@ const EmployeesDashboard = () => {
     const handleClickOutside = () => {
       setOpenDropdown(null);
     };
+
+    const leaveByDate = React.useMemo(() => {
+      const map: Record<string, LeaveCalendarDay> = {};
+      leaveCalendarData.forEach((d) => {
+        map[d.date] = d;
+      });
+      return map;
+    }, [leaveCalendarData]);
+
+    const calendarMonthInfo = React.useMemo(() => {
+      if (leaveCalendarData.length === 0) {
+        const now = new Date();
+        return {
+          year: now.getFullYear(),
+          month: now.getMonth(),
+          monthLabel: now.toLocaleString('default', { month: 'long', year: 'numeric' }),
+          daysInMonth: new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(),
+          startWeekday: new Date(now.getFullYear(), now.getMonth(), 1).getDay(),
+        };
+      }
+      const firstDate = new Date(leaveCalendarData[0].date);
+      const year = firstDate.getFullYear();
+      const month = firstDate.getMonth();
+      return {
+        year,
+        month,
+        monthLabel: firstDate.toLocaleString('default', { month: 'long', year: 'numeric' }),
+        daysInMonth: new Date(year, month + 1, 0).getDate(),
+        startWeekday: new Date(year, month, 1).getDay(),
+      };
+    }, [leaveCalendarData]);
+
+    const selectedDayLeave = leaveByDate[selectedCalendarDate];
   
     const departmentData = [
       { name: 'Engineering', value: 18, color: '#6366F1', percentage: 34.6 },
@@ -1238,7 +1302,7 @@ const EmployeesDashboard = () => {
                   lineHeight: '1'
                 }}>×</button>
             </div>
-            <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '24px' }}>January 2026</div>
+            <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '24px' }}>{calendarMonthInfo.monthLabel}</div>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(7, 1fr)',
@@ -1250,36 +1314,62 @@ const EmployeesDashboard = () => {
                   {day}
                 </div>
               ))}
-              {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
-                const isToday = day === 15;
-                const hasLeave = [8, 12, 15, 20, 23].includes(day);
+              {Array.from({ length: calendarMonthInfo.startWeekday }, (_, i) => (
+                <div key={`pad-${i}`} style={{ padding: '12px' }} />
+              ))}
+              {Array.from({ length: calendarMonthInfo.daysInMonth }, (_, i) => {
+                const day = i + 1;
+                const dateStr = `${calendarMonthInfo.year}-${String(calendarMonthInfo.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayData = leaveByDate[dateStr];
+                const hasLeave = (dayData?.on_leave_count ?? 0) > 0;
+                const isSelected = dateStr === selectedCalendarDate;
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const isToday = dateStr === todayStr;
                 return (
-                  <div key={day} style={{
-                    textAlign: 'center',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    background: isToday ? '#EEF2FF' : hasLeave ? '#FEF3C7' : '#F9FAFB',
-                    border: isToday ? '2px solid #6366F1' : '1px solid #E5E7EB',
-                    fontSize: '14px',
-                    fontWeight: isToday ? '600' : '400',
-                    color: isToday ? '#6366F1' : '#374151',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}>
+                  <div
+                    key={day}
+                    onClick={() => setSelectedCalendarDate(dateStr)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === 'Enter' && setSelectedCalendarDate(dateStr)}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: isSelected ? '#EEF2FF' : isToday ? '#E0E7FF' : hasLeave ? '#FEF3C7' : '#F9FAFB',
+                      border: isSelected || isToday ? '2px solid #6366F1' : '1px solid #E5E7EB',
+                      fontSize: '14px',
+                      fontWeight: isSelected || isToday ? '600' : '400',
+                      color: isSelected || isToday ? '#6366F1' : '#374151',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      minHeight: '56px'
+                    }}
+                  >
                     {day}
-                    {hasLeave && <div style={{ fontSize: '10px', color: '#92400E', marginTop: '4px' }}>On Leave</div>}
+                    {hasLeave && <div style={{ fontSize: '10px', color: '#92400E', marginTop: '4px' }}>On Leave {dayData?.on_leave_count ? `(${dayData.on_leave_count})` : ''}</div>}
                   </div>
                 );
               })}
             </div>
             <div style={{ marginTop: '24px', padding: '16px', background: '#F9FAFB', borderRadius: '8px' }}>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827', marginBottom: '8px' }}>Employees on Leave Today (Jan 15)</div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827', marginBottom: '8px' }}>
+                Employees on Leave {selectedCalendarDate === new Date().toISOString().slice(0, 10) ? 'Today' : ''} ({selectedCalendarDate})
+              </div>
               <div style={{ fontSize: '13px', color: '#6B7280', lineHeight: '1.8' }}>
-                • John Smith - Annual Leave<br/>
-                • Sarah Johnson - Sick Leave<br/>
-                • Mike Williams - Personal Leave<br/>
-                • Emily Davis - Annual Leave<br/>
-                • David Brown - Sick Leave
+                {selectedDayLeave?.employees?.length ? (
+                  selectedDayLeave.employees.map((emp) => (
+                    <div key={`${emp.user_id}-${emp.request_id}`}>
+                      • {getDisplayName(emp.user_id, emp.employee_name)} - {emp.leave_type}
+                    </div>
+                  ))
+                ) : (
+                  <span style={{ color: '#9CA3AF' }}>No employees on leave this day.</span>
+                )}
               </div>
             </div>
           </div>
