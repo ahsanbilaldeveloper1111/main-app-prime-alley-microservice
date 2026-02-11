@@ -9,13 +9,19 @@ import GenericListPage from "@components/GenericListPage";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-import  { useState } from 'react';
+import {
+  getEmployeeDashboardGraphDepartmentHeadcount,
+  getEmployeeDashboardGraphApprovalsAging,
+  getEmployeeDashboardGraphJourneyStatus,
+  getEmployeeDashboardGraphAttendanceTrend,
+  type EmployeeDashboardParams,
+} from "@utils/staffManagement";
+import DashboardStats from "./partials/DashboardStats";
+
+import { useState, useEffect } from "react";
 import { 
   Users, 
-  CheckCircle, 
-  MessageSquare, 
   Send, 
-  AlertTriangle,
   Plus,
   Calendar,
   Upload,
@@ -42,21 +48,62 @@ import {
   Cell
 } from 'recharts';
 
-
 const EmployeesDashboard = () => {
     const [selectedTimeframe, setSelectedTimeframe] = useState('Last 7 Days');
-    const [selectedDays, setSelectedDays] = useState('Last 30 Days');
+    const [selectedDays, setSelectedDays] = useState('30');
     const [selectedChartPeriod, setSelectedChartPeriod] = useState('Last 14 Days');
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [selectedRole, setSelectedRole] = useState('HR Admin');
+    const [periodType, setPeriodType] = useState<'Monthly' | 'Date' | 'Range'>('Monthly');
+    const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+    const [rangeStartDate, setRangeStartDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+    const [rangeEndDate, setRangeEndDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
     const [showCalendar, setShowCalendar] = useState(false);
     const [showEmployeeForm, setShowEmployeeForm] = useState(false);
     const [showLeaveForm, setShowLeaveForm] = useState(false);
     const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+
+    const dashboardParams: EmployeeDashboardParams = (() => {
+      const base: EmployeeDashboardParams = { days: selectedDays };
+      if (periodType === 'Monthly') {
+        base.period_type = 'monthly';
+        return base;
+      }
+      if (periodType === 'Date') {
+        base.period_type = 'date';
+        base.date = selectedDate;
+        return base;
+      }
+      base.period_type = 'range';
+      base.start_date = rangeStartDate;
+      base.end_date = rangeEndDate;
+      return base;
+    })();
+
+    useEffect(() => {
+      const fetchDashboardData = async () => {
+        try {
+          const [departmentHeadcount, approvalsAging, journeyStatus, attendanceTrend] =
+            await Promise.all([
+              getEmployeeDashboardGraphDepartmentHeadcount(dashboardParams),
+              getEmployeeDashboardGraphApprovalsAging(dashboardParams),
+              getEmployeeDashboardGraphJourneyStatus(dashboardParams),
+              getEmployeeDashboardGraphAttendanceTrend(dashboardParams),
+            ]);
+          console.log("[EmployeesDashboard] departmentHeadcount", departmentHeadcount);
+          console.log("[EmployeesDashboard] approvalsAging", approvalsAging);
+          console.log("[EmployeesDashboard] journeyStatus", journeyStatus);
+          console.log("[EmployeesDashboard] attendanceTrend", attendanceTrend);
+        } catch (e) {
+          console.error("[EmployeesDashboard] fetchDashboardData error", e);
+        }
+      };
+      fetchDashboardData();
+    }, [selectedDays, periodType, selectedDate, rangeStartDate, rangeEndDate]);
   
-    const timeframeOptions = ['Today', 'Last 7 Days', 'Last 14 Days', 'Last 30 Days', 'Last 90 Days'];
-    const daysOptions = ['Last 7 Days', 'Last 30 Days', 'Last 60 Days', 'Last 90 Days', 'Last 180 Days', 'Last Year'];
-    const chartPeriodOptions = ['Last 7 Days', 'Last 14 Days', 'Last 30 Days', 'Last 60 Days', 'Last 90 Days'];
+    const timeframeOptions = ['Today', '7', '14', '30', '90'];
+    const daysOptions = ['7', '30', '60', '90', '180', 'Year'];
+    const chartPeriodOptions = ['7', '14', '30', '60', '90'];
     const roleOptions = ['HR Admin', 'Manager', 'Employee', 'Admin'];
   
     const toggleDropdown = (dropdown: string) => {
@@ -201,9 +248,10 @@ const EmployeesDashboard = () => {
             color: '#111827',
             margin: 0
           }}>Employee Management Home</h1>
+          
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {/* Role Dropdown */}
-            <div style={{ position: 'relative' }}>
+            {/* <div style={{ position: 'relative' }}>
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
@@ -273,10 +321,10 @@ const EmployeesDashboard = () => {
                   ))}
                 </div>
               )}
-            </div>
+            </div> */}
 
             {/* Manager Button (no dropdown) */}
-            <button style={{
+            {/* <button style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -292,10 +340,10 @@ const EmployeesDashboard = () => {
             }}>
               <Users size={16} color="#6B7280" />
               <span>Manager</span>
-            </button>
+            </button> */}
 
             {/* Timeframe Dropdown */}
-            <div style={{ position: 'relative' }}>
+            {/* <div style={{ position: 'relative' }}>
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
@@ -363,6 +411,123 @@ const EmployeesDashboard = () => {
                     </div>
                   ))}
                 </div>
+              )}
+            </div> */}
+
+            {/* Period Dropdown: Monthly | Date | Range (default Monthly) */}
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleDropdown('period');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 14px',
+                    background: '#FFFFFF',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    color: '#374151',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <span>{periodType}</span>
+                  <ChevronDown size={14} color="#9CA3AF" />
+                </button>
+                {openDropdown === 'period' && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: '4px',
+                      background: '#FFFFFF',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                      minWidth: '140px',
+                      zIndex: 1000,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {(['Monthly', 'Date', 'Range'] as const).map((option) => (
+                      <div
+                        key={option}
+                        onClick={() => {
+                          setPeriodType(option);
+                          setOpenDropdown(null);
+                        }}
+                        style={{
+                          padding: '10px 14px',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          color: periodType === option ? '#6366F1' : '#374151',
+                          fontWeight: periodType === option ? '600' : '500',
+                          background: periodType === option ? '#F0F9FF' : 'transparent',
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (periodType !== option) e.currentTarget.style.background = '#F9FAFB';
+                        }}
+                        onMouseLeave={(e) => {
+                          if (periodType !== option) e.currentTarget.style.background = 'transparent';
+                        }}
+                      >
+                        {option}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {periodType === 'Date' && (
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    color: '#374151',
+                  }}
+                />
+              )}
+              {periodType === 'Range' && (
+                <>
+                  <input
+                    type="date"
+                    value={rangeStartDate}
+                    onChange={(e) => setRangeStartDate(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      color: '#374151',
+                    }}
+                  />
+                  <span style={{ fontSize: '13px', color: '#6B7280' }}>–</span>
+                  <input
+                    type="date"
+                    value={rangeEndDate}
+                    onChange={(e) => setRangeEndDate(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      color: '#374151',
+                    }}
+                  />
+                </>
               )}
             </div>
 
@@ -441,258 +606,7 @@ const EmployeesDashboard = () => {
         </div>
 
         {/* Stats Cards */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-          marginBottom: '16px'
-        }}>
-          {/* Total Employees */}
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid #F3F4F6'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: '#EEF2FF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Users size={24} color="#6366F1" strokeWidth={2} />
-              </div>
-              <div style={{
-                fontSize: '36px',
-                fontWeight: '700',
-                color: '#111827',
-                lineHeight: '1'
-              }}>52</div>
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#6B7280',
-              fontWeight: '500',
-              marginBottom: '12px'
-            }}>Total Employees</div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-              color: '#374151'
-            }}>
-              <Circle size={8} fill="#6366F1" color="#6366F1" />
-              <span>46 Active / 6 Inactive</span>
-            </div>
-            <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '8px' }}>Total:</div>
-          </div>
-
-          {/* Pending Approvals */}
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid #F3F4F6'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: '#D1FAE5',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <CheckCircle size={24} color="#10B981" strokeWidth={2} />
-              </div>
-              <div style={{
-                fontSize: '36px',
-                fontWeight: '700',
-                color: '#111827',
-                lineHeight: '1'
-              }}>7</div>
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#6B7280',
-              fontWeight: '500',
-              marginBottom: '12px'
-            }}>Pending Approvals</div>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '4px 10px',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: '600',
-              background: '#FEF3C7',
-              color: '#92400E'
-            }}>⏰ 3 overdue</span>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-              color: '#374151',
-              marginTop: '8px'
-            }}>
-              <Circle size={8} fill="#F59E0B" color="#F59E0B" />
-              <span>Avg age: 2.5 days</span>
-            </div>
-          </div>
-
-          {/* On Leave Today */}
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid #F3F4F6'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: '#FEF3C7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <MessageSquare size={24} color="#F59E0B" strokeWidth={2} />
-              </div>
-              <div style={{
-                fontSize: '36px',
-                fontWeight: '700',
-                color: '#111827',
-                lineHeight: '1'
-              }}>5</div>
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#6B7280',
-              fontWeight: '500',
-              marginBottom: '12px'
-            }}>On Leave Today</div>
-            <a href="#" onClick={handleViewCalendar} style={{
-              fontSize: '13px',
-              color: '#6366F1',
-              textDecoration: 'none',
-              fontWeight: '500',
-              cursor: 'pointer'
-            }}>View calendar →</a>
-          </div>
-
-          {/* Pending Acknowledgments */}
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid #F3F4F6'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: '#EDE9FE',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Send size={24} color="#8B5CF6" strokeWidth={2} />
-              </div>
-              <div style={{
-                fontSize: '36px',
-                fontWeight: '700',
-                color: '#111827',
-                lineHeight: '1'
-              }}>4</div>
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#6B7280',
-              fontWeight: '500',
-              marginBottom: '12px'
-            }}>Pending Acknowledgments</div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-              color: '#374151',
-              marginTop: '8px'
-            }}>
-              <Circle size={8} fill="#F59E0B" color="#F59E0B" />
-              <span>2 Due Soon</span>
-            </div>
-          </div>
-
-          {/* Compliance Alerts */}
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid #F3F4F6'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: '#FEE2E2',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <AlertTriangle size={24} color="#EF4444" strokeWidth={2} />
-              </div>
-              <div style={{
-                fontSize: '36px',
-                fontWeight: '700',
-                color: '#111827',
-                lineHeight: '1'
-              }}>3</div>
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#6B7280',
-              fontWeight: '500',
-              marginBottom: '12px'
-            }}>Compliance Alerts</div>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              <span style={{
-                padding: '4px 8px',
-                borderRadius: '6px',
-                fontSize: '11px',
-                fontWeight: '600',
-                background: '#FEE2E2',
-                color: '#991B1B'
-              }}>High 1</span>
-              <span style={{
-                padding: '4px 8px',
-                borderRadius: '6px',
-                fontSize: '11px',
-                fontWeight: '600',
-                background: '#FEF3C7',
-                color: '#92400E'
-              }}>Med 1</span>
-              <span style={{
-                padding: '4px 8px',
-                borderRadius: '6px',
-                fontSize: '11px',
-                fontWeight: '600',
-                background: '#F3F4F6',
-                color: '#374151'
-              }}>Low 1</span>
-            </div>
-          </div>
-        </div>
+        <DashboardStats onViewCalendar={handleViewCalendar} params={dashboardParams} />
 
         {/* Action Buttons */}
         <div style={{

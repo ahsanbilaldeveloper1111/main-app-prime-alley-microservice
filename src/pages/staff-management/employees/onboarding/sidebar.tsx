@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { 
-  X, 
+import React, { useState, useEffect } from "react";
+import {
+  X,
   Briefcase,
   Calendar,
   Clock,
@@ -9,8 +9,38 @@ import {
   Bell,
   MoreVertical,
   Lightbulb,
-  User
-} from 'lucide-react';
+  User,
+  Plus,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import {
+  updateJourney,
+  getJourney,
+  createJourneyStep,
+  updateJourneyStep,
+  deleteJourneyStep,
+  deleteJourney,
+} from "@utils/staffManagement";
+import { toast } from "react-toastify";
+import { Form, Modal } from "react-bootstrap";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import { GlobalDateTimeFormat } from "@utils/Helper";
+import moment from "moment";
+
+/** API journey step shape */
+interface JourneyStepRecord {
+  id?: number;
+  journey_id?: string | number;
+  stage?: string;
+  title?: string;
+  description?: string;
+  status?: string;
+  sort_order?: string | number;
+  due_date?: string | null;
+  completed_at?: string | null;
+  [key: string]: unknown;
+}
 
 interface ChecklistItem {
   id: string;
@@ -40,11 +70,212 @@ interface OnboardingEmployee {
 interface OnboardingDetailSidebarProps {
   employee: OnboardingEmployee;
   onClose: () => void;
+  onRefreshJourneys?: () => void;
 }
 
-const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ employee, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'Onboarding' | 'Audit & Risk Center'>('Onboarding');
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "in_progress", label: "In Progress" },
+  { value: "on_track", label: "On Track" },
+  { value: "overdue", label: "Overdue" },
+  { value: "completed", label: "Completed" },
+];
+
+function statusDisplayToApiValue(display: string): string {
+  const map: Record<string, string> = {
+    "In Progress": "in_progress",
+    "On Track": "on_track",
+    Overdue: "overdue",
+    Completed: "completed",
+  };
+  return map[display] ?? "in_progress";
+}
+
+const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ employee, onClose, onRefreshJourneys }) => {
+  const [activeTab, setActiveTab] = useState<"Onboarding" | "Audit & Risk Center">("Onboarding");
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
+  const [statusValue, setStatusValue] = useState<string>(() =>
+    statusDisplayToApiValue(employee.status)
+  );
+  const [statusUpdating, setStatusUpdating] = useState(false);
+
+  const [journeySteps, setJourneySteps] = useState<JourneyStepRecord[]>([]);
+  const [stepsLoading, setStepsLoading] = useState(false);
+  const [showAddStepForm, setShowAddStepForm] = useState(false);
+  const [addStepSubmitting, setAddStepSubmitting] = useState(false);
+  const [addStepForm, setAddStepForm] = useState({
+    stage: "General",
+    title: "",
+    description: "",
+    due_date: new Date().toISOString().slice(0, 10),
+    status: "pending",
+    sort_order: 0,
+  });
+
+  const [editingStep, setEditingStep] = useState<JourneyStepRecord | null>(null);
+  const [editStepForm, setEditStepForm] = useState({
+    stage: "General",
+    title: "",
+    description: "",
+    due_date: "",
+    status: "pending",
+    sort_order: 0,
+  });
+  const [editStepSubmitting, setEditStepSubmitting] = useState(false);
+  const [deletingStepId, setDeletingStepId] = useState<number | null>(null);
+  const [deletingJourney, setDeletingJourney] = useState(false);
+  const [showDeleteJourneyModal, setShowDeleteJourneyModal] = useState(false);
+
+  useEffect(() => {
+    setStatusValue(statusDisplayToApiValue(employee.status));
+  }, [employee.id, employee.status]);
+
+  const journeyId = Number(employee.id);
+  const canUpdateJourney = Number.isInteger(journeyId) && journeyId > 0;
+
+  useEffect(() => {
+    if (!canUpdateJourney) return;
+    let cancelled = false;
+    setStepsLoading(true);
+    getJourney(journeyId)
+      .then((data) => {
+        if (cancelled) return;
+        const raw = data as { steps?: JourneyStepRecord[] };
+        const list = Array.isArray(raw?.steps) ? raw.steps : [];
+        setJourneySteps(list);
+      })
+      .catch(() => {
+        if (!cancelled) setJourneySteps([]);
+      })
+      .finally(() => {
+        if (!cancelled) setStepsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [journeyId, canUpdateJourney]);
+
+  const handleAddStepSubmit = async () => {
+    if (!canUpdateJourney) return;
+    setAddStepSubmitting(true);
+    try {
+      await createJourneyStep(journeyId, {
+        stage: addStepForm.stage,
+        title: addStepForm.title,
+        description: addStepForm.description,
+        due_date: addStepForm.due_date,
+        status: addStepForm.status,
+        sort_order: addStepForm.sort_order,
+       
+      });
+      toast.success("Step added.");
+      setShowAddStepForm(false);
+      setAddStepForm({
+        stage: "General",
+        title: "",
+        description: "",
+        due_date: new Date().toISOString().slice(0, 10),
+        status: "pending",
+        sort_order: journeySteps.length,
+      });
+      const data = await getJourney(journeyId) as { steps?: JourneyStepRecord[] };
+      const list = Array.isArray(data?.steps) ? data.steps : [];
+      setJourneySteps(list);
+      onRefreshJourneys?.();
+    } catch {
+      // createJourneyStep handles error toast
+    } finally {
+      setAddStepSubmitting(false);
+    }
+  };
+
+  const openEditStep = (step: JourneyStepRecord) => {
+    const due = step.due_date
+      ? moment(step.due_date).format("YYYY-MM-DD")
+      : new Date().toISOString().slice(0, 10);
+    setEditingStep(step);
+    setEditStepForm({
+      stage: step.stage ?? "General",
+      title: step.title ?? "",
+      description: step.description ?? "",
+      due_date: due,
+      status: step.status ?? "pending",
+      sort_order: Number(step.sort_order ?? 0),
+    });
+  };
+
+  const handleEditStepSubmit = async () => {
+    if (!editingStep?.id || !canUpdateJourney) return;
+    setEditStepSubmitting(true);
+    try {
+      await updateJourneyStep(journeyId, editingStep.id, {
+        stage: editStepForm.stage,
+        title: editStepForm.title,
+        description: editStepForm.description,
+        due_date: editStepForm.due_date,
+        status: editStepForm.status,
+        sort_order: editStepForm.sort_order,
+        
+      });
+      toast.success("Step updated.");
+      setEditingStep(null);
+      const data = (await getJourney(journeyId)) as { steps?: JourneyStepRecord[] };
+      setJourneySteps(Array.isArray(data?.steps) ? data.steps : []);
+      onRefreshJourneys?.();
+    } catch {
+      // updateJourneyStep handles error toast
+    } finally {
+      setEditStepSubmitting(false);
+    }
+  };
+
+  const handleDeleteStep = async (step: JourneyStepRecord) => {
+    if (step.id == null || !canUpdateJourney) return;
+    // if (!window.confirm("Delete this step?")) return;
+    setDeletingStepId(step.id);
+    try {
+      await deleteJourneyStep(journeyId, step.id);
+      toast.success("Step deleted.");
+      const data = (await getJourney(journeyId)) as { steps?: JourneyStepRecord[] };
+      setJourneySteps(Array.isArray(data?.steps) ? data.steps : []);
+      onRefreshJourneys?.();
+    } catch {
+      // deleteJourneyStep handles error toast
+    } finally {
+      setDeletingStepId(null);
+    }
+  };
+
+  const handleDeleteJourney = async () => {
+    if (!canUpdateJourney) return;
+    setDeletingJourney(true);
+    try {
+      await deleteJourney(journeyId);
+      toast.success("Journey deleted.");
+      setShowDeleteJourneyModal(false);
+      onRefreshJourneys?.();
+      onClose();
+    } catch {
+      // deleteJourney handles error toast
+    } finally {
+      setDeletingJourney(false);
+    }
+  };
+
+  const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newStatus = e.target.value;
+    if (!canUpdateJourney) return;
+    setStatusUpdating(true);
+    try {
+      await updateJourney(journeyId, { status: newStatus });
+      setStatusValue(newStatus);
+      toast.success("Status updated.");
+      onRefreshJourneys?.();
+    } catch {
+      // updateJourney handles error toast
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
 
   // Dynamic checklist based on employee progress
   const allChecklistItems = [
@@ -124,8 +355,32 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
           }}>
             Onboarding Detail
           </h2>
-          <button
-            onClick={onClose}
+
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {canUpdateJourney && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteJourneyModal(true)}
+                disabled={deletingJourney}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "6px 12px",
+                  backgroundColor: "transparent",
+                  color: "#b91c1c",
+                  border: "none",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  cursor: deletingJourney ? "not-allowed" : "pointer",
+                }}
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
+            <button
+              onClick={onClose}
             style={{
               background: 'none',
               border: 'none',
@@ -138,6 +393,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
           >
             <X size={24} />
           </button>
+        </div>
         </div>
 
         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
@@ -204,7 +460,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
       </div>
 
       {/* Tabs */}
-      <div style={{
+      {/* <div style={{
         display: 'flex',
         gap: '8px',
         padding: '16px 24px',
@@ -246,13 +502,14 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
         >
           Audit & Risk Center
         </button>
-      </div>
+      </div> */}
 
       {/* Scrollable Content */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '24px'
+        padding: '24px',
+        display: 'none',
       }}>
         {/* Hir-date Section */}
         <div style={{
@@ -545,8 +802,361 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
         </div>
       </div>
 
+      {/* Status */}
+      {canUpdateJourney && (
+        <div style={{ padding: "16px 24px", borderTop: "1px solid #e9d5ff" }}>
+          <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "8px" }}>
+            Status
+          </label>
+          <select
+            className="form-select"
+            value={statusValue}
+            onChange={handleStatusChange}
+            disabled={statusUpdating}
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              fontSize: "14px",
+              border: "1px solid #e5e7eb",
+              borderRadius: "8px",
+              backgroundColor: "white",
+              color: "#1f2937",
+              cursor: statusUpdating ? "not-allowed" : "pointer",
+            }}
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {statusUpdating && (
+            <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>Updating…</div>
+          )}
+        </div>
+      )}
+
+      {/* Steps list & Add step */}
+      {canUpdateJourney && (
+        <div style={{ padding: "16px 24px", borderTop: "1px solid #e9d5ff", flex: 1, overflow: "auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <label style={{ fontSize: "13px", fontWeight: "600", color: "#374151" }}>Steps</label>
+            <button
+              type="button"
+              onClick={() => {
+                setAddStepForm((f) => ({ ...f, sort_order: journeySteps.length }));
+                setShowAddStepForm(true);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 12px",
+                backgroundColor: "#6366f1",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "13px",
+                fontWeight: "600",
+                cursor: "pointer",
+              }}
+            >
+              <Plus size={16} />
+              Add step
+            </button>
+          </div>
+          {stepsLoading ? (
+            <div style={{ fontSize: "13px", color: "#6b7280" }}>Loading steps…</div>
+          ) : journeySteps.length === 0 && !showAddStepForm ? (
+            <div style={{ fontSize: "13px", color: "#6b7280" }}>No steps yet.</div>
+          ) : (
+            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {journeySteps.map((step) => (
+                <li
+                  key={step.id ?? step.title ?? String(Math.random())}
+                  style={{
+                    padding: "12px",
+                    marginBottom: "8px",
+                    backgroundColor: "#f9fafb",
+                    borderRadius: "8px",
+                    border: "1px solid #e5e7eb",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "14px", fontWeight: "600", color: "#1f2937", marginBottom: "4px" }}>
+                        {step.title || "—"}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>
+                        {step.stage && <span style={{ marginRight: "8px" }}>{step.stage}</span>}
+                        {step.status && (
+                          <span style={{ padding: "2px 6px", backgroundColor: "#e5e7eb", borderRadius: "4px" }}>
+                            {step.status}
+                          </span>
+                        )}
+                      </div>
+                      {step.description && (
+                        <div style={{ fontSize: "13px", color: "#4b5563" }}>{step.description}</div>
+                      )}
+                      {step.due_date && (
+                        <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
+                          Due: {moment(step.due_date).format(GlobalDateTimeFormat)}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditStep(step);
+                        }}
+                        title="Edit"
+                        style={{
+                          padding: "6px",
+                          border: "none",
+                          borderRadius: "6px",
+                          backgroundColor: "#e0e7ff",
+                          color: "#4338ca",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteStep(step);
+                        }}
+                        disabled={deletingStepId === step.id}
+                        title="Delete"
+                        style={{
+                          padding: "6px",
+                          border: "none",
+                          borderRadius: "6px",
+                          backgroundColor: "#fee2e2",
+                          color: "#b91c1c",
+                          cursor: deletingStepId === step.id ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Modal show={showAddStepForm} onHide={() => setShowAddStepForm(false)} centered style={{ zIndex: 99999 }}>
+            <Modal.Header closeButton>
+              <Modal.Title>New step</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Stage</Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="Stage"
+                    value={addStepForm.stage}
+                    onChange={(e) => setAddStepForm((f) => ({ ...f, stage: e.target.value }))}
+                  />
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>Title</Form.Label>
+                  <Form.Control
+                    type="text"
+                    placeholder="Title"
+                    value={addStepForm.title}
+                    onChange={(e) => setAddStepForm((f) => ({ ...f, title: e.target.value }))}
+                  />
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>Description</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={2}
+                    placeholder="Description"
+                    value={addStepForm.description}
+                    onChange={(e) => setAddStepForm((f) => ({ ...f, description: e.target.value }))}
+                  />
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>Due Date</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={addStepForm.due_date}
+                    onChange={(e) => setAddStepForm((f) => ({ ...f, due_date: e.target.value }))}
+                  />
+                </Form.Group>
+                {/* <Form.Group className="mb-3">
+                  <Form.Label>Status</Form.Label>
+                  <Form.Control
+                    as="select"
+                    value={addStepForm.status}
+                    onChange={(e) => setAddStepForm((f) => ({ ...f, status: e.target.value }))}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                  </Form.Control>
+                </Form.Group> */}
+                {/* <Form.Group className="mb-3">
+                  <Form.Label>Sort Order</Form.Label>
+                  <Form.Control
+                    type="number"
+                    min={0}
+                    value={addStepForm.sort_order}
+                    onChange={(e) => setAddStepForm((f) => ({ ...f, sort_order: Number(e.target.value) || 0 }))}
+                  />
+                </Form.Group> */}
+               
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <button
+                type="button"
+                onClick={() => setShowAddStepForm(false)}
+                disabled={addStepSubmitting}
+                style={{
+                  padding: "8px 16px",
+                  backgroundColor: "white",
+                  color: "#6b7280",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  cursor: addStepSubmitting ? "not-allowed" : "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddStepSubmit}
+                disabled={addStepSubmitting}
+                style={{
+                  padding: "8px 16px",
+                  backgroundColor: "#6366f1",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  cursor: addStepSubmitting ? "not-allowed" : "pointer",
+                }}
+              >
+                {addStepSubmitting ? "Adding…" : "Add step"}
+              </button>
+            </Modal.Footer>
+          </Modal>
+
+          <Modal show={editingStep != null} onHide={() => setEditingStep(null)} centered style={{ zIndex: 99999 }}>
+            <Modal.Header closeButton>
+              <Modal.Title>Edit step</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <Form.Group className="mb-3">
+                <Form.Label>Stage</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Stage"
+                  value={editStepForm.stage}
+                  onChange={(e) => setEditStepForm((f) => ({ ...f, stage: e.target.value }))}
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Title</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Title"
+                  value={editStepForm.title}
+                  onChange={(e) => setEditStepForm((f) => ({ ...f, title: e.target.value }))}
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Description</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={2}
+                  placeholder="Description"
+                  value={editStepForm.description}
+                  onChange={(e) => setEditStepForm((f) => ({ ...f, description: e.target.value }))}
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Due Date</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={editStepForm.due_date}
+                  onChange={(e) => setEditStepForm((f) => ({ ...f, due_date: e.target.value }))}
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Status</Form.Label>
+                <Form.Control
+                  as="select"
+                  value={editStepForm.status}
+                  onChange={(e) => setEditStepForm((f) => ({ ...f, status: e.target.value }))}
+                >
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                </Form.Control>
+              </Form.Group>
+              {/* <Form.Group className="mb-3">
+                <Form.Label>Sort Order</Form.Label>
+                <Form.Control
+                  type="number"
+                  min={0}
+                  value={editStepForm.sort_order}
+                  onChange={(e) => setEditStepForm((f) => ({ ...f, sort_order: Number(e.target.value) || 0 }))}
+                />
+              </Form.Group> */}
+            </Modal.Body>
+            <Modal.Footer>
+              <button
+                type="button"
+                onClick={() => setEditingStep(null)}
+                disabled={editStepSubmitting}
+                style={{
+                  padding: "8px 16px",
+                  backgroundColor: "white",
+                  color: "#6b7280",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  cursor: editStepSubmitting ? "not-allowed" : "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleEditStepSubmit}
+                disabled={editStepSubmitting}
+                style={{
+                  padding: "8px 16px",
+                  backgroundColor: "#6366f1",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  cursor: editStepSubmitting ? "not-allowed" : "pointer",
+                }}
+              >
+                {editStepSubmitting ? "Saving…" : "Save"}
+              </button>
+            </Modal.Footer>
+          </Modal>
+        </div>
+      )}
+
       {/* Footer Action Buttons */}
-      <div style={{
+      {/* <div style={{
         padding: '20px 24px',
         borderTop: '1px solid #e9d5ff',
         display: 'flex',
@@ -591,7 +1201,16 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
         >
           Submit
         </button>
-      </div>
+      </div> */}
+
+      <DeleteConfirmationModal
+        show={showDeleteJourneyModal}
+        onHide={() => setShowDeleteJourneyModal(false)}
+        onConfirm={handleDeleteJourney}
+        itemName={`onboarding journey for ${employee.name}`}
+        itemType="journey"
+        loading={deletingJourney}
+      />
     </div>
   );
 };

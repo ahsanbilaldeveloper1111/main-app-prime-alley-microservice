@@ -10,8 +10,10 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 
-import { useState } from 'react';
-import dynamic from 'next/dynamic';
+import { useState, useEffect, useMemo, useCallback } from "react";
+import dynamic from "next/dynamic";
+import { getUserProfilesOrgChart, getUserProfilesOrgChartTree } from "@utils/staffManagement";
+import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { 
   Search, 
   ChevronDown, 
@@ -40,23 +42,39 @@ const Tree = dynamic(
     () => import('react-organizational-chart').then((mod) => mod.TreeNode),
     { ssr: false }
   );
+
+  /** API org-chart-tree node shape */
+  interface ApiOrgChartNode {
+    id?: number;
+    user_id?: string;
+    parent_id?: number | null;
+    parent_profile_id?: number | null;
+    department_id?: string;
+    job_title?: string;
+    status?: string;
+    is_on_leave_today?: boolean;
+    children?: ApiOrgChartNode[];
+    [key: string]: unknown;
+  }
   
+  type EmployeeStatus = 'On Leave' | 'Active' | 'Inactive';
+
   interface Employee {
     id: string;
     name: string;
     title: string;
     department: string;
     avatar: string;
-    status?: 'On Leave' | 'Active';
+    status?: EmployeeStatus;
     children?: Employee[];
   }
-  
+
   interface TeamMember {
     id: string;
     name: string;
     title: string;
     avatar: string;
-    status: 'On Leave' | 'Active';
+    status: EmployeeStatus;
     leaveDates?: string;
   }
   
@@ -79,6 +97,7 @@ const Tree = dynamic(
   `;
 
 const OrganizationalChart = () => {
+    const { mainAppDepartments, mainAppUsers } = useMainAppLookups();
     const [activeTab, setActiveTab] = useState<'All Department' | 'Org Chart' | 'My Team'>('Org Chart');
     const [searchTerm, setSearchTerm] = useState('');
     const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
@@ -95,107 +114,111 @@ const OrganizationalChart = () => {
     });
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
     const [showEmployeeSidebar, setShowEmployeeSidebar] = useState(false);
-  
-    const departments = ['All Department', 'Engineering', 'Marketing', 'HR', 'Analytics', 'Sales'];
-  
-    // Hierarchical data structure for the org chart (now as state)
-    const [orgData, setOrgData] = useState<Employee>({
-      id: '1',
-      name: 'Hassan Ali',
-      title: 'CEO',
-      department: 'Executive',
-      avatar: '',
-      status: 'Active',
-      children: [
-        {
-          id: '2',
-          name: 'Farah Ahmed',
-          title: 'Marketing',
-          department: 'Marketing',
-          avatar: '',
-          status: 'Active',
-          children: [
-            {
-              id: '5',
-              name: 'Zohaib Rehman',
-              title: 'Marketing Lead',
-              department: 'Marketing',
-              avatar: '',
-              status: 'On Leave'
-            }
-          ]
-        },
-        {
-          id: '3',
-          name: 'Sarah Malik',
-          title: 'HR Specialist',
-          department: 'HR',
-          avatar: '',
-          status: 'Active'
-        },
-        {
-          id: '4',
-          name: 'Hassan Mir',
-          title: 'Analytics',
-          department: 'Analytics',
-          avatar: '',
-          status: 'Active',
-          children: [
-            {
-              id: '7',
-              name: 'Saira Khan',
-              title: 'Data Analyst',
-              department: 'Analytics',
-              avatar: '',
-              status: 'On Leave'
-            },
-            {
-              id: '8',
-              name: 'Sarah Ahmed',
-              title: 'Business Analyst',
-              department: 'Analytics',
-              avatar: '',
-              status: 'On Leave'
-            },
-            {
-              id: '9',
-              name: 'Faisal Ansari',
-              title: 'Data Scientist',
-              department: 'Analytics',
-              avatar: '',
-              status: 'On Leave'
-            }
-          ]
-        }
-      ]
-    });
-  
-    const myTeam: TeamMember[] = [
-      {
-        id: '1',
-        name: 'Ali Nawaz',
-        title: 'Data Analyst',
-        avatar: '',
-        status: 'On Leave',
-        leaveDates: 'Mon - Wed'
-      },
-      {
-        id: '2',
-        name: 'Saira Khan',
-        title: 'Business Analyst',
-        avatar: '',
-        status: 'On Leave',
-        leaveDates: 'Mon - Wed'
-      },
-      {
-        id: '3',
-        name: 'Faisal Ansari',
-        title: 'Data Scientist',
-        avatar: '',
-        status: 'On Leave',
-        leaveDates: 'Mon - Fri'
+    const [orgChartTreeRaw, setOrgChartTreeRaw] = useState<ApiOrgChartNode[] | null>(null);
+    const [loadingOrgChart, setLoadingOrgChart] = useState(true);
+
+    const refetchOrgChart = useCallback(async () => {
+      setLoadingOrgChart(true);
+      try {
+        const raw = await getUserProfilesOrgChartTree();
+        const list: ApiOrgChartNode[] =
+          Array.isArray(raw)
+            ? (raw as ApiOrgChartNode[])
+            : raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)
+              ? ((raw as { data: ApiOrgChartNode[] }).data)
+              : [];
+        setOrgChartTreeRaw(list);
+      } catch (e) {
+        console.error("[OrganizationalChart] fetch org chart error:", e);
+        setOrgChartTreeRaw([]);
+      } finally {
+        setLoadingOrgChart(false);
       }
-    ];
+    }, []);
+
+    useEffect(() => {
+      refetchOrgChart();
+    }, [refetchOrgChart]);
+
+    const departments = ['All Department', ...(mainAppDepartments?.map((d) => d.name).filter(Boolean) as string[])];
+
+    const [orgData, setOrgData] = useState<Employee | null>(null);
+    useEffect(() => {
+      if (!orgChartTreeRaw || orgChartTreeRaw.length === 0) {
+        setOrgData(null);
+        return;
+      }
+      const getName = (userId: string | undefined) => {
+        if (!userId) return '—';
+        const u = mainAppUsers?.find((x) => String(x.id) === String(userId));
+        return u?.name ?? userId;
+      };
+      const getDeptName = (departmentId: string | undefined) => {
+        if (!departmentId) return '—';
+        const d = mainAppDepartments?.find((x) => String(x.id) === String(departmentId));
+        return d?.name ?? departmentId;
+      };
+      const apiNodeToEmployee = (node: ApiOrgChartNode): Employee => {
+        const rawStatus = (node.status ?? '').toString().toLowerCase();
+        const status: EmployeeStatus = node.is_on_leave_today
+          ? 'On Leave'
+          : rawStatus === 'inactive'
+            ? 'Inactive'
+            : 'Active';
+        return {
+          id: String(node.id ?? ''),
+          name: getName(node.user_id),
+          title: node.job_title ?? '—',
+          department: getDeptName(node.department_id),
+          avatar: '',
+          status,
+          children: (node.children && node.children.length > 0)
+            ? node.children.map(apiNodeToEmployee)
+            : undefined,
+        };
+      };
+      const roots = orgChartTreeRaw.map(apiNodeToEmployee);
+      const built: Employee =
+        roots.length === 1
+          ? roots[0]
+          : {
+              id: 'root',
+              name: 'Organization',
+              title: '',
+              department: '',
+              avatar: '',
+              status: 'Active',
+              children: roots,
+            };
+      setOrgData(built);
+    }, [orgChartTreeRaw, mainAppUsers, mainAppDepartments]);
+
+    const rawProfileById = useMemo(() => {
+      const map: Record<string, ApiOrgChartNode> = {};
+      const walk = (nodes: ApiOrgChartNode[]) => {
+        nodes.forEach((n) => {
+          if (n.id != null) map[String(n.id)] = n;
+          if (n.children?.length) walk(n.children);
+        });
+      };
+      if (orgChartTreeRaw?.length) walk(orgChartTreeRaw);
+      return map;
+    }, [orgChartTreeRaw]);
+
+    const flattenTeam = (emp: Employee | null, out: Employee[] = []): Employee[] => {
+      if (!emp) return out;
+      if (emp.id !== 'root') out.push(emp);
+      (emp.children ?? []).forEach((c) => flattenTeam(c, out));
+      return out;
+    };
+    const myTeam: TeamMember[] = (orgData ? flattenTeam(orgData) : []).map((e) => ({
+      id: e.id,
+      name: e.name,
+      title: e.title,
+      avatar: e.avatar,
+      status: (e.status ?? 'Active') as EmployeeStatus,
+      leaveDates: e.status === 'On Leave' ? '—' : undefined,
+    }));
   
     // Render org chart node
     const renderNode = (employee: Employee) => {
@@ -271,7 +294,23 @@ const OrganizationalChart = () => {
               On Leave
             </span>
           )}
-          {employee.status === 'Active' && employee.id !== '1' && (
+          {employee.status === 'Inactive' && (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 10px',
+              backgroundColor: '#f3f4f6',
+              color: '#6b7280',
+              borderRadius: '12px',
+              fontSize: '11px',
+              fontWeight: '500',
+              marginTop: '8px'
+            }}>
+              Inactive
+            </span>
+          )}
+          {employee.status === 'Active' && employee.id !== '1' && employee.id !== 'root' && (
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -367,7 +406,7 @@ const OrganizationalChart = () => {
         alert('Please fill in all required fields');
         return;
       }
-  
+      if (!orgData) return;
       const newEmp: Employee = {
         id: Date.now().toString(),
         name: newEmployee.name,
@@ -377,7 +416,6 @@ const OrganizationalChart = () => {
         status: newEmployee.status,
         children: []
       };
-  
       const updatedTree = addEmployeeToTree(orgData, newEmployee.parentId, newEmp);
       setOrgData(updatedTree);
       setShowAddDialog(false);
@@ -738,6 +776,15 @@ const OrganizationalChart = () => {
                 overflow: 'auto',
                 position: 'relative'
               }}>
+              {loadingOrgChart ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px', color: '#6b7280' }}>
+                  Loading chart...
+                </div>
+              ) : !orgData ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px', color: '#6b7280' }}>
+                  No organizational data available.
+                </div>
+              ) : (
               <div style={{
                 transform: `scale(${zoomLevel / 100})`,
                 transformOrigin: 'top center',
@@ -753,6 +800,7 @@ const OrganizationalChart = () => {
                   {orgData.children?.map((child) => renderTree(child))}
                 </Tree>
               </div>
+              )}
             </div>
           </>
         )}
@@ -773,14 +821,14 @@ const OrganizationalChart = () => {
               <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Users size={18} color="#6b7280" />
-                  <span style={{ fontSize: '14px', color: '#6b7280' }}>8</span>
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>{myTeam.length}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '500', color: '#1f2937' }}>3</span>
+                  <span style={{ fontSize: '14px', fontWeight: '500', color: '#1f2937' }}>{myTeam.filter((m) => m.status === 'On Leave').length}</span>
                   <span style={{ fontSize: '14px', color: '#6b7280' }}>On Leave Today</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '500', color: '#1f2937' }}>3</span>
+                  <span style={{ fontSize: '14px', fontWeight: '500', color: '#1f2937' }}>0</span>
                   <span style={{ fontSize: '14px', color: '#6b7280' }}>Pending Approvals</span>
                 </div>
               </div>
@@ -1007,7 +1055,7 @@ const OrganizationalChart = () => {
                   onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                 >
                   <option value="">Select reporting manager</option>
-                  {getAllEmployees(orgData).map(emp => (
+                  {(orgData ? getAllEmployees(orgData) : []).map(emp => (
                     <option key={emp.id} value={emp.id}>
                       {emp.name} - {emp.title}
                     </option>
@@ -1116,7 +1164,10 @@ const OrganizationalChart = () => {
           >
             <OrgEmployeeSidebar
               employee={selectedEmployee}
-              allEmployees={orgData}
+              allEmployees={orgData ?? { id: 'root', name: '', title: '', department: '', avatar: '', status: 'Active', children: [] }}
+              rawProfile={selectedEmployee ? rawProfileById[selectedEmployee.id] : undefined}
+              users={mainAppUsers}
+              onRefresh={refetchOrgChart}
               onClose={() => {
                 setShowEmployeeSidebar(false);
                 setSelectedEmployee(null);
