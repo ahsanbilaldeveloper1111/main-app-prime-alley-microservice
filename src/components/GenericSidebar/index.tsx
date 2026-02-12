@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Maximize2, Minimize2, LucideIcon, User, Phone, Mail, ChevronLeft, ChevronRight, MessageSquare, Video, Calendar } from 'lucide-react';
 import { Badge, Button } from 'react-bootstrap';
 import AICompose, { type AIComposeOpenedFrom } from '@components/aicompose';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS: AI_COMPOSE_PERMISSIONS } = HEADER_CONSTANTS;
 
 // Wrapper component to add close functionality to AICompose - fills flex container so it sticks with sidebar
 const AIComposeWrapper: React.FC<{
@@ -225,12 +229,18 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   actions,
   width = '400px'
 }) => {
+  const { hasPermission } = usePermissions();
   const [activeTab, setActiveTab] = useState(tabs && tabs.length > 0 ? tabs[0].id : '');
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
   const [showAICompose, setShowAICompose] = useState(false);
   const [aiComposeOpenedFrom, setAiComposeOpenedFrom] = useState<AIComposeOpenedFrom>('whatsapp');
   const tabsContainerRef = useRef<HTMLDivElement>(null);
+
+  const canWhatsApp = hasPermission(AI_COMPOSE_PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM) || hasPermission(AI_COMPOSE_PERMISSIONS.VIEW_WHATSAPP_MESSAGES_CRM);
+  const canEmail = hasPermission(AI_COMPOSE_PERMISSIONS.SEND_EMAIL_CRM) || hasPermission(AI_COMPOSE_PERMISSIONS.VIEW_EMAILS_CRM);
+  const canSms = hasPermission(AI_COMPOSE_PERMISSIONS.SEND_SMS_CRM) || hasPermission(AI_COMPOSE_PERMISSIONS.VIEW_SMS_CRM);
+  const canMeetings = hasPermission(AI_COMPOSE_PERMISSIONS.CREATE_MEETING_CRM) || hasPermission(AI_COMPOSE_PERMISSIONS.VIEW_MEETINGS_CRM);
 
   // Auto-select first tab when sidebar opens or tabs change
   useEffect(() => {
@@ -820,7 +830,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
               )}
             </button>
 
-            {/* WhatsApp Button - Always Visible */}
+            {/* WhatsApp Button */}
+            {canWhatsApp && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -864,8 +875,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 WhatsApp
               </span>
             </button>
+            )}
 
-            {/* Email Button - Always Visible */}
+            {/* Email Button */}
+            {canEmail && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -909,8 +922,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 Email
               </span>
             </button>
+            )}
 
-            {/* SMS Button - Always Visible */}
+            {/* SMS Button */}
+            {canSms && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -954,8 +969,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 SMS
               </span>
             </button>
+            )}
 
-            {/* Meet Now Button - Always Visible */}
+            {/* Meet Now Button */}
+            {canMeetings && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -999,8 +1016,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 Meet Now
               </span>
             </button>
+            )}
 
-            {/* Schedule Button - Same as Meet Now but opens with meeting type "scheduled" */}
+            {/* Schedule Button */}
+            {canMeetings && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -1043,6 +1062,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 Schedule
               </span>
             </button>
+            )}
           </div>
         </div>
 

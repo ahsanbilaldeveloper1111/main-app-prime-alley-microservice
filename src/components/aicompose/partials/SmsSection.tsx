@@ -4,6 +4,10 @@ import { Star, MessageSquare, Clock, Info } from 'lucide-react';
 import type { RegisterFooter, ChannelSectionContext } from '../types';
 import { getContextSource } from '../types';
 import CommonOptionsFields from './CommonOptionsFields';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS: P } = HEADER_CONSTANTS;
 
 const DEFAULT_DRAFT = `Hi Ms. Shilpa, this is PrimeAlley. Can we schedule a 10-min call this week?`;
 
@@ -18,6 +22,9 @@ const SUGGESTIONS = [
 ];
 
 const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionContext> = ({ registerFooter, contextPayload, commonOptions, setCommonOptions }) => {
+  const { hasPermission } = usePermissions();
+  const canSend = hasPermission(P.SEND_SMS_CRM);
+  const canView = hasPermission(P.VIEW_SMS_CRM);
   const [draftContent, setDraftContent] = useState(DEFAULT_DRAFT);
   const [objective, setObjective] = useState('Book a meeting');
   const [tone, setTone] = useState('Professional + Friendly');
@@ -43,6 +50,14 @@ const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionC
     registerFooter?.({ cancel: handleCancel, copy: handleCopy, later: handleLater, send: handleSend });
     return () => registerFooter?.(null);
   }, [registerFooter, draftContent, objective, tone, contextPayload]);
+
+  if (!canSend && !canView) {
+    return (
+      <div className="d-flex align-items-center justify-content-center text-muted py-5">
+        <p className="mb-0">You don&apos;t have permission to send or view SMS here.</p>
+      </div>
+    );
+  }
 
   return (
     <>
