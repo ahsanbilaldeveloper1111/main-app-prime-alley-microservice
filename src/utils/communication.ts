@@ -47,6 +47,14 @@ export interface SendEmailErrorResponse {
   errors?: Record<string, string[]>;
 }
 
+/** WhatsApp template item from GET whatsapp-templates. */
+export interface WhatsAppTemplateItem {
+  name: string;
+  id: number;
+  content_sid: string;
+  params: string[];
+}
+
 /** Request payload for send-whatsapp. */
 export interface SendWhatsAppPayload {
   /** Recipient phone (E.164, e.g. `+15551234567`). */
@@ -323,6 +331,23 @@ export const getEmails = async (params?: Record<string, string>): Promise<unknow
 export const getChats = async (params?: Record<string, string>): Promise<unknown> => {
   const response = await axiosInstance.get(`${prefix}/chats`, { params });
   return response.data;
+};
+
+/**
+ * GET whatsapp-templates
+ * Fetches WhatsApp templates list (name, id, content_sid, params).
+ */
+export const getWhatsAppTemplates = async (params?: Record<string, string>): Promise<WhatsAppTemplateItem[]> => {
+  const response = await axiosInstance.get<WhatsAppTemplateItem[] | { data?: WhatsAppTemplateItem[] }>(
+    `${prefix}/whatsapp-templates`,
+    { params }
+  );
+  const data = response.data;
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && Array.isArray((data as { data?: WhatsAppTemplateItem[] }).data)) {
+    return (data as { data: WhatsAppTemplateItem[] }).data;
+  }
+  return [];
 };
 
 /**

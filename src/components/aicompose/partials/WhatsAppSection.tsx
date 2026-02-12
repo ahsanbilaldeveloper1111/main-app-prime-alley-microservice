@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Row, Col, Form, Button, Card, Badge } from 'react-bootstrap';
 import { Star, MessageCircle, Clock, Sparkles } from 'lucide-react';
 import type { RegisterFooter, ChannelSectionContext } from '../types';
 import { getContextSource } from '../types';
-import { generateWhatsApp, getWhatsAppChatMessages, getChats, sendWhatsApp } from '@utils/communication';
-import type { GenerateWhatsAppPayload } from '@utils/communication';
+import { generateWhatsApp, getWhatsAppChatMessages, getChats, sendWhatsApp, getWhatsAppTemplates } from '@utils/communication';
+import type { GenerateWhatsAppPayload, WhatsAppTemplateItem } from '@utils/communication';
 import parsePhoneNumber from 'libphonenumber-js';
 import moment from 'moment-timezone';
 import { GlobalDateTimeFormat } from '@utils/Helper';
@@ -25,10 +25,34 @@ interface WhatsAppMessage {
   id: number;
   direction: 'inbound' | 'outbound';
   message: string;
+  message_type?: string;
+  content_sid?: string;
   status?: string;
   from_number?: string;
   to_number?: string;
   created_at: string;
+}
+
+function resolveTemplateSentLabel(
+  contentSid: string,
+  templateList: WhatsAppTemplateItem[] | null | undefined
+): string {
+  if (!Array.isArray(templateList) || templateList.length === 0) return 'Template sent';
+  const template = templateList.find((t) => t.content_sid === contentSid);
+  if (template?.name) return `Template sent — ${template.name}`;
+  return 'Template sent (template no longer in list)';
+}
+
+/** Display text for a chat message; uses template list to resolve name when message_type is 'template'. */
+function getMessageDisplayText(
+  msg: WhatsAppMessage,
+  templateList: WhatsAppTemplateItem[] | null | undefined
+): string {
+  if (msg.message?.trim()) return msg.message;
+  if (msg.message_type === 'template' && msg.content_sid) {
+    return resolveTemplateSentLabel(msg.content_sid, templateList);
+  }
+  return 'Template sent';
 }
 
 const DEFAULT_DRAFT = `Hi Ms. Shilpa, this is PrimeAlley.
@@ -59,7 +83,7 @@ const DEFAULT_COMMON_OPTIONS = {
   customCtaType: '',
 };
 
-const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionContext> = ({ registerFooter, contextPayload, commonOptions: commonOptionsProp, setCommonOptions }) => {
+const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionContext> = ({ registerFooter, contextPayload, commonOptions: commonOptionsProp, setCommonOptions, moduleSlug }) => {
   const commonOptions = commonOptionsProp ?? DEFAULT_COMMON_OPTIONS;
   const [draftContent, setDraftContent] = useState(DEFAULT_DRAFT);
   const [objective, setObjective] = useState('Book a meeting');
@@ -194,7 +218,9 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
     const fetchChats = async () => {
       setChatsLoading(true);
       try {
-        const res = await getChats() as { data?: WhatsAppChatItem[] };
+        const res = await getChats({
+          ...(moduleSlug ? { module_slug: moduleSlug } : {}),
+        }) as { data?: WhatsAppChatItem[] };
         setChats(Array.isArray(res?.data) ? res.data : []);
       } catch (e) {
         console.error('Failed to fetch chats', e);
@@ -204,7 +230,7 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
       }
     };
     fetchChats();
-  }, []);
+  }, [moduleSlug]);
 
   const [selectedChat, setSelectedChat] = useState<number | null>(null);
   const [viewChatMessages, setViewChatMessages] = useState<WhatsAppMessage[]>([]);
@@ -215,6 +241,8 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
     window_minutes_remaining?: number;
   } | null>(null);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const messagesListRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (selectedChat == null) {
       setViewChatMessages([]);
@@ -239,19 +267,56 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
       }
     };
     fetchMessages();
-  }, [selectedChat]);
+  }, [selectedChat, moduleSlug]);
+
+  // Scroll message list to bottom when messages load or change (show latest first)
+  useEffect(() => {
+    if (messagesLoading || viewChatMessages.length === 0) return;
+    const el = messagesListRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [viewChatMessages, messagesLoading]);
 
   const [sendMode, setSendMode] = useState<'two-way' | 'template'>('two-way');
   const [sendPhone, setSendPhone] = useState('');
-  const [templateValue, setTemplateValue] = useState('');
   const [sendMessageText, setSendMessageText] = useState('');
   const [sendLoading, setSendLoading] = useState(false);
   const [customSendPrompt, setCustomSendPrompt] = useState('');
   const [sendGenerateLoading, setSendGenerateLoading] = useState(false);
   const [sendPhoneError, setSendPhoneError] = useState<string | null>(null);
+
+  const [whatsappTemplates, setWhatsappTemplates] = useState<WhatsAppTemplateItem[]>([]);
+  const [whatsappTemplatesLoading, setWhatsappTemplatesLoading] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<WhatsAppTemplateItem | null>(null);
+  const [templateParamValues, setTemplateParamValues] = useState<Record<string, string>>({});
+
   useEffect(() => {
     if (contactPhone) setSendPhone(contactPhone);
   }, [contactPhone]);
+
+  useEffect(() => {
+    const shouldLoadTemplates = sendMode === 'template' || selectedChat != null;
+    if (!shouldLoadTemplates) return;
+    const fetchTemplates = async () => {
+      setWhatsappTemplatesLoading(true);
+      try {
+        const list = await getWhatsAppTemplates();
+        setWhatsappTemplates(Array.isArray(list) ? list : []);
+      } catch (e) {
+        console.error('Failed to fetch WhatsApp templates', e);
+        setWhatsappTemplates([]);
+      } finally {
+        setWhatsappTemplatesLoading(false);
+      }
+    };
+    fetchTemplates();
+  }, [sendMode, selectedChat]);
+
+  useEffect(() => {
+    setSelectedTemplate(null);
+    setTemplateParamValues({});
+  }, [sendMode]);
 
   const isSendPhoneE164 = (value: string): boolean => {
     if (!value.trim()) return false;
@@ -305,16 +370,38 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
     try {
       if (sendMode === 'two-way') {
         await sendWhatsApp({ number: phone, message: sendMessageText || generatedContent });
+        setSendMessageText('');
       } else {
-        await sendWhatsApp({ number: phone, content_sid: templateValue, content_variables: undefined });
+        if (!selectedTemplate?.content_sid) {
+          console.error('No template selected');
+          setSendLoading(false);
+          return;
+        }
+        const params = selectedTemplate.params ?? [];
+        const content_variables: Record<string, string> = {};
+        params.forEach((_, index) => {
+          const key = String(index + 1);
+          content_variables[key] = templateParamValues[key] ?? '';
+        });
+        await sendWhatsApp({
+          number: phone,
+          content_sid: selectedTemplate.content_sid,
+          content_variables: Object.keys(content_variables).length > 0 ? content_variables : undefined,
+        });
+        setTemplateParamValues({});
       }
-      setSendMessageText('');
     } catch (e) {
       console.error('Send WhatsApp failed', e);
     } finally {
       setSendLoading(false);
     }
   };
+
+  const selectedTemplateContentSid = selectedTemplate?.content_sid ?? null;
+  const canSendTemplate =
+    selectedTemplate != null &&
+    selectedTemplate.content_sid &&
+    (selectedTemplate.params ?? []).every((_, i) => (templateParamValues[String(i + 1)] ?? '').trim() !== '');
 
   const [replyQuery, setReplyQuery] = useState('');
   const [replyMessage, setReplyMessage] = useState('');
@@ -414,18 +501,7 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                       <option value="template">Template</option>
                     </Form.Select>
                   </Form.Group>
-                  {sendMode === 'template' && (
-                    <Form.Group className="mb-3">
-                      <Form.Label className="fw-semibold">Template (content_sid / value)</Form.Label>
-                      <Form.Control
-                        value={templateValue}
-                        onChange={(e) => setTemplateValue(e.target.value)}
-                        placeholder="Template SID or selected value"
-                      />
-                    </Form.Group>
-                  )}
-                  {sendMode === 'two-way' && (
-                  <>
+
                   <Form.Group className="mb-3">
                     <Form.Label className="fw-semibold">Phone number (E.164)</Form.Label>
                     <Form.Control
@@ -451,10 +527,73 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                       <Form.Control.Feedback type="invalid">{sendPhoneError}</Form.Control.Feedback>
                     )}
                   </Form.Group>
-                  {sendMode === 'two-way' && (
-                    <>
 
-{commonOptions != null && setCommonOptions != null && (
+                  {sendMode === 'template' && (
+                    <>
+                      <Form.Group className="mb-3">
+                        <Form.Label className="fw-semibold">Template</Form.Label>
+                        <Form.Select
+                          value={selectedTemplateContentSid ?? ''}
+                          onChange={(e) => {
+                            const contentSid = e.target.value;
+                            const template = contentSid
+                              ? whatsappTemplates.find((t) => t.content_sid === contentSid) ?? null
+                              : null;
+                            setSelectedTemplate(template);
+                            setTemplateParamValues({});
+                          }}
+                          disabled={whatsappTemplatesLoading}
+                          aria-label="Select WhatsApp template"
+                        >
+                          <option value="">
+                            {whatsappTemplatesLoading ? 'Loading templates...' : 'Select a template'}
+                          </option>
+                          {whatsappTemplates.map((t) => (
+                            <option key={t.id} value={t.content_sid}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </Form.Select>
+                      </Form.Group>
+                      {selectedTemplate && Array.isArray(selectedTemplate.params) && selectedTemplate.params.length > 0 && (
+                        <div className="mb-3">
+                          <Form.Label className="fw-semibold">Template variables (required)</Form.Label>
+                          {selectedTemplate.params.map((paramLabel, index) => {
+                            const key = String(index + 1);
+                            return (
+                              <Form.Group key={key} className="mb-2">
+                                <Form.Label className="small mb-1">{paramLabel}</Form.Label>
+                                <Form.Control
+                                  value={templateParamValues[key] ?? ''}
+                                  onChange={(e) =>
+                                    setTemplateParamValues((prev) => ({ ...prev, [key]: e.target.value }))
+                                  }
+                                  placeholder={paramLabel}
+                                  required
+                                />
+                              </Form.Group>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <Button
+                        variant="primary"
+                        onClick={handleSendMessage}
+                        disabled={
+                          sendLoading ||
+                          !sendPhone.trim() ||
+                          !isSendPhoneE164(sendPhone) ||
+                          !canSendTemplate
+                        }
+                      >
+                        {sendLoading ? 'Sending...' : 'Send'}
+                      </Button>
+                    </>
+                  )}
+
+                  {sendMode === 'two-way' && (
+                  <>
+                  {commonOptions != null && setCommonOptions != null && (
         <>
         <Row>
         <CommonOptionsFields commonOptions={commonOptions} setCommonOptions={setCommonOptions} />
@@ -521,8 +660,6 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                     >
                       {sendLoading ? 'Sending...' : 'Send'}
                     </Button>
-                    </>
-                  )}
                   </>
                   )}
                 </Card.Body>
@@ -571,7 +708,7 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                   ) : viewChatMessages.length === 0 ? (
                     <div className="small text-muted py-3">No messages in this chat</div>
                   ) : (
-                    <div className="d-flex flex-column gap-2 mb-3" style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                    <div ref={messagesListRef} className="d-flex flex-column gap-2 mb-3" style={{ maxHeight: '280px', overflowY: 'auto' }}>
                       {viewChatMessages.map((msg) => (
                         <div
                           key={msg.id}
@@ -581,7 +718,7 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                             className={`rounded-3 px-3 py-2  ${msg.direction === 'outbound' ? 'bg-primary text-white' : 'bg-light text-dark border'}`}
                             style={{ maxWidth: '85%' }}
                           >
-                            <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>
+                            <div style={{ whiteSpace: 'pre-wrap' }}>{getMessageDisplayText(msg, whatsappTemplates)}</div>
                             <div className={`d-flex align-items-center gap-2 mt-1 ${msg.direction === 'outbound' ? 'justify-content-end' : 'justify-content-start'}`}>
                               <small className={msg.direction === 'outbound' ? 'text-white-50' : 'text-muted'}>
                                 {msg.created_at? moment(msg.created_at).format(GlobalDateTimeFormat) : ''}
