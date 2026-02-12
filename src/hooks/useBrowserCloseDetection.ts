@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { signOut } from 'next-auth/react';
+import { clearSessionCookiesClient } from '../utils/cookieUtils';
 
 const BROWSER_SESSION_KEY = 'app_browser_session_active';
 
@@ -61,12 +62,12 @@ export const useBrowserCloseDetection = () => {
             console.error('Error calling clear-all-sessions API:', error);
           }
 
-          // Clear NextAuth session by calling signOut
-          // This will properly clear JWT cookies
+          // Clear NextAuth cookies and session
+          clearSessionCookiesClient(true);
           try {
-            await signOut({ 
+            await signOut({
               callbackUrl: '/auth/signin',
-              redirect: true // Redirect to signin page
+              redirect: true,
             });
             return; // signOut will redirect, so we can return here
           } catch (error) {

@@ -24,6 +24,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from 'next/router';
 import { getStorageImageUrl } from '@utils/imageUtils';
 import ResetPasswordModal from '@components/ResetPasswordModal';
+import { clearSessionCookiesClient } from '@utils/cookieUtils';
 
 interface ProfileSidebarProps {
   isOpen?: boolean;
@@ -608,7 +609,8 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                 <button className="profile-menu-button"
                   onClick={() => {
                     onClose?.();
-                    signOut({ callbackUrl: '/auth/signin',redirect: true });
+                    clearSessionCookiesClient(true);
+                    signOut({ callbackUrl: '/auth/signin', redirect: true });
                   }}
                 >
                   <div className="profile-menu-content">

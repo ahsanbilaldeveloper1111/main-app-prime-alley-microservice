@@ -1,7 +1,11 @@
 import NextAuth from 'next-auth';
 import type { NextAuthOptions } from 'next-auth';
+import type { JWT } from 'next-auth/jwt';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { nextAuthLogger } from '../../../utils/nextAuthLogger';
+import { jwtPayloadStore } from '../../../utils/sessionStore';
+import { signSmallPayload, generateSessionId } from '../../../utils/smallJwt';
+import { customJwtDecode } from '../../../utils/authJwt';
 
 // Constants
 const REFRESH_BUFFER_MS = 2 * 60 * 1000; // 2 minutes before expiry
@@ -175,6 +179,29 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
     maxAge: SESSION_MAX_AGE,
+  },
+
+  // Small cookie (Option A): store full token server-side; cookie only holds signed sessionId to avoid 431
+  jwt: {
+    async encode({ token = {}, secret, maxAge = SESSION_MAX_AGE }) {
+      const sessionId = generateSessionId();
+      const now = Math.floor(Date.now() / 1000);
+      const exp = (typeof token.exp === 'number' ? token.exp : now + maxAge);
+      jwtPayloadStore.set(sessionId, token as Record<string, unknown>);
+      const secretStr = typeof secret === 'string' ? secret : (secret as Buffer).toString('binary');
+      // Include id + permissions in cookie so Edge middleware can verify without store lookup
+      return signSmallPayload(
+        {
+          sessionId,
+          exp,
+          iat: typeof token.iat === 'number' ? token.iat : now,
+          id: typeof token.id === 'string' ? token.id : undefined,
+          permissions: Array.isArray(token.permissions) ? token.permissions : undefined,
+        },
+        secretStr
+      );
+    },
+    decode: customJwtDecode,
   },
 
   pages: {

@@ -1,6 +1,7 @@
 import { signOut } from 'next-auth/react';
 import { toast } from 'react-toastify';
 import { clearAllLocalStorage } from './localStorageUtils';
+import { clearSessionCookiesClient } from './cookieUtils';
 import axiosInstance from './axios';
 
 interface TokenData {
@@ -457,6 +458,7 @@ class TokenService {
       if (typeof window !== 'undefined' && window.sessionStorage) {
         sessionStorage.clear();
         clearAllLocalStorage();
+        clearSessionCookiesClient(true);
         signOut();
         window.location.href = '/auth/signin';
         toast.error('Session expired - Please login again');
