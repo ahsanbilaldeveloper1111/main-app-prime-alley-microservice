@@ -14,6 +14,7 @@ const DEFAULT_MESSAGE = 'Hi, this is PrimeAlley. Can we schedule a 10-min call t
 const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionContext> = ({
   registerFooter,
   contextPayload,
+  moduleSlug,
 }) => {
   const { data: session } = useSession();
   const source = getContextSource(contextPayload);
@@ -43,7 +44,7 @@ const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionC
       const res = await getSmsList({
         page: String(page),
         per_page: String(perPage),
-        ...(extension && extension !== 'unknown' ? { user_extension: extension } : {}),
+        ...(moduleSlug ? { module_slug: moduleSlug } : {}),
       });
       setSmsList(Array.isArray(res?.data) ? res.data : []);
       setSmsMeta(res?.meta ?? null);
@@ -54,7 +55,7 @@ const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionC
     } finally {
       setSmsLoading(false);
     }
-  }, [extension]);
+  }, [extension, moduleSlug]);
 
   useEffect(() => {
     fetchSms(smsPage, smsPerPage);
@@ -289,7 +290,7 @@ const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionC
                   </p>
                 </div>
               ) : (
-                <div className="d-flex flex-column gap-2">
+                <div className="d-flex flex-column gap-2" style={{ height: '300px', overflowY: 'auto', scrollbarWidth: 'thin', paddingRight: '10px' }}>
                   {smsList.map((sms) => (
                     <Card
                       key={sms.id}
@@ -342,11 +343,11 @@ const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionC
                     <Form.Select
                       size="sm"
                       style={{ width: 'auto' }}
-                      value={smsPerPage}
+                        value={smsPerPage}
                       onChange={(e) => {
                         setSmsPerPage(Number(e.target.value));
-                        setSmsPage(1);
-                      }}
+                          setSmsPage(1);
+                        }}
                     >
                       {[5, 10, 15, 25, 50].map((n) => (
                         <option key={n} value={n}>{n}</option>
