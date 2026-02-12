@@ -1,65 +1,89 @@
-import React, { useState } from 'react';
-import { X, ChevronDown, Minimize2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Minimize2 } from 'lucide-react';
+
+export interface WrapUpReasonOption {
+  value: string;
+  label: string;
+}
+
+/** Call variable definition from API (e.g. wrap-up or campaign config response) */
+export interface CallVariableConfig {
+  key: string;
+  label: string;
+}
 
 interface WrapUpModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit?: (data: { wrapUp: string; variables: Record<string, string> }) => void;
+  /** wrapUp can be single value (string) or multiple (string[]); backend receives wrapUpItems array */
+  onSubmit?: (data: { wrapUp: string | string[]; variables: Record<string, string> }) => void;
   onMinimize?: () => void;
+  /** When provided, use these options instead of the default list (e.g. from getFinesseWrapUpReasons) */
+  wrapUpReasons?: WrapUpReasonOption[];
+  /** When provided, call variables section is built from API data instead of hardcoded keys */
+  callVariablesConfig?: CallVariableConfig[];
+  /** Max reasons selectable (e.g. 5); shown as hint */
+  maxReasons?: number;
 }
 
-interface CallVariables {
-  callVariable1: string;
-  callVariable2: string;
-  callVariable3: string;
-  callVariable4: string;
+const DEFAULT_WRAP_UP_OPTIONS: WrapUpReasonOption[] = [
+  { value: 'not_interested', label: 'Not Interested' },
+  { value: 'language_barrier', label: 'Language Barrier' },
+  { value: 'call_back', label: 'Call Back' },
+  { value: 'follow_up', label: 'Follow Up' },
+  { value: 'busy', label: 'Busy' },
+  { value: 'wrong_number', label: 'Wrong Number' },
+  { value: 'do_not_call', label: 'Do Not Call' },
+  { value: 'voicemail', label: 'Voicemail' },
+  { value: 'successful', label: 'Successful' },
+  { value: 'appointment_set', label: 'Appointment Set' },
+];
+
+function emptyVariablesFromConfig(config: CallVariableConfig[] | undefined): Record<string, string> {
+  if (!config?.length) return {};
+  return config.reduce<Record<string, string>>((acc, { key }) => {
+    acc[key] = '';
+    return acc;
+  }, {});
 }
 
-const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, onMinimize }) => {
-  const [selectedWrapUp, setSelectedWrapUp] = useState('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [callVariables, setCallVariables] = useState<CallVariables>({
-    callVariable1: '',
-    callVariable2: '',
-    callVariable3: '',
-    callVariable4: ''
-  });
+const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, onMinimize, wrapUpReasons, callVariablesConfig, maxReasons = 5 }) => {
+  const [selectedWrapUpIds, setSelectedWrapUpIds] = useState<string[]>([]);
+  const initialVariables = emptyVariablesFromConfig(callVariablesConfig);
+  const [callVariables, setCallVariables] = useState<Record<string, string>>(initialVariables);
 
-  const wrapUpOptions = [
-    { value: 'not_interested', label: 'Not Interested' },
-    { value: 'language_barrier', label: 'Language Barrier' },
-    { value: 'call_back', label: 'Call Back' },
-    { value: 'follow_up', label: 'Follow Up' },
-    { value: 'busy', label: 'Busy' },
-    { value: 'wrong_number', label: 'Wrong Number' },
-    { value: 'do_not_call', label: 'Do Not Call' },
-    { value: 'voicemail', label: 'Voicemail' },
-    { value: 'successful', label: 'Successful' },
-    { value: 'appointment_set', label: 'Appointment Set' }
-  ];
+  // When API config changes (e.g. modal opened with new data), reset variables to match config
+  useEffect(() => {
+    setCallVariables(emptyVariablesFromConfig(callVariablesConfig));
+  }, [callVariablesConfig]);
 
-  const handleVariableChange = (key: keyof CallVariables, value: string) => {
-    setCallVariables(prev => ({
-      ...prev,
-      [key]: value
-    }));
+  // Prefer API data (wrapUpReasons from getFinesseWrapUpReasons). Use default list only when no API data was passed.
+  const wrapUpOptions = wrapUpReasons != null && wrapUpReasons.length > 0 ? wrapUpReasons : DEFAULT_WRAP_UP_OPTIONS;
+
+  // Variable keys to show: from API config when provided, otherwise none (no hardcoded callVariable1-4)
+  const variableKeys = callVariablesConfig?.length ? callVariablesConfig : [];
+
+  const handleVariableChange = (key: string, value: string) => {
+    setCallVariables(prev => ({ ...prev, [key]: value }));
+  };
+
+  const toggleWrapUp = (value: string) => {
+    setSelectedWrapUpIds(prev => {
+      if (prev.includes(value)) return prev.filter(v => v !== value);
+      if (prev.length >= maxReasons) return prev;
+      return [...prev, value];
+    });
   };
 
   const handleSubmit = () => {
-    if (onSubmit) {
+    if (onSubmit && selectedWrapUpIds.length > 0) {
       onSubmit({
-        wrapUp: selectedWrapUp,
+        wrapUp: selectedWrapUpIds.length === 1 ? selectedWrapUpIds[0] : selectedWrapUpIds,
         variables: { ...callVariables }
       });
     }
-    // Reset form
-    setSelectedWrapUp('');
-    setCallVariables({
-      callVariable1: '',
-      callVariable2: '',
-      callVariable3: '',
-      callVariable4: ''
-    });
+    setSelectedWrapUpIds([]);
+    setCallVariables(emptyVariablesFromConfig(callVariablesConfig));
     onClose();
   };
 
@@ -293,6 +317,47 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
           clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
         }
 
+        .wrap-up-checkbox-list {
+          border: 2px solid #e5e7eb;
+          border-radius: 10px;
+          max-height: 260px;
+          overflow-y: auto;
+          padding: 8px 0;
+          background: #f8fafc;
+        }
+
+        .wrap-up-checkbox-option {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 16px;
+          cursor: pointer;
+          font-size: 14px;
+          color: #475569;
+          transition: background 0.2s;
+        }
+
+        .wrap-up-checkbox-option:hover {
+          background: #f1f5f9;
+        }
+
+        .wrap-up-checkbox-option input[type="checkbox"] {
+          width: 18px;
+          height: 18px;
+          accent-color: #7c3aed;
+          cursor: pointer;
+        }
+
+        .wrap-up-checkbox-option input[type="checkbox"]:disabled {
+          cursor: not-allowed;
+          opacity: 0.5;
+        }
+
+        .wrap-up-checkbox-label {
+          font-weight: 500;
+          color: #1e293b;
+        }
+
         .variables-section {
           margin-top: 24px;
         }
@@ -454,87 +519,65 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
           </div>
 
           <div className="modal-body">
-            {/* Wrap Up Selection */}
+            {/* Wrap Up Selection – checkboxes, multiple selection, labels from API */}
             <div className="form-group">
               <label className="form-label">
                 Wrap Up <span className="required">*</span>
               </label>
-              <div className="dropdown-container">
-                <div
-                  className={`dropdown-select ${isDropdownOpen ? 'active' : ''}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsDropdownOpen(!isDropdownOpen);
-                  }}
-                >
-                  <span style={{ color: selectedWrapUp ? '#1e293b' : '#94a3b8' }}>
-                    {selectedWrapUp
-                      ? wrapUpOptions.find(opt => opt.value === selectedWrapUp)?.label
-                      : 'Select wrap-up items...'}
-                  </span>
-                  <ChevronDown 
-                    className={`dropdown-icon ${isDropdownOpen ? 'open' : ''}`} 
-                    size={20} 
-                  />
+              {maxReasons > 0 && (
+                <div className="wrap-up-hint" style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+                  Maximum of {maxReasons} reasons can be selected.
                 </div>
-
-                {isDropdownOpen && (
-                  <div className="dropdown-menu">
-                    {wrapUpOptions.map(option => (
-                      <div
-                        key={option.value}
-                        className={`dropdown-option ${selectedWrapUp === option.value ? 'selected' : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedWrapUp(option.value);
-                          setIsDropdownOpen(false);
-                        }}
-                      >
-                        <div className="checkbox-custom">
-                          {selectedWrapUp === option.value && (
-                            <div className="checkbox-check" />
-                          )}
-                        </div>
-                        {option.label}
-                      </div>
-                    ))}
-                  </div>
-                )}
+              )}
+              <div className="wrap-up-checkbox-list">
+                {wrapUpOptions.map(option => (
+                  <label key={option.value} className="wrap-up-checkbox-option">
+                    <input
+                      type="checkbox"
+                      checked={selectedWrapUpIds.includes(option.value)}
+                      onChange={() => toggleWrapUp(option.value)}
+                      disabled={!selectedWrapUpIds.includes(option.value) && selectedWrapUpIds.length >= maxReasons}
+                    />
+                    <span className="wrap-up-checkbox-label">{option.label}</span>
+                  </label>
+                ))}
               </div>
             </div>
 
-            {/* Call Variables */}
-            <div className="variables-section">
-              <div className="variables-header">Call Variables</div>
-              <div className="variables-table-container">
-                <table className="variables-table">
-                  <thead>
-                    <tr>
-                      <th>NAME</th>
-                      <th>VALUE</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(Object.keys(callVariables) as Array<keyof CallVariables>).map((key) => (
-                      <tr key={key}>
-                        <td>
-                          <div className="variable-name">{key}</div>
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            className="variable-input"
-                            value={callVariables[key]}
-                            onChange={(e) => handleVariableChange(key, e.target.value)}
-                            placeholder="Enter value..."
-                          />
-                        </td>
+            {/* Call Variables – from API config when provided */}
+            {variableKeys.length > 0 && (
+              <div className="variables-section">
+                <div className="variables-header">Call Variables</div>
+                <div className="variables-table-container">
+                  <table className="variables-table">
+                    <thead>
+                      <tr>
+                        <th>NAME</th>
+                        <th>VALUE</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {variableKeys.map(({ key, label }) => (
+                        <tr key={key}>
+                          <td>
+                            <div className="variable-name">{label}</div>
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              className="variable-input"
+                              value={callVariables[key] ?? ''}
+                              onChange={(e) => handleVariableChange(key, e.target.value)}
+                              placeholder="Enter value..."
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="modal-footer">
@@ -544,7 +587,7 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
             <button
               className="btn btn-primary"
               onClick={handleSubmit}
-              disabled={!selectedWrapUp}
+              disabled={selectedWrapUpIds.length === 0}
             >
               Submit Wrap Up
             </button>
