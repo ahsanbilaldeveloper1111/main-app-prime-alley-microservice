@@ -56,7 +56,7 @@ import {
   CrmProduct,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import { ModuleSlug, ValidationType, checkRequiredFields } from "@utils/Helper";
+import { ModuleSlug } from "@utils/Helper";
 
 interface CreateLeadModalProps {
   show: boolean;
@@ -701,62 +701,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate all required fields using checkRequiredFields
-    const requiredFields = [
-      { field: "name" as const, name: "Lead Name" },
-      { field: "user_extension" as const, name: "User" },
-      { field: "stage_id" as const, name: "Stage" },
-    ];
-
-    if (!checkRequiredFields(formData, requiredFields)) {
+    // Use same validation as Edit Lead modal (step-by-step checks)
+    if (!validateStep0() || !validateStep1() || !validateStep2() || !validateStep3()) {
       return;
-    }
-
-    // Validate at least one contact person exists and has name or phone
-    if (!formData.contact_persons || formData.contact_persons.length === 0) {
-      toast.error("Please add at least one contact person");
-      return;
-    }
-
-    const hasValidContact = formData.contact_persons.some(
-      (person) => person.name || person.phone
-    );
-
-    if (!hasValidContact) {
-      toast.error(
-        "Please provide at least name or phone for one contact person"
-      );
-      return;
-    }
-
-    // Validate required campaign fields
-    if (selectedCampaign && selectedCampaign.fields) {
-      const requiredCampaignFields = selectedCampaign.fields.filter(
-        (field: any) => field.is_required
-      );
-
-      if (requiredCampaignFields.length > 0) {
-        const missingFields: string[] = [];
-
-        requiredCampaignFields.forEach((field: any) => {
-          const fieldValue = formData.campaign_field_values[field.field_name];
-          if (
-            !fieldValue ||
-            (typeof fieldValue === "string" && fieldValue.trim() === "")
-          ) {
-            missingFields.push(field.field_name);
-          }
-        });
-
-        if (missingFields.length > 0) {
-          toast.error(
-            `Please fill in all required campaign fields: ${missingFields.join(
-              ", "
-            )}`
-          );
-          return;
-        }
-      }
     }
 
     setLoading(true);
@@ -850,68 +797,79 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     }));
   };
 
-  // Validation functions for each step
+  // Validation functions for each step (aligned with Edit Lead modal)
   const validateStep0 = (): boolean => {
-    const requiredFields = [
-      { field: "name" as const, name: "Lead Name" },
-      { field: "user_extension" as const, name: "User" },
-      { field: "stage_id" as const, name: "Stage" },
-    ];
-    return checkRequiredFields(formData, requiredFields);
+    if (!formData.name?.trim()) {
+      toast.error("Lead name is required");
+      return false;
+    }
+    if (formData.user_extension == null || formData.user_extension === "") {
+      toast.error("Assigned To is required");
+      return false;
+    }
+    if (!formData.stage_id) {
+      toast.error("Stage is required");
+      return false;
+    }
+    return true;
   };
 
   const validateStep1 = (): boolean => {
-    // Step 1 (Company Info) has no required fields
+    if (!formData.company_name?.trim()) {
+      toast.error("Company name is required");
+      return false;
+    }
+    if (showOtherBusinessType && !businessTypeOther?.trim()) {
+      toast.error("Please specify the business type");
+      return false;
+    }
+    if (!showOtherBusinessType && !businessTypeId) {
+      toast.error("Business type is required");
+      return false;
+    }
     return true;
   };
 
   const validateStep2 = (): boolean => {
-    // Validate that at least one contact person exists and has name or phone
-    if (!formData.contact_persons || formData.contact_persons.length === 0) {
-      toast.error("Please add at least one contact person");
-      return false;
-    }
-
-    // Check if at least one contact person has email or phone
-    let hasValidContact = formData.contact_persons.every(
-      (person) => person.email || person.phone
-    );
-
-    // Validate email format for each contact person that has an email
-    for (const person of formData.contact_persons) {
-      const hasEmail = !!person?.email;
-      let isValid = true;
-      if (hasEmail) {
-        isValid = checkRequiredFields(
-          { email: person.email, name: person.name },
-          [
-            { field: "email", name: "Email", type: ValidationType.EMAIL },
-            { field: "name", name: "Name" },
-          ]
-        );
-      } else {
-        isValid = checkRequiredFields(
-          { name: person.name },
-          [{ field: "name", name: "Name" }]
-        );
+    for (let i = 0; i < formData.contact_persons.length; i++) {
+      const person = formData.contact_persons[i];
+      if (!person.title?.trim()) {
+        toast.error(`Contact person ${i + 1}: Title is required`);
+        return false;
       }
-      if (!isValid) {
+      if (!person.name?.trim()) {
+        toast.error(`Contact person ${i + 1}: Name is required`);
+        return false;
+      }
+      if (!person.phone?.trim()) {
+        toast.error(`Contact person ${i + 1}: Phone is required`);
+        return false;
+      }
+      if (!person.email?.trim()) {
+        toast.error(`Contact person ${i + 1}: Email is required`);
+        return false;
+      }
+      if (!/\S+@\S+\.\S+/.test(person.email)) {
+        toast.error(`Contact person ${i + 1}: Invalid email format`);
         return false;
       }
     }
-
-    if (!hasValidContact) {
-      toast.error(
-        "Please provide at least email or phone for each contact person"
-      );
-      return false;
-    }
-
     return true;
   };
 
   const validateStep3 = (): boolean => {
-    // Step 3 (Other Info) has no required fields
+    if (selectedCampaign?.fields) {
+      const requiredCampaignFields = selectedCampaign.fields.filter(
+        (field: any) => field.is_required
+      );
+      for (const field of requiredCampaignFields) {
+        const fieldValue = formData.campaign_field_values?.[field.field_name];
+        if (!fieldValue || (typeof fieldValue === "string" && fieldValue.trim() === "")) {
+          toast.error(`${field.field_name} is required`);
+          return false;
+        }
+      }
+    }
     return true;
   };
 
@@ -1712,12 +1670,14 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                 <Card className="border-0 bg-light">
                   <Card.Body>
                     <h5 className="fw-bold mb-4 text-success">
-                      Client Information
+                      COMPANY INFORMATION
                     </h5>
                     <Row>
                       <Col md={6}>
                         <Form.Group className="mb-3">
-                          <Form.Label>Client Name</Form.Label>
+                          <Form.Label>
+                            Company Name <span className="text-danger">*</span>
+                          </Form.Label>
                           <Form.Control
                             type="text"
                             value={formData.company_name}
@@ -1730,7 +1690,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                       </Col>
                       <Col md={6}>
                         <Form.Group className="mb-3">
-                          <Form.Label>Business Type</Form.Label>
+                          <Form.Label>
+                            Business Type <span className="text-danger">*</span>
+                          </Form.Label>
                           <Form.Select
                             value={
                               showOtherBusinessType
@@ -1770,7 +1732,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                       {showOtherBusinessType && (
                         <Col md={6}>
                           <Form.Group className="mb-3">
-                            <Form.Label>Business Type (Other)</Form.Label>
+                            <Form.Label>
+                              Business Type (Other) <span className="text-danger">*</span>
+                            </Form.Label>
                             <Form.Control
                               type="text"
                               value={businessTypeOther}
@@ -1923,7 +1887,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                           <Row>
                             <Col md={6}>
                               <Form.Group className="mb-3">
-                                <Form.Label>Title</Form.Label>
+                                <Form.Label>
+                                  Title <span className="text-danger">*</span>
+                                </Form.Label>
                                 <Form.Select
                                   value={person.title}
                                   onChange={(e) =>
@@ -1945,7 +1911,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                             </Col>
                             <Col md={6}>
                               <Form.Group className="mb-3">
-                                <Form.Label>Name</Form.Label>
+                                <Form.Label>
+                                  Name <span className="text-danger">*</span>
+                                </Form.Label>
                                 <Form.Control
                                   type="text"
                                   value={person.name}
@@ -1962,7 +1930,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                             </Col>
                             <Col md={12}>
                               <Form.Group className="mb-3">
-                                <Form.Label>Phone</Form.Label>
+                                <Form.Label>
+                                  Phone <span className="text-danger">*</span>
+                                </Form.Label>
                                 <div className="phone-input-wrapper">
                                   <PhoneInput
                                     international
@@ -2026,7 +1996,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                             </Col>
                             <Col md={12}>
                               <Form.Group className="mb-3">
-                                <Form.Label>Email</Form.Label>
+                                <Form.Label>
+                                  Email <span className="text-danger">*</span>
+                                </Form.Label>
                                 <Form.Control
                                   type="email"
                                   value={person.email}
