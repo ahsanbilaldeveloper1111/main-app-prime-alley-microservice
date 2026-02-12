@@ -5664,6 +5664,7 @@ const handleCloseEditModal = useCallback(() => {
           setShowDealSidebar(false);
           setSelectedDeal(null);
         }}
+        moduleSlug={ModuleSlug.CRM_DEALS}
         title={selectedDeal?.name || 'Deal Details'}
         subtitle={selectedDeal?.company || selectedDeal?.company_name || ''}
         metadata={selectedDeal?.id ? `Deal ID: ${selectedDeal.id}` : ''}
