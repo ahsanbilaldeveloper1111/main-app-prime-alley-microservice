@@ -19,7 +19,7 @@ import {
 } from "@utils/staffManagement";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
-import { Button, Modal, Form } from "react-bootstrap";
+import { Badge, Button, Modal, Form } from "react-bootstrap";
 
 import {
   Search,
@@ -83,6 +83,35 @@ function getAgingLabel(iso: string | null | undefined): string {
   }
 }
 
+function getDateRangeForOption(option: string): { start_date_from: string; start_date_to: string } | null {
+  if (!option?.trim()) return null;
+  const now = new Date();
+  const to = new Date(now);
+  to.setHours(23, 59, 59, 999);
+  const toStr = to.toISOString().slice(0, 10);
+  const from = new Date(now);
+  switch (option.trim()) {
+    case "Today":
+      from.setHours(0, 0, 0, 0);
+      return { start_date_from: toStr, start_date_to: toStr };
+    case "Last 7 days":
+      from.setDate(from.getDate() - 7);
+      break;
+    case "Last 30 days":
+      from.setDate(from.getDate() - 30);
+      break;
+    case "Last 3 months":
+      from.setMonth(from.getMonth() - 3);
+      break;
+    case "All time":
+    default:
+      return null;
+  }
+  from.setHours(0, 0, 0, 0);
+  const fromStr = from.toISOString().slice(0, 10);
+  return { start_date_from: fromStr, start_date_to: toStr };
+}
+
 const ApprovalRequest = () => {
   const { data: session } = useSession();
   const { mainAppUsers } = useMainAppLookups();
@@ -97,7 +126,7 @@ const ApprovalRequest = () => {
     [mainAppUsers]
   );
 
-  const [activeTab, setActiveTab] = useState<"Pending" | "Approved" | "Rejected">("Pending");
+  const [activeTab, setActiveTab] = useState<"All" | "Pending" | "Approved" | "Rejected">("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState("");
   const [selectedRequestedByUserId, setSelectedRequestedByUserId] = useState<string | null>(null);
@@ -183,7 +212,7 @@ const ApprovalRequest = () => {
     async (page = 1) => {
       setLoadingRequests(true);
       try {
-        const status = TAB_TO_STATUS[activeTab] ?? "pending";
+        const status = TAB_TO_STATUS[activeTab] ?? "";
         const params: Record<string, unknown> = {
           page,
           limit: 10,
@@ -193,8 +222,12 @@ const ApprovalRequest = () => {
         const category = selectedType ? categories.find((c) => (c.name ?? c.code ?? String(c.id)) === selectedType) : undefined;
         if (category?.id != null) params.user_request_category_id = category.id;
         if (selectedRequestedByUserId != null && selectedRequestedByUserId.trim())
-          params.assignees = [selectedRequestedByUserId.trim()];
-        if (selectedDate?.trim()) params.created_at = selectedDate.trim();
+          params.user_ids = [selectedRequestedByUserId.trim()];
+        const dateRange = getDateRangeForOption(selectedDate ?? "");
+        if (dateRange) {
+          params.created_at_from = dateRange.start_date_from;
+          params.created_at_to = dateRange.start_date_to;
+        }
         const { data, pagination: p } = await getUserRequests(params);
         setRequests(data ?? []);
         if (p) setRequestsPagination({ page: p.page, limit: p.limit, total: p.total, last_page: p.last_page });
@@ -300,7 +333,7 @@ const ApprovalRequest = () => {
     selectedRequestedByUserId != null
       ? (requestedByUsers.find((u) => String(u.id) === selectedRequestedByUserId)?.name ?? selectedRequestedByUserId)
       : "";
-  const dateOptions = ["Last 7 days", "Last 30 days", "Last 3 months", "All time"];
+  const dateOptions = ["Today","Last 7 days", "Last 30 days", "Last 3 months", "All time"];
   const agingOptions = ["Less than 1 day", "1-3 days", "3-7 days", "More than 7 days"];
 
   const totalPages = requestsPagination?.last_page ?? 1;
@@ -399,7 +432,7 @@ const ApprovalRequest = () => {
           marginBottom: '24px',
           borderBottom: '2px solid #e5e7eb'
         }}>
-          {(['Pending', 'Approved', 'Rejected'] as const).map(tab => (
+          {(['All','Pending', 'Approved', 'Rejected'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => {
@@ -819,7 +852,7 @@ const ApprovalRequest = () => {
         
 
         {/* Inbox Header */}
-        <div style={{ 
+        {/* <div style={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center',
@@ -840,16 +873,12 @@ const ApprovalRequest = () => {
               <span style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>
                 {totalRequests}
               </span>
-              {/* <ChevronDown size={14} color="#6b7280" />
-              <span style={{ fontSize: '14px', color: '#6b7280' }}>
-                {activeTab}
-              </span> */}
             </div>
           </div>
           <div style={{ fontSize: '14px', color: '#6b7280' }}>
             {totalRequests} {activeTab}
           </div>
-        </div>
+        </div> */}
 
         {/* Requests Table */}
         <div style={{ 
@@ -877,6 +906,9 @@ const ApprovalRequest = () => {
                       <ChevronDown size={14} />
                     </div>
                   </th>
+                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Status</th>
+                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Approved/Rejected By</th>
+                  <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Approved/Rejected On</th>
                  
                 </tr>
               </thead>
@@ -952,6 +984,26 @@ const ApprovalRequest = () => {
                           >
                             {getAgingLabel(created_at)}
                           </span>
+                        </td>
+                        <td style={{ padding: "16px" }}>
+                          <Badge
+                            bg={
+                              request.status?.toLowerCase() === "approved"
+                                ? "success"
+                                : request.status?.toLowerCase() === "rejected"
+                                  ? "danger"
+                                  : "info"
+                            }
+                            className="text-capitalize"
+                          >
+                            {request.status}
+                          </Badge>
+                        </td>
+                        <td style={{ padding: "16px" }}>
+                          {getDisplayName(request.approved_by_user_id)}
+                        </td>
+                        <td style={{ padding: "16px" }}>
+                          {formatRequestDate(request.approved_at)}
                         </td>
                        
                       </tr>

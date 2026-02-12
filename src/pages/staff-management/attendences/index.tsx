@@ -26,6 +26,37 @@ import "@assets/scss/tabs.scss";
 
 const ITEMS_PER_PAGE = 15;
 
+const dateOptions = ["Today", "Last 7 days", "Last 30 days", "Last 3 months", "All time"];
+
+function getDateRangeForOption(option: string): { date_from: string; date_to: string } | null {
+  if (!option?.trim()) return null;
+  const now = new Date();
+  const to = new Date(now);
+  to.setHours(23, 59, 59, 999);
+  const toStr = to.toISOString().slice(0, 10);
+  const from = new Date(now);
+  switch (option.trim()) {
+    case "Today":
+      from.setHours(0, 0, 0, 0);
+      return { date_from: toStr, date_to: toStr };
+    case "Last 7 days":
+      from.setDate(from.getDate() - 7);
+      break;
+    case "Last 30 days":
+      from.setDate(from.getDate() - 30);
+      break;
+    case "Last 3 months":
+      from.setMonth(from.getMonth() - 3);
+      break;
+    case "All time":
+    default:
+      return null;
+  }
+  from.setHours(0, 0, 0, 0);
+  const fromStr = from.toISOString().slice(0, 10);
+  return { date_from: fromStr, date_to: toStr };
+}
+
 const Attendences = () => {
   const { data: session } = useSession();
   const { mainAppUsers } = useMainAppLookups();
@@ -43,6 +74,8 @@ const Attendences = () => {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [userSearchTerm, setUserSearchTerm] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,11 +98,16 @@ const Attendences = () => {
   const loadAttendance = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params: { page: number; limit: number; user_id?: string } = {
+      const params: { page: number; limit: number; user_id?: string; date_from?: string; date_to?: string } = {
         page,
         limit: ITEMS_PER_PAGE,
       };
       if (selectedUserId != null && selectedUserId.trim()) params.user_id = selectedUserId.trim();
+      const dateRange = getDateRangeForOption(selectedDate ?? "");
+      if (dateRange) {
+        params.date_from = dateRange.date_from;
+        params.date_to = dateRange.date_to;
+      }
       const { data, pagination: p } = await getAttendance(params);
       setRecords(data ?? []);
       if (p) {
@@ -88,7 +126,7 @@ const Attendences = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedUserId]);
+  }, [selectedUserId, selectedDate]);
 
   const loadStatus = useCallback(async () => {
     setStatusLoading(true);
@@ -108,7 +146,7 @@ const Attendences = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedUserId]);
+  }, [selectedUserId, selectedDate]);
 
   useEffect(() => {
     loadStatus();
@@ -117,7 +155,8 @@ const Attendences = () => {
   const handleCheckIn = async () => {
     setCheckInOutLoading(true);
     try {
-      const payload = selectedUserId != null && selectedUserId.trim() ? { user_id: selectedUserId.trim() } : {};
+      const userId = session?.user?.id != null ? String(session.user.id) : undefined;
+      const payload = userId ? { user_id: userId } : {};
       await attendanceCheckIn(payload);
       toast.success("Checked in successfully");
       await loadStatus();
@@ -130,7 +169,8 @@ const Attendences = () => {
   const handleCheckOut = async () => {
     setCheckInOutLoading(true);
     try {
-      const payload = selectedUserId != null && selectedUserId.trim() ? { user_id: selectedUserId.trim() } : {};
+      const userId = session?.user?.id != null ? String(session.user.id) : undefined;
+      const payload = userId ? { user_id: userId } : {};
       await attendanceCheckOut(payload);
       toast.success("Checked out successfully");
       await loadStatus();
@@ -268,8 +308,8 @@ const Attendences = () => {
         </div>
       </div>
 
-      {/* User filter dropdown */}
-      <div style={{ marginBottom: "16px" }}>
+      {/* Filters: User + Date */}
+      <div style={{ marginBottom: "16px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
         <div style={{ position: "relative", display: "inline-block" }}>
           <button
             type="button"
@@ -386,10 +426,86 @@ const Attendences = () => {
             </div>
           )}
         </div>
+
+        {/* Date filter dropdown */}
+        <div style={{ position: "relative" }}>
+          <button
+            type="button"
+            onClick={() => setShowDateDropdown(!showDateDropdown)}
+            style={{
+              padding: "10px 16px",
+              border: "1px solid #e5e7eb",
+              borderRadius: "8px",
+              backgroundColor: "white",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              cursor: "pointer",
+              fontSize: "14px",
+              minWidth: "140px",
+              justifyContent: "space-between",
+            }}
+          >
+            <span>{selectedDate || "All Dates"}</span>
+            <ChevronDown size={16} />
+          </button>
+          {showDateDropdown && (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                marginTop: "4px",
+                backgroundColor: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: "8px",
+                boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+                zIndex: 10,
+                minWidth: "180px",
+              }}
+            >
+              <div
+                onClick={() => {
+                  setSelectedDate("");
+                  setShowDateDropdown(false);
+                }}
+                style={{
+                  padding: "10px 16px",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  color: "#6366f1",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "white")}
+              >
+                All Dates
+              </div>
+              {dateOptions.map((option) => (
+                <div
+                  key={option}
+                  onClick={() => {
+                    setSelectedDate(option);
+                    setShowDateDropdown(false);
+                  }}
+                  style={{
+                    padding: "10px 16px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    backgroundColor: selectedDate === option ? "#f3f4f6" : "white",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f3f4f6")}
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.backgroundColor = selectedDate === option ? "#f3f4f6" : "white")
+                  }
+                >
+                  {option}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-
-
-      
 
       {/* Table header */}
       <div
