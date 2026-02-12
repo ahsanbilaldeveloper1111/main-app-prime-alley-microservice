@@ -1,6 +1,8 @@
 /**
  * Custom session store for NextAuth to avoid large JWT cookies
- * Stores session data in memory and only uses small session IDs in cookies
+ * - sessionStore: used by /api/auth/session for TMS sessionId storage
+ * - jwtPayloadStore: used by custom JWT encode/decode to store full token server-side;
+ *   only a small session id is stored in the cookie to avoid 431
  */
 
 export interface NextAuthSessionData {
@@ -20,13 +22,21 @@ export interface NextAuthSessionData {
   expires: string;
 }
 
+/** Full JWT payload from NextAuth jwt callback (stored server-side, keyed by sessionId) */
+export type JWTPayload = Record<string, unknown>;
+
 // Global session store (in production, use Redis or database)
 declare global {
   var nextAuthSessions: Map<string, NextAuthSessionData> | undefined;
+  var nextAuthJwtPayloadStore: Map<string, JWTPayload> | undefined;
 }
 
 if (!global.nextAuthSessions) {
   global.nextAuthSessions = new Map();
+}
+
+if (!global.nextAuthJwtPayloadStore) {
+  global.nextAuthJwtPayloadStore = new Map();
 }
 
 export const sessionStore = {
@@ -53,7 +63,36 @@ export const sessionStore = {
   }
 };
 
-// Run cleanup every 5 minutes
+/**
+ * Store for full JWT payloads keyed by sessionId (Option A: small cookie).
+ * Cookie only contains a signed sessionId; full session is resolved here.
+ */
+export const jwtPayloadStore = {
+  set: (sessionId: string, payload: JWTPayload) => {
+    global.nextAuthJwtPayloadStore!.set(sessionId, payload);
+  },
+
+  get: (sessionId: string): JWTPayload | null => {
+    return global.nextAuthJwtPayloadStore!.get(sessionId) || null;
+  },
+
+  delete: (sessionId: string) => {
+    global.nextAuthJwtPayloadStore!.delete(sessionId);
+  },
+
+  cleanup: () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    global.nextAuthJwtPayloadStore!.forEach((payload, sessionId) => {
+      const exp = payload.exp as number | undefined;
+      if (typeof exp === 'number' && exp < nowSec) {
+        global.nextAuthJwtPayloadStore!.delete(sessionId);
+      }
+    });
+  }
+};
+
+// Run cleanup every 5 minutes for both stores
 if (typeof setInterval !== 'undefined') {
   setInterval(sessionStore.cleanup, 5 * 60 * 1000);
+  setInterval(jwtPayloadStore.cleanup, 5 * 60 * 1000);
 }

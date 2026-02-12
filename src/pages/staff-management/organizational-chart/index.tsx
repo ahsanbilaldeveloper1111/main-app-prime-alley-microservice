@@ -64,6 +64,7 @@ const Tree = dynamic(
 
   interface Employee {
     id: string;
+    userId?: string;
     name: string;
     title: string;
     department: string;
@@ -133,6 +134,7 @@ const OrganizationalChart = () => {
         if (departmentId != null && departmentId !== '') params.department_id = departmentId;
         if (userIds != null && userIds.length > 0) params.user_ids = userIds;
         const raw = await getUserProfilesOrgChartTree(Object.keys(params).length ? params : undefined);
+        console.log("raw", raw);
         const list: ApiOrgChartNode[] =
           Array.isArray(raw)
             ? (raw as ApiOrgChartNode[])
@@ -160,17 +162,9 @@ const OrganizationalChart = () => {
       [mainAppDepartments, refetchOrgChart]
     );
 
-    const handleUserChange = useCallback(
-      (userId: string, selectedDept: string) => {
-        const departmentId =
-          selectedDept === 'All Department' || !selectedDept
-            ? undefined
-            : mainAppDepartments?.find((d) => d.name === selectedDept)?.id;
-        const userIds = userId ? [userId] : undefined;
-        refetchOrgChart(departmentId != null ? String(departmentId) : undefined, userIds);
-      },
-      [mainAppDepartments, refetchOrgChart]
-    );
+    const handleUserChange = useCallback((userId: string, _selectedDept: string) => {
+      setSelectedUserId(userId);
+    }, []);
 
     useEffect(() => {
       refetchOrgChart();
@@ -203,6 +197,7 @@ const OrganizationalChart = () => {
             : 'Active';
         return {
           id: String(node.id ?? ''),
+          userId: node.user_id != null ? String(node.user_id) : undefined,
           name: getName(node.user_id),
           title: node.job_title ?? '—',
           department: getDeptName(node.department_id),
@@ -230,6 +225,17 @@ const OrganizationalChart = () => {
       setOrgData(built);
     }, [orgChartTreeRaw, mainAppUsers, mainAppDepartments, session?.user]);
 
+    useEffect(() => {
+      if (!selectedUserId) return;
+      const timer = setTimeout(() => {
+        const el = document.querySelector(`[data-org-chart-user-id="${selectedUserId}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }, [selectedUserId]);
+
     const rawProfileById = useMemo(() => {
       const map: Record<string, ApiOrgChartNode> = {};
       const walk = (nodes: ApiOrgChartNode[]) => {
@@ -241,6 +247,48 @@ const OrganizationalChart = () => {
       if (orgChartTreeRaw?.length) walk(orgChartTreeRaw);
       return map;
     }, [orgChartTreeRaw]);
+
+    const orgChartUserIds = useMemo(() => {
+      const set = new Set<string>();
+      const walk = (nodes: ApiOrgChartNode[]) => {
+        nodes.forEach((n) => {
+          if (n.user_id != null) set.add(String(n.user_id));
+          if (n.children?.length) walk(n.children);
+        });
+      };
+      if (orgChartTreeRaw?.length) walk(orgChartTreeRaw);
+      return set;
+    }, [orgChartTreeRaw]);
+
+    const usersInOrgChart = useMemo(
+      () => (mainAppUsers ?? []).filter((u) => orgChartUserIds.has(String(u.id))),
+      [mainAppUsers, orgChartUserIds]
+    );
+
+    const selectedUserSubtreeIds = useMemo(() => {
+      const set = new Set<string>();
+      if (!selectedUserId || !orgData) return set;
+      const collectSubtree = (emp: Employee): void => {
+        set.add(emp.id);
+        (emp.children ?? []).forEach(collectSubtree);
+      };
+      const findAndCollect = (emp: Employee): boolean => {
+        if (emp.userId === selectedUserId) {
+          collectSubtree(emp);
+          return true;
+        }
+        for (const c of emp.children ?? []) {
+          if (findAndCollect(c)) return true;
+        }
+        return false;
+      };
+      if (orgData.id === 'root' && orgData.children) {
+        orgData.children.forEach((c) => findAndCollect(c));
+      } else {
+        findAndCollect(orgData);
+      }
+      return set;
+    }, [selectedUserId, orgData]);
 
     const flattenTeam = (emp: Employee | null, out: Employee[] = []): Employee[] => {
       if (!emp) return out;
@@ -260,8 +308,13 @@ const OrganizationalChart = () => {
     // Render org chart node
     const renderNode = (employee: Employee) => {
       const isRoot = employee.id === 'root';
+      const isSelectedUser = Boolean(selectedUserId && employee.userId === selectedUserId);
+      const isInSelectedSubtree = Boolean(selectedUserId && selectedUserSubtreeIds.has(employee.id));
+      const shouldFade = Boolean(selectedUserId && !isInSelectedSubtree);
+      const isChildHighlight = isInSelectedSubtree && !isSelectedUser;
       return (
         <div
+          {...(employee.userId ? { 'data-org-chart-user-id': employee.userId } : {})}
           onClick={isRoot ? undefined : () => {
             setSelectedEmployee(employee);
             setShowEmployeeSidebar(true);
@@ -271,12 +324,18 @@ const OrganizationalChart = () => {
             borderRadius: '12px',
             display: 'inline-block',
             backgroundColor: 'white',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            border: '1px solid #e5e7eb',
+            boxShadow: isSelectedUser
+              ? '0 0 0 2px #6366f1, 0 4px 12px rgba(99,102,241,0.25)'
+              : isChildHighlight
+                ? '0 0 0 1px #6366f1, 0 2px 8px rgba(99,102,241,0.12)'
+                : '0 2px 8px rgba(0,0,0,0.08)',
+            border: isSelectedUser ? '2px solid #6366f1' : isChildHighlight ? '1px solid #6366f1' : '1px solid #e5e7eb',
             minWidth: '200px',
             textAlign: 'center',
             transition: 'all 0.3s ease',
             cursor: isRoot ? 'default' : 'pointer',
+            opacity: shouldFade ? 0.35 : 1,
+            pointerEvents: shouldFade ? 'none' : 'auto',
           }}
           onMouseEnter={isRoot ? undefined : (e) => {
             e.currentTarget.style.transform = 'translateY(-4px)';
@@ -410,17 +469,23 @@ const OrganizationalChart = () => {
     };
   
     const toggleFullscreen = () => {
-      const chartContainer = document.getElementById('org-chart-container');
-      if (!document.fullscreenElement && chartContainer) {
-        chartContainer.requestFullscreen().catch(err => {
+      const wrapper = document.getElementById('org-chart-fullscreen-wrapper');
+      if (!document.fullscreenElement && wrapper) {
+        wrapper.requestFullscreen().catch(err => {
           console.error('Error attempting to enable fullscreen:', err);
         });
-        setIsFullscreen(true);
       } else if (document.exitFullscreen) {
         document.exitFullscreen();
-        setIsFullscreen(false);
       }
     };
+
+    useEffect(() => {
+      const onFullscreenChange = () => {
+        setIsFullscreen(!!document.fullscreenElement);
+      };
+      document.addEventListener('fullscreenchange', onFullscreenChange);
+      return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+    }, []);
   
     const handleAddEmployee = () => {
       setShowAddDialog(true);
@@ -590,7 +655,7 @@ const OrganizationalChart = () => {
                   fontWeight: '500',
                 }}
               >
-                {selectedUserId ? (mainAppUsers?.find((u) => String(u.id) === selectedUserId)?.name ?? selectedUserId) : 'All Users'}
+                {selectedUserId ? (usersInOrgChart.find((u) => String(u.id) === selectedUserId)?.name ?? selectedUserId) : 'All Users'}
                 <ChevronDown size={16} />
               </button>
               {showUserDropdown && (
@@ -627,7 +692,7 @@ const OrganizationalChart = () => {
                   >
                     All Users
                   </div>
-                  {(mainAppUsers ?? []).map((u) => {
+                  {usersInOrgChart.map((u) => {
                     const uid = String(u.id);
                     const isSelected = selectedUserId === uid;
                     return (
@@ -786,7 +851,10 @@ const OrganizationalChart = () => {
         </div> */}
 
         {activeTab === 'Org Chart' && (
-          <>
+          <div
+            id="org-chart-fullscreen-wrapper"
+            style={{ backgroundColor: '#f9fafb', borderRadius: '12px', padding: '24px' }}
+          >
             {/* Org Chart Header with Controls */}
             <div style={{ 
               display: 'flex', 
@@ -877,6 +945,7 @@ const OrganizationalChart = () => {
                   {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                   {isFullscreen ? 'Exit' : 'Fullscreen'}
                 </button>
+                {!isFullscreen && (
                 <button
                   onClick={() => router.push('/staff-management/employees')}
                   style={{
@@ -900,6 +969,7 @@ const OrganizationalChart = () => {
                   <Plus size={16} />
                   View Employee
                 </button>
+                )}
               </div>
             </div>
 
@@ -942,7 +1012,7 @@ const OrganizationalChart = () => {
               </div>
               )}
             </div>
-          </>
+          </div>
         )}
 
         {activeTab === 'My Team' && (

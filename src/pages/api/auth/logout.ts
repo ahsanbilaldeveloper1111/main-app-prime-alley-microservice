@@ -16,8 +16,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('Cleared TMS session from memory store:', sessionId);
     }
 
-    // Clear the TMS session ID cookie using centralized utility
-    setCookieClearHeaders(res, false);
+    // Clear all session cookies including NextAuth (avoids 431 and clean multi-account use)
+    setCookieClearHeaders(res, true);
 
     return res.status(200).json({
       success: true,

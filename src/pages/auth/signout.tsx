@@ -2,11 +2,12 @@
 
 import { useEffect } from 'react';
 import { signOut } from 'next-auth/react';
+import { clearSessionCookiesClient } from '../../utils/cookieUtils';
 
 export default function SignOut() {
   useEffect(() => {
-    // Immediately sign out and redirect to signin page
-    signOut({ 
+    clearSessionCookiesClient(true);
+    signOut({
       callbackUrl: '/auth/signin',
       redirect: true
     });

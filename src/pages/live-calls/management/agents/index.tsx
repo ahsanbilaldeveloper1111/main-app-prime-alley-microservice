@@ -368,9 +368,10 @@ const LiveCallsAgentsManagement = () => {
         }
       };
     
-      const handleWrapUpSubmit = (data: { wrapUp: string; variables: Record<string, string> }) => {
+      const handleWrapUpSubmit = (data: { wrapUp: string | string[]; variables: Record<string, string> }) => {
         console.log('Wrap Up Data:', data);
-        alert(`✅ Wrap Up Submitted!\n\nStatus: ${data.wrapUp}\nVariables: ${JSON.stringify(data.variables, null, 2)}`);
+        const status = Array.isArray(data.wrapUp) ? data.wrapUp.join(', ') : data.wrapUp;
+        alert(`✅ Wrap Up Submitted!\n\nStatus: ${status}\nVariables: ${JSON.stringify(data.variables, null, 2)}`);
         setIsWrapUpOpen(false);
         setIsWrapUpMinimized(false);
         // Here you can also end the call or perform other actions

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getRequiredPermissions, isProtectedPath } from './config/permissions';
+import { edgeJwtDecode } from './utils/authJwtEdge';
 
 export async function middleware(request: NextRequest) {
     const path = request.nextUrl.pathname;
@@ -40,14 +41,17 @@ export async function middleware(request: NextRequest) {
         }
     }
 
-    // Get the session token
-    const token = await getToken({ 
+    // Edge-safe decode (Web Crypto only; Node crypto not available in middleware)
+    const token = await getToken({
         req: request,
-        secret: process.env.NEXTAUTH_SECRET 
+        secret: process.env.NEXTAUTH_SECRET,
+        decode: edgeJwtDecode,
     });
+    console.log("token",token);
 
     if (!token) {
         // Redirect to login
+        console.log('Redirecting to login');
         return NextResponse.redirect(
             new URL('/auth/signin', request.url)
         );

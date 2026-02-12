@@ -1,7 +1,7 @@
 import "@assets/scss/datatable-style.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import React, { type ReactElement, useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { type ReactElement, useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { Row, Col } from "react-bootstrap";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -23,6 +23,7 @@ import {
 
 import CallWidget from '../CallWidget';
 import WrapUpModal from '../WrapUp';
+import type { CallVariableConfig } from '../WrapUp';
 
 import TopBar from '../TopBarAgent';
 import FinesseAuthGate from '../FinesseAuthGate';
@@ -40,6 +41,11 @@ import {
   importFinesseCampaignContacts,
   getFinesseCampaignsContactsStatus,
   sendFinesseDialogAction,
+  getFinesseWrapUpReasons,
+  getEffectiveTeamId,
+  normalizeFinesseUserData,
+  scheduleFinesseCampaign,
+  type FinesseUserData,
 } from '@utils/finesse';
 import { useFinesseCapabilities } from '@hooks/live-calls/useFinesseCapabilities';
 import { useFinesseStomp, type FinessePreviewEvent } from '@hooks/live-calls/useFinesseStomp';
@@ -131,6 +137,9 @@ const LiveCallsCampaignsManagement = () => {
       const [uploadedFile, setUploadedFile] = useState<File | null>(null);
       const [columnMapping, setColumnMapping] = useState<Array<{id: number, name: string, order: number}>>([]);
       const [isWrapUpOpen, setIsWrapUpOpen] = useState(false);
+      const [wrapUpReasons, setWrapUpReasons] = useState<Array<{ value: string; label: string }>>([]);
+      const [wrapUpReasonsLoading, setWrapUpReasonsLoading] = useState(false);
+      const [callVariablesConfig, setCallVariablesConfig] = useState<CallVariableConfig[]>([]);
 
       const statusDropdownRef = useRef<HTMLDivElement>(null);
       const userMenuRef = useRef<HTMLDivElement>(null);
@@ -159,20 +168,42 @@ const LiveCallsCampaignsManagement = () => {
         (session?.user as { username?: string } | undefined)?.username ??
         '';
 
-      // Fetch Finesse user and map to TopBar (teams, selectedTeam, agentStatus) – runs when past FinesseAuthGate
+      // Hydrate from storage on mount so teams/APIs run when landing after link (storage is set but first render may miss it).
+      // useLayoutEffect so dropdown is filled before first paint and dependent APIs run.
+      const [finesseHydrated, setFinesseHydrated] = useState(false);
+      useLayoutEffect(() => {
+        if (typeof window === 'undefined') return;
+        const stored = getFinesseUserData();
+        if (stored) {
+          setFinesseHydrated(true);
+          const teamNames = stored.teams?.map((t) => t.name) ?? [];
+          const names = teamNames.length > 0 ? teamNames : (stored.teamName ? [stored.teamName] : []);
+          if (names.length > 0) {
+            setTeams(names);
+            setSelectedTeam(stored.teamName || names[0] || '');
+          }
+          if (stored.state) setAgentStatus(stored.state);
+        }
+      }, []);
+
+      // Fetch Finesse user and map to TopBar (teams, selectedTeam, agentStatus) – runs when past FinesseAuthGate / after hydrate
       useEffect(() => {
-        if (!finesseUsername) return;
+        if (!finesseHydrated) return;
+        const data = getFinesseUserData();
+        const teamId = getEffectiveTeamId(data);
+        const username = data?.loginId ?? data?.loginName ?? (session?.user as { username?: string } | undefined)?.username ?? '';
+        if (!username || teamId == null) return;
 
         const loadUser = async () => {
           try {
-            const response = await getFinesseUser(finesseUsername);
-            const data = response?.responseData ?? response;
-            if (!data) return;
-            const teamNames = data.teams?.map((t: { name: string }) => t.name) ?? [];
+            const response = await getFinesseUser(teamId, username);
+            const resData = response?.responseData ?? response;
+            if (!resData) return;
+            const teamNames = (resData as { teams?: Array<{ name: string }> }).teams?.map((t) => t.name) ?? [];
             setTeams(teamNames);
-            setSelectedTeam(data.teamName ?? teamNames[0] ?? '');
-            setAgentStatus(data.state ?? 'READY');
-            setFinesseUserData(data);
+            setSelectedTeam((resData as { teamName?: string }).teamName ?? teamNames[0] ?? '');
+            setAgentStatus((resData as { state?: string }).state ?? 'READY');
+            setFinesseUserData(normalizeFinesseUserData(resData as FinesseUserData));
           } catch {
             const stored = getFinesseUserData();
             if (stored) {
@@ -184,16 +215,20 @@ const LiveCallsCampaignsManagement = () => {
           }
         };
         loadUser();
-      }, [finesseUsername]);
+      }, [finesseHydrated, finesseUsername, session?.user]);
 
-      // Fetch campaigns from Finesse – runs when past FinesseAuthGate
+      // Fetch campaigns from Finesse – runs when past FinesseAuthGate / after hydrate
       useEffect(() => {
-        if (!finesseUsername) return;
+        if (!finesseHydrated) return;
+        const data = getFinesseUserData();
+        const teamId = getEffectiveTeamId(data);
+        const username = data?.loginId ?? data?.loginName ?? (session?.user as { username?: string } | undefined)?.username ?? '';
+        if (!username || teamId == null) return;
 
         const loadCampaigns = async () => {
           setCampaignsLoading(true);
           try {
-            const response = await getFinesseCampaigns(finesseUsername);
+            const response = await getFinesseCampaigns(teamId, username);
             const list = response?.data ?? response?.responseData ?? response;
             const arr = Array.isArray(list) ? list : list?.campaigns ?? list?.items ?? [];
             setCampaigns((arr as any[]).map((item, index) => mapApiCampaignToRow(item, index)));
@@ -205,15 +240,19 @@ const LiveCallsCampaignsManagement = () => {
           }
         };
         loadCampaigns();
-      }, [finesseUsername]);
+      }, [finesseHydrated, finesseUsername, session?.user]);
 
-      // Load import statuses in background – runs when past FinesseAuthGate
+      // Load import statuses in background – runs when past FinesseAuthGate / after hydrate
       useEffect(() => {
-        if (!finesseUsername) return;
+        if (!finesseHydrated) return;
+        const data = getFinesseUserData();
+        const teamId = getEffectiveTeamId(data);
+        const username = data?.loginId ?? data?.loginName ?? (session?.user as { username?: string } | undefined)?.username ?? '';
+        if (!username || teamId == null) return;
 
         const loadImportStatuses = async () => {
           try {
-            const statusData = await getFinesseCampaignsContactsStatus(finesseUsername);
+            const statusData = await getFinesseCampaignsContactsStatus(teamId, username);
             const list = (statusData as { importStatuses?: Array<{ campaignId: number }> })?.importStatuses ?? (statusData as { campaigns?: Array<{ campaignId: number }> })?.campaigns ?? [];
             const arr = Array.isArray(list) ? list : [];
             const map: Record<number, unknown> = {};
@@ -226,7 +265,7 @@ const LiveCallsCampaignsManagement = () => {
           }
         };
         loadImportStatuses();
-      }, [finesseUsername]);
+      }, [finesseHydrated, finesseUsername, session?.user]);
 
       const statusOptions = [
         { value: 'READY', label: 'Ready', color: '#10b981', icon: CheckCircle },
@@ -239,8 +278,10 @@ const LiveCallsCampaignsManagement = () => {
       const [previewDialogs, setPreviewDialogs] = useState<Record<string, FinessePreviewEvent>>({});
       const [token, setToken] = useState<string | null>(null);
 
-      const capabilityUsername = getFinesseUserData()?.loginId ?? getFinesseUserData()?.loginName ?? null;
-      const { hasCampaignMgmt, loading: capabilityLoading } = useFinesseCapabilities(capabilityUsername);
+      const finesseDataForCap = getFinesseUserData();
+      const capabilityTeamId = getEffectiveTeamId(finesseDataForCap);
+      const capabilityUsername = finesseDataForCap?.loginId ?? finesseDataForCap?.loginName ?? null;
+      const { hasCampaignMgmt, loading: capabilityLoading } = useFinesseCapabilities(capabilityTeamId, capabilityUsername);
 
       const activePreviewDialog = useMemo(() => {
         const dialogs = Object.values(previewDialogs);
@@ -266,6 +307,7 @@ const LiveCallsCampaignsManagement = () => {
         return {
           username: d?.loginId ?? d?.loginName,
           extension: d?.extension ?? u?.phone,
+          teamId: getEffectiveTeamId(d),
         };
       }, [session?.user]);
 
@@ -310,13 +352,21 @@ const LiveCallsCampaignsManagement = () => {
         onPreviewEvent: handlePreviewEvent,
       });
 
+      // Drive call widget and status from preview event: ALERTING → Ringing (Accept/Reject/Close from actions), ACTIVE → Connected (Wrap up when UPDATE_CALL_DATA in actions)
       useEffect(() => {
-        if (!activePreviewDialog?.dialogId) return;
+        if (!activePreviewDialog?.dialogId) {
+          setShowCallWidget(false);
+          return;
+        }
         const participant = activePreviewDialog.participants?.[0];
-        const isAlerting = activePreviewDialog.dialogState === 'ALERTING' || participant?.state === 'ALERTING';
+        const dialogState = activePreviewDialog.dialogState ?? participant?.state;
+        const isAlerting = dialogState === 'ALERTING' || participant?.state === 'ALERTING';
+        const isActive = dialogState === 'ACTIVE' || participant?.state === 'ACTIVE';
+        setShowCallWidget(true);
         if (isAlerting) {
-          setShowCallWidget(true);
           setCallStatus('Ringing');
+        } else if (isActive) {
+          setCallStatus('Connected');
         }
       }, [activePreviewDialog?.dialogId, activePreviewDialog?.dialogState, activePreviewDialog?.participants]);
 
@@ -379,14 +429,14 @@ const LiveCallsCampaignsManagement = () => {
       const handleToggleCampaign = async (id: number) => {
         const campaign = campaigns.find(c => c.id === id);
         if (!campaign) return;
-        const { username } = getFinesseContext();
-        if (!username) {
+        const { username, teamId } = getFinesseContext();
+        if (!username || teamId == null) {
           toast.error('user not found.');
           return;
         }
         const newEnabled = !campaign.enabled;
         try {
-          await setFinesseCampaignEnabled(username, id, newEnabled);
+          await setFinesseCampaignEnabled(teamId, username, id, newEnabled);
           setCampaigns(prev => prev.map(c => (c.id === id ? { ...c, enabled: newEnabled } : c)));
           // if (newEnabled) {
           //   setShowCallWidget(true);
@@ -399,11 +449,11 @@ const LiveCallsCampaignsManagement = () => {
       };
     
       const handleAcceptCall = async () => {
-        const { username, extension } = getFinesseContext();
+        const { username, extension, teamId } = getFinesseContext();
         const dialogId = activePreviewDialog?.dialogId;
-        if (username && extension && dialogId) {
+        if (username && extension && dialogId && teamId != null) {
           try {
-            await sendFinesseDialogAction(username, String(dialogId), {
+            await sendFinesseDialogAction(teamId, username, String(dialogId), {
               extension: String(extension),
               action: 'ACCEPT',
             });
@@ -419,11 +469,11 @@ const LiveCallsCampaignsManagement = () => {
       };
 
       const handleRejectCall = async () => {
-        const { username, extension } = getFinesseContext();
+        const { username, extension, teamId } = getFinesseContext();
         const dialogId = activePreviewDialog?.dialogId;
-        if (username && extension && dialogId) {
+        if (username && extension && dialogId && teamId != null) {
           try {
-            await sendFinesseDialogAction(username, String(dialogId), {
+            await sendFinesseDialogAction(teamId, username, String(dialogId), {
               extension: String(extension),
               action: 'REJECT',
             });
@@ -437,11 +487,11 @@ const LiveCallsCampaignsManagement = () => {
       };
 
       const handleRejectOrClose = async (action: 'REJECT' | 'CLOSE') => {
-        const { username, extension } = getFinesseContext();
+        const { username, extension, teamId } = getFinesseContext();
         const dialogId = activePreviewDialog?.dialogId;
-        if (username && extension && dialogId) {
+        if (username && extension && dialogId && teamId != null) {
           try {
-            await sendFinesseDialogAction(username, String(dialogId), {
+            await sendFinesseDialogAction(teamId, username, String(dialogId), {
               extension: String(extension),
               action,
             });
@@ -455,11 +505,11 @@ const LiveCallsCampaignsManagement = () => {
       };
 
       const handleEndCall = async () => {
-        const { username, extension } = getFinesseContext();
+        const { username, extension, teamId } = getFinesseContext();
         const dialogId = activePreviewDialog?.dialogId;
-        if (username && extension && dialogId) {
+        if (username && extension && dialogId && teamId != null) {
           try {
-            await sendFinesseDialogAction(username, String(dialogId), {
+            await sendFinesseDialogAction(teamId, username, String(dialogId), {
               extension: String(extension),
               action: 'DROP',
             });
@@ -546,20 +596,20 @@ const LiveCallsCampaignsManagement = () => {
           toast.error('Please select a file to upload.');
           return;
         }
-        const { username } = getFinesseContext();
-        if (!username) {
+        const { username, teamId } = getFinesseContext();
+        if (!username || teamId == null) {
           toast.error('user not found.');
           return;
         }
         try {
-          await importFinesseCampaignContacts(username, selectedCampaignId, uploadedFile);
+          await importFinesseCampaignContacts(teamId, username, selectedCampaignId, uploadedFile);
           toast.success('Contacts imported successfully.');
           handleCloseUploadModal();
-          const response = await getFinesseCampaigns(username);
+          const response = await getFinesseCampaigns(teamId, username);
           const list = response?.data ?? response?.responseData ?? response;
           const arr = Array.isArray(list) ? list : list?.campaigns ?? list?.items ?? [];
           setCampaigns((arr as any[]).map((item, index) => mapApiCampaignToRow(item, index)));
-          const statusData = await getFinesseCampaignsContactsStatus(username).catch(() => null);
+          const statusData = await getFinesseCampaignsContactsStatus(teamId, username).catch(() => null);
           if (statusData) {
             const listStatus = (statusData as { importStatuses?: Array<{ campaignId: number }> })?.importStatuses ?? (statusData as { campaigns?: Array<{ campaignId: number }> })?.campaigns ?? [];
             const arrStatus = Array.isArray(listStatus) ? listStatus : [];
@@ -574,30 +624,46 @@ const LiveCallsCampaignsManagement = () => {
         }
       };
     
-      const handleTimeChange = (campaignId: number, field: 'timeFrom' | 'timeTo' | 'startTime' | 'endTime', value: string) => {
-        setCampaigns(campaigns.map(campaign => {
-          if (campaign.id !== campaignId) return campaign;
-          const updates: Partial<CampaignRow> = { [field]: value };
-          if (field === 'startTime') updates.timeFrom = value;
-          if (field === 'endTime') updates.timeTo = value;
-          if (field === 'timeFrom') updates.startTime = value;
-          if (field === 'timeTo') updates.endTime = value;
-          return { ...campaign, ...updates };
-        }));
+      const handleTimeChange = async (campaignId: number, field: 'timeFrom' | 'timeTo' | 'startTime' | 'endTime', value: string) => {
+        const campaign = campaigns.find(c => c.id === campaignId);
+        if (!campaign) return;
+        const updates: Partial<CampaignRow> = { [field]: value };
+        if (field === 'startTime') updates.timeFrom = value;
+        if (field === 'endTime') updates.timeTo = value;
+        if (field === 'timeFrom') updates.startTime = value;
+        if (field === 'timeTo') updates.endTime = value;
+        const nextStart = updates.startTime ?? campaign.startTime;
+        const nextEnd = updates.endTime ?? campaign.endTime;
+        setCampaigns(campaigns.map(c => (c.id !== campaignId ? c : { ...c, ...updates })));
+        const { username, teamId } = getFinesseContext();
+        if (!username || teamId == null) return;
+        try {
+          await scheduleFinesseCampaign(teamId, username, campaignId, {
+            startTime: nextStart,
+            endTime: nextEnd,
+          });
+          toast.success('Campaign schedule updated.');
+        } catch (err: unknown) {
+          const msg = (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to update schedule';
+          toast.error(msg);
+          setCampaigns(campaigns.map(c => (c.id !== campaignId ? c : { ...campaign })));
+        }
       };
     
-      const handleWrapUpSubmit = async (data: { wrapUp: string; variables: Record<string, string> }) => {
-        const { username, extension } = getFinesseContext();
+      const handleWrapUpSubmit = async (data: { wrapUp: string | string[]; variables: Record<string, string> }) => {
+        const { username, extension, teamId } = getFinesseContext();
         const dialogId = activePreviewDialog?.dialogId;
-        if (username && extension && dialogId) {
+        if (username && extension && dialogId && teamId != null) {
+          const reasons = Array.isArray(data.wrapUp) ? data.wrapUp : [data.wrapUp];
+          const wrapUpItems = reasons.map((reason) => ({ reason }));
           try {
-            await sendFinesseDialogAction(username, String(dialogId), {
+            await sendFinesseDialogAction(teamId, username, String(dialogId), {
               extension: String(extension),
               action: 'UPDATE_CALL_DATA',
-              wrapUpItems: [{ reason: data.wrapUp }],
+              wrapUpItems,
               callVariables: data.variables,
             });
-            await sendFinesseDialogAction(username, String(dialogId), {
+            await sendFinesseDialogAction(teamId, username, String(dialogId), {
               extension: String(extension),
               action: 'DROP',
             });
@@ -616,15 +682,62 @@ const LiveCallsCampaignsManagement = () => {
     
       const handleWrapUpMinimize = () => setIsWrapUpOpen(false);
 
+      /** Fetch wrap-up reasons from API, log to console, then open Wrap up modal */
+      const handleWrapUpClick = async () => {
+        const { username, teamId } = getFinesseContext();
+        if (!username || teamId == null) {
+          toast.error('User not found.');
+          return;
+        }
+        setWrapUpReasonsLoading(true);
+        try {
+          const response = await getFinesseWrapUpReasons(teamId, username);
+          console.log('[Finesse] wrapUpReasons API response:', response);
+          const raw = response?.responseData ?? response?.data ?? response;
+          const list = Array.isArray(raw) ? raw : raw?.wrapUpReasons ?? raw?.reasonCodes ?? raw?.reasons ?? [];
+          const options: Array<{ value: string; label: string }> = list.map((item: { uri?: string; id?: number; code?: string; label?: string; name?: string }) => {
+            // API shape: { uri: "/finesse/api/User/.../WrapUpReason/5", label: "Not Interested", forAll }
+            const idFromUri = typeof item.uri === 'string' ? item.uri.split('/').filter(Boolean).pop() : undefined;
+            const value = String(idFromUri ?? item.id ?? item.code ?? item.label ?? item.name ?? '');
+            const label = String(item.label ?? item.name ?? item.code ?? value ?? '—');
+            return { value, label };
+          });
+          const reasonsToShow = options.length ? options : [{ value: 'other', label: 'Other' }];
+          setWrapUpReasons(reasonsToShow);
+          // Parse call variables from API (responseData.callVariables, .variables, .callVariableDefinitions, etc.)
+          const data = response?.responseData ?? response?.data ?? response;
+          const callVarsRaw = (data as { callVariables?: Array<{ key?: string; name?: string; label?: string }> })?.callVariables
+            ?? (data as { variables?: Array<{ key?: string; name?: string; label?: string }> })?.variables
+            ?? (data as { callVariableDefinitions?: Array<{ key?: string; name?: string; label?: string }> })?.callVariableDefinitions;
+          const callVarConfig: CallVariableConfig[] = Array.isArray(callVarsRaw)
+            ? callVarsRaw.map((v: { key?: string; name?: string; label?: string }) => ({
+                key: String(v.key ?? v.name ?? ''),
+                label: String(v.label ?? v.name ?? v.key ?? '—'),
+              })).filter((v: CallVariableConfig) => v.key)
+            : [];
+          setCallVariablesConfig(callVarConfig);
+          // Open modal after state is committed so it receives API data (not default list)
+          setTimeout(() => setIsWrapUpOpen(true), 0);
+        } catch (err) {
+          console.error('[Finesse] wrapUpReasons failed:', err);
+          toast.error((err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to load wrap-up reasons.');
+          setWrapUpReasons([{ value: 'other', label: 'Other' }]);
+          setCallVariablesConfig([]);
+          setTimeout(() => setIsWrapUpOpen(true), 0);
+        } finally {
+          setWrapUpReasonsLoading(false);
+        }
+      };
+
       const handleAgentStatusChange = async (newState: string) => {
-        const { username } = getFinesseContext();
-        if (!username) {
+        const { username, teamId } = getFinesseContext();
+        if (!username || teamId == null) {
           toast.error('user not found.');
           return;
         }
         const state = newState === 'READY' || newState === 'NOT_READY' ? newState : 'READY';
         try {
-          await finesseSetState(username, state);
+          await finesseSetState(teamId, username, state);
           setAgentStatus(state);
         } catch (err: any) {
           toast.error(err?.response?.data?.message || err?.message || 'Failed to update agent state.');
@@ -1997,6 +2110,8 @@ const LiveCallsCampaignsManagement = () => {
         dialedNumber={activePreviewDialog?.dialedNumber}
         previewActions={activePreviewDialog?.participants?.[0]?.actions}
         onRejectWithAction={handleRejectOrClose}
+        onWrapUpClick={handleWrapUpClick}
+        wrapUpLoading={wrapUpReasonsLoading}
       />
 
       <WrapUpModal
@@ -2004,6 +2119,8 @@ const LiveCallsCampaignsManagement = () => {
         onClose={() => setIsWrapUpOpen(false)}
         onSubmit={handleWrapUpSubmit}
         onMinimize={handleWrapUpMinimize}
+        wrapUpReasons={wrapUpReasons}
+        callVariablesConfig={callVariablesConfig}
       />
 
       {/* Upload Contacts Modal */}

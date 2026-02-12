@@ -29,9 +29,9 @@ export const useAuth = () => {
   const logout = async () => {
     try {
       clearTokens();
-      
+      clearSessionCookiesClient(true);
       await signOut();
-      
+
       // Simple redirect to login page
       if (typeof window !== 'undefined') {
         window.location.href = '/auth/signin';

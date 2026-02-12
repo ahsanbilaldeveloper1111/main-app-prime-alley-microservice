@@ -1529,7 +1529,7 @@ const Employees = () => {
                             }}
                             title="Create Journey"
                           >
-                            <Calendar size={16} color="#6366f1" /> Create Journey
+                            <Calendar size={16} color="#6366f1" />  Create Journey
                           </button>
                           )}
 
