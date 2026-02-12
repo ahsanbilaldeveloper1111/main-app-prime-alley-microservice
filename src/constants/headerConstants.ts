@@ -421,9 +421,20 @@ MENU_COLORS: {
     VIEW_UNIFIED_WORKSPACE: 'unified-workspace-services',
     VIEW_USER_NOTIFICATIONS: 'notifications-users',
 
-    
-    
-    
+    // AI Compose (CRM) - WhatsApp, SMS, Email, Meetings
+    SEND_WHATSAPP_MESSAGE_CRM: 'send-whatsapp-message-crm',
+    VIEW_WHATSAPP_MESSAGES_CRM: 'view-whatsapp-messages-crm',
+    SEND_SMS_CRM: 'send-sms-crm',
+    VIEW_SMS_CRM: 'view-sms-crm',
+    SEND_EMAIL_CRM: 'send-email-crm',
+    VIEW_EMAILS_CRM: 'view-emails-crm',
+    CREATE_MEETING_CRM: 'create-meeting-crm',
+    VIEW_MEETINGS_CRM: 'view-meetings-crm',
+
+    // CRM Deals
+    APPROVE_REJECT_CRM_DEALS: 'approve-reject-crm-deals',
+    DOWNLOAD_DOCUMENT_CRM_DEALS: 'download-document-crm-deals',
+
   } as const
 } as const;
 

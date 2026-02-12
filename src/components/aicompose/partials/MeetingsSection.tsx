@@ -9,6 +9,10 @@ import {
   createInstantMeeting,
   createScheduledMeeting,
 } from '@utils/communication';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS: P } = HEADER_CONSTANTS;
 import { generateEmail } from '@utils/communication';
 import moment from 'moment-timezone';
 import { GlobalDateTimeFormat } from '@utils/Helper';
@@ -57,6 +61,9 @@ const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter; initialMeetin
   setCommonOptions,
   initialMeetingType,
 }) => {
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission(P.CREATE_MEETING_CRM);
+  const canView = hasPermission(P.VIEW_MEETINGS_CRM);
   const commonOptions = commonOptionsProp ?? DEFAULT_COMMON_OPTIONS;
   const source = getContextSource(contextPayload);
 
@@ -232,12 +239,21 @@ const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter; initialMeetin
 
   const eventId = (m: MeetingItem) => m.event_id ?? (m as { id?: string }).id;
 
+  if (!canCreate && !canView) {
+    return (
+      <div className="d-flex align-items-center justify-content-center text-muted py-5">
+        <p className="mb-0">You don&apos;t have permission to create or view meetings here.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-100 d-flex flex-column min-h-0">
       
       <Row className="mb-4 flex-grow-1 min-h-0">
         <Col xs={12}>
           <>
+              {canCreate && (
               <Row className="g-4">
                 <Col lg={7}>
                   <Card className="border">
@@ -380,6 +396,7 @@ const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter; initialMeetin
                   </div>
                 </Col>
               </Row>
+              )}
             </>
         </Col>
       </Row>
@@ -430,6 +447,7 @@ const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter; initialMeetin
         </Modal.Body>
       </Modal>
 
+        {canView && (
         <Row className="mt-3">
           <Col xs={12}>
             <Card className="border">
@@ -542,6 +560,7 @@ const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter; initialMeetin
             </Card>
           </Col>
         </Row>
+        )}
       
     </div>
   );
