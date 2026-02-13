@@ -67,6 +67,7 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
       show={show}
       onHide={handleClose}
       centered
+      style={{ zIndex: 999999 }}
     >
       <Modal.Header closeButton className="border-bottom">
         <Modal.Title>Confirm Deletion</Modal.Title>

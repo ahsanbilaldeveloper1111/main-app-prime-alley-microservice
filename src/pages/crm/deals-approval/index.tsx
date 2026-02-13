@@ -2136,6 +2136,7 @@ const handleCloseEditModal = useCallback(() => {
                 className: 'text-danger'
               },
 
+              ...(session?.user?.permissions?.includes('approve-reject-crm-deals') ? [
               {
                 label: 'Approve',
                 icon: <CheckCircle size={14} />,
@@ -2150,6 +2151,7 @@ const handleCloseEditModal = useCallback(() => {
                 className: 'text-danger',
                 show: (row: any) => (row.rawData?.approval_status ?? row.approval_status) === 'pending'
               }
+              ] : [])
               
             ]
           }
@@ -5118,6 +5120,7 @@ const handleCloseEditModal = useCallback(() => {
           setShowDealSidebar(false);
           setSelectedDeal(null);
         }}
+        moduleSlug={ModuleSlug.CRM_DEALS}
         title={selectedDeal?.name || 'Deal Details'}
         subtitle={selectedDeal?.company || selectedDeal?.company_name || ''}
         metadata={selectedDeal?.id ? `Deal ID: ${selectedDeal.id}` : ''}

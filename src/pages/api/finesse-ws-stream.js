@@ -1,6 +1,12 @@
 /**
  * Finesse WS stream API: client connects via SSE; server proxies to Finesse via SockJS/STOMP.
  * Same pattern as cti-stomp-stream. Streams state, errors, and optional preview dialog events.
+ *
+ * Env: FINESSE_WS_BACKEND or NEXT_PUBLIC_FINESSE_WS_BASE (e.g. http://192.168.30.137:8010).
+ *
+ * 502 with app on SSL: reverse proxy (nginx/Apache) in front of Next.js is closing long-lived
+ * SSE. Fix: disable buffering and set long timeouts for this path. See
+ * docs/FINESSE-WS-STREAM-502-FIX.md and ci/nginx-finesse-ws-stream.conf.example.
  */
 
 import { Client } from '@stomp/stompjs';
@@ -21,11 +27,13 @@ const SSE_TYPE = {
   STOMP_ERROR: 'stomp_error',
 };
 
+/** Headers for SSE; proxy-friendly so nginx/etc. don’t buffer or timeout and return 502 */
 const SSE_HEADERS = {
   'Content-Type': 'text/event-stream',
-  'Cache-Control': 'no-cache, no-transform',
-  Connection: 'keep-alive',
+  'Cache-Control': 'no-cache, no-store, no-transform, must-revalidate',
   'X-Accel-Buffering': 'no',
+  Connection: 'keep-alive',
+  'Transfer-Encoding': 'chunked',
 };
 
 const connectionPool = new Map();
@@ -127,6 +135,27 @@ function getSockJsUrl() {
   return base.endsWith('/ws') ? base : `${base.replace(/\/$/, '')}/ws`;
 }
 
+function sendSSEErrorAndEnd(res, connectionKey, message) {
+  try {
+    if (!res.headersSent) {
+      res.writeHead(200, SSE_HEADERS);
+    }
+    res.write(`data: ${JSON.stringify({ type: SSE_TYPE.ERROR, message })}\n\n`);
+  } catch {
+    // ignore
+  }
+  try {
+    res.end();
+  } catch {
+    // ignore
+  }
+  if (connectionKey) {
+    const streams = sseStreams.get(connectionKey) || [];
+    const idx = streams.indexOf(res);
+    if (idx > -1) streams.splice(idx, 1);
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
@@ -145,7 +174,12 @@ export default async function handler(req, res) {
     return;
   }
 
-  res.writeHead(200, SSE_HEADERS);
+  try {
+    res.writeHead(200, SSE_HEADERS);
+  } catch (err) {
+    if (isDev) console.error('[Finesse WS Stream] writeHead failed:', err?.message ?? err);
+    return res.status(500).json({ message: 'Failed to start stream' });
+  }
 
   if (!sseStreams.has(connectionKey)) sseStreams.set(connectionKey, []);
   sseStreams.get(connectionKey).push(res);
@@ -197,55 +231,62 @@ export default async function handler(req, res) {
   const sockJsUrl = getSockJsUrl();
   log('Connecting to backend:', sockJsUrl, 'user:', connectionKey);
 
-  const { default: SockJS } = await import('sockjs-client');
-  const client = new Client({
-    webSocketFactory: () => new SockJS(sockJsUrl),
-    connectHeaders: { Authorization: `Bearer ${token}` },
-    heartbeatIncoming: 4000,
-    heartbeatOutgoing: 4000,
-    reconnectDelay: 0,
-    connectionTimeout: 10000,
-    debug: isDev
-      ? (str) => {
-          const s = String(str);
-          if (s.includes('CONNECTED') || s.includes('SUBSCRIBE') || s.includes('MESSAGE')) {
-            console.log('[Finesse STOMP]', s.substring(0, 120));
+  try {
+    const { default: SockJS } = await import('sockjs-client');
+    const client = new Client({
+      webSocketFactory: () => new SockJS(sockJsUrl),
+      connectHeaders: { Authorization: `Bearer ${token}` },
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
+      reconnectDelay: 0,
+      connectionTimeout: 10000,
+      debug: isDev
+        ? (str) => {
+            const s = String(str);
+            if (s.includes('CONNECTED') || s.includes('SUBSCRIBE') || s.includes('MESSAGE')) {
+              console.log('[Finesse STOMP]', s.substring(0, 120));
+            }
           }
+        : undefined,
+      onConnect: () => {
+        connectionPool.set(connectionKey, {
+          client,
+          lastUsed: Date.now(),
+          token,
+          finesseUserId,
+        });
+        setupSubscriptions(client, connectionKey, finesseUserId, hasPreview);
+        writeToStreams(connectionKey, { type: SSE_TYPE.STOMP_CONNECTED });
+      },
+      onStompError: (frame) => {
+        const message = frame?.headers?.message ?? '';
+        const body = frame?.body ?? '';
+        if (looksLikeAuthError(message, body)) {
+          writeToStreams(connectionKey, { type: SSE_TYPE.AUTH_REQUIRED, message: AUTH_REQUIRED_MESSAGE });
+          try {
+            cleanupSubscriptions(connectionKey);
+            client.deactivate();
+          } catch {
+            // ignore
+          }
+          connectionPool.delete(connectionKey);
+          return;
         }
-      : undefined,
-    onConnect: () => {
-      connectionPool.set(connectionKey, {
-        client,
-        lastUsed: Date.now(),
-        token,
-        finesseUserId,
-      });
-      setupSubscriptions(client, connectionKey, finesseUserId, hasPreview);
-      writeToStreams(connectionKey, { type: SSE_TYPE.STOMP_CONNECTED });
-    },
-    onStompError: (frame) => {
-      const message = frame?.headers?.message ?? '';
-      const body = frame?.body ?? '';
-      if (looksLikeAuthError(message, body)) {
-        writeToStreams(connectionKey, { type: SSE_TYPE.AUTH_REQUIRED, message: AUTH_REQUIRED_MESSAGE });
-        try {
-          cleanupSubscriptions(connectionKey);
-          client.deactivate();
-        } catch {
-          // ignore
-        }
-        connectionPool.delete(connectionKey);
-        return;
-      }
-      writeToStreams(connectionKey, { type: SSE_TYPE.STOMP_ERROR, message, body });
-    },
-    onWebSocketClose: () => {
-      cleanupSubscriptions(connectionKey);
-      const conn = connectionPool.get(connectionKey);
-      if (conn?.client === client) connectionPool.delete(connectionKey);
-      writeToStreams(connectionKey, { type: SSE_TYPE.STOMP_CLOSED });
-    },
-  });
+        writeToStreams(connectionKey, { type: SSE_TYPE.STOMP_ERROR, message, body });
+      },
+      onWebSocketClose: () => {
+        cleanupSubscriptions(connectionKey);
+        const conn = connectionPool.get(connectionKey);
+        if (conn?.client === client) connectionPool.delete(connectionKey);
+        writeToStreams(connectionKey, { type: SSE_TYPE.STOMP_CLOSED });
+      },
+    });
 
-  client.activate();
+    client.activate();
+  } catch (err) {
+    const msg = err?.message ?? String(err);
+    if (isDev) console.error('[Finesse WS Stream] STOMP setup failed:', msg);
+    cleanup();
+    sendSSEErrorAndEnd(res, connectionKey, `Stream setup failed: ${msg}. Check FINESSE_WS_BACKEND (e.g. http://host:8010) and that the backend is reachable.`);
+  }
 }

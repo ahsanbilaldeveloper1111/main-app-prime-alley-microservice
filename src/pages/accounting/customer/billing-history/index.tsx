@@ -24,6 +24,7 @@ import FormModal from "@pages/partial/FormModal";
 
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
+import { ModuleSlug } from "@utils/Helper";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 
 interface PaymentRow {
@@ -380,6 +381,7 @@ const BillingHistory = () => {
       <GenericSidebar
         isOpen={showPaymentSidebar}
         onClose={closePaymentSidebar}
+        moduleSlug={ModuleSlug.BILLING}
         title={selectedPaymentSidebar ? `Payment #${selectedPaymentSidebar.id}` : "Payment Details"}
         subtitle={selectedPaymentSidebar?.invoice?.invoice_number ? `Invoice #${selectedPaymentSidebar.invoice.invoice_number}` : ""}
         metadata={selectedPaymentSidebar?.payment_date ? moment(selectedPaymentSidebar.payment_date).format("DD-MMM-YYYY") : undefined}

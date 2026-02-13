@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { signOut } from 'next-auth/react';
 import { toast } from "react-toastify";
 import tokenService from "./tokenService";
+import { clearSessionCookiesClient } from './cookieUtils';
 
 const axiosInstance: import('axios').AxiosInstance = axios.create({
   //baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
@@ -125,14 +126,12 @@ axiosInstance.interceptors.response.use(
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
             return axiosInstance(originalRequest);
           } else {
-            // Token refresh failed, but don't immediately clear session
-            // Let the user continue with their current session
-            //console.log('Token refresh failed, but keeping session active');
-            // Logout user
-            signOut();
+            // Token refresh failed - clear cookies and session, then sign out
             if (typeof window !== 'undefined') {
+              clearSessionCookiesClient(true);
               sessionStorage.clear();
             }
+            signOut();
             return Promise.reject(error);
           }
         } catch (refreshError) {

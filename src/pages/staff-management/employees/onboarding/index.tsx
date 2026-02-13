@@ -1,20 +1,20 @@
 import "@assets/scss/datatable-style.scss";
-import React, {
-  ReactElement,
-} from "react";
+import React, { ReactElement, useEffect, useState, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
+import { useSession } from "next-auth/react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 
-import  { useState, useMemo } from 'react';
-import { 
-  Search, 
-  ChevronDown, 
-  FileText, 
+import { getJourneys } from "@utils/staffManagement";
+import { useMainAppLookups } from "@hooks/useMainAppLookups";
+import {
+  Search,
+  ChevronDown,
+  FileText,
   User,
   Settings,
   Info,
@@ -23,9 +23,8 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  ChevronRightIcon
-} from 'lucide-react';
-import OnboardingDetailSidebar from './sidebar';
+} from "lucide-react";
+import OnboardingDetailSidebar from "./sidebar";
 
 interface OnboardingEmployee {
   id: string;
@@ -37,78 +36,130 @@ interface OnboardingEmployee {
   status: 'In Progress' | 'On Track' | 'Overdue' | 'Completed';
   role?: string;
   department?: string;
+  total_steps_count?: string | number;
+  completed_steps_count?: string | number;
 }
 
 
+/** API journey item shape (matches API response) */
+interface JourneyRecord {
+  id?: number;
+  user_profile_id?: string | number;
+  user_id?: string | number;
+  job_title?: string;
+  department_name?: string;
+  start_date?: string;
+  status?: string;
+  total_steps_count?: string | number;
+  completed_steps_count?: string | number;
+  steps?: { name?: string; [key: string]: unknown }[];
+  user_profile?: { id?: number; user_id?: string; job_title?: string; [key: string]: unknown };
+  [key: string]: unknown;
+}
+
+/** API pagination shape */
+interface JourneysPagination {
+  total?: number;
+  limit?: number;
+  page?: number;
+  last_page?: number;
+  from?: number;
+  to?: number;
+}
+
+const STATUS_DISPLAY: Record<string, "In Progress" | "On Track" | "Overdue" | "Completed"> = {
+  in_progress: "In Progress",
+  on_track: "On Track",
+  overdue: "Overdue",
+  completed: "Completed",
+};
+
 const EmployeesOnboarding = () => {
-    const [activeTab, setActiveTab] = useState<'Onboarding' | 'Audit & Risk Center'>('Onboarding');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [selectedEmployee, setSelectedEmployee] = useState<OnboardingEmployee | null>(null);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
-    const employees: OnboardingEmployee[] = [
-      {
-        id: '1',
-        name: 'Anum Malik',
-        avatar: '',
-        startDate: 'Apr 24, 2024',
-        stages: ['document', 'profile', 'settings'],
-        progress: 25,
-        status: 'In Progress',
-        role: 'Junior Developer',
-        department: 'Engineering'
-      },
-      {
-        id: '2',
-        name: 'Hassan Ali',
-        avatar: '',
-        startDate: 'Apr 22, 2024',
-        stages: ['document', 'profile'],
-        progress: 50,
-        status: 'On Track',
-        role: 'Senior Developer',
-        department: 'Engineering'
-      },
-      {
-        id: '3',
-        name: 'Madiha Khan',
-        avatar: '',
-        startDate: 'Apr 15, 2024',
-        stages: ['document', 'profile', 'info', 'settings'],
-        progress: 75,
-        status: 'Overdue',
-        role: 'Product Manager',
-        department: 'Product'
-      },
-      {
-        id: '4',
-        name: 'Hamza Ahmed',
-        avatar: '',
-        startDate: 'Apr 10, 2024',
-        stages: ['document', 'profile', 'check'],
-        progress: 100,
-        status: 'Completed',
-        role: 'UI/UX Designer',
-        department: 'Design'
+  const { data: session } = useSession();
+  const { mainAppDepartments, mainAppUsers, companyIdentifier } = useMainAppLookups();
+  const [activeTab, setActiveTab] = useState<"Onboarding" | "Audit & Risk Center">("Onboarding");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedEmployee, setSelectedEmployee] = useState<OnboardingEmployee | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const itemsPerPage = 15;
+  const [journeysData, setJourneysData] = useState<JourneyRecord[]>([]);
+  const [journeysPagination, setJourneysPagination] = useState<JourneysPagination | null>(null);
+  const [loadingJourneys, setLoadingJourneys] = useState(true);
+  const [refreshJourneysKey, setRefreshJourneysKey] = useState(0);
+
+  useEffect(() => {
+    if (!companyIdentifier) {
+      setLoadingJourneys(false);
+      return;
+    }
+    const fetchJourneys = async () => {
+      setLoadingJourneys(true);
+      try {
+        const journeysResult = await getJourneys({ page: currentPage, limit: itemsPerPage });
+        console.log("[Onboarding] getJourneys response (page " + currentPage + "):", journeysResult);
+        const data = Array.isArray(journeysResult?.data) ? (journeysResult.data as JourneyRecord[]) : [];
+        setJourneysData(data);
+        setJourneysPagination((journeysResult?.pagination as JourneysPagination) ?? null);
+      } catch (e) {
+        console.error("[Onboarding] fetch journeys error:", e);
+        setJourneysData([]);
+        setJourneysPagination(null);
+      } finally {
+        setLoadingJourneys(false);
       }
-    ];
-  
-    const itemsPerPage = 10;
-  
-    const filteredEmployees = useMemo(() => {
-      return employees.filter(emp => {
-        const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             emp.startDate.includes(searchTerm);
-        return matchesSearch;
-      });
-    }, [searchTerm, employees]);
-  
-    const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
-    const paginatedEmployees = filteredEmployees.slice(
-      (currentPage - 1) * itemsPerPage,
-      currentPage * itemsPerPage
-    );
+    };
+    fetchJourneys();
+  }, [companyIdentifier, currentPage, refreshJourneysKey]);
+
+  const employees: OnboardingEmployee[] = useMemo(() => {
+    return journeysData.map((j) => {
+      const userId = j.user_id != null ? String(j.user_id) : "";
+      const name = mainAppUsers.find((u) => String(u.id) === userId)?.name ?? (userId || "—");
+      const statusKey = (j.status ?? "in_progress").toLowerCase().replace(/\s/g, "_");
+      const status: OnboardingEmployee["status"] =
+        STATUS_DISPLAY[statusKey] ?? "In Progress";
+      const totalSteps = Math.max(1, Number(j.total_steps_count ?? 0));
+      const completedSteps = Number(j.completed_steps_count ?? 0);
+      const progress = Math.round((completedSteps / totalSteps) * 100);
+      const steps = Array.isArray(j.steps) ? j.steps : [];
+      const stepNames = steps.length
+        ? steps.map((s) => (s.name ?? "document").toLowerCase())
+        : ["document", "profile"];
+      const startDateFormatted = j.start_date
+        ? new Date(j.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+        : "—";
+      return {
+        id: String(j.id ?? j.user_profile_id ?? (userId || "unknown")),
+        name,
+        avatar: "",
+        startDate: startDateFormatted,
+        stages: stepNames,
+        progress,
+        status,
+        role: j.job_title ?? j.user_profile?.job_title ?? undefined,
+        department: j.department_name ?? undefined,
+        total_steps_count: j.total_steps_count,
+        completed_steps_count: j.completed_steps_count,
+      };
+    });
+  }, [journeysData, mainAppUsers]);
+
+  const filteredEmployees = useMemo(() => {
+    return employees.filter((emp) => {
+      const matchesSearch =
+        emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp.startDate.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesSearch;
+    });
+  }, [searchTerm, employees]);
+
+  const totalPages = Math.max(1, journeysPagination?.last_page ?? 1);
+  const paginatedEmployees = filteredEmployees;
+  const paginationFrom = journeysPagination?.from ?? 0;
+  const paginationTo = journeysPagination?.to ?? 0;
+  const paginationTotal = journeysPagination?.total ?? 0;
   
     const getStageIcon = (stage: string) => {
       switch (stage) {
@@ -168,12 +219,12 @@ const EmployeesOnboarding = () => {
           <div style={{ 
             display: 'flex', 
             gap: '8px', 
-            marginBottom: '24px',
-            borderBottom: '2px solid #e5e7eb',
+            // marginBottom: '24px',
+            // borderBottom: '2px solid #e5e7eb',
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            {/* <div style={{ display: 'flex', gap: '8px' }}>
               {(['Onboarding', 'Audit & Risk Center'] as const).map(tab => (
                 <button
                   key={tab}
@@ -196,10 +247,10 @@ const EmployeesOnboarding = () => {
                   {tab}
                 </button>
               ))}
-            </div>
+            </div> */}
   
             {/* Search Bar */}
-            <div style={{ position: 'relative', width: '350px', marginBottom: '-2px' }}>
+            {/* <div style={{ position: 'relative', width: '350px', marginBottom: '-2px' }}>
               <Search 
                 size={20} 
                 style={{ 
@@ -235,21 +286,26 @@ const EmployeesOnboarding = () => {
                   color: '#9ca3af'
                 }} 
               />
-            </div>
+            </div> */}
           </div>
   
           {/* Onboarding Table */}
-          <div style={{ 
-            backgroundColor: 'white', 
-            borderRadius: '12px', 
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            overflow: 'hidden'
+          <div style={{
+            backgroundColor: "white",
+            borderRadius: "12px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+            overflow: "hidden",
           }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            {loadingJourneys ? (
+              <div style={{ padding: "24px", textAlign: "center", color: "#6b7280" }}>
+                Loading onboarding data…
+              </div>
+            ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>New Hire</th>
+                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Employee Name</th>
                     <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Start Date</th>
                     <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Stages</th>
                     <th style={{ padding: '16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Progress</th>
@@ -300,7 +356,8 @@ const EmployeesOnboarding = () => {
                         </td>
                         <td style={{ padding: '16px' }}>
                           <div style={{ display: 'flex', gap: '8px' }}>
-                            {employee.stages.map((stage, idx) => (
+                            {employee?.completed_steps_count ?? 0}/{employee?.total_steps_count ?? 0}
+                            {/* {employee.stages.map((stage, idx) => (
                               <div
                                 key={idx}
                                 style={{
@@ -315,7 +372,7 @@ const EmployeesOnboarding = () => {
                               >
                                 {getStageIcon(stage)}
                               </div>
-                            ))}
+                            ))} */}
                           </div>
                         </td>
                         <td style={{ padding: '16px' }}>
@@ -405,19 +462,20 @@ const EmployeesOnboarding = () => {
                 </tbody>
               </table>
             </div>
-  
+            )}
+
             {/* Footer */}
             <div style={{
-              padding: '16px 24px',
-              borderTop: '1px solid #e5e7eb',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '16px'
+              padding: "16px 24px",
+              borderTop: "1px solid #e5e7eb",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "16px",
             }}>
-              <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredEmployees.length)} of 21 documents
+              <div style={{ fontSize: "14px", color: "#6b7280" }}>
+                Showing {paginationFrom}-{paginationTo} of {paginationTotal} documents
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button
@@ -545,6 +603,7 @@ const EmployeesOnboarding = () => {
                   setIsSidebarOpen(false);
                   setSelectedEmployee(null);
                 }}
+                onRefreshJourneys={() => setRefreshJourneysKey((k) => k + 1)}
               />
             </div>
           </div>

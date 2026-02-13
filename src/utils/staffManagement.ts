@@ -3,6 +3,26 @@ import axiosInstance from "./axios";
 
 const PREFIX = "/staff-management";
 
+/** Company identifier from session; set via setStaffManagementCompanyIdentifier (e.g. from employees page). */
+let _companyIdentifier: string | null = null;
+
+export function setStaffManagementCompanyIdentifier(companyIdentifier: string | null): void {
+  _companyIdentifier = companyIdentifier;
+}
+
+export function getStaffManagementCompanyIdentifier(): string | null {
+  return _companyIdentifier;
+}
+
+/** Merge company_identifier into params when set; use for staff-management API calls. */
+function staffParams<T extends Record<string, unknown>>(params?: T): (T & { company_identifier?: string }) {
+  const base = (params ?? {}) as T;
+  if (_companyIdentifier != null && _companyIdentifier !== "") {
+    return { ...base, company_identifier: _companyIdentifier } as T & { company_identifier: string };
+  }
+  return base as T & { company_identifier?: string };
+}
+
 // --- API Response & Pagination ---
 
 export interface ApiPagination {
@@ -40,6 +60,15 @@ function extractDataWithPagination<T>(
   throw new Error(body?.message || "API request failed");
 }
 
+function handleApiError(error: unknown, fallbackMessage: string): never {
+  const msg =
+    error && typeof error === "object" && "message" in error
+      ? String((error as { message?: string }).message)
+      : fallbackMessage;
+  toast.error(msg);
+  throw error;
+}
+
 // --- Dashboard ---
 
 export interface DashboardOverview {
@@ -66,16 +95,12 @@ export interface DashboardData {
 export const getDashboard = async (): Promise<DashboardData> => {
   try {
     const response = await axiosInstance.get<ApiResponse<DashboardData>>(
-      `${PREFIX}/dashboard`
+      `${PREFIX}/dashboard`,
+      { params: staffParams() }
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch dashboard";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch dashboard");
   }
 };
 
@@ -98,12 +123,7 @@ export const getAuditLogs = async (
     );
     return extractDataWithPagination(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch audit logs";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch audit logs");
   }
 };
 
@@ -146,6 +166,13 @@ export interface UserProfile extends UserProfilePayload {
   [key: string]: unknown;
 }
 
+export interface UserProfileMinified {
+  id: number;
+  user_id: string;
+  parent_id: string | null;
+  department_id: string;
+}
+
 export const getUserProfiles = async (params?: {
   page?: number;
   limit?: number;
@@ -158,12 +185,19 @@ export const getUserProfiles = async (params?: {
     );
     return extractDataWithPagination(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch user profiles";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch user profiles");
+  }
+};
+
+export const getUserProfilesMinified = async (): Promise<UserProfileMinified[]> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<UserProfileMinified[]>>(
+      `${PREFIX}/user-profiles?minified_data=true`
+    );
+    const raw = extractData(response);
+    return Array.isArray(raw) ? raw : [];
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch user profiles minified");
   }
 };
 
@@ -177,12 +211,7 @@ export const createUserProfile = async (
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to create user profile";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to create user profile");
   }
 };
 
@@ -193,12 +222,7 @@ export const getUserProfile = async (id: number): Promise<UserProfile> => {
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch user profile";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch user profile");
   }
 };
 
@@ -213,12 +237,7 @@ export const updateUserProfile = async (
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to update user profile";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to update user profile");
   }
 };
 
@@ -226,12 +245,66 @@ export const deleteUserProfile = async (id: number): Promise<void> => {
   try {
     await axiosInstance.delete(`${PREFIX}/user-profiles/${id}`);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to delete user profile";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to delete user profile");
+  }
+};
+
+export const getUserProfilesOrgChart = async (): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<unknown>>(
+      `${PREFIX}/user-profiles/org-chart`
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch org chart");
+  }
+};
+
+export const getUserProfilesOrgChartTree = async (params?: {
+  department_id?: string;
+  user_ids?: string[];
+}): Promise<unknown> => {
+  try {
+    const requestParams: Record<string, string | string[] | undefined> = {};
+    if (params?.department_id != null && params.department_id !== "") requestParams.department_id = params.department_id;
+    if (params?.user_ids != null && params.user_ids.length > 0) requestParams.user_ids = params.user_ids;
+    const response = await axiosInstance.get<ApiResponse<unknown>>(
+      `${PREFIX}/user-profiles/org-chart-tree`,
+      { params: Object.keys(requestParams).length ? requestParams : undefined }
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch org chart tree");
+  }
+};
+
+export const putUserProfileBulkReports = async (
+  id: string | number,
+  data: Record<string, unknown>
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.put<ApiResponse<unknown>>(
+      `${PREFIX}/user-profiles/${id}/bulk-reports`,
+      data
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to update user profile bulk reports");
+  }
+};
+
+export const putUserProfileParent = async (
+  id: string | number,
+  data: Record<string, unknown>
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.put<ApiResponse<unknown>>(
+      `${PREFIX}/user-profiles/${id}/parent`,
+      data
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to update user profile parent");
   }
 };
 
@@ -265,12 +338,7 @@ export const getUserRequestCategories = async (params?: {
     >(`${PREFIX}/user-request-categories`, { params });
     return extractDataWithPagination(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch user request categories";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch user request categories");
   }
 };
 
@@ -283,12 +351,7 @@ export const createUserRequestCategory = async (
     >(`${PREFIX}/user-request-categories`, data);
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to create user request category";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to create user request category");
   }
 };
 
@@ -301,12 +364,7 @@ export const getUserRequestCategory = async (
     >(`${PREFIX}/user-request-categories/${id}`);
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch user request category";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch user request category");
   }
 };
 
@@ -320,12 +378,7 @@ export const updateUserRequestCategory = async (
     >(`${PREFIX}/user-request-categories/${id}`, data);
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to update user request category";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to update user request category");
   }
 };
 
@@ -333,12 +386,7 @@ export const deleteUserRequestCategory = async (id: number): Promise<void> => {
   try {
     await axiosInstance.delete(`${PREFIX}/user-request-categories/${id}`);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to delete user request category";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to delete user request category");
   }
 };
 
@@ -409,12 +457,7 @@ export const getUserRequestCategoryFields = async (
     >(`${PREFIX}/user-request-categories/${categoryId}/fields`);
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch category fields";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch category fields");
   }
 };
 
@@ -428,12 +471,7 @@ export const createUserRequestCategoryField = async (
     >(`${PREFIX}/user-request-categories/${categoryId}/fields`, data);
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to create category field";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to create category field");
   }
 };
 
@@ -451,12 +489,7 @@ export const updateUserRequestCategoryField = async (
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to update category field";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to update category field");
   }
 };
 
@@ -469,12 +502,7 @@ export const deleteUserRequestCategoryField = async (
       `${PREFIX}/user-request-categories/${categoryId}/fields/${fieldId}`
     );
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to delete category field";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to delete category field");
   }
 };
 
@@ -493,12 +521,7 @@ export const reorderUserRequestCategoryFields = async (
       { fields }
     );
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to reorder category fields";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to reorder category fields");
   }
 };
 
@@ -537,7 +560,7 @@ export interface UserRequest {
 }
 
 export interface UserRequestCreatePayload {
-  tenant_id: string;
+  tenant_id?: string | null;
   user_request_category_id: number;
   user_id?: string;
   subject: string;
@@ -566,12 +589,7 @@ export const getUserRequests = async (params?: {
     );
     return extractDataWithPagination(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch user requests";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch user requests");
   }
 };
 
@@ -594,12 +612,7 @@ export const createUserRequest = async (
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to create user request";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to create user request");
   }
 };
 
@@ -610,7 +623,8 @@ function buildUserRequestFormData(
   }
 ): FormData {
   const form = new FormData();
-  form.append("tenant_id", payload.tenant_id);
+  if (payload.tenant_id != null && payload.tenant_id !== "")
+    form.append("tenant_id", payload.tenant_id);
   form.append("user_request_category_id", String(payload.user_request_category_id));
   if (payload.user_id) form.append("user_id", payload.user_id);
   form.append("subject", payload.subject);
@@ -642,12 +656,7 @@ export const getUserRequest = async (id: number): Promise<UserRequest> => {
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch user request";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch user request");
   }
 };
 
@@ -680,12 +689,7 @@ export const updateUserRequest = async (
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to update user request";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to update user request");
   }
 };
 
@@ -727,12 +731,7 @@ export const deleteUserRequest = async (id: number): Promise<void> => {
   try {
     await axiosInstance.delete(`${PREFIX}/user-requests/${id}`);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to delete user request";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to delete user request");
   }
 };
 
@@ -746,12 +745,7 @@ export const downloadUserRequestAttachment = async (
     );
     return response.data;
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to download attachment";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to download attachment");
   }
 };
 
@@ -784,12 +778,7 @@ export const getLocations = async (params?: {
     );
     return extractDataWithPagination(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch locations";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch locations");
   }
 };
 
@@ -803,12 +792,7 @@ export const createLocation = async (
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to create location";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to create location");
   }
 };
 
@@ -819,12 +803,7 @@ export const getLocation = async (id: number): Promise<Location> => {
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch location";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch location");
   }
 };
 
@@ -839,12 +818,7 @@ export const updateLocation = async (
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to update location";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to update location");
   }
 };
 
@@ -852,12 +826,7 @@ export const deleteLocation = async (id: number): Promise<void> => {
   try {
     await axiosInstance.delete(`${PREFIX}/locations/${id}`);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to delete location";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to delete location");
   }
 };
 
@@ -900,12 +869,7 @@ export const getAttendance = async (params?: {
     );
     return extractDataWithPagination(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch attendance";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch attendance");
   }
 };
 
@@ -916,12 +880,7 @@ export const getAttendanceStatus = async (): Promise<AttendanceStatusData> => {
     >(`${PREFIX}/attendance/status`);
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch attendance status";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch attendance status");
   }
 };
 
@@ -935,12 +894,7 @@ export const attendanceCheckIn = async (
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to check in";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to check in");
   }
 };
 
@@ -954,12 +908,7 @@ export const attendanceCheckOut = async (
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to check out";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to check out");
   }
 };
 
@@ -967,12 +916,219 @@ export const deleteAttendance = async (id: number): Promise<void> => {
   try {
     await axiosInstance.delete(`${PREFIX}/attendance/${id}`);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to delete attendance record";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to delete attendance record");
+  }
+};
+
+// --- Analytics ---
+
+export const getEmployeeManagementHome = async (): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<unknown>>(
+      `${PREFIX}/analytics/employee-management-home`
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch employee management home");
+  }
+};
+
+/** Params sent to employee dashboard APIs (counters + graphs). */
+export interface EmployeeDashboardParams {
+  days?: string;
+  period_type?: "monthly" | "date" | "range";
+  date?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+export const getEmployeeDashboardCounters = async (
+  params?: EmployeeDashboardParams
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<unknown>>(
+      `${PREFIX}/analytics/employee-dashboard/counters`,
+      { params: params ?? {} }
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch employee dashboard counters");
+  }
+};
+
+export const getEmployeeDashboardGraphDepartmentHeadcount = async (
+  params?: EmployeeDashboardParams
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<unknown>>(
+      `${PREFIX}/analytics/employee-dashboard/graphs/department-headcount`,
+      { params: params ?? {} }
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch department headcount graph");
+  }
+};
+
+export const getEmployeeDashboardGraphApprovalsAging = async (
+  params?: EmployeeDashboardParams
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<unknown>>(
+      `${PREFIX}/analytics/employee-dashboard/graphs/approvals-aging`,
+      { params: params ?? {} }
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch approvals aging graph");
+  }
+};
+
+export const getEmployeeDashboardGraphJourneyStatus = async (
+  params?: EmployeeDashboardParams
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<unknown>>(
+      `${PREFIX}/analytics/employee-dashboard/graphs/journey-status`,
+      { params: params ?? {} }
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch journey status graph");
+  }
+};
+
+export const getEmployeeDashboardGraphAttendanceTrend = async (
+  params?: EmployeeDashboardParams
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<unknown>>(
+      `${PREFIX}/analytics/employee-dashboard/graphs/attendance-trend`,
+      { params: params ?? {} }
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch attendance trend graph");
+  }
+};
+
+export const getEmployeeDashboardLeaveCalendar = async (
+  params?: EmployeeDashboardParams
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<unknown>>(
+      `${PREFIX}/analytics/employee-dashboard/leave-calendar`,
+      { params: params ?? {} }
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch leave calendar");
+  }
+};
+
+// --- Journeys ---
+
+export const getJourneys = async (params?: {
+  page?: number;
+  limit?: number;
+  [key: string]: unknown;
+}): Promise<{ data: unknown[]; pagination?: ApiPagination }> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<unknown[]>>(
+      `${PREFIX}/journeys`,
+      { params }
+    );
+    return extractDataWithPagination(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch journeys");
+  }
+};
+
+export const createJourney = async (data: Record<string, unknown>): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.post<ApiResponse<unknown>>(
+      `${PREFIX}/journeys`,
+      data
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to create journey");
+  }
+};
+
+export const getJourney = async (id: number): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<unknown>>(
+      `${PREFIX}/journeys/${id}`
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch journey");
+  }
+};
+
+export const updateJourney = async (
+  id: number,
+  data: Record<string, unknown>
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.put<ApiResponse<unknown>>(
+      `${PREFIX}/journeys/${id}`,
+      data
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to update journey");
+  }
+};
+
+export const deleteJourney = async (id: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`${PREFIX}/journeys/${id}`);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to delete journey");
+  }
+};
+
+export const createJourneyStep = async (
+  id: number,
+  data: Record<string, unknown>
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.post<ApiResponse<unknown>>(
+      `${PREFIX}/journeys/${id}/steps`,
+      data
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to create journey step");
+  }
+};
+
+export const updateJourneyStep = async (
+  id: number,
+  stepId: number,
+  data: Record<string, unknown>
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.put<ApiResponse<unknown>>(
+      `${PREFIX}/journeys/${id}/steps/${stepId}`,
+      data
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to update journey step");
+  }
+};
+
+export const deleteJourneyStep = async (
+  id: number,
+  stepId: number
+): Promise<void> => {
+  try {
+    await axiosInstance.delete(`${PREFIX}/journeys/${id}/steps/${stepId}`);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to delete journey step");
   }
 };
 
@@ -985,12 +1141,7 @@ export const getMainAppCompanies = async (): Promise<unknown[]> => {
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch companies";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch companies");
   }
 };
 
@@ -1003,12 +1154,7 @@ export const getMainAppDepartments = async (
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch departments";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch departments");
   }
 };
 
@@ -1023,12 +1169,7 @@ export const getMainAppUsers = async (
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to fetch users";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to fetch users");
   }
 };
 
@@ -1050,12 +1191,7 @@ export const postCompanyImage = async (
     );
     return extractData(response);
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to upload company image";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to upload company image");
   }
 };
 
@@ -1079,11 +1215,9 @@ export const deleteCompanyImage = async (companyId: string): Promise<void> => {
       params: { company_id: companyId },
     });
   } catch (error: unknown) {
-    const msg =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message?: string }).message)
-        : "Failed to delete company image";
-    toast.error(msg);
-    throw error;
+    handleApiError(error, "Failed to delete company image");
   }
 };
+
+
+

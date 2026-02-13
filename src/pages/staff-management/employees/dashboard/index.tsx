@@ -9,13 +9,23 @@ import GenericListPage from "@components/GenericListPage";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-import  { useState } from 'react';
+import {
+  getEmployeeDashboardGraphDepartmentHeadcount,
+  getEmployeeDashboardGraphApprovalsAging,
+  getEmployeeDashboardGraphJourneyStatus,
+  getEmployeeDashboardGraphAttendanceTrend,
+  getEmployeeDashboardLeaveCalendar,
+  type EmployeeDashboardParams,
+} from "@utils/staffManagement";
+import { useMainAppLookups } from "@hooks/useMainAppLookups";
+import DashboardStats from "./partials/DashboardStats";
+import AddEmployeeModal from "@pages/staff-management/AddEmployeeModal";
+import NewRequestModal from "@pages/staff-management/NewRequestModal";
+
+import { useState, useEffect, useCallback } from "react";
 import { 
   Users, 
-  CheckCircle, 
-  MessageSquare, 
   Send, 
-  AlertTriangle,
   Plus,
   Calendar,
   Upload,
@@ -42,21 +52,103 @@ import {
   Cell
 } from 'recharts';
 
+export interface LeaveCalendarEmployee {
+  user_id: string;
+  employee_name: string;
+  leave_type: string;
+  request_id: number;
+}
+
+export interface LeaveCalendarDay {
+  date: string;
+  on_leave_count: number;
+  employees: LeaveCalendarEmployee[];
+}
 
 const EmployeesDashboard = () => {
+    const { mainAppUsers, companyIdentifier } = useMainAppLookups();
+    const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+    const [showNewRequestModal, setShowNewRequestModal] = useState(false);
+
+    const getDisplayName = useCallback(
+      (userId: string | number | null | undefined, fallback?: string): string => {
+        if (userId == null || userId === "") return fallback ?? "—";
+        const u = mainAppUsers?.find((x) => String(x.id) === String(userId));
+        return u?.name ?? fallback ?? String(userId);
+      },
+      [mainAppUsers]
+    );
+
     const [selectedTimeframe, setSelectedTimeframe] = useState('Last 7 Days');
-    const [selectedDays, setSelectedDays] = useState('Last 30 Days');
+    const [selectedDays, setSelectedDays] = useState('30');
     const [selectedChartPeriod, setSelectedChartPeriod] = useState('Last 14 Days');
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [selectedRole, setSelectedRole] = useState('HR Admin');
+    const [periodType, setPeriodType] = useState<'Monthly' | 'Date' | 'Range'>('Monthly');
+    const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+    const [rangeStartDate, setRangeStartDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+    const [rangeEndDate, setRangeEndDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
     const [showCalendar, setShowCalendar] = useState(false);
     const [showEmployeeForm, setShowEmployeeForm] = useState(false);
     const [showLeaveForm, setShowLeaveForm] = useState(false);
     const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+    const [leaveCalendarData, setLeaveCalendarData] = useState<LeaveCalendarDay[]>([]);
+    const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+    const [departmentHeadcountData, setDepartmentHeadcountData] = useState<{ name: string; count: number }[]>([]);
+    const [approvalsAgingData, setApprovalsAgingData] = useState<{ "0_3_days"?: number; "4_7_days"?: number; "8_plus_days"?: number }>({});
+
+    const dashboardParams: EmployeeDashboardParams = (() => {
+      const base: EmployeeDashboardParams = { days: selectedDays };
+      if (periodType === 'Monthly') {
+        base.period_type = 'monthly';
+        return base;
+      }
+      if (periodType === 'Date') {
+        base.period_type = 'date';
+        base.date = selectedDate;
+        return base;
+      }
+      base.period_type = 'range';
+      base.start_date = rangeStartDate;
+      base.end_date = rangeEndDate;
+      return base;
+    })();
+
+    useEffect(() => {
+      const fetchDashboardData = async () => {
+        try {
+          const [departmentHeadcount, approvalsAging, journeyStatus, attendanceTrend, leaveCalendar] =
+            await Promise.all([
+              getEmployeeDashboardGraphDepartmentHeadcount(dashboardParams),
+              getEmployeeDashboardGraphApprovalsAging(dashboardParams),
+              getEmployeeDashboardGraphJourneyStatus(dashboardParams),
+              getEmployeeDashboardGraphAttendanceTrend(),
+              getEmployeeDashboardLeaveCalendar(),
+            ]);
+          console.log("[EmployeesDashboard] departmentHeadcount", departmentHeadcount);
+          console.log("[EmployeesDashboard] approvalsAging", approvalsAging);
+          console.log("[EmployeesDashboard] journeyStatus", journeyStatus);
+          console.log("[EmployeesDashboard] attendanceTrend", attendanceTrend);
+          console.log("[EmployeesDashboard] leaveCalendar", leaveCalendar);
+          setLeaveCalendarData(Array.isArray(leaveCalendar) ? (leaveCalendar as LeaveCalendarDay[]) : []);
+          setDepartmentHeadcountData(
+            Array.isArray(departmentHeadcount)
+              ? (departmentHeadcount as { name?: string; count?: number }[]).map((d) => ({
+                  name: String(d?.name ?? "—"),
+                  count: Number(d?.count ?? 0),
+                }))
+              : []
+          );
+        } catch (e) {
+          console.error("[EmployeesDashboard] fetchDashboardData error", e);
+        }
+      };
+      fetchDashboardData();
+    }, [selectedDays, periodType, selectedDate, rangeStartDate, rangeEndDate]);
   
-    const timeframeOptions = ['Today', 'Last 7 Days', 'Last 14 Days', 'Last 30 Days', 'Last 90 Days'];
-    const daysOptions = ['Last 7 Days', 'Last 30 Days', 'Last 60 Days', 'Last 90 Days', 'Last 180 Days', 'Last Year'];
-    const chartPeriodOptions = ['Last 7 Days', 'Last 14 Days', 'Last 30 Days', 'Last 60 Days', 'Last 90 Days'];
+    const timeframeOptions = ['Today', '7', '14', '30', '60'];
+    const daysOptions = ['7', '30', '60'];
+    const chartPeriodOptions = ['7', '14', '30', '60', '90'];
     const roleOptions = ['HR Admin', 'Manager', 'Employee', 'Admin'];
   
     const toggleDropdown = (dropdown: string) => {
@@ -66,26 +158,64 @@ const EmployeesDashboard = () => {
     const handleClickOutside = () => {
       setOpenDropdown(null);
     };
+
+    const leaveByDate = React.useMemo(() => {
+      const map: Record<string, LeaveCalendarDay> = {};
+      leaveCalendarData.forEach((d) => {
+        map[d.date] = d;
+      });
+      return map;
+    }, [leaveCalendarData]);
+
+    const calendarMonthInfo = React.useMemo(() => {
+      if (leaveCalendarData.length === 0) {
+        const now = new Date();
+        return {
+          year: now.getFullYear(),
+          month: now.getMonth(),
+          monthLabel: now.toLocaleString('default', { month: 'long', year: 'numeric' }),
+          daysInMonth: new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(),
+          startWeekday: new Date(now.getFullYear(), now.getMonth(), 1).getDay(),
+        };
+      }
+      const firstDate = new Date(leaveCalendarData[0].date);
+      const year = firstDate.getFullYear();
+      const month = firstDate.getMonth();
+      return {
+        year,
+        month,
+        monthLabel: firstDate.toLocaleString('default', { month: 'long', year: 'numeric' }),
+        daysInMonth: new Date(year, month + 1, 0).getDate(),
+        startWeekday: new Date(year, month, 1).getDay(),
+      };
+    }, [leaveCalendarData]);
+
+    const selectedDayLeave = leaveByDate[selectedCalendarDate];
+
+    const DEPARTMENT_CHART_COLORS = ['#6366F1', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899', '#06B6D4', '#84CC16', '#F97316'];
+
+    const departmentData = React.useMemo(() => {
+      const list = departmentHeadcountData;
+      if (!list.length) return [];
+      const total = list.reduce((sum, d) => sum + d.count, 0);
+      return list.map((d, idx) => ({
+        name: d.name,
+        value: d.count,
+        color: DEPARTMENT_CHART_COLORS[idx % DEPARTMENT_CHART_COLORS.length],
+        percentage: total > 0 ? Math.round((d.count / total) * 1000) / 10 : 0,
+      }));
+    }, [departmentHeadcountData]);
   
-    const departmentData = [
-      { name: 'Engineering', value: 18, color: '#6366F1', percentage: 34.6 },
-      { name: 'Sales', value: 15, color: '#10B981', percentage: 28.8 },
-      { name: 'Marketing', value: 8, color: '#8B5CF6', percentage: 15.4 },
-      { name: 'Finance', value: 6, color: '#F59E0B', percentage: 11.5 },
-      { name: 'HR', value: 5, color: '#EC4899', percentage: 9.6 }
-    ];
-  
-    const approvalsData = [
-      { day: 'Jan 15', value: 12 },
-      { day: 'Jan 16', value: 14 },
-      { day: 'Jan 17', value: 13 },
-      { day: 'Jan 18', value: 16 },
-      { day: 'Jan 19', value: 15 },
-      { day: 'Jan 20', value: 18 },
-      { day: 'Jan 21', value: 17 },
-      { day: 'Jan 22', value: 19 },
-      { day: 'Jan 23', value: 21 }
-    ];
+    const approvalsAgingChartData = React.useMemo(() => {
+      const d = approvalsAgingData;
+      return [
+        { name: "0-3 days", value: d["0_3_days"] ?? 0, fill: "#10B981" },
+        { name: "4-7 days", value: d["4_7_days"] ?? 0, fill: "#F59E0B" },
+        { name: "8+ days", value: d["8_plus_days"] ?? 0, fill: "#EF4444" },
+      ];
+    }, [approvalsAgingData]);
+
+    const approvalsAgingTotal = (approvalsAgingData["0_3_days"] ?? 0) + (approvalsAgingData["4_7_days"] ?? 0) + (approvalsAgingData["8_plus_days"] ?? 0);
   
     const documents = [
       { 
@@ -116,11 +246,15 @@ const EmployeesDashboard = () => {
   
     // Handler functions
     const handleAddEmployee = () => {
-      setShowEmployeeForm(true);
+      setShowAddEmployeeModal(true);
     };
   
     const handleRequestLeave = () => {
       setShowLeaveForm(true);
+    };
+
+    const handleNewRequest = () => {
+      setShowNewRequestModal(true);
     };
   
     const handleUploadDocument = () => {
@@ -201,9 +335,10 @@ const EmployeesDashboard = () => {
             color: '#111827',
             margin: 0
           }}>Employee Management Home</h1>
+          
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {/* Role Dropdown */}
-            <div style={{ position: 'relative' }}>
+            {/* <div style={{ position: 'relative' }}>
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
@@ -273,10 +408,10 @@ const EmployeesDashboard = () => {
                   ))}
                 </div>
               )}
-            </div>
+            </div> */}
 
             {/* Manager Button (no dropdown) */}
-            <button style={{
+            {/* <button style={{
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -292,10 +427,10 @@ const EmployeesDashboard = () => {
             }}>
               <Users size={16} color="#6B7280" />
               <span>Manager</span>
-            </button>
+            </button> */}
 
             {/* Timeframe Dropdown */}
-            <div style={{ position: 'relative' }}>
+            {/* <div style={{ position: 'relative' }}>
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
@@ -363,6 +498,123 @@ const EmployeesDashboard = () => {
                     </div>
                   ))}
                 </div>
+              )}
+            </div> */}
+
+            {/* Period Dropdown: Monthly | Date | Range (default Monthly) */}
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleDropdown('period');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 14px',
+                    background: '#FFFFFF',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    color: '#374151',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <span>{periodType}</span>
+                  <ChevronDown size={14} color="#9CA3AF" />
+                </button>
+                {openDropdown === 'period' && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: '4px',
+                      background: '#FFFFFF',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                      minWidth: '140px',
+                      zIndex: 1000,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {(['Monthly', 'Date', 'Range'] as const).map((option) => (
+                      <div
+                        key={option}
+                        onClick={() => {
+                          setPeriodType(option);
+                          setOpenDropdown(null);
+                        }}
+                        style={{
+                          padding: '10px 14px',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          color: periodType === option ? '#6366F1' : '#374151',
+                          fontWeight: periodType === option ? '600' : '500',
+                          background: periodType === option ? '#F0F9FF' : 'transparent',
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (periodType !== option) e.currentTarget.style.background = '#F9FAFB';
+                        }}
+                        onMouseLeave={(e) => {
+                          if (periodType !== option) e.currentTarget.style.background = 'transparent';
+                        }}
+                      >
+                        {option}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {periodType === 'Date' && (
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    color: '#374151',
+                  }}
+                />
+              )}
+              {periodType === 'Range' && (
+                <>
+                  <input
+                    type="date"
+                    value={rangeStartDate}
+                    onChange={(e) => setRangeStartDate(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      color: '#374151',
+                    }}
+                  />
+                  <span style={{ fontSize: '13px', color: '#6B7280' }}>–</span>
+                  <input
+                    type="date"
+                    value={rangeEndDate}
+                    onChange={(e) => setRangeEndDate(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      color: '#374151',
+                    }}
+                  />
+                </>
               )}
             </div>
 
@@ -441,258 +693,7 @@ const EmployeesDashboard = () => {
         </div>
 
         {/* Stats Cards */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-          marginBottom: '16px'
-        }}>
-          {/* Total Employees */}
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid #F3F4F6'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: '#EEF2FF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Users size={24} color="#6366F1" strokeWidth={2} />
-              </div>
-              <div style={{
-                fontSize: '36px',
-                fontWeight: '700',
-                color: '#111827',
-                lineHeight: '1'
-              }}>52</div>
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#6B7280',
-              fontWeight: '500',
-              marginBottom: '12px'
-            }}>Total Employees</div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-              color: '#374151'
-            }}>
-              <Circle size={8} fill="#6366F1" color="#6366F1" />
-              <span>46 Active / 6 Inactive</span>
-            </div>
-            <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '8px' }}>Total:</div>
-          </div>
-
-          {/* Pending Approvals */}
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid #F3F4F6'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: '#D1FAE5',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <CheckCircle size={24} color="#10B981" strokeWidth={2} />
-              </div>
-              <div style={{
-                fontSize: '36px',
-                fontWeight: '700',
-                color: '#111827',
-                lineHeight: '1'
-              }}>7</div>
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#6B7280',
-              fontWeight: '500',
-              marginBottom: '12px'
-            }}>Pending Approvals</div>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              padding: '4px 10px',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontWeight: '600',
-              background: '#FEF3C7',
-              color: '#92400E'
-            }}>⏰ 3 overdue</span>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-              color: '#374151',
-              marginTop: '8px'
-            }}>
-              <Circle size={8} fill="#F59E0B" color="#F59E0B" />
-              <span>Avg age: 2.5 days</span>
-            </div>
-          </div>
-
-          {/* On Leave Today */}
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid #F3F4F6'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: '#FEF3C7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <MessageSquare size={24} color="#F59E0B" strokeWidth={2} />
-              </div>
-              <div style={{
-                fontSize: '36px',
-                fontWeight: '700',
-                color: '#111827',
-                lineHeight: '1'
-              }}>5</div>
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#6B7280',
-              fontWeight: '500',
-              marginBottom: '12px'
-            }}>On Leave Today</div>
-            <a href="#" onClick={handleViewCalendar} style={{
-              fontSize: '13px',
-              color: '#6366F1',
-              textDecoration: 'none',
-              fontWeight: '500',
-              cursor: 'pointer'
-            }}>View calendar →</a>
-          </div>
-
-          {/* Pending Acknowledgments */}
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid #F3F4F6'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: '#EDE9FE',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Send size={24} color="#8B5CF6" strokeWidth={2} />
-              </div>
-              <div style={{
-                fontSize: '36px',
-                fontWeight: '700',
-                color: '#111827',
-                lineHeight: '1'
-              }}>4</div>
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#6B7280',
-              fontWeight: '500',
-              marginBottom: '12px'
-            }}>Pending Acknowledgments</div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-              color: '#374151',
-              marginTop: '8px'
-            }}>
-              <Circle size={8} fill="#F59E0B" color="#F59E0B" />
-              <span>2 Due Soon</span>
-            </div>
-          </div>
-
-          {/* Compliance Alerts */}
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid #F3F4F6'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: '#FEE2E2',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <AlertTriangle size={24} color="#EF4444" strokeWidth={2} />
-              </div>
-              <div style={{
-                fontSize: '36px',
-                fontWeight: '700',
-                color: '#111827',
-                lineHeight: '1'
-              }}>3</div>
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#6B7280',
-              fontWeight: '500',
-              marginBottom: '12px'
-            }}>Compliance Alerts</div>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              <span style={{
-                padding: '4px 8px',
-                borderRadius: '6px',
-                fontSize: '11px',
-                fontWeight: '600',
-                background: '#FEE2E2',
-                color: '#991B1B'
-              }}>High 1</span>
-              <span style={{
-                padding: '4px 8px',
-                borderRadius: '6px',
-                fontSize: '11px',
-                fontWeight: '600',
-                background: '#FEF3C7',
-                color: '#92400E'
-              }}>Med 1</span>
-              <span style={{
-                padding: '4px 8px',
-                borderRadius: '6px',
-                fontSize: '11px',
-                fontWeight: '600',
-                background: '#F3F4F6',
-                color: '#374151'
-              }}>Low 1</span>
-            </div>
-          </div>
-        </div>
+        <DashboardStats onViewCalendar={handleViewCalendar} params={dashboardParams} />
 
         {/* Action Buttons */}
         <div style={{
@@ -703,7 +704,7 @@ const EmployeesDashboard = () => {
         }}>
           {[
             { icon: Plus, color: '#6366F1', text: 'Add Employee', onClick: handleAddEmployee },
-            { icon: Calendar, color: '#10B981', text: 'Request Leave', onClick: handleRequestLeave },
+            { icon: Calendar, color: '#10B981', text: 'New Request', onClick: handleNewRequest },
             { icon: Upload, color: '#8B5CF6', text: 'Upload Document', onClick: handleUploadDocument }
           ].map((action, idx) => (
             <button 
@@ -781,56 +782,64 @@ const EmployeesDashboard = () => {
             </div>
             
             <div style={{ marginBottom: '16px' }}>
-              {departmentData.map((dept, idx) => (
-                <div key={idx} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  marginBottom: '10px',
-                  fontSize: '14px'
-                }}>
-                  <Circle size={12} fill={dept.color} color={dept.color} />
-                  <span style={{ flex: 1, color: '#374151', fontWeight: '500' }}>{dept.name}</span>
-                  <span style={{ fontWeight: '700', color: '#111827', fontSize: '15px' }}>{dept.value}</span>
-                  <span style={{ fontSize: '12px', color: '#9CA3AF', minWidth: '45px', textAlign: 'right' }}>({dept.percentage}%)</span>
-                </div>
-              ))}
+              {departmentData.length === 0 ? (
+                <div style={{ fontSize: '14px', color: '#9CA3AF', padding: '12px 0' }}>No department data for the selected period.</div>
+              ) : (
+                departmentData.map((dept, idx) => (
+                  <div key={idx} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginBottom: '10px',
+                    fontSize: '14px'
+                  }}>
+                    <Circle size={12} fill={dept.color} color={dept.color} />
+                    <span style={{ flex: 1, color: '#374151', fontWeight: '500' }}>{dept.name}</span>
+                    <span style={{ fontWeight: '700', color: '#111827', fontSize: '15px' }}>{dept.value}</span>
+                    <span style={{ fontSize: '12px', color: '#9CA3AF', minWidth: '45px', textAlign: 'right' }}>({dept.percentage}%)</span>
+                  </div>
+                ))
+              )}
             </div>
 
             <div style={{ height: '160px', marginTop: '12px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={departmentData}
-                  margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
-                >
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                  />
-                  <YAxis 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                    domain={[0, 20]}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      background: '#FFFFFF', 
-                      border: '1px solid #E5E7EB', 
-                      borderRadius: '8px',
-                      fontSize: '12px'
-                    }}
-                    formatter={(value: any, name: any, props: any) => [`${value} employees (${props.payload.percentage}%)`, 'Count']}
-                  />
-                  <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={45}>
-                    {departmentData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              {departmentData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart 
+                    data={departmentData}
+                    margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
+                  >
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                    />
+                    <YAxis 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                      domain={[0, departmentData.length ? Math.max(...departmentData.map((d) => d.value), 0) + 1 : 5]}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        background: '#FFFFFF', 
+                        border: '1px solid #E5E7EB', 
+                        borderRadius: '8px',
+                        fontSize: '12px'
+                      }}
+                      formatter={(value: number, _name: unknown, props: { payload?: { percentage?: number } }) => [`${value} employees${props.payload?.percentage != null ? ` (${props.payload.percentage}%)` : ''}`, 'Count']}
+                    />
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={45}>
+                      {departmentData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF', fontSize: '14px' }}>No chart data</div>
+              )}
             </div>
 
             {/* Department Insights */}
@@ -847,15 +856,36 @@ const EmployeesDashboard = () => {
                   color: '#111827',
                   margin: 0
                 }}>Department Insights</h4>
-                
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {/* Insight 1 */}
-               
+                {departmentData.length > 0 && (
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: '#EFF6FF',
+                    border: '1px solid #DBEAFE'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '4px'
+                    }}>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#1E40AF' }}>
+                        Total headcount
+                      </span>
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#2563EB' }}>
+                        {departmentData.reduce((sum, d) => sum + d.value, 0)} employees
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#1E40AF', lineHeight: '1.4' }}>
+                      {departmentData.length} department{departmentData.length !== 1 ? 's' : ''} in scope
+                    </div>
+                  </div>
+                )}
 
-                {/* Insight 2 */}
-                <div style={{
+                {/* <div style={{
                   padding: '12px',
                   borderRadius: '8px',
                   background: '#F0FDF4',
@@ -877,10 +907,9 @@ const EmployeesDashboard = () => {
                   <div style={{ fontSize: '12px', color: '#15803D', lineHeight: '1.4' }}>
                     Top performing team this quarter
                   </div>
-                </div>
+                </div> */}
 
-                {/* Insight 3 */}
-                <div style={{
+                {/* <div style={{
                   padding: '12px',
                   borderRadius: '8px',
                   background: '#FEF3C7',
@@ -902,7 +931,7 @@ const EmployeesDashboard = () => {
                   <div style={{ fontSize: '12px', color: '#92400E', lineHeight: '1.4' }}>
                     Consider hiring support staff
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>
@@ -927,7 +956,7 @@ const EmployeesDashboard = () => {
                 margin: 0
               }}>Approvals Aging</h3>
               <div style={{ position: 'relative' }}>
-                <button 
+                {/* <button 
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleDropdown('chartPeriod');
@@ -945,8 +974,8 @@ const EmployeesDashboard = () => {
                   }}>
                   <span>{selectedChartPeriod}</span>
                   <ChevronDown size={14} color="#9CA3AF" />
-                </button>
-                {openDropdown === 'chartPeriod' && (
+                </button> */}
+                {/* {openDropdown === 'chartPeriod' && (
                   <div onClick={(e) => e.stopPropagation()} style={{
                     position: 'absolute',
                     top: '100%',
@@ -991,7 +1020,7 @@ const EmployeesDashboard = () => {
                       </div>
                     ))}
                   </div>
-                )}
+                )} */}
               </div>
             </div>
 
@@ -1002,55 +1031,55 @@ const EmployeesDashboard = () => {
                   fontWeight: '700',
                   color: '#111827',
                   lineHeight: '1'
-                }}>21</div>
+                }}>{approvalsAgingTotal}</div>
                 <span style={{
                   fontSize: '14px',
                   color: '#6366F1',
                   fontWeight: '500'
-                }}>This Week</span>
+                }}>Pending</span>
               </div>
             </div>
 
             <div style={{ height: '180px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={approvalsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
-                  <XAxis 
-                    dataKey="day" 
-                    stroke="#E5E7EB" 
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                    axisLine={{ stroke: '#E5E7EB' }}
-                  />
-                  <YAxis 
-                    tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                    domain={[0, 25]}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      background: '#FFFFFF', 
-                      border: '1px solid #E5E7EB', 
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                      padding: '8px 12px'
-                    }}
-                    formatter={(value: any) => [`${value} approvals`, 'Count']}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="#6366F1" 
-                    strokeWidth={3} 
-                    dot={{ fill: '#6366F1', r: 4 }}
-                    activeDot={{ r: 6, fill: '#6366F1', stroke: '#FFFFFF', strokeWidth: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {approvalsAgingChartData.some((d) => d.value > 0) || approvalsAgingTotal === 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={approvalsAgingChartData} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#9CA3AF', fontSize: 11 }}
+                      domain={[0, Math.max(...approvalsAgingChartData.map((d) => d.value), 0) + 1]}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: '#FFFFFF',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        padding: '8px 12px'
+                      }}
+                      formatter={(value: number) => [`${value} pending`, 'Count']}
+                    />
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={48}>
+                      {approvalsAgingChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF', fontSize: '14px' }}>No aging data</div>
+              )}
             </div>
 
             {/* Recently Uploaded Docs */}
-            <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #F3F4F6' }}>
+            {/* <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #F3F4F6' }}>
               <div style={{
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -1125,7 +1154,7 @@ const EmployeesDashboard = () => {
                   </div>
                 </div>
               ))}
-            </div>
+            </div> */}
           </div>
         </div>
 
@@ -1136,7 +1165,7 @@ const EmployeesDashboard = () => {
           gap: '16px'
         }}>
           {/* More Actions */}
-          <div style={{
+          {/* <div style={{
             background: '#FFFFFF',
             borderRadius: '12px',
             padding: '24px',
@@ -1201,10 +1230,10 @@ const EmployeesDashboard = () => {
                 </button>
               ))}
             </div>
-          </div>
+          </div> */}
 
           {/* AI Insights */}
-          <div style={{
+          {/* <div style={{
             background: '#FFFFFF',
             borderRadius: '12px',
             padding: '24px',
@@ -1278,7 +1307,7 @@ const EmployeesDashboard = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
 
@@ -1324,7 +1353,7 @@ const EmployeesDashboard = () => {
                   lineHeight: '1'
                 }}>×</button>
             </div>
-            <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '24px' }}>January 2026</div>
+            <div style={{ fontSize: '14px', color: '#6B7280', marginBottom: '24px' }}>{calendarMonthInfo.monthLabel}</div>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(7, 1fr)',
@@ -1336,36 +1365,62 @@ const EmployeesDashboard = () => {
                   {day}
                 </div>
               ))}
-              {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
-                const isToday = day === 15;
-                const hasLeave = [8, 12, 15, 20, 23].includes(day);
+              {Array.from({ length: calendarMonthInfo.startWeekday }, (_, i) => (
+                <div key={`pad-${i}`} style={{ padding: '12px' }} />
+              ))}
+              {Array.from({ length: calendarMonthInfo.daysInMonth }, (_, i) => {
+                const day = i + 1;
+                const dateStr = `${calendarMonthInfo.year}-${String(calendarMonthInfo.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayData = leaveByDate[dateStr];
+                const hasLeave = (dayData?.on_leave_count ?? 0) > 0;
+                const isSelected = dateStr === selectedCalendarDate;
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const isToday = dateStr === todayStr;
                 return (
-                  <div key={day} style={{
-                    textAlign: 'center',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    background: isToday ? '#EEF2FF' : hasLeave ? '#FEF3C7' : '#F9FAFB',
-                    border: isToday ? '2px solid #6366F1' : '1px solid #E5E7EB',
-                    fontSize: '14px',
-                    fontWeight: isToday ? '600' : '400',
-                    color: isToday ? '#6366F1' : '#374151',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}>
+                  <div
+                    key={day}
+                    onClick={() => setSelectedCalendarDate(dateStr)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === 'Enter' && setSelectedCalendarDate(dateStr)}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: isSelected ? '#EEF2FF' : isToday ? '#E0E7FF' : hasLeave ? '#FEF3C7' : '#F9FAFB',
+                      border: isSelected || isToday ? '2px solid #6366F1' : '1px solid #E5E7EB',
+                      fontSize: '14px',
+                      fontWeight: isSelected || isToday ? '600' : '400',
+                      color: isSelected || isToday ? '#6366F1' : '#374151',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      minHeight: '56px'
+                    }}
+                  >
                     {day}
-                    {hasLeave && <div style={{ fontSize: '10px', color: '#92400E', marginTop: '4px' }}>On Leave</div>}
+                    {hasLeave && <div style={{ fontSize: '10px', color: '#92400E', marginTop: '4px' }}>On Leave {dayData?.on_leave_count ? `(${dayData.on_leave_count})` : ''}</div>}
                   </div>
                 );
               })}
             </div>
             <div style={{ marginTop: '24px', padding: '16px', background: '#F9FAFB', borderRadius: '8px' }}>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827', marginBottom: '8px' }}>Employees on Leave Today (Jan 15)</div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827', marginBottom: '8px' }}>
+                Employees on Leave {selectedCalendarDate === new Date().toISOString().slice(0, 10) ? 'Today' : ''} ({selectedCalendarDate})
+              </div>
               <div style={{ fontSize: '13px', color: '#6B7280', lineHeight: '1.8' }}>
-                • John Smith - Annual Leave<br/>
-                • Sarah Johnson - Sick Leave<br/>
-                • Mike Williams - Personal Leave<br/>
-                • Emily Davis - Annual Leave<br/>
-                • David Brown - Sick Leave
+                {selectedDayLeave?.employees?.length ? (
+                  selectedDayLeave.employees.map((emp) => (
+                    <div key={`${emp.user_id}-${emp.request_id}`}>
+                      • {getDisplayName(emp.user_id, emp.employee_name)} - {emp.leave_type}
+                    </div>
+                  ))
+                ) : (
+                  <span style={{ color: '#9CA3AF' }}>No employees on leave this day.</span>
+                )}
               </div>
             </div>
           </div>
@@ -1454,6 +1509,17 @@ const EmployeesDashboard = () => {
           </div>
         </div>
       )}
+
+      <AddEmployeeModal
+        show={showAddEmployeeModal}
+        onHide={() => setShowAddEmployeeModal(false)}
+        tenantId={companyIdentifier ?? undefined}
+      />
+
+      <NewRequestModal
+        show={showNewRequestModal}
+        onHide={() => setShowNewRequestModal(false)}
+      />
 
       {/* Leave Request Form Modal */}
       {showLeaveForm && (

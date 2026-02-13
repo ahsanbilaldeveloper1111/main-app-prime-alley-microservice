@@ -27,6 +27,7 @@ import { Filter, Package, FileText, Calendar } from "lucide-react";
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import GenericSidebar from "@components/GenericSidebar";
+import { ModuleSlug } from "@utils/Helper";
 
 interface Product {
   id: number;
@@ -381,6 +382,7 @@ const ProductDetails = () => {
       <GenericSidebar
         isOpen={showProductSidebar}
         onClose={handleCloseProductSidebar}
+        moduleSlug={ModuleSlug.BILLING}
         title={selectedProductView?.product?.name ?? "Subscription Details"}
         subtitle={
           selectedProductView?.product?.is_active ? "Active" : "Suspended"

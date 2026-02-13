@@ -1,7 +1,11 @@
 import NextAuth from 'next-auth';
 import type { NextAuthOptions } from 'next-auth';
+import type { JWT } from 'next-auth/jwt';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { nextAuthLogger } from '../../../utils/nextAuthLogger';
+import { jwtPayloadStore } from '../../../utils/sessionStore';
+import { signSmallPayload, generateSessionId } from '../../../utils/smallJwt';
+import { customJwtDecode } from '../../../utils/authJwt';
 
 // Constants
 const REFRESH_BUFFER_MS = 2 * 60 * 1000; // 2 minutes before expiry
@@ -25,6 +29,11 @@ declare module 'next-auth' {
       id?: string | null;
       name?: string | null;
       email?: string | null;
+
+      company_id?: string | null;
+      company_name?: string | null;
+      company_identifier?: string | null;
+
       username?: string | null;
       is_admin?: string | null;
       login_as?: string | null;
@@ -46,6 +55,9 @@ declare module 'next-auth' {
     name?: string | null;
     email?: string | null;
     username?: string | null;
+    company_id?: string | null;
+    company_name?: string | null;
+    company_identifier?: string | null;
     role?: string | null;
     is_admin?: string | null;
     login_as?: string | null;
@@ -128,6 +140,9 @@ export const authOptions: NextAuthOptions = {
             id: jsonData.data?.id,
             name: jsonData.data?.name,
             email: jsonData.data?.email,
+            company_id: jsonData.data?.company_id,
+            company_name: jsonData.data?.company_name,
+            company_identifier: jsonData.data?.company_identifier,
             username: jsonData.data?.username,
             role: jsonData.data?.role,
             phone: jsonData.data?.phone,
@@ -166,6 +181,29 @@ export const authOptions: NextAuthOptions = {
     maxAge: SESSION_MAX_AGE,
   },
 
+  // Small cookie (Option A): store full token server-side; cookie only holds signed sessionId to avoid 431
+  jwt: {
+    async encode({ token = {}, secret, maxAge = SESSION_MAX_AGE }) {
+      const sessionId = generateSessionId();
+      const now = Math.floor(Date.now() / 1000);
+      const exp = (typeof token.exp === 'number' ? token.exp : now + maxAge);
+      jwtPayloadStore.set(sessionId, token as Record<string, unknown>);
+      const secretStr = typeof secret === 'string' ? secret : (secret as Buffer).toString('binary');
+      // Include id + permissions in cookie so Edge middleware can verify without store lookup
+      return signSmallPayload(
+        {
+          sessionId,
+          exp,
+          iat: typeof token.iat === 'number' ? token.iat : now,
+          id: typeof token.id === 'string' ? token.id : undefined,
+          permissions: Array.isArray(token.permissions) ? token.permissions : undefined,
+        },
+        secretStr
+      );
+    },
+    decode: customJwtDecode,
+  },
+
   pages: {
     signIn: '/auth/signin',
     signOut: '/auth/signout',
@@ -182,6 +220,9 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           name: user.name,
           email: user.email,
+          company_id: user.company_id,
+          company_name: user.company_name,
+          company_identifier: user.company_identifier,
           username: user.username,
           is_admin: user.is_admin,
           login_as: user.login_as,
@@ -222,6 +263,11 @@ export const authOptions: NextAuthOptions = {
           id: token.id as string | null,
           name: token.name as string | null,
           email: token.email as string | null,
+          
+          company_id: token.company_id as string | null,
+          company_name: token.company_name as string | null,
+          company_identifier: token.company_identifier as string | null,
+
           username: token.username as string | null,
           role: token.role as string | null,
           is_admin: token.is_admin as string | null,

@@ -8,6 +8,10 @@ import { sendSms, getSmsList, generateSms } from '@utils/communication';
 import type { SmsListItem, SmsListMeta } from '@utils/communication';
 import moment from 'moment-timezone';
 import { GlobalDateTimeFormat } from '@utils/Helper';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS: P } = HEADER_CONSTANTS;
 
 const DEFAULT_MESSAGE = 'Hi, this is PrimeAlley. Can we schedule a 10-min call this week?';
 
@@ -16,6 +20,10 @@ const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionC
   contextPayload,
   moduleSlug,
 }) => {
+  const { hasPermission } = usePermissions();
+  const canSend = hasPermission(P.SEND_SMS_CRM);
+  const canView = hasPermission(P.VIEW_SMS_CRM);
+
   const { data: session } = useSession();
   const source = getContextSource(contextPayload);
 
@@ -30,6 +38,10 @@ const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionC
   const [smsMeta, setSmsMeta] = useState<SmsListMeta | null>(null);
   const [smsPage, setSmsPage] = useState(1);
   const [smsPerPage, setSmsPerPage] = useState(15);
+
+  const [contactPhone, setContactPhone] = useState('');
+  const [selectedSmsId, setSelectedSmsId] = useState<number | null>(null);
+  const [showSmsModal, setShowSmsModal] = useState(false);
 
   const extension = (session?.user as { extension?: string; phone?: string } | undefined)?.extension
     ?? (session?.user as { extension?: string; phone?: string } | undefined)?.phone
@@ -61,7 +73,6 @@ const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionC
     fetchSms(smsPage, smsPerPage);
   }, [smsPage, smsPerPage, fetchSms]);
 
-  const [contactPhone, setContactPhone] = useState('');
   useEffect(() => {
     const payload = contextPayload ?? {} as Record<string, unknown>;
     if (source === 'leads' && payload?.lead) {
@@ -152,8 +163,14 @@ const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionC
     return () => registerFooter?.(null);
   }, [registerFooter, message, sendTo]);
 
-  const [selectedSmsId, setSelectedSmsId] = useState<number | null>(null);
-  const [showSmsModal, setShowSmsModal] = useState(false);
+  if (!canSend && !canView) {
+    return (
+      <div className="d-flex align-items-center justify-content-center text-muted py-5">
+        <p className="mb-0">You don&apos;t have permission to send or view SMS here.</p>
+      </div>
+    );
+  }
+
   const selectedSms =
     selectedSmsId === null ? null : smsList.find((s) => s.id === selectedSmsId) ?? null;
 
@@ -163,6 +180,7 @@ const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionC
     <div className="h-100 d-flex flex-column min-h-0">
       <Row className="mb-4 flex-grow-1 min-h-0">
         <Col xs={12}>
+          {canSend && (
           <Row className="g-4">
             <Col lg={7}>
               <Card className="border">
@@ -268,9 +286,11 @@ const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionC
               </div>
             </Col>
           </Row>
+          )}
         </Col>
       </Row>
 
+      {canView && (
       <Row className="mt-3">
         <Col xs={12}>
           <Card className="border">
@@ -386,6 +406,7 @@ const SmsSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionC
           </Card>
         </Col>
       </Row>
+      )}
 
       <Modal show={showSmsModal && selectedSms != null} onHide={() => { setShowSmsModal(false); setSelectedSmsId(null); }} size="lg" centered>
         <Modal.Header closeButton>

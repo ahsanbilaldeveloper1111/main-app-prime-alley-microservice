@@ -30,7 +30,7 @@ import {
   Layers,
 } from "lucide-react";
 import "@assets/scss/ticketsnew.scss";
-import { GlobalDateFormat, GlobalTimeFormat, ModuleSlug } from "@utils/Helper";
+import { GlobalDateFormat, GlobalTimeFormat, ModuleSlug, convertDateTimeWithOffsetToLocal } from "@utils/Helper";
 import moment from "moment";
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
@@ -417,7 +417,7 @@ const HistoryPage = () => {
       render: (row) => (
         <div className="small text-uppercase">
           {row.dateTime ? moment(row.dateTime).format(GlobalDateFormat) : '-'}
-          <div className="text-muted">{row.dateTime ? moment(row.dateTime).format(GlobalTimeFormat) : ''}</div>
+        <div className="text-muted">{row.dateTime ? convertDateTimeWithOffsetToLocal(row.dateTime, undefined, GlobalTimeFormat) : ''}</div>
         </div>
       )
     },
@@ -631,6 +631,7 @@ const HistoryPage = () => {
       <GenericSidebar
         isOpen={showActivitySidebar}
         onClose={() => setShowActivitySidebar(false)}
+        moduleSlug={ModuleSlug.CRM_HISTORY}
         title={selectedActivityRecord?.customer || 'Activity Details'}
         subtitle={`Assigned to ${selectedActivityRecord?.agent || 'N/A'}`}
         avatar={{

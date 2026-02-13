@@ -2626,6 +2626,7 @@ const CrmOrders = () => {
           setRelatedDeal(null);
           setRelatedLead(null);
         }}
+        moduleSlug={ModuleSlug.CRM_ORDERS}
         title={viewingOrder?.order_number || `Order #${viewingOrder?.id}` || 'Order Details'}
         subtitle={viewingOrder?.customer_name || ''}
         metadata={viewingOrder?.id ? `Order ID: ${viewingOrder.id}` : ''}

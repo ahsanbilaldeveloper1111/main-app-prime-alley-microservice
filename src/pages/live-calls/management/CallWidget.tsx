@@ -35,6 +35,9 @@ interface CallWidgetProps {
   previewActions?: string[];
   /** When set, Reject area uses this with action 'REJECT' or 'CLOSE' instead of handleRejectCall */
   onRejectWithAction?: (action: 'REJECT' | 'CLOSE') => void;
+  /** When call is connected, clicking Wrap up fetches reasons and opens modal */
+  onWrapUpClick?: () => void;
+  wrapUpLoading?: boolean;
 }
 
 const CallWidget: React.FC<CallWidgetProps> = ({
@@ -57,6 +60,8 @@ const CallWidget: React.FC<CallWidgetProps> = ({
   dialedNumber,
   previewActions = [],
   onRejectWithAction,
+  onWrapUpClick,
+  wrapUpLoading = false,
 }) => {
   const [showRejectMenu, setShowRejectMenu] = useState(false);
 
@@ -430,6 +435,38 @@ const CallWidget: React.FC<CallWidgetProps> = ({
                   <span>Conference</span>
                 </button>
               </div>
+
+              {onWrapUpClick && previewActions.includes('UPDATE_CALL_DATA') && (
+                <button
+                  className="btn-wrap-up"
+                  onClick={onWrapUpClick}
+                  disabled={wrapUpLoading}
+                  style={{
+                    width: '100%',
+                    marginBottom: 8,
+                    padding: '12px 16px',
+                    border: 'none',
+                    borderRadius: 12,
+                    fontWeight: 600,
+                    cursor: wrapUpLoading ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    background: 'linear-gradient(135deg, #2c7ade 0%, #0891b2 100%)',
+                    color: 'white',
+                  }}
+                >
+                  {wrapUpLoading ? (
+                    <>Loading...</>
+                  ) : (
+                    <>
+                      <CheckCircle size={18} />
+                      Wrap up
+                    </>
+                  )}
+                </button>
+              )}
 
               <button className="btn-end-call" onClick={handleEndCall}>
                 <PhoneOff />
