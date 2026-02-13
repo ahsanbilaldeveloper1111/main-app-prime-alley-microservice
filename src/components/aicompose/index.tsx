@@ -26,7 +26,7 @@ const CHANNEL_ORDER: Record<AIComposeChannel, number> = {
   meetings: 3,
 };
 
-const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextPayload }) => {
+const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextPayload, moduleSlug }) => {
   const { hasPermission } = usePermissions();
   const canWhatsApp = hasPermission(P.SEND_WHATSAPP_MESSAGE_CRM) || hasPermission(P.VIEW_WHATSAPP_MESSAGES_CRM);
   const canEmail = hasPermission(P.SEND_EMAIL_CRM) || hasPermission(P.VIEW_EMAILS_CRM);
@@ -270,10 +270,10 @@ const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextP
                 </div>
               ) : (
                 <>
-                  {selectedChannel === 'whatsapp' && <WhatsAppSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} />}
-                  {selectedChannel === 'email' && <EmailSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} />}
-                  {selectedChannel === 'sms' && <SmsSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} />}
-                  {selectedChannel === 'meetings' && <MeetingsSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} initialMeetingType={getInitialMeetingType(openedFrom)} />}
+                  {selectedChannel === 'whatsapp' && <WhatsAppSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} moduleSlug={moduleSlug} />}
+                  {selectedChannel === 'email' && <EmailSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} moduleSlug={moduleSlug} />}
+                  {selectedChannel === 'sms' && <SmsSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} moduleSlug={moduleSlug} />}
+                  {selectedChannel === 'meetings' && <MeetingsSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} moduleSlug={moduleSlug} initialMeetingType={getInitialMeetingType(openedFrom)} />}
                 </>
               )}
             </div>

@@ -631,6 +631,7 @@ const HistoryPage = () => {
       <GenericSidebar
         isOpen={showActivitySidebar}
         onClose={() => setShowActivitySidebar(false)}
+        moduleSlug={ModuleSlug.CRM_HISTORY}
         title={selectedActivityRecord?.customer || 'Activity Details'}
         subtitle={`Assigned to ${selectedActivityRecord?.agent || 'N/A'}`}
         avatar={{

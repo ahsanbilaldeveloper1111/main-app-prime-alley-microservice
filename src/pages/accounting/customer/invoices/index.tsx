@@ -22,6 +22,7 @@ import PrimeAlleyLogo from "@assets/images/Prime3.png";
 import Layout from "@layout/index";
 import GenericTable, { TableColumn, TableAction as GenericTableAction } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
+import { ModuleSlug } from "@utils/Helper";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import {
   getInvoices,
@@ -2548,6 +2549,7 @@ const InvoiceList = () => {
       <GenericSidebar
         isOpen={showInvoiceSidebar}
         onClose={closeInvoiceSidebar}
+        moduleSlug={ModuleSlug.BILLING}
         title={selectedInvoiceSidebar ? `Invoice #${selectedInvoiceSidebar.invoice_number}` : "Invoice Details"}
         subtitle={selectedInvoiceSidebar?.company?.name ?? ""}
         metadata={selectedInvoiceSidebar?.due_date ? `Due: ${moment(selectedInvoiceSidebar.due_date).format("DD-MMM-YYYY")}` : undefined}

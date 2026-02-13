@@ -7563,6 +7563,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           setShowLeadSidebar(false);
           setSelectedLead(null);
         }}
+        moduleSlug={ModuleSlug.CRM_LEADS}
         onCall={handleSidebarCall}
         title={selectedLead?.name || 'Lead Details'}
         subtitle={selectedLead?.company_name || selectedLead?.company || ''}

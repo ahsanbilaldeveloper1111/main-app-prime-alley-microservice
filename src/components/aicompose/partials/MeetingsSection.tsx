@@ -59,6 +59,7 @@ const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter; initialMeetin
   contextPayload,
   commonOptions: commonOptionsProp,
   setCommonOptions,
+  moduleSlug,
   initialMeetingType,
 }) => {
   const { hasPermission } = usePermissions();
@@ -92,6 +93,7 @@ const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter; initialMeetin
       const res = (await getMeetings({
         page: String(page),
         per_page: String(perPage),
+        ...(moduleSlug ? { module_slug: moduleSlug } : {}),
       })) as { data?: MeetingItem[]; events?: MeetingItem[]; meta?: MeetingsMeta };
       const list = Array.isArray(res?.data) ? res.data : Array.isArray(res?.events) ? res.events : [];
       setMeetings(list);
@@ -104,7 +106,7 @@ const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter; initialMeetin
     } finally {
       setMeetingsLoading(false);
     }
-  }, []);
+  }, [moduleSlug]);
 
   useEffect(() => {
     fetchMeetings(meetingsPage, meetingsPerPage);

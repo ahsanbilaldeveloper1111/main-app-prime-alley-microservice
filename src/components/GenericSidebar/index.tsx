@@ -12,7 +12,8 @@ const AIComposeWrapper: React.FC<{
   onClose: () => void;
   openedFrom?: AIComposeOpenedFrom;
   contextPayload?: Record<string, unknown>;
-}> = ({ onClose, openedFrom = 'whatsapp', contextPayload }) => {
+  moduleSlug?: string;
+}> = ({ onClose, openedFrom = 'whatsapp', contextPayload, moduleSlug }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   return (
     <>
@@ -122,7 +123,7 @@ const AIComposeWrapper: React.FC<{
               </button>
             </div>
 
-            <AICompose key={openedFrom} openedFrom={openedFrom} contextPayload={contextPayload} />
+            <AICompose key={openedFrom} openedFrom={openedFrom} contextPayload={contextPayload} moduleSlug={moduleSlug} />
           </div>
         </div>
       </div>
@@ -201,6 +202,8 @@ export interface GenericSidebarProps {
   onSchedule?: () => void;
   /** Context payload (e.g. lead, deal, order) passed to AI Compose and to action handlers */
   contextPayload?: Record<string, unknown>;
+  /** Module slug for AI Compose list APIs (page from which compose was opened) */
+  moduleSlug?: string;
   sections?: SidebarSection[];
   tabs?: SidebarTab[];
   actions?: SidebarAction[];
@@ -224,6 +227,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   onMeetNow = () => console.log('Meet Now action clicked'),
   onSchedule = () => console.log('Schedule action clicked'),
   contextPayload,
+  moduleSlug,
   sections,
   tabs,
   actions,
@@ -612,6 +616,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             openedFrom={aiComposeOpenedFrom}
             onClose={() => setShowAICompose(false)}
             contextPayload={contextPayload}
+            moduleSlug={moduleSlug}
           />
         </div>
       )}

@@ -60,7 +60,7 @@ const KEY_POINTS = [
   { id: '3', label: 'Offer', value: 'quick demo' },
 ];
 
-const EmailSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionContext> = ({ registerFooter, contextPayload, commonOptions: commonOptionsProp, setCommonOptions }) => {
+const EmailSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionContext> = ({ registerFooter, contextPayload, commonOptions: commonOptionsProp, setCommonOptions, moduleSlug }) => {
   const { hasPermission } = usePermissions();
   const canSend = hasPermission(P.SEND_EMAIL_CRM);
   const canView = hasPermission(P.VIEW_EMAILS_CRM);
@@ -88,6 +88,7 @@ const EmailSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectio
       const res = (await getEmails({
         page: String(page),
         per_page: String(perPage),
+        ...(moduleSlug ? { module_slug: moduleSlug } : {}),
       })) as { data?: EmailItem[]; meta?: EmailsMeta };
       setEmails(Array.isArray(res?.data) ? res.data : []);
       if (res?.meta) setEmailsMeta(res.meta);
@@ -99,7 +100,7 @@ const EmailSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectio
     } finally {
       setEmailsLoading(false);
     }
-  }, []);
+  }, [moduleSlug]);
 
   useEffect(() => {
     fetchEmails(emailsPage, emailsPerPage);
