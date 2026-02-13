@@ -25,7 +25,7 @@ import CallWidget from '../CallWidget';
 import WrapUpModal from '../WrapUp';
 import type { CallVariableConfig } from '../WrapUp';
 
-import TopBar from '../TopBarAgent';
+import TopBar, { type TeamOption } from '../TopBarAgent';
 import FinesseAuthGate from '../FinesseAuthGate';
 import { toast } from 'react-toastify';
 import {
@@ -34,6 +34,7 @@ import {
   setFinesseUserData,
   clearFinesseUserData,
   finesseUnlink,
+  finesseLink,
   getFinesseUser,
   finesseSetState,
   getFinesseCampaigns,
@@ -43,6 +44,9 @@ import {
   sendFinesseDialogAction,
   getFinesseWrapUpReasons,
   getEffectiveTeamId,
+  getStoredTeamId,
+  setStoredTeamId,
+  getFinessePasswordForRelink,
   normalizeFinesseUserData,
   scheduleFinesseCampaign,
   type FinesseUserData,
@@ -121,6 +125,7 @@ function formatImportStatusDisplay(s: ImportStatusShape | null | undefined): str
 const LiveCallsCampaignsManagement = () => {
       const { data: session } = useSession();
       const [teams, setTeams] = useState<string[]>([]);
+      const [teamsWithIds, setTeamsWithIds] = useState<TeamOption[]>([]);
       const [selectedTeam, setSelectedTeam] = useState('');
       const [agentStatus, setAgentStatus] = useState('READY');
       const [showStatusDropdown, setShowStatusDropdown] = useState(false);
@@ -139,11 +144,14 @@ const LiveCallsCampaignsManagement = () => {
       const [isWrapUpOpen, setIsWrapUpOpen] = useState(false);
       const [wrapUpReasons, setWrapUpReasons] = useState<Array<{ value: string; label: string }>>([]);
       const [wrapUpReasonsLoading, setWrapUpReasonsLoading] = useState(false);
+      const [holdLoading, setHoldLoading] = useState(false);
       const [callVariablesConfig, setCallVariablesConfig] = useState<CallVariableConfig[]>([]);
 
       const statusDropdownRef = useRef<HTMLDivElement>(null);
       const userMenuRef = useRef<HTMLDivElement>(null);
       const fileInputRef = useRef<HTMLInputElement>(null);
+      const wrapUpEventDialogIdRef = useRef<string | null>(null);
+      const wrapUpAutoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     
       // Close dropdowns when clicking outside
       useEffect(() => {
@@ -175,12 +183,18 @@ const LiveCallsCampaignsManagement = () => {
         const stored = getFinesseUserData();
         if (stored) {
           setFinesseHydrated(true);
-          const teamNames = stored.teams?.map((t) => t.name) ?? [];
-          const names = teamNames.length > 0 ? teamNames : (stored.teamName ? [stored.teamName] : []);
-          if (names.length > 0) {
-            setTeams(names);
-            setSelectedTeam(stored.teamName || names[0] || '');
+          const teamList = stored.teams ?? [];
+          const withIds: TeamOption[] = teamList.map((t) => ({ id: t.id, name: t.name }));
+          const teamNames = withIds.length > 0 ? withIds.map((t) => t.name) : (stored.teamName ? [stored.teamName] : []);
+          if (withIds.length > 0) {
+            setTeamsWithIds(withIds);
+            setTeams(teamNames);
+          } else if (teamNames.length > 0) {
+            setTeams(teamNames);
           }
+          const storedTeamId = getStoredTeamId();
+          const match = withIds.find((t) => t.id === storedTeamId);
+          setSelectedTeam(match?.name ?? stored.teamName ?? teamNames[0] ?? '');
           if (stored.state) setAgentStatus(stored.state);
         }
       }, []);
@@ -209,17 +223,29 @@ const LiveCallsCampaignsManagement = () => {
             const response = await getFinesseUser(teamId, username);
             const resData = response?.responseData ?? response;
             if (!resData) return;
-            const teamNames = (resData as { teams?: Array<{ name: string }> }).teams?.map((t) => t.name) ?? [];
+            const rawTeams = (resData as { teams?: Array<{ id: number; name: string }> }).teams ?? [];
+            const withIds: TeamOption[] = rawTeams.map((t) => ({ id: t.id, name: t.name }));
+            const teamNames = withIds.length > 0 ? withIds.map((t) => t.name) : [];
+            setTeamsWithIds(withIds);
             setTeams(teamNames);
-            setSelectedTeam((resData as { teamName?: string }).teamName ?? teamNames[0] ?? '');
+            const normalized = normalizeFinesseUserData(resData as FinesseUserData);
+            setFinesseUserData(normalized);
+            const effectiveTeamId = normalized.teamId ?? (normalized.teams?.[0]?.id) ?? getStoredTeamId();
+            setStoredTeamId(effectiveTeamId);
+            const match = withIds.find((t) => t.id === effectiveTeamId);
+            setSelectedTeam(match?.name ?? (resData as { teamName?: string }).teamName ?? teamNames[0] ?? '');
             setAgentStatus((resData as { state?: string }).state ?? 'READY');
-            setFinesseUserData(normalizeFinesseUserData(resData as FinesseUserData));
           } catch {
             const stored = getFinesseUserData();
             if (stored) {
-              const teamNames = stored.teams?.map((t) => t.name) ?? [];
-              if (teamNames.length > 0) setTeams(teamNames);
-              if (stored.teamName) setSelectedTeam(stored.teamName);
+              const withIds = stored.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [];
+              if (withIds.length > 0) {
+                setTeamsWithIds(withIds);
+                setTeams(withIds.map((t) => t.name));
+              }
+              const storedTeamId = getStoredTeamId();
+              const match = withIds.find((t) => t.id === storedTeamId);
+              setSelectedTeam(match?.name ?? stored.teamName ?? withIds[0]?.name ?? '');
               if (stored.state) setAgentStatus(stored.state);
             }
           }
@@ -339,6 +365,7 @@ const LiveCallsCampaignsManagement = () => {
             return { ...prev, [dialogId]: payload };
           });
         } else if (eventType === 'ENDED') {
+          if (wrapUpEventDialogIdRef.current === dialogId) wrapUpEventDialogIdRef.current = null;
           setPreviewDialogs((prev) => {
             const next = { ...prev };
             delete next[dialogId];
@@ -362,21 +389,30 @@ const LiveCallsCampaignsManagement = () => {
         onPreviewEvent: handlePreviewEvent,
       });
 
-      // Drive call widget and status from preview event: ALERTING → Ringing (Accept/Reject/Close from actions), ACTIVE → Connected (Wrap up when UPDATE_CALL_DATA in actions)
+      // Drive call widget and status from preview event: ALERTING → Ringing, ACTIVE → Connected; sync hold; WRAP_UP/ALERTING+UPDATE_CALL_DATA → show Wrap up button (user clicks to open modal)
       useEffect(() => {
         if (!activePreviewDialog?.dialogId) {
           setShowCallWidget(false);
           return;
         }
-        const participant = activePreviewDialog.participants?.[0];
+        const { extension } = getFinesseContext();
+        const participants = activePreviewDialog.participants ?? [];
+        const agentParticipant = participants.find((p) => (p as { mediaAddress?: string }).mediaAddress === extension) ?? participants[0];
+        const participant = agentParticipant ?? activePreviewDialog.participants?.[0];
         const dialogState = activePreviewDialog.dialogState ?? participant?.state;
         const isAlerting = dialogState === 'ALERTING' || participant?.state === 'ALERTING';
         const isActive = dialogState === 'ACTIVE' || participant?.state === 'ACTIVE';
+        const isHeld = participant?.state === 'HELD';
+        const hasUpdateCallData = Array.isArray(participant?.actions) && (participant as { actions?: string[] }).actions?.includes('UPDATE_CALL_DATA');
+        const isWrapUpState = participant?.state === 'WRAP_UP' && hasUpdateCallData;
         setShowCallWidget(true);
         if (isAlerting) {
           setCallStatus('Ringing');
-        } else if (isActive) {
+        } else if (isWrapUpState) {
+          setCallStatus('Wrap up');
+        } else if (isActive || isHeld) {
           setCallStatus('Connected');
+          setIsHold(isHeld);
         }
       }, [activePreviewDialog?.dialogId, activePreviewDialog?.dialogState, activePreviewDialog?.participants]);
 
@@ -419,11 +455,62 @@ const LiveCallsCampaignsManagement = () => {
         }
       };
     
+      /** When user selects a different team: unlink from current team, update storage with new teamId, then link to new team. */
+      const handleTeamChange = async (newTeamName: string, newTeamId: number) => {
+        const current = getFinesseUserData();
+        if (!current) {
+          toast.error('Session expired. Please sign in again.');
+          return;
+        }
+        const currentTeamId = getEffectiveTeamId(current);
+        const username = current.loginId ?? current.loginName ?? (session?.user as { username?: string } | undefined)?.username ?? '';
+        const extension = current.extension ?? (session?.user as { phone?: string } | undefined)?.phone ?? '';
+        if (!username || !extension) {
+          toast.error('User not found.');
+          return;
+        }
+        if (currentTeamId != null && Number(currentTeamId) === newTeamId) return;
+        const password = getFinessePasswordForRelink();
+        if (!password) {
+          toast.error('Please sign out and sign in again to switch team.');
+          return;
+        }
+        try {
+          if (currentTeamId != null) {
+            await finesseUnlink(username, currentTeamId);
+          }
+          setFinesseUserData({ ...current, teamId: newTeamId, teamName: newTeamName });
+          setStoredTeamId(newTeamId);
+          const response = await finesseLink({
+            teamId: newTeamId,
+            finesseUserId: username,
+            finessePassword: password,
+            extension,
+          });
+          if (response?.status === 'success' && response?.responseData) {
+            const data = normalizeFinesseUserData(response.responseData as FinesseUserData);
+            setFinesseUserData(data);
+          }
+          setSelectedTeam(newTeamName);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('finesse-authenticated'));
+          }
+          toast.success(`Switched to team ${newTeamName.replace(/-/g, ' ')}.`);
+        } catch (err: unknown) {
+          const msg = (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to switch team';
+          toast.error(msg);
+        }
+      };
+
       const handleLogout = async () => {
-        const { username } = getFinesseContext();
+        const { username, teamId } = getFinesseContext();
+        if (!username || teamId == null) {
+          toast.error('user not found.');
+          return;
+        }
         try {
           if (username) {
-            await finesseUnlink(username);
+            await finesseUnlink(username, teamId);
           }
         } catch (err: unknown) {
           const message = err && typeof err === 'object' && 'response' in err
@@ -514,6 +601,32 @@ const LiveCallsCampaignsManagement = () => {
         setCallStatus('Ringing');
       };
 
+      /** Reset local call UI state only (no DROP API). Use when closing wrap-up without submitting. */
+      const resetCallWidgetState = () => {
+        setShowCallWidget(false);
+        setCallTimer(0);
+        setCallStatus('Ringing');
+        setIsMuted(false);
+        setIsHold(false);
+      };
+
+      const dropCallAndReset = async () => {
+        const { username, extension, teamId } = getFinesseContext();
+        const dialogId = activePreviewDialog?.dialogId;
+        if (username && extension && dialogId && teamId != null) {
+          try {
+            await sendFinesseDialogAction(teamId, username, String(dialogId), {
+              extension: String(extension),
+              action: 'DROP',
+            });
+          } catch (err: unknown) {
+            toast.error((err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to end call');
+          }
+        }
+        resetCallWidgetState();
+      };
+
+      /** End call: send DROP first; server will send WRAP_UP event, then we show wrap-up modal with wrapUpTimer. */
       const handleEndCall = async () => {
         const { username, extension, teamId } = getFinesseContext();
         const dialogId = activePreviewDialog?.dialogId;
@@ -527,11 +640,26 @@ const LiveCallsCampaignsManagement = () => {
             toast.error((err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to end call');
           }
         }
-        setShowCallWidget(false);
-        setCallTimer(0);
-        setCallStatus('Ringing');
-        setIsMuted(false);
-        setIsHold(false);
+      };
+
+      const handleHoldToggle = async (hold: boolean) => {
+        const { username, extension, teamId } = getFinesseContext();
+        const dialogId = activePreviewDialog?.dialogId;
+        if (username && extension && dialogId && teamId != null) {
+          setHoldLoading(true);
+          try {
+            await sendFinesseDialogAction(teamId, username, String(dialogId), {
+              extension: String(extension),
+              action: hold ? 'HOLD' : 'RETRIEVE',
+            });
+            setIsHold(hold);
+            toast.success(hold ? 'Call on hold' : 'Call resumed');
+          } catch (err: unknown) {
+            toast.error((err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? (hold ? 'Failed to hold' : 'Failed to resume'));
+          } finally {
+            setHoldLoading(false);
+          }
+        }
       };
     
       const handleOpenUploadModal = (campaignId: number) => {
@@ -665,35 +793,41 @@ const LiveCallsCampaignsManagement = () => {
         const dialogId = activePreviewDialog?.dialogId;
         if (username && extension && dialogId && teamId != null) {
           const reasons = Array.isArray(data.wrapUp) ? data.wrapUp : [data.wrapUp];
-          const wrapUpItems = reasons.map((reason) => ({ reason }));
+          const wrapUpItems: string[] = reasons.map((idOrValue) => {
+            const option = wrapUpReasons.find((o) => o.value === String(idOrValue));
+            return option ? option.label : String(idOrValue ?? '');
+          });
           try {
             await sendFinesseDialogAction(teamId, username, String(dialogId), {
               extension: String(extension),
               action: 'UPDATE_CALL_DATA',
               wrapUpItems,
-              callVariables: data.variables,
             });
-            await sendFinesseDialogAction(teamId, username, String(dialogId), {
-              extension: String(extension),
-              action: 'DROP',
-            });
-            toast.success('Wrap up submitted and call ended.');
+            toast.success('Wrap up submitted.');
           } catch (err: unknown) {
             toast.error((err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to submit wrap up');
           }
         }
+        if (wrapUpAutoCloseTimerRef.current) {
+          clearTimeout(wrapUpAutoCloseTimerRef.current);
+          wrapUpAutoCloseTimerRef.current = null;
+        }
         setIsWrapUpOpen(false);
-        setShowCallWidget(false);
-        setCallTimer(0);
-        setCallStatus('Ringing');
-        setIsMuted(false);
-        setIsHold(false);
       };
     
       const handleWrapUpMinimize = () => setIsWrapUpOpen(false);
 
-      /** Fetch wrap-up reasons from API, log to console, then open Wrap up modal */
-      const handleWrapUpClick = async () => {
+      const startWrapUpAutoCloseTimer = useCallback(() => {
+        if (wrapUpAutoCloseTimerRef.current) clearTimeout(wrapUpAutoCloseTimerRef.current);
+        const seconds = getFinesseUserData()?.wrapUpTimer ?? 10;
+        wrapUpAutoCloseTimerRef.current = setTimeout(() => {
+          setIsWrapUpOpen(false);
+          wrapUpAutoCloseTimerRef.current = null;
+        }, seconds * 1000);
+      }, []);
+
+      /** Fetch wrap-up reasons from API, then open Wrap up modal. When openedFromWrapUpEvent, modal auto-closes after wrapUpTimer seconds. */
+      const handleWrapUpClick = async (_openedFromEndCall?: boolean, openedFromWrapUpEvent?: boolean) => {
         const { username, teamId } = getFinesseContext();
         if (!username || teamId == null) {
           toast.error('User not found.');
@@ -726,14 +860,19 @@ const LiveCallsCampaignsManagement = () => {
               })).filter((v: CallVariableConfig) => v.key)
             : [];
           setCallVariablesConfig(callVarConfig);
-          // Open modal after state is committed so it receives API data (not default list)
-          setTimeout(() => setIsWrapUpOpen(true), 0);
+          setTimeout(() => {
+            setIsWrapUpOpen(true);
+            if (openedFromWrapUpEvent) startWrapUpAutoCloseTimer();
+          }, 0);
         } catch (err) {
           console.error('[Finesse] wrapUpReasons failed:', err);
           toast.error((err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to load wrap-up reasons.');
           setWrapUpReasons([{ value: 'other', label: 'Other' }]);
           setCallVariablesConfig([]);
-          setTimeout(() => setIsWrapUpOpen(true), 0);
+          setTimeout(() => {
+            setIsWrapUpOpen(true);
+            if (openedFromWrapUpEvent) startWrapUpAutoCloseTimer();
+          }, 0);
         } finally {
           setWrapUpReasonsLoading(false);
         }
@@ -1958,7 +2097,7 @@ const LiveCallsCampaignsManagement = () => {
           setSearchQuery={setSearchQuery}
           selectedTeam={selectedTeam}
           setSelectedTeam={setSelectedTeam}
-          teams={teams}
+          teams={teamsWithIds.length > 0 ? teamsWithIds : teams.map((name, i) => ({ id: i, name }))}
           agentStatus={agentStatus}
           setAgentStatus={setAgentStatus}
           showStatusDropdown={showStatusDropdown}
@@ -1968,6 +2107,7 @@ const LiveCallsCampaignsManagement = () => {
           statusOptions={statusOptions}
           handleLogout={handleLogout}
           onStatusChange={handleAgentStatusChange}
+          onTeamChange={teamsWithIds.length > 0 ? handleTeamChange : undefined}
         />
         </Col>
 </Row>
@@ -2122,11 +2262,20 @@ const LiveCallsCampaignsManagement = () => {
         onRejectWithAction={handleRejectOrClose}
         onWrapUpClick={handleWrapUpClick}
         wrapUpLoading={wrapUpReasonsLoading}
+        onHoldToggle={handleHoldToggle}
+        holdLoading={holdLoading}
       />
 
       <WrapUpModal
         isOpen={isWrapUpOpen}
-        onClose={() => setIsWrapUpOpen(false)}
+        onClose={() => {
+          if (wrapUpAutoCloseTimerRef.current) {
+            clearTimeout(wrapUpAutoCloseTimerRef.current);
+            wrapUpAutoCloseTimerRef.current = null;
+          }
+          setIsWrapUpOpen(false);
+          resetCallWidgetState();
+        }}
         onSubmit={handleWrapUpSubmit}
         onMinimize={handleWrapUpMinimize}
         wrapUpReasons={wrapUpReasons}
