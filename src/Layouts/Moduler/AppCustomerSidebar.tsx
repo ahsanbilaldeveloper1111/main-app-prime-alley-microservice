@@ -274,14 +274,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       url: '',
       subItems: [
         {
-          id: 'ai-bot-trunk-profiles',
+          id: 'ai-agent-outbound-trunk-profiles',
           title: 'Trunk Profiles',
           icon: <Bot size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
           url: '/ai-ml/trunk-profiles'
         },
         {
-          id: 'ai-bot-profile',
+          id: 'ai-agent-outbound-voice-bot-profiles',
           title: 'Voice Bot Profiles',
           icon: <Bot size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,

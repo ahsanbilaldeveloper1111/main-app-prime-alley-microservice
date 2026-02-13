@@ -15,6 +15,7 @@ import { toast } from "react-toastify";
 import axiosInstance from "@utils/axios";
 import FormModal from "@pages/partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
+import { getTrunksOutbound } from "@utils/ai-agent/outbound";
 
 import { Row, Col, Form } from 'react-bootstrap';
 import {
@@ -59,12 +60,14 @@ const AIMLTrunkProfile = () => {
   const [newTrunkAddress, setNewTrunkAddress] = useState<string>('');
   const [newTrunkNumbers, setNewTrunkNumbers] = useState<string>('');
 
-  // Fetch trunks
+  // Fetch trunks (aiml list-trunks + outbound for reference)
   const fetchTrunks = useCallback(async () => {
     try {
       const response = await axiosInstance.get('aiml/list-trunks');
       const received = normalizeTrunkList(response?.data?.trunks ?? []);
       setTrunks(received);
+      const outboundResponse = await getTrunksOutbound();
+      console.log('getTrunksOutbound response:', outboundResponse?.data);
     } catch (error) {
       console.error('Error fetching trunks:', error);
       toast.error('Failed to fetch trunks');
