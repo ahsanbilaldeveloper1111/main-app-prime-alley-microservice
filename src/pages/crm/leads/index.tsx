@@ -53,6 +53,7 @@ import {
   Modal,
   Popover,
   OverlayTrigger,
+  Tooltip as BsTooltip,
   Spinner,
 } from "react-bootstrap";
 import Select from "react-select";
@@ -168,6 +169,7 @@ interface LeadData {
   source: string;
   campaign: string;
   isLost: boolean;
+  lostReasonName?: string;
   rawData: any;
   [key: string]: any; // Index signature
 }
@@ -1403,8 +1405,8 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       phone: phone,
       company: lead.company_name || "",
       industry: lead.industry || "",
-      stage: lead.stage?.name || (lead.stage_id ? "Unknown" : "New"),
-      stageColor: lead.stage?.color || "grey",
+      stage: lead.is_lost ? "Lost" : (lead.stage?.name || (lead.stage_id ? "Unknown" : "New")),
+      stageColor: lead.is_lost ? "grey" : (lead.stage?.color || "grey"),
       leadPotential: lead?.lead_potential || "Not Set",
       lead_score: lead?.stage?.score || 0,
       assignedUser:
@@ -1427,6 +1429,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       source: lead.source || "",
       campaign: lead.campaign?.name || "",
       isLost: lead.is_lost || false,
+      lostReasonName: lead.is_lost ? lead.stage?.name || "" : "",
       rawData: lead, // Keep original data for actions
     };
   };
@@ -1672,7 +1675,12 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         }
       }
 
-      setViewingLead(leadData);
+      setViewingLead({
+        ...leadData,
+        stage: leadData.is_lost
+          ? { ...(leadData.stage || {}), name: "Lost" }
+          : leadData.stage,
+      });
       //setActiveTab("lead-info"); // Reset to first tab when opening modal
       setShowLeadViewModal(true);
     } catch (error) {
@@ -2684,9 +2692,24 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       key: 'stage',
       label: 'Stage',
       sortable: true,
-      type: 'badge',
-      badge: {
-        getColor: (lead) => lead.stageColor || '#6c757d'
+      type: 'custom',
+      render: (lead: LeadData) => {
+        const badge = (
+          <Badge bg="" style={{ backgroundColor: lead.stageColor || '#6c757d' }}>
+            {lead.stage || '-'}
+          </Badge>
+        );
+        if (lead.isLost && lead.lostReasonName) {
+          return (
+            <OverlayTrigger
+              placement="top"
+              overlay={<BsTooltip id={`stage-${lead.id}`}>Reason: {lead.lostReasonName}</BsTooltip>}
+            >
+              <span className="d-inline-block" style={{ cursor: 'help' }}>{badge}</span>
+            </OverlayTrigger>
+          );
+        }
+        return badge;
       }
     },
     {
@@ -6775,9 +6798,9 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               <p className="mb-1">
                 <strong>Lead:</strong> {leadToChangeStage.name}
               </p>
-              {leadToChangeStage.stage && (
+              {(leadToChangeStage.stage || leadToChangeStage.is_lost) && (
                 <p className="mb-0 text-muted">
-                  <strong>Current Stage:</strong> {leadToChangeStage.stage.name}
+                  <strong>Current Stage:</strong> {leadToChangeStage.is_lost ? "Lost" : leadToChangeStage.stage?.name}
                 </p>
               )}
             </div>
@@ -7621,7 +7644,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               },
               {
                 label: 'Stage',
-                value: selectedLead?.stage?.name || selectedLead?.stage || 'N/A',
+                value: (selectedLead?.is_lost || selectedLead?.isLost) ? 'Lost' : (selectedLead?.stage?.name || selectedLead?.stage || 'N/A'),
                 type: 'badge',
                 badgeVariant: 'primary'
               },
