@@ -13,14 +13,18 @@ export interface UseFinesseCapabilitiesResult {
 
 /**
  * Fetches Finesse user capabilities and checks for CAMPAIGN_MGMT (reference: CampaignMgmtGate).
+ * Requires teamId and finesseUserId (e.g. from getFinesseUserData()).
  */
-export function useFinesseCapabilities(username: string | null | undefined): UseFinesseCapabilitiesResult {
+export function useFinesseCapabilities(
+  teamId: number | string | null | undefined,
+  finesseUserId: string | null | undefined
+): UseFinesseCapabilitiesResult {
   const [capabilities, setCapabilities] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchCapabilities = useCallback(async () => {
-    if (!username?.trim()) {
+    if (teamId == null || !String(finesseUserId)?.trim()) {
       setCapabilities([]);
       setLoading(false);
       setError(null);
@@ -29,7 +33,7 @@ export function useFinesseCapabilities(username: string | null | undefined): Use
     setLoading(true);
     setError(null);
     try {
-      const response = await getFinesseUserCapabilities(username);
+      const response = await getFinesseUserCapabilities(teamId, String(finesseUserId));
       const list =
         response?.responseData?.capabilities ??
         response?.capabilities ??
@@ -48,7 +52,7 @@ export function useFinesseCapabilities(username: string | null | undefined): Use
     } finally {
       setLoading(false);
     }
-  }, [username]);
+  }, [teamId, finesseUserId]);
 
   useEffect(() => {
     fetchCapabilities();

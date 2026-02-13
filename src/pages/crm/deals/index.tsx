@@ -2355,7 +2355,7 @@ const handleCloseEditModal = useCallback(() => {
           variant: 'link' as const,
           className: 'text-info'
         },
-        {
+        ...(session?.user?.permissions?.includes('download-document-crm-deals') ? [{
           label: 'Download',
           icon: <DownloadIcon size={16} />,
           onClick: (row: any) => {
@@ -2364,7 +2364,7 @@ const handleCloseEditModal = useCallback(() => {
           variant: 'link' as const,
           className: 'text-secondary',
           show: (row: any) => (row.rawData?.approval_status ?? row.approval_status) === 'approved'
-        },
+        }] : []),
         ...(session?.user?.permissions?.includes('add-crm-orders') ? [{
           label: 'Convert to Order',
           icon: <ShoppingBag size={16} />,
@@ -5052,6 +5052,7 @@ const handleCloseEditModal = useCallback(() => {
 
                           {/* Actions */}
                           <div className="d-flex gap-1">
+                            {session?.user?.permissions?.includes('download-document-crm-deals') && (
                             <Button 
                               variant="link" 
                               size="sm" 
@@ -5061,6 +5062,7 @@ const handleCloseEditModal = useCallback(() => {
                             >
                               <DownloadIcon size={18} />
                             </Button>
+                            )}
                             <Button 
                               variant="link" 
                               size="sm" 

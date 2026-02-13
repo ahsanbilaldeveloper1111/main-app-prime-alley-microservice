@@ -8,6 +8,8 @@ import {
   getFinesseUserData,
   getFinesseToken,
   setFinesseToken,
+  normalizeFinesseUserData,
+  type FinesseUserData,
 } from '@utils/finesse';
 
 export interface FinesseAuthGateProps {
@@ -36,6 +38,7 @@ export default function FinesseAuthGate({
   const [finessePassword, setFinessePassword] = useState('');
   const [finesseError, setFinesseError] = useState<string | null>(null);
   const [isFinesseLoading, setIsFinesseLoading] = useState(false);
+  const [teamId, setTeamId] = useState<number | null>(15);
 
   // Require both token and user data to be considered authenticated
   useEffect(() => {
@@ -65,12 +68,13 @@ export default function FinesseAuthGate({
     setIsFinesseLoading(true);
     try {
       const response = await finesseLink({
+        teamId: teamId as number | string,
         finesseUserId: username,
         finessePassword: finessePassword.trim(),
         extension,
       });
       if (response?.status === 'success' && response?.responseData) {
-        const data = response.responseData;
+        const data = normalizeFinesseUserData(response.responseData as FinesseUserData);
         setFinesseUserData(data);
         if (response?.token) {
           setFinesseToken(response.token);

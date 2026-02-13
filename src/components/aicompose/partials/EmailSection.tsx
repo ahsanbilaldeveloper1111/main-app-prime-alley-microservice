@@ -4,6 +4,10 @@ import { Mail, Clock, Sparkles } from 'lucide-react';
 import type { RegisterFooter, ChannelSectionContext } from '../types';
 import { getContextSource } from '../types';
 import { generateEmail, getEmails, sendEmail } from '@utils/communication';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS: P } = HEADER_CONSTANTS;
 import moment from 'moment-timezone';
 import { GlobalDateTimeFormat } from '@utils/Helper';
 import CommonOptionsFields from './CommonOptionsFields';
@@ -57,6 +61,9 @@ const KEY_POINTS = [
 ];
 
 const EmailSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionContext> = ({ registerFooter, contextPayload, commonOptions: commonOptionsProp, setCommonOptions, moduleSlug }) => {
+  const { hasPermission } = usePermissions();
+  const canSend = hasPermission(P.SEND_EMAIL_CRM);
+  const canView = hasPermission(P.VIEW_EMAILS_CRM);
   const commonOptions = commonOptionsProp ?? { industry: '', customIndustry: '', tone: 'professional', language: 'en', customLanguage: '', urgency: 'normal', ctaType: '', customCtaType: '' };
   const [description, setDescription] = useState('');
   const [generatedContent, setGeneratedContent] = useState('');
@@ -264,12 +271,21 @@ const EmailSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectio
   const displaySubject = sendSubject || '(No subject)';
   const displayBody = sendBody || generatedContent;
 
+  if (!canSend && !canView) {
+    return (
+      <div className="d-flex align-items-center justify-content-center text-muted py-5">
+        <p className="mb-0">You don&apos;t have permission to send or view emails here.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-100 d-flex flex-column min-h-0">
      
       <Row className="mb-4 flex-grow-1 min-h-0">
         <Col xs={12}>
           <>
+              {canSend && (
               <Row className="g-4">
                 <Col lg={7}>
                   <Card className="border">
@@ -441,11 +457,13 @@ const EmailSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectio
                   </div>
                 </Col>
               </Row>
+              )}
             </>
         </Col>
       </Row>
 
       
+        {canView && (
         <Row className="mt-3">
           <Col xs={12}>
             <Card className="border">
@@ -545,6 +563,7 @@ const EmailSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectio
             </Card>
           </Col>
         </Row>
+        )}
 
       <Modal show={showEmailModal && selectedEmail != null} onHide={() => { setShowEmailModal(false); setSelectedEmailId(null); }} size="lg" centered>
         <Modal.Header closeButton>

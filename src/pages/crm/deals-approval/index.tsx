@@ -2136,6 +2136,7 @@ const handleCloseEditModal = useCallback(() => {
                 className: 'text-danger'
               },
 
+              ...(session?.user?.permissions?.includes('approve-reject-crm-deals') ? [
               {
                 label: 'Approve',
                 icon: <CheckCircle size={14} />,
@@ -2150,6 +2151,7 @@ const handleCloseEditModal = useCallback(() => {
                 className: 'text-danger',
                 show: (row: any) => (row.rawData?.approval_status ?? row.approval_status) === 'pending'
               }
+              ] : [])
               
             ]
           }
