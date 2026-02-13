@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Row, Col, Form, Button, Card, Badge } from 'react-bootstrap';
 import { Star, MessageCircle, Clock, Sparkles } from 'lucide-react';
 import type { RegisterFooter, ChannelSectionContext } from '../types';
@@ -11,6 +11,8 @@ import parsePhoneNumber from 'libphonenumber-js';
 import moment from 'moment-timezone';
 import { GlobalDateTimeFormat } from '@utils/Helper';
 import CommonOptionsFields from './CommonOptionsFields';
+import { useWhatsAppSocket } from '@hooks/useWhatsAppSocket';
+import type { WhatsAppSocketPayload } from '@hooks/useWhatsAppSocket';
 
 /** Chat item from GET chats response (data array item) */
 interface WhatsAppChatItem {
@@ -55,6 +57,30 @@ function getMessageDisplayText(
     return resolveTemplateSentLabel(msg.content_sid, templateList);
   }
   return 'Template sent';
+}
+
+function payloadToMessage(payload: WhatsAppSocketPayload): WhatsAppMessage {
+  const raw = payload as Record<string, unknown>;
+  const messageText =
+    payload.message ??
+    (typeof raw.body === 'string' ? raw.body : '') ??
+    (raw.text as string) ??
+    '';
+  return {
+    id: typeof payload.id === 'number' ? payload.id : 0,
+    direction: (payload.direction as WhatsAppMessage['direction']) ?? 'inbound',
+    message: messageText,
+    message_type: payload.message_type ?? (raw.message_type as string),
+    content_sid: payload.content_sid ?? (raw.content_sid as string),
+    status: payload.status ?? (raw.status as string),
+    from_number: payload.from_number ?? (raw.from as string) ?? (raw.from_number as string),
+    to_number: payload.to_number ?? (raw.to as string),
+    created_at:
+      payload.created_at ??
+      (raw.created_at as string) ??
+      (raw.timestamp as string) ??
+      new Date().toISOString(),
+  };
 }
 
 const DEFAULT_DRAFT = `Hi Ms. Shilpa, this is PrimeAlley.
@@ -222,23 +248,23 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
 
   const [chats, setChats] = useState<WhatsAppChatItem[]>([]);
   const [chatsLoading, setChatsLoading] = useState(false);
-  useEffect(() => {
-    const fetchChats = async () => {
-      setChatsLoading(true);
-      try {
-        const res = await getChats({
-          ...(moduleSlug ? { module_slug: moduleSlug } : {}),
-        }) as { data?: WhatsAppChatItem[] };
-        setChats(Array.isArray(res?.data) ? res.data : []);
-      } catch (e) {
-        console.error('Failed to fetch chats', e);
-        setChats([]);
-      } finally {
-        setChatsLoading(false);
-      }
-    };
-    fetchChats();
+  const fetchChats = useCallback(async () => {
+    setChatsLoading(true);
+    try {
+      const res = await getChats({
+        ...(moduleSlug ? { module_slug: moduleSlug } : {}),
+      }) as { data?: WhatsAppChatItem[] };
+      setChats(Array.isArray(res?.data) ? res.data : []);
+    } catch (e) {
+      console.error('Failed to fetch chats', e);
+      setChats([]);
+    } finally {
+      setChatsLoading(false);
+    }
   }, [moduleSlug]);
+  useEffect(() => {
+    fetchChats();
+  }, [fetchChats]);
 
   const [selectedChat, setSelectedChat] = useState<number | null>(null);
   const [viewChatMessages, setViewChatMessages] = useState<WhatsAppMessage[]>([]);
@@ -285,6 +311,56 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
       el.scrollTop = el.scrollHeight;
     }
   }, [viewChatMessages, messagesLoading]);
+
+  // Real-time WhatsApp socket: new messages and status updates
+  const onMessageReceived = useCallback(
+    (payload: WhatsAppSocketPayload) => {
+      const rawChatId = payload.whats_app_chat_id;
+      if (rawChatId == null) return;
+      const chatIdNum = Number(rawChatId);
+      if (Number.isNaN(chatIdNum)) return;
+      const msg = payloadToMessage(payload);
+      if (selectedChat != null && chatIdNum === selectedChat) {
+        setViewChatMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+      }
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === chatIdNum
+            ? {
+                ...c,
+                last_message_preview: msg.message?.slice(0, 80) ?? c.last_message_preview,
+                last_message_at: msg.created_at ?? c.last_message_at,
+              }
+            : c
+        )
+      );
+    },
+    [selectedChat]
+  );
+  const onStatusUpdated = useCallback(
+    (payload: WhatsAppSocketPayload) => {
+      const rawChatId = payload.whats_app_chat_id;
+      if (rawChatId == null || payload.message_sid == null) return;
+      const chatIdNum = Number(rawChatId);
+      if (selectedChat == null || chatIdNum !== selectedChat) return;
+      setViewChatMessages((prev) =>
+        prev.map((m) =>
+          String(m.id) === String(payload.message_sid) || (payload.id != null && m.id === payload.id)
+            ? { ...m, status: payload.status ?? m.status }
+            : m
+        )
+      );
+    },
+    [selectedChat]
+  );
+  useWhatsAppSocket({
+    moduleSlug: moduleSlug ?? undefined,
+    selectedChatId: selectedChat,
+    callbacks: { onMessageReceived, onStatusUpdated },
+  });
 
   const [sendMode, setSendMode] = useState<'two-way' | 'template'>('two-way');
   const [sendPhone, setSendPhone] = useState('');
@@ -398,6 +474,7 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
         });
         setTemplateParamValues({});
       }
+      await fetchChats();
     } catch (e) {
       console.error('Send WhatsApp failed', e);
     } finally {
