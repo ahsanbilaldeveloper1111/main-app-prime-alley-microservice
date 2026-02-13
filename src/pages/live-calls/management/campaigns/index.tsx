@@ -34,7 +34,6 @@ import {
   setFinesseUserData,
   clearFinesseUserData,
   finesseUnlink,
-  finesseLink,
   getFinesseUser,
   finesseSetState,
   getFinesseCampaigns,
@@ -46,7 +45,6 @@ import {
   getEffectiveTeamId,
   getStoredTeamId,
   setStoredTeamId,
-  getFinessePasswordForRelink,
   normalizeFinesseUserData,
   scheduleFinesseCampaign,
   type FinesseUserData,
@@ -214,7 +212,7 @@ const LiveCallsCampaignsManagement = () => {
       useEffect(() => {
         if (!finesseHydrated) return;
         const data = getFinesseUserData();
-        const teamId = getEffectiveTeamId(data);
+        const teamId = getStoredTeamId();
         const username = data?.loginId ?? data?.loginName ?? (session?.user as { username?: string } | undefined)?.username ?? '';
         if (!username || teamId == null) return;
 
@@ -230,9 +228,8 @@ const LiveCallsCampaignsManagement = () => {
             setTeams(teamNames);
             const normalized = normalizeFinesseUserData(resData as FinesseUserData);
             setFinesseUserData(normalized);
-            const effectiveTeamId = normalized.teamId ?? (normalized.teams?.[0]?.id) ?? getStoredTeamId();
-            setStoredTeamId(effectiveTeamId);
-            const match = withIds.find((t) => t.id === effectiveTeamId);
+            setStoredTeamId(teamId);
+            const match = withIds.find((t) => t.id === teamId);
             setSelectedTeam(match?.name ?? (resData as { teamName?: string }).teamName ?? teamNames[0] ?? '');
             setAgentStatus((resData as { state?: string }).state ?? 'READY');
           } catch {
@@ -337,6 +334,7 @@ const LiveCallsCampaignsManagement = () => {
         return active[0] ?? null;
       }, [previewDialogs]);
 
+      /** teamId is from storage (FINESSE_SELECTED_TEAM_ID_KEY) for all APIs when user is linked. */
       const getFinesseContext = useCallback(() => {
         const d = getFinesseUserData();
         const u = session?.user as { phone?: string } | undefined;
@@ -455,71 +453,42 @@ const LiveCallsCampaignsManagement = () => {
         }
       };
     
-      /** When user selects a different team: unlink from current team, update storage with new teamId, then link to new team. */
+      /** When user selects a different team: unlink from current team, then set stored teamId, clear finesse data and token, then show Authentication required (no reload). */
       const handleTeamChange = async (newTeamName: string, newTeamId: number) => {
-        const current = getFinesseUserData();
-        if (!current) {
-          toast.error('Session expired. Please sign in again.');
-          return;
-        }
-        const currentTeamId = getEffectiveTeamId(current);
-        const username = current.loginId ?? current.loginName ?? (session?.user as { username?: string } | undefined)?.username ?? '';
-        const extension = current.extension ?? (session?.user as { phone?: string } | undefined)?.phone ?? '';
-        if (!username || !extension) {
-          toast.error('User not found.');
-          return;
-        }
-        if (currentTeamId != null && Number(currentTeamId) === newTeamId) return;
-        const password = getFinessePasswordForRelink();
-        if (!password) {
-          toast.error('Please sign out and sign in again to switch team.');
-          return;
-        }
-        try {
-          if (currentTeamId != null) {
-            await finesseUnlink(username, currentTeamId);
+        const currentTeamId = getStoredTeamId();
+        if (Number(currentTeamId) === newTeamId) return;
+        const { username, teamId } = getFinesseContext();
+        if (username && teamId != null) {
+          try {
+            await finesseUnlink(username, teamId);
+          } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Unlink failed';
+            toast.error(msg);
+            return;
           }
-          setFinesseUserData({ ...current, teamId: newTeamId, teamName: newTeamName });
-          setStoredTeamId(newTeamId);
-          const response = await finesseLink({
-            teamId: newTeamId,
-            finesseUserId: username,
-            finessePassword: password,
-            extension,
-          });
-          if (response?.status === 'success' && response?.responseData) {
-            const data = normalizeFinesseUserData(response.responseData as FinesseUserData);
-            setFinesseUserData(data);
-          }
-          setSelectedTeam(newTeamName);
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('finesse-authenticated'));
-          }
-          toast.success(`Switched to team ${newTeamName.replace(/-/g, ' ')}.`);
-        } catch (err: unknown) {
-          const msg = (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to switch team';
-          toast.error(msg);
+        }
+        setStoredTeamId(newTeamId);
+        clearFinesseUserData();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('finesse-require-reauth'));
         }
       };
 
       const handleLogout = async () => {
         const { username, teamId } = getFinesseContext();
-        if (!username || teamId == null) {
-          toast.error('user not found.');
-          return;
-        }
-        try {
-          if (username) {
+        if (username && teamId != null) {
+          try {
             await finesseUnlink(username, teamId);
+          } catch (err: unknown) {
+            const message = err && typeof err === 'object' && 'response' in err
+              ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+              : err instanceof Error ? err.message : 'Unlink failed';
+            toast.error(message ?? 'Failed to unlink from Finesse');
           }
-        } catch (err: unknown) {
-          const message = err && typeof err === 'object' && 'response' in err
-            ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-            : err instanceof Error ? err.message : 'Unlink failed';
-          toast.error(message ?? 'Failed to unlink from Finesse');
-        } finally {
-          clearFinesseUserData();
-          globalThis.window.location.reload();
+        }
+        clearFinesseUserData();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('finesse-require-reauth'));
         }
       };
     

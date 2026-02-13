@@ -6,10 +6,8 @@ const prefix = 'finesse';
 
 export const FINESSE_USER_DATA_KEY = 'finesseResponseData';
 export const FINESSE_TOKEN_KEY = 'finesseToken';
-/** Stored selected team id for link/relink; default 15 when not set. */
+/** Stored selected team id; use this for all APIs (payloads/query params). Default 15 when not set. */
 export const FINESSE_SELECTED_TEAM_ID_KEY = 'finesseSelectedTeamId';
-/** Stored password for re-link when user switches team (cleared on logout). */
-export const FINESSE_PASSWORD_RELINK_KEY = 'finessePasswordForRelink';
 
 const DEFAULT_TEAM_ID = 15;
 
@@ -29,24 +27,6 @@ export const setStoredTeamId = (teamId: number): void => {
   if (typeof globalThis.window === 'undefined') return;
   try {
     globalThis.sessionStorage.setItem(FINESSE_SELECTED_TEAM_ID_KEY, String(teamId));
-  } catch {
-    // ignore
-  }
-};
-
-export const getFinessePasswordForRelink = (): string | null => {
-  if (typeof globalThis.window === 'undefined') return null;
-  try {
-    return globalThis.sessionStorage.getItem(FINESSE_PASSWORD_RELINK_KEY);
-  } catch {
-    return null;
-  }
-};
-
-export const setFinessePasswordForRelink = (password: string): void => {
-  if (typeof globalThis.window === 'undefined') return;
-  try {
-    globalThis.sessionStorage.setItem(FINESSE_PASSWORD_RELINK_KEY, password);
   } catch {
     // ignore
   }
@@ -111,28 +91,29 @@ export const getFinesseToken = (): string | null => {
   }
 };
 
+/**
+ * Clears Finesse user data and token from sessionStorage.
+ * Called on team switch and logout so the next link (re-auth) gets a fresh token from the API.
+ * Finesse token is thus cleared here and replaced when user authenticates again (setFinesseToken(response.token)).
+ */
 export const clearFinesseUserData = (): void => {
   if (typeof globalThis.window === 'undefined') return;
   try {
     globalThis.sessionStorage.removeItem(FINESSE_USER_DATA_KEY);
     globalThis.sessionStorage.removeItem(FINESSE_TOKEN_KEY);
-    globalThis.sessionStorage.removeItem(FINESSE_PASSWORD_RELINK_KEY);
   } catch {
     // ignore
   }
 };
 
 /**
- * Resolve effective teamId from user data. API may return teamId null while teams[] has ids.
- * Use this when calling team-scoped endpoints.
+ * Resolve effective teamId for API calls and UI. When user is linked (data present), uses
+ * finesseSelectedTeamId from storage so the teams dropdown and all APIs use the same team.
+ * When no user data, returns null. getStoredTeamId() (default 15) is the single source of truth when linked.
  */
 export const getEffectiveTeamId = (data: FinesseUserData | null): number | string | null => {
   if (!data) return null;
-  if (data.teamId != null) return data.teamId;
-  const teams = data.teams;
-  if (!teams?.length) return null;
-  const byName = data.teamName ? teams.find((t) => t.name === data.teamName) : undefined;
-  return byName?.id ?? teams[0]?.id ?? null;
+  return getStoredTeamId();
 };
 
 /**

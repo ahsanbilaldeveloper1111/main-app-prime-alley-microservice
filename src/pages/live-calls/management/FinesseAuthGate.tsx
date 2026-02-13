@@ -11,7 +11,6 @@ import {
   normalizeFinesseUserData,
   getStoredTeamId,
   setStoredTeamId,
-  setFinessePasswordForRelink,
   type FinesseUserData,
 } from '@utils/finesse';
 export interface FinesseAuthGateProps {
@@ -40,8 +39,6 @@ export default function FinesseAuthGate({
   const [finessePassword, setFinessePassword] = useState('');
   const [finesseError, setFinesseError] = useState<string | null>(null);
   const [isFinesseLoading, setIsFinesseLoading] = useState(false);
-  const [teamId] = useState<number>(() => getStoredTeamId());
-
   // Require both token and user data to be considered authenticated
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -50,6 +47,14 @@ export default function FinesseAuthGate({
     if (token && userData) {
       setIsFinesseAuthenticated(true);
     }
+  }, []);
+
+  // When team is changed, storage is cleared and this event is fired; show auth form without reload
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onRequireReauth = () => setIsFinesseAuthenticated(false);
+    window.addEventListener('finesse-require-reauth', onRequireReauth);
+    return () => window.removeEventListener('finesse-require-reauth', onRequireReauth);
   }, []);
 
   const handleFinesseAuth = async (e: React.FormEvent) => {
@@ -68,9 +73,10 @@ export default function FinesseAuthGate({
     }
     setFinesseError(null);
     setIsFinesseLoading(true);
+    const teamIdToUse = getStoredTeamId();
     try {
       const response = await finesseLink({
-        teamId: teamId as number | string,
+        teamId: teamIdToUse as number | string,
         finesseUserId: username,
         finessePassword: finessePassword.trim(),
         extension,
@@ -78,9 +84,7 @@ export default function FinesseAuthGate({
       if (response?.status === 'success' && response?.responseData) {
         const data = normalizeFinesseUserData(response.responseData as FinesseUserData);
         setFinesseUserData(data);
-        const resolvedTeamId = data.teamId ?? (data.teams?.[0]?.id);
-        if (resolvedTeamId != null) setStoredTeamId(resolvedTeamId);
-        setFinessePasswordForRelink(finessePassword.trim());
+        setStoredTeamId(teamIdToUse);
         if (response?.token) {
           setFinesseToken(response.token);
         }
