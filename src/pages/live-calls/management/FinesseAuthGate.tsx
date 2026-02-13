@@ -9,9 +9,10 @@ import {
   getFinesseToken,
   setFinesseToken,
   normalizeFinesseUserData,
+  getStoredTeamId,
+  setStoredTeamId,
   type FinesseUserData,
 } from '@utils/finesse';
-
 export interface FinesseAuthGateProps {
   children: ReactNode;
   /** Breadcrumb subTitle (e.g. "Live Calls Campaigns Management") */
@@ -38,8 +39,6 @@ export default function FinesseAuthGate({
   const [finessePassword, setFinessePassword] = useState('');
   const [finesseError, setFinesseError] = useState<string | null>(null);
   const [isFinesseLoading, setIsFinesseLoading] = useState(false);
-  const [teamId, setTeamId] = useState<number | null>(15);
-
   // Require both token and user data to be considered authenticated
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -48,6 +47,14 @@ export default function FinesseAuthGate({
     if (token && userData) {
       setIsFinesseAuthenticated(true);
     }
+  }, []);
+
+  // When team is changed, storage is cleared and this event is fired; show auth form without reload
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onRequireReauth = () => setIsFinesseAuthenticated(false);
+    window.addEventListener('finesse-require-reauth', onRequireReauth);
+    return () => window.removeEventListener('finesse-require-reauth', onRequireReauth);
   }, []);
 
   const handleFinesseAuth = async (e: React.FormEvent) => {
@@ -66,9 +73,10 @@ export default function FinesseAuthGate({
     }
     setFinesseError(null);
     setIsFinesseLoading(true);
+    const teamIdToUse = getStoredTeamId();
     try {
       const response = await finesseLink({
-        teamId: teamId as number | string,
+        teamId: teamIdToUse as number | string,
         finesseUserId: username,
         finessePassword: finessePassword.trim(),
         extension,
@@ -76,10 +84,14 @@ export default function FinesseAuthGate({
       if (response?.status === 'success' && response?.responseData) {
         const data = normalizeFinesseUserData(response.responseData as FinesseUserData);
         setFinesseUserData(data);
+        setStoredTeamId(teamIdToUse);
         if (response?.token) {
           setFinesseToken(response.token);
         }
         setIsFinesseAuthenticated(true);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('finesse-authenticated'));
+        }
       } else {
         setFinesseError(
           response?.message || response?.statusCode || 'Authentication failed.'

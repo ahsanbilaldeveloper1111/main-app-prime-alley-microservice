@@ -1,12 +1,11 @@
 import "@assets/scss/datatable-style.scss";
-import React, {
-  ReactElement,
-} from "react";
+import React, { ReactElement } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
-
-import  { useState, useEffect, useRef } from 'react';
+import { Row, Col } from "react-bootstrap";
+import { useSession } from 'next-auth/react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Users,
   Settings,
@@ -52,8 +51,19 @@ import { LineChart, Line, ResponsiveContainer, AreaChart, Area } from 'recharts'
 
 import CallWidget from '../CallWidget';
 import WrapUpModal from '../WrapUp';
+import TopBar from '../TopBarAgent';
 import FinesseAuthGate from '../FinesseAuthGate';
-import { getFinesseUserTeam, getFinesseUserData } from '@utils/finesse';
+import { toast } from 'react-toastify';
+import {
+  getFinesseUserTeam,
+  getFinesseUserData,
+  getStoredTeamId,
+  setStoredTeamId,
+  getEffectiveTeamId,
+  clearFinesseUserData,
+  finesseUnlink,
+  finesseSetState,
+} from '@utils/finesse';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -187,27 +197,39 @@ const LiveCallsAgentsManagement = () => {
         return () => clearInterval(interval);
       }, []);
 
-      // Populate teams from finesseResponseData in storage (sessionStorage)
-      useEffect(() => {
+      // Populate teams from storage; selected team from FINESSE_SELECTED_TEAM_ID_KEY (getStoredTeamId)
+      const hydrateTeamsFromStorage = useCallback(() => {
         const data = getFinesseUserData();
         if (data?.teams?.length) {
           setTeams(data.teams);
-          const initialTeam = data.teamName && data.teams.some((t) => t.name === data.teamName)
-            ? data.teamName
-            : data.teams[0].name;
-          setSelectedTeam(initialTeam);
+          const storedTeamId = getStoredTeamId();
+          const match = data.teams.find((t) => t.id === storedTeamId);
+          setSelectedTeam(match?.name ?? data.teamName ?? data.teams[0].name ?? '');
         } else {
           setTeams([]);
           setSelectedTeam('');
         }
       }, []);
+      useEffect(() => {
+        hydrateTeamsFromStorage();
+      }, [hydrateTeamsFromStorage]);
+      // When gate authenticates on same page (no reload), re-hydrate teams and refetch
+      useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const onAuthenticated = () => {
+          hydrateTeamsFromStorage();
+          setRefreshTrigger((t) => t + 1);
+        };
+        window.addEventListener('finesse-authenticated', onAuthenticated);
+        return () => window.removeEventListener('finesse-authenticated', onAuthenticated);
+      }, [hydrateTeamsFromStorage]);
 
-      // Fetch user team details when we have storage data, username, and a selected team
+      // Fetch user team details using teamId from storage (FINESSE_SELECTED_TEAM_ID_KEY)
       useEffect(() => {
         const data = getFinesseUserData();
         const username = data?.loginId ?? data?.loginName;
-        const teamId = teams.find((t) => t.name === selectedTeam)?.id;
-        if (!username || teamId === undefined) {
+        const teamId = getEffectiveTeamId(data);
+        if (!username || teamId == null) {
           setTeamData(null);
           setTeamDataError(null);
           return;
@@ -226,7 +248,65 @@ const LiveCallsAgentsManagement = () => {
           .finally(() => {
             setTeamDataLoading(false);
           });
-      }, [selectedTeam, teams, refreshTrigger, includeLoggedOut]);
+      }, [refreshTrigger, includeLoggedOut]);
+
+      const getFinesseContext = useCallback(() => {
+        const d = getFinesseUserData();
+        return {
+          username: d?.loginId ?? d?.loginName,
+          teamId: getEffectiveTeamId(d),
+        };
+      }, []);
+
+      const handleTeamChange = async (newTeamName: string, newTeamId: number) => {
+        if (Number(getStoredTeamId()) === newTeamId) return;
+        const { username, teamId } = getFinesseContext();
+        if (username && teamId != null) {
+          try {
+            await finesseUnlink(username, teamId);
+          } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Unlink failed';
+            toast.error(msg);
+            return;
+          }
+        }
+        setStoredTeamId(newTeamId);
+        clearFinesseUserData();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('finesse-require-reauth'));
+        }
+      };
+
+      const handleLogout = async () => {
+        const { username, teamId } = getFinesseContext();
+        if (username && teamId != null) {
+          try {
+            await finesseUnlink(username, teamId);
+          } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Unlink failed';
+            toast.error(msg ?? 'Failed to unlink from Finesse');
+          }
+        }
+        clearFinesseUserData();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('finesse-require-reauth'));
+        }
+      };
+
+      const handleAgentStatusChange = async (newState: string) => {
+        const { username, teamId } = getFinesseContext();
+        if (!username || teamId == null) {
+          toast.error('User not found.');
+          return;
+        }
+        const state = newState === 'READY' || newState === 'NOT_READY' ? newState : 'READY';
+        try {
+          await finesseSetState(teamId, username, state);
+          setAgentStatus(state);
+        } catch (err: unknown) {
+          toast.error((err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to update agent state.');
+        }
+      };
     
       const statusOptions = [
         { value: 'READY', label: 'Ready', color: '#10b981', icon: CheckCircle },
@@ -284,15 +364,9 @@ const LiveCallsAgentsManagement = () => {
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
       };
     
-      const handleStatusChange = (status: string) => {
-        console.log('handleStatusChange called with:', status);
-        setAgentStatus(status);
+      const handleStatusChange = async (status: string) => {
         setShowStatusDropdown(false);
-        
-        const statusLabel = statusOptions.find(s => s.value === status)?.label;
-        if (statusLabel) {
-          alert(`✅ Status changed to ${statusLabel}`);
-        }
+        await handleAgentStatusChange(status);
       };
     
       const handleBulkStatusChange = (newStatus: string) => {
@@ -358,14 +432,6 @@ const LiveCallsAgentsManagement = () => {
         setCallStatus('Ringing');
         setIsMuted(false);
         setIsHold(false);
-      };
-    
-      const handleLogout = () => {
-        if (confirm('Are you sure you want to logout?')) {
-          alert('Logging out...');
-          // Add your logout logic here
-          // window.location.href = '/signin-page';
-        }
       };
     
       const handleWrapUpSubmit = (data: { wrapUp: string | string[]; variables: Record<string, string> }) => {
@@ -1419,15 +1485,33 @@ const LiveCallsAgentsManagement = () => {
         }
       `}</style>
 
-     
+      <Row>
+        <Col md={12}>
+          <TopBar
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            selectedTeam={selectedTeam}
+            setSelectedTeam={setSelectedTeam}
+            teams={teams}
+            agentStatus={agentStatus}
+            setAgentStatus={setAgentStatus}
+            showStatusDropdown={showStatusDropdown}
+            setShowStatusDropdown={setShowStatusDropdown}
+            showUserMenu={showUserMenu}
+            setShowUserMenu={setShowUserMenu}
+            statusOptions={statusOptions}
+            handleLogout={handleLogout}
+            onStatusChange={handleStatusChange}
+            onTeamChange={teams.length > 0 ? handleTeamChange : undefined}
+          />
+        </Col>
+      </Row>
 
       {/* Page Header */}
       <div className="page-header">
             <h1 className="page-title">Agent Management </h1>
             <p className="page-subtitle">Monitor agent status, availability, and manage team operations in real-time</p>
           </div>
-
-          
 
           {/* Main Card */}
           <div className="card">
@@ -1467,21 +1551,6 @@ const LiveCallsAgentsManagement = () => {
               </div>
               
               <div className="filters">
-                {teams.length > 0 && (
-                  <div className="team-selector">
-                    <select
-                      value={selectedTeam}
-                      onChange={(e) => setSelectedTeam(e.target.value)}
-                      aria-label="Select team"
-                    >
-                      {teams.map((t) => (
-                        <option key={t.id} value={t.name}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
                 {/* <div className="view-toggle">
                   <button
                     className={viewMode === 'table' ? 'active' : ''}

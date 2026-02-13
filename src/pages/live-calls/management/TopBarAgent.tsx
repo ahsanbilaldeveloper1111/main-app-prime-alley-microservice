@@ -17,12 +17,18 @@ interface StatusOption {
   icon: any;
 }
 
+export interface TeamOption {
+  id: number;
+  name: string;
+}
+
 interface TopBarProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   selectedTeam: string;
   setSelectedTeam: (team: string) => void;
-  teams: string[];
+  /** Team names only (legacy) or full team options with id for onTeamChange */
+  teams: string[] | TeamOption[];
   agentStatus: string;
   setAgentStatus: (status: string) => void;
   showStatusDropdown: boolean;
@@ -33,6 +39,8 @@ interface TopBarProps {
   handleLogout: () => void;
   /** When provided, called on status change (e.g. to call API); parent should update state on success */
   onStatusChange?: (newState: string) => void | Promise<void>;
+  /** When provided and teams are TeamOption[], called when user selects a different team (unlink → storage → link flow). */
+  onTeamChange?: (teamName: string, teamId: number) => void | Promise<void>;
 }
 
 const TopBar: React.FC<TopBarProps> = ({
@@ -49,8 +57,13 @@ const TopBar: React.FC<TopBarProps> = ({
   setShowUserMenu,
   statusOptions,
   handleLogout,
-  onStatusChange
+  onStatusChange,
+  onTeamChange,
 }) => {
+  const teamOptions: TeamOption[] = Array.isArray(teams) && teams.length > 0 && typeof teams[0] === 'object' && teams[0] != null && 'id' in (teams[0] as object)
+    ? (teams as TeamOption[])
+    : (teams as string[]).map((name, i) => ({ id: i, name }));
+  const teamNames = teamOptions.map((t) => t.name);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -284,11 +297,16 @@ const TopBar: React.FC<TopBarProps> = ({
           <div className="team-selector">
             <select
               value={selectedTeam}
-              onChange={(e) => setSelectedTeam(e.target.value)}
+              onChange={(e) => {
+                const name = e.target.value;
+                setSelectedTeam(name);
+                const team = teamOptions.find((t) => t.name === name);
+                if (team && onTeamChange) onTeamChange(name, team.id);
+              }}
             >
-              {teams.map(team => (
-                <option key={team} value={team}>
-                  {team.replace(/-/g, ' ')}
+              {teamOptions.map((team) => (
+                <option key={team.id} value={team.name}>
+                  {team.name.replace(/-/g, ' ')}
                 </option>
               ))}
             </select>

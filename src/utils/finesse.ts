@@ -6,6 +6,31 @@ const prefix = 'finesse';
 
 export const FINESSE_USER_DATA_KEY = 'finesseResponseData';
 export const FINESSE_TOKEN_KEY = 'finesseToken';
+/** Stored selected team id; use this for all APIs (payloads/query params). Default 15 when not set. */
+export const FINESSE_SELECTED_TEAM_ID_KEY = 'finesseSelectedTeamId';
+
+const DEFAULT_TEAM_ID = 15;
+
+export const getStoredTeamId = (): number => {
+  if (typeof globalThis.window === 'undefined') return DEFAULT_TEAM_ID;
+  try {
+    const raw = globalThis.sessionStorage.getItem(FINESSE_SELECTED_TEAM_ID_KEY);
+    if (raw == null || raw === '') return DEFAULT_TEAM_ID;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : DEFAULT_TEAM_ID;
+  } catch {
+    return DEFAULT_TEAM_ID;
+  }
+};
+
+export const setStoredTeamId = (teamId: number): void => {
+  if (typeof globalThis.window === 'undefined') return;
+  try {
+    globalThis.sessionStorage.setItem(FINESSE_SELECTED_TEAM_ID_KEY, String(teamId));
+  } catch {
+    // ignore
+  }
+};
 
 export interface FinesseUserData {
   dialogsUri?: string;
@@ -66,6 +91,11 @@ export const getFinesseToken = (): string | null => {
   }
 };
 
+/**
+ * Clears Finesse user data and token from sessionStorage.
+ * Called on team switch and logout so the next link (re-auth) gets a fresh token from the API.
+ * Finesse token is thus cleared here and replaced when user authenticates again (setFinesseToken(response.token)).
+ */
 export const clearFinesseUserData = (): void => {
   if (typeof globalThis.window === 'undefined') return;
   try {
@@ -77,16 +107,13 @@ export const clearFinesseUserData = (): void => {
 };
 
 /**
- * Resolve effective teamId from user data. API may return teamId null while teams[] has ids.
- * Use this when calling team-scoped endpoints.
+ * Resolve effective teamId for API calls and UI. When user is linked (data present), uses
+ * finesseSelectedTeamId from storage so the teams dropdown and all APIs use the same team.
+ * When no user data, returns null. getStoredTeamId() (default 15) is the single source of truth when linked.
  */
 export const getEffectiveTeamId = (data: FinesseUserData | null): number | string | null => {
   if (!data) return null;
-  if (data.teamId != null) return data.teamId;
-  const teams = data.teams;
-  if (!teams?.length) return null;
-  const byName = data.teamName ? teams.find((t) => t.name === data.teamName) : undefined;
-  return byName?.id ?? teams[0]?.id ?? null;
+  return getStoredTeamId();
 };
 
 /**
@@ -123,10 +150,13 @@ export const finesseLink = async (payload: FinesseLinkPayload) => {
 /**
  * POST /finesse/unlink/{username} - Unlink Finesse user (Bearer token required)
  */
-export const finesseUnlink = async (username: string) => {
+export const finesseUnlink = async (finesseUserId: string, teamId: number | string) => {
   const response = await axiosInstance.post(
-    `${prefix}/unlink/${encodeURIComponent(username)}`,
-    {}
+    `${prefix}/unlink`,
+    {
+      finesseUserId: finesseUserId,
+      teamId: teamId,
+    }
   );
   return response.data;
 };
@@ -211,12 +241,21 @@ export const getFinesseCampaignsContactsStatus = async (
 
 // ==================== Dialog Actions (call answer, decline, wrap-up) ====================
 
+/** API expects callVariables as array of { name, value }; we accept object and convert. */
 export interface FinesseDialogActionPayload {
   extension: string;
   action: string;
   actionParam?: string | null;
-  wrapUpItems?: Array<{ reason?: string }>;
-  callVariables?: Record<string, string>;
+  wrapUpReason?: string;
+  wrapUpItems?: string[];
+  /** Pass Record<string, string> (from form); sent to API as Array<{ name, value }>. */
+  callVariables?: Record<string, string> | Array<{ name: string; value: string }>;
+  actionParamCombinationValid?: boolean;
+  wrapUpItemsValidIfProvided?: boolean;
+  callVariableNamesUnique?: boolean;
+  updateCallDataRequiresItemsOrCallVars?: boolean;
+  updateCallDataFieldsOnlyForUpdateCallData?: boolean;
+  wrapUpReasonNotAllowedForUpdateCallData?: boolean;
 }
 
 /**
@@ -234,8 +273,22 @@ export const sendFinesseDialogAction = async (
   };
   if (payload.actionParam != null) body.actionParam = payload.actionParam;
   if (payload.action === 'UPDATE_CALL_DATA') {
+    if (payload.wrapUpReason != null) body.wrapUpReason = payload.wrapUpReason;
     if (payload.wrapUpItems != null) body.wrapUpItems = payload.wrapUpItems;
-    if (payload.callVariables != null) body.callVariables = payload.callVariables;
+    if (payload.callVariables != null) {
+      const arr = Array.isArray(payload.callVariables)
+        ? payload.callVariables
+        : Object.entries(payload.callVariables)
+            .filter(([, value]) => value != null && String(value).trim() !== '')
+            .map(([name, value]) => ({ name, value: String(value) }));
+      if (arr.length > 0) body.callVariables = arr;
+    }
+    if (payload.actionParamCombinationValid !== undefined) body.actionParamCombinationValid = payload.actionParamCombinationValid;
+    if (payload.wrapUpItemsValidIfProvided !== undefined) body.wrapUpItemsValidIfProvided = payload.wrapUpItemsValidIfProvided;
+    if (payload.callVariableNamesUnique !== undefined) body.callVariableNamesUnique = payload.callVariableNamesUnique;
+    if (payload.updateCallDataRequiresItemsOrCallVars !== undefined) body.updateCallDataRequiresItemsOrCallVars = payload.updateCallDataRequiresItemsOrCallVars;
+    if (payload.updateCallDataFieldsOnlyForUpdateCallData !== undefined) body.updateCallDataFieldsOnlyForUpdateCallData = payload.updateCallDataFieldsOnlyForUpdateCallData;
+    if (payload.wrapUpReasonNotAllowedForUpdateCallData !== undefined) body.wrapUpReasonNotAllowedForUpdateCallData = payload.wrapUpReasonNotAllowedForUpdateCallData;
   }
   const response = await axiosInstance.post(
     `${prefix}/teams/${teamId}/user/${encodeURIComponent(finesseUserId)}/dialog/${encodeURIComponent(dialogId)}/action`,

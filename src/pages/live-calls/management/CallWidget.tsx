@@ -38,6 +38,9 @@ interface CallWidgetProps {
   /** When call is connected, clicking Wrap up fetches reasons and opens modal */
   onWrapUpClick?: () => void;
   wrapUpLoading?: boolean;
+  /** When provided, Hold/Resume calls this (e.g. dialog action API) instead of only setting local state */
+  onHoldToggle?: (hold: boolean) => void | Promise<void>;
+  holdLoading?: boolean;
 }
 
 const CallWidget: React.FC<CallWidgetProps> = ({
@@ -62,6 +65,8 @@ const CallWidget: React.FC<CallWidgetProps> = ({
   onRejectWithAction,
   onWrapUpClick,
   wrapUpLoading = false,
+  onHoldToggle,
+  holdLoading = false,
 }) => {
   const [showRejectMenu, setShowRejectMenu] = useState(false);
 
@@ -363,9 +368,9 @@ const CallWidget: React.FC<CallWidgetProps> = ({
               )}
             </span>
             
-            {callStatus === 'Connected' && (
+            {/* {callStatus === 'Connected' && (
               <div className="call-timer">{formatTime(callTimer)}</div>
-            )}
+            )} */}
           </div>
 
           <div className="call-info-grid">
@@ -412,28 +417,48 @@ const CallWidget: React.FC<CallWidgetProps> = ({
           {callStatus === 'Connected' && (
             <>
               <div className="call-controls">
-                <button
-                  className={`call-control-btn ${isMuted ? 'active' : ''}`}
-                  onClick={() => setIsMuted(!isMuted)}
-                >
-                  {isMuted ? <MicOff /> : <Mic />}
-                  <span>{isMuted ? 'Unmute' : 'Mute'}</span>
-                </button>
-                <button
-                  className={`call-control-btn ${isHold ? 'active' : ''}`}
-                  onClick={() => setIsHold(!isHold)}
-                >
-                  <Pause />
-                  <span>{isHold ? 'Resume' : 'Hold'}</span>
-                </button>
-                <button className="call-control-btn">
-                  <Phone />
-                  <span>Transfer</span>
-                </button>
-                <button className="call-control-btn">
-                  <Users />
-                  <span>Conference</span>
-                </button>
+                {/* {previewActions.includes('MUTE') && (
+                  <button
+                    className={`call-control-btn ${isMuted ? 'active' : ''}`}
+                    onClick={() => setIsMuted(!isMuted)}
+                  >
+                    {isMuted ? <MicOff /> : <Mic />}
+                    <span>{isMuted ? 'Unmute' : 'Mute'}</span>
+                  </button>
+                )} */}
+                {(previewActions.includes('HOLD') || previewActions.includes('RETRIEVE')) && (
+                  <button
+                    className={`call-control-btn ${isHold ? 'active' : ''}`}
+                    disabled={holdLoading}
+                    onClick={async () => {
+                      const nextHold = !isHold;
+                      if (onHoldToggle) {
+                        try {
+                          await onHoldToggle(nextHold);
+                        } catch {
+                          // Error toasted by parent; parent updates isHold on success
+                        }
+                      } else {
+                        setIsHold(nextHold);
+                      }
+                    }}
+                  >
+                    <Pause />
+                    <span>{holdLoading ? '...' : isHold ? 'Resume' : 'Hold'}</span>
+                  </button>
+                )}
+                {/* {previewActions.includes('TRANSFER_SST') && (
+                  <button className="call-control-btn">
+                    <Phone />
+                    <span>Transfer</span>
+                  </button>
+                )}
+                {previewActions.includes('CONSULT_CALL') && (
+                  <button className="call-control-btn">
+                    <Users />
+                    <span>Conference</span>
+                  </button>
+                )} */}
               </div>
 
               {onWrapUpClick && previewActions.includes('UPDATE_CALL_DATA') && (
@@ -468,15 +493,79 @@ const CallWidget: React.FC<CallWidgetProps> = ({
                 </button>
               )}
 
-              <button className="btn-end-call" onClick={handleEndCall}>
-                <PhoneOff />
-                End Call
-              </button>
+              {previewActions.includes('DROP') && (
+                <button className="btn-end-call" onClick={handleEndCall}>
+                  <PhoneOff />
+                  End Call
+                </button>
+              )}
             </>
           )}
 
-          {callStatus === 'Ringing' && (
+          {callStatus === 'Wrap up' && onWrapUpClick && previewActions.includes('UPDATE_CALL_DATA') && (
             <div className="call-action-buttons">
+              <button
+                className="btn-wrap-up"
+                onClick={onWrapUpClick}
+                disabled={wrapUpLoading}
+                style={{
+                  width: '100%',
+                  marginBottom: 8,
+                  padding: '12px 16px',
+                  border: 'none',
+                  borderRadius: 12,
+                  fontWeight: 600,
+                  cursor: wrapUpLoading ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  background: 'linear-gradient(135deg, #2c7ade 0%, #0891b2 100%)',
+                  color: 'white',
+                }}
+              >
+                {wrapUpLoading ? <>Loading...</> : <><CheckCircle size={18} /> Wrap up</>}
+              </button>
+            </div>
+          )}
+
+          {callStatus === 'Ringing' && (
+
+            <>
+              {onWrapUpClick && previewActions.includes('UPDATE_CALL_DATA') && (
+                <button
+                  className="btn-wrap-up"
+                  onClick={onWrapUpClick}
+                  disabled={wrapUpLoading}
+                  style={{
+                    width: '100%',
+                    marginBottom: 8,
+                    padding: '12px 16px',
+                    border: 'none',
+                    borderRadius: 12,
+                    fontWeight: 600,
+                    cursor: wrapUpLoading ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    background: 'linear-gradient(135deg, #2c7ade 0%, #0891b2 100%)',
+                    color: 'white',
+                  }}
+                >
+                  {wrapUpLoading ? (
+                    <>Loading...</>
+                  ) : (
+                    <>
+                      <CheckCircle size={18} />
+                      Wrap up
+                    </>
+                  )}
+                </button>
+              )}
+              
+            <div className="call-action-buttons">
+              
               {previewActions.length ? (
                 <>
                   {previewActions.includes('ACCEPT') && (
@@ -576,6 +665,8 @@ const CallWidget: React.FC<CallWidgetProps> = ({
                 </>
               )}
             </div>
+
+            </>
           )}
         </div>
       </div>
