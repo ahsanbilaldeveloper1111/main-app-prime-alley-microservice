@@ -6,7 +6,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 
-import  { useState, useEffect, useRef } from 'react';
+import  { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Users,
   Settings,
@@ -188,7 +188,7 @@ const LiveCallsAgentsManagement = () => {
       }, []);
 
       // Populate teams from finesseResponseData in storage (sessionStorage)
-      useEffect(() => {
+      const hydrateTeamsFromStorage = useCallback(() => {
         const data = getFinesseUserData();
         if (data?.teams?.length) {
           setTeams(data.teams);
@@ -201,6 +201,16 @@ const LiveCallsAgentsManagement = () => {
           setSelectedTeam('');
         }
       }, []);
+      useEffect(() => {
+        hydrateTeamsFromStorage();
+      }, [hydrateTeamsFromStorage]);
+      // When gate authenticates on same page (no reload), re-hydrate teams from storage
+      useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const onAuthenticated = () => hydrateTeamsFromStorage();
+        window.addEventListener('finesse-authenticated', onAuthenticated);
+        return () => window.removeEventListener('finesse-authenticated', onAuthenticated);
+      }, [hydrateTeamsFromStorage]);
 
       // Fetch user team details when we have storage data, username, and a selected team
       useEffect(() => {

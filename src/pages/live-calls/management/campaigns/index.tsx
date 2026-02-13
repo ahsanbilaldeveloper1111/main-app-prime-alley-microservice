@@ -171,8 +171,7 @@ const LiveCallsCampaignsManagement = () => {
       // Hydrate from storage on mount so teams/APIs run when landing after link (storage is set but first render may miss it).
       // useLayoutEffect so dropdown is filled before first paint and dependent APIs run.
       const [finesseHydrated, setFinesseHydrated] = useState(false);
-      useLayoutEffect(() => {
-        if (typeof window === 'undefined') return;
+      const hydrateFromStorage = useCallback(() => {
         const stored = getFinesseUserData();
         if (stored) {
           setFinesseHydrated(true);
@@ -185,6 +184,17 @@ const LiveCallsCampaignsManagement = () => {
           if (stored.state) setAgentStatus(stored.state);
         }
       }, []);
+      useLayoutEffect(() => {
+        if (typeof window === 'undefined') return;
+        hydrateFromStorage();
+      }, [hydrateFromStorage]);
+      // When gate authenticates on same page (no reload/router), re-hydrate from storage so teams and APIs run
+      useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const onAuthenticated = () => hydrateFromStorage();
+        window.addEventListener('finesse-authenticated', onAuthenticated);
+        return () => window.removeEventListener('finesse-authenticated', onAuthenticated);
+      }, [hydrateFromStorage]);
 
       // Fetch Finesse user and map to TopBar (teams, selectedTeam, agentStatus) – runs when past FinesseAuthGate / after hydrate
       useEffect(() => {

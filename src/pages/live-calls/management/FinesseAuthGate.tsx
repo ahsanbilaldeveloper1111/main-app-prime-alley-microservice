@@ -11,7 +11,6 @@ import {
   normalizeFinesseUserData,
   type FinesseUserData,
 } from '@utils/finesse';
-
 export interface FinesseAuthGateProps {
   children: ReactNode;
   /** Breadcrumb subTitle (e.g. "Live Calls Campaigns Management") */
@@ -80,6 +79,9 @@ export default function FinesseAuthGate({
           setFinesseToken(response.token);
         }
         setIsFinesseAuthenticated(true);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('finesse-authenticated'));
+        }
       } else {
         setFinesseError(
           response?.message || response?.statusCode || 'Authentication failed.'
