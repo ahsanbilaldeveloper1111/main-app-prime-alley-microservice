@@ -83,6 +83,64 @@ export interface SendWhatsAppErrorResponse {
   window_started_at?: string;
 }
 
+/** Request payload for POST send-sms. */
+export interface SendSmsPayload {
+  /** Recipient phone (E.164, max 32 chars). */
+  to: string;
+  /** SMS body (max 1600 chars). */
+  message: string;
+  /** Tenant identifier (max 255 chars). */
+  tenant_id: string;
+  /** Sender/extension (max 64 chars, e.g. "536"). */
+  extension: string;
+}
+
+/** Success response (200) for send-sms. */
+export interface SendSmsSuccessData {
+  id: number;
+  to: string;
+  status: string;
+  external_id?: string;
+  created_at: string;
+}
+
+export interface SendSmsSuccessResponse {
+  status: 'success';
+  message: string;
+  data: SendSmsSuccessData;
+}
+
+/** Error response (e.g. 422) for send-sms. */
+export interface SendSmsErrorResponse {
+  status: 'error';
+  message: string;
+  errors?: Record<string, string[]>;
+  data?: SendSmsSuccessData;
+}
+
+/** SMS list item from GET sms. */
+export interface SmsListItem {
+  id: number;
+  created_by?: string;
+  to: string;
+  message: string;
+  status: string;
+  error_message?: string | null;
+  external_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Pagination meta from GET sms. */
+export interface SmsListMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+  from?: number;
+  to?: number;
+}
+
 /** Request payload for POST meetings/instant. */
 export interface CreateInstantMeetingPayload {
   /** Meeting title (max 255 chars). */
@@ -189,6 +247,31 @@ export interface GenerateWhatsAppSuccessResponse {
   result: string;
 }
 
+/** Request payload for POST generate-sms. */
+export interface GenerateSmsPayload {
+  /** Natural-language prompt for the SMS. */
+  query: string;
+  /** Existing draft to refine. */
+  previous_content?: string;
+  /** Lead context (when opened from leads). */
+  lead?: unknown;
+  /** Deal context (when opened from deals). */
+  deal?: unknown;
+  /** Order context (when opened from orders). */
+  order?: unknown;
+  /** Tone of the message. */
+  tone?: string;
+  /** Language of the message. */
+  language?: string;
+  /** Urgency of the message. */
+  urgency?: string;
+}
+
+/** Success response (200) for generate-sms. */
+export interface GenerateSmsSuccessResponse {
+  result: string;
+}
+
 // ==================== APIs ====================
 
 /**
@@ -283,6 +366,20 @@ export const generateWhatsApp = async (
   return response.data;
 };
 
+/**
+ * POST generate-sms
+ * Generates SMS message content from a natural-language prompt.
+ */
+export const generateSms = async (
+  data: GenerateSmsPayload
+): Promise<GenerateSmsSuccessResponse> => {
+  const response = await axiosInstance.post<GenerateSmsSuccessResponse>(
+    `${prefix}/generate-sms`,
+    data
+  );
+  return response.data;
+};
+
 // ==================== GET APIs ====================
 
 /**
@@ -358,6 +455,47 @@ export const getWhatsAppMessageStatus = async (
   const response = await axiosInstance.get(
     `${prefix}/whatsapp/message-status`,
     { params }
+  );
+  return response.data;
+};
+
+/**
+ * POST send-sms
+ * Sends SMS via backend gateway and stores the record.
+ */
+export const sendSms = async (
+  data: SendSmsPayload
+): Promise<SendSmsSuccessResponse> => {
+  const response = await axiosInstance.post<SendSmsSuccessResponse>(
+    `${prefix}/send-sms`,
+    data
+  );
+  if (response?.status === 200) {
+    toast.success(response.data.message || 'SMS sent');
+    return response.data;
+  }
+  toast.error(response?.data?.message ?? 'Failed to send SMS');
+  throw new Error(response?.data?.message ?? 'Failed to send SMS');
+};
+
+/**
+ * GET sms
+ * Paginated list of sent SMS records. Optional filter by user_extension.
+ */
+export const getSmsList = async (
+  params?: Record<string, string | number | string[]>
+): Promise<{ data: SmsListItem[]; meta: SmsListMeta }> => {
+  const normalized = params
+    ? Object.fromEntries(
+        Object.entries(params).map(([k, v]) => [
+          k,
+          Array.isArray(v) ? v : String(v),
+        ])
+      )
+    : undefined;
+  const response = await axiosInstance.get<{ data: SmsListItem[]; meta: SmsListMeta }>(
+    `${prefix}/sms`,
+    { params: normalized }
   );
   return response.data;
 };
