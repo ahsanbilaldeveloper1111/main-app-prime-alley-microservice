@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Container, Card } from 'react-bootstrap';
 import { MessageSquare, Mail, MessageCircle, Video } from 'lucide-react';
 import type { AIComposeChannel, AIComposeOpenedFrom, AIComposeProps, FooterHandlers, CommonChannelOptions } from './types';
@@ -6,6 +6,10 @@ import WhatsAppSection from './partials/WhatsAppSection';
 import EmailSection from './partials/EmailSection';
 import SmsSection from './partials/SmsSection';
 import MeetingsSection from './partials/MeetingsSection';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS: P } = HEADER_CONSTANTS;
 
 export type { AIComposeChannel, AIComposeOpenedFrom, AIComposeProps } from './types';
 
@@ -22,7 +26,22 @@ const CHANNEL_ORDER: Record<AIComposeChannel, number> = {
   meetings: 3,
 };
 
-const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextPayload }) => {
+const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextPayload, moduleSlug }) => {
+  const { hasPermission } = usePermissions();
+  const canWhatsApp = hasPermission(P.SEND_WHATSAPP_MESSAGE_CRM) || hasPermission(P.VIEW_WHATSAPP_MESSAGES_CRM);
+  const canEmail = hasPermission(P.SEND_EMAIL_CRM) || hasPermission(P.VIEW_EMAILS_CRM);
+  const canSms = hasPermission(P.SEND_SMS_CRM) || hasPermission(P.VIEW_SMS_CRM);
+  const canMeetings = hasPermission(P.CREATE_MEETING_CRM) || hasPermission(P.VIEW_MEETINGS_CRM);
+
+  const visibleChannels = useMemo((): AIComposeChannel[] => {
+    const ch: AIComposeChannel[] = [];
+    if (canWhatsApp) ch.push('whatsapp');
+    if (canEmail) ch.push('email');
+    if (canSms) ch.push('sms');
+    if (canMeetings) ch.push('meetings');
+    return ch;
+  }, [canWhatsApp, canEmail, canSms, canMeetings]);
+
   const [selectedChannel, setSelectedChannel] = useState<AIComposeChannel>(
     () => getChannelFromOpenedFrom(openedFrom)
   );
@@ -31,6 +50,12 @@ const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextP
   useEffect(() => {
     setSelectedChannel(getChannelFromOpenedFrom(openedFrom));
   }, [openedFrom]);
+
+  useEffect(() => {
+    if (visibleChannels.length > 0 && !visibleChannels.includes(selectedChannel)) {
+      setSelectedChannel(visibleChannels[0]);
+    }
+  }, [visibleChannels, selectedChannel]);
 
   const handleTabChange = (e: React.MouseEvent, newChannel: AIComposeChannel) => {
     e.stopPropagation();
@@ -92,6 +117,7 @@ const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextP
           {/* Channel tabs */}
           <div className="mb-2">
                 <div className="d-flex gap-2 mb-3">
+                  {canWhatsApp && (
                   <button
                     onClick={(e) => handleTabChange(e, 'whatsapp')}
                     style={{
@@ -124,7 +150,8 @@ const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextP
                     <MessageCircle size={18} />
                     WhatsApp
                   </button>
-                 
+                  )}
+                  {canEmail && (
                   <button
                     onClick={(e) => handleTabChange(e, 'email')}
                     style={{
@@ -157,6 +184,8 @@ const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextP
                     <Mail size={18} />
                     Email
                   </button>
+                  )}
+                  {canSms && (
                   <button
                     onClick={(e) => handleTabChange(e, 'sms')}
                     style={{
@@ -189,6 +218,8 @@ const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextP
                     <MessageSquare size={18} />
                     SMS
                   </button>
+                  )}
+                  {canMeetings && (
                   <button
                     onClick={(e) => handleTabChange(e, 'meetings')}
                     style={{
@@ -221,6 +252,7 @@ const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextP
                     <Video size={18} />
                     Meetings
                   </button>
+                  )}
                 </div>
               </div>
 
@@ -232,10 +264,18 @@ const AICompose: React.FC<AIComposeProps> = ({ openedFrom = 'whatsapp', contextP
               style={{ minHeight: '320px' }}
               onClick={(e) => e.stopPropagation()}
             >
-              {selectedChannel === 'whatsapp' && <WhatsAppSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} />}
-              {selectedChannel === 'email' && <EmailSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} />}
-              {selectedChannel === 'sms' && <SmsSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} />}
-              {selectedChannel === 'meetings' && <MeetingsSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} initialMeetingType={getInitialMeetingType(openedFrom)} />}
+              {visibleChannels.length === 0 ? (
+                <div className="d-flex align-items-center justify-content-center text-muted py-5">
+                  <p className="mb-0">You don&apos;t have permission to use any channel here.</p>
+                </div>
+              ) : (
+                <>
+                  {selectedChannel === 'whatsapp' && <WhatsAppSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} moduleSlug={moduleSlug} />}
+                  {selectedChannel === 'email' && <EmailSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} moduleSlug={moduleSlug} />}
+                  {selectedChannel === 'sms' && <SmsSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} moduleSlug={moduleSlug} />}
+                  {selectedChannel === 'meetings' && <MeetingsSection registerFooter={registerFooter} contextPayload={contextPayload} commonOptions={commonOptions} setCommonOptions={setCommonOptions} moduleSlug={moduleSlug} initialMeetingType={getInitialMeetingType(openedFrom)} />}
+                </>
+              )}
             </div>
           </div>
         </Card.Body>

@@ -5,6 +5,8 @@ import type { RegisterFooter, ChannelSectionContext } from '../types';
 import { getContextSource } from '../types';
 import { generateWhatsApp, getWhatsAppChatMessages, getChats, sendWhatsApp, getWhatsAppTemplates } from '@utils/communication';
 import type { GenerateWhatsAppPayload, WhatsAppTemplateItem } from '@utils/communication';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import parsePhoneNumber from 'libphonenumber-js';
 import moment from 'moment-timezone';
 import { GlobalDateTimeFormat } from '@utils/Helper';
@@ -83,7 +85,13 @@ const DEFAULT_COMMON_OPTIONS = {
   customCtaType: '',
 };
 
+
 const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSectionContext> = ({ registerFooter, contextPayload, commonOptions: commonOptionsProp, setCommonOptions, moduleSlug }) => {
+  const { hasPermission } = usePermissions();
+  const { PERMISSIONS: P } = HEADER_CONSTANTS;
+  
+  const canSend = hasPermission(P.SEND_WHATSAPP_MESSAGE_CRM);
+  const canView = hasPermission(P.VIEW_WHATSAPP_MESSAGES_CRM);
   const commonOptions = commonOptionsProp ?? DEFAULT_COMMON_OPTIONS;
   const [draftContent, setDraftContent] = useState(DEFAULT_DRAFT);
   const [objective, setObjective] = useState('Book a meeting');
@@ -92,7 +100,7 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
   const [generateLoading, setGenerateLoading] = useState(false);
   const [emojiLevel, setEmojiLevel] = useState('moderate');
   const [descriptionSuggestLoading, setDescriptionSuggestLoading] = useState(false);
-
+  
   const source = getContextSource(contextPayload);
 
   const handleInsert = (content: string) => {
@@ -443,10 +451,19 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
     }
   };
 
+  if (!canSend && !canView) {
+    return (
+      <div className="d-flex align-items-center justify-content-center text-muted py-5">
+        <p className="mb-0">You don&apos;t have permission to send or view WhatsApp messages here.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-100 d-flex flex-column min-h-0">
       
     <Row className="mb-4 flex-grow-1 min-h-0" style={{ flexWrap: 'nowrap' }}>
+          {canView && (
           <Col md={3} className="border-end d-flex flex-column min-h-0" style={{ overflowY: 'auto' }}>
             {chatsLoading ? (
               <div className="d-flex flex-column align-items-center justify-content-center gap-2 py-4">
@@ -490,8 +507,10 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
               </div>
             )}
           </Col>
-          <Col md={9}>
+          )}
+          <Col md={canView ? 9 : 12}>
             {selectedChat == null ? (
+              canSend ? (
               <Card className="border">
                 <Card.Body>
                   <Form.Group className="mb-3">
@@ -664,6 +683,11 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                   )}
                 </Card.Body>
               </Card>
+              ) : canView ? (
+              <div className="d-flex align-items-center justify-content-center text-muted py-5">
+                <p className="mb-0">Select a chat to view messages.</p>
+              </div>
+              ) : null
             ) : (
               <Card className="border">
                 <Card.Body className="p-3">
@@ -736,6 +760,7 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                   
 
                   {/* Input area: Query for AI, Message, Content SID, Auto Generate, Send */}
+                  {canSend && (
                   <div className="border-top pt-3">
                     <Form.Group className="mb-2">
                       <Form.Label className="small fw-semibold text-muted">Query for AI (optional)</Form.Label>
@@ -799,6 +824,7 @@ const WhatsAppSection: React.FC<{ registerFooter?: RegisterFooter } & ChannelSec
                       </Button>
                     </div>
                   </div>
+                  )}
                 </Card.Body>
               </Card>
             )}

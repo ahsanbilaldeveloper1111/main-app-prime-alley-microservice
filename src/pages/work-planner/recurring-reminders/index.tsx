@@ -1286,6 +1286,7 @@ const RecurringReminders = () => {
           <GenericSidebar
             isOpen={!!(showTaskDetail && selectedTaskDetails)}
             onClose={() => { setShowTaskDetail(false); setSelectedTask(null); }}
+            moduleSlug={ModuleSlug.WORK_PLANNER}
             title={selectedTaskDetails?.name ?? 'Task Details'}
             subtitle={selectedTaskDetails?.status === 'active' ? 'Active' : 'Paused'}
             metadata={selectedTaskDetails?.recurrence}

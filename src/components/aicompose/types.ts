@@ -18,6 +18,8 @@ export interface AIComposeProps {
   openedFrom?: AIComposeOpenedFrom;
   /** Context payload (e.g. lead, deal, order) from the page using the sidebar */
   contextPayload?: Record<string, unknown>;
+  /** Module slug for list APIs (page from which compose was opened) */
+  moduleSlug?: string;
 }
 
 export interface FooterHandlers {
@@ -47,6 +49,8 @@ export interface ChannelSectionContext {
   /** Shared options for all channels; when provided, sections use these instead of local state */
   commonOptions?: CommonChannelOptions;
   setCommonOptions?: React.Dispatch<React.SetStateAction<CommonChannelOptions>>;
+  /** Module slug for list APIs (page from which compose was opened) */
+  moduleSlug?: string;
 }
 
 /** Source page when opening AI Compose from CRM (leads, deals, orders) */
