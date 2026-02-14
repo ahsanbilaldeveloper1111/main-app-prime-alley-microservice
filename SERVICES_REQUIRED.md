@@ -58,16 +58,22 @@
 - **Protocol**: WebSocket (ws/wss)
 - **Service Type**: External WebSocket server
 
+### 8. **WhatsApp / App Socket Server** (Socket.IO)
+- **Purpose**: Real-time WhatsApp messages, notifications, and other app events (JWT-authenticated)
+- **Environment Variable**: `NEXT_PUBLIC_WHATSAPP_SOCKET_URL`
+- **Protocol**: Socket.IO (websocket + polling)
+- **Service Type**: External Socket.IO server (e.g. Laravel Redis broadcasts)
+
 ## Optional Services
 
-### 8. **SQL Server** (Optional)
+### 9. **SQL Server** (Optional)
 - **Purpose**: Database (if enabled)
 - **Status**: Currently disabled in `systeminfo.py`
 - **Port**: 1433 (default)
 - **Driver**: ODBC Driver for SQL Server
 - **Note**: Can be enabled by setting `CONFIG["SQL"]["ENABLED"] = True` in `systeminfo.py`
 
-### 9. **Stripe Payment Service** (Optional - for payment features)
+### 10. **Stripe Payment Service** (Optional - for payment features)
 - **Purpose**: Payment processing
 - **Environment Variable**: `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
 - **Server-side**: `STRIPE_SECRET_KEY`
@@ -75,7 +81,7 @@
 
 ## Authentication Services
 
-### 10. **NextAuth**
+### 11. **NextAuth**
 - **Purpose**: Authentication framework
 - **Environment Variables**:
   - `NEXTAUTH_SECRET` (required)
@@ -148,6 +154,7 @@ Optional but recommended:
 - `NEXT_PUBLIC_PRIVATE_CTI_SOCKET_URL` - CTI WebSocket server
 - `NEXT_PUBLIC_PRIVATE_AIML_SOCKET_URL` - AI/ML WebSocket server
 - `NEXT_PUBLIC_CALL_LOGS_SOCKET_URL` - Call logs WebSocket server
+- `NEXT_PUBLIC_WHATSAPP_SOCKET_URL` or `NEXT_PUBLIC_SOCKET_URL` - WhatsApp/App Socket.IO server (default: http://localhost:6001)
 - Firebase configuration variables
 - Stripe keys (if using payments)
 
