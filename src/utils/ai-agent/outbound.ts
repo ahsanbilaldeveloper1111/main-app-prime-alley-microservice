@@ -350,16 +350,6 @@ export interface DeleteTrunkPayload {
 // No payload or params
 export const getTrunksOutbound = async () => {
   try {
-
-    const responses = await axiosInstance.post(`zabbix/hosts`,{
-      params: {
-        output: ["hostid", "host", "name"],
-        selectInterfaces: ["interfaceid", "ip"],
-      }
-    });
-    console.log(responses);
-
-    return false;
     const response = await axiosInstance.get(`${VOICEBOT_PREFIX}/get_trunks/outbound`);
     return response;
   } catch (error) {
