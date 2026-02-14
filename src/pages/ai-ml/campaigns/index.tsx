@@ -16,6 +16,8 @@ import { ListCampaigns, DeleteCampaign, ListVoiceBots, UpdateCampaign, DispatchC
 import ConfirmModal from "@pages/partial/ConfirmModal";
 import { toast } from "react-toastify";
 import { Row, Col } from 'react-bootstrap';
+import CreateCampaignModal from '@pages/ai-ml/campaigns/CreateCampaignModal';
+import EditCampaignModal from '@pages/ai-ml/campaigns/EditCampaignModal';
 import {
   Search,
   MoreVertical,
@@ -47,6 +49,7 @@ interface Campaign {
   scheduled: string;
   progress: number;
   progressColor: string;
+  numbers_count: number;
   callsMade: number;
   answered: number;
   failed: number;
@@ -84,6 +87,9 @@ const AIMLCampaigns = () => {
   const [showDispatchModal, setShowDispatchModal] = useState<boolean>(false);
   const [selectedCampaignForDispatch, setSelectedCampaignForDispatch] = useState<Campaign | null>(null);
   const [isDispatching, setIsDispatching] = useState<boolean>(false);
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [showEditModal, setShowEditModal] = useState<boolean>(false);
+  const [selectedCampaignIdForEdit, setSelectedCampaignIdForEdit] = useState<number | null>(null);
   
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignDetail | null>(null);
 
@@ -115,6 +121,7 @@ const AIMLCampaigns = () => {
     // Calculate progress (mock for now, can be replaced with actual data)
     const progress = isActive ? Math.floor(Math.random() * 30 + 60) : 0;
     
+    const numbersCount = campaign.numbers_count ?? 0;
     return {
       id: campaign.id || 0,
       name: campaign.name || 'Unnamed Campaign',
@@ -126,9 +133,10 @@ const AIMLCampaigns = () => {
       scheduled: campaign.schedule_time ? new Date(campaign.schedule_time).toLocaleDateString() : 'Not Scheduled',
       progress: progress,
       progressColor: progress > 70 ? '#20c997' : progress > 40 ? '#ffc107' : '#dc3545',
-      callsMade: campaign.numbers_count || 0,
-      answered: Math.floor((campaign.numbers_count || 0) * 0.7),
-      failed: Math.floor((campaign.numbers_count || 0) * 0.1),
+      numbers_count: numbersCount,
+      callsMade: numbersCount,
+      answered: Math.floor(numbersCount * 0.7),
+      failed: Math.floor(numbersCount * 0.1),
       status: status // Store original status
     };
   };
@@ -226,9 +234,10 @@ const AIMLCampaigns = () => {
     });
   };
 
-  // Handle edit campaign
+  // Handle edit campaign - open EditCampaignModal
   const handleEditCampaign = (campaignId: number) => {
-    router.push(`/ai-ml/campaigns/edit-campaign?id=${campaignId}`);
+    setSelectedCampaignIdForEdit(campaignId);
+    setShowEditModal(true);
   };
 
   // Handle pause/resume campaign
@@ -371,7 +380,8 @@ const AIMLCampaigns = () => {
           Campaigns
         </h2>
         <button
-         onClick={() => router.push('/ai-ml/campaigns/create-campaign')}
+             onClick={() => setShowCreateModal(true)}
+           // onClick={() => router.push('/ai-ml/campaigns/create-campaign')}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -602,9 +612,9 @@ const AIMLCampaigns = () => {
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>ID</th>
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Campaign Name</th>
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Bot Profile</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Client</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Total Users</th>
                     {/* <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Type</th> */}
-                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Progress</th>
+                    {/* <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Progress</th> */}
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#6b7280', borderBottom: '1px solid #e5e7eb' }}>Actions</th>
                   </tr>
                 </thead>
@@ -648,7 +658,7 @@ const AIMLCampaigns = () => {
                         </div>
                       </td>
                       <td style={{ padding: '16px', fontSize: '14px', color: '#6b7280', borderBottom: '1px solid #f3f4f6' }}>{campaign.botProfile}</td>
-                      <td style={{ padding: '16px', fontSize: '14px', color: '#1f2937', borderBottom: '1px solid #f3f4f6' }}>{campaign.client}</td>
+                      <td style={{ padding: '16px', fontSize: '14px', color: '#1f2937', borderBottom: '1px solid #f3f4f6' }}>{campaign.numbers_count}</td>
                       {/* <td style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
                         <span style={{
                           display: 'inline-flex',
@@ -664,7 +674,7 @@ const AIMLCampaigns = () => {
                           {campaign.type}
                         </span>
                       </td> */}
-                      <td style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+                      {/* <td style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div style={{ 
                             flex: 1, 
@@ -688,7 +698,7 @@ const AIMLCampaigns = () => {
                             {campaign.progress}%
                           </span>
                         </div>
-                      </td>
+                      </td> */}
                       <td style={{ padding: '16px', borderBottom: '1px solid #f3f4f6', position: 'relative' }}>
                         <button
                           onClick={(e) => {
@@ -743,7 +753,7 @@ const AIMLCampaigns = () => {
                               <Edit size={16} />
                               Edit Campaign
                             </div>
-                            <div
+                            {/* <div
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setExpandedActions(null);
@@ -764,7 +774,7 @@ const AIMLCampaigns = () => {
                             >
                               <BarChart3 size={16} />
                               View Analytics
-                            </div>
+                            </div> */}
                             <div
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1142,6 +1152,29 @@ const AIMLCampaigns = () => {
       requireTextConfirmation={true}
       requiredConfirmationText="dispatch"
       loading={isDispatching}
+    />
+
+    <CreateCampaignModal
+      show={showCreateModal}
+      onHide={() => setShowCreateModal(false)}
+      onSuccess={() => {
+        setShowCreateModal(false);
+        fetchCampaigns();
+      }}
+    />
+
+    <EditCampaignModal
+      show={showEditModal}
+      campaignId={selectedCampaignIdForEdit}
+      onHide={() => {
+        setShowEditModal(false);
+        setSelectedCampaignIdForEdit(null);
+      }}
+      onSuccess={() => {
+        setShowEditModal(false);
+        setSelectedCampaignIdForEdit(null);
+        fetchCampaigns();
+      }}
     />
     </React.Fragment>
   );

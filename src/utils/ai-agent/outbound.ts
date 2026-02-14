@@ -5,7 +5,7 @@ import axiosInstance from "@utils/axios";
 // ---------------------------------------------------------------------------
 
 const CONTROLHUB_PREFIX='aiml';
-const VOICEBOT_PREFIX=CONTROLHUB_PREFIX+'/voicebot';
+const VOICEBOT_PREFIX='voicebot';
 
 
 export interface CampaignItem {
@@ -330,13 +330,73 @@ export const getAllOutboundCalls = async (
 // Trunk Profiles (outbound)
 // ---------------------------------------------------------------------------
 
+export interface AddTrunkPayload {
+  name: string;
+  address: string;
+  numbers: string;
+}
+
+export interface UpdateTrunkPayload {
+  trunk_id: string;
+  name: string;
+  address: string;
+  numbers: string;
+}
+
+export interface DeleteTrunkPayload {
+  trunk_id: string;
+}
+
 // No payload or params
 export const getTrunksOutbound = async () => {
   try {
+
+    const responses = await axiosInstance.post(`zabbix/hosts`,{
+      params: {
+        output: ["hostid", "host", "name"],
+        selectInterfaces: ["interfaceid", "ip"],
+      }
+    });
+    console.log(responses);
+
+    return false;
     const response = await axiosInstance.get(`${VOICEBOT_PREFIX}/get_trunks/outbound`);
     return response;
   } catch (error) {
     console.error("getTrunksOutbound error:", error);
+    throw error;
+  }
+};
+
+// Payload: name, address, numbers
+export const addTrunk = async (payload: AddTrunkPayload) => {
+  try {
+    const response = await axiosInstance.post(`${CONTROLHUB_PREFIX}/add-trunk`, payload);
+    return response;
+  } catch (error) {
+    console.error("addTrunk error:", error);
+    throw error;
+  }
+};
+
+// Payload: trunk_id, name, address, numbers
+export const updateTrunk = async (payload: UpdateTrunkPayload) => {
+  try {
+    const response = await axiosInstance.post(`${CONTROLHUB_PREFIX}/update-trunk`, payload);
+    return response;
+  } catch (error) {
+    console.error("updateTrunk error:", error);
+    throw error;
+  }
+};
+
+// Payload: trunk_id
+export const deleteTrunk = async (payload: DeleteTrunkPayload) => {
+  try {
+    const response = await axiosInstance.post(`${CONTROLHUB_PREFIX}/delete-trunk`, payload);
+    return response;
+  } catch (error) {
+    console.error("deleteTrunk error:", error);
     throw error;
   }
 };

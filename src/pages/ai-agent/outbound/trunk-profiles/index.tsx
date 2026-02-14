@@ -12,10 +12,9 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
-import axiosInstance from "@utils/axios";
 import FormModal from "@pages/partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
-import { getTrunksOutbound } from "@utils/ai-agent/outbound";
+import { getTrunksOutbound, addTrunk, updateTrunk, deleteTrunk } from "@utils/ai-agent/outbound";
 
 import { Row, Col, Form } from 'react-bootstrap';
 import {
@@ -63,11 +62,12 @@ const AIMLTrunkProfile = () => {
   // Fetch trunks (aiml list-trunks + outbound for reference)
   const fetchTrunks = useCallback(async () => {
     try {
-      const response = await axiosInstance.get('aiml/list-trunks');
+      //const response = await axiosInstance.get('aiml/list-trunks');
+      
+      const response = await getTrunksOutbound();
+      console.log('getTrunksOutbound response:', response?.data);
       const received = normalizeTrunkList(response?.data?.trunks ?? []);
       setTrunks(received);
-      const outboundResponse = await getTrunksOutbound();
-      console.log('getTrunksOutbound response:', outboundResponse?.data);
     } catch (error) {
       console.error('Error fetching trunks:', error);
       toast.error('Failed to fetch trunks');
@@ -94,7 +94,7 @@ const AIMLTrunkProfile = () => {
       return;
     }
 
-    axiosInstance.post('aiml/add-trunk', {
+    addTrunk({
       name: newTrunkName,
       address: newTrunkAddress,
       numbers: newTrunkNumbers
@@ -133,8 +133,7 @@ const AIMLTrunkProfile = () => {
       return;
     }
 
-    // Note: Update API endpoint may be different - adjust as needed
-    axiosInstance.post('aiml/update-trunk', {
+    updateTrunk({
       trunk_id: selectedTrunk.sip_trunk_id,
       name: newTrunkName,
       address: newTrunkAddress,
@@ -170,7 +169,7 @@ const AIMLTrunkProfile = () => {
   const handleConfirmDeleteTrunk = useCallback(() => {
     if (!selectedTrunk) return;
 
-    axiosInstance.post('aiml/delete-trunk', {
+    deleteTrunk({
       trunk_id: selectedTrunk.sip_trunk_id
     }).then((response) => {
       toast.success('Trunk deleted successfully');
