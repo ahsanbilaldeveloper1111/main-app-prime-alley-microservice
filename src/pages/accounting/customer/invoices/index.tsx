@@ -2919,8 +2919,8 @@ const InvoiceList = () => {
                     <p className="mb-2">{selectedInvoiceForView?.company?.profile?.address || ''}</p>
                     <p className="mb-3">{selectedInvoiceForView?.company?.country || ''}</p>
 
-                    {selectedInvoiceForView?.company?.profile?.tax_id && (
-                    <p className="mb-0 fw-bold"><b>Tax ID:</b> {selectedInvoiceForView?.company?.profile?.tax_id || ''}</p>
+                    {selectedInvoiceForView?.company?.profile?.tax_id && selectedInvoiceForView?.company?.profile?.tax_id > 0 && (
+                    <p className="mb-0 fw-bold"><b>TRN No.:</b> {selectedInvoiceForView?.company?.profile?.tax_id || ''}</p>
                     )}
 
                   </div>
@@ -2928,10 +2928,18 @@ const InvoiceList = () => {
                 <Col md={6}>
                 <table className="table table-borderless">
                       <tbody>
+                      
                         <tr>
                           <td className="fw-bold p-2" style={{ verticalAlign: 'top', width: '40%' }}>Invoice Number:</td>
                           <td className="p-2">{selectedInvoiceForView.invoice_number || 'N/A'}</td>
                         </tr>
+                        <tr>
+                          <td className="fw-bold p-2" style={{ verticalAlign: 'top', width: '40%' }}>Invoice Date:</td>
+                          <td className="p-2">{selectedInvoiceForView.invoice_date
+                              ? moment(selectedInvoiceForView.invoice_date).format(GlobalDateFormat)
+                              : 'N/A'}</td>
+                        </tr>
+                        
                         <tr>
                           <td className="fw-bold p-2" style={{ verticalAlign: 'top' }}>Invoice Period:</td>
                           <td className="p-2">
@@ -3064,10 +3072,10 @@ const InvoiceList = () => {
                             <th className="text-uppercase">Product Name</th>
                             <th className="text-uppercase text-start">Product Description</th>
                             <th className="text-uppercase text-end">QTY</th>
-                            <th className="text-uppercase text-end">Unit Price</th>
-                            <th className="text-uppercase text-end">Tax</th>
-                            <th className="text-uppercase text-end">Amount</th>
-                            <th className="text-uppercase text-end">Total Price</th>
+                            <th className="text-uppercase text-end">Unit Price ({selectedInvoiceForView.currency_code || 'AED'})</th>
+                            <th className="text-uppercase text-end">Tax ({selectedInvoiceForView.currency_code || 'AED'})</th>
+                            <th className="text-uppercase text-end">Amount ({selectedInvoiceForView.currency_code || 'AED'})</th>
+                            <th className="text-uppercase text-end">Total Price ({selectedInvoiceForView.currency_code || 'AED'})</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -3113,22 +3121,22 @@ const InvoiceList = () => {
                               </td>
                               <td className="text-end">{item.quantity}</td>
                               <td className="text-end">
-                                {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.unit_price || '0'))}
+                                 {formatNumber(parseFloat(item.unit_price || '0'))}
                               </td>
                               
                               {/* <td className="text-end">{formatNumber(parseFloat(item.tax_rate || '0'))}%</td> */}
                               <td className="text-end">
-                                {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.tax_amount || '0'))}
+                                 {formatNumber(parseFloat(item.tax_amount || '0'))}
                               </td>
 
 
                               <td className="text-end">
-                                {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.line_total || '0'))}
+                                 {formatNumber(parseFloat(item.line_total || '0'))}
                               </td>
                               
                               <td className="text-end">
                                 <strong>
-                                  {selectedInvoiceForView.currency_code || 'AED'} {formatNumber(parseFloat(item.tax_amount || '0') + parseFloat(item.line_total || '0'))}
+                                  {formatNumber(parseFloat(item.tax_amount || '0') + parseFloat(item.line_total || '0'))}
                                 </strong>
                               </td>
                             </tr>
@@ -3145,10 +3153,10 @@ const InvoiceList = () => {
                               <p>{!selectedInvoiceForView.notes && !selectedInvoiceForView.terms_conditions && 'No notes or terms provided'}</p>
                             </Card.Body>
                           </Card> */}
-                          <h5 className="mb-2 fw-bold" style={{ color: '#14509e' }}>Special Instructions</h5>
+                          <h5 className="mb-2 fw-bold" style={{ color: '#14509e' }}>Terms & Conditions</h5>
                           <ol style={{paddingLeft: '15px'}}>
                             <li><p className="mb-1 text-muted">Payment can be made as bank transfer or direct deposit</p></li>
-                            <li><p className="mb-1 text-muted">Cheque can be issued in favor of PRIME ALLEY TECHNOLOGY LLC.</p></li>
+                            <li><p className="mb-1 text-muted">Cheque can be issued in favor of {selectedInvoiceForView?.company?.reseller?.name || 'N/A'}.</p></li>
                             <li><p className="mb-1 text-muted">Services may be disconnected after the due date without further notice.</p></li>
                             <li><p className="mb-1 text-muted">Value Added Tax (VAT) 5% will be applicable to this invoice.</p></li>
                           </ol>
