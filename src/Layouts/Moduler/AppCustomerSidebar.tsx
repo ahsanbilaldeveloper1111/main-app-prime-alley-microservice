@@ -274,14 +274,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       url: '',
       subItems: [
         {
-          id: 'ai-bot-trunk-profiles',
+          id: 'ai-agent-outbound-trunk-profiles',
           title: 'Trunk Profiles',
           icon: <Bot size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-ml/trunk-profiles'
+          url: '/ai-agent/outbound/trunk-profiles'
         },
         {
-          id: 'ai-bot-profile',
+          id: 'ai-agent-outbound-voice-bot-profiles',
           title: 'Voice Bot Profiles',
           icon: <Bot size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
@@ -293,6 +293,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <User size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
           url: '/ai-ml/campaigns'
+        },
+        {
+          id: 'ai-bot-campaigns',
+          title: 'Create Campaign (static)',
+          icon: <User size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/ai-ml/campaigns/create-campaign'
         },
         {
           id: 'ai-bot-campaigns-pitch-deck',
@@ -519,6 +526,27 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <MonitorSpeaker size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
           url: '/netops/devices'
+        },
+        {
+          id: 'netops-hosts',
+          title: 'Hosts',
+          icon: <Server size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          url: '/netops/hosts'
+        },
+        {
+          id: 'netops-hosts-groups',
+          title: 'Hosts Groups',
+          icon: <Server size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          url: '/netops/hosts/groups'
+        },
+        {
+          id: 'netops-hosts-alerts',
+          title: 'Hosts Alerts',
+          icon: <Server size={16} />,
+          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+          url: '/netops/hosts/alerts'
         },
         {
           id: 'netops-services',

@@ -117,6 +117,14 @@ export const routePermissions: RoutePermission[] = [
                 path: '/application-monitoring',
                 permissions: [PERMISSIONS.NETOPS_SERVICES]
             },
+            {
+                path: '/hosts',
+                permissions: [PERMISSIONS.NETOPS_SERVICES]
+            },
+            {
+                path: '/hosts/groups',
+                permissions: [PERMISSIONS.NETOPS_SERVICES]
+            },
         ]
     },
      
@@ -352,6 +360,15 @@ export const routePermissions: RoutePermission[] = [
                 path: '/campaign-reports',
                 permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML]
             }
+        ]
+    },
+
+    //ai-agent services start
+    {
+        path: '/ai-agent',
+        permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML],
+        children: [
+            { path: '/outbound/trunk-profiles', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] }
         ]
     },
 
