@@ -427,7 +427,6 @@ const TasksList = () => {
     // Only trigger on actual pagination changes, not on filter changes
     // fetchTasks is recreated when pagination.page or pagination.limit changes, so it will have latest values
     fetchTasks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.page, pagination.limit, hierarchyLoading, fetchTasks]); // Include fetchTasks in deps to ensure it has latest pagination values
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);

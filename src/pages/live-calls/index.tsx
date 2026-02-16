@@ -460,6 +460,23 @@ const LiveCallDashboard = () => {
     const dnsList = Object.values(dnsMap) as any[]
     const nowIso = new Date().toISOString()
 
+    // Idle since from complete_state: when = registered/online, lastCallEndTime = last call ended.
+    // Per device: idle since = max(when, lastCallEndTime). Per DN: latest across devices.
+    const getIdleSinceIsoFromCompleteState = (dn: string): string | undefined => {
+      const dnEntry = dnsList.find((d: any) => String(d.dn) === dn)
+      const deviceList = dnEntry ? (Object.values(dnEntry.devices || {}) as any[]) : []
+      let latestMs: number | undefined
+      deviceList.forEach((device: any) => {
+        if (device.terminalState !== 'REGISTERED') return
+        const whenMs = device.when ? new Date(device.when).getTime() : 0
+        const lastCallEndMs = device.lastCallEndTime ? new Date(device.lastCallEndTime).getTime() : 0
+        const idleSinceMs = whenMs && lastCallEndMs ? Math.max(whenMs, lastCallEndMs) : (whenMs || lastCallEndMs)
+        if (!idleSinceMs) return
+        if (latestMs === undefined || idleSinceMs > latestMs) latestMs = idleSinceMs
+      })
+      return latestMs !== undefined ? new Date(latestMs).toISOString() : undefined
+    }
+
     const getLatestRegisteredWhenIso = (dn: string): string | undefined => {
       let latest: string | undefined = undefined
       Object.entries(registeredDnsStore).forEach(([key, value]) => {
@@ -503,16 +520,16 @@ const LiveCallDashboard = () => {
 
         if (currentSection === 'activeIdle') {
           const transitionedIntoIdle = !!prevSection && prevSection !== 'activeIdle'
-          const becameRegistered = !prevIsRegistered && isRegistered
-          const missingTimestamp = next[dnKey] === undefined
 
           if (transitionedIntoIdle) {
             if (next === prev) next = { ...prev }
             next[dnKey] = nowIso
-          } else if (becameRegistered || missingTimestamp) {
-            const initialIso = getLatestRegisteredWhenIso(dnKey) || nowIso
+          } else {
+            // Prefer idle since from complete_state (when + lastCallEndTime), then registered store, then keep previous or now
+            const fromCompleteState = getIdleSinceIsoFromCompleteState(dnKey)
+            const idleIso = fromCompleteState || getLatestRegisteredWhenIso(dnKey) || next[dnKey] || nowIso
             if (next === prev) next = { ...prev }
-            next[dnKey] = initialIso
+            next[dnKey] = idleIso
           }
         }
 

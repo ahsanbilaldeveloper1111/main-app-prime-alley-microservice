@@ -192,7 +192,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       editor.removeEventListener('keyup', handleKeyUp);
       editor.removeEventListener('click', handleClick);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // updateActiveFormats is stable and doesn't need to be in deps
 
   // Rich text formatting functions

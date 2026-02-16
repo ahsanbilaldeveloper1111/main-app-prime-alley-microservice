@@ -279,7 +279,6 @@ const CreateRecurringTaskModal: React.FC<CreateRecurringTaskModalProps> = ({
     // Wait for projects if editing (so status/project mapping stays stable)
     if (isEdit && editTask && fetchedProjects.length === 0 && loadingProjects) return;
     setFormData(getInitialFormData());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, editTask, isEdit, fetchedProjects, loadingProjects, selectedStatusForTask]);
 
   const projects: Project[] = fetchedProjects.length > 0 ? fetchedProjects : propProject ? [propProject] : [];

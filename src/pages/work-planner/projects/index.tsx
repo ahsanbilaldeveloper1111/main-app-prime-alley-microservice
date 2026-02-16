@@ -157,7 +157,6 @@ const WorkPlannerProjects = () => {
       if (!hierarchyLoading) {
         fetchProjects({ search: searchTerm, status: filterStatus, owner: filterOwner });
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pagination.page, pagination.limit, hierarchyLoading]);
     
     const fetchProjects = async (filters?: Partial<AppliedProjectFilters>) => {
