@@ -114,6 +114,7 @@ const GlobalFloatingCallBar: React.FC = () => {
   const { showIncomingCallModal: showIncomingCallModalFromContext, setIncomingCall: setIncomingCallContext, setShowIncomingCallModal: setShowIncomingCallModalContext } = useIncomingCall();
   const [dialedNumber, setDialedNumber] = useState("");
   const [isDialing, setIsDialing] = useState(false);
+  const [isEndingCall, setIsEndingCall] = useState(false);
   const [showDeviceSelectionModal, setShowDeviceSelectionModal] =
     useState(false);
   const [availableDevices, setAvailableDevices] = useState<any[]>([]);
@@ -674,6 +675,25 @@ const GlobalFloatingCallBar: React.FC = () => {
       return call;
   }, [activeCalls, userAddress, callStateMap]);
 
+  // Only the party who put the call on hold can resume (not the held party). If our party is ON_HOLD we were held by the other side -> hide Resume. Caller who put on hold can resume.
+  const canCurrentUserResumeCall = React.useMemo(() => {
+    if (!activeCall || activeCall.status !== "onHold" || !activeCall.callId || !userAddress || !callStateMap?.[activeCall.callId]) return false;
+    const callState = callStateMap[activeCall.callId];
+    const heldByAddress = callState.heldByAddress;
+    if (heldByAddress !== undefined) {
+      return userAddress === heldByAddress;
+    }
+    const parties = callState.parties || [];
+    const ourParty = parties.find((p: any) => p.callingAddress === userAddress || p.calledAddress === userAddress);
+    if (ourParty) {
+      if (ourParty.callStatus === "ON_HOLD") {
+        return ourParty.callingAddress === userAddress;
+      }
+      return true;
+    }
+    return false;
+  }, [activeCall, userAddress, callStateMap]);
+
   // Real-time duration update for active calls
   const [currentDuration, setCurrentDuration] = React.useState<number | null>(null);
   
@@ -1101,6 +1121,7 @@ const GlobalFloatingCallBar: React.FC = () => {
       return;
     }
 
+    setIsEndingCall(true);
     try {
       const result = await endCall({
         callId: activeCall.callId,
@@ -1121,6 +1142,8 @@ const GlobalFloatingCallBar: React.FC = () => {
       }
     } catch (error) {
       //toast.error("Failed to end call");
+    } finally {
+      setIsEndingCall(false);
     }
   };
 
@@ -1739,7 +1762,7 @@ const GlobalFloatingCallBar: React.FC = () => {
               </>
             )}
 
-            {activeCall.status === "onHold" && (
+            {activeCall.status === "onHold" && canCurrentUserResumeCall && (
               <button
                 type="button"
                 role="button"
@@ -1914,34 +1937,36 @@ const GlobalFloatingCallBar: React.FC = () => {
             <button
               type="button"
               tabIndex={0}
+              disabled={isEndingCall}
               onClick={(e) => {
                 e.stopPropagation();
                 handleEndCall();
               }}
-              className="btn btn-danger btn-sm  rounded-1 d-flex align-items-center gap-1"
-              // style={{
-              //   padding: "0.625rem 1rem",
-              //   fontWeight: 500,
-              //   color:"#fff",
-              //   fontSize: "1rem",
-              //   boxShadow: "0 4px 6px -1px rgba(239,68,68,0.3)",
-              //   marginLeft: "0.5rem",
-              // }}
+              className="btn btn-danger btn-sm rounded-1 d-flex align-items-center gap-1"
               onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = "0 6px 8px -1px rgba(239,68,68,0.4)";
+                if (!isEndingCall) e.currentTarget.style.boxShadow = "0 6px 8px -1px rgba(239,68,68,0.4)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.boxShadow = "0 4px 6px -1px rgba(239,68,68,0.3)";
               }}
               title="End Call"
             >
-              <i
-                className="material-icons-two-tone"
-                style={{ fontSize: "1rem", color: "#fff",backgroundColor:"#fff" }}
-              >
-                call_end
-              </i>
-              End Call
+              {isEndingCall ? (
+                <>
+                  <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" style={{ width: "1rem", height: "1rem", borderWidth: "2px" }} />
+                  Ending...
+                </>
+              ) : (
+                <>
+                  <i
+                    className="material-icons-two-tone"
+                    style={{ fontSize: "1rem", color: "#fff", backgroundColor: "#fff" }}
+                  >
+                    call_end
+                  </i>
+                  End Call
+                </>
+              )}
             </button>
           </div>
         </div>
