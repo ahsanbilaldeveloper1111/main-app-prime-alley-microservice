@@ -58,6 +58,8 @@ import {
   Calendar,
   XCircle,
   Clock as ClockIcon,
+  ChevronDown,
+  X,
   AlertCircle as AlertCircleIcon,
   UserPlus,
   ArrowUp,
@@ -75,7 +77,6 @@ import {
   Phone as PhoneIcon,
   Phone,
   Mail,
-  X,
   User,
   History,
   FileText,
@@ -84,8 +85,21 @@ import {
 } from "lucide-react";
 import ConvertToLeadModal from "@components/ConvertToLeadModal";
 import { Column } from "@components/CustomDataTable";
-import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebar";
+import GenericTable, {
+  TableColumn,
+  TableAction,
+  PaginationConfig,
+  ToolbarConfig,
+  FilterPill,
+  TabConfig,
+} from "@components/GenericTable";
+
+import GenericSidebar, { 
+  SidebarSection, 
+  QuickAction,
+  BreezeRecordSummary,
+  SidebarField
+} from '@components/GenericSidebarNew';
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import {
@@ -601,6 +615,23 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   const [selectedProspect, setSelectedProspect] = useState<any>(null);
   const [showFilterBar, setShowFilterBar] = useState(false);
 
+  // Add Contacts button states
+  const [showAddContactsDropdown, setShowAddContactsDropdown] = useState(false);
+  const [showCreateContactSidebar, setShowCreateContactSidebar] = useState(false);
+  const addContactsRef = useRef<HTMLDivElement>(null);
+  const [contactForm, setContactForm] = useState({
+    email: '',
+    firstName: '',
+    lastName: '',
+    contactOwner: 'Rizwan Haider',
+    jobTitle: '',
+    phoneNumber: '',
+    lifecycleStage: 'Lead',
+    leadStatus: '',
+    legalBasis: [] as string[],
+    isMarketingContact: false,
+  });
+
   // Call recordings state
   const [callRecordings, setCallRecordings] = useState<any[]>([]);
   const [callRecordingsLoading, setCallRecordingsLoading] = useState(false);
@@ -629,6 +660,20 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     }
   }, [router.isReady, router.query.tab]);
   
+  // Close Add Contacts dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (addContactsRef.current && !addContactsRef.current.contains(event.target as Node)) {
+        setShowAddContactsDropdown(false);
+      }
+    };
+    
+    if (showAddContactsDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showAddContactsDropdown]);
+
   // Handler to update filter and URL
   const handleFilterChange = useCallback((filterId: string) => {
     setActiveFilter(filterId);
@@ -646,6 +691,10 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   }, [router]);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [prospectsSearch, setProspectsSearch] = useState("");
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showTabModal, setShowTabModal] = useState(false);
+  const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   const [prospectsFilters, setProspectsFilters] = useState({
     assignedTo: null as string | null,
     campaigns: null as string[] | null,
@@ -679,6 +728,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   const [dataList, setDataList] = useState<CrmDataItem[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [clearSelectedRows, setClearSelectedRows] = useState(false);
   const [metrics, setMetrics] = useState<CrmDataMetrics>({
     assigned_records: 0,
     unassigned_records: 0,
@@ -801,7 +851,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
           module_slug: ModuleSlug.CRM_CAMPAIGNS,
         });
 
-        campaignsResponse.data.forEach((campaign) => {
+        campaignsResponse.data.forEach((campaign: any) => {
           campaignsMap[campaign.id] = campaign.name;
         });
       }
@@ -940,7 +990,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     const loadTags = async () => {
       try {
         const tags = await getCrmDataTags();
-        const tagOptions = tags.map((tag) => ({
+        const tagOptions = tags.map((tag: any) => ({
           value: tag.name,
           label: tag.name,
           id: tag.id,
@@ -966,7 +1016,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     const loadCampaigns = async () => {
       try {
         const campaignsResponse = await getCampaigns({ per_page: 1000 });
-        const campaignOptions = campaignsResponse.data.map((campaign) => ({
+        const campaignOptions = campaignsResponse.data.map((campaign: any) => ({
           value: campaign.id.toString(),
           label: campaign.name,
           id: campaign.id,
@@ -975,7 +1025,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
 
         // Also populate the campaignsById map
         const campaignsMap: Record<number, string> = {};
-        campaignsResponse.data.forEach((campaign) => {
+        campaignsResponse.data.forEach((campaign: any) => {
           campaignsMap[campaign.id] = campaign.name;
         });
         setCampaignsById(campaignsMap);
@@ -1320,6 +1370,13 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   useEffect(() => {
     fetchCrmData();
   }, [fetchCrmData, refreshKey]);
+
+  // Clear selection after bulk delete or when clearSelectedRows changes
+  useEffect(() => {
+    if (clearSelectedRows) {
+      setSelectedItems([]);
+    }
+  }, [clearSelectedRows]);
 
   // CSV validation function
   const validateCsvFile = (
@@ -2072,7 +2129,6 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     isEditingSchedule,
   ]);
 
-  const [clearSelectedRows, setClearSelectedRows] = useState(false);
   // Handle bulk delete
   const handleBulkDelete = useCallback(async () => {
     if (selectedItems.length === 0) {
@@ -2117,6 +2173,41 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   const handleCloseFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(false);
   }, []);
+
+  // Handle preview button click - shows sidebar
+  const handlePreviewClick = useCallback((prospect: any) => {
+    setSelectedProspect(prospect);
+    setShowProspectSidebar(true);
+  }, []);
+
+  // Handle first column click - navigates to detail page
+  const handleFirstColumnClick = useCallback((prospect: any) => {
+    router.push('/crm/data/prospects-detailpage');
+  }, [router]);
+
+  // Stats cards data for metrics
+  const prospectsStatsCards: StatsCardData[] = useMemo(() => [
+    {
+      title: 'Prospects missing Owner',
+      value: dataList.filter((p: any) => !p.user_extension || p.user_extension === '').length
+    },
+    {
+      title: 'Prospects missing Lead Status',
+      value: dataList.filter((p: any) => !p.disposition || p.disposition === '').length
+    },
+    {
+      title: 'Prospects never called',
+      value: dataList.filter((p: any) => !p.last_called_at).length
+    },
+    {
+      title: 'Prospects with no recent activity',
+      value: dataList.filter((p: any) => {
+        if (!p.last_called_at) return true;
+        const daysSinceActivity = moment().diff(moment(p.last_called_at), 'days');
+        return daysSinceActivity > 30;
+      }).length
+    }
+  ], [dataList]);
 
   // Define columns for GenericTable - Clean declarative definitions
  const prospectsColumns: TableColumn<any>[] = useMemo(
@@ -2711,6 +2802,686 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     ]
   );
 
+  // Render Add Contacts Button with Dropdown
+  const renderAddContactsButton = () => (
+    <div style={{ position: 'absolute', right: '19px', top: '18px', width: '146px' }} ref={addContactsRef}>
+      <button
+        onClick={() => setShowAddContactsDropdown(!showAddContactsDropdown)}
+        style={{
+          padding: '9px 13px',
+          backgroundColor: '#000000',
+          color: '#ffffff',
+          border: 'none',
+          borderRadius: '4px',
+          fontSize: '12px',
+          fontWeight: '500',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#1a1a1a';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = '#000000';
+        }}
+      >
+        Add prospects
+        <ChevronDown size={16} />
+      </button>
+
+      {showAddContactsDropdown && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          right: 0,
+          marginTop: '4px',
+          backgroundColor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '5px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          minWidth: '160px',
+          zIndex: 1000,
+          overflow: 'hidden',
+        }}>
+          <button
+            onClick={() => {
+              setShowAddContactsDropdown(false);
+              setShowCreateContactSidebar(true);
+            }}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              textAlign: 'left',
+              fontSize: '14px',
+              color: '#141414',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f7fafc';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            Create new
+          </button>
+          <button
+            onClick={() => {
+              setShowAddContactsDropdown(false);
+              console.log('Import contacts');
+            }}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              textAlign: 'left',
+              fontSize: '14px',
+              color: '#d97706',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f7fafc';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            Import
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  // Render Create Contact Sidebar
+  const renderCreateContactSidebar = () => {
+    if (!showCreateContactSidebar) return null;
+
+    const isFormValid = contactForm.email && contactForm.firstName && contactForm.lastName;
+
+    return (
+      <>
+        {/* Overlay */}
+        <div
+          className="contact-sidebar-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1000,
+          }}
+          onClick={() => setShowCreateContactSidebar(false)}
+        />
+
+        {/* Sidebar */}
+        <div
+          className="contact-sidebar-container"
+          style={{
+            position: 'fixed',
+            top: 0,
+            right: 0,
+            width: '600px',
+            height: '100vh',
+            backgroundColor: '#ffffff',
+            boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.1)',
+            zIndex: 1001,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Header */}
+          <div className="contact-sidebar-header" style={{
+            padding: '20px 24px',
+            borderBottom: '1px solid #eaf0f6',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <h2 className="contact-sidebar-title" style={{
+              fontSize: '20px',
+              fontWeight: '600',
+              color: '#141414',
+              margin: 0,
+            }}>
+              Create Contact
+            </h2>
+            <button
+              className="contact-sidebar-close-btn"
+              onClick={() => setShowCreateContactSidebar(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '4px',
+                cursor: 'pointer',
+                color: '#718096',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          {/* Form Content */}
+          <div className="contact-sidebar-content" style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '40px',
+          }}>
+            {/* Primary Fields Section */}
+            <div className="contact-form-section">
+              {/* Email Field */}
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label contact-form-label-required" style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  marginBottom: '8px',
+                }}>
+                  Email <span style={{ color: '#f2545b' }}>*</span>
+                </label>
+                <input
+                  type="email"
+                  className="contact-form-input"
+                  data-test-id="email-input"
+                  value={contactForm.email}
+                  onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #8a8a8a',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* First Name Field */}
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label contact-form-label-required" style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  marginBottom: '8px',
+                }}>
+                  First name <span style={{ color: '#f2545b' }}>*</span>
+                </label>
+                <input
+                  className="contact-form-textarea"
+                  data-test-id="firstname-input"
+                  value={contactForm.firstName}
+                  onChange={(e) => setContactForm({ ...contactForm, firstName: e.target.value })}
+                  required
+                  
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #8a8a8a',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#0091ae'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e0'}
+                />
+              </div>
+
+              {/* Last Name Field */}
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label contact-form-label-required" style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  marginBottom: '8px',
+                }}>
+                  Last name <span style={{ color: '#f2545b' }}>*</span>
+                </label>
+                <input
+                  className="contact-form-textarea"
+                  data-test-id="lastname-input"
+                  value={contactForm.lastName}
+                  onChange={(e) => setContactForm({ ...contactForm, lastName: e.target.value })}
+                  required
+                  
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #8a8a8a',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#0091ae'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e0'}
+                />
+              </div>
+            </div>
+
+            {/* Secondary Fields Section */}
+            <div className="contact-form-section" style={{ marginTop: '24px' }}>
+              {/* Contact Owner Field */}
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label" style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  marginBottom: '8px',
+                }}>
+                  Contact owner
+                </label>
+                <Dropdown className="contact-form-dropdown">
+                  <Dropdown.Toggle
+                    className="contact-form-dropdown-toggle"
+                    data-test-id="hubspot_owner_id-input"
+                    variant="outline-secondary"
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      border: '1px solid #8a8a8a',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      backgroundColor: '#ffffff',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    {contactForm.contactOwner}
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu style={{ width: '100%' }}>
+                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, contactOwner: 'Rizwan Haider' })}>
+                      Rizwan Haider
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, contactOwner: 'John Doe' })}>
+                      John Doe
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, contactOwner: 'Jane Smith' })}>
+                      Jane Smith
+                    </Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown>
+              </div>
+
+              {/* Job Title Field */}
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label" style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  marginBottom: '8px',
+                }}>
+                  Job title
+                </label>
+                <textarea
+                  className="contact-form-textarea"
+                  data-test-id="jobtitle-input"
+                  value={contactForm.jobTitle}
+                  onChange={(e) => setContactForm({ ...contactForm, jobTitle: e.target.value })}
+                  rows={1}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #8a8a8a',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#0091ae'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e0'}
+                />
+              </div>
+
+              {/* Phone Number Field */}
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label" style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  marginBottom: '8px',
+                }}>
+                  Phone number
+                </label>
+                <textarea
+                  className="contact-form-textarea"
+                  data-test-id="property-input-phone-button"
+                  value={contactForm.phoneNumber}
+                  onChange={(e) => setContactForm({ ...contactForm, phoneNumber: e.target.value })}
+                  rows={1}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #8a8a8a',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = '#0091ae'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e0'}
+                />
+              </div>
+
+              {/* Lifecycle Stage Field */}
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label" style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  marginBottom: '8px',
+                }}>
+                  Lifecycle stage
+                </label>
+                <Dropdown className="contact-form-dropdown">
+                  <Dropdown.Toggle
+                    className="contact-form-dropdown-toggle"
+                    data-test-id="lifecyclestage-input"
+                    variant="outline-secondary"
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      border: '1px solid #8a8a8a',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      backgroundColor: '#ffffff',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    {contactForm.lifecycleStage}
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu style={{ width: '100%' }}>
+                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, lifecycleStage: 'Lead' })}>
+                      Lead
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, lifecycleStage: 'Prospect' })}>
+                      Prospect
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, lifecycleStage: 'Customer' })}>
+                      Customer
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, lifecycleStage: 'Evangelist' })}>
+                      Evangelist
+                    </Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown>
+              </div>
+
+              {/* Lead Status Field */}
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label" style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  marginBottom: '8px',
+                }}>
+                  Lead status
+                </label>
+                <Dropdown className="contact-form-dropdown">
+                  <Dropdown.Toggle
+                    className="contact-form-dropdown-toggle"
+                    data-test-id="hs_lead_status-input"
+                    variant="outline-secondary"
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      border: '1px solid #8a8a8a',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      backgroundColor: '#ffffff',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      color: contactForm.leadStatus ? '#141414' : '#a0aec0',
+                    }}
+                  >
+                    {contactForm.leadStatus || 'Select...'}
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu style={{ width: '100%' }}>
+                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, leadStatus: 'New' })}>
+                      New
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, leadStatus: 'Open' })}>
+                      Open
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, leadStatus: 'In Progress' })}>
+                      In Progress
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, leadStatus: 'Qualified' })}>
+                      Qualified
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, leadStatus: 'Unqualified' })}>
+                      Unqualified
+                    </Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown>
+              </div>
+
+              {/* Legal Basis Field */}
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label" style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  marginBottom: '8px',
+                }}>
+                  Legal basis for processing contact&apos;s data
+                </label>
+                <Dropdown className="contact-form-dropdown">
+                  <Dropdown.Toggle
+                    className="contact-form-dropdown-toggle"
+                    data-test-id="hs_legal_basis-input"
+                    data-fnd-select-multi-value="true"
+                    variant="outline-secondary"
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      border: '1px solid #8a8a8a',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      backgroundColor: '#ffffff',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      color: contactForm.legalBasis.length > 0 ? '#141414' : '#a0aec0',
+                    }}
+                  >
+                    {contactForm.legalBasis.length > 0 
+                      ? contactForm.legalBasis.join(', ') 
+                      : 'Select...'}
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu style={{ width: '100%', padding: '8px' }}>
+                    {['Legitimate interest', 'Consent', 'Contract', 'Legal obligation', 'Vital interests', 'Public task'].map((option) => (
+                      <Dropdown.Item
+                        key={option}
+                        as="div"
+                        style={{ padding: '4px 8px' }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const isSelected = contactForm.legalBasis.includes(option);
+                          const newBasis = isSelected
+                            ? contactForm.legalBasis.filter(b => b !== option)
+                            : [...contactForm.legalBasis, option];
+                          setContactForm({ ...contactForm, legalBasis: newBasis });
+                        }}
+                      >
+                        <Form.Check
+                          type="checkbox"
+                          label={option}
+                          checked={contactForm.legalBasis.includes(option)}
+                          onChange={() => {}} // Handled by parent onClick
+                        />
+                      </Dropdown.Item>
+                    ))}
+                  </Dropdown.Menu>
+                </Dropdown>
+              </div>
+            </div>
+
+            {/* Marketing Contact Section */}
+            <div className="contact-form-section" style={{
+              marginTop: '24px',
+              paddingTop: '24px',
+              borderTop: '1px solid #eaf0f6',
+            }}>
+              <div className="contact-form-field">
+                <Form.Check
+                  type="checkbox"
+                  className="contact-form-checkbox"
+                  checked={contactForm.isMarketingContact}
+                  onChange={(e) => setContactForm({ ...contactForm, isMarketingContact: e.target.checked })}
+                  label={
+                    <span style={{
+                      fontSize: '14px',
+                      color: '#141414',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}>
+                      Set this contact as a marketing contact
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '50%',
+                          backgroundColor: '#e0e7ef',
+                          color: '#6c757d',
+                          fontSize: '12px',
+                          cursor: 'help',
+                        }}
+                        title="Marketing contacts can be used for marketing campaigns and automations"
+                      >
+                        i
+                      </span>
+                    </span>
+                  }
+                />
+                <p style={{
+                  fontSize: '13px',
+                  color: '#6c757d',
+                  marginTop: '8px',
+                  marginLeft: '24px',
+                  marginBottom: 0,
+                }}>
+                  Allow your team to market to this Contact
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer Buttons */}
+          <div className="contact-sidebar-footer" style={{
+            padding: '16px 24px',
+            borderTop: '1px solid #eaf0f6',
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'flex-start',
+          }}>
+            <button
+              type="submit"
+              className="contact-form-btn-create"
+              disabled={!isFormValid}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: isFormValid ? '#0091ae' : '#cbd5e0',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: isFormValid ? 'pointer' : 'not-allowed',
+              }}
+              onMouseEnter={(e) => {
+                if (isFormValid) e.currentTarget.style.backgroundColor = '#007a94';
+              }}
+              onMouseLeave={(e) => {
+                if (isFormValid) e.currentTarget.style.backgroundColor = '#0091ae';
+              }}
+            >
+              Create
+            </button>
+            <button
+              type="button"
+              className="contact-form-btn-create-another"
+              disabled={!isFormValid}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: 'transparent',
+                color: isFormValid ? '#141414' : '#a0aec0',
+                border: '1px solid #8a8a8a',
+                borderRadius: '4px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: isFormValid ? 'pointer' : 'not-allowed',
+              }}
+              onMouseEnter={(e) => {
+                if (isFormValid) e.currentTarget.style.backgroundColor = '#f7fafc';
+              }}
+              onMouseLeave={(e) => {
+                if (isFormValid) e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              Create and add another
+            </button>
+            <button
+              type="button"
+              className="contact-form-btn-cancel"
+              onClick={() => setShowCreateContactSidebar(false)}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: 'transparent',
+                color: '#141414',
+                border: '1px solid #8a8a8a',
+                borderRadius: '4px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f7fafc'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
   if (!session?.user?.permissions?.includes("list-crm-data-management")) {
     return null;
   }
@@ -2766,6 +3537,31 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         .timeline-item:last-child .timeline-line {
           display: none;
         }
+        .generic-table-row.clickable {
+          cursor: pointer;
+        }
+        
+        
+        /* Page layout for full height */
+        .prospects-page-container {
+          display: flex;
+          flex-direction: column;
+          height: calc(100vh - 100px);
+          overflow: hidden;
+        }
+        
+        .prospects-content-area {
+          flex: 1;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .prospects-scrollable-content {
+          flex: 1;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
       `,
         }}
       />
@@ -2775,7 +3571,12 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         subTitle="Prospects"
       />
 
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+      {/* Main flex container for content and sidebar */}
+      <div style={{ display: 'flex', gap: '0', height: 'calc(100vh)', overflow: 'hidden' }}>
+        {/* Main content area */}
+        <div className="prospects-scrollable-content" style={{ flex: 1 }}>
+
+      {/* <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-0">
         <div className="mb-3 mb-md-0">
   <nav aria-label="breadcrumb">
     <ol className="breadcrumb mb-0">
@@ -2791,13 +3592,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   </nav>
 </div>
         <div className="d-flex flex-wrap gap-2">
-          {/* <Button
-            variant={showProspectsAnalytics ? "primary" : "outline-secondary"}
-            onClick={() => setShowProspectsAnalytics(!showProspectsAnalytics)}
-          >
-            <FiDatabase size={16} className="me-2" />
-            {showProspectsAnalytics ? "Hide Analytics" : "Show Analytics"}
-          </Button> */}
+         
 
 {session?.user?.permissions?.includes("add-crm-data-management") && (
   <Button
@@ -2836,10 +3631,10 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
 
 
         </div>
-      </div>
+      </div> */}
         
         {/* Stats Cards */}
-      <StatsCards 
+      {/* <StatsCards 
         data={[
           {
             title: 'All Prospects',
@@ -2905,7 +3700,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
           }
         ]}
         gridMinWidth="180px"
-      />
+      /> */}
 
       <div className="container-fluid">
         {/* Analytics Section - Collapsible */}
@@ -3405,46 +4200,263 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
           )}
 
         {/* Prospects Table */}
-        {session?.user?.permissions?.includes("list-crm-data-management") && (
-          <GenericTable
-            data={dataList}
-            columns={prospectsColumns}
-            actions={prospectsActions}
-            selectable={session?.user?.permissions?.includes("delete-crm-data-management")}
-            selectedRows={dataList.filter(item => selectedItems.includes(item.id))}
-            onSelectionChange={(selected) => setSelectedItems(selected.map(item => item.id))}
-            customizableColumns={true}
-            defaultSelectedColumns={defaultSelectedColumns}
-            columnStorageKey="crmDataSelectedColumns"
-            pagination={{
-              currentPage: pagination.currentPage,
-              rowsPerPage: pagination.rowsPerPage,
-              totalRows: totalRecords,
-              pageSizeOptions: [10, 25, 50, 100]
-            }}
-            onPaginationChange={(page, rowsPerPage) => {
-              setPagination({
-                ...pagination,
-                currentPage: page,
-                rowsPerPage
-              });
-            }}
-            sortable={true}
-            defaultSortColumn={pagination.sortColumn}
-            defaultSortDirection={pagination.sortDirection}
-            onRowClick={(row) => handleProspectClick(row)}
-            onRowDoubleClick={(row) => {
-              if (session?.user?.permissions?.includes("view-crm-data-management")) {
-                handleViewData(row);
-              }
-            }}
-            loading={loading}
-            emptyMessage="No prospects found matching your criteria"
-            loadingMessage="Loading prospects..."
-            hover={true}
-            uniqueKey="id"
-          />
-        )}
+        <div className="prospects-table-wrapper" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <GenericTable
+  data={dataList}
+  columns={prospectsColumns}
+  actions={prospectsActions}
+  showActions={false}
+  
+  // Selection
+  selectable={session?.user?.permissions?.includes("delete-crm-data-management")}
+  selectedRows={dataList.filter(item => selectedItems.includes(item.id))}
+  onSelectionChange={(selected) => {
+    setSelectedItems(selected.map(item => item.id));
+    setClearSelectedRows(false);
+  }}
+  
+  // Column customization
+  // customizableColumns={true}
+  // defaultSelectedColumns={defaultSelectedColumns}
+  // columnStorageKey="crmDataSelectedColumns"
+  
+  // Pagination
+  pagination={{
+    currentPage: pagination.currentPage,
+    rowsPerPage: pagination.rowsPerPage,
+    totalRows: totalRecords,
+    pageSizeOptions: [10, 15, 25, 50, 100]
+  }}
+  onPaginationChange={(page, rowsPerPage) => {
+    setPagination({
+      ...pagination,
+      currentPage: page,
+      rowsPerPage
+    });
+  }}
+  
+  // Sorting
+  sortable={true}
+  defaultSortColumn={pagination.sortColumn}
+  defaultSortDirection={pagination.sortDirection}
+  onSort={(column, direction) => {
+    setPagination({
+      ...pagination,
+      sortColumn: column,
+      sortDirection: direction
+    });
+  }}
+  
+  // Row interactions
+  onPreviewClick={(row) => handlePreviewClick(row)}
+  onFirstColumnClick={(row) => handleFirstColumnClick(row)}
+  onRowDoubleClick={(row) => {
+    if (session?.user?.permissions?.includes("view-crm-data-management")) {
+      handleViewData(row);
+    }
+  }}
+  
+  // Loading & styling
+  loading={loading}
+  emptyMessage="No prospects found matching your criteria"
+  loadingMessage="Loading prospects..."
+  hover={true}
+  uniqueKey="id"
+  
+  // Fixed height mode
+  fixedHeight={true}
+  maxHeight="calc(100vh - 380px)"
+  
+  // Toolbar
+  showToolbar={true}
+  toolbar={{
+    // Tabs
+    showTabs: true,
+    tabsDropdownLabel: "Prospects",
+    tabs: [
+      { id: 'all', label: 'All prospects', count: totalRecords, removable: false },
+      ...customTabs
+    ],
+    activeTab: activeFilter,
+    onTabChange: handleFilterChange,
+    onTabAdd: () => setShowTabModal(true),
+    onTabRemove: (tabId) => {
+      setCustomTabs(tabs => tabs.filter(t => t.id !== tabId));
+      if (activeFilter === tabId) {
+        handleFilterChange('all');
+      }
+    },
+    
+    // Search
+    showSearch: true,
+    searchValue: prospectsSearch,
+    searchPlaceholder: "Search prospects...",
+    onSearchChange: (value) => {
+      setProspectsSearch(value);
+      // Clear search on empty value
+      if (!value) {
+        const newFilters = { ...currentFilters };
+        delete newFilters.search;
+        handleFiltersChange(newFilters);
+        setRefreshKey((prev) => prev + 1);
+      }
+    },
+    onSearch: () => {
+      if (prospectsSearch) {
+        handleFiltersChange({
+          ...currentFilters,
+          search: prospectsSearch
+        });
+        setRefreshKey((prev) => prev + 1);
+      }
+    },
+    
+    // Actions
+    showTableViewDropdown: true,
+    tableViewLabel: "Table view",
+    showViewSwitcher: true,
+    showEditColumns: true,
+    onEditColumnsClick: () => setShowColumnEditor(true),
+    showPipelineDropdown: true,
+    pipelineLabel: "All Pipelines",
+    showFiltersButton: true,
+    onFiltersClick: handleOpenFiltersSidebar,
+    showSortButton: true,
+    showExportButton: true,
+    onExportClick: () => setShowExportModal(true),
+    showSaveButton: true,
+    onSaveClick: () => console.log('Save view'),
+    
+    // Filter Pills
+    filterPills: [
+      { 
+        id: 'contact_owner', 
+        label: 'Contact Owner', 
+        showDropdown: true,
+        dropdownOptions: [
+          { label: 'All Owners', value: 'all', onClick: () => {
+            const newFilters = { ...currentFilters };
+            delete newFilters.user_extension;
+            handleFiltersChange(newFilters);
+            setRefreshKey((prev) => prev + 1);
+          }},
+          ...extensions.map(ext => ({
+            label: ext.name || ext.extension,
+            value: ext.extension,
+            onClick: () => {
+              handleFiltersChange({ ...currentFilters, user_extension: ext.extension });
+              setRefreshKey((prev) => prev + 1);
+            }
+          }))
+        ]
+      },
+      { 
+        id: 'create_date', 
+        label: 'Create date', 
+        showDropdown: true,
+        dropdownOptions: [
+          { label: 'All Time', value: 'all', onClick: () => {
+            const newFilters = { ...currentFilters };
+            delete newFilters.created_at_from;
+            delete newFilters.created_at_to;
+            handleFiltersChange(newFilters);
+            setRefreshKey((prev) => prev + 1);
+          }},
+          { label: 'Today', value: 'today', onClick: () => {
+            const today = moment().format('YYYY-MM-DD');
+            handleFiltersChange({ ...currentFilters, created_at_from: today, created_at_to: today });
+            setRefreshKey((prev) => prev + 1);
+          }},
+          { label: 'Last 7 Days', value: 'week', onClick: () => {
+            const from = moment().subtract(7, 'days').format('YYYY-MM-DD');
+            const to = moment().format('YYYY-MM-DD');
+            handleFiltersChange({ ...currentFilters, created_at_from: from, created_at_to: to });
+            setRefreshKey((prev) => prev + 1);
+          }},
+          { label: 'Last 30 Days', value: 'month', onClick: () => {
+            const from = moment().subtract(30, 'days').format('YYYY-MM-DD');
+            const to = moment().format('YYYY-MM-DD');
+            handleFiltersChange({ ...currentFilters, created_at_from: from, created_at_to: to });
+            setRefreshKey((prev) => prev + 1);
+          }}
+        ]
+      },
+      { 
+        id: 'last_activity', 
+        label: 'Last activity date', 
+        showDropdown: true,
+        dropdownOptions: [
+          { label: 'All Time', value: 'all', onClick: () => {
+            const newFilters = { ...currentFilters };
+            delete newFilters.last_called_at_from;
+            delete newFilters.last_called_at_to;
+            handleFiltersChange(newFilters);
+            setRefreshKey((prev) => prev + 1);
+          }},
+          { label: 'Today', value: 'today', onClick: () => {
+            const today = moment().format('YYYY-MM-DD');
+            handleFiltersChange({ ...currentFilters, last_called_at_from: today, last_called_at_to: today });
+            setRefreshKey((prev) => prev + 1);
+          }},
+          { label: 'Last 7 Days', value: 'week', onClick: () => {
+            const from = moment().subtract(7, 'days').format('YYYY-MM-DD');
+            const to = moment().format('YYYY-MM-DD');
+            handleFiltersChange({ ...currentFilters, last_called_at_from: from, last_called_at_to: to });
+            setRefreshKey((prev) => prev + 1);
+          }},
+          { label: 'Last 30 Days', value: 'month', onClick: () => {
+            const from = moment().subtract(30, 'days').format('YYYY-MM-DD');
+            const to = moment().format('YYYY-MM-DD');
+            handleFiltersChange({ ...currentFilters, last_called_at_from: from, last_called_at_to: to });
+            setRefreshKey((prev) => prev + 1);
+          }}
+        ]
+      },
+      { 
+        id: 'lead_status', 
+        label: 'Lead Status', 
+        showDropdown: true,
+        dropdownOptions: [
+          { label: 'All Status', value: 'all', onClick: () => {
+            const newFilters = { ...currentFilters };
+            delete newFilters.disposition;
+            handleFiltersChange(newFilters);
+            setRefreshKey((prev) => prev + 1);
+          }},
+          { label: 'Hot Lead', value: 'hot_lead', onClick: () => {
+            handleFiltersChange({ ...currentFilters, disposition: 'hot_lead' });
+            setRefreshKey((prev) => prev + 1);
+          }},
+          { label: 'Warm Lead', value: 'warm_lead', onClick: () => {
+            handleFiltersChange({ ...currentFilters, disposition: 'warm_lead' });
+            setRefreshKey((prev) => prev + 1);
+          }},
+          { label: 'Cold Lead', value: 'cold_lead', onClick: () => {
+            handleFiltersChange({ ...currentFilters, disposition: 'cold_lead' });
+            setRefreshKey((prev) => prev + 1);
+          }},
+          { label: 'Qualified', value: 'qualified', onClick: () => {
+            handleFiltersChange({ ...currentFilters, disposition: 'qualified' });
+            setRefreshKey((prev) => prev + 1);
+          }},
+          { label: 'Not Interested', value: 'not_interested', onClick: () => {
+            handleFiltersChange({ ...currentFilters, disposition: 'not_interested' });
+            setRefreshKey((prev) => prev + 1);
+          }}
+        ]
+      },
+    ],
+    showAdvancedFilters: true,
+    onAdvancedFiltersClick: handleOpenFiltersSidebar,
+
+    // Right-aligned custom actions
+    rightActions: renderAddContactsButton()
+  }}
+  
+  // Stats cards for metrics
+  statsCards={prospectsStatsCards}
+/>
+        </div>
       </div>
 
       {/* Upload Modal */}
@@ -5659,67 +6671,215 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         recording={selectedRecording}
       />
 
+        </div> {/* End main content area */}
+
       {/* Prospect Detail Sidebar */}
+      {showProspectSidebar && (
       <GenericSidebar
         isOpen={showProspectSidebar}
         onClose={handleCloseProspectSidebar}
         moduleSlug={ModuleSlug.CRM_DATA_MANAGEMENT}
         title={selectedProspect?.name || 'Prospect Details'}
         subtitle={selectedProspect?.phone || ''}
+        email={selectedProspect?.email}
+        phone={selectedProspect?.phone}
         avatar={{
           initials: getInitials(selectedProspect?.name || 'NA'),
           name: selectedProspect?.name || 'NA',
           gradient: getRandomColor(selectedProspect?.name || '')
         }}
-        width="400px"
+        breezeRecordSummary={{
+          content: "This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
+          timestamp: "Generated on Feb 14, 2026 at 2:30 PM",
+          onRefresh: () => console.log('Refresh AI summary'),
+          onThumbsUp: () => console.log('Thumbs up'),
+          onThumbsDown: () => console.log('Thumbs down'),
+          onCopy: () => {
+            navigator.clipboard.writeText("This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.");
+            console.log('Summary copied');
+          },
+          onAskQuestion: () => console.log('Ask AI a question')
+        }}
+        recordLink={{
+          label: 'View record',
+          onClick: () => console.log('View full prospect record')
+        }}
+        actionsDropdown={{
+          label: 'Actions',
+          items: [
+            { 
+              label: 'Convert to Lead', 
+              onClick: () => {
+                setConvertingProspectId(selectedProspect?.id);
+                setShowConvertToLeadModal(true);
+              }
+            },
+            { label: 'Assign to User', onClick: () => console.log('Assign') },
+            { 
+              label: 'Delete', 
+              onClick: () => handleDeleteData(selectedProspect)
+            }
+          ]
+        }}
+        quickActions={[
+          { 
+            id: 'note', 
+            label: 'Note', 
+            icon: FileText, 
+            onClick: () => console.log('Add note'),
+            disabled: false 
+          },
+          { 
+            id: 'call', 
+            label: 'Call', 
+            icon: Phone, 
+            onClick: () => selectedProspect?.phone && handleCallClick(selectedProspect),
+            disabled: !selectedProspect?.phone 
+          },
+          { 
+            id: 'email', 
+            label: 'Email', 
+            icon: Mail, 
+            onClick: () => console.log('Send email'),
+            disabled: !selectedProspect?.email 
+          },
+          { 
+            id: 'task', 
+            label: 'Task', 
+            icon: CheckSquare, 
+            onClick: () => console.log('Create task'),
+            disabled: false 
+          },
+          { 
+            id: 'meeting', 
+            label: 'Meeting', 
+            icon: Calendar, 
+            onClick: () => console.log('Schedule meeting'),
+            disabled: false 
+          },
+          { 
+            id: 'more', 
+            label: 'More', 
+            icon: MoreVertical, 
+            onClick: () => console.log('More actions'),
+            disabled: false 
+          }
+        ]}
         sections={[
           {
-            id: 'prospect-info',
-            title: 'Prospect Information',
+            id: 'about-prospect',
+            title: 'About this prospect',
             icon: Target,
+            collapsible: true,
+            defaultExpanded: true,
+            actions: [
+              { label: 'Edit all properties', onClick: () => console.log('Edit all') }
+            ],
             fields: [
               {
                 label: 'Name',
-                value: selectedProspect?.name || 'N/A'
+                value: selectedProspect?.name || 'N/A',
+                copyable: true
               },
               {
                 label: 'Phone',
                 value: selectedProspect?.phone || 'N/A',
-                icon: Phone
+                type: 'phone',
+                copyable: true,
+                externalLink: selectedProspect?.phone ? `tel:${selectedProspect.phone}` : undefined
+              },
+              {
+                label: 'Email',
+                value: selectedProspect?.email || 'N/A',
+                type: 'email',
+                copyable: true,
+                externalLink: selectedProspect?.email ? `mailto:${selectedProspect.email}` : undefined,
+                show: !!selectedProspect?.email
               },
               {
                 label: 'Assigned To',
                 value: selectedProspect?.user_extension ? getNameByExtension(selectedProspect.user_extension) : 'Unassigned',
-                icon: User
+                hasDetails: true,
+                onDetailsClick: () => console.log('Show user details')
               },
               {
                 label: 'Campaign',
                 value: selectedProspect?.campaign?.name || 'No Campaign',
-                show: !!selectedProspect?.campaign
+                show: !!selectedProspect?.campaign,
+                hasDetails: !!selectedProspect?.campaign,
+                onDetailsClick: () => console.log('Show campaign details')
+              },
+              {
+                label: 'Status',
+                value: selectedProspect?.status || 'Active',
+                type: 'text'
               },
               {
                 label: 'Created Date',
-                value: selectedProspect?.created_at,
-                type: 'date',
-                icon: Calendar
+                value: selectedProspect?.created_at ? moment(selectedProspect.created_at).format('MMM DD, YYYY') : 'N/A',
+                type: 'date'
+              },
+              {
+                label: 'Last Updated',
+                value: selectedProspect?.updated_at ? moment(selectedProspect.updated_at).format('MMM DD, YYYY') : 'N/A',
+                type: 'date'
               }
             ]
           },
           {
-            id: 'call-recordings',
-            title: 'Call Recordings',
+            id: 'recent-activities',
+            title: 'Recent activities',
             icon: History,
-            badge: {
-              value: 0,
-              variant: 'secondary'
-            },
+            collapsible: true,
+            defaultExpanded: true,
+            count: 0,
             emptyState: {
               icon: History,
-              message: 'No call recordings available yet'
+              message: 'No recent activities for this prospect.',
+              action: {
+                label: 'Log activity',
+                onClick: () => console.log('Log activity')
+              }
+            }
+          },
+          {
+            id: 'call-recordings',
+            title: 'Call Recordings',
+            icon: PhoneIcon,
+            collapsible: true,
+            defaultExpanded: true,
+            count: 0,
+            actions: [
+              { label: 'View all recordings', onClick: () => console.log('View all') }
+            ],
+            emptyState: {
+              icon: PhoneIcon,
+              message: 'No call recordings available yet.',
+              action: {
+                label: 'Make a call',
+                onClick: () => selectedProspect?.phone && handleCallClick(selectedProspect)
+              }
+            }
+          },
+          {
+            id: 'notes',
+            title: 'Notes',
+            icon: FileText,
+            collapsible: true,
+            defaultExpanded: true,
+            count: 0,
+            emptyState: {
+              icon: FileText,
+              message: 'No notes added yet.',
+              action: {
+                label: 'Add note',
+                onClick: () => console.log('Add note')
+              }
             }
           }
         ]}
       />
+      )}
 
       {/* Filters Sidebar */}
       <GenericFilterSidebar
@@ -5979,6 +7139,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         }}
       />
 
+      </div> {/* End flex container */}
+
       {/* Convert to Lead Modal */}
 {convertingProspectId && (
   <ConvertToLeadModal
@@ -5994,6 +7156,146 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     }}
   />
 )}
+
+      {/* Column Editor Modal */}
+      <Modal show={showColumnEditor} onHide={() => setShowColumnEditor(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Customize Columns</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted mb-3">Select which columns to display in the table</p>
+          <Row>
+            {prospectsColumns.map((col) => (
+              <Col key={col.key} md={6} className="mb-2">
+                <Form.Check
+                  type="checkbox"
+                  label={col.label}
+                  checked={defaultSelectedColumns.includes(col.key)}
+                  onChange={(e) => {
+                    // Handle column toggle
+                    console.log('Toggle column:', col.key, e.target.checked);
+                  }}
+                />
+              </Col>
+            ))}
+          </Row>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowColumnEditor(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={() => setShowColumnEditor(false)}>
+            Apply Changes
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Export Modal */}
+      <Modal show={showExportModal} onHide={() => setShowExportModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Export Prospects</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Export {totalRecords} prospects to CSV file?</p>
+          <Form.Group className="mb-3">
+            <Form.Label>File Name</Form.Label>
+            <Form.Control
+              type="text"
+              defaultValue={`prospects_${moment().format('YYYY-MM-DD')}`}
+              placeholder="Enter file name"
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowExportModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              const csvContent = [
+                prospectsColumns.map(col => col.label).join(','),
+                ...dataList.map(row =>
+                  prospectsColumns.map(col => {
+                    const value = row[col.key as keyof CrmDataItem];
+                    return typeof value === 'string' ? `"${value}"` : value;
+                  }).join(',')
+                )
+              ].join('\n');
+
+              const blob = new Blob([csvContent], { type: 'text/csv' });
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `prospects_${moment().format('YYYY-MM-DD')}.csv`;
+              a.click();
+              window.URL.revokeObjectURL(url);
+              setShowExportModal(false);
+              toast.success('Prospects exported successfully!');
+            }}
+          >
+            <Download size={16} className="me-2" />
+            Export
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Add Tab Modal */}
+      <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Add New Tab</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted mb-3">Select a filter to add as a new tab</p>
+          <div className="d-grid gap-2">
+            <Button
+              variant="outline-primary"
+              onClick={() => {
+                if (!customTabs.find(t => t.id === 'scheduled')) {
+                  setCustomTabs([...customTabs, {
+                    id: 'scheduled',
+                    label: 'Scheduled',
+                    count: metrics.scheduled_records,
+                    removable: true
+                  }]);
+                  setShowTabModal(false);
+                  toast.success('Tab added successfully!');
+                }
+              }}
+              disabled={customTabs.some(t => t.id === 'scheduled')}
+            >
+              <FiCalendar size={16} className="me-2" />
+              Scheduled
+            </Button>
+            <Button
+              variant="outline-primary"
+              onClick={() => {
+                if (!customTabs.find(t => t.id === 'has_leads')) {
+                  setCustomTabs([...customTabs, {
+                    id: 'has_leads',
+                    label: 'Convert to Leads',
+                    removable: true
+                  }]);
+                  setShowTabModal(false);
+                  toast.success('Tab added successfully!');
+                }
+              }}
+              disabled={customTabs.some(t => t.id === 'has_leads')}
+            >
+              <FiTarget size={16} className="me-2" />
+              Convert to Leads
+            </Button>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowTabModal(false)}>
+            Cancel
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Create Contact Sidebar */}
+      {renderCreateContactSidebar()}
     </React.Fragment>
   );
 };
@@ -6003,4 +7305,3 @@ CrmProspectsManagement.getLayout = (page: ReactElement) => {
 };
 
 export default CrmProspectsManagement;
-
