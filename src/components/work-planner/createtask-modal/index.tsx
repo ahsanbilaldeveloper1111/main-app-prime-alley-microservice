@@ -378,7 +378,6 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         linkedRecordIds: []
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, editTask, isEdit, fetchedProjects, loadingProjects, selectedStatusForTask]);
 
   // Convert extensions to users format for assignees
@@ -449,7 +448,6 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         statusId: selectedStatusForTask || availableStatuses[0].id 
       }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.projectId, fetchedProjects, genericStatuses, loadingGenericStatuses, isEdit, selectedStatusForTask]);
 
   const priorities: Priority[] = [

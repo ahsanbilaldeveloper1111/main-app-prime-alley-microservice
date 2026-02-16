@@ -6678,7 +6678,6 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
       <GenericSidebar
         isOpen={showProspectSidebar}
         onClose={handleCloseProspectSidebar}
-        moduleSlug={ModuleSlug.CRM_DATA_MANAGEMENT}
         title={selectedProspect?.name || 'Prospect Details'}
         subtitle={selectedProspect?.phone || ''}
         email={selectedProspect?.email}
