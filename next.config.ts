@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 import path from "node:path";
 
 const nextConfig: NextConfig = {
+
+     // 🔴 Disable Next.js Dev Indicator (the "N" bubble)
+     devIndicators: {
+        buildActivity: false,
+    },
     sassOptions: {
         includePaths: [
             path.join(__dirname, "src/assets/scss"),

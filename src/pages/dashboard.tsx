@@ -120,12 +120,12 @@ const Dashboard = () => {
       <div className="content-wrapper crm-dashboard-content">
         
         {/* Header Navigation */}
-<Row className="mb-4">
+{/* <Row className="mb-4">
   <Col xs={12} md={6}>
     <div className="d-flex gap-2 mb-3">
-      {/* <Button variant="primary" size="sm">Today</Button>
+      <Button variant="primary" size="sm">Today</Button>
       <Button variant="outline-secondary" size="sm">This Week</Button>
-      <Button variant="outline-secondary" size="sm">This Month</Button> */}
+      <Button variant="outline-secondary" size="sm">This Month</Button>
     </div>
   </Col>
   <Col xs={12} sm={12} md={12} lg={12} xl={12} xxl={6}>
@@ -144,7 +144,7 @@ const Dashboard = () => {
       </div>
     </div>
   </Col>
-</Row>
+</Row> */}
 
         {/* Title */}
         <h4 className="mb-4 fw-bold">My CRM Workspace</h4>

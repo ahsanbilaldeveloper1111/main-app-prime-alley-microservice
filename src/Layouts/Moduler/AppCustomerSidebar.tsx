@@ -94,18 +94,32 @@ interface MainMenuItem {
   target?: string;
 }
 
+const SIDEBAR_WIDTH_COLLAPSED = 65;
+const SIDEBAR_WIDTH_EXPANDED = 280;
+
 interface SidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
+  /** When provided, sidebar expand/collapse is controlled by parent (e.g. for topbar alignment) */
+  isSidebarExpanded?: boolean;
+  setSidebarExpanded?: (expanded: boolean) => void;
 }
 
 const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({ 
   sidebarOpen, 
-  setSidebarOpen
+  setSidebarOpen,
+  isSidebarExpanded: controlledExpanded,
+  setSidebarExpanded: setControlledExpanded,
 }) => {
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(false);
+  const isSidebarExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
+  const setIsSidebarExpanded = setControlledExpanded ?? setInternalExpanded;
   const [activeModule, setActiveModule] = useState<string | null>(null);
   const [expandedSubModules, setExpandedSubModules] = useState<string[]>([]);
+  const [hoveredModuleId, setHoveredModuleId] = useState<string | null>(null);
+  const [hoveredItemRect, setHoveredItemRect] = useState<{ top: number; height: number } | null>(null);
+  const [isFlyoutPinned, setIsFlyoutPinned] = useState(false);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const prevPathnameRef = useRef<string>('');
   
@@ -118,20 +132,9 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'crm',                 // 2. CRM Workspace
     'live-calls',          // 3. Live Wallboards
     'call-history',        // 4. Call Details
-    'ai-bot-and-analytics', // 5. Outbound AI Agent
-    'inbound-ai-bot-and-analytics', // 6. Inbound AI Agent
-    'ai-chat-section', // 7. AI Chat
-    'gsm', // 8. GSM
-    'tms', // 9. TMS
-    'netops', // 10. NetOps
-    'ai-ml', // 11. AI ML
-    'dncr', // 12. DNCR
-    'accounts',            // 10. Billing & Payments
-    'work-planner',        // 11. Work Planner
-    'staff-management', // 12. Staff Management
-    'reports',             // 12. Unified Reports
-    'settings',
-    'resources',
+    'accounts',            // 5. Billing & Payments
+    'work-planner',        // 6. Work Planner
+    'reports',             // 7. Unified Reports
   ];
 
   const mainMenuItems: MainMenuItem[] = [
@@ -139,7 +142,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'dashboard',
       key: 'dashboard',
       permission: '',
-      icon: <LayoutDashboard size={20} />,
+      icon: <LayoutDashboard size={16} />,
       color: MENU_COLORS.DASHBOARD,
       title: "Overview",
       label: "Overview",
@@ -148,7 +151,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     {
       id: 'dashboard-unified-workspace',
       key: 'dashboard-unified-workspace',
-      icon: <LayoutDashboard size={20} />,
+      icon: <LayoutDashboard size={16} />,
       color: MENU_COLORS.DASHBOARD,
       permission: PERMISSIONS.VIEW_UNIFIED_WORKSPACE,
       title: "Unified Workspace",
@@ -160,7 +163,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'crm',
       key: 'crm',
       permission: PERMISSIONS.CRM_SERVICES,
-      icon: <Briefcase size={20} />,
+      icon: <Briefcase size={16} />,
       color: MENU_COLORS.CRM,
       title: "CRM Workspace",
       label: "CRM Workspace",
@@ -222,7 +225,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'live-calls',
       key: 'live-calls',
       permission: PERMISSIONS.VIEW_CTI,
-      icon: <MonitorCheck size={20} />,
+      icon: <MonitorCheck size={16} />,
       color: MENU_COLORS.LIVE_CALLS,
       title: "Live Wallboards",
       label: "Live Wallboards",
@@ -233,7 +236,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'call-history',
       key: 'call-history',
       permission: PERMISSIONS.CALL_HISTORY_SERVICES,
-      icon: <Phone size={20} />,
+      icon: <Phone size={16} />,
       color: MENU_COLORS.CALL_HISTORY,
       title: 'Call Details',
       label: 'Call Details',
@@ -267,7 +270,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'ai-bot-and-analytics',
       key: 'ai-bot-and-analytics',
       permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-      icon: <Workflow size={20} />,
+      icon: <Workflow size={16} />,
       color: MENU_COLORS.AUTOMATION,
       title: "Outbound AI Agent",
       label: "Outbound AI Agent",
@@ -377,7 +380,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'ai-chat-section',
       key: 'ai-chat-section',
       permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-      icon: <Workflow size={20} />,
+      icon: <Workflow size={16} />,
       color: MENU_COLORS.AUTOMATION,
       title: "AI Chat",
       label: "AI Chat",
@@ -425,7 +428,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'gsm',
       key: 'gsm',
       permission: PERMISSIONS.GSM_SERVICES,
-      icon: <RadioTower size={20} />,
+      icon: <RadioTower size={16} />,
       color: MENU_COLORS.SIM_GATEWAY,
       title: MENU_LABELS.SIM_GATEWAY,
       label: MENU_LABELS.SIM_GATEWAY,
@@ -473,7 +476,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'tms',
       key: 'tms',
       permission: PERMISSIONS.TMS_SERVICES,
-      icon: <Workflow size={20} />,
+      icon: <Workflow size={16} />,
       color: MENU_COLORS.AUTOMATION,
       title: MENU_LABELS.AUTOMATION,
       label: MENU_LABELS.AUTOMATION,
@@ -500,7 +503,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'netops',
       key: 'netops',
       permission: PERMISSIONS.NETOPS_SERVICES,
-      icon: <LayoutDashboard size={20} />,
+      icon: <LayoutDashboard size={16} />,
       color: MENU_COLORS.NETOPS,
       title: MENU_LABELS.NETOPS,
       label: MENU_LABELS.NETOPS,
@@ -562,7 +565,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'ai-ml',
       key: 'ai-ml',
       permission: PERMISSIONS.AI_ML_SERVICES,
-      icon: <FileChartPie size={20} />,
+      icon: <FileChartPie size={16} />,
       color: MENU_COLORS.AI_INSIGHTS,
       title: MENU_LABELS.AI_INSIGHTS,
       label: MENU_LABELS.AI_INSIGHTS,
@@ -603,7 +606,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'dncr',
       key: 'dncr',
       permission: PERMISSIONS.DNCR_SERVICES,
-      icon: <Ban size={20} />,
+      icon: <Ban size={16} />,
       color: MENU_COLORS.DNCR,
       title: MENU_LABELS.COMPLIANCES,
       label: MENU_LABELS.COMPLIANCES,
@@ -637,7 +640,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'accounts',
       key: 'accounts',
       permission: PERMISSIONS.ACCOUNTS_SERVICES,
-      icon: <CreditCard size={20} />,
+      icon: <CreditCard size={16} />,
       color: MENU_COLORS.BILLING,
       title: MENU_LABELS.BILLING,
       label: MENU_LABELS.BILLING,
@@ -692,7 +695,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'work-planner',
       key: 'work-planner',
       permission: PERMISSIONS.WORK_PLANNER_SERVICES,
-      icon: <Calendar size={20} />,
+      icon: <Calendar size={16} />,
       color: MENU_COLORS.BILLING,
       title: "Work Planner",
       label: "Work Planner",
@@ -754,7 +757,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'staff-management',
       key: 'staff-management',
       permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES,
-      icon: <Users size={20} />,
+      icon: <Users size={16} />,
       color: MENU_COLORS.BILLING,
       title: "Staff Management",
       label: "Staff Management",
@@ -823,7 +826,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'reports',
       key: 'reports',
       permission: PERMISSIONS.REPORTS_SERVICES,
-      icon: <BarChart3 size={20} />,
+      icon: <BarChart3 size={16} />,
       color: MENU_COLORS.REPORTS,
       title: MENU_LABELS.REPORTS,
       label: MENU_LABELS.REPORTS,
@@ -850,7 +853,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'settings',
       key: 'settings',
       permission: '',
-      icon: <Settings size={20} />,
+      icon: <Settings size={16} />,
       color: '#0d6efd',
       title: "Settings",
       label: "Settings",
@@ -861,7 +864,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       id: 'resources',
       key: 'resources',
       permission: '',
-      icon: <NotebookText size={20} />,
+      icon: <NotebookText size={16} />,
       color: MENU_COLORS.RESOURCES,
       title: MENU_LABELS.RESOURCES,
       label: MENU_LABELS.RESOURCES,
@@ -877,15 +880,78 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  const handleModuleClick = (module: MainMenuItem) => {
+  const handleModuleClick = (module: MainMenuItem, ev?: React.MouseEvent<HTMLElement>) => {
     if (module.url && module.url !== '') {
-      // Direct navigation for modules with URLs
       setActiveModule(null);
-    } else if (module.subItems && module.subItems.length > 0) {
-      // Toggle submenu for modules with subItems
-      setActiveModule(activeModule === module.id ? null : module.id);
+      return;
+    }
+    if (module.subItems && module.subItems.length > 0) {
+      if (isSidebarExpanded && ev) {
+        // Expanded: open same flyout as hover, pinned next to clicked item
+        if (hoveredModuleId === module.id && isFlyoutPinned) {
+          setHoveredModuleId(null);
+          setHoveredItemRect(null);
+          setIsFlyoutPinned(false);
+        } else {
+          const rect = ev.currentTarget.getBoundingClientRect();
+          setHoveredModuleId(module.id);
+          setHoveredItemRect({ top: rect.top, height: rect.height });
+          setIsFlyoutPinned(true);
+        }
+        return;
+      }
+      setActiveModule(null);
     }
   };
+
+  const handleCollapsedItemMouseEnter = (module: MainMenuItem, ev: React.MouseEvent<HTMLElement>) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    if (module.subItems && module.subItems.length > 0) {
+      const rect = ev.currentTarget.getBoundingClientRect();
+      setHoveredModuleId(module.id);
+      setHoveredItemRect({ top: rect.top, height: rect.height });
+    }
+  };
+
+  const handleCollapsedItemMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredModuleId(null);
+      setHoveredItemRect(null);
+      hoverTimeoutRef.current = null;
+    }, 150);
+  };
+
+  const handleFlyoutMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+  };
+
+  const handleFlyoutMouseLeave = () => {
+    if (!isFlyoutPinned) {
+      setHoveredModuleId(null);
+      setHoveredItemRect(null);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    };
+  }, []);
+
+  // Hide flyout when sidebar is collapsed
+  useEffect(() => {
+    if (!isSidebarExpanded && isFlyoutPinned) {
+      setHoveredModuleId(null);
+      setHoveredItemRect(null);
+      setIsFlyoutPinned(false);
+    }
+  }, [isSidebarExpanded, isFlyoutPinned]);
 
   // Auto-detect active module based on current route
   useEffect(() => {
@@ -953,17 +1019,17 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
     .sidebar-container {
       position: fixed;
-      top: 76px;
+      top: 0;
       left: 0;
-      height: calc(100vh - 76px);
-      width: ${isSidebarExpanded ? '280px' : '72px'};
-      background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%);
-      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      height: 100vh;
+      width: ${isSidebarExpanded ? `${SIDEBAR_WIDTH_EXPANDED}px` : `${SIDEBAR_WIDTH_COLLAPSED}px`};
+      background: #260646;
+      border: none;
       display: flex;
       flex-direction: column;
       z-index: 1000;
       transition: width 0.3s ease-in-out;
-      box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1);
+      /* box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1); */
     }
 
     @media (max-width: 1199px) {
@@ -998,11 +1064,11 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
     .sidebar-header {
       flex-shrink: 0;
-      padding: 16px;
+      padding: 24px 16px;
       display: flex;
       align-items: center;
-      justify-content: ${isSidebarExpanded ? 'space-between' : 'center'};
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      justify-content: ${isSidebarExpanded ? 'flex-start' : 'center'};
+      /* border-bottom: 1px solid rgba(255, 255, 255, 0.1); */
     }
 
     .sidebar-logo {
@@ -1032,13 +1098,22 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       background: rgba(255, 255, 255, 0.2);
     }
 
+    .sidebar-footer {
+      flex-shrink: 0;
+      padding: 12px 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: ${isSidebarExpanded ? 'flex-end' : 'center'};
+    }
+
     .sidebar-menu {
       flex: 1;
-      overflow-y: hidden;
+      overflow-y: auto;
+      min-height: 0;
       padding: 12px 8px;
       display: flex;
       flex-direction: column;
-      overflow-y: auto;
     }
 
     .sidebar-menu::-webkit-scrollbar {
@@ -1065,8 +1140,139 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }
 
     .menu-item {
-      margin-bottom: 4px;
+      margin-bottom: 14px;
       position: relative;
+    }
+
+    .menu-item-tooltip {
+      display: none;
+      position: absolute;
+      left: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      margin-left: 12px;
+      padding: 8px 12px;
+      background: #1e3a8a;
+      color: white;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      z-index: 1002;
+      pointer-events: none;
+    }
+
+    .sidebar-container.collapsed .menu-item:hover .menu-item-tooltip {
+      display: block;
+    }
+
+    .sidebar-container.collapsed .menu-item .menu-item-tooltip {
+      animation: tooltipFade 0.15s ease;
+    }
+
+    @keyframes tooltipFade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* Submenu flyout - purple background, white text, 3px gap from sidebar */
+    .submenu-flyout {
+      position: fixed;
+      top: 0;
+      min-width: 200px;
+      max-width: 220px;
+      background: #260646 !important;
+      border-radius: 0 8px 8px 0;
+      box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2), 0 4px 20px rgba(0, 0, 0, 0.12);
+      z-index: 1010;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-left: none;
+      animation: flyoutFade 0.15s ease;
+    }
+
+    @keyframes flyoutFade {
+      from { opacity: 0; transform: translateX(-4px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .submenu-flyout-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.15);
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .submenu-flyout-content {
+      padding: 8px 0;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+
+    .submenu-flyout-content::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .submenu-flyout-content::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    .submenu-flyout-content::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+    }
+
+    .submenu-flyout-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      text-align: left;
+      padding: 10px 16px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 300;
+      color: rgba(255, 255, 255, 0.95);
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+      box-sizing: border-box;
+    }
+
+    .submenu-flyout-item:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    .submenu-flyout-item.active {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      font-weight: 400;
+    }
+
+    .submenu-flyout-item .flyout-item-icon {
+      color: rgba(255, 255, 255, 0.9);
+      display: flex;
+      flex-shrink: 0;
+    }
+
+    .submenu-flyout-item.active .flyout-item-icon {
+      color: #fff;
+    }
+
+    .submenu-flyout-item-label {
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.85);
+      cursor: default;
     }
 
     .menu-item-button {
@@ -1097,7 +1303,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }
 
     .menu-item-icon {
-      color: white;
+      color: #dfdbdb;
       display: flex;
       align-items: center;
       flex-shrink: 0;
@@ -1126,9 +1332,9 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     /* Submenu Panel */
     .submenu-panel {
       position: fixed;
-      left: ${isSidebarExpanded ? '280px' : '72px'};
-      top: 76px;
-      height: calc(100vh - 76px);
+      left: ${isSidebarExpanded ? `${SIDEBAR_WIDTH_EXPANDED}px` : `${SIDEBAR_WIDTH_COLLAPSED}px`};
+      top: 0;
+      height: 100vh;
       width: 280px;
       background: white;
       border-right: 1px solid #e5e7eb;
@@ -1139,6 +1345,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      display: none !important;
+
     }
 
     @media (max-width: 1199px) {
@@ -1385,24 +1593,23 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
       {/* Backdrop for mobile and submenu */}
       <div
-        className={`sidebar-backdrop ${(sidebarOpen || activeModule) ? 'show' : ''}`}
+        className={`sidebar-backdrop ${(sidebarOpen || activeModule || isFlyoutPinned) ? 'show' : ''}`}
         onClick={() => {
           setSidebarOpen(false);
           setActiveModule(null);
+          if (isFlyoutPinned) {
+            setHoveredModuleId(null);
+            setHoveredItemRect(null);
+            setIsFlyoutPinned(false);
+          }
         }}
       />
 
       {/* Main Sidebar */}
-      <div className={`sidebar-container ${!sidebarOpen ? 'mobile-hidden' : ''}`}>
+      <div className={`sidebar-container ${!sidebarOpen ? 'mobile-hidden' : ''} ${!isSidebarExpanded ? 'collapsed' : ''}`}>
         {/* Header */}
         <div className="sidebar-header">
           {isSidebarExpanded && <div className="sidebar-logo">Dashboard</div>}
-          <button 
-            className="expand-toggle-btn"
-            onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-          >
-            {isSidebarExpanded ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-          </button>
         </div>
 
         {/* Menu Items */}
@@ -1410,7 +1617,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           <ul className="menu-nav">
             {/* Dashboard Items */}
             {dashboardItems.map((module) => (
-              <li key={module.id} className="menu-item">
+              <li
+                key={module.id}
+                className="menu-item"
+                onMouseEnter={!isSidebarExpanded && module.subItems?.length ? (ev) => handleCollapsedItemMouseEnter(module, ev) : undefined}
+                onMouseLeave={!isSidebarExpanded && module.subItems?.length ? handleCollapsedItemMouseLeave : undefined}
+              >
+                {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
                 {module.url !== '' ? (
                   <Link href={(BASE_URL || '') + (module.url || '/')}>
                     <button
@@ -1427,8 +1640,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                   </Link>
                 ) : (
                   <button
-                    className={`menu-item-button ${activeModule === module.id ? 'active' : ''}`}
-                    onClick={() => handleModuleClick(module)}
+                    className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
+                    onClick={(e) => handleModuleClick(module, e)}
                   >
                     <div className="menu-item-icon">{module.icon}</div>
                     {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
@@ -1446,7 +1659,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
             {/* Services Items */}
             {servicesItems.map((module) => (
-              <li key={module.id} className="menu-item">
+              <li
+                key={module.id}
+                className="menu-item"
+                onMouseEnter={!isSidebarExpanded && module.subItems?.length ? (ev) => handleCollapsedItemMouseEnter(module, ev) : undefined}
+                onMouseLeave={!isSidebarExpanded && module.subItems?.length ? handleCollapsedItemMouseLeave : undefined}
+              >
+                {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
                 {module.url !== '' ? (
                   <Link href={(BASE_URL || '') + (module.url || '/')}>
                     <button
@@ -1463,8 +1682,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                   </Link>
                 ) : (
                   <button
-                    className={`menu-item-button ${activeModule === module.id ? 'active' : ''}`}
-                    onClick={() => handleModuleClick(module)}
+                    className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
+                    onClick={(e) => handleModuleClick(module, e)}
                   >
                     <div className="menu-item-icon">{module.icon}</div>
                     {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
@@ -1482,7 +1701,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
             {/* System Items */}
             {systemItems.map((module) => (
-              <li key={module.id} className="menu-item">
+              <li
+                key={module.id}
+                className="menu-item"
+                onMouseEnter={!isSidebarExpanded && module.subItems?.length ? (ev) => handleCollapsedItemMouseEnter(module, ev) : undefined}
+                onMouseLeave={!isSidebarExpanded && module.subItems?.length ? handleCollapsedItemMouseLeave : undefined}
+              >
+                {!isSidebarExpanded && <span className="menu-item-tooltip">{module.title}</span>}
                 {module.url !== '' ? (
                   <Link href={(BASE_URL || '') + (module.url || '/')}>
                     <button
@@ -1499,8 +1724,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
                   </Link>
                 ) : (
                   <button
-                    className={`menu-item-button ${activeModule === module.id ? 'active' : ''}`}
-                    onClick={() => handleModuleClick(module)}
+                    className={`menu-item-button ${activeModule === module.id ? 'active' : ''} ${hoveredModuleId === module.id && (isFlyoutPinned || !isSidebarExpanded) ? 'active' : ''}`}
+                    onClick={(e) => handleModuleClick(module, e)}
                   >
                     <div className="menu-item-icon">{module.icon}</div>
                     {isSidebarExpanded && <span className="menu-item-text">{module.title}</span>}
@@ -1515,7 +1740,80 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             ))}
           </ul>
         </div>
+
+        {/* Footer with expand/collapse */}
+        <div className="sidebar-footer">
+          <button 
+            className="expand-toggle-btn"
+            onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+          >
+            {isSidebarExpanded ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+          </button>
+        </div>
       </div>
+
+      {/* Collapsed sidebar: hover flyout for sub-items (above main content) */}
+      {/* Submenu flyout: when collapsed on hover, when expanded on click (same style, above content) */}
+      {hoveredModuleId && hoveredItemRect && (() => {
+        const flyoutModule = mainMenuItems.find(m => m.id === hoveredModuleId);
+        if (!flyoutModule?.subItems?.length) return null;
+        return (
+          <div
+            className="submenu-flyout"
+            style={{
+              top: hoveredItemRect.top,
+              left: (isSidebarExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED) + 3,
+            }}
+            onMouseEnter={handleFlyoutMouseEnter}
+            onMouseLeave={handleFlyoutMouseLeave}
+          >
+            <div className="submenu-flyout-header">{flyoutModule.title}</div>
+            <div className="submenu-flyout-content">
+              {flyoutModule.subItems.map((subItem: SubMenuItem) => (
+                subItem.subItems && subItem.subItems.length > 0 ? (
+                  <div key={subItem.id}>
+                    <div className="submenu-flyout-item submenu-flyout-item-label">
+                      <span className="flyout-item-icon">{subItem.icon}</span>
+                      {subItem.title}
+                    </div>
+                    {subItem.subItems.map((nestedItem: SubMenuItem) => (
+                      <Link
+                        key={nestedItem.id}
+                        href={(BASE_URL || '') + (nestedItem.url || '/')}
+                        className={`submenu-flyout-item ${router.pathname === nestedItem.url ? 'active' : ''}`}
+                        onClick={() => {
+                          setHoveredModuleId(null);
+                          setHoveredItemRect(null);
+                          setIsFlyoutPinned(false);
+                          if (globalThis.window?.innerWidth && globalThis.window.innerWidth < 1200) setSidebarOpen(false);
+                        }}
+                      >
+                        <span className="flyout-item-icon">{nestedItem.icon}</span>
+                        {nestedItem.title}
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <Link
+                    key={subItem.id}
+                    href={(BASE_URL || '') + (subItem.url || '/')}
+                    className={`submenu-flyout-item ${router.pathname === subItem.url ? 'active' : ''}`}
+                    onClick={() => {
+                      setHoveredModuleId(null);
+                      setHoveredItemRect(null);
+                      setIsFlyoutPinned(false);
+                      if (globalThis.window?.innerWidth && globalThis.window.innerWidth < 1200) setSidebarOpen(false);
+                    }}
+                  >
+                    <span className="flyout-item-icon">{subItem.icon}</span>
+                    {subItem.title}
+                  </Link>
+                )
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Submenu Panel */}
       {activeModuleData && activeModuleData.subItems && (
@@ -1594,4 +1892,5 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
   );
 };
 
+export { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED };
 export default ApplicationCustomerSidebar;
