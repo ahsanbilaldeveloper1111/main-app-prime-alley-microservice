@@ -1,7 +1,9 @@
 
-$googleFontsUrl: "https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap";
-@import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap");
+// $googleFontsUrl: "https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap";
+// @import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap");
 
+$googleFontsUrl: "https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@300;400;500;600;700&display=swap";
+@import url("https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@300;400;500;600;700&display=swap");
 
 @import "./style.scss";
 @import "./style-preset.scss";
@@ -17,6 +19,14 @@ $googleFontsUrl: "https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;
 // body {
 //   font-family: 'Public Sans', sans-serif;
 // }
+/* Hide Next.js Dev Indicator (N icon) */
+#__next-dev-tools,
+[data-nextjs-dev-tools],
+[data-nextjs-toast],
+[data-nextjs-portal] {
+  display: none !important;
+}
+
 .pc-sidebar{
     background-color:#ffffff !important;
 }

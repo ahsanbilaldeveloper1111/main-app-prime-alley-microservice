@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Table, Form, Button, Dropdown, Card } from 'react-bootstrap';
+import { Table, Form, Button, Dropdown, Card, InputGroup } from 'react-bootstrap';
 import {
   ArrowUpDown,
   ArrowUp,
@@ -8,9 +8,20 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Layers
+  Layers,
+  Search,
+  X,
+  Plus,
+  Filter,
+  Download,
+  Save,
+  MoreVertical,
+  Menu,
+  ChevronDown,
+  ExternalLink
 } from 'lucide-react';
 import '@assets/css/GenericTable.css';
+import GenericStatsCards, { StatsCardData } from '@components/GenericStatsCards';
 
 // Type definitions
 export interface TableColumn<T = any> {
@@ -89,6 +100,87 @@ export interface PaginationConfig {
   pageSizeOptions?: number[];
 }
 
+export interface TabConfig {
+  id: string;
+  label: string;
+  count?: number;
+  icon?: React.ReactNode;
+  removable?: boolean;
+}
+
+export interface FilterPill {
+  id: string;
+  label: string;
+  icon?: React.ReactNode;
+  onClick?: () => void;
+  showDropdown?: boolean;
+  dropdownOptions?: Array<{
+    label: string;
+    value: string;
+    onClick?: () => void;
+  }>;
+}
+
+export interface ToolbarConfig {
+  // Search
+  showSearch?: boolean;
+  searchValue?: string;
+  searchPlaceholder?: string;
+  onSearchChange?: (value: string) => void;
+  onSearch?: () => void;
+  
+  // Tabs
+  showTabs?: boolean;
+  tabs?: TabConfig[];
+  activeTab?: string;
+  onTabChange?: (tabId: string) => void;
+  onTabAdd?: () => void;
+  onTabRemove?: (tabId: string) => void;
+  tabsDropdownLabel?: string;
+  
+  // View controls
+  showViewSwitcher?: boolean;
+  currentView?: 'table' | 'grid' | 'list';
+  onViewChange?: (view: 'table' | 'grid' | 'list') => void;
+  
+  // Edit columns
+  showEditColumns?: boolean;
+  onEditColumnsClick?: () => void;
+  
+  // Filters
+  showFiltersButton?: boolean;
+  onFiltersClick?: () => void;
+  filterPills?: FilterPill[];
+  showAdvancedFilters?: boolean;
+  onAdvancedFiltersClick?: () => void;
+  
+  // Sort
+  showSortButton?: boolean;
+  onSortClick?: () => void;
+  
+  // Export
+  showExportButton?: boolean;
+  onExportClick?: () => void;
+  
+  // Save
+  showSaveButton?: boolean;
+  onSaveClick?: () => void;
+  
+  // Custom actions
+  customActions?: React.ReactNode;
+  rightActions?: React.ReactNode; // Right-aligned custom actions (e.g., Add Contacts button)
+  
+  // Table view dropdown
+  showTableViewDropdown?: boolean;
+  tableViewLabel?: string;
+  onTableViewClick?: () => void;
+  
+  // Pipelines/Groups dropdown
+  showPipelineDropdown?: boolean;
+  pipelineLabel?: string;
+  onPipelineClick?: () => void;
+}
+
 export interface GenericTableProps<T = any> {
   // Data
   data: T[];
@@ -123,6 +215,8 @@ export interface GenericTableProps<T = any> {
   // Row interactions
   onRowClick?: (row: T, index: number) => void;
   onRowDoubleClick?: (row: T, index: number) => void;
+  onPreviewClick?: (row: T, index: number) => void; // Preview button click handler
+  onFirstColumnClick?: (row: T, index: number) => void; // First column click handler
   rowClassName?: (row: T, index: number) => string;
   
   // Styling
@@ -136,8 +230,19 @@ export interface GenericTableProps<T = any> {
   emptyMessage?: string | React.ReactNode;
   loadingMessage?: string | React.ReactNode;
   
+  // Toolbar configuration
+  toolbar?: ToolbarConfig;
+  showToolbar?: boolean;
+  
   // Misc
   uniqueKey?: string; // Key to use for row key (default: 'id')
+  
+  // Fixed height mode
+  fixedHeight?: boolean; // Enable fixed height with scrollable body
+  maxHeight?: string; // Max height for the table body (e.g., 'calc(100vh - 300px)')
+  
+  // Stats cards
+  statsCards?: StatsCardData[]; // Stats cards data to display above table
 }
 
 const GenericTable = <T extends Record<string, any>>({
@@ -161,6 +266,8 @@ const GenericTable = <T extends Record<string, any>>({
   columnStorageKey,
   onRowClick,
   onRowDoubleClick,
+  onPreviewClick,
+  onFirstColumnClick,
   rowClassName,
   striped = false,
   hover = true,
@@ -169,7 +276,12 @@ const GenericTable = <T extends Record<string, any>>({
   loading = false,
   emptyMessage = 'No data available',
   loadingMessage = 'Loading...',
-  uniqueKey = 'id'
+  toolbar,
+  showToolbar = false,
+  uniqueKey = 'id',
+  fixedHeight = false,
+  maxHeight = 'calc(100vh - 300px)',
+  statsCards
 }: GenericTableProps<T>) => {
   // Sorting state
   const [sortColumn, setSortColumn] = useState(defaultSortColumn);
@@ -196,6 +308,15 @@ const GenericTable = <T extends Record<string, any>>({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; row: T } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
+  // Hover state for preview button
+  const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
+  
+  // Filter pills visibility state (hidden by default)
+  const [showFilterPills, setShowFilterPills] = useState(false);
+  
+  // Metrics visibility state (hidden by default)
+  const [showMetrics, setShowMetrics] = useState(false);
+  
   // Flatten actions into context menu items (buttons + dropdown options)
   type ContextMenuItem = { label: string; icon?: React.ReactNode; onClick: (row: T) => void; divider?: boolean; className?: string };
   const getContextMenuItems = useMemo(() => {
@@ -231,6 +352,8 @@ const GenericTable = <T extends Record<string, any>>({
 
   // Close context menu on outside click or Escape
   useEffect(() => {
+
+    
     if (!contextMenu) return;
     const close = () => setContextMenu(null);
     const onMouseDown = (e: MouseEvent) => {
@@ -247,9 +370,11 @@ const GenericTable = <T extends Record<string, any>>({
     };
   }, [contextMenu]);
 
+
+
   // Check if a row is selected
   const isSelected = (row: T) => {
-    return selectedRows.some(selectedRow => selectedRow[uniqueKey] === row[uniqueKey]);
+    return selectedRows.some(selectedRow => selectedRow[uniqueKey as keyof T] === row[uniqueKey as keyof T]);
   };
 
   // Handle select all
@@ -266,7 +391,7 @@ const GenericTable = <T extends Record<string, any>>({
     if (checked) {
       onSelectionChange?.([...selectedRows, row]);
     } else {
-      onSelectionChange?.(selectedRows.filter(r => r[uniqueKey] !== row[uniqueKey]));
+      onSelectionChange?.(selectedRows.filter(r => r[uniqueKey as keyof T] !== row[uniqueKey as keyof T]));
     }
   };
 
@@ -275,6 +400,13 @@ const GenericTable = <T extends Record<string, any>>({
     if (!customizableColumns) return columns;
     return columns.filter(col => selectedColumns.includes(col.key));
   }, [columns, selectedColumns, customizableColumns]);
+
+  // Truncate text utility
+  const truncateText = (text: string | number, maxLength: number = 20): string => {
+    const str = String(text || '');
+    if (str.length <= maxLength) return str;
+    return str.substring(0, maxLength) + '...';
+  };
 
   // Handle sorting
   const handleSort = (column: string) => {
@@ -299,33 +431,36 @@ const GenericTable = <T extends Record<string, any>>({
     // Get value using accessor or key
     const getValue = () => {
       if (column.accessor) return column.accessor(row);
-      return row[column.key];
+      return row[column.key as keyof T];
     };
 
     const value = getValue();
 
     // Handle empty values
     if (value === null || value === undefined || value === '') {
-      return <span className="gt-empty-cell">{column.emptyValue || '-'}</span>;
+      return <span className="gt-empty-cell">{column.emptyValue || '--'}</span>;
     }
 
     // Render based on type
     switch (column.type) {
       case 'avatar':
         const name = String(value);
+        const displayName = truncateText(name, 20);
         const initials = column.avatar?.getInitials?.(row) || name.substring(0, 2).toUpperCase();
         const bgColor = column.avatar?.getColor?.(row) || '#6c757d';
         
         return (
-          <div className="gt-name-cell">
+          <div className="gt-name-cell" title={name}>
             <div className="gt-avatar" style={{ backgroundColor: bgColor }}>
               {initials}
             </div>
-            <span className="gt-name-text">{name}</span>
+            <span className="gt-name-text">{displayName}</span>
           </div>
         );
 
       case 'badge':
+        const badgeText = String(value);
+        const truncatedBadgeText = truncateText(badgeText, 20);
         const badgeVariant = column.badge?.getVariant?.(row) || 'secondary';
         const badgeColor = column.badge?.getColor?.(row);
         const showDot = column.badge?.showDot?.(row) ?? false;
@@ -337,24 +472,27 @@ const GenericTable = <T extends Record<string, any>>({
           <span 
             className={badgeClass} 
             style={badgeColor ? { backgroundColor: badgeColor } : undefined}
+            title={badgeText}
           >
             {showDot && <span className="gt-status-dot"></span>}
-            {value}
+            {truncatedBadgeText}
           </span>
         );
 
       case 'multi-field':
         if (!column.fields) return value;
         
-        const primaryValue = row[column.fields.primary];
-        const secondaryValue = column.fields.secondary ? row[column.fields.secondary] : null;
+        const primaryValue = String(row[column.fields.primary as keyof T] || '');
+        const secondaryValue = column.fields.secondary ? String(row[column.fields.secondary as keyof T] || '') : null;
+        const truncatedPrimary = truncateText(primaryValue, 20);
+        const truncatedSecondary = secondaryValue ? truncateText(secondaryValue, 20) : null;
         
         return (
-          <div className="gt-company-cell">
-            <div className="gt-company-name gt-text">{primaryValue || column.emptyValue || '-'}</div>
-            {secondaryValue && (
+          <div className="gt-company-cell" title={`${primaryValue}${secondaryValue ? '\n' + secondaryValue : ''}`}>
+            <div className="gt-company-name gt-text">{truncatedPrimary || column.emptyValue || '--'}</div>
+            {truncatedSecondary && (
               <div className={column.fields.secondaryClass || 'gt-company-industry'}>
-                {secondaryValue}
+                {truncatedSecondary}
               </div>
             )}
           </div>
@@ -366,11 +504,15 @@ const GenericTable = <T extends Record<string, any>>({
 
       case 'date':
         // Date formatting handled by accessor function
-        return <span className="gt-text">{value}</span>;
+        const dateText = String(value);
+        const truncatedDate = truncateText(dateText, 20);
+        return <span className="gt-text" title={dateText}>{truncatedDate}</span>;
 
       case 'text':
       default:
-        return <span className="gt-text">{value}</span>;
+        const textValue = String(value);
+        const truncatedText = truncateText(textValue, 20);
+        return <span className="gt-text" title={textValue}>{truncatedText}</span>;
     }
   };
 
@@ -379,8 +521,8 @@ const GenericTable = <T extends Record<string, any>>({
     if (onSort || !sortColumn) return data;
     
     return [...data].sort((a, b) => {
-      const aVal = a[sortColumn] ?? '';
-      const bVal = b[sortColumn] ?? '';
+      const aVal = a[sortColumn as keyof T] ?? '';
+      const bVal = b[sortColumn as keyof T] ?? '';
       
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
@@ -418,6 +560,304 @@ const GenericTable = <T extends Record<string, any>>({
     if (onColumnChange) {
       onColumnChange(newSelected);
     }
+  };
+
+  // Render toolbar
+  const renderToolbar = () => {
+    if (!showToolbar || !toolbar) return null;
+
+    return (
+      <div className="gt-toolbar-container">
+        {/* Tabs Section */}
+        {toolbar.showTabs && toolbar.tabs && toolbar.tabs.length > 0 && (
+          <div className="gt-toolbar-tabs-section">
+            <div className="d-flex align-items-center gap-3">
+              {/* Dropdown (if provided) */}
+              {toolbar.tabsDropdownLabel && (
+                <Dropdown>
+                  <Dropdown.Toggle variant="outline-secondary" size="sm" className="gt-toolbar-dropdown">
+                    <span>{toolbar.tabsDropdownLabel}</span>
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu style={{ zIndex: '99' }}>
+                    <Dropdown.Item>Prospects</Dropdown.Item>
+                    <Dropdown.Item>Leads</Dropdown.Item>
+                    <Dropdown.Item>Deals</Dropdown.Item>
+                    <Dropdown.Item>Orders</Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown>
+              )}
+
+              {/* Tabs */}
+              <div className="d-flex align-items-center gap-2">
+                {toolbar.tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => toolbar.onTabChange?.(tab.id)}
+                    className={`gt-tab-button ${
+                      toolbar.activeTab === tab.id ? 'active' : ''
+                    }`}
+                  >
+                    {tab.icon && <span className="gt-tab-icon">{tab.icon}</span>}
+                    <span>{tab.label}</span>
+                    {tab.count !== undefined && (
+                      <span className="gt-tab-count">{tab.count}</span>
+                    )}
+                    {tab.removable && (
+                      <button className="gt-tab-close" onClick={(e) => { 
+                        e.stopPropagation();
+                        toolbar.onTabRemove?.(tab.id);
+                      }}>
+                        <X size={12} />
+                      </button>
+                    )}
+                  </button>
+                ))}
+                {toolbar.onTabAdd && (
+                  <button className="gt-tab-add-button" onClick={toolbar.onTabAdd}>
+                    <Plus size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Right-aligned custom actions (e.g., Add Contacts) */}
+              {toolbar.rightActions && (
+                <div style={{ marginLeft: 'auto' }}>
+                  {toolbar.rightActions}
+                </div>
+              )}
+
+
+            </div>
+          </div>
+        )}
+
+        {/* Search and Toolbar Actions */}
+        <div className="gt-toolbar-main">
+          {/* Left: Search */}
+          {toolbar.showSearch && (
+            <div className="gt-toolbar-search">
+              <InputGroup size="sm">
+                <InputGroup.Text className="gt-search-icon">
+                  <Search size={16} />
+                </InputGroup.Text>
+                <Form.Control
+                  type="text"
+                  placeholder={toolbar.searchPlaceholder || 'Search'}
+                  value={toolbar.searchValue || ''}
+                  onChange={(e) => toolbar.onSearchChange?.(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && toolbar.onSearch) {
+                      toolbar.onSearch();
+                    }
+                  }}
+                  className="gt-search-input"
+                />
+              </InputGroup>
+            </div>
+          )}
+
+          {/* Right: Toolbar Actions */}
+          <div className="gt-toolbar-actions">
+            {/* Table View Dropdown */}
+            {toolbar.showTableViewDropdown && (
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" size="sm" className="gt-toolbar-btn">
+                  <Menu size={16} className="me-1" />
+                  <span>{toolbar.tableViewLabel || 'Table view'}</span>
+                </Dropdown.Toggle>
+                <Dropdown.Menu>
+                  <Dropdown.Item onClick={toolbar.onTableViewClick}>Table</Dropdown.Item>
+                  <Dropdown.Item>Grid</Dropdown.Item>
+                  <Dropdown.Item>List</Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
+            )}
+
+            {/* View Switcher */}
+            {/* {toolbar.showViewSwitcher && (
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                className="gt-toolbar-btn gt-icon-btn"
+                onClick={() => toolbar.onViewChange?.('table')}
+              >
+                <Menu size={16} />
+              </Button>
+            )} */}
+
+            {/* Edit Columns */}
+            {toolbar.showEditColumns && (
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                className="gt-toolbar-btn"
+                onClick={toolbar.onEditColumnsClick}
+              >
+                Edit columns
+              </Button>
+            )}
+
+            {/* Pipeline Dropdown */}
+            {toolbar.showPipelineDropdown && (
+              <Dropdown>
+                <Dropdown.Toggle variant="outline-secondary" size="sm" className="gt-toolbar-btn">
+                  <span>{toolbar.pipelineLabel || 'All Pipelines'}</span>
+                </Dropdown.Toggle>
+                <Dropdown.Menu onClick={toolbar.onPipelineClick}>
+                  <Dropdown.Item>All Pipelines</Dropdown.Item>
+                  <Dropdown.Item>Sales Pipeline</Dropdown.Item>
+                  <Dropdown.Item>Marketing Pipeline</Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
+            )}
+
+            {/* Filters */}
+            {toolbar.showFiltersButton && (
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                className="gt-toolbar-btn"
+                onClick={() => setShowFilterPills(!showFilterPills)}
+              >
+                Filters
+              </Button>
+            )}
+
+            {/* Sort */}
+            {toolbar.showSortButton && (
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                className="gt-toolbar-btn"
+                onClick={toolbar.onSortClick}
+              >
+                Sort
+              </Button>
+            )}
+
+{statsCards && statsCards.length > 0 && (
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                className="gt-toolbar-btn"
+                onClick={() => setShowMetrics(!showMetrics)}
+              >
+                Metrics
+              </Button>
+            )}
+
+            {/* Export */}
+            {toolbar.showExportButton && (
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                className="gt-toolbar-btn"
+                onClick={toolbar.onExportClick}
+              >
+                Export
+              </Button>
+            )}
+
+            {/* Actions Menu */}
+            <Dropdown>
+              <Dropdown.Toggle
+                variant="outline-secondary"
+                size="sm"
+                className="gt-toolbar-btn gt-icon-btn"
+              >
+                <MoreVertical size={16} />
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item>Import</Dropdown.Item>
+                <Dropdown.Item>Bulk Actions</Dropdown.Item>
+                <Dropdown.Divider />
+                <Dropdown.Item>Settings</Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+
+            {/* Save */}
+            {/* {toolbar.showSaveButton && (
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                className="gt-toolbar-btn"
+                onClick={toolbar.onSaveClick}
+              >
+                Save
+              </Button>
+            )} */}
+
+            {/* Custom Actions */}
+            {toolbar.customActions}
+          </div>
+        </div>
+
+        {/* Filter Pills */}
+        {showFilterPills && toolbar.filterPills && toolbar.filterPills.length > 0 && (
+          <div className="gt-filter-pills">
+            <div className="d-flex align-items-center gap-2 flex-wrap">
+              {toolbar.filterPills.map((pill) => (
+                pill.showDropdown ? (
+                  <Dropdown key={pill.id}>
+                    <Dropdown.Toggle variant="outline-secondary" size="sm" className="gt-filter-pill">
+                      {pill.icon && <span className="me-1">{pill.icon}</span>}
+                      <span>{pill.label}</span>
+                    </Dropdown.Toggle>
+                    <Dropdown.Menu>
+                      {pill.dropdownOptions && pill.dropdownOptions.length > 0 ? (
+                        pill.dropdownOptions.map((option, idx) => (
+                          <Dropdown.Item 
+                            key={idx} 
+                            onClick={option.onClick || pill.onClick}
+                          >
+                            {option.label}
+                          </Dropdown.Item>
+                        ))
+                      ) : (
+                        <>
+                          <Dropdown.Item onClick={pill.onClick}>All</Dropdown.Item>
+                          <Dropdown.Item onClick={pill.onClick}>Active</Dropdown.Item>
+                          <Dropdown.Item onClick={pill.onClick}>Inactive</Dropdown.Item>
+                        </>
+                      )}
+                    </Dropdown.Menu>
+                  </Dropdown>
+                ) : (
+                  <button
+                    key={pill.id}
+                    className="gt-filter-pill"
+                    onClick={pill.onClick}
+                  >
+                    {pill.icon && <span className="me-1">{pill.icon}</span>}
+                    <span>{pill.label}</span>
+                  </button>
+                )
+              ))}
+              <button className="gt-filter-pill-add">
+                <Plus size={14} className="me-1" />
+                <span>More</span>
+              </button>
+              {toolbar.showAdvancedFilters && (
+                <button
+                  className="gt-filter-pill-add"
+                  onClick={toolbar.onAdvancedFiltersClick}
+                >
+                  <Filter size={14} className="me-1" />
+                  <span>Advanced filters</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Stats Cards */}
+        {showMetrics && statsCards && statsCards.length > 0 && (
+          <div style={{ paddingTop: '16px', backgroundColor: '#ffffff', paddingBottom: '1px', borderLeft: '1px solid #cccccc', borderRight: '1px solid #ccccccc' }}>
+            <GenericStatsCards data={statsCards} gridMinWidth="250px" valueFontSize="28px" />
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Pagination controls
@@ -543,10 +983,19 @@ const GenericTable = <T extends Record<string, any>>({
         </div>
       )}
 
+      {/* Toolbar */}
+      {renderToolbar()}
+
       {/* Table */}
-      <Card className="border-0 shadow-sm generic-table-card">
+      <Card className="border-1 shadow-sm generic-table-card">
         <Card.Body className="p-0">
-          <div className="generic-table-responsive">
+          <div 
+            className={`generic-table-responsive ${fixedHeight ? 'fixed-height-table' : ''}`}
+            style={fixedHeight ? { 
+              maxHeight, 
+              overflow: 'auto'
+            } : {}}
+          >
             <Table
               hover={hover}
               striped={striped}
@@ -579,11 +1028,12 @@ const GenericTable = <T extends Record<string, any>>({
                           col.sortable !== false && sortable && handleSort(col.key);
                         }}
                       >
-                        <div className="th-content d-flex align-items-center justify-content-between gap-1">
-                          <div className="d-flex align-items-center">
-                            <span>{col.label}</span>
-                            {col.sortable !== false && sortable && renderSortIcon(col.key)}
-                          </div>
+                        <div className="th-content d-flex align-items-center justify-content-between">
+  {/* Left Side - Column Name */}
+  <span>{col.label}</span>
+
+  {/* Right Side - Sort Icon */}
+  {col.sortable !== false && sortable && renderSortIcon(col.key)}
                           {showCustomizerInHeader && (
                             <Dropdown align="end" autoClose="outside" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                               <Dropdown.Toggle
@@ -709,11 +1159,13 @@ const GenericTable = <T extends Record<string, any>>({
                 ) : (
                   sortedData.map((row, index) => (
                     <tr
-                      key={row[uniqueKey] || index}
+                      key={String(row[uniqueKey as keyof T] || index)}
                       onClick={() => onRowClick?.(row, index)}
                       onDoubleClick={() => onRowDoubleClick?.(row, index)}
+                      onMouseEnter={() => setHoveredRowIndex(index)}
+                      onMouseLeave={() => setHoveredRowIndex(null)}
                       onContextMenu={(e) => {
-                        if (!showActions || actions.length === 0) return;
+                        if (actions.length === 0) return;
                         e.preventDefault();
                         e.stopPropagation();
                         const items = getContextMenuItems(row);
@@ -734,13 +1186,54 @@ const GenericTable = <T extends Record<string, any>>({
                           />
                         </td>
                       )}
-                      {visibleColumns.map((col) => (
+                      {visibleColumns.map((col, colIdx) => (
                         <td
                           key={col.key}
                           className="generic-table-td"
-                          style={{ textAlign: col.align || 'left' }}
+                          style={{ textAlign: col.align || 'left', position: colIdx === 0 ? 'relative' : undefined }}
                         >
-                          {renderCellContent(col, row, index)}
+                          <div
+                            onClick={(e) => {
+                              if (colIdx === 0 && onFirstColumnClick) {
+                                e.stopPropagation();
+                                onFirstColumnClick(row, index);
+                              }
+                            }}
+                            style={{
+                              cursor: colIdx === 0 && onFirstColumnClick ? 'pointer' : undefined,
+                              display: 'inline-block'
+                            }}
+                          >
+                            {renderCellContent(col, row, index)}
+                          </div>
+                          {colIdx === 0 && hoveredRowIndex === index && onPreviewClick && (
+                            <button
+                            className="preview-button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onPreviewClick(row, index);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              right: '8px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              fontSize: '12px',
+                              padding: '4px 10px',
+                              zIndex: 10,
+                              whiteSpace: 'nowrap',
+                              backgroundColor: '#ffffff',
+                              border: '1px solid #141414',
+                              color: '#141414',
+                              fontWeight: '300',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Preview
+                          </button>
+                          
+                           )} 
                         </td>
                       ))}
                       {showActions && actions.length > 0 && (
@@ -773,7 +1266,7 @@ const GenericTable = <T extends Record<string, any>>({
                                         variant={action.variant || 'link'}
                                         size="sm"
                                         className={action.className || ''}
-                                        id={`dropdown-${row[uniqueKey]}-${actionIndex}`}
+                                        id={`dropdown-${String(row[uniqueKey as keyof T])}-${actionIndex}`}
                                       >
                                         {action.icon}
                                       </Dropdown.Toggle>
