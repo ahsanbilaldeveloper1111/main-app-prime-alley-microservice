@@ -4,7 +4,8 @@ import {
   Calendar, MessageSquare, ClipboardList, ExternalLink, Copy, RefreshCw,
   ThumbsUp, ThumbsDown, Paperclip, Users, Building2, DollarSign,
   FileText, Tag, Zap, ShoppingCart, CreditCard, Link2, Instagram,
-  Briefcase, FileCheck, ListTodo, User, Sparkles
+  Briefcase, FileCheck, ListTodo, User, Sparkles, Maximize2, Bold,
+  Italic, Underline, List, Link, Image, Smile, Plus, Clock
 } from 'lucide-react';
 import { Badge } from 'react-bootstrap';
 
@@ -78,7 +79,7 @@ export interface GenericSidebarProps {
   
   // Header Information
   title: string;
-  subtitle?: string; // Job title
+  subtitle?: string;
   company?: string;
   avatar?: {
     initials?: string;
@@ -118,8 +119,2924 @@ export interface GenericSidebarProps {
   
   // Context payload for integrations
   contextPayload?: Record<string, unknown>;
+  
+  // Note modal callbacks
+  onNoteCreate?: (note: string, createTask: boolean, taskDueDate?: string) => void;
+  
+  // Email modal callbacks
+  onEmailSend?: (emailData: {
+    to: string[];
+    cc: string[];
+    bcc: string[];
+    subject: string;
+    body: string;
+    attachments?: File[];
+  }) => void;
+  
+  // Sender info for email
+  senderEmail?: string;
+  senderName?: string;
+  
+  // Task modal callbacks
+  onTaskCreate?: (taskData: {
+    title: string;
+    activityDate: string;
+    activityTime: string;
+    reminder: string;
+    repeat: boolean;
+    taskType: string;
+    priority: string;
+    queue: string;
+    assignedTo: string;
+    notes: string;
+  }) => void;
+
+  onCall?: (phoneNumber: string) => void;
+  callerNumber?: string;
 }
 
+
+// ============================================================================
+// CALL MODAL COMPONENT
+// ============================================================================
+
+interface CallModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    contactName: string;
+    phoneNumber: string;
+    company?: string;
+    callerNumber?: string;
+    onCall: (phoneNumber: string) => void;
+  }
+  
+  const CallModal: React.FC<CallModalProps> = ({ 
+    isOpen, 
+    onClose, 
+    contactName,
+    phoneNumber,
+    company,
+    callerNumber,
+    onCall 
+  }) => {
+    if (!isOpen) return null;
+  
+    const handleCall = () => {
+      onCall(phoneNumber);
+      onClose();
+    };
+  
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 'auto 15vh auto auto',
+          top: '275px',
+          width: '340px',
+          backgroundColor: '#ffffff',
+          zIndex: 1000,
+          boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+          borderRadius: '8px',
+          border: '1px solid #cbd5e0',
+          overflow: 'hidden',
+          animation: 'slideInUp 0.3s ease-out',
+        }}
+      >
+        {/* Content */}
+        <div style={{ padding: '16px' }}>
+          {/* Contact Name */}
+          <div style={{ marginBottom: '12px' }}>
+            <h3 style={{ 
+              fontSize: '16px', 
+              fontWeight: '600', 
+              color: '#141414', 
+              margin: 0 
+            }}>
+              {contactName}
+            </h3>
+          </div>
+  
+          {/* Call Button */}
+          <button
+            onClick={handleCall}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '5px',
+              fontSize: '14px',
+              color: '#141414',
+              cursor: 'pointer',
+              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '12px',
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f7fafc';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffffff';
+            }}
+          >
+            <Phone size={16} style={{ color: '#718096' }} />
+            <div>
+              <span style={{ fontWeight: '500' }}>Call {phoneNumber}</span>
+              <span style={{ color: '#718096', fontSize: '13px', marginLeft: '4px' }}>
+                (Phone Number)
+              </span>
+            </div>
+          </button>
+  
+          {/* Company Name */}
+          {company && (
+            <div style={{ marginBottom: '12px' }}>
+              <p style={{ 
+                fontSize: '14px', 
+                fontWeight: '500', 
+                color: '#141414', 
+                margin: 0 
+              }}>
+                {company}
+              </p>
+            </div>
+          )}
+  
+          {/* Call From Section */}
+          {callerNumber && (
+            <div 
+              style={{ 
+                paddingTop: '12px',
+                borderTop: '1px solid #e2e8f0'
+              }}
+            >
+              <button
+                style={{
+                  width: '100%',
+                  padding: '8px 0',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  fontSize: '13px',
+                  color: '#141414',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span>Call from: {callerNumber}</span>
+                <ChevronRight size={16} style={{ color: '#718096' }} />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  
+// ============================================================================
+// NOTES MODAL COMPONENT
+// ============================================================================
+
+interface NotesModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  recordName: string;
+  onSave: (note: string, createTask: boolean, taskDueDate?: string) => void;
+}
+
+const NotesModal: React.FC<NotesModalProps> = ({ isOpen, onClose, recordName, onSave }) => {
+  const [noteText, setNoteText] = useState('');
+  const [createTask, setCreateTask] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [isDraftSaved, setIsDraftSaved] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [isOpen]);
+
+  // Auto-save draft simulation
+  useEffect(() => {
+    if (noteText.trim()) {
+      const timer = setTimeout(() => {
+        setIsDraftSaved(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [noteText]);
+
+  if (!isOpen) return null;
+
+  const handleSave = () => {
+    onSave(noteText, createTask, createTask ? 'In 3 business days (Friday)' : undefined);
+    setNoteText('');
+    setCreateTask(false);
+    setIsDraftSaved(false);
+    setIsMaximized(false);
+    setAttachments([]);
+    onClose();
+  };
+
+  const handleMaximize = () => {
+    setIsMaximized(!isMaximized);
+  };
+
+  // Text formatting functions with toggle support
+  const toggleFormatting = (prefix: string, suffix: string = prefix) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = noteText.substring(start, end);
+    
+    if (selectedText) {
+      // Check if text is already formatted
+      const beforeText = noteText.substring(Math.max(0, start - prefix.length), start);
+      const afterText = noteText.substring(end, end + suffix.length);
+      
+      if (beforeText === prefix && afterText === suffix) {
+        // Remove formatting
+        const newText = 
+          noteText.substring(0, start - prefix.length) + 
+          selectedText + 
+          noteText.substring(end + suffix.length);
+        setNoteText(newText);
+        
+        setTimeout(() => {
+          textarea.focus();
+          textarea.setSelectionRange(start - prefix.length, end - prefix.length);
+        }, 0);
+      } else {
+        // Add formatting
+        const newText = noteText.substring(0, start) + prefix + selectedText + suffix + noteText.substring(end);
+        setNoteText(newText);
+        
+        setTimeout(() => {
+          textarea.focus();
+          textarea.setSelectionRange(start + prefix.length, end + prefix.length);
+        }, 0);
+      }
+    } else {
+      // No selection, insert at cursor with placeholder
+      const placeholder = 'text';
+      const newText = noteText.substring(0, start) + prefix + placeholder + suffix + noteText.substring(end);
+      setNoteText(newText);
+      
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + prefix.length, start + prefix.length + placeholder.length);
+      }, 0);
+    }
+  };
+
+  const insertText = (text: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    
+    const newText = noteText.substring(0, start) + text + noteText.substring(end);
+    setNoteText(newText);
+    
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + text.length, start + text.length);
+    }, 0);
+  };
+
+  const handleBold = () => {
+    toggleFormatting('**');
+  };
+
+  const handleItalic = () => {
+    toggleFormatting('*');
+  };
+
+  const handleUnderline = () => {
+    toggleFormatting('__');
+  };
+
+  const handleLink = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = noteText.substring(start, end);
+    
+    const linkText = selectedText || 'link text';
+    const linkUrl = 'https://';
+    const markdown = `[${linkText}](${linkUrl})`;
+    
+    const newText = noteText.substring(0, start) + markdown + noteText.substring(end);
+    setNoteText(newText);
+    
+    setTimeout(() => {
+      textarea.focus();
+      const urlStart = start + linkText.length + 3;
+      textarea.setSelectionRange(urlStart, urlStart + linkUrl.length);
+    }, 0);
+  };
+
+  const handleList = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const lines = noteText.substring(0, start).split('\n');
+    const isAtLineStart = lines[lines.length - 1].trim() === '';
+    
+    if (isAtLineStart) {
+      insertText('- ');
+    } else {
+      insertText('\n- ');
+    }
+  };
+
+  const handleCode = () => {
+    toggleFormatting('`');
+  };
+
+  const handleImage = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = noteText.substring(start, end);
+    
+    const altText = selectedText || 'image description';
+    const imageUrl = 'https://';
+    const markdown = `![${altText}](${imageUrl})`;
+    
+    const newText = noteText.substring(0, start) + markdown + noteText.substring(end);
+    setNoteText(newText);
+    
+    setTimeout(() => {
+      textarea.focus();
+      const urlStart = start + altText.length + 4;
+      textarea.setSelectionRange(urlStart, urlStart + imageUrl.length);
+    }, 0);
+  };
+
+  const handleAttachment = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setAttachments(prev => [...prev, ...files]);
+    e.target.value = '';
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Keyboard shortcuts handler
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.ctrlKey || e.metaKey) {
+      switch (e.key.toLowerCase()) {
+        case 'b':
+          e.preventDefault();
+          handleBold();
+          break;
+        case 'i':
+          e.preventDefault();
+          handleItalic();
+          break;
+        case 'u':
+          e.preventDefault();
+          handleUnderline();
+          break;
+        case 'k':
+          e.preventDefault();
+          handleLink();
+          break;
+      }
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: isMaximized ? '60px 20px 20px 20px' : 'auto 15vh 0.5vh auto',
+        height: isMaximized ? 'auto' : '512px',
+        width: isMaximized ? 'auto' : '650px',
+        backgroundColor: '#ffffff',
+        zIndex: 1000,
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+        borderRadius: '8px',
+        border: '1px solid #cbd5e0',
+        overflow: 'hidden',
+        animation: 'slideInUp 0.3s ease-out',
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '16px 20px',
+          borderBottom: '1px solid #e2e8f0',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              color: '#141414',
+              padding: '4px',
+            }}
+          >
+            <ChevronDown size={20} style={{ transform: 'rotate(90deg)' }} />
+          </button>
+          <h2 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', margin: 0 }}>
+            Note
+          </h2>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={handleMaximize}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px',
+              color: '#141414',
+            }}
+            title={isMaximized ? "Restore" : "Maximize"}
+          >
+            <Maximize2 size={18} />
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px',
+              color: '#141414',
+            }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+      </div>
+
+      {/* Record Label */}
+      <div
+        style={{
+          padding: '12px 20px',
+          borderBottom: '1px solid #e2e8f0',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '13px', color: '#141414', fontWeight: '400' }}>For</span>
+          <span
+            style={{
+              padding: '4px 12px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #cbd5e0',
+              borderRadius: '16px',
+              fontSize: '13px',
+              color: '#141414',
+              fontWeight: '500',
+            }}
+          >
+            {recordName}
+          </span>
+        </div>
+      </div>
+
+      {/* Note Content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '20px', flex: 1 }}>
+          <textarea
+            ref={textareaRef}
+            placeholder="Start typing to leave a note..."
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            style={{
+              width: '100%',
+              height: isMaximized ? '400px' : '120px',
+              border: 'none',
+              outline: 'none',
+              fontSize: '14px',
+              color: '#141414',
+              fontFamily: 'inherit',
+              resize: 'none',
+              lineHeight: '1.5',
+            }}
+          />
+        </div>
+
+        {/* Formatting Toolbar */}
+        <div
+          style={{
+            padding: '12px 20px',
+            borderTop: '1px solid #e2e8f0',
+            borderBottom: '1px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          <button
+            onClick={handleBold}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '6px',
+              cursor: 'pointer',
+              color: '#141414',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '3px',
+            }}
+            title="Bold (Ctrl+B)"
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <Bold size={16} />
+          </button>
+          <button
+            onClick={handleItalic}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '6px',
+              cursor: 'pointer',
+              color: '#141414',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '3px',
+            }}
+            title="Italic (Ctrl+I)"
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <Italic size={16} />
+          </button>
+          <button
+            onClick={handleUnderline}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '6px',
+              cursor: 'pointer',
+              color: '#141414',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '3px',
+            }}
+            title="Underline (Ctrl+U)"
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <Underline size={16} />
+          </button>
+          <div
+            style={{
+              width: '1px',
+              height: '20px',
+              backgroundColor: '#cbd5e0',
+              margin: '0 4px',
+            }}
+          />
+          <button
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              color: '#141414',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '3px',
+              fontSize: '13px',
+              fontWeight: '500',
+              gap: '4px',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            More
+            <ChevronDown size={14} />
+          </button>
+          <button
+            onClick={handleLink}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '6px',
+              cursor: 'pointer',
+              color: '#141414',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '3px',
+            }}
+            title="Link (Ctrl+K)"
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <Link size={16} />
+          </button>
+          <button
+            onClick={handleImage}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '6px',
+              cursor: 'pointer',
+              color: '#141414',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '3px',
+            }}
+            title="Insert Image"
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <Image size={16} />
+          </button>
+          <button
+            onClick={handleCode}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '6px',
+              cursor: 'pointer',
+              color: '#141414',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '3px',
+            }}
+            title="Code"
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <MessageSquare size={16} />
+          </button>
+          <button
+            onClick={handleList}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '6px',
+              cursor: 'pointer',
+              color: '#141414',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '3px',
+            }}
+            title="Bullet List"
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <List size={16} />
+          </button>
+          <button
+            onClick={handleAttachment}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '6px',
+              cursor: 'pointer',
+              color: '#141414',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '3px',
+            }}
+            title="Attach File"
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <Paperclip size={16} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFileSelect}
+            style={{ display: 'none' }}
+          />
+          <button
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '6px',
+              cursor: 'pointer',
+              color: '#141414',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '3px',
+            }}
+            title="More options"
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+
+        {/* Attachments */}
+        {attachments.length > 0 && (
+          <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px', fontWeight: '600' }}>
+              Attachments ({attachments.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {attachments.map((file, index) => (
+                <div
+                  key={index}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '6px 10px',
+                    backgroundColor: '#f5f8fa',
+                    borderRadius: '4px',
+                    fontSize: '13px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, overflow: 'hidden' }}>
+                    <Paperclip size={14} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {file.name}
+                    </span>
+                    <span style={{ color: '#666', fontSize: '12px', flexShrink: 0 }}>
+                      ({(file.size / 1024).toFixed(1)} KB)
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => removeAttachment(index)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      color: '#718096',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Remove"
+                    onMouseEnter={(e) => (e.currentTarget.style.color = '#f44336')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = '#718096')}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Associated Records */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+          <button
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '13px',
+              fontWeight: '600',
+              color: '#141414',
+            }}
+          >
+            Associated with 1 record
+            <ChevronDown size={14} />
+          </button>
+        </div>
+
+        {/* Task Creation Option */}
+        <div style={{ padding: '16px 20px' }}>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              color: '#141414',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={createTask}
+              onChange={(e) => setCreateTask(e.target.checked)}
+              style={{
+                width: '16px',
+                height: '16px',
+                cursor: 'pointer',
+              }}
+            />
+            <span>
+              Create a <strong>To-do</strong> task to follow up{' '}
+              <button
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#141414',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                  padding: 0,
+                  fontSize: '13px',
+                  fontWeight: '600',
+                }}
+              >
+                In 3 business days (Friday)
+              </button>
+              <ChevronDown size={14} style={{ marginLeft: '4px' }} />
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div
+        style={{
+          padding: '16px 20px',
+          borderTop: '1px solid #e2e8f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {isDraftSaved && (
+            <>
+              <span style={{ fontSize: '13px', color: '#0c9960', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M13.5 4.5L6 12L2.5 8.5" stroke="#0c9960" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Draft saved
+              </span>
+              <button
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: '#cbd5e0',
+                }}
+              >
+                <X size={16} />
+              </button>
+            </>
+          )}
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={!noteText.trim()}
+          style={{
+            padding: '8px 20px',
+            backgroundColor: noteText.trim() ? '#141414' : '#cbd5e0',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '4px',
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: noteText.trim() ? 'pointer' : 'not-allowed',
+            transition: 'background-color 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            if (noteText.trim()) {
+              e.currentTarget.style.backgroundColor = '#ff6347';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (noteText.trim()) {
+              e.currentTarget.style.backgroundColor = '#141414';
+            }
+          }}
+        >
+          Create note
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// EMAIL MODAL COMPONENT
+// ============================================================================
+interface EmailModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    recipientEmail?: string;
+    recipientName?: string;
+    senderEmail?: string;
+    senderName?: string;
+    onSend: (emailData: {
+      to: string[];
+      cc: string[];
+      bcc: string[];
+      subject: string;
+      body: string;
+      createTask: boolean;
+      taskDueDate?: string;
+      attachments?: File[];
+    }) => void;
+  }
+  
+  const EmailModal: React.FC<EmailModalProps> = ({ 
+    isOpen, 
+    onClose, 
+    recipientEmail,
+    recipientName,
+    senderEmail = 'user@example.com',
+    senderName = 'Your Name',
+    onSend 
+  }) => {
+    const [toEmails, setToEmails] = useState<string[]>(recipientEmail ? [recipientEmail] : []);
+    const [ccEmails, setCcEmails] = useState<string[]>([]);
+    const [bccEmails, setBccEmails] = useState<string[]>([]);
+    const [showCc, setShowCc] = useState(false);
+    const [showBcc, setShowBcc] = useState(false);
+    const [subject, setSubject] = useState('');
+    const [emailBody, setEmailBody] = useState('');
+    const [isMaximized, setIsMaximized] = useState(false);
+    const [currentToInput, setCurrentToInput] = useState('');
+    const [currentCcInput, setCurrentCcInput] = useState('');
+    const [currentBccInput, setCurrentBccInput] = useState('');
+    const [activeTab, setActiveTab] = useState<'templates' | 'sequences' | 'documents' | 'meetings' | 'quotes'>('templates');
+    const [createTask, setCreateTask] = useState(false);
+    const [showSendDropdown, setShowSendDropdown] = useState(false);
+    const emailBodyRef = useRef<HTMLTextAreaElement>(null);
+    const sendDropdownRef = useRef<HTMLDivElement>(null);
+  
+    useEffect(() => {
+      if (recipientEmail && !toEmails.includes(recipientEmail)) {
+        setToEmails([recipientEmail]);
+      }
+    }, [recipientEmail]);
+  
+    useEffect(() => {
+      if (isOpen && emailBodyRef.current) {
+        emailBodyRef.current.focus();
+      }
+    }, [isOpen]);
+  
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (sendDropdownRef.current && !sendDropdownRef.current.contains(event.target as Node)) {
+          setShowSendDropdown(false);
+        }
+      };
+  
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+  
+    if (!isOpen) return null;
+  
+    const handleMaximize = () => {
+      setIsMaximized(!isMaximized);
+    };
+  
+    const addEmail = (email: string, type: 'to' | 'cc' | 'bcc') => {
+      const trimmedEmail = email.trim();
+      if (!trimmedEmail) return;
+  
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(trimmedEmail)) {
+        alert('Please enter a valid email address');
+        return;
+      }
+  
+      if (type === 'to') {
+        if (!toEmails.includes(trimmedEmail)) {
+          setToEmails([...toEmails, trimmedEmail]);
+        }
+        setCurrentToInput('');
+      } else if (type === 'cc') {
+        if (!ccEmails.includes(trimmedEmail)) {
+          setCcEmails([...ccEmails, trimmedEmail]);
+        }
+        setCurrentCcInput('');
+      } else if (type === 'bcc') {
+        if (!bccEmails.includes(trimmedEmail)) {
+          setBccEmails([...bccEmails, trimmedEmail]);
+        }
+        setCurrentBccInput('');
+      }
+    };
+  
+    const removeEmail = (email: string, type: 'to' | 'cc' | 'bcc') => {
+      if (type === 'to') {
+        setToEmails(toEmails.filter(e => e !== email));
+      } else if (type === 'cc') {
+        setCcEmails(ccEmails.filter(e => e !== email));
+      } else if (type === 'bcc') {
+        setBccEmails(bccEmails.filter(e => e !== email));
+      }
+    };
+  
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, type: 'to' | 'cc' | 'bcc') => {
+      if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
+        e.preventDefault();
+        const value = type === 'to' ? currentToInput : type === 'cc' ? currentCcInput : currentBccInput;
+        addEmail(value, type);
+      }
+    };
+  
+    const handleSend = () => {
+      if (toEmails.length === 0) {
+        alert('Please add at least one recipient');
+        return;
+      }
+  
+      if (!subject.trim()) {
+        const confirmSend = window.confirm('Send email without a subject?');
+        if (!confirmSend) return;
+      }
+  
+      onSend({
+        to: toEmails,
+        cc: ccEmails,
+        bcc: bccEmails,
+        subject,
+        body: emailBody,
+        createTask,
+        taskDueDate: createTask ? 'In 3 business days (Friday)' : undefined,
+      });
+  
+      // Reset form
+      setToEmails([]);
+      setCcEmails([]);
+      setBccEmails([]);
+      setSubject('');
+      setEmailBody('');
+      setShowCc(false);
+      setShowBcc(false);
+      setCreateTask(false);
+      setIsMaximized(false);
+      onClose();
+    };
+  
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: isMaximized ? '60px 20px 20px 20px' : 'auto 15vh 7.5vh auto',
+          height: isMaximized ? 'auto' : '550px',
+          width: isMaximized ? 'auto' : '650px',
+          backgroundColor: '#ffffff',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+          borderRadius: '8px',
+          border: '1px solid #cbd5e0',
+          overflow: 'hidden',
+          animation: 'slideInUp 0.3s ease-out',
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 16px',
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#ffffff',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                color: '#141414',
+                padding: '4px',
+              }}
+            >
+              <ChevronDown size={20} style={{ transform: 'rotate(90deg)' }} />
+            </button>
+            <h2 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', margin: 0 }}>
+              Email
+            </h2>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              onClick={handleMaximize}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '6px',
+                color: '#141414',
+              }}
+              title={isMaximized ? "Restore" : "Maximize"}
+            >
+              <Maximize2 size={18} />
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '6px',
+                color: '#141414',
+              }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+  
+        {/* Tabs */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '24px',
+            padding: '12px 20px',
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#ffffff',
+          }}
+        >
+          {['Templates', 'Sequences', 'Documents', 'Meetings', 'Quotes'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab.toLowerCase() as any)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '4px 0',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: activeTab === tab.toLowerCase() ? '600' : '400',
+                color: '#141414',
+                borderBottom: activeTab === tab.toLowerCase() ? '2px solid #ff7a59' : '2px solid transparent',
+                transition: 'all 0.2s',
+              }}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+  
+        {/* Email Form */}
+        <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#ffffff' }}>
+          {/* To Field */}
+          <div style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <label style={{ fontSize: '14px', fontWeight: '600', color: '#141414', minWidth: '60px', paddingTop: '8px' }}>
+                To
+              </label>
+              <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                {toEmails.map((email) => (
+                  <span
+                    key={email}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '4px 10px',
+                      backgroundColor: '#f7fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '16px',
+                      fontSize: '13px',
+                      color: '#141414',
+                    }}
+                  >
+                    {email}
+                    <button
+                      onClick={() => removeEmail(email, 'to')}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        color: '#718096',
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  type="email"
+                  value={currentToInput}
+                  onChange={(e) => setCurrentToInput(e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, 'to')}
+                  onBlur={() => currentToInput && addEmail(currentToInput, 'to')}
+                  placeholder={toEmails.length === 0 ? 'Enter email address' : ''}
+                  style={{
+                    flex: 1,
+                    minWidth: '200px',
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: '14px',
+                    color: '#141414',
+                    padding: '6px 0',
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+  
+          {/* From Field */}
+          <div style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <label style={{ fontSize: '14px', fontWeight: '600', color: '#141414', minWidth: '60px' }}>
+                From
+              </label>
+              <div>
+                <span style={{ fontSize: '14px', color: '#141414', fontWeight: '500' }}>
+                  {senderName}
+                </span>
+                {' '}
+                <span style={{ fontSize: '13px', color: '#718096' }}>
+                  ({senderEmail})
+                </span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {!showCc && (
+                <button
+                  onClick={() => setShowCc(true)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: '#0091ae',
+                    textDecoration: 'underline',
+                    padding: '0',
+                  }}
+                >
+                  Cc
+                </button>
+              )}
+              {!showBcc && (
+                <button
+                  onClick={() => setShowBcc(true)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: '#0091ae',
+                    textDecoration: 'underline',
+                    padding: '0',
+                  }}
+                >
+                  Bcc
+                </button>
+              )}
+            </div>
+          </div>
+  
+          {/* CC Field */}
+          {showCc && (
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <label style={{ fontSize: '14px', fontWeight: '600', color: '#141414', minWidth: '60px', paddingTop: '8px' }}>
+                  Cc
+                </label>
+                <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                  {ccEmails.map((email) => (
+                    <span
+                      key={email}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 10px',
+                        backgroundColor: '#f7fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '16px',
+                        fontSize: '13px',
+                        color: '#141414',
+                      }}
+                    >
+                      {email}
+                      <button
+                        onClick={() => removeEmail(email, 'cc')}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          color: '#718096',
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="email"
+                    value={currentCcInput}
+                    onChange={(e) => setCurrentCcInput(e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, 'cc')}
+                    onBlur={() => currentCcInput && addEmail(currentCcInput, 'cc')}
+                    placeholder="Enter email address"
+                    style={{
+                      flex: 1,
+                      minWidth: '200px',
+                      border: 'none',
+                      outline: 'none',
+                      fontSize: '14px',
+                      color: '#141414',
+                      padding: '6px 0',
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+  
+          {/* BCC Field */}
+          {showBcc && (
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <label style={{ fontSize: '14px', fontWeight: '600', color: '#141414', minWidth: '60px', paddingTop: '8px' }}>
+                  Bcc
+                </label>
+                <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                  {bccEmails.map((email) => (
+                    <span
+                      key={email}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 10px',
+                        backgroundColor: '#f7fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '16px',
+                        fontSize: '13px',
+                        color: '#141414',
+                      }}
+                    >
+                      {email}
+                      <button
+                        onClick={() => removeEmail(email, 'bcc')}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          color: '#718096',
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="email"
+                    value={currentBccInput}
+                    onChange={(e) => setCurrentBccInput(e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, 'bcc')}
+                    onBlur={() => currentBccInput && addEmail(currentBccInput, 'bcc')}
+                    placeholder="Enter email address"
+                    style={{
+                      flex: 1,
+                      minWidth: '200px',
+                      border: 'none',
+                      outline: 'none',
+                      fontSize: '14px',
+                      color: '#141414',
+                      padding: '6px 0',
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+  
+          {/* Subject Field */}
+          <div style={{ padding: '12px 20px', borderBottom: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <label style={{ fontSize: '14px', fontWeight: '600', color: '#141414', minWidth: '60px' }}>
+                Subject
+              </label>
+              <input
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder=""
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  fontSize: '14px',
+                  color: '#141414',
+                  padding: '8px 12px',
+                  borderRadius: '3px',
+                }}
+              />
+            </div>
+          </div>
+  
+          {/* Email Body */}
+          <div style={{ padding: '20px' }}>
+            <textarea
+              ref={emailBodyRef}
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              placeholder="Type your email message here..."
+              style={{
+                width: '100%',
+                height: isMaximized ? '400px' : '200px',
+                border: 'none',
+                outline: 'none',
+                fontSize: '14px',
+                color: '#141414',
+                fontFamily: 'inherit',
+                resize: 'none',
+                lineHeight: '1.6',
+              }}
+            />
+          </div>
+        </div>
+  
+        {/* Formatting Toolbar and Associated Records */}
+        <div
+          style={{
+            padding: '12px 20px',
+            borderTop: '1px solid #e2e8f0',
+            borderBottom: '1px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: '#ffffff',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '6px',
+                cursor: 'pointer',
+                color: '#141414',
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '3px',
+                fontSize: '14px',
+                fontWeight: '600',
+              }}
+              title="Bold"
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              B
+            </button>
+            <button
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '6px',
+                cursor: 'pointer',
+                color: '#141414',
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '3px',
+                fontSize: '14px',
+                fontWeight: '600',
+                fontStyle: 'italic',
+              }}
+              title="Italic"
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              I
+            </button>
+            <button
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '6px',
+                cursor: 'pointer',
+                color: '#141414',
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '3px',
+                fontSize: '14px',
+                fontWeight: '600',
+                textDecoration: 'underline',
+              }}
+              title="Underline"
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              U
+            </button>
+            <button
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '6px 10px',
+                cursor: 'pointer',
+                color: '#141414',
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '3px',
+                fontSize: '13px',
+                fontWeight: '500',
+                gap: '4px',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              More
+              <ChevronDown size={14} />
+            </button>
+            <button
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '6px',
+                cursor: 'pointer',
+                color: '#141414',
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '3px',
+              }}
+              title="Link"
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              <Link size={16} />
+            </button>
+            <button
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '6px',
+                cursor: 'pointer',
+                color: '#141414',
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '3px',
+              }}
+              title="Image"
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              <Image size={16} />
+            </button>
+            <button
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '6px 10px',
+                cursor: 'pointer',
+                color: '#141414',
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '3px',
+                fontSize: '13px',
+                fontWeight: '500',
+                gap: '4px',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              Insert
+              <ChevronDown size={14} />
+            </button>
+            <button
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '6px',
+                cursor: 'pointer',
+                color: '#141414',
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '3px',
+              }}
+              title="Attach file"
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              <Paperclip size={16} />
+            </button>
+          </div>
+          <button
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              color: '#141414',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '3px',
+              fontSize: '13px',
+              fontWeight: '500',
+              gap: '4px',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            Associated with 1 record
+            <ChevronDown size={14} />
+          </button>
+        </div>
+  
+        {/* Footer - Task Creation and Send */}
+        <div
+          style={{
+            padding: '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: '#ffffff',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ position: 'relative' }} ref={sendDropdownRef}>
+
+            <div style={{ display: 'flex', alignItems: 'stretch' }}>
+              <button
+                onClick={handleSend}
+                disabled={toEmails.length === 0}
+                style={{
+                  padding: '8px 16px',
+                  paddingRight: '12px',
+                  backgroundColor: toEmails.length > 0 ? '#cbd5e0' : '#e2e8f0',
+                  color: '#141414',
+                  border: 'none',
+                  borderRadius: '4px 0 0 4px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: toEmails.length > 0 ? 'pointer' : 'not-allowed',
+                  transition: 'background-color 0.2s',
+                  borderRight: '1px solid #a0aec0',
+                }}
+                onMouseEnter={(e) => {
+                  if (toEmails.length > 0) {
+                    e.currentTarget.style.backgroundColor = '#b8c5d0';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (toEmails.length > 0) {
+                    e.currentTarget.style.backgroundColor = '#cbd5e0';
+                  }
+                }}
+              >
+                Send
+              </button>
+              <button
+                onClick={() => setShowSendDropdown(!showSendDropdown)}
+                disabled={toEmails.length === 0}
+                style={{
+                  padding: '8px 8px',
+                  backgroundColor: toEmails.length > 0 ? '#cbd5e0' : '#e2e8f0',
+                  color: '#141414',
+                  border: 'none',
+                  borderRadius: '0 4px 4px 0',
+                  fontSize: '14px',
+                  cursor: toEmails.length > 0 ? 'pointer' : 'not-allowed',
+                  transition: 'background-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                onMouseEnter={(e) => {
+                  if (toEmails.length > 0) {
+                    e.currentTarget.style.backgroundColor = '#b8c5d0';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (toEmails.length > 0) {
+                    e.currentTarget.style.backgroundColor = '#cbd5e0';
+                  }
+                }}
+              >
+                <ChevronDown size={16} />
+              </button>
+              </div>
+              {showSendDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  left: 0,
+                  marginBottom: '4px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '5px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  minWidth: '180px',
+                  zIndex: 1000,
+                  overflow: 'hidden'
+                }}>
+                  <button
+                    onClick={() => {
+                      handleSend();
+                      setShowSendDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      color: '#33475b',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f7fafc';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    Send now
+                  </button>
+                  <button
+                    onClick={() => {
+                      console.log('Schedule send');
+                      setShowSendDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      color: '#33475b',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f7fafc';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    Schedule send
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+  
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              color: '#141414',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={createTask}
+              onChange={(e) => setCreateTask(e.target.checked)}
+              style={{
+                width: '16px',
+                height: '16px',
+                cursor: 'pointer',
+              }}
+            />
+            <span>
+              Create a <strong>To-do</strong> task to follow up{' '}
+              <button
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#141414',
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                  padding: 0,
+                  fontSize: '13px',
+                  fontWeight: '600',
+                }}
+              >
+                In 3 business days (Friday)
+              </button>
+              <ChevronDown size={14} style={{ marginLeft: '4px', verticalAlign: 'middle' }} />
+            </span>
+          </label>
+        </div>
+      </div>
+    );
+  };
+  
+
+
+  // ============================================================================
+// TASK MODAL COMPONENT
+// ============================================================================
+
+interface TaskModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    assignedTo?: string;
+    assignedToName?: string;
+    onSave: (taskData: {
+      title: string;
+      activityDate: string;
+      activityTime: string;
+      reminder: string;
+      repeat: boolean;
+      taskType: string;
+      priority: string;
+      queue: string;
+      assignedTo: string;
+      notes: string;
+    }) => void;
+  }
+  
+  const TaskModal: React.FC<TaskModalProps> = ({ 
+    isOpen, 
+    onClose, 
+    assignedTo = '',
+    assignedToName = 'Unassigned',
+    onSave 
+  }) => {
+    const [title, setTitle] = useState('');
+    const [activityDate, setActivityDate] = useState('In 3 business days (Friday)');
+    const [activityTime, setActivityTime] = useState('08:00');
+    const [reminder, setReminder] = useState('No reminder');
+    const [repeat, setRepeat] = useState(false);
+    const [taskType, setTaskType] = useState('To-do');
+    const [priority, setPriority] = useState('None');
+    const [queue, setQueue] = useState('None');
+    const [assignedToState, setAssignedToState] = useState(assignedToName);
+    const [notes, setNotes] = useState('');
+    const [isMaximized, setIsMaximized] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [showTimePicker, setShowTimePicker] = useState(false);
+    const [showReminderPicker, setShowReminderPicker] = useState(false);
+    const [showTaskTypeDropdown, setShowTaskTypeDropdown] = useState(false);
+    const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+    const [showQueueDropdown, setShowQueueDropdown] = useState(false);
+    const [showAssignedToDropdown, setShowAssignedToDropdown] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const notesRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+      if (isOpen && titleInputRef.current) {
+        titleInputRef.current.focus();
+      }
+    }, [isOpen]);
+  
+    if (!isOpen) return null;
+
+  // Text formatting functions with toggle support
+  const toggleFormatting = (prefix: string, suffix: string = prefix) => {
+    const textarea = notesRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = notes.substring(start, end);
+    
+    if (selectedText) {
+      // Check if text is already formatted
+      const beforeText = notes.substring(Math.max(0, start - prefix.length), start);
+      const afterText = notes.substring(end, end + suffix.length);
+      
+      if (beforeText === prefix && afterText === suffix) {
+        // Remove formatting
+        const newText = 
+          notes.substring(0, start - prefix.length) + 
+          selectedText + 
+          notes.substring(end + suffix.length);
+        setNotes(newText);
+        
+        setTimeout(() => {
+          textarea.focus();
+          textarea.setSelectionRange(start - prefix.length, end - prefix.length);
+        }, 0);
+      } else {
+        // Add formatting
+        const newText = notes.substring(0, start) + prefix + selectedText + suffix + notes.substring(end);
+        setNotes(newText);
+        
+        setTimeout(() => {
+          textarea.focus();
+          textarea.setSelectionRange(start + prefix.length, end + prefix.length);
+        }, 0);
+      }
+    } else {
+      // No selection, insert at cursor with placeholder
+      const placeholder = 'text';
+      const newText = notes.substring(0, start) + prefix + placeholder + suffix + notes.substring(end);
+      setNotes(newText);
+      
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + prefix.length, start + prefix.length + placeholder.length);
+      }, 0);
+    }
+  };
+
+  const insertText = (text: string) => {
+    const textarea = notesRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    
+    const newText = notes.substring(0, start) + text + notes.substring(end);
+    setNotes(newText);
+    
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + text.length, start + text.length);
+    }, 0);
+  };
+
+  const handleBold = () => {
+    toggleFormatting('**');
+  };
+
+  const handleItalic = () => {
+    toggleFormatting('*');
+  };
+
+  const handleUnderline = () => {
+    toggleFormatting('__');
+  };
+
+  const handleLink = () => {
+    const textarea = notesRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = notes.substring(start, end);
+    
+    const linkText = selectedText || 'link text';
+    const linkUrl = 'https://';
+    const markdown = `[${linkText}](${linkUrl})`;
+    
+    const newText = notes.substring(0, start) + markdown + notes.substring(end);
+    setNotes(newText);
+    
+    setTimeout(() => {
+      textarea.focus();
+      const urlStart = start + linkText.length + 3;
+      textarea.setSelectionRange(urlStart, urlStart + linkUrl.length);
+    }, 0);
+  };
+
+  const handleList = () => {
+    const textarea = notesRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const lines = notes.substring(0, start).split('\n');
+    const isAtLineStart = lines[lines.length - 1].trim() === '';
+    
+    if (isAtLineStart) {
+      insertText('- ');
+    } else {
+      insertText('\n- ');
+    }
+  };
+
+  const handleCode = () => {
+    toggleFormatting('`');
+  };
+
+  const handleImage = () => {
+    const textarea = notesRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = notes.substring(start, end);
+    
+    const altText = selectedText || 'image description';
+    const imageUrl = 'https://';
+    const markdown = `![${altText}](${imageUrl})`;
+    
+    const newText = notes.substring(0, start) + markdown + notes.substring(end);
+    setNotes(newText);
+    
+    setTimeout(() => {
+      textarea.focus();
+      const urlStart = start + altText.length + 4;
+      textarea.setSelectionRange(urlStart, urlStart + imageUrl.length);
+    }, 0);
+  };
+
+  const handleAttachment = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setAttachments(prev => [...prev, ...files]);
+    e.target.value = '';
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Keyboard shortcuts handler
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.ctrlKey || e.metaKey) {
+      switch (e.key.toLowerCase()) {
+        case 'b':
+          e.preventDefault();
+          handleBold();
+          break;
+        case 'i':
+          e.preventDefault();
+          handleItalic();
+          break;
+        case 'u':
+          e.preventDefault();
+          handleUnderline();
+          break;
+        case 'k':
+          e.preventDefault();
+          handleLink();
+          break;
+      }
+    }
+  };
+
+  const handleSave = () => {
+    if (!title.trim()) {
+      alert('Please enter a task title');
+      return;
+    }
+
+    onSave({
+      title,
+      activityDate,
+      activityTime,
+      reminder,
+      repeat,
+      taskType,
+      priority,
+      queue,
+      assignedTo: assignedToState,
+      notes,
+    });
+
+    // Reset form
+    setTitle('');
+    setActivityDate('In 3 business days (Friday)');
+    setActivityTime('08:00');
+    setReminder('No reminder');
+    setRepeat(false);
+    setTaskType('To-do');
+    setPriority('None');
+    setQueue('None');
+    setNotes('');
+    setAttachments([]);
+    setIsMaximized(false);
+    onClose();
+  };
+  
+    const taskTypes = ['To-do', 'Call', 'Email', 'Meeting'];
+    const priorities = ['None', 'Low', 'Medium', 'High'];
+    const queues = ['None', 'Sales Queue', 'Support Queue', 'Marketing Queue'];
+    const dateOptions = [
+      'Today',
+      'Tomorrow', 
+      'In 3 business days (Friday)',
+      'In 1 week',
+      'In 2 weeks',
+      'In 1 month',
+      'Custom...'
+    ];
+    const reminderOptions = [
+      'No reminder',
+      'At time of task',
+      '5 minutes before',
+      '15 minutes before',
+      '30 minutes before',
+      '1 hour before',
+      '1 day before'
+    ];
+  
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: isMaximized ? '60px 20px 20px 20px' : 'auto 15vh 7.5vh auto',
+          height: isMaximized ? 'auto' : '650px',
+          width: isMaximized ? 'auto' : '650px',
+          backgroundColor: '#ffffff',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+          borderRadius: '8px',
+          border: '1px solid #cbd5e0',
+          overflow: 'hidden',
+          animation: 'slideInUp 0.3s ease-out',
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 16px',
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#ffffff',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                color: '#141414',
+                padding: '4px',
+              }}
+            >
+              <ChevronDown size={20} style={{ transform: 'rotate(90deg)' }} />
+            </button>
+            <h2 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', margin: 0 }}>
+              Task
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px',
+              color: '#141414',
+            }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+  
+        {/* Task Content */}
+        <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#ffffff', padding: '20px' }}>
+          {/* Task Title Input */}
+          <div style={{ marginBottom: '20px' }}>
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter your task"
+              style={{
+                width: '100%',
+                border: 'none',
+                outline: 'none',
+                fontSize: '14px',
+                color: '#141414',
+                padding: '12px 16px',
+                borderRadius: '4px',
+              }}
+            />
+          </div>
+  
+          {/* Activity Date and Reminder Row */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: '1fr 1fr', 
+            gap: '20px',
+            marginBottom: '20px' 
+          }}>
+            {/* Activity Date */}
+            <div>
+              <label style={{ 
+                fontSize: '13px', 
+                color: '#141414', 
+                fontWeight: '400',
+                display: 'block',
+                marginBottom: '8px'
+              }}>
+                Activity date
+              </label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setShowDatePicker(!showDatePicker)}
+                  style={{
+                    
+                    padding: '8px 2px',
+                    backgroundColor: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#141414',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  {activityDate}
+                </button>
+                <button
+                  onClick={() => setShowTimePicker(!showTimePicker)}
+                  style={{
+                    padding: '8px 2px',
+                    backgroundColor: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    color: '#141414',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontWeight: '300',
+                  }}
+                >
+                  <Clock size={16} />
+                  {activityTime}
+                </button>
+              </div>
+              
+              {/* Date Picker Dropdown */}
+              {showDatePicker && (
+                <div style={{
+                  position: 'absolute',
+                  marginTop: '4px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '5px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  minWidth: '200px',
+                  zIndex: 1001,
+                  overflow: 'hidden'
+                }}>
+                  {dateOptions.map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => {
+                        setActivityDate(option);
+                        setShowDatePicker(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        textAlign: 'left',
+                        fontSize: '14px',
+                        color: '#33475b',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f7fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+  
+            {/* Send Reminder */}
+            <div>
+              <label style={{ 
+                fontSize: '13px', 
+                color: '#141414', 
+                fontWeight: '400',
+                display: 'block',
+                marginBottom: '8px'
+              }}>
+                Send reminder
+              </label>
+              <button
+                onClick={() => setShowReminderPicker(!showReminderPicker)}
+                style={{
+                  width: '100%',
+                  padding: '8px 3px',
+                  backgroundColor: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                {reminder}
+              </button>
+  
+              {/* Reminder Picker Dropdown */}
+              {showReminderPicker && (
+                <div style={{
+                  position: 'absolute',
+                  marginTop: '4px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '5px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  minWidth: '200px',
+                  zIndex: 1001,
+                  overflow: 'hidden'
+                }}>
+                  {reminderOptions.map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => {
+                        setReminder(option);
+                        setShowReminderPicker(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        textAlign: 'left',
+                        fontSize: '14px',
+                        color: '#33475b',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f7fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+  
+          {/* Set to Repeat Checkbox */}
+          <div style={{ marginBottom: '20px' }}>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: '#141414',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={repeat}
+                onChange={(e) => setRepeat(e.target.checked)}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  cursor: 'pointer',
+                }}
+              />
+              Set to repeat
+            </label>
+          </div>
+  
+          {/* Task Properties Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '20px',
+            marginBottom: '20px',
+            paddingBottom: '20px',
+            borderBottom: '1px solid #e2e8f0'
+          }}>
+            {/* Task Type */}
+            <div style={{ position: 'relative' }}>
+              <label style={{ 
+                fontSize: '13px', 
+                color: '#718096', 
+                fontWeight: '400',
+                display: 'block',
+                marginBottom: '8px'
+              }}>
+                Task Type
+              </label>
+              <button
+                onClick={() => setShowTaskTypeDropdown(!showTaskTypeDropdown)}
+                style={{
+                  width: '100%',
+                  padding: '4px 0',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                {taskType}
+              </button>
+              {showTaskTypeDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '4px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '5px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  minWidth: '150px',
+                  zIndex: 1001,
+                  overflow: 'hidden'
+                }}>
+                  {taskTypes.map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => {
+                        setTaskType(type);
+                        setShowTaskTypeDropdown(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        textAlign: 'left',
+                        fontSize: '14px',
+                        color: '#33475b',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f7fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+  
+            {/* Priority */}
+            <div style={{ position: 'relative' }}>
+              <label style={{ 
+                fontSize: '13px', 
+                color: '#718096', 
+                fontWeight: '400',
+                display: 'block',
+                marginBottom: '8px'
+              }}>
+                Priority
+              </label>
+              <button
+                onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
+                style={{
+                  width: '100%',
+                  padding: '4px 0',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                {priority}
+              </button>
+              {showPriorityDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '4px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '5px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  minWidth: '150px',
+                  zIndex: 1001,
+                  overflow: 'hidden'
+                }}>
+                  {priorities.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => {
+                        setPriority(p);
+                        setShowPriorityDropdown(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        textAlign: 'left',
+                        fontSize: '14px',
+                        color: '#33475b',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f7fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+  
+            {/* Queue */}
+            <div style={{ position: 'relative' }}>
+              <label style={{ 
+                fontSize: '13px', 
+                color: '#718096', 
+                fontWeight: '400',
+                display: 'block',
+                marginBottom: '8px'
+              }}>
+                Queue
+              </label>
+              <button
+                onClick={() => setShowQueueDropdown(!showQueueDropdown)}
+                style={{
+                  width: '100%',
+                  padding: '4px 0',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                {queue}
+              </button>
+              {showQueueDropdown && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  marginTop: '4px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '5px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  minWidth: '180px',
+                  zIndex: 1001,
+                  overflow: 'hidden'
+                }}>
+                  {queues.map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => {
+                        setQueue(q);
+                        setShowQueueDropdown(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        textAlign: 'left',
+                        fontSize: '14px',
+                        color: '#33475b',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f7fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+  
+            {/* Activity Assigned To */}
+            <div style={{ position: 'relative' }}>
+              <label style={{ 
+                fontSize: '13px', 
+                color: '#718096', 
+                fontWeight: '400',
+                display: 'block',
+                marginBottom: '8px'
+              }}>
+                Activity assigned to
+              </label>
+              <button
+                onClick={() => setShowAssignedToDropdown(!showAssignedToDropdown)}
+                style={{
+                  width: '100%',
+                  padding: '4px 0',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#141414',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                {assignedToState}
+              </button>
+            </div>
+          </div>
+  
+          {/* Notes Section */}
+          <div style={{ marginBottom: '20px' }}>
+            <textarea
+              ref={notesRef}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Notes..."
+              style={{
+                width: '100%',
+                height: isMaximized ? '300px' : '75px',
+                border: 'none',
+                outline: 'none',
+                fontSize: '14px',
+                color: '#141414',
+                fontFamily: 'inherit',
+                resize: 'none',
+                lineHeight: '1.6',
+                padding: '0',
+              }}
+            />
+          </div>
+  
+          {/* Formatting Toolbar */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingTop: '12px',
+              borderTop: '1px solid #e2e8f0',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '6px',
+                  cursor: 'pointer',
+                  color: '#141414',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '3px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                }}
+                title="Bold"
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                B
+              </button>
+              <button
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '6px',
+                  cursor: 'pointer',
+                  color: '#141414',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '3px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  fontStyle: 'italic',
+                }}
+                title="Italic"
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                I
+              </button>
+              <button
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '6px',
+                  cursor: 'pointer',
+                  color: '#141414',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '3px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  textDecoration: 'underline',
+                }}
+                title="Underline"
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                U
+              </button>
+              <button
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '6px 10px',
+                  cursor: 'pointer',
+                  color: '#141414',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '3px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  gap: '4px',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                More
+                <ChevronDown size={14} />
+              </button>
+              <button
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '6px',
+                  cursor: 'pointer',
+                  color: '#141414',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '3px',
+                }}
+                title="Link"
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                <Link size={16} />
+              </button>
+              <button
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '6px',
+                  cursor: 'pointer',
+                  color: '#141414',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '3px',
+                }}
+                title="Image"
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                <Image size={16} />
+              </button>
+              <button
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '6px',
+                  cursor: 'pointer',
+                  color: '#141414',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '3px',
+                }}
+                title="List"
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                <List size={16} />
+              </button>
+            </div>
+            <button
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '6px 10px',
+                cursor: 'pointer',
+                color: '#141414',
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '3px',
+                fontSize: '13px',
+                fontWeight: '500',
+                gap: '4px',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              Associated with 1 record
+              <ChevronDown size={14} />
+            </button>
+          </div>
+        </div>
+  
+        {/* Footer */}
+        <div
+          style={{
+            padding: '16px 20px',
+            borderTop: '1px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            backgroundColor: '#ffffff',
+          }}
+        >
+          <button
+            onClick={handleSave}
+            disabled={!title.trim()}
+            style={{
+              padding: '8px 24px',
+              backgroundColor: title.trim() ? '#cbd5e0' : '#e2e8f0',
+              color: '#141414',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: title.trim() ? 'pointer' : 'not-allowed',
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              if (title.trim()) {
+                e.currentTarget.style.backgroundColor = '#b8c5d0';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (title.trim()) {
+                e.currentTarget.style.backgroundColor = '#cbd5e0';
+              }
+            }}
+          >
+            Create
+          </button>
+        </div>
+      </div>
+    );
+  };
+  
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -142,27 +3059,34 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   actionsDropdown,
   permissionMessage,
   contextPayload,
+  onNoteCreate,
+  onEmailSend,
+  senderEmail,
+  senderName,
+  onTaskCreate,
+  onCall,
+  callerNumber,
 }) => {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [showSectionActions, setShowSectionActions] = useState<string | null>(null);
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showCallModal, setShowCallModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const sectionDropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   // Initialize collapsed sections based on defaultExpanded
-  // All sections are EXPANDED by default - only collapse if explicitly set to defaultExpanded: false
   useEffect(() => {
     const collapsed = new Set<string>();
     if (sections && sections.length > 0) {
       sections.forEach(section => {
-        // Only collapse if collapsible AND explicitly set to defaultExpanded: false
-        // If defaultExpanded is undefined or true, section remains expanded
         if (section.collapsible && section.defaultExpanded === false) {
           collapsed.add(section.id);
         }
       });
     }
-    // Set collapsed sections (empty set means all sections are expanded)
     setCollapsedSections(collapsed);
   }, [sections]);
 
@@ -173,7 +3097,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         setShowActionsDropdown(false);
       }
       
-      // Close section dropdowns
       Object.entries(sectionDropdownRefs.current).forEach(([key, ref]) => {
         if (ref && !ref.contains(event.target as Node)) {
           setShowSectionActions(prev => prev === key ? null : prev);
@@ -201,19 +3124,151 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    // You can add a toast notification here
   };
 
-  // Default quick actions matching HubSpot design
-  const defaultQuickActions: QuickAction[] = quickActions || [
-    { id: 'note', label: 'Note', icon: ClipboardList, onClick: () => console.log('Note'), disabled: false },
-    { id: 'email', label: 'Email', icon: Mail, onClick: () => console.log('Email'), disabled: true },
+  const handleNoteClick = () => {
+    setShowNotesModal(true);
+  };
+
+  const handleNoteClose = () => {
+    setShowNotesModal(false);
+  };
+
+  const handleNoteSave = (note: string, createTask: boolean, taskDueDate?: string) => {
+    onNoteCreate?.(note, createTask, taskDueDate);
+    console.log('Note saved:', { note, createTask, taskDueDate });
+  };
+
+  const handleEmailClick = () => {
+    setShowEmailModal(true);
+  };
+
+  const handleEmailClose = () => {
+    setShowEmailModal(false);
+  };
+
+  const handleEmailSend = (emailData: {
+    to: string[];
+    cc: string[];
+    bcc: string[];
+    subject: string;
+    body: string;
+    attachments?: File[];
+  }) => {
+    onEmailSend?.(emailData);
+    console.log('Email sent:', emailData);
+  };
+
+  const handleTaskClick = () => {
+    setShowTaskModal(true);
+  };
+
+  const handleTaskClose = () => {
+    setShowTaskModal(false);
+  };
+
+  const handleTaskSave = (taskData: {
+    title: string;
+    activityDate: string;
+    activityTime: string;
+    reminder: string;
+    repeat: boolean;
+    taskType: string;
+    priority: string;
+    queue: string;
+    assignedTo: string;
+    notes: string;
+  }) => {
+    onTaskCreate?.(taskData);
+    console.log('Task created:', taskData);
+  };
+
+  const handleCallClick = () => {
+    if (phone) {
+      setShowCallModal(true);
+    } else {
+      alert('No phone number available');
+    }
+  };
+
+  const handleCallClose = () => {
+    setShowCallModal(false);
+  };
+
+  const handleCall = (phoneNumber: string) => {
+    onCall?.(phoneNumber);
+    console.log('Calling:', phoneNumber);
+  };
+  // Process quick actions to override note and email actions if provided
+  const processedQuickActions = quickActions ? quickActions.map(action => {
+    if (action.id === 'note') {
+      return {
+        ...action,
+        onClick: () => {
+          handleNoteClick();
+          action.onClick?.(); // Call the original onClick if provided
+        }
+      };
+    }
+    if (action.id === 'email') {
+      return {
+        ...action,
+        onClick: () => {
+          handleEmailClick();
+          action.onClick?.(); // Call the original onClick if provided
+        }
+      };
+    }
+    if (action.id === 'task') {
+      return {
+        ...action,
+        onClick: () => {
+          handleTaskClick();
+          action.onClick?.(); // Call the original onClick if provided
+        }
+      };
+    }
+    if (action.id === 'call') {
+        return {
+          ...action,
+          onClick: () => {
+            handleCallClick();
+            action.onClick?.(); // Call the original onClick if provided
+          }
+        };
+      }
+    return action;
+  }) : [
+    { id: 'note', label: 'Note', icon: ClipboardList, onClick: handleNoteClick, disabled: false },
+    { id: 'email', label: 'Email', icon: Mail, onClick: handleEmailClick, disabled: !email },
     { id: 'call', label: 'Call', icon: Phone, onClick: () => console.log('Call'), disabled: true },
-    { id: 'task', label: 'Task', icon: ClipboardList, onClick: () => console.log('Task'), disabled: true },
+    { id: 'task', label: 'Task', icon: ClipboardList, onClick: handleTaskClick, disabled: false },
     { id: 'meeting', label: 'Meeting', icon: Calendar, onClick: () => console.log('Meeting'), disabled: false },
     { id: 'more', label: 'More', icon: MoreHorizontal, onClick: () => console.log('More'), disabled: false }
   ];
 
+  // Process sections to override note-related actions
+  const processedSections = sections.map(section => {
+    // If this is a notes section with an empty state action, override it to open modal
+    if (section.id === 'notes' && section.emptyState?.action) {
+      return {
+        ...section,
+        emptyState: {
+          ...section.emptyState,
+          action: {
+            ...section.emptyState.action,
+            onClick: () => {
+              handleNoteClick();
+              section.emptyState?.action?.onClick?.(); // Call original if provided
+            }
+          }
+        }
+      };
+    }
+    return section;
+  });
+
+  
   const renderField = (field: SidebarField, index: number) => {
     if (field.show === false) return null;
 
@@ -235,7 +3290,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 style={{
                   padding: '4px 10px',
                   backgroundColor: '#eaf0f6',
-                  color: '#33475b',
+                  color: '#141414',
                   borderRadius: '3px',
                   fontSize: '13px',
                   fontWeight: '400'
@@ -520,7 +3575,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                         border: 'none',
                         textAlign: 'left',
                         fontSize: '14px',
-                        color: '#33475b',
+                        color: '#141414',
                         cursor: 'pointer',
                         transition: 'background-color 0.2s'
                       }}
@@ -624,6 +3679,17 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             }
           }
           
+          @keyframes slideInUp {
+            from { 
+              transform: translateY(20px);
+              opacity: 0;
+            }
+            to { 
+              transform: translateY(0);
+              opacity: 1;
+            }
+          }
+          
           @keyframes spin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
@@ -671,9 +3737,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
           .quick-action-btn.disabled {
             background-color: rgb(245, 245, 245);
-  border-color: rgb(230, 230, 230);
-  color: rgb(138, 138, 138);
-  cursor: not-allowed;
+            border-color: rgb(230, 230, 230);
+            color: rgb(138, 138, 138);
+            cursor: not-allowed;
           }
 
           .quick-action-wrapper {
@@ -685,7 +3751,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
           .quick-action-label {
             font-size: 12px;
-            color: #33475b;
+            color: #141414;
             font-weight: '500';
             white-space: nowrap;
             text-align: center;
@@ -704,6 +3770,45 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         `}
       </style>
 
+      {/* Notes Modal - Rendered as floating window */}
+      <NotesModal
+        isOpen={showNotesModal}
+        onClose={handleNoteClose}
+        recordName={title}
+        onSave={handleNoteSave}
+      />
+
+      {/* Email Modal - Rendered as floating window */}
+      <EmailModal
+        isOpen={showEmailModal}
+        onClose={handleEmailClose}
+        recipientEmail={email}
+        recipientName={title}
+        senderEmail={senderEmail}
+        senderName={senderName}
+        onSend={handleEmailSend}
+      />
+
+      {/* Task Modal - Rendered as floating window */}
+      <TaskModal
+        isOpen={showTaskModal}
+        onClose={handleTaskClose}
+        assignedTo={title}
+        assignedToName={title}
+        onSave={handleTaskSave}
+      />
+
+      {/* Call Modal - Rendered as floating dropdown */}
+      <CallModal
+        isOpen={showCallModal}
+        onClose={handleCallClose}
+        contactName={title}
+        phoneNumber={phone || ''}
+        company={company}
+        callerNumber={callerNumber}
+        onCall={handleCall}
+      />
+
       <div
         style={{
           width,
@@ -716,634 +3821,620 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           animation: 'slideInRight 0.3s ease-out',
           flexShrink: 0,
           marginTop: '43px',
+          position: 'relative',
         }}
       >
         {/* Fixed Top Bar - Title and Close (Non-scrollable) */}
         <div style={{
-          padding: '20px 24px',
-          border: '1px solid #cccccc',
-          backgroundColor: '#ffffff',
-          flexShrink: 0,
-          borderRadius: '10px 10px 0 0',
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <h2 style={{
-              fontSize: '20px',
-              fontWeight: '500',
-              color: '#141414',
-              margin: 0
+              padding: '20px 24px',
+              border: '1px solid #cccccc',
+              backgroundColor: '#ffffff',
+              flexShrink: 0,
+              borderRadius: '10px 10px 0 0',
             }}>
-              {title}
-            </h2>
-
-            {onClose && (
-              <button
-                onClick={onClose}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  padding: '4px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#718096',
-                  transition: 'all 0.2s',
-                  borderRadius: '4px'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = '#2d3748';
-                  e.currentTarget.style.backgroundColor = '#f7fafc';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#718096';
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-                aria-label="Close"
-              >
-                <X size={20} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Scrollable Content Area */}
-        <div 
-          className="sidebar-scrollbar"
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            backgroundColor: '#f0f0f0',
-            maxHeight: 'calc(100vh - 252px)',
-            borderBottom: '1px solid #cccccc',
-            borderRadius: '0 0 10px 10px',
-          }}
-        >
-          {/* Contact & Actions Section */}
-          <div style={{
-            backgroundColor: '#ffffff',
-            padding: '16px 24px',
-            marginBottom: '12px',
-            borderLeft: '1px solid #cccccc',
-              borderRight: '1px solid #cccccc',
-              
-              borderBottom: '1px solid #cccccc',
-              borderRadius: '0 0 10px 10px',
-          }}>
-            {/* Record Link and Actions */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '16px',
-              paddingBottom: '10px',
-              
-            }}>
-            {recordLink && (
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  recordLink.onClick();
-                }}
-                style={{
-                  fontSize: '14px',
-                  color: '#006162',
-                  textDecoration: 'underline',
-                  fontWeight: '500'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = '#007a8c';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#0091ae';
-                }}
-              >
-                {recordLink.label}
-              </a>
-            )}
-
-            {actionsDropdown && (
-              <div style={{ position: 'relative' }} ref={dropdownRef}>
-                <button
-                  onClick={() => setShowActionsDropdown(!showActionsDropdown)}
-                  style={{
-                    padding: '6px 14px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#33475b',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f7fafc';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  {actionsDropdown.label}
-                  <ChevronDown size={14} />
-                </button>
-                
-                {showActionsDropdown && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    right: 0,
-                    marginTop: '4px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '5px',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                    minWidth: '180px',
-                    zIndex: 1000,
-                    overflow: 'hidden'
-                  }}>
-                    {actionsDropdown.items.map((item, index) => (
-                      <button
-                        key={index}
-                        onClick={() => {
-                          item.onClick();
-                          setShowActionsDropdown(false);
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '10px 16px',
-                          backgroundColor: 'transparent',
-                          border: 'none',
-                          textAlign: 'left',
-                          fontSize: '14px',
-                          color: '#33475b',
-                          cursor: 'pointer',
-                          transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f7fafc';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Permission Message */}
-          {permissionMessage && (
-            <div style={{
-              padding: '12px 16px',
-              backgroundColor: '#fffbeb',
-              border: '1px solid #fde68a',
-              borderRadius: '5px',
-              fontSize: '13px',
-              color: '#92400e',
-              marginBottom: '16px',
-              lineHeight: '1.5',
-            }}>
-              {permissionMessage}
-            </div>
-          )}
-
-          {/* Avatar and Name Section */}
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '12px',
-              marginBottom: '12px',
-            }}>
-              {avatar && (
-                <div style={{
-                  width: '40px',
-                  height: '37px',
-                  borderRadius: '26px',
-                  background: '#efe7f0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '10px',
-                  fontWeight: '400',
-                  color: '#141414',
-                  flexShrink: 0,
-                  backgroundImage: avatar.imageUrl ? `url(${avatar.imageUrl})` : undefined,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }}>
-                  {!avatar.imageUrl && (avatar.initials || avatar.name.substring(0, 2).toUpperCase())}
-                </div>
-              )}
-              <div style={{ flex: 1}}>
-                <h1 style={{
-                  fontSize: '22px',
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <h2 style={{
+                  fontSize: '20px',
                   fontWeight: '500',
                   color: '#141414',
-                  margin: '0 0 4px 0',
-                  lineHeight: '1.3'
+                  margin: 0
                 }}>
                   {title}
-                </h1>
-                {/* {subtitle && (
-                  <p style={{
-                    fontSize: '14px',
-                    color: '#718096',
-                    margin: 0,
-                    lineHeight: '1.4'
-                  }}>
-                    {subtitle}
-                  </p>
-                  
-                )} */}
+                </h2>
+
+                {onClose && (
+                  <button
+                    onClick={onClose}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#718096',
+                      transition: 'all 0.2s',
+                      borderRadius: '4px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = '#2d3748';
+                      e.currentTarget.style.backgroundColor = '#f7fafc';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = '#718096';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    aria-label="Close"
+                  >
+                    <X size={20} />
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Email */}
-            {email && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px',
-                marginBottom: '8px'
+            {/* Scrollable Content Area */}
+            <div 
+              className="sidebar-scrollbar"
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                backgroundColor: '#f0f0f0',
+                maxHeight: 'calc(100vh - 252px)',
+                borderBottom: '1px solid #cccccc',
+                borderRadius: '0 0 10px 10px',
+              }}
+            >
+              {/* Contact & Actions Section */}
+              <div style={{
+                backgroundColor: '#ffffff',
+                padding: '16px 24px',
+                marginBottom: '12px',
+                borderLeft: '1px solid #cccccc',
+                borderRight: '1px solid #cccccc',
+                borderBottom: '1px solid #cccccc',
+                borderRadius: '0 0 10px 10px',
               }}>
-                <a
-                  href={`mailto:${email}`}
-                  style={{
-                    fontSize: '14px',
-                    color: '#0091ae',
-                    textDecoration: 'none',
-                    fontWeight: '400',
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.textDecoration = 'underline';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.textDecoration = 'none';
-                  }}
-                >
-                  {email}
-                </a>
-                <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                  <button
-                    onClick={() => copyToClipboard(email)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      padding: '4px',
-                      cursor: 'pointer',
-                      color: '#718096',
-                      display: 'flex',
-                      alignItems: 'center',
-                      borderRadius: '3px'
-                    }}
-                    title="Copy email"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f7fafc';
-                      e.currentTarget.style.color = '#2d3748';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = '#718096';
-                    }}
-                  >
-                    <Copy size={14} />
-                  </button>
-                  <a
-                    href={`mailto:${email}`}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      padding: '4px',
-                      cursor: 'pointer',
-                      color: '#718096',
-                      display: 'flex',
-                      alignItems: 'center',
-                      borderRadius: '3px',
-                      textDecoration: 'none'
-                    }}
-                    title="Send email"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f7fafc';
-                      e.currentTarget.style.color = '#2d3748';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = '#718096';
-                    }}
-                  >
-                    <ExternalLink size={14} />
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {/* Phone */}
-            {phone && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between',
-                gap: '8px',
-                marginBottom: '16px',
-              }}>
-                <div  style={{ flex: 1 }}>
-                  <p style={{ 
-                    fontSize: '13px', 
-                    color: '#141414',
-                    fontWeight: '400',
-                    marginBottom: '1px'
-                  }}>
-                    Phone Number
-                  </p>
-                  <p style={{ 
-                    fontSize: '13px', 
-                    color: '#141414',
-                    fontWeight: '400'
-                  }}>
-                    {subtitle}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Actions */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',      // vertical center
-            justifyContent: 'center',  // horizontal center
-            gap: '23px',
-            paddingTop: '5px',
-            flexWrap: 'wrap',
-          }}>
-            {defaultQuickActions.map((action) => {
-              const ActionIcon = action.icon;
-              return (
-                <div key={action.id} className="quick-action-wrapper">
-                  <button
-                    onClick={() => {
-                      if (!action.disabled) {
-                        action.onClick();
-                        onQuickActionClick?.(action.id);
-                      }
-                    }}
-                    className={`quick-action-btn ${action.disabled ? 'disabled' : ''}`}
-                    title={action.label}
-                    disabled={action.disabled}
-                  >
-                    <ActionIcon 
-                      size={20} 
-                      color={action.disabled ? '#cbd5e0' : '#718096'} 
-                    />
-                  </button>
-                  <span className="quick-action-label">{action.label}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-          {/* Breeze Record Summary */}
-          {breezeRecordSummary && (
-            <div style={{
-              backgroundColor: '#ffffff',
-              
-              borderRadius: '10px',
-              marginBottom: '12px',
-              overflow: 'hidden',
-              border: '1px solid #cccccc',
-            }}>
-              <div 
-                style={{
+                {/* Record Link and Actions */}
+                <div style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '14px 20px',
-                  cursor: 'pointer',
-                  backgroundColor: '#ffffff'
-                }}
-                onClick={() => toggleSection('breeze-summary')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <ChevronDown 
-                    size={18} 
-                    style={{ 
-                      color: '#141414',
-                      transform: collapsedSections.has('breeze-summary') ? 'rotate(-90deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.2s ease'
-                    }} 
-                  />
-                  <h3 style={{
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: '#141414',
-                    margin: 0,
-                    lineHeight: '1.2'
-                  }}>
-                    Breeze record summary
-                  </h3>
-                  <div style={{
-                    padding: '3px 10px',
-                    background: 'linear-gradient(114deg, rgb(255, 56, 66) 0%, rgb(210, 6, 136) 100%)',
-                    color: 'white',
-                    borderRadius: '12px',
-                    fontSize: '11px',
-                    fontWeight: '600',
-                    textTransform: 'uppercase'
-                  }}>
-                    AI
-                  </div>
-                </div>
-              </div>
-
-              {!collapsedSections.has('breeze-summary') && (
-                <div style={{ 
-                  padding: '20px',
-                  
+                  marginBottom: '16px',
+                  paddingBottom: '10px',
                 }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '13px',
-                    color: '#141414',
-                    marginBottom: '12px'
-                  }}>
-                    <span> {breezeRecordSummary.timestamp}</span>
-                    {breezeRecordSummary.onRefresh && (
-                      <button
-                        onClick={breezeRecordSummary.onRefresh}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          padding: '2px',
-                          cursor: 'pointer',
-                          color: '#141414',
-                          display: 'flex',
-                          alignItems: 'center'
-                        }}
-                        title="Refresh"
-                      >
-                        <RefreshCw size={12} />
-                      </button>
-                    )}
-                  </div>
-
-                  <div style={{
-                    fontSize: '14px',
-                    color: '#141414',
-                    lineHeight: '1.6',
-                    marginBottom: '16px',
-                    border: '1px solid #ff9fcc',
-                    padding: '18px 20px',
-                    borderRadius: '5px',
-                  }}>
-                    {breezeRecordSummary.content}
-                  </div>
-
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    paddingTop: '12px',
-                    borderTop: '1px solid #fee'
-                  }}>
-                    {breezeRecordSummary.onThumbsUp && (
-                      <button
-                        onClick={breezeRecordSummary.onThumbsUp}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          padding: '6px',
-                          cursor: 'pointer',
-                          color: '#141414',
-                          display: 'flex',
-                          alignItems: 'center',
-                          borderRadius: '3px'
-                        }}
-                        title="Good summary"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f7fafc';
-                          e.currentTarget.style.color = '#2d3748';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = '#718096';
-                        }}
-                      >
-                        <ThumbsUp size={16} />
-                      </button>
-                    )}
-                    {breezeRecordSummary.onThumbsDown && (
-                      <button
-                        onClick={breezeRecordSummary.onThumbsDown}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          padding: '6px',
-                          cursor: 'pointer',
-                          color: '#141414',
-                          display: 'flex',
-                          alignItems: 'center',
-                          borderRadius: '3px'
-                        }}
-                        title="Bad summary"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f7fafc';
-                          e.currentTarget.style.color = '#2d3748';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = '#718096';
-                        }}
-                      >
-                        <ThumbsDown size={16} />
-                      </button>
-                    )}
-                    {breezeRecordSummary.onCopy && (
-                      <button
-                        onClick={breezeRecordSummary.onCopy}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          padding: '6px',
-                          cursor: 'pointer',
-                          color: '#141414',
-                          display: 'flex',
-                          alignItems: 'center',
-                          borderRadius: '3px'
-                        }}
-                        title="Copy"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f7fafc';
-                          e.currentTarget.style.color = '#2d3748';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = '#718096';
-                        }}
-                      >
-                        <Copy size={16} />
-                      </button>
-                    )}
-                  </div>
-
-                  {breezeRecordSummary.onAskQuestion && (
-                    <button
-                      onClick={breezeRecordSummary.onAskQuestion}
+                  {recordLink && (
+                    <a
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        recordLink.onClick();
+                      }}
                       style={{
-                        marginTop: '16px',
-                        width: '36%',
-                        padding: '6px 0',
-                        backgroundColor: 'transparent',
-                        border: '1px solid #d20688',
-                        borderRadius: '20px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        color: '#d20688',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
+                        fontSize: '14px',
+                        color: '#006162',
+                        textDecoration: 'underline',
+                        fontWeight: '500'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = '#007a8c';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = '#0091ae';
+                      }}
+                    >
+                      {recordLink.label}
+                    </a>
+                  )}
+
+                  {actionsDropdown && (
+                    <div style={{ position: 'relative' }} ref={dropdownRef}>
+                      <button
+                        onClick={() => setShowActionsDropdown(!showActionsDropdown)}
+                        style={{
+                          padding: '6px 14px',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          color: '#141414',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f7fafc';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        {actionsDropdown.label}
+                        <ChevronDown size={14} />
+                      </button>
+                      
+                      {showActionsDropdown && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '100%',
+                          right: 0,
+                          marginTop: '4px',
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '5px',
+                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                          minWidth: '180px',
+                          zIndex: 1000,
+                          overflow: 'hidden'
+                        }}>
+                          {actionsDropdown.items.map((item, index) => (
+                            <button
+                              key={index}
+                              onClick={() => {
+                                item.onClick();
+                                setShowActionsDropdown(false);
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '10px 16px',
+                                backgroundColor: 'transparent',
+                                border: 'none',
+                                textAlign: 'left',
+                                fontSize: '14px',
+                                color: '#141414',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#f7fafc';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Permission Message */}
+                {permissionMessage && (
+                  <div style={{
+                    padding: '12px 16px',
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    borderRadius: '5px',
+                    fontSize: '13px',
+                    color: '#92400e',
+                    marginBottom: '16px',
+                    lineHeight: '1.5',
+                  }}>
+                    {permissionMessage}
+                  </div>
+                )}
+
+                {/* Avatar and Name Section */}
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                    marginBottom: '12px',
+                  }}>
+                    {avatar && (
+                      <div style={{
+                        width: '40px',
+                        height: '37px',
+                        borderRadius: '26px',
+                        background: '#efe7f0',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '5px'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#fff5f7';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                    >
-                      <Sparkles size={16} />
-                      Ask a question
-                    </button>
+                        fontSize: '10px',
+                        fontWeight: '400',
+                        color: '#141414',
+                        flexShrink: 0,
+                        backgroundImage: avatar.imageUrl ? `url(${avatar.imageUrl})` : undefined,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }}>
+                        {!avatar.imageUrl && (avatar.initials || avatar.name.substring(0, 2).toUpperCase())}
+                      </div>
+                    )}
+                    <div style={{ flex: 1}}>
+                      <h1 style={{
+                        fontSize: '22px',
+                        fontWeight: '500',
+                        color: '#141414',
+                        margin: '0 0 4px 0',
+                        lineHeight: '1.3'
+                      }}>
+                        {title}
+                      </h1>
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  {email && (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px',
+                      marginBottom: '8px'
+                    }}>
+                      <a
+                        href={`mailto:${email}`}
+                        style={{
+                          fontSize: '14px',
+                          color: '#0091ae',
+                          textDecoration: 'none',
+                          fontWeight: '400',
+                          flex: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.textDecoration = 'underline';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.textDecoration = 'none';
+                        }}
+                      >
+                        {email}
+                      </a>
+                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                        <button
+                          onClick={() => copyToClipboard(email)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            padding: '4px',
+                            cursor: 'pointer',
+                            color: '#718096',
+                            display: 'flex',
+                            alignItems: 'center',
+                            borderRadius: '3px'
+                          }}
+                          title="Copy email"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f7fafc';
+                            e.currentTarget.style.color = '#2d3748';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = '#718096';
+                          }}
+                        >
+                          <Copy size={14} />
+                        </button>
+                        <a
+                          href={`mailto:${email}`}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            padding: '4px',
+                            cursor: 'pointer',
+                            color: '#718096',
+                            display: 'flex',
+                            alignItems: 'center',
+                            borderRadius: '3px',
+                            textDecoration: 'none'
+                          }}
+                          title="Send email"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f7fafc';
+                            e.currentTarget.style.color = '#2d3748';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = '#718096';
+                          }}
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Phone */}
+                  {phone && (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      gap: '8px',
+                      marginBottom: '16px',
+                    }}>
+                      <div  style={{ flex: 1 }}>
+                        <p style={{ 
+                          fontSize: '13px', 
+                          color: '#141414',
+                          fontWeight: '400',
+                          marginBottom: '1px'
+                        }}>
+                          Phone Number
+                        </p>
+                        <p style={{ 
+                          fontSize: '13px', 
+                          color: '#141414',
+                          fontWeight: '400'
+                        }}>
+                          {subtitle}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick Actions */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '23px',
+                  paddingTop: '5px',
+                  flexWrap: 'wrap',
+                }}>
+                  {processedQuickActions.map((action) => {
+                    const ActionIcon = action.icon;
+                    return (
+                      <div key={action.id} className="quick-action-wrapper">
+                        <button
+                          onClick={() => {
+                            if (!action.disabled) {
+                              action.onClick();
+                              onQuickActionClick?.(action.id);
+                            }
+                          }}
+                          className={`quick-action-btn ${action.disabled ? 'disabled' : ''}`}
+                          title={action.label}
+                          disabled={action.disabled}
+                        >
+                          <ActionIcon 
+                            size={20} 
+                            color={action.disabled ? '#cbd5e0' : '#718096'} 
+                          />
+                        </button>
+                        <span className="quick-action-label">{action.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Breeze Record Summary */}
+              {breezeRecordSummary && (
+                <div style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '10px',
+                  marginBottom: '12px',
+                  overflow: 'hidden',
+                  border: '1px solid #cccccc',
+                }}>
+                  <div 
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '14px 20px',
+                      cursor: 'pointer',
+                      backgroundColor: '#ffffff'
+                    }}
+                    onClick={() => toggleSection('breeze-summary')}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <ChevronDown 
+                        size={18} 
+                        style={{ 
+                          color: '#141414',
+                          transform: collapsedSections.has('breeze-summary') ? 'rotate(-90deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.2s ease'
+                        }} 
+                      />
+                      <h3 style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        color: '#141414',
+                        margin: 0,
+                        lineHeight: '1.2'
+                      }}>
+                        Breeze record summary
+                      </h3>
+                      <div style={{
+                        padding: '3px 10px',
+                        background: 'linear-gradient(114deg, rgb(255, 56, 66) 0%, rgb(210, 6, 136) 100%)',
+                        color: 'white',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        textTransform: 'uppercase'
+                      }}>
+                        AI
+                      </div>
+                    </div>
+                  </div>
+
+                  {!collapsedSections.has('breeze-summary') && (
+                    <div style={{ 
+                      padding: '20px',
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontSize: '13px',
+                        color: '#141414',
+                        marginBottom: '12px'
+                      }}>
+                        <span>{breezeRecordSummary.timestamp}</span>
+                        {breezeRecordSummary.onRefresh && (
+                          <button
+                            onClick={breezeRecordSummary.onRefresh}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              padding: '2px',
+                              cursor: 'pointer',
+                              color: '#141414',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            title="Refresh"
+                          >
+                            <RefreshCw size={12} />
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{
+                        fontSize: '14px',
+                        color: '#141414',
+                        lineHeight: '1.6',
+                        marginBottom: '16px',
+                        border: '1px solid #ff9fcc',
+                        padding: '18px 20px',
+                        borderRadius: '5px',
+                      }}>
+                        {breezeRecordSummary.content}
+                      </div>
+
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        paddingTop: '12px',
+                        borderTop: '1px solid #fee'
+                      }}>
+                        {breezeRecordSummary.onThumbsUp && (
+                          <button
+                            onClick={breezeRecordSummary.onThumbsUp}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              padding: '6px',
+                              cursor: 'pointer',
+                              color: '#141414',
+                              display: 'flex',
+                              alignItems: 'center',
+                              borderRadius: '3px'
+                            }}
+                            title="Good summary"
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f7fafc';
+                              e.currentTarget.style.color = '#2d3748';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.color = '#718096';
+                            }}
+                          >
+                            <ThumbsUp size={16} />
+                          </button>
+                        )}
+                        {breezeRecordSummary.onThumbsDown && (
+                          <button
+                            onClick={breezeRecordSummary.onThumbsDown}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              padding: '6px',
+                              cursor: 'pointer',
+                              color: '#141414',
+                              display: 'flex',
+                              alignItems: 'center',
+                              borderRadius: '3px'
+                            }}
+                            title="Bad summary"
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f7fafc';
+                              e.currentTarget.style.color = '#2d3748';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.color = '#718096';
+                            }}
+                          >
+                            <ThumbsDown size={16} />
+                          </button>
+                        )}
+                        {breezeRecordSummary.onCopy && (
+                          <button
+                            onClick={breezeRecordSummary.onCopy}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              padding: '6px',
+                              cursor: 'pointer',
+                              color: '#141414',
+                              display: 'flex',
+                              alignItems: 'center',
+                              borderRadius: '3px'
+                            }}
+                            title="Copy"
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f7fafc';
+                              e.currentTarget.style.color = '#2d3748';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.color = '#718096';
+                            }}
+                          >
+                            <Copy size={16} />
+                          </button>
+                        )}
+                      </div>
+
+                      {breezeRecordSummary.onAskQuestion && (
+                        <button
+                          onClick={breezeRecordSummary.onAskQuestion}
+                          style={{
+                            marginTop: '16px',
+                            width: '36%',
+                            padding: '6px 0',
+                            backgroundColor: 'transparent',
+                            border: '1px solid #d20688',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            color: '#d20688',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#fff5f7';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <Sparkles size={16} />
+                          Ask a question
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Sections */}
-          {sections.map(section => renderSection(section))}
-        </div>
+              {/* Sections */}
+              {processedSections.map(section => renderSection(section))}
+            </div>
       </div>
     </>
   );

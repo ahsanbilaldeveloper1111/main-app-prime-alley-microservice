@@ -1921,6 +1921,22 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     }
   }, []);
 
+  const handleNoteCreate = (note: string, createTask: boolean, taskDueDate?: string) => {
+    console.log('Note created:', {
+      prospectId: selectedProspect.id,
+      note,
+      createTask,
+      taskDueDate
+    });
+    
+    // Here you would typically:
+    // 1. Save the note to your backend/database
+    // 2. If createTask is true, create a task with the due date
+    // 3. Update the UI to show the new note
+    // 4. Maybe refresh the notes section
+    
+    alert(`Note saved successfully!\n\nNote: ${note}\nCreate Task: ${createTask}\nDue Date: ${taskDueDate || 'N/A'}`);
+  };
   // Handle call button click
   const handleCallClick = useCallback(async (item: CrmDataItem) => {
     const phone = item.phone;
@@ -6687,6 +6703,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
           name: selectedProspect?.name || 'NA',
           gradient: getRandomColor(selectedProspect?.name || '')
         }}
+        onNoteCreate={handleNoteCreate}
         breezeRecordSummary={{
           content: "This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
           timestamp: "Generated on Feb 14, 2026 at 2:30 PM",
@@ -6725,28 +6742,28 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             id: 'note', 
             label: 'Note', 
             icon: FileText, 
-            onClick: () => console.log('Add note'),
+            onClick: () => {}, // This is handled internally now
             disabled: false 
           },
           { 
             id: 'call', 
             label: 'Call', 
             icon: Phone, 
-            onClick: () => selectedProspect?.phone && handleCallClick(selectedProspect),
+            onClick: () => {},
             disabled: !selectedProspect?.phone 
           },
           { 
             id: 'email', 
             label: 'Email', 
             icon: Mail, 
-            onClick: () => console.log('Send email'),
-            disabled: !selectedProspect?.email 
+            onClick: () => {},
+            //disabled: !selectedProspect?.email 
           },
           { 
             id: 'task', 
             label: 'Task', 
             icon: CheckSquare, 
-            onClick: () => console.log('Create task'),
+            onClick: () => {},
             disabled: false 
           },
           { 
