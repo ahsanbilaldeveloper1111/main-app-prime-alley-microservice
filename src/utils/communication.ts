@@ -293,7 +293,13 @@ export const sendEmail = async (
     `${prefix}/send-email`,
     data
   );
-  return response.data;
+  if(response?.status ===200){
+    toast.success(response.data.message || 'Email sent successfully');
+    return response.data;
+  } else {
+    toast.error(response.data.message || 'Failed to send Email');
+    throw new Error(response.data.message || 'Failed to send Email');
+  }
 };
 
 /**
@@ -329,7 +335,13 @@ export const createInstantMeeting = async (
     `${meetingsPrefix}/instant`,
     data
   );
-  return response.data;
+  if(response?.status ===200){
+    toast.success(response.data.message || 'Instant meeting created successfully');
+    return response.data;
+  } else {
+    toast.error(response.data.message || 'Failed to create instant meeting');
+    throw new Error(response.data.message || 'Failed to create instant meeting');
+  }
 };
 
 /**
@@ -343,7 +355,13 @@ export const createScheduledMeeting = async (
     `${meetingsPrefix}/scheduled`,
     data
   );
-  return response.data;
+  if(response?.status ===200){
+    toast.success(response.data.message || 'Scheduled meeting created successfully');
+    return response.data;
+  } else {
+    toast.error(response.data.message || 'Failed to create scheduled meeting');
+    throw new Error(response.data.message || 'Failed to create scheduled meeting');
+  }
 };
 
 /**
@@ -496,11 +514,12 @@ export const sendSms = async (
     data
   );
   if (response?.status === 200) {
-    toast.success(response.data.message || 'SMS sent');
+    toast.success(response.data.message || 'SMS sent successfully');
     return response.data;
+  } else {
+    toast.error(response.data.message || 'Failed to send SMS');
+    throw new Error(response.data.message || 'Failed to send SMS');
   }
-  toast.error(response?.data?.message ?? 'Failed to send SMS');
-  throw new Error(response?.data?.message ?? 'Failed to send SMS');
 };
 
 /**

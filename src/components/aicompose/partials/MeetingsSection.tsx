@@ -5,7 +5,6 @@ import type { RegisterFooter, ChannelSectionContext } from '../types';
 import { getContextSource } from '../types';
 import {
   getMeetings,
-  getMeetingByEventId,
   createInstantMeeting,
   createScheduledMeeting,
 } from '@utils/communication';
@@ -112,32 +111,9 @@ const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter; initialMeetin
     fetchMeetings(meetingsPage, meetingsPerPage);
   }, [meetingsPage, meetingsPerPage, fetchMeetings]);
 
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [selectedMeeting, setSelectedMeeting] = useState<MeetingItem | null>(null);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
-  const [meetingDetail, setMeetingDetail] = useState<MeetingItem | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  useEffect(() => {
-    if (!selectedEventId) {
-      setMeetingDetail(null);
-      return;
-    }
-    const fetchDetail = async () => {
-      setDetailLoading(true);
-      try {
-        const res = (await getMeetingByEventId(selectedEventId)) as { data?: MeetingItem; status?: string } | MeetingItem;
-        const detail = res && typeof res === 'object' && 'data' in res && res.data != null ? res.data : (res as MeetingItem);
-        setMeetingDetail(detail || null);
-      } catch (e) {
-        console.error('Failed to fetch meeting detail', e);
-        setMeetingDetail(null);
-      } finally {
-        setDetailLoading(false);
-      }
-    };
-    fetchDetail();
-  }, [selectedEventId]);
 
- 
   const handleCreateMeeting = async () => {
     const attendees = attendeesStr
       ? attendeesStr.split(',').map((e) => e.trim()).filter(Boolean)
@@ -154,17 +130,7 @@ const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter; initialMeetin
         setTitle('');
         setDescription('');
         setAttendeesStr('');
-        if (res?.data) {
-          const newMeeting: MeetingItem = {
-            event_id: res.data.event_id,
-            meeting_link: res.data.meeting_link,
-            html_link: res.data.html_link,
-            summary: res.data.summary,
-            start_time: res.data.start_time,
-            end_time: res.data.end_time,
-          };
-          setMeetings((prev) => [newMeeting, ...prev]);
-        } 
+        await fetchMeetings(meetingsPage, meetingsPerPage);
       } catch (e) {
         console.error('Create instant meeting failed', e);
       } finally {
@@ -403,49 +369,44 @@ const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter; initialMeetin
         </Col>
       </Row>
 
-      <Modal show={showMeetingModal && selectedEventId != null} onHide={() => { setShowMeetingModal(false); setSelectedEventId(null); }} size="lg" centered>
+      <Modal show={showMeetingModal && selectedMeeting != null} onHide={() => { setShowMeetingModal(false); setSelectedMeeting(null); }} size="lg" centered>
         <Modal.Header closeButton>
-          <Modal.Title>{meetingDetail?.summary ?? 'Meeting Details'}</Modal.Title>
+          <Modal.Title>{selectedMeeting?.summary ?? 'Meeting Details'}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {detailLoading ? (
-            <div className="d-flex align-items-center gap-2 py-3">
-              <span className="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true" />
-              <span className="small text-muted">Loading meeting...</span>
-            </div>
-          ) : meetingDetail != null ? (
+          {selectedMeeting != null && (
             <>
               <div className="small text-muted mb-2">
-                {meetingDetail.start_time
-                  ? moment(meetingDetail.start_time).format(GlobalDateTimeFormat)
+                {selectedMeeting.start_time
+                  ? moment(selectedMeeting.start_time).format(GlobalDateTimeFormat)
                   : '—'}
-                {meetingDetail.end_time && ` – ${moment(meetingDetail.end_time).format(GlobalDateTimeFormat)}`}
+                {selectedMeeting.end_time && ` – ${moment(selectedMeeting.end_time).format(GlobalDateTimeFormat)}`}
               </div>
               
-              {meetingDetail.meeting_link && (
-                <a href={meetingDetail.meeting_link} target="_blank" rel="noopener noreferrer" className="d-block mb-2 text-primary">
-                  {meetingDetail.meeting_link}
+              {selectedMeeting.meeting_link && (
+                <a href={selectedMeeting.meeting_link} target="_blank" rel="noopener noreferrer" className="d-block mb-2 text-primary">
+                  {selectedMeeting.meeting_link}
                 </a>
               )}
-              {meetingDetail.html_link && (
-                <a href={meetingDetail.html_link} target="_blank" rel="noopener noreferrer" className="d-block mb-2">
+              {selectedMeeting.html_link && (
+                <a href={selectedMeeting.html_link} target="_blank" rel="noopener noreferrer" className="d-block mb-2">
                   Open in Calendar
                 </a>
               )}
-              {meetingDetail.description && (
+              {selectedMeeting.description && (
                 <div className="mt-2 pt-2 border-top">
                   <div className="small fw-semibold text-muted mb-1">Description</div>
-                  <p className="mb-0 small" style={{ whiteSpace: 'pre-line' }}>{meetingDetail.description}</p>
+                  <p className="mb-0 small" style={{ whiteSpace: 'pre-line' }}>{selectedMeeting.description}</p>
                 </div>
               )}
-              {meetingDetail.attendees && meetingDetail.attendees.length > 0 && (
+              {selectedMeeting.attendees && selectedMeeting.attendees.length > 0 && (
                 <div className="mt-2 pt-2 border-top">
                   <div className="small fw-semibold text-muted mb-1">Attendees</div>
-                  <p className="mb-0 small">{meetingDetail.attendees.join(', ')}</p>
+                  <p className="mb-0 small">{selectedMeeting.attendees.join(', ')}</p>
                 </div>
               )}
             </>
-          ) : null}
+          )}
         </Modal.Body>
       </Modal>
 
@@ -476,9 +437,9 @@ const MeetingsSection: React.FC<{ registerFooter?: RegisterFooter; initialMeetin
                       return (
                         <Card
                           key={id}
-                          className={`cursor-pointer mb-2 position-relative ${selectedEventId === id ? 'border-primary bg-light' : ''}`}
+                          className={`cursor-pointer mb-2 position-relative ${selectedMeeting && eventId(selectedMeeting) === id ? 'border-primary bg-light' : ''}`}
                           onClick={() => {
-                            setSelectedEventId(id);
+                            setSelectedMeeting(m);
                             setShowMeetingModal(true);
                           }}
                         >
