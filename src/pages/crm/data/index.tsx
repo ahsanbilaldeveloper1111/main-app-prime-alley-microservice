@@ -727,6 +727,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   });
   const [dataList, setDataList] = useState<CrmDataItem[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
+  /** Total count of all prospects (unchanged when switching to Scheduled / Convert to Leads tab) */
+  const [totalAllProspects, setTotalAllProspects] = useState(0);
   const [loading, setLoading] = useState(false);
   const [clearSelectedRows, setClearSelectedRows] = useState(false);
   const [metrics, setMetrics] = useState<CrmDataMetrics>({
@@ -1340,6 +1342,13 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
 
       setDataList(response.data || []);
       setTotalRecords(response.pagination.total || 0);
+      
+      // Keep total all prospects only when fetching without tab filter (all prospects)
+      const isAllProspects = memoizedFilters.has_scheduled_calls !== true && memoizedFilters.has_tickets !== true;
+      if (isAllProspects) {
+        setTotalAllProspects(response.pagination.total || 0);
+      }
+
       setMetrics(
         response.metrics || {
           assigned_records: 0,
@@ -4274,7 +4283,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     showTabs: true,
     tabsDropdownLabel: "Prospects",
     tabs: [
-      { id: 'all', label: 'All prospects', count: totalRecords, removable: false },
+      { id: 'all', label: 'All prospects', count: totalAllProspects, removable: false },
       ...customTabs
     ],
     activeTab: activeFilter,
