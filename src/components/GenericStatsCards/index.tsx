@@ -4,7 +4,7 @@ import { LucideIcon, Circle } from 'lucide-react';
 export interface StatsCardData {
   title: string;
   value: string | number;
-  icon: LucideIcon;
+  icon?: LucideIcon;
   iconColor?: string;
   iconBgColor?: string;
   subtitle?: string;
@@ -53,47 +53,31 @@ const StatsCards: React.FC<StatsCardsProps> = ({
             key={index}
             style={{
               background: '#FFFFFF',
-              borderRadius: '12px',
+              
               padding: '20px',
-              border: '1px solid #F3F4F6'
+              
             }}
           >
-            {/* Icon and Value */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '16px', 
-              marginBottom: '12px' 
-            }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '12px',
-                background: iconBgColor,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <IconComponent size={24} color={iconColor} strokeWidth={2} />
-              </div>
-              <div style={{
-                fontSize: valueFontSize,
-                fontWeight: '700',
-                color: '#111827',
-                lineHeight: '1'
-              }}>
-                {card.value}
-              </div>
-            </div>
-
             {/* Title */}
             <div style={{
               fontSize: '14px',
-              color: '#6B7280',
+              color: '#141414',
               fontWeight: '500',
-              marginBottom: '12px'
+              marginBottom: '8px',
+              textAlign: 'center'
             }}>
               {card.title}
+            </div>
+
+            {/* Value */}
+            <div style={{
+              fontSize: '28px',
+              fontWeight: '500',
+              color: '#006162',
+              lineHeight: '1',
+              textAlign: 'center'
+            }}>
+              {card.value}
             </div>
 
             {/* Badge */}
@@ -127,28 +111,6 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               </div>
             )}
 
-            {/* Link */}
-            {card.link && (
-              <a 
-                href="#" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  card.link?.onClick();
-                }}
-                style={{
-                  fontSize: '13px',
-                  color: '#6366F1',
-                  textDecoration: 'none',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  display: 'inline-block',
-                  marginTop: card.badge || card.metric ? '8px' : '0'
-                }}
-              >
-                {card.link.text}
-              </a>
-            )}
-
             {/* Additional Text */}
             {card.additionalText && (
               <div style={{ 
@@ -168,7 +130,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                 gap: '6px',
                 fontSize: '13px',
                 color: '#374151',
-                marginTop: card.badge || card.metric || card.link ? '8px' : '0'
+                marginTop: card.badge || card.metric ? '8px' : '0'
               }}>
                 <Circle size={8} fill="#6366F1" color="#6366F1" />
                 <span>{card.subtitle}</span>
