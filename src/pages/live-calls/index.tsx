@@ -29,6 +29,17 @@ import {
 } from '@components/live-calls/utils/handlers'
 import { animateCardMove as animateCardMoveHelper } from '@components/live-calls/utils/animationHelpers'
 
+// Parse server timestamp as UTC when no timezone is present (backend often sends UTC without 'Z')
+function parseServerTime(isoOrDate: string | null | undefined): number {
+  if (!isoOrDate || typeof isoOrDate !== 'string') return 0
+  const s = isoOrDate.trim()
+  if (!s) return 0
+  const hasTz = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(s)
+  const toParse = hasTz ? s : s + 'Z'
+  const ms = new Date(toParse).getTime()
+  return Number.isFinite(ms) ? ms : 0
+}
+
 const LiveCallDashboard = () => {
   const { data:session, status } = useSession();
   const [showPageLoader, setShowPageLoader] = useState(false)
@@ -278,8 +289,8 @@ const LiveCallDashboard = () => {
     return Object.values(categorizedDns).filter(section => section === 'downOffline').length;
   }, [categorizedDns]);
 
-  // Track registered DNs with their timestamps for oldest idle calculation
-  const [registeredDnsStore, setRegisteredDnsStore] = useState<Record<string, { deviceName: string; when: string }>>({})
+  // Track registered DNs with their timestamps for oldest idle calculation (when = online, lastCallEndTime = last call ended)
+  const [registeredDnsStore, setRegisteredDnsStore] = useState<Record<string, { deviceName: string; when: string; lastCallEndTime?: string }>>({})
 
   // Idle tracking (Available & Idle only) - keyed by DN
   // - initialized only for REGISTERED extensions
@@ -289,6 +300,39 @@ const LiveCallDashboard = () => {
   const [idleSinceByDn, setIdleSinceByDn] = useState<Record<string, string>>({})
   const prevSectionByDnRef = useRef<Record<string, string>>({})
   const prevIsRegisteredByDnRef = useRef<Record<string, boolean>>({})
+  const prevDnsInCallRef = useRef<Set<string>>(new Set())
+
+  // When a call ends (DN was in call, now is not), set their idle since to now so idle time updates immediately
+  useEffect(() => {
+    if (!callStateMap || typeof callStateMap !== 'object') return
+    const currentDnsInCall = new Set<string>()
+    Object.values(callStateMap).forEach((call: any) => {
+      if (call?.isTerminating) return
+      if (!call?.parties?.length) return
+      call.parties.forEach((p: any) => {
+        if (p.callStatus !== 'DROPPED' && p.callStatus !== 'DISCONNECTED') {
+          if (p.callingAddress) currentDnsInCall.add(String(p.callingAddress))
+          if (p.calledAddress) currentDnsInCall.add(String(p.calledAddress))
+        }
+      })
+    })
+    const prev = prevDnsInCallRef.current
+    const justEnded = Array.from(prev).filter(dn => !currentDnsInCall.has(dn))
+    prevDnsInCallRef.current = currentDnsInCall
+    if (justEnded.length > 0) {
+      const nowIso = new Date().toISOString()
+      setIdleSinceByDn(prevState => {
+        let next = prevState
+        justEnded.forEach(dn => {
+          if (next[dn] !== nowIso) {
+            if (next === prevState) next = { ...prevState }
+            next[dn] = nowIso
+          }
+        })
+        return next
+      })
+    }
+  }, [callStateMap])
 
   // Process complete_state events to track registered devices
   useEffect(() => {
@@ -322,13 +366,14 @@ const LiveCallDashboard = () => {
           }
         }
 
-        const registered: Record<string, { deviceName: string; when: string }> = {}
+        const registered: Record<string, { deviceName: string; when: string; lastCallEndTime?: string }> = {}
         devices.forEach((device: any) => {
           if (device.terminalState === 'REGISTERED' && device.dn && device.deviceName && device.when) {
             const key = `${device.dn}_${device.deviceName}`
             registered[key] = {
               deviceName: device.deviceName,
-              when: device.when
+              when: device.when,
+              ...(device.lastCallEndTime && { lastCallEndTime: device.lastCallEndTime })
             }
           }
         })
@@ -371,12 +416,14 @@ const LiveCallDashboard = () => {
         const key = `${device.dn}_${device.deviceName}`
         
         if (device.terminalState === 'REGISTERED' && device.when) {
-          // Add or update registered device
+          // Add or update registered device (preserve lastCallEndTime if dns_states doesn't send it)
           setRegisteredDnsStore(prev => ({
             ...prev,
             [key]: {
               deviceName: device.deviceName,
-              when: device.when
+              when: device.when,
+              ...(device.lastCallEndTime && { lastCallEndTime: device.lastCallEndTime }),
+              ...(prev[key]?.lastCallEndTime && !device.lastCallEndTime && { lastCallEndTime: prev[key].lastCallEndTime })
             }
           }))
         } else if (device.terminalState === 'UNREGISTERED' || device.terminalState === 'STALE') {
@@ -395,16 +442,17 @@ const LiveCallDashboard = () => {
   useEffect(() => {
     if (!dnsMap) return
 
-    const registered: Record<string, { deviceName: string; when: string }> = {}
+    const registered: Record<string, { deviceName: string; when: string; lastCallEndTime?: string }> = {}
     Object.values(dnsMap).forEach((dnData: any) => {
       Object.values(dnData.devices || {}).forEach((device: any) => {
         if (device.terminalState === 'REGISTERED' && device.dn && device.deviceName) {
           const key = `${device.dn}_${device.deviceName}`
-          // Use existing timestamp if available, otherwise use current time
           const existing = registeredDnsStore[key]
           registered[key] = {
             deviceName: device.deviceName,
-            when: existing?.when || device.when || new Date().toISOString()
+            when: existing?.when || device.when || new Date().toISOString(),
+            ...(device.lastCallEndTime && { lastCallEndTime: device.lastCallEndTime }),
+            ...(existing?.lastCallEndTime && !device.lastCallEndTime && { lastCallEndTime: existing.lastCallEndTime })
           }
         }
       })
@@ -413,7 +461,7 @@ const LiveCallDashboard = () => {
     // Remove devices that are no longer in dnsMap
     const currentKeys = new Set(Object.keys(registered))
     setRegisteredDnsStore(prev => {
-      const updated: Record<string, { deviceName: string; when: string }> = {}
+      const updated: Record<string, { deviceName: string; when: string; lastCallEndTime?: string }> = {}
       Object.entries(prev).forEach(([key, value]) => {
         if (currentKeys.has(key)) {
           updated[key] = value
@@ -468,8 +516,8 @@ const LiveCallDashboard = () => {
       let latestMs: number | undefined
       deviceList.forEach((device: any) => {
         if (device.terminalState !== 'REGISTERED') return
-        const whenMs = device.when ? new Date(device.when).getTime() : 0
-        const lastCallEndMs = device.lastCallEndTime ? new Date(device.lastCallEndTime).getTime() : 0
+        const whenMs = parseServerTime(device.when)
+        const lastCallEndMs = parseServerTime(device.lastCallEndTime)
         const idleSinceMs = whenMs && lastCallEndMs ? Math.max(whenMs, lastCallEndMs) : (whenMs || lastCallEndMs)
         if (!idleSinceMs) return
         if (latestMs === undefined || idleSinceMs > latestMs) latestMs = idleSinceMs
@@ -477,17 +525,19 @@ const LiveCallDashboard = () => {
       return latestMs !== undefined ? new Date(latestMs).toISOString() : undefined
     }
 
+    // Idle since from registered store: max(when, lastCallEndTime) per device, then latest across devices
     const getLatestRegisteredWhenIso = (dn: string): string | undefined => {
-      let latest: string | undefined = undefined
+      let latestMs: number | undefined
       Object.entries(registeredDnsStore).forEach(([key, value]) => {
         const [storeDn] = key.split('_')
-        if (storeDn !== String(dn)) return
-        if (!value?.when) return
-        if (!latest || new Date(value.when) > new Date(latest)) {
-          latest = value.when
-        }
+        if (storeDn !== String(dn) || !value?.when) return
+        const whenMs = parseServerTime(value.when)
+        const lastCallEndMs = parseServerTime(value.lastCallEndTime)
+        const idleSinceMs = whenMs && lastCallEndMs ? Math.max(whenMs, lastCallEndMs) : whenMs
+        if (!idleSinceMs) return
+        if (latestMs === undefined || idleSinceMs > latestMs) latestMs = idleSinceMs
       })
-      return latest
+      return latestMs !== undefined ? new Date(latestMs).toISOString() : undefined
     }
 
     const currentSectionByDn = categorizedDns as Record<string, string>
@@ -545,6 +595,9 @@ const LiveCallDashboard = () => {
         }
       })
 
+      // Return prev if unchanged to avoid re-render loop (deps like categorizedDns can be new refs each render)
+      const prevKeys = Object.keys(prev)
+      if (Object.keys(next).length === prevKeys.length && prevKeys.every(k => next[k] === prev[k])) return prev
       return next
     })
   }, [categorizedDns, dnsMap, isInitialized, registeredDnsStore])
@@ -1123,7 +1176,7 @@ const LiveCallDashboard = () => {
       />
 
       {/* Device Options Popup Modal */}
-      <MonitoringModal
+      {/* <MonitoringModal
         show={!!showPopup}
         showPopup={showPopup}
         activeMonitoring={activeMonitoring}
@@ -1142,7 +1195,7 @@ const LiveCallDashboard = () => {
         onBargeInSelect={handleBargeInSelect}
         onStopMonitoring={stopMonitoring}
         isDnInActiveCallFn={isDnInActiveCall}
-      />
+      /> */}
 
       {/* Device Selection Modal for Monitoring */}
       <DeviceSelectionModal

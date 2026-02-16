@@ -351,6 +351,22 @@ const Layout = ({ children }: LayoutProps) => {
 		return UserDummyImage.src;
 	}, [incomingCallUserData]);
 
+	// Close incoming call popup when the call is answered/connected (e.g. from Jabber or another device)
+	useEffect(() => {
+		if (!showIncomingCallModal || !incomingCall) return;
+		const calls = Array.from(activeCalls.values());
+		const answeredMatch = calls.find((call: any) => {
+			const sameCall = call.callId === incomingCall.callId ||
+				(call.callingAddress === incomingCall.callingAddress && call.calledAddress === incomingCall.calledAddress);
+			const notRinging = call.status && call.status !== "ringing";
+			return sameCall && notRinging;
+		});
+		if (answeredMatch) {
+			setShowIncomingCallModal(false);
+			setIncomingCall(null);
+		}
+	}, [showIncomingCallModal, incomingCall, activeCalls, setShowIncomingCallModal, setIncomingCall]);
+
 	const handleAttendCall = async () => {
 		if (!hasPermission("dial-call-cti")) {
 			return;

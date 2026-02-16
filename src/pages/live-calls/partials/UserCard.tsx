@@ -555,6 +555,18 @@ const UserCard: React.FC<UserCardProps> = ({
                          (p.callStatus === 'RINGING' || p.callStatus === 'DIALING')
                        ))
   const showCallControls = active && call && sectionKey !== 'downOffline' && !isRingingCall
+  // Monitoring buttons: supervisor (not in call) sees on both parties; caller sees only on the other party's card (never on own); called party sees on none
+  const isThisCardInCall = !!(call?.parties?.length && call.parties.some((p: any) => p.callingAddress === dn || p.calledAddress === dn))
+  const isCurrentUserInThisCall = !!(userAddress && call?.parties?.some((p: any) => p.callingAddress === userAddress || p.calledAddress === userAddress))
+  const isCurrentUserCalledPartyInThisCall = !!(userAddress && call?.parties?.some((p: any) => p.calledAddress === userAddress))
+  const isThisCardCurrentUser = !!(userAddress && dn === userAddress)
+  const showMonitoringButtons = isCurrentUserInThisCall
+    ? (!isCurrentUserCalledPartyInThisCall && isThisCardInCall && !isThisCardCurrentUser)
+    : isThisCardInCall
+  // When supervisor is already monitoring someone, disable Start Monitoring on all other cards until they stop
+  const supervisorIsAlreadyMonitoring = !!(userAddress && activeMonitoring.monitor === userAddress && (activeMonitoring.dn || (activeMonitoring as any).sessions?.length > 0))
+  const thisCardIsMonitored = (activeMonitoring as any).sessions?.some((s: { dn: string }) => s.dn === dn) || activeMonitoring.dn === dn
+  const disableStartMonitoringMustStopFirst = supervisorIsAlreadyMonitoring && !thisCardIsMonitored
   // Show badge for all active calls including RINGING (separate from monitoring controls)
   const showCallStatusBadge = active && call && callStatus && status !== 'Live Coaching'
 
@@ -961,7 +973,8 @@ const UserCard: React.FC<UserCardProps> = ({
             {showCallControls && (
               <div className="d-flex gap-1">
                 {(() => {
-                  const isMonitored = activeMonitoring.dn === dn // This card is being monitored
+                  if (!showMonitoringButtons) return null
+                  const isMonitored = (activeMonitoring as any).sessions?.some((s: { dn: string }) => s.dn === dn) || activeMonitoring.dn === dn // This card is being monitored
                   const isSupervisorMonitoring = activeMonitoring.monitor === dn // This DN is a supervisor doing monitoring
                   const isCurrentUser = userAddress && dn === userAddress // This is current user's card
                   
@@ -1031,6 +1044,33 @@ const UserCard: React.FC<UserCardProps> = ({
                     )
                   }
                   
+                  if (disableStartMonitoringMustStopFirst) {
+                    return (
+                      <Button 
+                        variant="light" 
+                        size="sm" 
+                        className="p-0 border" 
+                        disabled
+                        style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          borderRadius: '4px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#9ca3af',
+                          borderColor: '#e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'not-allowed',
+                          opacity: 0.5
+                        }}
+                        title="Stop current monitoring first"
+                      >
+                        <Volume2 size={8} />
+                      </Button>
+                    )
+                  }
+                  
                   return (
                     <Button 
                       variant="light" 
@@ -1060,7 +1100,8 @@ const UserCard: React.FC<UserCardProps> = ({
                   )
                 })()}
                 {(() => {
-                  const isMonitored = activeMonitoring.dn === dn
+                  if (!showMonitoringButtons) return null
+                  const isMonitored = (activeMonitoring as any).sessions?.some((s: { dn: string }) => s.dn === dn) || activeMonitoring.dn === dn
                   const isSupervisorMonitoring = activeMonitoring.monitor === dn
                   const isCurrentUser = userAddress && dn === userAddress
                   
@@ -1122,6 +1163,33 @@ const UserCard: React.FC<UserCardProps> = ({
                     )
                   }
                   
+                  if (disableStartMonitoringMustStopFirst) {
+                    return (
+                      <Button 
+                        variant="light" 
+                        size="sm" 
+                        className="p-0 border" 
+                        disabled
+                        style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          borderRadius: '4px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#9ca3af',
+                          borderColor: '#e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'not-allowed',
+                          opacity: 0.5
+                        }}
+                        title="Stop current monitoring first"
+                      >
+                        <Mic size={8} />
+                      </Button>
+                    )
+                  }
+                  
                   return (
                     <Button 
                       variant="light" 
@@ -1151,7 +1219,8 @@ const UserCard: React.FC<UserCardProps> = ({
                   )
                 })()}
                 {(() => {
-                  const isMonitored = activeMonitoring.dn === dn
+                  if (!showMonitoringButtons) return null
+                  const isMonitored = (activeMonitoring as any).sessions?.some((s: { dn: string }) => s.dn === dn) || activeMonitoring.dn === dn
                   const isSupervisorMonitoring = activeMonitoring.monitor === dn
                   const isCurrentUser = userAddress && dn === userAddress
                   
@@ -1207,6 +1276,33 @@ const UserCard: React.FC<UserCardProps> = ({
                           opacity: 0.5
                         }}
                         title="Barge In (Disabled - Being Monitored)"
+                      >
+                        <Users size={8} />
+                      </Button>
+                    )
+                  }
+                  
+                  if (disableStartMonitoringMustStopFirst) {
+                    return (
+                      <Button 
+                        variant="light" 
+                        size="sm" 
+                        className="p-0 border" 
+                        disabled
+                        style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          borderRadius: '4px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#9ca3af',
+                          borderColor: '#e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'not-allowed',
+                          opacity: 0.5
+                        }}
+                        title="Stop current monitoring first"
                       >
                         <Users size={8} />
                       </Button>

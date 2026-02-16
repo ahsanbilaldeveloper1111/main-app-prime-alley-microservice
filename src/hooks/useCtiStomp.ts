@@ -26,6 +26,8 @@ interface CtiCallEvent {
   hasActiveParticipants: boolean;
   eventName: string;
   currentState?: string;
+  /** Set on HELD: address of the party who put the call on hold (only they can resume). From details "GlobalCalling:X" => heldBy = other party; else heldBy = caller. */
+  heldByAddress?: string;
 }
 
 interface SummaryData {
@@ -96,6 +98,7 @@ const globalConnectionRefs = {
   reconnectionAttemptsRef: { current: 0 }, // Track reconnection attempts
   lastMessageTimeRef: { current: null as number | null }, // Track last message time for health check
   healthCheckIntervalRef: { current: null as NodeJS.Timeout | null }, // Health check interval
+  hasRequestedInitialStateRef: { current: false }, // Request initial-state only once per connection to avoid loops
 };
 
 /**
@@ -177,6 +180,7 @@ export default function useCtiStomp(
   const localReconnectionAttemptsRef = useRef(0);
   const localLastMessageTimeRef = useRef<number | null>(null);
   const localHealthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const localHasRequestedInitialStateRef = useRef(false);
 
   // Use shared refs for global instance, individual refs for other instances
   const clientRef = isGlobalInstance ? globalConnectionRefs.clientRef : localClientRef;
@@ -195,7 +199,8 @@ export default function useCtiStomp(
   const reconnectionAttemptsRef = isGlobalInstance ? globalConnectionRefs.reconnectionAttemptsRef : localReconnectionAttemptsRef;
   const lastMessageTimeRef = isGlobalInstance ? globalConnectionRefs.lastMessageTimeRef : localLastMessageTimeRef;
   const healthCheckIntervalRef = isGlobalInstance ? globalConnectionRefs.healthCheckIntervalRef : localHealthCheckIntervalRef;
-  
+  const hasRequestedInitialStateRef = isGlobalInstance ? globalConnectionRefs.hasRequestedInitialStateRef : localHasRequestedInitialStateRef;
+
   // Store attemptReconnection function in a ref so it can be accessed from multiple useEffects
   const attemptReconnectionRef = useRef<((maxAttempts?: number) => Promise<void>) | null>(null);
 
@@ -625,6 +630,28 @@ export default function useCtiStomp(
           }
         }
 
+        // On HELD: determine who put the call on hold for Resume button (only that party can resume).
+        // details "GlobalCalling:X" means the other party held -> heldBy = the address that is not X.
+        // No GlobalCalling -> caller put on hold -> heldBy = callingAddress.
+        let heldByAddress: string | undefined;
+        if (evt.eventType === "HELD" && activePartiesOnly.length >= 1) {
+          const p = activePartiesOnly[0];
+          const calling = p.callingAddress;
+          const called = p.calledAddress;
+          const details = (evt as any).details || "";
+          const globalCallingMatch = details.match(/GlobalCalling:(\S+)/);
+          if (globalCallingMatch) {
+            const globalCalling = globalCallingMatch[1].trim();
+            heldByAddress = calling === globalCalling ? called : calling;
+          } else {
+            heldByAddress = calling;
+          }
+        } else if (effectiveCurrentState !== "HELD") {
+          heldByAddress = undefined;
+        } else {
+          heldByAddress = base.heldByAddress;
+        }
+
         // Store only active parties (DROPPED parties are removed immediately)
         // Update state with new eventTime, sequence, and currentState
         updated[callId] = {
@@ -646,6 +673,7 @@ export default function useCtiStomp(
               ? evt.hasActiveParticipants
               : hasActiveParties,
           eventName: evt.eventName || base.eventName,
+          heldByAddress,
         };
 
         // If all parties are dropped or call is terminating, remove the call state
@@ -848,7 +876,8 @@ export default function useCtiStomp(
             }
           }
 
-          // Add or update call in callStateMap
+          // Add or update call in callStateMap (preserve heldByAddress when state is HELD and we had it from a prior HELD event)
+          const existing = updated[callId];
           updated[callId] = {
             ...callData,
             callId,
@@ -857,6 +886,7 @@ export default function useCtiStomp(
             hasActiveParticipants: callData.hasActiveParticipants !== false,
             isTerminating: callData.isTerminating === true,
             eventTime: callData.eventTime || new Date().toISOString(),
+            ...(currentState === 'HELD' && existing?.heldByAddress != null && { heldByAddress: existing.heldByAddress }),
           };
 
           console.log(`[useCtiStomp] Added/updated ongoing call: ${callId} for DN: ${dn}, state: ${currentState}`);
@@ -925,25 +955,38 @@ export default function useCtiStomp(
     []
   );
 
-  // Helper function to publish STOMP messages via API
+  // Helper function to publish STOMP messages via API.
+  // If the API returns "No active STOMP connection" (e.g. POST hit a different instance than SSE), retry once after a short delay.
   const publishStompMessage = useCallback(
-    async (destination: string, body: string = "") => {
+    async (destination: string, body: string = "", retry = true): Promise<boolean> => {
       if (!tokenRef.current || !userAddressRef.current) {
         return false;
       }
 
-      try {
-        // Note: axiosInstance has baseURL: '/api', so we use '/cti-stomp-stream' not '/api/cti-stomp-stream'
+      const doPost = async () => {
         const response = await axiosInstance.post("/cti-stomp-stream", {
           token: tokenRef.current,
           userAddress: userAddressRef.current,
           destination,
           body,
-          screenId: screenIdRef.current || "default", // Include screenId in POST request
+          screenId: screenIdRef.current || "default",
         });
-
         return response.data.success === true;
-      } catch (error) {
+      };
+
+      try {
+        return await doPost();
+      } catch (error: any) {
+        const errMsg = error?.response?.data?.error || "";
+        const isNoConnection = typeof errMsg === "string" && errMsg.includes("No active STOMP connection");
+        if (retry && isNoConnection) {
+          await new Promise((r) => setTimeout(r, 600));
+          try {
+            return await doPost();
+          } catch {
+            return false;
+          }
+        }
         return false;
       }
     },
@@ -1108,6 +1151,7 @@ export default function useCtiStomp(
         isGettingTokenRef.current = false;
         connectionStartTimeRef.current = null;
         isReconnectingRef.current = false;
+        hasRequestedInitialStateRef.current = false;
 
         // Clear token, userAddress, userTeams, and userDataExtensions refs
         tokenRef.current = null;
@@ -1222,6 +1266,7 @@ export default function useCtiStomp(
       isInitializedRef.current = false;
       isGettingTokenRef.current = false; // Reset token flag
       connectionStartTimeRef.current = null;
+      hasRequestedInitialStateRef.current = false;
 
       // Only reset reconnecting flag if not preserving it
       if (!preserveReconnecting) {
@@ -1358,6 +1403,7 @@ export default function useCtiStomp(
         isInitializedRef.current = false;
         isGettingTokenRef.current = false; // Reset token flag
         connectionStartTimeRef.current = null;
+        hasRequestedInitialStateRef.current = false;
 
         // Clear reconnection timer if it exists
         if (reconnectionTimerRef.current) {
@@ -1573,7 +1619,8 @@ export default function useCtiStomp(
                   if (!updated[dn]) {
                     updated[dn] = { dn, devices: {} };
                   }
-                  updated[dn].devices[deviceName] = s;
+                  const existing = updated[dn].devices[deviceName];
+                  updated[dn].devices[deviceName] = { ...existing, ...s };
                   if (updateSummaryDataRef.current) {
                     updateSummaryDataRef.current(updated);
                   }
@@ -1589,6 +1636,12 @@ export default function useCtiStomp(
                 if (handleCallEventRef.current) {
                   handleCallEventRef.current(data.data);
                 }
+                if (data.data?.eventType === "DROPPED" || data.data?.eventType === "DISCONNECTED") {
+                  if (publishStompMessageRef.current) {
+                    publishStompMessageRef.current("/app/request/initial-state", "");
+                    publishStompMessageRef.current("/app/request/ongoing-calls", "");
+                  }
+                }
               } catch (err) {
                 setError("Failed to process call event");
               }
@@ -1597,8 +1650,9 @@ export default function useCtiStomp(
             case "stomp_connected":
               setIsInitialized(true);
               setError(null);
-              // Request initial state after connection
-              if (publishStompMessageRef.current) {
+              // Request initial state only once per connection to avoid repeated demands
+              if (!hasRequestedInitialStateRef.current && publishStompMessageRef.current) {
+                hasRequestedInitialStateRef.current = true;
                 publishStompMessageRef.current(
                   "/app/request/initial-state",
                   ""
@@ -1736,6 +1790,7 @@ export default function useCtiStomp(
         isReconnectingRef.current = false;
         reconnectionAttemptsRef.current = 0;
         lastMessageTimeRef.current = null;
+        hasRequestedInitialStateRef.current = false;
       };
     };
 
@@ -2510,7 +2565,14 @@ export default function useCtiStomp(
                     );
                     setDnsMap(grouped);
                     updateSummaryDataRef.current(grouped);
-                    
+                    setEventLog((prev) => [
+                      ...prev,
+                      {
+                        type: "initial-state",
+                        data: grouped,
+                        timestamp: new Date().toISOString(),
+                      },
+                    ]);
                     // CRITICAL: Broadcast complete_state to non-master tabs
                     // This ensures non-master tabs receive the initial data for live-calls page
                     if (isGlobalInstance && manager.isMasterTab() && manager.isCrossTabSupported()) {
@@ -2530,7 +2592,8 @@ export default function useCtiStomp(
                     if (!updated[dn]) {
                       updated[dn] = { dn, devices: {} };
                     }
-                    updated[dn].devices[deviceName] = s;
+                    const existing = updated[dn].devices[deviceName];
+                    updated[dn].devices[deviceName] = { ...existing, ...s };
                     if (updateSummaryDataRef.current) {
                       updateSummaryDataRef.current(updated);
                     }
@@ -2551,12 +2614,19 @@ export default function useCtiStomp(
                   if (handleCallEventRef.current) {
                     handleCallEventRef.current(data.data);
                   }
+                  if (data.data?.eventType === "DROPPED" || data.data?.eventType === "DISCONNECTED") {
+                    if (publishStompMessageRef.current) {
+                      publishStompMessageRef.current("/app/request/initial-state", "");
+                      publishStompMessageRef.current("/app/request/ongoing-calls", "");
+                    }
+                  }
                   break;
 
                 case "stomp_connected":
                   setIsInitialized(true);
                   setError(null);
-                  if (publishStompMessageRef.current) {
+                  if (!hasRequestedInitialStateRef.current && publishStompMessageRef.current) {
+                    hasRequestedInitialStateRef.current = true;
                     publishStompMessageRef.current(
                       "/app/request/initial-state",
                       ""
@@ -2715,7 +2785,8 @@ export default function useCtiStomp(
             if (!updated[dn]) {
               updated[dn] = { dn, devices: {} };
             }
-            updated[dn].devices[deviceName] = s;
+            const existing = updated[dn].devices[deviceName];
+            updated[dn].devices[deviceName] = { ...existing, ...s };
             if (updateSummaryDataRef.current) {
               updateSummaryDataRef.current(updated);
             }
