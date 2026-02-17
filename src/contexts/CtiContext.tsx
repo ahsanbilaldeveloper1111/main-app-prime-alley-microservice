@@ -24,6 +24,7 @@ const CALL_STATES_TIMESTAMP_KEY = "cti_call_states_timestamp";
 interface CtiContextType {
   // Connection state
   isInitialized: boolean;
+  isReconnecting: boolean;
   error: string | null;
   userAddress: string;
   
@@ -1130,6 +1131,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
   const value = useMemo<CtiContextType>(() => ({
     // Connection state
     isInitialized: ctiStomp.isInitialized,
+    isReconnecting: ctiStomp.isReconnecting,
     error: ctiStomp.error,
     userAddress: ctiStomp.userAddress,
     

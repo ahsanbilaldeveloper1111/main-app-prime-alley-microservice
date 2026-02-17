@@ -555,18 +555,18 @@ const UserCard: React.FC<UserCardProps> = ({
                          (p.callStatus === 'RINGING' || p.callStatus === 'DIALING')
                        ))
   const showCallControls = active && call && sectionKey !== 'downOffline' && !isRingingCall
-  // Monitoring buttons: supervisor (not in call) sees on both parties; caller sees only on the other party's card (never on own); called party sees on none
+  // Monitoring buttons: only supervisor NOT in the call sees them (on both parties' cards). Participants in the call (caller or called) never see monitoring on any card.
   const isThisCardInCall = !!(call?.parties?.length && call.parties.some((p: any) => p.callingAddress === dn || p.calledAddress === dn))
   const isCurrentUserInThisCall = !!(userAddress && call?.parties?.some((p: any) => p.callingAddress === userAddress || p.calledAddress === userAddress))
-  const isCurrentUserCalledPartyInThisCall = !!(userAddress && call?.parties?.some((p: any) => p.calledAddress === userAddress))
-  const isThisCardCurrentUser = !!(userAddress && dn === userAddress)
-  const showMonitoringButtons = isCurrentUserInThisCall
-    ? (!isCurrentUserCalledPartyInThisCall && isThisCardInCall && !isThisCardCurrentUser)
-    : isThisCardInCall
+  const showMonitoringButtons = !isCurrentUserInThisCall && isThisCardInCall
   // When supervisor is already monitoring someone, disable Start Monitoring on all other cards until they stop
   const supervisorIsAlreadyMonitoring = !!(userAddress && activeMonitoring.monitor === userAddress && (activeMonitoring.dn || (activeMonitoring as any).sessions?.length > 0))
   const thisCardIsMonitored = (activeMonitoring as any).sessions?.some((s: { dn: string }) => s.dn === dn) || activeMonitoring.dn === dn
   const disableStartMonitoringMustStopFirst = supervisorIsAlreadyMonitoring && !thisCardIsMonitored
+  // Permission checks for monitoring actions (start/stop)
+  const hasSilentMonitoringPermission = !!session?.user?.permissions?.includes('silent-monitoring-cti')
+  const hasWhisperMonitoringPermission = !!session?.user?.permissions?.includes('whisper-monitoring-cti')
+  const hasBargeInPermission = !!session?.user?.permissions?.includes('barge-in-cti')
   // Show badge for all active calls including RINGING (separate from monitoring controls)
   const showCallStatusBadge = active && call && callStatus && status !== 'Live Coaching'
 
@@ -920,27 +920,28 @@ const UserCard: React.FC<UserCardProps> = ({
                 {activeMonitoring.monitor === dn && activeMonitoring.type && userAddress && dn === userAddress && (() => {
                   const normalizedType = getNormalizedMonitoringType(activeMonitoring.type)
                   if (!normalizedType) return null
-                  
+                  const hasStopPermission = normalizedType === 'silent-monitor' ? hasSilentMonitoringPermission
+                    : normalizedType === 'whisper' ? hasWhisperMonitoringPermission
+                    : hasBargeInPermission
                   return (
                     <div 
                       className="rounded-circle d-flex align-items-center justify-content-center position-relative"
                       style={{ 
                         width: '28px', 
                         height: '28px',
-                        backgroundColor: normalizedType === 'silent-monitor' ? '#1e40af' : 
-                                       normalizedType === 'whisper' ? '#6b21a8' : '#9a3412',
+                        backgroundColor: hasStopPermission
+                          ? (normalizedType === 'silent-monitor' ? '#1e40af' : normalizedType === 'whisper' ? '#6b21a8' : '#9a3412')
+                          : '#9ca3af',
                         color: '#ffffff',
-                        border: `2px solid ${normalizedType === 'silent-monitor' ? '#1e40af' : 
-                                normalizedType === 'whisper' ? '#6b21a8' : '#9a3412'}`,
-                        cursor: 'pointer'
+                        border: `2px solid ${hasStopPermission ? (normalizedType === 'silent-monitor' ? '#1e40af' : normalizedType === 'whisper' ? '#6b21a8' : '#9a3412') : '#9ca3af'}`,
+                        cursor: hasStopPermission ? 'pointer' : 'not-allowed',
+                        opacity: hasStopPermission ? 1 : 0.7
                       }}
-                      title={`Stop ${normalizedType === 'silent-monitor' ? 'Silent Monitor' : 
-                              normalizedType === 'whisper' ? 'Whisper' : 'Barge In'}`}
-                      onClick={async (e) => {
+                      title={hasStopPermission ? `Stop ${normalizedType === 'silent-monitor' ? 'Silent Monitor' : normalizedType === 'whisper' ? 'Whisper' : 'Barge In'}` : 'No permission to stop'}
+                      onClick={hasStopPermission ? async (e) => {
                         e.stopPropagation()
                         if (activeMonitoring.type && activeMonitoring.dn) {
-                          // Convert normalized type back to API format
-                          let stopType = 'SILENT' // default
+                          let stopType = 'SILENT'
                           if (normalizedType === 'silent-monitor') {
                             stopType = 'SILENT'
                           } else if (normalizedType === 'whisper') {
@@ -948,7 +949,6 @@ const UserCard: React.FC<UserCardProps> = ({
                           } else if (normalizedType === 'barge-in') {
                             stopType = 'BARGE_IN'
                           } else {
-                            // If already in API format, use as is
                             const upperType = activeMonitoring.type.toUpperCase()
                             if (upperType === 'SILENT' || upperType === 'WHISPER' || upperType === 'BARGE_IN') {
                               stopType = upperType
@@ -956,7 +956,7 @@ const UserCard: React.FC<UserCardProps> = ({
                           }
                           await stopMonitoring(activeMonitoring.dn, stopType)
                         }
-                      }}
+                      } : undefined}
                     >
                       {normalizedType === 'silent-monitor' ? (
                         <Volume2 size={12} />
@@ -974,6 +974,32 @@ const UserCard: React.FC<UserCardProps> = ({
               <div className="d-flex gap-1">
                 {(() => {
                   if (!showMonitoringButtons) return null
+                  if (!hasSilentMonitoringPermission) {
+                    return (
+                      <Button 
+                        variant="light" 
+                        size="sm" 
+                        className="p-0 border" 
+                        disabled
+                        style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          borderRadius: '4px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#9ca3af',
+                          borderColor: '#e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'not-allowed',
+                          opacity: 0.5
+                        }}
+                        title="No permission for Silent Monitor"
+                      >
+                        <Volume2 size={8} />
+                      </Button>
+                    )
+                  }
                   const isMonitored = (activeMonitoring as any).sessions?.some((s: { dn: string }) => s.dn === dn) || activeMonitoring.dn === dn // This card is being monitored
                   const isSupervisorMonitoring = activeMonitoring.monitor === dn // This DN is a supervisor doing monitoring
                   const isCurrentUser = userAddress && dn === userAddress // This is current user's card
@@ -1101,6 +1127,32 @@ const UserCard: React.FC<UserCardProps> = ({
                 })()}
                 {(() => {
                   if (!showMonitoringButtons) return null
+                  if (!hasWhisperMonitoringPermission) {
+                    return (
+                      <Button 
+                        variant="light" 
+                        size="sm" 
+                        className="p-0 border" 
+                        disabled
+                        style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          borderRadius: '4px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#9ca3af',
+                          borderColor: '#e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'not-allowed',
+                          opacity: 0.5
+                        }}
+                        title="No permission for Whisper"
+                      >
+                        <Mic size={8} />
+                      </Button>
+                    )
+                  }
                   const isMonitored = (activeMonitoring as any).sessions?.some((s: { dn: string }) => s.dn === dn) || activeMonitoring.dn === dn
                   const isSupervisorMonitoring = activeMonitoring.monitor === dn
                   const isCurrentUser = userAddress && dn === userAddress
@@ -1220,6 +1272,32 @@ const UserCard: React.FC<UserCardProps> = ({
                 })()}
                 {(() => {
                   if (!showMonitoringButtons) return null
+                  if (!hasBargeInPermission) {
+                    return (
+                      <Button 
+                        variant="light" 
+                        size="sm" 
+                        className="p-0 border" 
+                        disabled
+                        style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          borderRadius: '4px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#9ca3af',
+                          borderColor: '#e5e7eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'not-allowed',
+                          opacity: 0.5
+                        }}
+                        title="No permission for Barge In"
+                      >
+                        <Users size={8} />
+                      </Button>
+                    )
+                  }
                   const isMonitored = (activeMonitoring as any).sessions?.some((s: { dn: string }) => s.dn === dn) || activeMonitoring.dn === dn
                   const isSupervisorMonitoring = activeMonitoring.monitor === dn
                   const isCurrentUser = userAddress && dn === userAddress

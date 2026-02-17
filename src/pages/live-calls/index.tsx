@@ -49,6 +49,7 @@ const LiveCallDashboard = () => {
     callStateMap,
     error,
     isInitialized,
+    isReconnecting,
     hasActiveCalls,
     getDnCallState,
     getCallStateForDevice,
@@ -1056,6 +1057,11 @@ const LiveCallDashboard = () => {
 
 
 
+  // Don't show CTI loading when user is not authenticated (avoids "page stuck on loading" when session expires or user logs out)
+  if (status === 'unauthenticated') {
+    return null
+  }
+
   // Error and loading states
   if (error) {
     return (
@@ -1065,7 +1071,8 @@ const LiveCallDashboard = () => {
     )
   }
 
-  if (!isInitialized) {
+  // Full loading only when not initialized and not reconnecting (reconnecting keeps UI visible with a small banner)
+  if (!isInitialized && !isReconnecting) {
     return (
       <>
       <PageLoader isLoading={true} />
@@ -1078,8 +1085,19 @@ const LiveCallDashboard = () => {
 
   return (
     <>
+      {isReconnecting && (
+        <div
+          className="alert alert-warning mb-0 rounded-0 d-flex align-items-center justify-content-center gap-2"
+          style={{ fontSize: '0.875rem' }}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+          Reconnecting to server...
+        </div>
+      )}
       <style dangerouslySetInnerHTML={{ __html: CUSTOM_STYLES }} />
-      <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Calls" showPageLoader={showPageLoader} />
+      <BreadcrumbItem mainTitle="CTI" mainLink="/cti" subTitle="Live Calls" showPageLoader={showPageLoader && !isReconnecting} />
 
       {/* Header */}
       <PageHeader

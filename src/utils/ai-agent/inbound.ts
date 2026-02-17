@@ -1,7 +1,7 @@
 import axiosInstance from "@utils/axios";
 
 const CONTROLHUB_PREFIX = "aiml";
-const VOICEBOT_PREFIX = CONTROLHUB_PREFIX + "/voicebot";
+const VOICEBOT_PREFIX = "voicebot";
 
 // ---------------------------------------------------------------------------
 // Types
