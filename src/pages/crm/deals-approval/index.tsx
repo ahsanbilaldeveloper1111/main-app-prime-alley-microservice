@@ -9,8 +9,7 @@ import React, {
   useEffect,
 } from "react";
 import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
+import GenericTable, { TableColumn, TableAction, TabConfig } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
@@ -496,6 +495,10 @@ const CrmDeals = () => {
   const [showDealSidebar, setShowDealSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showTabModal, setShowTabModal] = useState(false);
+  const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -914,6 +917,11 @@ const CrmDeals = () => {
       console.error("Failed to download attachment:", error);
     }
   };
+
+  // Handle open filters sidebar
+  const handleOpenFiltersSidebar = useCallback(() => {
+    setShowFiltersSidebar(true);
+  }, []);
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
@@ -1918,6 +1926,16 @@ const handleCloseEditModal = useCallback(() => {
     return counts;
   }, [dealsData, extensions, stages, summaryTiles, totalDeals]);
 
+  // Update custom tabs counts when filterCounts change
+  useEffect(() => {
+    setCustomTabs(prevTabs => 
+      prevTabs.map(tab => {
+        const count = filterCounts[tab.id] || 0;
+        return { ...tab, count };
+      })
+    );
+  }, [filterCounts]);
+
   // Custom select styles
   const customSelectStyles = {
     control: (provided: any, state: any) => ({
@@ -1954,6 +1972,68 @@ const handleCloseEditModal = useCallback(() => {
       fontSize: '0.875rem'
     })
   };
+
+  // Define stats cards for GenericTable
+  const dealsStatsCards: StatsCardData[] = useMemo(() => [
+    {
+      title: 'All Deals',
+      value: summaryTiles?.total_deals || totalDeals || 0,
+      icon: Handshake,
+      iconColor: '#6366F1',
+      iconBgColor: '#EEF2FF',
+      subtitle: 'Total in pipeline'
+    },
+    {
+      title: 'New',
+      value: summaryTiles?.new_deals || analyticsData.stageCounts['New'] || 0,
+      icon: PlusCircle,
+      iconColor: '#3B82F6',
+      iconBgColor: '#DBEAFE',
+      metric: {
+        text: 'Fresh opportunities',
+        dotColor: '#2563EB'
+      }
+    },
+    {
+      title: 'Qualified',
+      value: summaryTiles?.qualified_deals || analyticsData.stageCounts['Qualified'] || 0,
+      icon: CheckCircle,
+      iconColor: '#10B981',
+      iconBgColor: '#D1FAE5',
+      subtitle: 'Verified & ready'
+    },
+    {
+      title: 'Proposal',
+      value: analyticsData.stageCounts['Proposal'] || 0,
+      icon: FileText,
+      iconColor: '#8B5CF6',
+      iconBgColor: '#EDE9FE',
+      metric: {
+        text: 'Submitted',
+        dotColor: '#7C3AED'
+      }
+    },
+    {
+      title: 'Negotiation',
+      value: analyticsData.stageCounts['Negotiation'] || analyticsData.inNegotiation || 0,
+      icon: Users,
+      iconColor: '#F59E0B',
+      iconBgColor: '#FEF3C7',
+      subtitle: 'In discussion'
+    },
+    {
+      title: 'Closed Won',
+      value: analyticsData.stageCounts['Closed Won'] || analyticsData.stageCounts['Won'] || analyticsData.won || 0,
+      icon: Target,
+      iconColor: '#059669',
+      iconBgColor: '#D1FAE5',
+      badge: {
+        text: 'Success',
+        bgColor: '#D1FAE5',
+        textColor: '#065F46'
+      }
+    }
+  ], [summaryTiles, totalDeals, analyticsData]);
 
   // Define columns for GenericTable
   const dealsColumns: TableColumn<any>[] = useMemo(
@@ -2189,144 +2269,7 @@ const handleCloseEditModal = useCallback(() => {
           vertical-align: middle;
         }
       `}} />
-      <BreadcrumbItem
-        mainTitle="CRM"
-        mainLink="/crm/dashboard"
-        subTitle="Deals"
-      />
       <div>
-        {/* Page Header */}
-        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-        <div className="mb-3 mb-md-0">
-  <nav aria-label="breadcrumb">
-    <ol className="breadcrumb mb-0">
-      <li className="breadcrumb-item">
-        <a href="/dashboard" className="text-decoration-none">
-          CRM
-        </a>
-      </li>
-      <li className="breadcrumb-item active fw-bold" aria-current="page">
-        Deals Approval
-      </li>
-    </ol>
-  </nav>
-</div>
-          <div className="d-flex flex-wrap gap-2">
-            {/* <Button 
-              variant={showDealsAnalytics ? "primary" : "outline-secondary"}
-              onClick={() => setShowDealsAnalytics(!showDealsAnalytics)}
-            >
-              <BarChart3 size={16} className="me-2" />
-              {showDealsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
-            </Button> */}
-            {/* {session?.user?.permissions?.includes('add-crm-deals') && (
-              <Link href="/crm/deals/create">
-                <Button variant="primary">
-                  <Plus size={16} className="me-2" />
-                  Add Deal
-                </Button>
-              </Link>
-            )} */}
-            <Button
-              variant={showFilterBar ? "secondary" : "outline-secondary"}
-              onClick={() => setShowFilterBar(!showFilterBar)}
-            >
-              <Layers size={16} className="me-2" />
-              {showFilterBar ? "Hide Tabs" : "Show Tabs"}
-            </Button>
-            <Button
-            variant={showFiltersSidebar ? "secondary" : "outline-secondary"}
-            onClick={() => setShowFiltersSidebar(!showFiltersSidebar)}
-          >
-            <FiFilter size={16} className="me-2" />
-            {showFiltersSidebar ? "Hide Filters" : "Show Filters"}
-          </Button>
-          </div>
-        </div>
-
-        {/* Stats Cards */}
-        <StatsCards 
-          data={[
-            {
-              title: 'All Deals',
-              value: summaryTiles?.total_deals || totalDeals || 0,
-              icon: Handshake,
-              iconColor: '#6366F1',
-              iconBgColor: '#EEF2FF',
-              subtitle: 'Total in pipeline'
-            },
-            {
-              title: 'New',
-              value: summaryTiles?.new_deals || analyticsData.stageCounts['New'] || 0,
-              icon: PlusCircle,
-              iconColor: '#3B82F6',
-              iconBgColor: '#DBEAFE',
-              metric: {
-                text: 'Fresh opportunities',
-                dotColor: '#2563EB'
-              }
-            },
-            {
-              title: 'Qualified',
-              value: summaryTiles?.qualified_deals || analyticsData.stageCounts['Qualified'] || 0,
-              icon: CheckCircle,
-              iconColor: '#10B981',
-              iconBgColor: '#D1FAE5',
-              subtitle: 'Verified & ready'
-            },
-            {
-              title: 'Proposal',
-              value: analyticsData.stageCounts['Proposal'] || 0,
-              icon: FileText,
-              iconColor: '#8B5CF6',
-              iconBgColor: '#EDE9FE',
-              metric: {
-                text: 'Submitted',
-                dotColor: '#7C3AED'
-              }
-            },
-            {
-              title: 'Negotiation',
-              value: analyticsData.stageCounts['Negotiation'] || analyticsData.inNegotiation || 0,
-              icon: Users,
-              iconColor: '#F59E0B',
-              iconBgColor: '#FEF3C7',
-              subtitle: 'In discussion'
-            },
-            {
-              title: 'Closed Won',
-              value: analyticsData.stageCounts['Closed Won'] || analyticsData.stageCounts['Won'] || analyticsData.won || 0,
-              icon: Target,
-              iconColor: '#059669',
-              iconBgColor: '#D1FAE5',
-              badge: {
-                text: 'Success',
-                bgColor: '#D1FAE5',
-                textColor: '#065F46'
-              }
-            }
-            // {
-            //   title: 'Lost',
-            //   value: summaryTiles?.lost_deals || filterCounts.lost || 0,
-            //   icon: AlertCircle,
-            //   iconColor: '#EF4444',
-            //   iconBgColor: '#FEE2E2',
-            //   subtitle: 'Needs review'
-            // },
-            // {
-            //   title: 'Deleted',
-            //   value: summaryTiles?.deleted_deals || filterCounts.deleted || 0,
-            //   icon: Trash2,
-            //   iconColor: '#6B7280',
-            //   iconBgColor: '#F3F4F6',
-            //   metric: {
-            //     text: 'Archived',
-            //     dotColor: '#9CA3AF'
-            //   }
-            // }
-          ]}
-          gridMinWidth="180px"
-        />
 
         {/* Analytics Section - Collapsible */}
         {showDealsAnalytics && (
@@ -2822,6 +2765,102 @@ const handleCloseEditModal = useCallback(() => {
           loadingMessage="Loading deals..."
           hover={true}
           uniqueKey="id"
+          
+          // Fixed height mode
+          fixedHeight={true}
+          maxHeight="calc(100vh - 380px)"
+          
+          // Toolbar
+          showToolbar={true}
+          toolbar={{
+            // Tabs
+            showTabs: true,
+            tabsDropdownLabel: "Deals",
+            tabs: [
+              { id: 'all', label: 'All deals', count: filterCounts.all, removable: false },
+              ...customTabs
+            ],
+            activeTab: activeFilter,
+            onTabChange: handleFilterChange,
+            onTabAdd: () => setShowTabModal(true),
+            onTabRemove: (tabId) => {
+              setCustomTabs(tabs => tabs.filter(t => t.id !== tabId));
+              if (activeFilter === tabId) {
+                handleFilterChange('all');
+              }
+            },
+            
+            // Search
+            showSearch: true,
+            searchValue: dealsSearch,
+            searchPlaceholder: "Search deals by name, company, value...",
+            onSearchChange: (value) => {
+              setDealsSearch(value);
+              // Clear search on empty value
+              if (!value) {
+                const newFilters = { ...currentFilters };
+                delete newFilters.search;
+                handleFiltersChange(newFilters);
+                setRefreshKey((prev) => prev + 1);
+              }
+            },
+            onSearch: () => {
+              if (dealsSearch) {
+                handleFiltersChange({
+                  ...currentFilters,
+                  search: dealsSearch
+                });
+                setDealsPagination({ ...dealsPagination, currentPage: 1 });
+                setRefreshKey((prev) => prev + 1);
+              }
+            },
+            
+            // Actions
+            showTableViewDropdown: true,
+            tableViewLabel: "Table view",
+            showViewSwitcher: true,
+            showEditColumns: true,
+            onEditColumnsClick: () => setShowColumnEditor(true),
+            showPipelineDropdown: true,
+            pipelineLabel: "All Pipelines",
+            showFiltersButton: true,
+            onFiltersClick: handleOpenFiltersSidebar,
+            showSortButton: true,
+            showExportButton: true,
+            onExportClick: () => setShowExportModal(true),
+            showSaveButton: true,
+            onSaveClick: () => console.log('Save view'),
+            
+            // Filter Pills
+            filterPills: [
+              { 
+                id: 'contact_owner', 
+                label: 'Contact Owner', 
+                showDropdown: true,
+                dropdownOptions: [
+                  { label: 'All Owners', value: 'all', onClick: () => {
+                    const newFilters = { ...currentFilters };
+                    delete newFilters.assigned_to;
+                    handleFiltersChange(newFilters);
+                    setRefreshKey((prev) => prev + 1);
+                  }},
+                  ...extensions.map(ext => ({
+                    label: ext.display_name || ext.name || ext.extension,
+                    value: ext.id || ext.extension,
+                    onClick: () => {
+                      handleFiltersChange({ ...currentFilters, assigned_to: ext.id || ext.extension });
+                      setRefreshKey((prev) => prev + 1);
+                    }
+                  }))
+                ]
+              }
+            ],
+            showAdvancedFilters: true,
+            onAdvancedFiltersClick: handleOpenFiltersSidebar
+          }}
+          
+          // Stats cards for metrics
+          statsCards={dealsStatsCards}
         />
       </div>
 
@@ -5321,14 +5360,6 @@ const handleCloseEditModal = useCallback(() => {
         width="400px"
         filters={[
           {
-            id: 'search',
-            label: 'Search',
-            type: 'text' as const,
-            value: dealsSearch,
-            onChange: (value) => setDealsSearch(value),
-            placeholder: 'Search deals by name, company, value...'
-          },
-          {
             id: 'assignedTo',
             label: 'Assigned To',
             type: 'select' as const,
@@ -6545,6 +6576,109 @@ const handleCloseEditModal = useCallback(() => {
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setEditShowRevisionHistoryModal(false)}>
             Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Add New Tab Modal */}
+      <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Add New Tab</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted mb-3">Select a filter to add as a new tab</p>
+          <div className="d-grid gap-2">
+            {stages.map((stage: any) => {
+              const isAlreadyAdded = customTabs.some(t => t.id === stage.id.toString());
+              const stageCount = filterCounts[stage.id] || 0;
+              return (
+                <Button
+                  key={stage.id}
+                  variant="outline-primary"
+                  onClick={() => {
+                    if (!isAlreadyAdded) {
+                      setCustomTabs([...customTabs, {
+                        id: stage.id.toString(),
+                        label: stage.name,
+                        count: stageCount,
+                        removable: true
+                      }]);
+                      setShowTabModal(false);
+                      toast.success('Tab added successfully!');
+                    }
+                  }}
+                  disabled={isAlreadyAdded}
+                  className="d-flex align-items-center justify-content-start"
+                  style={{ textAlign: 'left' }}
+                >
+                  <Layers size={16} className="me-2" />
+                  {stage.name}
+                  {stageCount > 0 && (
+                    <Badge bg="secondary" className="ms-auto">
+                      {stageCount}
+                    </Badge>
+                  )}
+                </Button>
+              );
+            })}
+            {/* Lost and Deleted tabs */}
+            <Button
+              variant="outline-primary"
+              onClick={() => {
+                if (!customTabs.find(t => t.id === 'lost')) {
+                  setCustomTabs([...customTabs, {
+                    id: 'lost',
+                    label: 'Lost',
+                    count: filterCounts.lost || 0,
+                    removable: true
+                  }]);
+                  setShowTabModal(false);
+                  toast.success('Tab added successfully!');
+                }
+              }}
+              disabled={customTabs.some(t => t.id === 'lost')}
+              className="d-flex align-items-center justify-content-start"
+              style={{ textAlign: 'left' }}
+            >
+              <X size={16} className="me-2" />
+              Lost
+              {(filterCounts.lost || 0) > 0 && (
+                <Badge bg="secondary" className="ms-auto">
+                  {filterCounts.lost || 0}
+                </Badge>
+              )}
+            </Button>
+            <Button
+              variant="outline-primary"
+              onClick={() => {
+                if (!customTabs.find(t => t.id === 'deleted')) {
+                  setCustomTabs([...customTabs, {
+                    id: 'deleted',
+                    label: 'Deleted',
+                    count: filterCounts.deleted || 0,
+                    removable: true
+                  }]);
+                  setShowTabModal(false);
+                  toast.success('Tab added successfully!');
+                }
+              }}
+              disabled={customTabs.some(t => t.id === 'deleted')}
+              className="d-flex align-items-center justify-content-start"
+              style={{ textAlign: 'left' }}
+            >
+              <Trash2 size={16} className="me-2" />
+              Deleted
+              {(filterCounts.deleted || 0) > 0 && (
+                <Badge bg="secondary" className="ms-auto">
+                  {filterCounts.deleted || 0}
+                </Badge>
+              )}
+            </Button>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowTabModal(false)}>
+            Cancel
           </Button>
         </Modal.Footer>
       </Modal>

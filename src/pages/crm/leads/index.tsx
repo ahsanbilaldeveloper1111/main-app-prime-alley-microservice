@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
+import GenericTable, { TableColumn, TableAction, TabConfig } from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import {
@@ -598,6 +598,8 @@ const CrmLeads = () => {
   const [showLeadHistoryModal, setShowLeadHistoryModal] = useState(false);
 
   const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
+  const [showTabModal, setShowTabModal] = useState(false);
+  const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   // Sidebar states
   const [showLeadSidebar, setShowLeadSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
@@ -2636,8 +2638,8 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       deleted: summaryTiles?.deleted_leads || 0,
     };
 
-    // Add counts for first 5 stages
-    stages.slice(0, 5).forEach((stage: any) => {
+    // Add counts for all stages (not just first 5, for custom tabs)
+    stages.forEach((stage: any) => {
       const stageLeads = transformed.filter(
         (l) => l.stage === stage.name || l.rawData?.stage_id === stage.id
       );
@@ -2646,6 +2648,16 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
 
     return counts;
   }, [leadsData, extensions, stages, summaryTiles, totalLeads]);
+
+  // Update custom tabs counts when filterCounts change
+  useEffect(() => {
+    setCustomTabs(prevTabs => 
+      prevTabs.map(tab => {
+        const count = filterCounts[tab.id] || 0;
+        return { ...tab, count };
+      })
+    );
+  }, [filterCounts]);
 
   // Define table columns - Clean data definitions only
   const leadsColumns: TableColumn<LeadData>[] = useMemo(() => [
@@ -2854,153 +2866,105 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
   return actions;
 }, [session, activeFilter, handleViewLead, handleConvertLead, handleDeleteLead, handleRestoreLead, handleChangeStage, handleMarkLost]);
 
+  // Handler to open filters sidebar
+  const handleOpenFiltersSidebar = useCallback(() => {
+    setShowFiltersSidebar(true);
+  }, []);
+
   if (!session?.user?.permissions?.includes("list-crm-leads")) {
     return null;
   }
 
   return (
     <React.Fragment>
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        .leads-table-wrapper {
+          width: 100%;
+          overflow: hidden;
+        }
+        .leads-table-wrapper .table-responsive {
+          width: 100%;
+          overflow-x: auto;
+          overflow-y: visible;
+          -webkit-overflow-scrolling: touch;
+        }
+        .leads-table-wrapper .table-responsive table {
+          width: 100%;
+          table-layout: auto;
+          margin-bottom: 0;
+        }
+        .leads-table-wrapper .table-responsive table th,
+        .leads-table-wrapper .table-responsive table td {
+          padding: 12px 16px;
+          vertical-align: middle;
+        }
+        .leads-table-wrapper .table-responsive table td:last-child,
+        .leads-table-wrapper .table-responsive table th:last-child {
+          max-width: none;
+        }
+        .leads-table-wrapper .table-responsive table td[style*="width"],
+        .leads-table-wrapper .table-responsive table th[style*="width"] {
+          max-width: none;
+        }
+        .timeline-line {
+          position: relative;
+          height: 2px;
+          background: #e9ecef;
+          margin-top: 10px;
+        }
+        .timeline-line::after {
+          content: "";
+          position: absolute;
+          top: -8px;
+          left: 0;
+          width: 2px;
+          height: 18px;
+          background: #e9ecef;
+        }
+        .timeline-item:last-child .timeline-line {
+          display: none;
+        }
+        .generic-table-row.clickable {
+          cursor: pointer;
+        }
+        
+        
+        /* Page layout for full height */
+        .leads-page-container {
+          display: flex;
+          flex-direction: column;
+          height: calc(100vh - 100px);
+          overflow: hidden;
+        }
+        
+        .leads-content-area {
+          flex: 1;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .leads-scrollable-content {
+          flex: 1;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+      `,
+        }}
+      />
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
         subTitle="Leads"
       />
 
-      <div>
-        {/* Page Header */}
-        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-        <div className="mb-3 mb-md-0">
-  <nav aria-label="breadcrumb">
-    <ol className="breadcrumb mb-0">
-      <li className="breadcrumb-item">
-        <a href="/dashboard" className="text-decoration-none">
-          CRM
-        </a>
-      </li>
-      <li className="breadcrumb-item active fw-bold" aria-current="page">
-        Leads
-      </li>
-    </ol>
-  </nav>
-</div>
-          <div className="d-flex flex-wrap gap-2">
-            {/* <Button
-              variant={showLeadsAnalytics ? "primary" : "outline-secondary"}
-              onClick={() => setShowLeadsAnalytics(!showLeadsAnalytics)}
-            >
-              <BarChart3 size={16} className="me-2" />
-              {showLeadsAnalytics ? "Hide Analytics" : "Show Analytics"}
-            </Button> */}
-            {session?.user?.permissions?.includes("add-crm-leads") && (
-    <Button 
-      variant="outline-secondary"
-      onClick={() => setShowCreateLeadModal(true)}
-    >
-      <Plus size={16} className="me-2" />
-      Add Lead
-    </Button>
-  )}
-            <Button
-              variant={showFilterBar ? "secondary" : "outline-secondary"}
-              onClick={() => setShowFilterBar(!showFilterBar)}
-            >
-              <Layers size={16} className="me-2" />
-              {showFilterBar ? "Hide Tabs" : "Show Tabs"}
-            </Button>
-            <Button
-              variant={showFiltersSidebar ? "secondary" : "outline-secondary"}
-              onClick={() => setShowFiltersSidebar(true)}
-            >
-              <Filter size={16} className="me-2" />
-              Filters
-            </Button>
-          </div>
-        </div>
+      {/* Main flex container for content and sidebar */}
+      <div style={{ display: 'flex', gap: '0', height: 'calc(100vh)', overflow: 'hidden' }}>
+        {/* Main content area */}
+        <div className="leads-scrollable-content" style={{ flex: 1 }}>
 
-            
-        {/* Stats Cards */}
-        <StatsCards 
-          data={[
-            {
-              title: 'All Leads',
-              value: summaryTiles?.total_leads || totalLeads || 0,
-              icon: Users,
-              iconColor: '#6366F1',
-              iconBgColor: '#EEF2FF',
-              subtitle: 'Total in system'
-            },
-            {
-              title: 'New',
-              value: summaryTiles?.new_leads || analyticsData.stageCounts['New'] || 0,
-              icon: UserCheck,
-              iconColor: '#3B82F6',
-              iconBgColor: '#DBEAFE',
-              metric: {
-                text: 'Fresh leads',
-                dotColor: '#2563EB'
-              }
-            },
-            {
-              title: 'Qualified',
-              value: summaryTiles?.qualified_leads || analyticsData.stageCounts['Qualified'] || 0,
-              icon: CheckCircle,
-              iconColor: '#10B981',
-              iconBgColor: '#D1FAE5',
-              subtitle: 'Verified & ready'
-            },
-            {
-              title: 'Proposal',
-              value: analyticsData.stageCounts['Proposal'] || 0,
-              icon: FileText,
-              iconColor: '#8B5CF6',
-              iconBgColor: '#EDE9FE',
-              metric: {
-                text: 'In review',
-                dotColor: '#7C3AED'
-              }
-            },
-            {
-              title: 'Negotiation',
-              value: analyticsData.stageCounts['Negotiation'] || 0,
-              icon: Handshake,
-              iconColor: '#F59E0B',
-              iconBgColor: '#FEF3C7',
-              subtitle: 'Active discussions'
-            },
-            {
-              title: 'Closed Won',
-              value: analyticsData.stageCounts['Closed Won'] || analyticsData.stageCounts['Won'] || 0,
-              icon: Target,
-              iconColor: '#059669',
-              iconBgColor: '#D1FAE5',
-              badge: {
-                text: 'Success',
-                bgColor: '#D1FAE5',
-                textColor: '#065F46'
-              }
-            }
-            // {
-            //   title: 'Lost',
-            //   value: summaryTiles?.lost_leads || filterCounts.lost || 0,
-            //   icon: AlertCircle,
-            //   iconColor: '#EF4444',
-            //   iconBgColor: '#FEE2E2',
-            //   subtitle: 'Requires review'
-            // },
-            // {
-            //   title: 'Deleted',
-            //   value: summaryTiles?.deleted_leads || filterCounts.deleted || 0,
-            //   icon: Trash2,
-            //   iconColor: '#6B7280',
-            //   iconBgColor: '#F3F4F6',
-            //   metric: {
-            //     text: 'Archived',
-            //     dotColor: '#9CA3AF'
-            //   }
-            // }
-          ]}
-          gridMinWidth="180px"
-        />
         {/* Analytics Section - Collapsible */}
         {showLeadsAnalytics && (
           <>
@@ -3120,6 +3084,72 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           </>
         )}
 
+        <div className="container-fluid">
+        {/* Stats Cards */}
+        <StatsCards 
+          data={[
+            {
+              title: 'All Leads',
+              value: summaryTiles?.total_leads || totalLeads || 0,
+              icon: Users,
+              iconColor: '#6366F1',
+              iconBgColor: '#EEF2FF',
+              subtitle: 'Total in system'
+            },
+            {
+              title: 'New',
+              value: summaryTiles?.new_leads || analyticsData.stageCounts['New'] || 0,
+              icon: UserCheck,
+              iconColor: '#3B82F6',
+              iconBgColor: '#DBEAFE',
+              metric: {
+                text: 'Fresh leads',
+                dotColor: '#2563EB'
+              }
+            },
+            {
+              title: 'Qualified',
+              value: summaryTiles?.qualified_leads || analyticsData.stageCounts['Qualified'] || 0,
+              icon: CheckCircle,
+              iconColor: '#10B981',
+              iconBgColor: '#D1FAE5',
+              subtitle: 'Verified & ready'
+            },
+            {
+              title: 'Proposal',
+              value: analyticsData.stageCounts['Proposal'] || 0,
+              icon: FileText,
+              iconColor: '#8B5CF6',
+              iconBgColor: '#EDE9FE',
+              metric: {
+                text: 'In review',
+                dotColor: '#7C3AED'
+              }
+            },
+            {
+              title: 'Negotiation',
+              value: analyticsData.stageCounts['Negotiation'] || 0,
+              icon: Handshake,
+              iconColor: '#F59E0B',
+              iconBgColor: '#FEF3C7',
+              subtitle: 'Active discussions'
+            },
+            {
+              title: 'Closed Won',
+              value: analyticsData.stageCounts['Closed Won'] || analyticsData.stageCounts['Won'] || 0,
+              icon: Target,
+              iconColor: '#059669',
+              iconBgColor: '#D1FAE5',
+              badge: {
+                text: 'Success',
+                bgColor: '#D1FAE5',
+                textColor: '#065F46'
+              }
+            }
+          ]}
+          gridMinWidth="180px"
+        />
+
         {/* Filter Bar */}
         {showFilterBar && (
           <FilterBar
@@ -3155,26 +3185,15 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             ]}
             activeFilter={activeFilter}
             onFilterChange={handleFilterChange}
-            
           />
         )}
 
         {/* Advanced Filters */}
-        {showAdvancedFilters && (
+        {showAdvancedFilters &&
+          session?.user?.permissions?.includes("list-crm-leads") && (
           <Card className="border-0 shadow-sm mb-4">
             <Card.Body>
               <Row className="g-3 align-items-end">
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">
-                    Search
-                  </Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="Search leads by name, company, email..."
-                    value={leadsSearch}
-                    onChange={(e) => setLeadsSearch(e.target.value)}
-                  />
-                </Col>
                 <Col md={4}>
                   <Form.Label className="small fw-bold mb-2">
                     Assigned To
@@ -3538,7 +3557,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                         setRefreshKey((prev) => prev + 1);
                       }}
                     >
-                      Reset
+                      Reset Filters
                     </Button>
                   </div>
                 </Col>
@@ -3547,8 +3566,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           </Card>
         )}
 
-        {/* Leads Table with GenericTable Component */}
-         
+        {/* Leads Table */}
+        <div className="leads-table-wrapper" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <GenericTable
           data={filteredLeads}
           columns={leadsColumns}
@@ -3557,7 +3576,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             currentPage: leadsPagination.currentPage,
             rowsPerPage: leadsPagination.rowsPerPage,
             totalRows: totalLeads,
-            pageSizeOptions: [10, 25, 50, 100]
+            pageSizeOptions: [10, 15, 25, 50, 100]
           }}
           onPaginationChange={(page, rowsPerPage) => {
             setLeadsPagination({
@@ -3569,6 +3588,13 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           sortable={true}
           defaultSortColumn={leadsPagination.sortColumn}
           defaultSortDirection={leadsPagination.sortDirection}
+          onSort={(column, direction) => {
+            setLeadsPagination({
+              ...leadsPagination,
+              sortColumn: column,
+              sortDirection: direction
+            });
+          }}
           customizableColumns={true}
           defaultSelectedColumns={[
             'name', 'company', 'email', 'phone', 'stage',
@@ -3586,10 +3612,200 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           }}
           loading={loading}
           emptyMessage="No leads found matching your criteria"
-          loadingMessage="Loading..."
+          loadingMessage="Loading leads..."
           hover={true}
           uniqueKey="id"
+          
+          // Fixed height mode
+          fixedHeight={true}
+          maxHeight="calc(100vh - 380px)"
+          
+          // Toolbar
+          showToolbar={true}
+          toolbar={{
+            // Tabs
+            showTabs: true,
+            tabsDropdownLabel: "Leads",
+            tabs: [
+              { id: 'all', label: 'All leads', count: filterCounts.all, removable: false },
+              ...customTabs
+            ],
+            activeTab: activeFilter,
+            onTabChange: handleFilterChange,
+            onTabAdd: () => setShowTabModal(true),
+            onTabRemove: (tabId) => {
+              setCustomTabs(tabs => tabs.filter(t => t.id !== tabId));
+              if (activeFilter === tabId) {
+                handleFilterChange('all');
+              }
+            },
+            
+            // Search
+            showSearch: true,
+            searchValue: leadsSearch,
+            searchPlaceholder: "Search leads by name, company, email...",
+            onSearchChange: (value) => {
+              setLeadsSearch(value);
+            },
+            onSearch: () => {
+              const filtersToApply: Record<string, any> = { ...currentFilters };
+              if (leadsSearch) {
+                filtersToApply.search = leadsSearch;
+              } else {
+                delete filtersToApply.search;
+              }
+              handleFiltersChange(filtersToApply);
+              setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+              setRefreshKey((prev) => prev + 1);
+            },
+            
+            // Actions
+            showTableViewDropdown: true,
+            tableViewLabel: "Table view",
+            showViewSwitcher: true,
+            showEditColumns: true,
+            showFiltersButton: true,
+            onFiltersClick: handleOpenFiltersSidebar,
+            showSortButton: true,
+            showExportButton: true,
+            showSaveButton: true,
+            
+            // Filter Pills
+            filterPills: [
+              { 
+                id: 'contact_owner', 
+                label: 'Contact Owner', 
+                showDropdown: true,
+                dropdownOptions: [
+                  { label: 'All Owners', value: 'all', onClick: () => {
+                    const newFilters = { ...currentFilters };
+                    delete newFilters.assigned_to;
+                    handleFiltersChange(newFilters);
+                    setRefreshKey((prev) => prev + 1);
+                  }},
+                  ...extensions.map(ext => ({
+                    label: ext.display_name || ext.name || ext.extension,
+                    value: ext.id || ext.extension,
+                    onClick: () => {
+                      handleFiltersChange({ ...currentFilters, assigned_to: ext.id || ext.extension });
+                      setRefreshKey((prev) => prev + 1);
+                    }
+                  }))
+                ]
+              },
+              { 
+                id: 'create_date', 
+                label: 'Create date', 
+                showDropdown: true,
+                dropdownOptions: [
+                  { label: 'All Time', value: 'all', onClick: () => {
+                    const newFilters = { ...currentFilters };
+                    delete newFilters.date_from;
+                    delete newFilters.date_to;
+                    handleFiltersChange(newFilters);
+                    setRefreshKey((prev) => prev + 1);
+                  }},
+                  { label: 'Today', value: 'today', onClick: () => {
+                    const today = moment().format('YYYY-MM-DD');
+                    handleFiltersChange({ ...currentFilters, date_from: today, date_to: today });
+                    setRefreshKey((prev) => prev + 1);
+                  }},
+                  { label: 'Last 7 Days', value: 'week', onClick: () => {
+                    const from = moment().subtract(7, 'days').format('YYYY-MM-DD');
+                    const to = moment().format('YYYY-MM-DD');
+                    handleFiltersChange({ ...currentFilters, date_from: from, date_to: to });
+                    setRefreshKey((prev) => prev + 1);
+                  }},
+                  { label: 'Last 30 Days', value: 'month', onClick: () => {
+                    const from = moment().subtract(30, 'days').format('YYYY-MM-DD');
+                    const to = moment().format('YYYY-MM-DD');
+                    handleFiltersChange({ ...currentFilters, date_from: from, date_to: to });
+                    setRefreshKey((prev) => prev + 1);
+                  }}
+                ]
+              },
+              { 
+                id: 'lead_stage', 
+                label: 'Lead Stage', 
+                showDropdown: true,
+                dropdownOptions: [
+                  { label: 'All Stages', value: 'all', onClick: () => {
+                    const newFilters = { ...currentFilters };
+                    delete newFilters.stage_id;
+                    handleFiltersChange(newFilters);
+                    setRefreshKey((prev) => prev + 1);
+                  }},
+                  ...stages.map(stage => ({
+                    label: stage.name,
+                    value: stage.id.toString(),
+                    onClick: () => {
+                      handleFiltersChange({ ...currentFilters, stage_id: stage.id.toString() });
+                      setRefreshKey((prev) => prev + 1);
+                    }
+                  }))
+                ]
+              },
+              { 
+                id: 'lead_potential', 
+                label: 'Lead Potential', 
+                showDropdown: true,
+                dropdownOptions: [
+                  { label: 'All Potential', value: 'all', onClick: () => {
+                    const newFilters = { ...currentFilters };
+                    delete newFilters.lead_potential;
+                    handleFiltersChange(newFilters);
+                    setRefreshKey((prev) => prev + 1);
+                  }},
+                  { label: 'Hot', value: 'Hot', onClick: () => {
+                    handleFiltersChange({ ...currentFilters, lead_potential: 'Hot' });
+                    setRefreshKey((prev) => prev + 1);
+                  }},
+                  { label: 'Warm', value: 'Warm', onClick: () => {
+                    handleFiltersChange({ ...currentFilters, lead_potential: 'Warm' });
+                    setRefreshKey((prev) => prev + 1);
+                  }},
+                  { label: 'Cold', value: 'Cold', onClick: () => {
+                    handleFiltersChange({ ...currentFilters, lead_potential: 'Cold' });
+                    setRefreshKey((prev) => prev + 1);
+                  }}
+                ]
+              },
+            ],
+            showAdvancedFilters: true,
+            onAdvancedFiltersClick: handleOpenFiltersSidebar,
+
+            // Right-aligned custom actions
+            rightActions: session?.user?.permissions?.includes("add-crm-leads") ? (
+              <button
+                onClick={() => setShowCreateLeadModal(true)}
+                style={{
+                  padding: '9px 13px',
+                  backgroundColor: '#000000',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#1a1a1a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#000000';
+                }}
+              >
+                Add Lead
+              </button>
+            ) : undefined
+          }}
         />
+        </div>
+        </div>
+        </div>
       </div>
 
       {/* Delete Lead Modal */}
@@ -8046,14 +8262,6 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         width="400px"
         filters={[
           {
-            id: 'search',
-            label: 'Search',
-            type: 'text',
-            value: leadsSearch,
-            onChange: (value) => setLeadsSearch(value),
-            placeholder: 'Search leads by name, company, email...'
-          },
-          {
             id: 'assignedTo',
             label: 'Assigned To',
             type: 'select',
@@ -8317,6 +8525,109 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
     }}
   />
 )}
+
+      {/* Add Tab Modal */}
+      <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Add New Tab</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted mb-3">Select a stage to add as a new tab</p>
+          <div className="d-grid gap-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            {stages.map((stage: any) => {
+              const isAlreadyAdded = customTabs.some(t => t.id === stage.id.toString());
+              const stageCount = filterCounts[stage.id] || 0;
+              return (
+                <Button
+                  key={stage.id}
+                  variant="outline-primary"
+                  onClick={() => {
+                    if (!isAlreadyAdded) {
+                      setCustomTabs([...customTabs, {
+                        id: stage.id.toString(),
+                        label: stage.name,
+                        count: stageCount,
+                        removable: true
+                      }]);
+                      setShowTabModal(false);
+                      toast.success('Tab added successfully!');
+                    }
+                  }}
+                  disabled={isAlreadyAdded}
+                  className="d-flex align-items-center justify-content-start"
+                  style={{ textAlign: 'left' }}
+                >
+                  <Layers size={16} className="me-2" />
+                  {stage.name}
+                  {stageCount > 0 && (
+                    <Badge bg="secondary" className="ms-auto">
+                      {stageCount}
+                    </Badge>
+                  )}
+                </Button>
+              );
+            })}
+            {/* Lost and Deleted tabs */}
+            <Button
+              variant="outline-primary"
+              onClick={() => {
+                if (!customTabs.find(t => t.id === 'lost')) {
+                  setCustomTabs([...customTabs, {
+                    id: 'lost',
+                    label: 'Lost',
+                    count: filterCounts.lost || 0,
+                    removable: true
+                  }]);
+                  setShowTabModal(false);
+                  toast.success('Tab added successfully!');
+                }
+              }}
+              disabled={customTabs.some(t => t.id === 'lost')}
+              className="d-flex align-items-center justify-content-start"
+              style={{ textAlign: 'left' }}
+            >
+              <X size={16} className="me-2" />
+              Lost
+              {(filterCounts.lost || 0) > 0 && (
+                <Badge bg="secondary" className="ms-auto">
+                  {filterCounts.lost || 0}
+                </Badge>
+              )}
+            </Button>
+            <Button
+              variant="outline-primary"
+              onClick={() => {
+                if (!customTabs.find(t => t.id === 'deleted')) {
+                  setCustomTabs([...customTabs, {
+                    id: 'deleted',
+                    label: 'Deleted',
+                    count: filterCounts.deleted || 0,
+                    removable: true
+                  }]);
+                  setShowTabModal(false);
+                  toast.success('Tab added successfully!');
+                }
+              }}
+              disabled={customTabs.some(t => t.id === 'deleted')}
+              className="d-flex align-items-center justify-content-start"
+              style={{ textAlign: 'left' }}
+            >
+              <Trash2 size={16} className="me-2" />
+              Deleted
+              {(filterCounts.deleted || 0) > 0 && (
+                <Badge bg="secondary" className="ms-auto">
+                  {filterCounts.deleted || 0}
+                </Badge>
+              )}
+            </Button>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowTabModal(false)}>
+            Cancel
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
 {/* Add modal at the end */}
 <CreateLeadModal

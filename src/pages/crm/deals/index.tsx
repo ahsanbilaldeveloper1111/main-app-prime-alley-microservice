@@ -10,7 +10,13 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
+import GenericTable, {
+  TableColumn,
+  TableAction,
+  ToolbarConfig,
+  FilterPill,
+  TabConfig,
+} from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
@@ -524,6 +530,8 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
   const [showDealSidebar, setShowDealSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -690,10 +698,10 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
   
   // UI State
   const [showDealsAnalytics, setShowDealsAnalytics] = useState(false);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [showFilterBar, setShowFilterBar] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [dealsSearch, setDealsSearch] = useState('');
+  const [showTabModal, setShowTabModal] = useState(false);
+  const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   const [selectedDealsColumns, setSelectedDealsColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('dealsSelectedColumns');
     return saved ? JSON.parse(saved) : ['name', 'company', 'stage', 'approvalStatus', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner'];
@@ -990,6 +998,11 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
       console.error("Failed to download attachment:", error);
     }
   };
+
+  // Handle open filters sidebar
+  const handleOpenFiltersSidebar = useCallback(() => {
+    setShowFiltersSidebar(true);
+  }, []);
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
@@ -2143,14 +2156,24 @@ const handleCloseEditModal = useCallback(() => {
       deleted: summaryTiles?.deleted_deals || 0,
     };
     
-    // Add counts for first 5 stages
-    stages.slice(0, 5).forEach((stage: any) => {
+    // Add counts for all stages (not just first 5, for custom tabs)
+    stages.forEach((stage: any) => {
       const stageDeals = transformed.filter(d => d.stage === stage.name || d.rawData?.stage_id === stage.id);
       counts[stage.id] = stageDeals.length;
     });
     
     return counts;
   }, [dealsData, extensions, stages, summaryTiles, totalDeals]);
+
+  // Update custom tabs counts when filterCounts change
+  useEffect(() => {
+    setCustomTabs(prevTabs => 
+      prevTabs.map(tab => {
+        const count = filterCounts[tab.id] || 0;
+        return { ...tab, count };
+      })
+    );
+  }, [filterCounts]);
 
   // Custom select styles
   const customSelectStyles = {
@@ -2188,6 +2211,68 @@ const handleCloseEditModal = useCallback(() => {
       fontSize: '0.875rem'
     })
   };
+
+  // Define stats cards for GenericTable
+  const dealsStatsCards: StatsCardData[] = useMemo(() => [
+    {
+      title: 'All Deals',
+      value: summaryTiles?.total_deals || totalDeals || 0,
+      icon: Handshake,
+      iconColor: '#6366F1',
+      iconBgColor: '#EEF2FF',
+      subtitle: 'Total in pipeline'
+    },
+    {
+      title: 'New',
+      value: summaryTiles?.new_deals || analyticsData.stageCounts['New'] || 0,
+      icon: PlusCircle,
+      iconColor: '#3B82F6',
+      iconBgColor: '#DBEAFE',
+      metric: {
+        text: 'Fresh opportunities',
+        dotColor: '#2563EB'
+      }
+    },
+    {
+      title: 'Qualified',
+      value: summaryTiles?.qualified_deals || analyticsData.stageCounts['Qualified'] || 0,
+      icon: CheckCircle,
+      iconColor: '#10B981',
+      iconBgColor: '#D1FAE5',
+      subtitle: 'Verified & ready'
+    },
+    {
+      title: 'Proposal',
+      value: analyticsData.stageCounts['Proposal'] || 0,
+      icon: FileText,
+      iconColor: '#8B5CF6',
+      iconBgColor: '#EDE9FE',
+      metric: {
+        text: 'Submitted',
+        dotColor: '#7C3AED'
+      }
+    },
+    {
+      title: 'Negotiation',
+      value: analyticsData.stageCounts['Negotiation'] || analyticsData.inNegotiation || 0,
+      icon: Users,
+      iconColor: '#F59E0B',
+      iconBgColor: '#FEF3C7',
+      subtitle: 'In discussion'
+    },
+    {
+      title: 'Closed Won',
+      value: analyticsData.stageCounts['Closed Won'] || analyticsData.stageCounts['Won'] || analyticsData.won || 0,
+      icon: Target,
+      iconColor: '#059669',
+      iconBgColor: '#D1FAE5',
+      badge: {
+        text: 'Success',
+        bgColor: '#D1FAE5',
+        textColor: '#065F46'
+      }
+    }
+  ], [summaryTiles, totalDeals, analyticsData]);
 
   // Define columns for GenericTable
   const dealsColumns: TableColumn<any>[] = useMemo(
@@ -2443,145 +2528,39 @@ const handleCloseEditModal = useCallback(() => {
           padding: 12px 16px;
           vertical-align: middle;
         }
+        
+        /* Page layout for full height */
+        .deals-page-container {
+          display: flex;
+          flex-direction: column;
+          height: calc(100vh - 100px);
+          overflow: hidden;
+        }
+        
+        .deals-content-area {
+          flex: 1;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .deals-scrollable-content {
+          flex: 1;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
       `}} />
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
         subTitle="Deals"
       />
-      <div>
-        {/* Page Header */}
-        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-        <div className="mb-3 mb-md-0">
-  <nav aria-label="breadcrumb">
-    <ol className="breadcrumb mb-0">
-      <li className="breadcrumb-item">
-        <a href="/dashboard" className="text-decoration-none">
-          CRM
-        </a>
-      </li>
-      <li className="breadcrumb-item active fw-bold" aria-current="page">
-        Deals
-      </li>
-    </ol>
-  </nav>
-</div>
-          <div className="d-flex flex-wrap gap-2">
-            {/* <Button 
-              variant={showDealsAnalytics ? "primary" : "outline-secondary"}
-              onClick={() => setShowDealsAnalytics(!showDealsAnalytics)}
-            >
-              <BarChart3 size={16} className="me-2" />
-              {showDealsAnalytics ? 'Hide Analytics' : 'Show Analytics'}
-            </Button> */}
-            {/* {session?.user?.permissions?.includes('add-crm-deals') && (
-              <Link href="/crm/deals/create">
-                <Button variant="primary">
-                  <Plus size={16} className="me-2" />
-                  Add Deal
-                </Button>
-              </Link>
-            )} */}
-            <Button
-              variant={showFilterBar ? "secondary" : "outline-secondary"}
-              onClick={() => setShowFilterBar(!showFilterBar)}
-            >
-              <Layers size={16} className="me-2" />
-              {showFilterBar ? "Hide Tabs" : "Show Tabs"}
-            </Button>
-            <Button
-            variant={showFiltersSidebar ? "secondary" : "outline-secondary"}
-            onClick={() => setShowFiltersSidebar(!showFiltersSidebar)}
-          >
-            <FiFilter size={16} className="me-2" />
-            {showFiltersSidebar ? "Hide Filters" : "Show Filters"}
-          </Button>
-          </div>
-        </div>
 
-        {/* Stats Cards */}
-        <StatsCards 
-          data={[
-            {
-              title: 'All Deals',
-              value: summaryTiles?.total_deals || totalDeals || 0,
-              icon: Handshake,
-              iconColor: '#6366F1',
-              iconBgColor: '#EEF2FF',
-              subtitle: 'Total in pipeline'
-            },
-            {
-              title: 'New',
-              value: summaryTiles?.new_deals || analyticsData.stageCounts['New'] || 0,
-              icon: PlusCircle,
-              iconColor: '#3B82F6',
-              iconBgColor: '#DBEAFE',
-              metric: {
-                text: 'Fresh opportunities',
-                dotColor: '#2563EB'
-              }
-            },
-            {
-              title: 'Qualified',
-              value: summaryTiles?.qualified_deals || analyticsData.stageCounts['Qualified'] || 0,
-              icon: CheckCircle,
-              iconColor: '#10B981',
-              iconBgColor: '#D1FAE5',
-              subtitle: 'Verified & ready'
-            },
-            {
-              title: 'Proposal',
-              value: analyticsData.stageCounts['Proposal'] || 0,
-              icon: FileText,
-              iconColor: '#8B5CF6',
-              iconBgColor: '#EDE9FE',
-              metric: {
-                text: 'Submitted',
-                dotColor: '#7C3AED'
-              }
-            },
-            {
-              title: 'Negotiation',
-              value: analyticsData.stageCounts['Negotiation'] || analyticsData.inNegotiation || 0,
-              icon: Users,
-              iconColor: '#F59E0B',
-              iconBgColor: '#FEF3C7',
-              subtitle: 'In discussion'
-            },
-            {
-              title: 'Closed Won',
-              value: analyticsData.stageCounts['Closed Won'] || analyticsData.stageCounts['Won'] || analyticsData.won || 0,
-              icon: Target,
-              iconColor: '#059669',
-              iconBgColor: '#D1FAE5',
-              badge: {
-                text: 'Success',
-                bgColor: '#D1FAE5',
-                textColor: '#065F46'
-              }
-            }
-            // {
-            //   title: 'Lost',
-            //   value: summaryTiles?.lost_deals || filterCounts.lost || 0,
-            //   icon: AlertCircle,
-            //   iconColor: '#EF4444',
-            //   iconBgColor: '#FEE2E2',
-            //   subtitle: 'Needs review'
-            // },
-            // {
-            //   title: 'Deleted',
-            //   value: summaryTiles?.deleted_deals || filterCounts.deleted || 0,
-            //   icon: Trash2,
-            //   iconColor: '#6B7280',
-            //   iconBgColor: '#F3F4F6',
-            //   metric: {
-            //     text: 'Archived',
-            //     dotColor: '#9CA3AF'
-            //   }
-            // }
-          ]}
-          gridMinWidth="180px"
-        />
+      {/* Main flex container for content and sidebar */}
+      <div style={{ display: 'flex', gap: '0', height: 'calc(100vh)', overflow: 'hidden' }}>
+        {/* Main content area */}
+        <div className="deals-scrollable-content" style={{ flex: 1 }}>
+        <div className="container-fluid">
 
         {/* Analytics Section - Collapsible */}
         {showDealsAnalytics && (
@@ -2673,358 +2652,8 @@ const handleCloseEditModal = useCallback(() => {
           </>
         )}
 
-        {/* Filter Bar */}
-        {showFilterBar && (
-          <FilterBar
-            quickFilters={[
-              {
-                id: 'all',
-                label: 'All Deals',
-                count: filterCounts.all,
-                color: '#0d6efd',
-                icon: <Users size={16} />
-              },
-              ...stages.slice(0, 5).map((stage: any) => ({
-                id: stage.id.toString(),
-                label: stage.name,
-                count: filterCounts[stage.id] || 0,
-                color: stage.color || '#6c757d',
-                icon: <Layers size={16} />
-              })),
-              {
-                id: 'lost',
-                label: 'Lost',
-                count: filterCounts.lost || 0,
-                color: '#fd7e14',
-                icon: <X size={16} />
-              },
-              {
-                id: 'deleted',
-                label: 'Deleted',
-                count: filterCounts.deleted || 0,
-                color: '#dc3545',
-                icon: <Trash2 size={16} />
-              }
-            ]}
-            activeFilter={activeFilter}
-            onFilterChange={handleFilterChange}
-            // searchValue={dealsSearch}
-            // onSearchChange={(value) => setDealsSearch(value)}
-            // onSearch={() => {
-            //   if (dealsSearch.trim()) {
-            //     handleFiltersChange({ search: dealsSearch.trim() });
-            //   } else {
-            //     handleFiltersChange({ search: null });
-            //   }
-            //   setDealsPagination({ ...dealsPagination, currentPage: 1 });
-            // }}
-            // searchPlaceholder="Search deals by name, company..."
-            // showAdvancedFilters={showAdvancedFilters}
-            // onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            // advancedFilterCount={
-            //   (dealsFilters.assignedTo !== null ? 1 : 0) +
-            //   (dealsFilters.stage !== null ? 1 : 0) +
-            //   (dealsFilters.followUpDateFrom !== null || dealsFilters.followUpDateTo !== null ? 1 : 0) +
-            //   (dealsFilters.probabilityMin !== null || dealsFilters.probabilityMax !== null ? 1 : 0) +
-            //   (dealsFilters.dealType !== null ? 1 : 0) +
-            //   (dealsFilters.industry !== null ? 1 : 0) +
-            //   (dealsFilters.expectedCloseDateFrom !== null || dealsFilters.expectedCloseDateTo !== null ? 1 : 0)
-            // }
-          />
-        )}
-
-        {/* Advanced Filters */}
-        {showAdvancedFilters && (
-          <Card className="border-0 shadow-sm mb-4">
-            <Card.Body>
-              <Row className="g-3 align-items-end">
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">
-                    Search
-                  </Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="Search deals by name, company, value..."
-                    value={dealsSearch}
-                    onChange={(e) => setDealsSearch(e.target.value)}
-                  />
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Assigned To</Form.Label>
-                  <Select
-                    options={extensions.map((ext: any) => ({ 
-                      value: ext.id || ext.extension, 
-                      label: ext.display_name || ext.name || ext.id || ext.extension
-                    }))}
-                    value={dealsFilters.assignedTo ? (() => {
-                      const assignedToId = dealsFilters.assignedTo;
-                      const ext = extensions.find((e: any) => (e.id || e.extension) === assignedToId);
-                      return ext ? { 
-                        value: assignedToId, 
-                        label: ext.display_name || ext.name || assignedToId 
-                      } : { value: assignedToId, label: assignedToId };
-                    })() : null}
-                    onChange={(selected) => {
-                      const assignedToValue = selected ? selected.value : null;
-                      setDealsFilters(prev => ({
-                        ...prev,
-                        assignedTo: assignedToValue
-                      }));
-                      // Reset to all when assigned filter changes
-                      setActiveFilter('all');
-                    }}
-                    placeholder="Select user..."
-                    styles={customSelectStyles}
-                    isClearable
-                  />
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Stages</Form.Label>
-                  <Select
-                    options={stages.map(s => ({ value: s.id.toString(), label: s.name }))}
-                    value={dealsFilters.stage ? (() => {
-                      const stageId = dealsFilters.stage;
-                      const stage = stages.find((st: any) => st.id.toString() === stageId);
-                      return stage ? { value: stageId, label: stage.name } : { value: stageId, label: stageId };
-                    })() : null}
-                    onChange={(selected) => {
-                      const stageValue = selected ? selected.value : null;
-                      setDealsFilters(prev => ({
-                        ...prev,
-                        stage: stageValue
-                      }));
-                      // Update activeFilter to match selected stage
-                      if (stageValue) {
-                        setActiveFilter(stageValue);
-                      } else {
-                        setActiveFilter('all');
-                      }
-                    }}
-                    placeholder="Select stage..."
-                    styles={customSelectStyles}
-                    isClearable
-                  />
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Follow-up Date From</Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={dealsFilters.followUpDateFrom || ''}
-                    onChange={(e) => {
-                      const dateValue = e.target.value || null;
-                      setDealsFilters(prev => ({
-                        ...prev,
-                        followUpDateFrom: dateValue
-                      }));
-                    }}
-                  />
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Follow-up Date To</Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={dealsFilters.followUpDateTo || ''}
-                    onChange={(e) => {
-                      const dateValue = e.target.value || null;
-                      setDealsFilters(prev => ({
-                        ...prev,
-                        followUpDateTo: dateValue
-                      }));
-                    }}
-                  />
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Probability Min (%)</Form.Label>
-                  <Form.Control
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={dealsFilters.probabilityMin || ''}
-                    onChange={(e) => {
-                      const value = e.target.value || null;
-                      setDealsFilters(prev => ({
-                        ...prev,
-                        probabilityMin: value
-                      }));
-                    }}
-                    placeholder="0"
-                  />
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Probability Max (%)</Form.Label>
-                  <Form.Control
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={dealsFilters.probabilityMax || ''}
-                    onChange={(e) => {
-                      const value = e.target.value || null;
-                      setDealsFilters(prev => ({
-                        ...prev,
-                        probabilityMax: value
-                      }));
-                    }}
-                    placeholder="100"
-                  />
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Deal Type</Form.Label>
-                  <Form.Select
-                    value={dealsFilters.dealType || ''}
-                    onChange={(e) => {
-                      const value = e.target.value || null;
-                      setDealsFilters(prev => ({
-                        ...prev,
-                        dealType: value
-                      }));
-                    }}
-                  >
-                    <option value="">Select Deal Type</option>
-                    <option value="new_sale">New Sale</option>
-                    <option value="renewal">Renewal</option>
-                    <option value="migration">Migration</option>
-                    <option value="upsell">Upsell</option>
-                  </Form.Select>
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Industry</Form.Label>
-                  <Form.Select
-                    value={dealsFilters.industry || ''}
-                    onChange={(e) => {
-                      const value = e.target.value || null;
-                      setDealsFilters(prev => ({
-                        ...prev,
-                        industry: value
-                      }));
-                    }}
-                  >
-                    <option value="">Select Industry</option>
-                    <option value="Technology">Technology</option>
-                    <option value="Healthcare">Healthcare</option>
-                    <option value="Finance">Finance</option>
-                    <option value="Banking & Financial Services">Banking & Financial Services</option>
-                    <option value="Manufacturing">Manufacturing</option>
-                    <option value="Retail">Retail</option>
-                    <option value="Education">Education</option>
-                    <option value="Real Estate">Real Estate</option>
-                    <option value="Telecommunications">Telecommunications</option>
-                    <option value="Construction">Construction</option>
-                    <option value="Other">Other</option>
-                  </Form.Select>
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Expected Close Date From</Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={dealsFilters.expectedCloseDateFrom || ''}
-                    onChange={(e) => {
-                      const dateValue = e.target.value || null;
-                      setDealsFilters(prev => ({
-                        ...prev,
-                        expectedCloseDateFrom: dateValue
-                      }));
-                    }}
-                  />
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Expected Close Date To</Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={dealsFilters.expectedCloseDateTo || ''}
-                    onChange={(e) => {
-                      const dateValue = e.target.value || null;
-                      setDealsFilters(prev => ({
-                        ...prev,
-                        expectedCloseDateTo: dateValue
-                      }));
-                    }}
-                  />
-                </Col>
-                <Col md={4}>
-                  <div className="d-flex gap-2">
-                    <Button
-                      variant="outline-secondary"
-                      className="d-flex align-items-center justify-content-center"
-                      onClick={() => {
-                        // Map dealsFilters to the format expected by handleFiltersChange
-                        const filtersToApply: Record<string, any> = {};
-                        
-                        if (dealsSearch) {
-                          filtersToApply.search = dealsSearch;
-                        }
-                        if (dealsFilters.assignedTo) {
-                          filtersToApply.assigned_to = dealsFilters.assignedTo;
-                        }
-                        if (dealsFilters.stage) {
-                          filtersToApply.stage_id = dealsFilters.stage;
-                        }
-                        if (dealsFilters.followUpDateFrom) {
-                          filtersToApply.follow_up_date_from = dealsFilters.followUpDateFrom;
-                        }
-                        if (dealsFilters.followUpDateTo) {
-                          filtersToApply.follow_up_date_to = dealsFilters.followUpDateTo;
-                        }
-                        if (dealsFilters.probabilityMin) {
-                          filtersToApply.probability_min = dealsFilters.probabilityMin;
-                        }
-                        if (dealsFilters.probabilityMax) {
-                          filtersToApply.probability_max = dealsFilters.probabilityMax;
-                        }
-                        if (dealsFilters.dealType) {
-                          filtersToApply.deal_type = dealsFilters.dealType;
-                        }
-                        if (dealsFilters.industry) {
-                          filtersToApply.industry = dealsFilters.industry;
-                        }
-                        if (dealsFilters.expectedCloseDateFrom) {
-                          filtersToApply.expected_close_date_from = dealsFilters.expectedCloseDateFrom;
-                        }
-                        if (dealsFilters.expectedCloseDateTo) {
-                          filtersToApply.expected_close_date_to = dealsFilters.expectedCloseDateTo;
-                        }
-                        
-                        handleFiltersChange(filtersToApply);
-                        setDealsPagination({ ...dealsPagination, currentPage: 1 });
-                        setRefreshKey(prev => prev + 1);
-                      }}
-                    >
-                      Submit Filters
-                    </Button>
-                    <Button
-                      variant="outline-secondary"
-                      className="d-flex align-items-center justify-content-center"
-                      onClick={() => {
-                        setDealsSearch("");
-                        setDealsFilters({
-                          assignedTo: null,
-                          stage: null,
-                          followUpDateFrom: null,
-                          followUpDateTo: null,
-                          probabilityMin: null,
-                          probabilityMax: null,
-                          dealType: null,
-                          industry: null,
-                          expectedCloseDateFrom: null,
-                          expectedCloseDateTo: null,
-                          approvalStatus: null,
-                        });
-                        handleFiltersChange({});
-                        setCurrentFilters({});
-                        setActiveFilter('all');
-                        setDealsPagination({ ...dealsPagination, currentPage: 1 });
-                        setRefreshKey(prev => prev + 1);
-                      }}
-                    >
-                      Reset
-                    </Button>
-                  </div>
-                </Col>
-              </Row>
-            </Card.Body>
-          </Card>
-        )}
-
         {/* Deals Table with GenericTable */}
+        <div className="deals-table-wrapper" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <GenericTable
           data={filteredDeals}
           columns={dealsColumns}
@@ -3032,6 +2661,7 @@ const handleCloseEditModal = useCallback(() => {
           customizableColumns={true}
           defaultSelectedColumns={['name', 'company', 'stage', 'status', 'approvalStatus', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner']}
           columnStorageKey="dealsSelectedColumns"
+          onColumnChange={(cols) => setSelectedDealsColumns(cols)}
           pagination={{
             currentPage: dealsPagination.currentPage,
             rowsPerPage: dealsPagination.rowsPerPage,
@@ -3046,9 +2676,23 @@ const handleCloseEditModal = useCallback(() => {
             });
           }}
           sortable={true}
+          defaultSortColumn={dealsPagination.sortColumn}
+          defaultSortDirection={dealsPagination.sortDirection}
+          onSort={(column, direction) => {
+            setDealsPagination({
+              ...dealsPagination,
+              sortColumn: column,
+              sortDirection: direction
+            });
+          }}
           onRowClick={(row) => {
             if (session?.user?.permissions?.includes('list-crm-deals')) {
               handleRowClicked(row.rawData?.id || row.id);
+            }
+          }}
+          onRowDoubleClick={(row) => {
+            if (session?.user?.permissions?.includes('list-crm-deals')) {
+              handleViewDeal(row.rawData?.id || row.id);
             }
           }}
           loading={loading}
@@ -3056,7 +2700,106 @@ const handleCloseEditModal = useCallback(() => {
           loadingMessage="Loading deals..."
           hover={true}
           uniqueKey="id"
+          
+          // Fixed height mode
+          fixedHeight={true}
+          maxHeight="calc(100vh - 380px)"
+          
+          // Toolbar
+          showToolbar={true}
+          toolbar={{
+            // Tabs
+            showTabs: true,
+            tabsDropdownLabel: "Deals",
+            tabs: [
+              { id: 'all', label: 'All deals', count: filterCounts.all, removable: false },
+              ...customTabs
+            ],
+            activeTab: activeFilter,
+            onTabChange: handleFilterChange,
+            onTabAdd: () => setShowTabModal(true),
+            onTabRemove: (tabId) => {
+              setCustomTabs(tabs => tabs.filter(t => t.id !== tabId));
+              if (activeFilter === tabId) {
+                handleFilterChange('all');
+              }
+            },
+            
+            // Search
+            showSearch: true,
+            searchValue: dealsSearch,
+            searchPlaceholder: "Search deals by name, company, value...",
+            onSearchChange: (value) => {
+              setDealsSearch(value);
+              // Clear search on empty value
+              if (!value) {
+                const newFilters = { ...currentFilters };
+                delete newFilters.search;
+                handleFiltersChange(newFilters);
+                setRefreshKey((prev) => prev + 1);
+              }
+            },
+            onSearch: () => {
+              if (dealsSearch) {
+                handleFiltersChange({
+                  ...currentFilters,
+                  search: dealsSearch
+                });
+                setDealsPagination({ ...dealsPagination, currentPage: 1 });
+                setRefreshKey((prev) => prev + 1);
+              }
+            },
+            
+            // Actions
+            showTableViewDropdown: true,
+            tableViewLabel: "Table view",
+            showViewSwitcher: true,
+            showEditColumns: true,
+            onEditColumnsClick: () => setShowColumnEditor(true),
+            showPipelineDropdown: true,
+            pipelineLabel: "All Pipelines",
+            showFiltersButton: true,
+            onFiltersClick: handleOpenFiltersSidebar,
+            showSortButton: true,
+            showExportButton: true,
+            onExportClick: () => setShowExportModal(true),
+            showSaveButton: true,
+            onSaveClick: () => console.log('Save view'),
+            
+            // Filter Pills
+            filterPills: [
+              { 
+                id: 'contact_owner', 
+                label: 'Contact Owner', 
+                showDropdown: true,
+                dropdownOptions: [
+                  { label: 'All Owners', value: 'all', onClick: () => {
+                    const newFilters = { ...currentFilters };
+                    delete newFilters.assigned_to;
+                    handleFiltersChange(newFilters);
+                    setRefreshKey((prev) => prev + 1);
+                  }},
+                  ...extensions.map(ext => ({
+                    label: ext.display_name || ext.name || ext.extension,
+                    value: ext.id || ext.extension,
+                    onClick: () => {
+                      handleFiltersChange({ ...currentFilters, assigned_to: ext.id || ext.extension });
+                      setRefreshKey((prev) => prev + 1);
+                    }
+                  }))
+                ]
+              }
+            ],
+            showAdvancedFilters: true,
+            onAdvancedFiltersClick: handleOpenFiltersSidebar
+          }}
+          
+          // Stats cards for metrics
+          statsCards={dealsStatsCards}
         />
+        </div>
+        </div>
+        </div>
       </div>
 
       {/* Delete Deal Modal */}
@@ -6155,14 +5898,6 @@ const handleCloseEditModal = useCallback(() => {
         width="400px"
         filters={[
           {
-            id: 'search',
-            label: 'Search',
-            type: 'text' as const,
-            value: dealsSearch,
-            onChange: (value) => setDealsSearch(value),
-            placeholder: 'Search deals by name, company, value...'
-          },
-          {
             id: 'assignedTo',
             label: 'Assigned To',
             type: 'select' as const,
@@ -7546,6 +7281,109 @@ const handleCloseEditModal = useCallback(() => {
     }}
   />
 )}
+
+      {/* Add New Tab Modal */}
+      <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Add New Tab</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted mb-3">Select a filter to add as a new tab</p>
+          <div className="d-grid gap-2">
+            {stages.map((stage: any) => {
+              const isAlreadyAdded = customTabs.some(t => t.id === stage.id.toString());
+              const stageCount = filterCounts[stage.id] || 0;
+              return (
+                <Button
+                  key={stage.id}
+                  variant="outline-primary"
+                  onClick={() => {
+                    if (!isAlreadyAdded) {
+                      setCustomTabs([...customTabs, {
+                        id: stage.id.toString(),
+                        label: stage.name,
+                        count: stageCount,
+                        removable: true
+                      }]);
+                      setShowTabModal(false);
+                      toast.success('Tab added successfully!');
+                    }
+                  }}
+                  disabled={isAlreadyAdded}
+                  className="d-flex align-items-center justify-content-start"
+                  style={{ textAlign: 'left' }}
+                >
+                  <Layers size={16} className="me-2" />
+                  {stage.name}
+                  {stageCount > 0 && (
+                    <Badge bg="secondary" className="ms-auto">
+                      {stageCount}
+                    </Badge>
+                  )}
+                </Button>
+              );
+            })}
+            {/* Lost and Deleted tabs */}
+            <Button
+              variant="outline-primary"
+              onClick={() => {
+                if (!customTabs.find(t => t.id === 'lost')) {
+                  setCustomTabs([...customTabs, {
+                    id: 'lost',
+                    label: 'Lost',
+                    count: filterCounts.lost || 0,
+                    removable: true
+                  }]);
+                  setShowTabModal(false);
+                  toast.success('Tab added successfully!');
+                }
+              }}
+              disabled={customTabs.some(t => t.id === 'lost')}
+              className="d-flex align-items-center justify-content-start"
+              style={{ textAlign: 'left' }}
+            >
+              <X size={16} className="me-2" />
+              Lost
+              {(filterCounts.lost || 0) > 0 && (
+                <Badge bg="secondary" className="ms-auto">
+                  {filterCounts.lost || 0}
+                </Badge>
+              )}
+            </Button>
+            <Button
+              variant="outline-primary"
+              onClick={() => {
+                if (!customTabs.find(t => t.id === 'deleted')) {
+                  setCustomTabs([...customTabs, {
+                    id: 'deleted',
+                    label: 'Deleted',
+                    count: filterCounts.deleted || 0,
+                    removable: true
+                  }]);
+                  setShowTabModal(false);
+                  toast.success('Tab added successfully!');
+                }
+              }}
+              disabled={customTabs.some(t => t.id === 'deleted')}
+              className="d-flex align-items-center justify-content-start"
+              style={{ textAlign: 'left' }}
+            >
+              <Trash2 size={16} className="me-2" />
+              Deleted
+              {(filterCounts.deleted || 0) > 0 && (
+                <Badge bg="secondary" className="ms-auto">
+                  {filterCounts.deleted || 0}
+                </Badge>
+              )}
+            </Button>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowTabModal(false)}>
+            Cancel
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
     </React.Fragment>
   );
