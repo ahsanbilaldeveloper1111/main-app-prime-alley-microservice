@@ -99,6 +99,8 @@ const globalConnectionRefs = {
   lastMessageTimeRef: { current: null as number | null }, // Track last message time for health check
   healthCheckIntervalRef: { current: null as NodeJS.Timeout | null }, // Health check interval
   hasRequestedInitialStateRef: { current: false }, // Request initial-state only once per connection to avoid loops
+  pendingRefreshAfterCallEndRef: { current: null as ReturnType<typeof setTimeout> | null }, // Single timeout for refresh after call end
+  lastRefreshAfterCallEndRef: { current: 0 }, // Throttle: last time we requested refresh after call end (ms)
 };
 
 /**
@@ -181,6 +183,8 @@ export default function useCtiStomp(
   const localLastMessageTimeRef = useRef<number | null>(null);
   const localHealthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const localHasRequestedInitialStateRef = useRef(false);
+  const localPendingRefreshAfterCallEndRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localLastRefreshAfterCallEndRef = useRef(0);
 
   // Use shared refs for global instance, individual refs for other instances
   const clientRef = isGlobalInstance ? globalConnectionRefs.clientRef : localClientRef;
@@ -200,6 +204,8 @@ export default function useCtiStomp(
   const lastMessageTimeRef = isGlobalInstance ? globalConnectionRefs.lastMessageTimeRef : localLastMessageTimeRef;
   const healthCheckIntervalRef = isGlobalInstance ? globalConnectionRefs.healthCheckIntervalRef : localHealthCheckIntervalRef;
   const hasRequestedInitialStateRef = isGlobalInstance ? globalConnectionRefs.hasRequestedInitialStateRef : localHasRequestedInitialStateRef;
+  const pendingRefreshAfterCallEndRef = isGlobalInstance ? globalConnectionRefs.pendingRefreshAfterCallEndRef : localPendingRefreshAfterCallEndRef;
+  const lastRefreshAfterCallEndRef = isGlobalInstance ? globalConnectionRefs.lastRefreshAfterCallEndRef : localLastRefreshAfterCallEndRef;
 
   // Store attemptReconnection function in a ref so it can be accessed from multiple useEffects
   const attemptReconnectionRef = useRef<((maxAttempts?: number) => Promise<void>) | null>(null);
@@ -956,7 +962,8 @@ export default function useCtiStomp(
   );
 
   // Helper function to publish STOMP messages via API.
-  // If the API returns "No active STOMP connection" (e.g. POST hit a different instance than SSE), retry once after a short delay.
+  // If the API returns "No active STOMP connection" (e.g. POST hit different instance than SSE, or connection briefly unavailable after call end), retry with backoff.
+  const PUBLISH_RETRY_DELAYS_MS = [0, 400, 800, 1200]; // 4 attempts: immediate, then +400ms, +800ms, +1200ms
   const publishStompMessage = useCallback(
     async (destination: string, body: string = "", retry = true): Promise<boolean> => {
       if (!tokenRef.current || !userAddressRef.current) {
@@ -974,24 +981,50 @@ export default function useCtiStomp(
         return response.data.success === true;
       };
 
-      try {
-        return await doPost();
-      } catch (error: any) {
-        const errMsg = error?.response?.data?.error || "";
-        const isNoConnection = typeof errMsg === "string" && errMsg.includes("No active STOMP connection");
-        if (retry && isNoConnection) {
-          await new Promise((r) => setTimeout(r, 600));
-          try {
-            return await doPost();
-          } catch {
+      for (let attempt = 0; attempt < (retry ? PUBLISH_RETRY_DELAYS_MS.length : 1); attempt++) {
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, PUBLISH_RETRY_DELAYS_MS[attempt]));
+        }
+        try {
+          return await doPost();
+        } catch (error: any) {
+          const errMsg = error?.response?.data?.error || "";
+          const isNoConnection = typeof errMsg === "string" && errMsg.includes("No active STOMP connection");
+          if (!retry || !isNoConnection || attempt === PUBLISH_RETRY_DELAYS_MS.length - 1) {
             return false;
           }
         }
-        return false;
       }
+      return false;
     },
     []
   );
+
+  // Schedule at most one refresh (initial-state + ongoing-calls) after call end, throttled to once per 2s. Prevents infinite loop when multiple DROPPED/DISCONNECTED events or response data re-trigger.
+  const REFRESH_AFTER_CALL_END_THROTTLE_MS = 2000;
+  const REFRESH_AFTER_CALL_END_DELAY_MS = 300;
+  const scheduleRefreshAfterCallEnd = useCallback(() => {
+    if (pendingRefreshAfterCallEndRef.current) {
+      clearTimeout(pendingRefreshAfterCallEndRef.current);
+      pendingRefreshAfterCallEndRef.current = null;
+    }
+    const now = Date.now();
+    if (lastRefreshAfterCallEndRef.current && now - lastRefreshAfterCallEndRef.current < REFRESH_AFTER_CALL_END_THROTTLE_MS) {
+      return;
+    }
+    pendingRefreshAfterCallEndRef.current = setTimeout(() => {
+      pendingRefreshAfterCallEndRef.current = null;
+      lastRefreshAfterCallEndRef.current = Date.now();
+      const pub = publishStompMessageRef.current;
+      if (pub) {
+        pub("/app/request/initial-state", "");
+        pub("/app/request/ongoing-calls", "");
+      }
+    }, REFRESH_AFTER_CALL_END_DELAY_MS);
+  }, []);
+
+  const scheduleRefreshAfterCallEndRef = useRef(scheduleRefreshAfterCallEnd);
+  scheduleRefreshAfterCallEndRef.current = scheduleRefreshAfterCallEnd;
 
   // Update refs when callbacks change (after all functions are defined)
   useEffect(() => {
@@ -1637,10 +1670,7 @@ export default function useCtiStomp(
                   handleCallEventRef.current(data.data);
                 }
                 if (data.data?.eventType === "DROPPED" || data.data?.eventType === "DISCONNECTED") {
-                  if (publishStompMessageRef.current) {
-                    publishStompMessageRef.current("/app/request/initial-state", "");
-                    publishStompMessageRef.current("/app/request/ongoing-calls", "");
-                  }
+                  scheduleRefreshAfterCallEndRef.current?.();
                 }
               } catch (err) {
                 setError("Failed to process call event");
@@ -2615,10 +2645,7 @@ export default function useCtiStomp(
                     handleCallEventRef.current(data.data);
                   }
                   if (data.data?.eventType === "DROPPED" || data.data?.eventType === "DISCONNECTED") {
-                    if (publishStompMessageRef.current) {
-                      publishStompMessageRef.current("/app/request/initial-state", "");
-                      publishStompMessageRef.current("/app/request/ongoing-calls", "");
-                    }
+                    scheduleRefreshAfterCallEndRef.current?.();
                   }
                   break;
 
