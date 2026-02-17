@@ -12,11 +12,13 @@ import {
   deleteTool,
   toggleTool,
   testTool,
+  getToolsExecutor,
+  reloadToolsExecutor,
   type Tool,
   type ToolPayload,
 } from "@utils/tools";
 import { Button, Form, Modal, Spinner, Table, Badge } from "react-bootstrap";
-import { Plus, Pencil, Trash2, Power, Play, ArrowLeft } from "lucide-react";
+import { Plus, Pencil, Trash2, Power, Play, RefreshCw, FileJson } from "lucide-react";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import ConfirmModal from "@pages/partial/ConfirmModal";
@@ -31,6 +33,10 @@ const ToolProfiles = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
+  const [showExecutorModal, setShowExecutorModal] = useState(false);
+  const [executorConfig, setExecutorConfig] = useState<unknown>(null);
+  const [executorLoading, setExecutorLoading] = useState(false);
+  const [reloadExecutorLoading, setReloadExecutorLoading] = useState(false);
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
 
   const [formPayload, setFormPayload] = useState<Partial<ToolPayload>>({
@@ -202,6 +208,36 @@ const ToolProfiles = () => {
     }
   };
 
+  const handleReloadExecutor = async () => {
+    setReloadExecutorLoading(true);
+    try {
+      await reloadToolsExecutor();
+      toast.success("Executor reloaded. Enabled tools are now in sync.");
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to reload executor");
+    } finally {
+      setReloadExecutorLoading(false);
+    }
+  };
+
+  const handleViewExecutor = async () => {
+    setExecutorLoading(true);
+    setShowExecutorModal(true);
+    setExecutorConfig(null);
+    try {
+      const config = await getToolsExecutor();
+      setExecutorConfig(config);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to load executor config");
+      setExecutorConfig(undefined);
+    } finally {
+      setExecutorLoading(false);
+    }
+  };
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Tools Profiles" />
@@ -214,7 +250,14 @@ const ToolProfiles = () => {
               <Plus size={16} className="me-2" />
               Add Tool
             </Button>
-            
+            <Button variant="outline-primary" onClick={handleViewExecutor} disabled={executorLoading}>
+              {executorLoading ? <Spinner size="sm" className="me-2" /> : <FileJson size={16} className="me-2" />}
+              View Executor
+            </Button>
+            <Button variant="outline-secondary" onClick={handleReloadExecutor} disabled={reloadExecutorLoading}>
+              {reloadExecutorLoading ? <Spinner size="sm" className="me-2" /> : <RefreshCw size={16} className="me-2" />}
+              Reload Executor
+            </Button>
           </>
         }
       />
@@ -446,6 +489,29 @@ const ToolProfiles = () => {
         requireTextConfirmation={true}
         requiredConfirmationText="delete"
       />
+
+      {/* Executor config modal */}
+      <Modal show={showExecutorModal} onHide={() => setShowExecutorModal(false)} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Executor config (LangGraph)</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {executorLoading ? (
+            <div className="text-center py-4">
+              <Spinner animation="border" />
+            </div>
+          ) : executorConfig !== null && executorConfig !== undefined ? (
+            <pre className="bg-light p-3 rounded small mb-0" style={{ maxHeight: 400, overflow: "auto" }}>
+              {JSON.stringify(executorConfig, null, 2)}
+            </pre>
+          ) : (
+            <p className="text-muted mb-0">No config or failed to load.</p>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowExecutorModal(false)}>Close</Button>
+        </Modal.Footer>
+      </Modal>
     </React.Fragment>
   );
 };
