@@ -4,7 +4,6 @@ import React, {
   useState,
   useCallback,
   useMemo,
-  useEffect,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -35,7 +34,6 @@ import { useRouter } from 'next/router'
 const AIChatFAQsGlobal = () => {
     const router = useRouter();
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [cachedFAQs, setCachedFAQs] = useState<FAQData[]>([]);
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -252,51 +250,35 @@ const AIChatFAQsGlobal = () => {
     }
   };
 
-  // Fetch FAQs from API (only called on mount and when refreshKey changes)
-  const fetchFAQsFromAPI = useCallback(async () => {
-    try {
-      const allFAQs = await getGlobalFAQs();
-      setCachedFAQs(allFAQs);
-    } catch (error) {
-      console.error("Error fetching FAQs:", error);
-      setCachedFAQs([]);
-    }
-  }, []);
-
-  // Fetch FAQs on mount and when refreshKey changes
-  useEffect(() => {
-    fetchFAQsFromAPI();
-  }, [refreshKey, fetchFAQsFromAPI]);
-
-  // Fetch data for GenericListPage (uses cached data, no API call on search)
+  // Fetch data for GenericListPage (get from API with search, no client-side filter)
   const fetchData = useCallback(
     async (page = 1, perPage = 15, search = "") => {
-      // Use cached FAQs instead of calling API
-      let filtered = cachedFAQs;
-      
-      // Client-side filtering
-      if (search) {
-        filtered = cachedFAQs.filter(
-          (faq) =>
-            faq.question.toLowerCase().includes(search.toLowerCase()) ||
-            faq.answer.toLowerCase().includes(search.toLowerCase())
-        );
+      try {
+        const allFAQs = await getGlobalFAQs(search || undefined);
+
+        const start = (page - 1) * perPage;
+        const end = start + perPage;
+        const paginated = allFAQs.slice(start, end);
+
+        return {
+          data: paginated,
+          total: allFAQs.length,
+          page,
+          per_page: perPage,
+          last_page: Math.ceil(allFAQs.length / perPage),
+        };
+      } catch (error) {
+        console.error("Error fetching FAQs:", error);
+        return {
+          data: [],
+          total: 0,
+          page: 1,
+          per_page: perPage,
+          last_page: 1,
+        };
       }
-
-      // Client-side pagination
-      const start = (page - 1) * perPage;
-      const end = start + perPage;
-      const paginated = filtered.slice(start, end);
-
-      return {
-        data: paginated,
-        total: filtered.length,
-        page,
-        per_page: perPage,
-        last_page: Math.ceil(filtered.length / perPage),
-      };
     },
-    [cachedFAQs]
+    []
   );
 
   return (

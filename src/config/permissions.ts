@@ -41,11 +41,18 @@ export const routePermissions: RoutePermission[] = [
     {path:'/crm/deals-approval',permissions: ['']},
     
     {path:'/ai-ml/tenant-faqs',permissions: ['']},
-    {path:'/ai-ml/global-faqs',permissions: ['']},
+    { path: '/ai-ml/global-faqs', permissions: [''] },
+    
     {path:'/chat/ai-faqs',permissions: [PERMISSIONS.TMS_SERVICES]},
     {path:'/chat/ai-bot-faqs',permissions: [PERMISSIONS.TMS_SERVICES]},
     {path:'/chat/ai-faqs/tenant',permissions: [PERMISSIONS.TMS_SERVICES]},
-    {path:'/chat/ai-faqs/global',permissions: [PERMISSIONS.TMS_SERVICES]},
+    { path: '/chat/ai-faqs/global', permissions: [PERMISSIONS.TMS_SERVICES] },
+    {path:'/chat/faq-profiles',permissions: [PERMISSIONS.TMS_SERVICES]},
+    {path:'/chat/faq-profiles/tenant',permissions: [PERMISSIONS.TMS_SERVICES]},
+    { path: '/chat/faq-profiles/global', permissions: [PERMISSIONS.TMS_SERVICES] },
+    { path: '/chat/usage-reports', permissions: [PERMISSIONS.TMS_SERVICES] },
+    {path:'/chat/tools-profiles',permissions: [PERMISSIONS.TMS_SERVICES]},
+    
     {path:'/company',permissions: ['set-company-image-users']},
 
     
@@ -368,7 +375,26 @@ export const routePermissions: RoutePermission[] = [
         path: '/ai-agent',
         permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML],
         children: [
-            { path: '/outbound/trunk-profiles', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] }
+        
+            { path: '/outbound', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML],
+                children: [
+                    { path: '/trunk-profiles', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
+                    { path: '/pitch-deck', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
+                    { path: '/usage-reports', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] }
+                ]
+            },
+            { path: '/inbound', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML],
+                children: [
+                    { path: '/trunk-profiles', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
+                    { path: '/faqs', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
+                    { path: '/campaign-reports', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
+                    { path: '/bot-profiles', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
+                    { path: '/live-monitoring', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] },
+                    { path: '/usage-reports', permissions: [PERMISSIONS.OUTBOUND_CALLS_AIML] }
+
+                ]
+            },
+
         ]
     },
 
