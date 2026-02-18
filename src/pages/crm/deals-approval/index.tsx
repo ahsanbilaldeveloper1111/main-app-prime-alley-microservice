@@ -9,10 +9,18 @@ import React, {
   useEffect,
 } from "react";
 import Layout from "@layout/index";
-import GenericTable, { TableColumn, TableAction, TabConfig } from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebar";
+import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericTable, {
+  TableColumn,
+  TableAction,
+  ToolbarConfig,
+  FilterPill,
+  TabConfig,
+} from "@components/GenericTable";
+import GenericSidebar from '@components/GenericSidebarNew';
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import ConvertToOrderModal from "@components/ConvertToOrderModal";
 import {
   FiUpload,
   FiDatabase,
@@ -61,6 +69,12 @@ import {
   DealTemplateData,
   DealTemplateField,
   BusinessTypeData,
+  PDFDownloadDeal,
+  getDealFollowUps,
+  createDealFollowUp,
+  updateDealFollowUp,
+  deleteDealFollowUp,
+  getDealMeetings
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -78,7 +92,7 @@ import {
   
 } from "react-bootstrap";
 import Select from 'react-select';
-import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper";
+import { GlobalDateFormat, GlobalDateTimeFormat, ModuleSlug, formatDateForTable, checkRequiredFields } from "@utils/Helper";
 import {
   Target,
   CheckCircle,
@@ -129,7 +143,11 @@ import {
   Package,
   RefreshCw,
   ArrowLeft,
+  Copy,
+  Trash,
+  Phone as PhoneIcon,
   Check,
+  CheckSquare,
   XCircle,
 } from 'lucide-react';
 import { 
@@ -497,8 +515,6 @@ const CrmDeals = () => {
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [showTabModal, setShowTabModal] = useState(false);
-  const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -511,6 +527,29 @@ const CrmDeals = () => {
   // Delete Attachment Modal
   const [showDeleteAttachmentModal, setShowDeleteAttachmentModal] = useState(false);
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: number; name: string } | null>(null);
+  
+  // Download file modal (table column)
+  const [showDownloadFileModal, setShowDownloadFileModal] = useState(false);
+  const [dealForDownload, setDealForDownload] = useState<any>(null);
+  
+  // Follow-up Modal
+  const [showAddFollowupModal, setShowAddFollowupModal] = useState(false);
+  const [followUpIdToEdit, setFollowUpIdToEdit] = useState<number | null>(null);
+  const [followupData, setFollowupData] = useState({
+    dealId: null as number | null,
+    dealName: "",
+    followUpDate: "",
+    followUpStatus: "Pending",
+    communicationChannel: "Phone Call",
+    communicationChannelOther: "",
+    notes: "",
+    userExtension: "",
+  });
+  const [loadingFollowUp, setLoadingFollowUp] = useState(false);
+
+  // Delete Follow-up Modal
+  const [showDeleteFollowUpModal, setShowDeleteFollowUpModal] = useState(false);
+  const [followUpToDelete, setFollowUpToDelete] = useState<{ dealId: number; followUpId: number; label?: string } | null>(null);
   
   // Meeting Modal
   const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
@@ -530,7 +569,7 @@ const CrmDeals = () => {
   
   // Delete Meeting Modal
   const [showDeleteMeetingModal, setShowDeleteMeetingModal] = useState(false);
-  const [meetingToDelete, setMeetingToDelete] = useState<{ meetingId: number; meetingName?: string } | null>(null);
+  const [meetingToDelete, setMeetingToDelete] = useState<{ meetingId: number; meetingName?: string; dealId?: number } | null>(null);
   
   // Mark Deal Lost Modal
   const [showMarkLostModal, setShowMarkLostModal] = useState(false);
@@ -573,6 +612,8 @@ const CrmDeals = () => {
     tax_percentage: "0",
     standard_discount_percentage: "0",
     special_discount_percentage: "0",
+    last_approved_at: null as string | null,
+    approval_status: null as string | null,
   });
   const [editProducts, setEditProducts] = useState<CrmProduct[]>([]);
   const [editLoadingProducts, setEditLoadingProducts] = useState(false);
@@ -608,6 +649,29 @@ const CrmDeals = () => {
     qty: 1,
     unit_price: 0,
   });
+  // Add/Edit Revision modal (replaces Add Item for Estimation step)
+  const [editShowAddRevisionModal, setEditShowAddRevisionModal] = useState(false);
+  const [editEditingRevisionIndex, setEditEditingRevisionIndex] = useState<number | null>(null);
+  const [editRevisionProducts, setEditRevisionProducts] = useState<Array<{
+    product_id: number;
+    product_service: string;
+    description: string;
+    qty: number;
+    unit_price: number;
+    original_currency: string;
+    original_price: number;
+    tax_percentage: string;
+    standard_discount_percentage: string;
+    special_discount_percentage: string;
+  }>>([]);
+  const [editRevisionFormData, setEditRevisionFormData] = useState({
+    tax_percentage: "0",
+    standard_discount_percentage: "0",
+    special_discount_percentage: "0",
+  });
+  const [editRevisionProductsCatalog, setEditRevisionProductsCatalog] = useState<CrmProduct[]>([]);
+  const [editRevisionLoadingProducts, setEditRevisionLoadingProducts] = useState(false);
+  const [editRevisionSelectedProductIds, setEditRevisionSelectedProductIds] = useState<Array<{ value: number; label: string }>>([]);
   const [editShowRevisionHistoryModal, setEditShowRevisionHistoryModal] = useState(false);
   const [editConvertingPrice, setEditConvertingPrice] = useState(false);
   const [editEstimates, setEditEstimates] = useState<any[]>([]);
@@ -616,27 +680,30 @@ const CrmDeals = () => {
   const [editNegotiationBar, setEditNegotiationBar] = useState(0);
   const [editProbability, setEditProbability] = useState(0);
   
+  const [showConvertToOrderModal, setShowConvertToOrderModal] = useState(false);
+  const [dealToConvert, setDealToConvert] = useState<number | null>(null);
+  
   // UI State
   const [showDealsAnalytics, setShowDealsAnalytics] = useState(false);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [showFilterBar, setShowFilterBar] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [dealsSearch, setDealsSearch] = useState('');
+  const [showTabModal, setShowTabModal] = useState(false);
+  const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   const [selectedDealsColumns, setSelectedDealsColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem('dealsSelectedColumns');
-    return saved ? JSON.parse(saved) : ['name', 'company', 'stage', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner'];
+    return saved ? JSON.parse(saved) : ['name', 'company', 'stage', 'approvalStatus', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner'];
   });
   const [dealsPagination, setDealsPagination] = useState({ currentPage: 1, rowsPerPage: 15, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
   const [serverPaginationMeta, setServerPaginationMeta] = useState<{ total: number; current_page: number; per_page: number; last_page: number } | null>(null);
   const [dealsFilters, setDealsFilters] = useState({
     assignedTo: null as string | null,
+    approvalStatus: null as string | null,
     stage: null as string | null,
     followUpDateFrom: null as string | null,
     followUpDateTo: null as string | null,
     probabilityMin: null as string | null,
     probabilityMax: null as string | null,
     dealType: null as string | null,
-    approvalStatus: 'pending' as string | null,
     industry: null as string | null,
     expectedCloseDateFrom: null as string | null,
     expectedCloseDateTo: null as string | null,
@@ -1134,6 +1201,113 @@ const CrmDeals = () => {
     }
   }, []);
 
+  const [dealMeetings, setDealMeetings] = useState<any[]>([]);
+  const [loadingDealMeetings, setLoadingDealMeetings] = useState(false);
+
+  const fetchDealMeetings = useCallback(async (dealId: number) => {
+    try {
+      setLoadingDealMeetings(true);
+      const dealMeetings  = await getDealMeetings({deal_id: dealId});
+      setDealMeetings(dealMeetings?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch deal meetings:", error);
+    } finally {
+      setLoadingDealMeetings(false);
+    }
+  }, []);
+
+  const [dealFollowUps, setDealFollowUps] = useState<any[]>([]);
+  const [loadingDealFollowUps, setLoadingDealFollowUps] = useState(false);
+
+  const fetchDealFollowUps = useCallback(async (dealId: number) => {
+    try {
+      setLoadingDealFollowUps(true);
+      const dealFollowUps  = await getDealFollowUps(dealId);
+      console.log("dealFollowUps", dealFollowUps);
+      setDealFollowUps(dealFollowUps || [] as any);
+    } catch (error) {
+
+    } finally {
+      setLoadingDealFollowUps(false);
+    }
+  }, []);
+
+  const handleRowClicked = useCallback(async (dealId: number) => {
+    try {
+      const dealData: any = await getDeal(dealId);
+      setSelectedDeal(dealData);
+      setShowDealSidebar(true);
+
+      await fetchDealFollowUps(dealId);
+      await fetchDealMeetings(dealId);
+
+    } catch (error) {
+      console.error("Failed to fetch deal:", error);
+      toast.error("Failed to load deal details");
+    }
+  }, [fetchDealFollowUps, fetchDealMeetings]);
+
+  const handlePreviewClick = useCallback(async (deal: any) => {
+    const dealId = deal.rawData?.id || deal.id;
+    // Set the deal immediately to show sidebar
+    setSelectedDeal(deal.rawData || deal);
+    setShowDealSidebar(true);
+    
+    // Fetch additional data (follow-ups, meetings) in the background
+    if (dealId) {
+      try {
+        await fetchDealFollowUps(dealId);
+        await fetchDealMeetings(dealId);
+        // Optionally refresh the deal data to get latest info
+        const dealData: any = await getDeal(dealId);
+        setSelectedDeal(dealData);
+      } catch (error) {
+        console.error("Failed to fetch deal details:", error);
+        // Don't show error toast as sidebar is already open with basic data
+      }
+    }
+  }, [fetchDealFollowUps, fetchDealMeetings]);
+
+  // Handle first column click - navigates to detail page
+  const handleFirstColumnClick = useCallback((deal: any) => {
+    const dealId = deal?.rawData?.id || deal?.id;
+    if (dealId) {
+      router.push({
+        pathname: '/crm/deals-approval/deals-approval-detailpage',
+        query: { id: dealId }
+      });
+    } else {
+      router.push('/crm/deals-approval/deals-approval-detailpage');
+    }
+  }, [router]);
+
+  const handleCallClick = useCallback(async (deal: any) => {
+    const phone = deal?.phone || deal?.rawData?.phone || relatedLead?.phone;
+    if (!phone) {
+      toast.error("No phone number available for this deal");
+      return;
+    }
+    // Handle call logic here - similar to leads page
+    // This might integrate with CTI or open a phone dialer
+    console.log("Calling:", phone);
+  }, [relatedLead]);
+
+  const handleNoteCreate = useCallback((note: string, createTask: boolean, taskDueDate?: string) => {
+    console.log('Note created:', {
+      dealId: selectedDeal?.id || selectedDeal?.rawData?.id,
+      note,
+      createTask,
+      taskDueDate
+    });
+    // Implement note creation logic here
+    toast.success('Note created successfully');
+  }, [selectedDeal]);
+
+  const handleCloseDealSidebar = useCallback(() => {
+    setShowDealSidebar(false);
+    setSelectedDeal(null);
+  }, []);
+
   const handleDeleteDeal = useCallback((dealId: number, dealName?: string) => {
     setDealToDelete({ id: dealId, name: dealName });
     setShowDeleteModal(true);
@@ -1158,9 +1332,10 @@ const CrmDeals = () => {
       await createMeeting(payload);
       
       // Refresh deal data
-      if (viewingDeal?.id === meetingData.dealId) {
-        await handleViewDeal(meetingData.dealId);
-      }
+     // if (viewingDeal?.id === meetingData.dealId) {
+       // await handleRowClicked(meetingData.dealId);
+        await fetchDealMeetings(meetingData.dealId);
+     // }
       
       // Reset form and close modal
       setShowAddMeetingModal(false);
@@ -1208,7 +1383,8 @@ const CrmDeals = () => {
       
       // Refresh deal data
       if (viewingDeal?.id === meetingData.dealId && meetingData.dealId) {
-        await handleViewDeal(meetingData.dealId);
+       // await handleRowClicked(meetingData.dealId);
+        await fetchDealMeetings(meetingData.dealId);
       }
       
       // Reset form and close modal
@@ -1311,8 +1487,8 @@ const CrmDeals = () => {
       await deleteMeeting(meetingToDelete.meetingId);
       
       // Refresh deal data
-      if (viewingDeal?.id) {
-        await handleViewDeal(viewingDeal.id);
+      if (meetingToDelete.dealId) {
+        await fetchDealMeetings(meetingToDelete.dealId);
       }
       
       // Refresh deals list
@@ -1325,7 +1501,137 @@ const CrmDeals = () => {
       console.error("Failed to delete meeting:", error);
       toast.error("Failed to delete meeting");
     }
-  }, [meetingToDelete, viewingDeal, handleViewDeal]);
+  }, [meetingToDelete, fetchDealMeetings]);
+
+  const handleCreateFollowUp = useCallback(async () => {
+    const isValid = checkRequiredFields(followupData, [
+      { field: "dealId", name: "Deal" },
+      { field: "followUpDate", name: "Follow-up Date" },
+      { field: "communicationChannel", name: "Communication Channel" },
+    ]);
+    if (
+      followupData.communicationChannel === "Other" &&
+      !followupData.communicationChannelOther?.trim()
+    ) {
+      toast.error("Please specify the communication channel");
+      return;
+    }
+    if (!isValid) return;
+
+    setLoadingFollowUp(true);
+    try {
+      const dealId = followupData.dealId!;
+      const followUp: any = await createDealFollowUp(dealId, {
+        follow_up_date: followupData.followUpDate,
+        communication_channel: followupData.communicationChannel,
+        communication_channel_other: followupData.communicationChannelOther,
+        notes: followupData.notes
+      });
+      if(followUp) {
+        setShowAddFollowupModal(false);
+        setFollowUpIdToEdit(null);
+        setFollowupData({
+          dealId: null,
+          dealName: "",
+          followUpDate: "",
+          followUpStatus: "Pending",
+          communicationChannel: "Phone Call",
+          communicationChannelOther: "",
+          notes: "",
+          userExtension: "",
+        });
+       // handleRowClicked(dealId);
+        await fetchDealFollowUps(dealId);
+      } 
+      
+    } catch (error) {
+      console.error("Failed to save follow-up:", error);
+      toast.error("Failed to save follow-up");
+    } finally {
+      setLoadingFollowUp(false);
+    }
+  }, [followupData, fetchDealFollowUps]);
+
+  const handleUpdateFollowUp = useCallback(async () => {
+    const isValid = checkRequiredFields(followupData, [
+      { field: "dealId", name: "Deal" },
+      { field: "followUpDate", name: "Follow-up Date" },
+      { field: "communicationChannel", name: "Communication Channel" },
+    ]);
+    if (
+      followupData.communicationChannel === "Other" &&
+      !followupData.communicationChannelOther?.trim()
+    ) {
+      toast.error("Please specify the communication channel");
+      return;
+    }
+    if (!followUpIdToEdit || !isValid) return;
+
+    setLoadingFollowUp(true);
+    try {
+      const dealId = followupData.dealId!;
+      const followUp: any = await updateDealFollowUp(dealId, followUpIdToEdit, {
+        follow_up_date: followupData.followUpDate,
+        communication_channel: followupData.communicationChannel,
+        communication_channel_other: followupData.communicationChannelOther,
+        notes: followupData.notes,
+      });
+      if(followUp) {
+        setShowAddFollowupModal(false);
+        setFollowUpIdToEdit(null);
+        setFollowupData({
+          dealId: null,
+          dealName: "",
+          followUpDate: "",
+          followUpStatus: "Pending",
+          communicationChannel: "Phone Call",
+          communicationChannelOther: "",
+          notes: "",
+          userExtension: "",
+        });
+        //handleRowClicked(dealId);
+        await fetchDealFollowUps(dealId);
+      }
+
+
+    } catch (error) {
+      console.error("Failed to update follow-up:", error);
+      toast.error("Failed to update follow-up");
+    } finally {
+      setLoadingFollowUp(false);
+    }
+  }, [followUpIdToEdit, followupData, fetchDealFollowUps]);
+
+  const handleDeleteFollowUp = useCallback(async (dealId: number, followUpId: number) => {
+    try {
+      await deleteDealFollowUp(dealId, followUpId);
+      await fetchDealFollowUps(dealId);
+    } catch (error) {
+      console.error("Failed to delete follow-up:", error);
+    }
+  }, [fetchDealFollowUps]);
+
+  const confirmDeleteFollowUp = useCallback(async () => {
+    if (!followUpToDelete) return;
+    try {
+      await handleDeleteFollowUp(followUpToDelete.dealId, followUpToDelete.followUpId);
+      await fetchDealFollowUps(followUpToDelete.dealId);
+      setShowDeleteFollowUpModal(false);
+      setFollowUpToDelete(null);
+      
+    } catch (error) {
+      console.error("Failed to delete follow-up:", error);
+    }
+  }, [followUpToDelete, handleDeleteFollowUp]);
+
+  const handleDownloadDeal = useCallback(async (dealId: number) => {
+    try {
+      await PDFDownloadDeal(dealId);
+    } catch (error) {
+      console.error("Failed to download deal:", error);
+      toast.error("Failed to download deal");
+    }
+  }, []);
 
   const confirmDeleteDeal = useCallback(async () => {
     if (!dealToDelete) return;
@@ -1463,9 +1769,18 @@ const handleEditDeal = useCallback(async (dealId: number) => {
       tax_percentage: (deal as any).tax_percentage?.toString() || "0",
       standard_discount_percentage: (deal as any).standard_discount_percentage?.toString() || "0",
       special_discount_percentage: (deal as any).special_discount_percentage?.toString() || "0",
+      last_approved_at: null,
+      approval_status: null,
     });
     // Set business type
     const dealAny = deal as any;
+    // Set approval fields if they exist
+    if (dealAny.last_approved_at !== undefined) {
+      setEditFormData(prev => ({ ...prev, last_approved_at: dealAny.last_approved_at }));
+    }
+    if (dealAny.approval_status !== undefined) {
+      setEditFormData(prev => ({ ...prev, approval_status: dealAny.approval_status }));
+    }
     if (dealAny.business_type_id) {
       setEditBusinessTypeId(Number(dealAny.business_type_id));
       setEditBusinessTypeOther("");
@@ -1675,11 +1990,13 @@ const handleCloseEditModal = useCallback(() => {
     contract_sent: false,
     contract_received: false,
     follow_up_date: "",
-    currency: "AED",
-    tax_percentage: "0",
-    standard_discount_percentage: "0",
-    special_discount_percentage: "0",
-  });
+      currency: "AED",
+      tax_percentage: "0",
+      standard_discount_percentage: "0",
+      special_discount_percentage: "0",
+      last_approved_at: null,
+      approval_status: null,
+    });
   setEditEstimationItems([]);
   setEditProducts([]);
   setEditDealTemplate(null);
@@ -2248,6 +2565,18 @@ const handleCloseEditModal = useCallback(() => {
   return (
     <React.Fragment>
       <style dangerouslySetInnerHTML={{__html: `
+        .deals-scrollable-content {
+          display: flex;
+          flex-direction: column;
+          height: calc(100vh - 100px);
+          overflow: hidden;
+        }
+        
+        .deals-scrollable-content .container-fluid {
+          display: flex;
+          flex-direction: column;
+        }
+        
         .deals-table-wrapper {
           width: 100%;
           overflow: hidden;
@@ -2269,7 +2598,17 @@ const handleCloseEditModal = useCallback(() => {
           vertical-align: middle;
         }
       `}} />
-      <div>
+      <BreadcrumbItem
+        mainTitle="CRM"
+        mainLink="/crm/dashboard"
+        subTitle="Deals Approval"
+      />
+
+      {/* Main flex container for content and sidebar */}
+      <div style={{ display: 'flex', gap: '0', height: 'calc(100vh)', overflow: 'hidden' }}>
+        {/* Main content area */}
+        <div className="deals-scrollable-content" style={{ flex: 1 }}>
+        <div className="container-fluid">
 
         {/* Analytics Section - Collapsible */}
         {showDealsAnalytics && (
@@ -2362,7 +2701,7 @@ const handleCloseEditModal = useCallback(() => {
         )}
 
         {/* Filter Bar */}
-        {showFilterBar && (
+        {false && (
           <FilterBar
             quickFilters={[
               {
@@ -2422,7 +2761,7 @@ const handleCloseEditModal = useCallback(() => {
         )}
 
         {/* Advanced Filters */}
-        {showAdvancedFilters && (
+        {false && (
           <Card className="border-0 shadow-sm mb-4">
             <Card.Body>
               <Row className="g-3 align-items-end">
@@ -2737,9 +3076,13 @@ const handleCloseEditModal = useCallback(() => {
           data={filteredDeals}
           columns={dealsColumns}
           actions={dealsActions}
+          showActions={false}
           customizableColumns={true}
-          defaultSelectedColumns={['name', 'company', 'stage', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner']}
+          defaultSelectedColumns={['name', 'company', 'stage', 'approvalStatus', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner']}
           columnStorageKey="dealsSelectedColumns"
+          onColumnChange={(cols) => setSelectedDealsColumns(cols)}
+          onPreviewClick={(deal) => handlePreviewClick(deal)}
+          onFirstColumnClick={(deal) => handleFirstColumnClick(deal)}
           pagination={{
             currentPage: dealsPagination.currentPage,
             rowsPerPage: dealsPagination.rowsPerPage,
@@ -2754,10 +3097,18 @@ const handleCloseEditModal = useCallback(() => {
             });
           }}
           sortable={true}
-          onRowClick={(row) => {
+          defaultSortColumn={dealsPagination.sortColumn}
+          defaultSortDirection={dealsPagination.sortDirection}
+          onSort={(column, direction) => {
+            setDealsPagination({
+              ...dealsPagination,
+              sortColumn: column,
+              sortDirection: direction
+            });
+          }}
+          onRowDoubleClick={(row) => {
             if (session?.user?.permissions?.includes('list-crm-deals')) {
-              setSelectedDeal(row.rawData || row);
-              setShowDealSidebar(true);
+              handleViewDeal(row.rawData?.id || row.id);
             }
           }}
           loading={loading}
@@ -2862,6 +3213,451 @@ const handleCloseEditModal = useCallback(() => {
           // Stats cards for metrics
           statsCards={dealsStatsCards}
         />
+        </div>
+        </div>
+
+      {/* Deal Sidebar */}
+      {showDealSidebar && (
+      <GenericSidebar
+        isOpen={showDealSidebar}
+        onClose={handleCloseDealSidebar}
+        title={selectedDeal?.name || 'Deal Details'}
+        subtitle={selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone || selectedDeal?.company || selectedDeal?.company_name || ''}
+        email={selectedDeal?.email || selectedDeal?.rawData?.email || relatedLead?.email}
+        phone={selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone}
+        avatar={{
+          initials: getInitials(selectedDeal?.name || 'NA'),
+          name: selectedDeal?.name || 'NA',
+          gradient: getRandomColor(selectedDeal?.name || '')
+        }}
+        onNoteCreate={handleNoteCreate}
+        breezeRecordSummary={{
+          content: `This deal was created on ${selectedDeal?.created_at ? moment(selectedDeal.created_at).format('MMMM DD, YYYY') : 'recent date'}. ${selectedDeal?.stage?.name ? `Currently in ${selectedDeal.stage.name} stage.` : ''} ${selectedDeal?.value ? `Deal value: ${selectedDeal.currency || 'AED'} ${parseFloat(String(selectedDeal.value)).toLocaleString()}.` : ''} ${selectedDeal?.company_name || selectedDeal?.company ? `Company: ${selectedDeal.company_name || selectedDeal.company}.` : ''}`,
+          timestamp: selectedDeal?.updated_at ? `Generated on ${moment(selectedDeal.updated_at).format('MMM DD, YYYY [at] h:mm A')}` : 'Generated recently',
+          onRefresh: () => console.log('Refresh AI summary'),
+          onThumbsUp: () => console.log('Thumbs up'),
+          onThumbsDown: () => console.log('Thumbs down'),
+          onCopy: () => {
+            const summaryText = `This deal was created on ${selectedDeal?.created_at ? moment(selectedDeal.created_at).format('MMMM DD, YYYY') : 'recent date'}. ${selectedDeal?.stage?.name ? `Currently in ${selectedDeal.stage.name} stage.` : ''} ${selectedDeal?.value ? `Deal value: ${selectedDeal.currency || 'AED'} ${parseFloat(String(selectedDeal.value)).toLocaleString()}.` : ''} ${selectedDeal?.company_name || selectedDeal?.company ? `Company: ${selectedDeal.company_name || selectedDeal.company}.` : ''}`;
+            navigator.clipboard.writeText(summaryText);
+            toast.success('Summary copied to clipboard');
+          },
+          onAskQuestion: () => console.log('Ask AI a question')
+        }}
+        recordLink={{
+          label: 'View record',
+          onClick: () => {
+            const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+            if (dealId) {
+              router.push(`/crm/deals/${dealId}/edit`);
+            }
+          }
+        }}
+        actionsDropdown={{
+          label: 'Actions',
+          items: [
+            { 
+              label: 'Edit Deal', 
+              onClick: () => {
+                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                if (dealId) {
+                  router.push(`/crm/deals/${dealId}/edit`);
+                }
+              }
+            },
+            ...((selectedDeal?.approval_status ?? selectedDeal?.rawData?.approval_status) === 'approved' ? [{
+              label: 'Convert to Order', 
+              onClick: () => {
+                setShowDealSidebar(false);
+                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                if (dealId) {
+                  setDealToConvert(dealId);
+                  setShowConvertToOrderModal(true);
+                }
+              }
+            }] : []),
+            { 
+              label: 'View History', 
+              onClick: () => {
+                setShowDealSidebar(false);
+                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                if (dealId) {
+                  handleViewDeal(dealId);
+                  setShowDealHistoryModal(true);
+                }
+              }
+            },
+            { 
+              label: 'Delete', 
+              onClick: () => {
+                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                if (dealId) {
+                  handleDeleteDeal(dealId, selectedDeal?.name);
+                }
+              }
+            }
+          ]
+        }}
+        quickActions={[
+          { 
+            id: 'note', 
+            label: 'Note', 
+            icon: FileText, 
+            onClick: () => {}, // This is handled internally now
+            disabled: false 
+          },
+          { 
+            id: 'call', 
+            label: 'Call', 
+            icon: PhoneIcon, 
+            onClick: () => {
+              const phone = selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone;
+              if (phone) {
+                handleCallClick(selectedDeal);
+              }
+            },
+            disabled: !(selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone)
+          },
+          { 
+            id: 'email', 
+            label: 'Email', 
+            icon: Mail, 
+            onClick: () => {},
+            disabled: !(selectedDeal?.email || selectedDeal?.rawData?.email || relatedLead?.email)
+          },
+          { 
+            id: 'task', 
+            label: 'Task', 
+            icon: CheckSquare, 
+            onClick: () => {},
+            disabled: false 
+          },
+          { 
+            id: 'meeting', 
+            label: 'Meeting', 
+            icon: Calendar, 
+            onClick: () => {
+              const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+              if (dealId) {
+                setMeetingData({
+                  dealId: Number(dealId),
+                  dealName: selectedDeal?.name || '',
+                  meetingName: '',
+                  meetingType: 'Online',
+                  meetingDate: '',
+                  meetingTime: '',
+                  meetingOutcome: '',
+                  extensions: []
+                });
+                setMeetingAttendees([]);
+                setShowAddMeetingModal(true);
+              }
+            },
+            disabled: false 
+          },
+          { 
+            id: 'more', 
+            label: 'More', 
+            icon: MoreVertical, 
+            onClick: () => console.log('More actions'),
+            disabled: false 
+          }
+        ]}
+        sections={[
+          {
+            id: 'about-deal',
+            title: 'About this deal',
+            icon: Handshake,
+            collapsible: true,
+            defaultExpanded: true,
+            actions: [
+              { label: 'Edit all properties', onClick: () => {
+                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                if (dealId) {
+                  router.push(`/crm/deals/${dealId}/edit`);
+                }
+              }}
+            ],
+            fields: [
+              {
+                label: 'Name',
+                value: selectedDeal?.name || 'N/A',
+                copyable: true
+              },
+              {
+                label: 'Phone',
+                value: selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone || 'N/A',
+                type: 'phone',
+                copyable: true,
+                externalLink: (selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone) ? `tel:${selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone}` : undefined,
+                show: !!(selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone)
+              },
+              {
+                label: 'Email',
+                value: selectedDeal?.email || selectedDeal?.rawData?.email || relatedLead?.email || 'N/A',
+                type: 'email',
+                copyable: true,
+                externalLink: (selectedDeal?.email || selectedDeal?.rawData?.email || relatedLead?.email) ? `mailto:${selectedDeal?.email || selectedDeal?.rawData?.email || relatedLead?.email}` : undefined,
+                show: !!(selectedDeal?.email || selectedDeal?.rawData?.email || relatedLead?.email)
+              },
+              {
+                label: 'Company',
+                value: selectedDeal?.company_name || selectedDeal?.company || 'N/A',
+                copyable: true,
+                show: !!(selectedDeal?.company_name || selectedDeal?.company)
+              },
+              {
+                label: 'Stage',
+                value: typeof selectedDeal?.stage === 'string' 
+                  ? selectedDeal.stage 
+                  : (selectedDeal?.stage?.name || selectedDeal?.rawData?.stage?.name || 'N/A'),
+                type: 'badge',
+                badgeVariant: 'primary'
+              },
+              {
+                label: 'Deal Value',
+                value: selectedDeal?.value 
+                  ? `${selectedDeal?.currency || 'AED'} ${parseFloat(String(selectedDeal.value)).toLocaleString()}`
+                  : 'N/A',
+                copyable: true,
+                show: !!selectedDeal?.value
+              },
+              {
+                label: 'Probability',
+                value: selectedDeal?.probability ? `${selectedDeal.probability}%` : 'N/A',
+                show: !!selectedDeal?.probability
+              },
+              {
+                label: 'Deal Type',
+                value: selectedDeal?.dealType || selectedDeal?.deal_type || 'N/A',
+                type: 'badge',
+                badgeVariant: 'info',
+                show: !!(selectedDeal?.dealType || selectedDeal?.deal_type)
+              },
+              {
+                label: 'Assigned To',
+                value: selectedDeal?.assigned_user?.display_name || selectedDeal?.assigned_user?.name || selectedDeal?.assignedUser || 'Unassigned',
+                hasDetails: true,
+                onDetailsClick: () => console.log('Show user details')
+              },
+              {
+                label: 'Created Date',
+                value: selectedDeal?.created_at || selectedDeal?.created ? moment(selectedDeal.created_at || selectedDeal.created).format('MMM DD, YYYY') : 'N/A',
+                type: 'date'
+              },
+              {
+                label: 'Last Updated',
+                value: selectedDeal?.updated_at || selectedDeal?.last_activity_at ? moment(selectedDeal.updated_at || selectedDeal.last_activity_at).format('MMM DD, YYYY') : 'N/A',
+                type: 'date'
+              }
+            ]
+          },
+          {
+            id: 'recent-activities',
+            title: 'Recent activities',
+            icon: History,
+            collapsible: true,
+            defaultExpanded: true,
+            count: 0,
+            emptyState: {
+              icon: History,
+              message: 'No recent activities for this deal.',
+              action: {
+                label: 'Log activity',
+                onClick: () => console.log('Log activity')
+              }
+            }
+          },
+          {
+            id: 'call-recordings',
+            title: 'Call Recordings',
+            icon: PhoneIcon,
+            collapsible: true,
+            defaultExpanded: true,
+            count: 0,
+            actions: [
+              { label: 'View all recordings', onClick: () => console.log('View all') }
+            ],
+            emptyState: {
+              icon: PhoneIcon,
+              message: 'No call recordings available yet.',
+              action: {
+                label: 'Make a call',
+                onClick: () => {
+                  const phone = selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone;
+                  if (phone) {
+                    handleCallClick(selectedDeal);
+                  }
+                }
+              }
+            }
+          },
+          {
+            id: 'notes',
+            title: 'Notes',
+            icon: FileText,
+            collapsible: true,
+            defaultExpanded: true,
+            count: 0,
+            emptyState: {
+              icon: FileText,
+              message: 'No notes added yet.',
+              action: {
+                label: 'Add note',
+                onClick: () => console.log('Add note')
+              }
+            }
+          },
+          {
+            id: 'follow-ups',
+            title: 'Follow-ups',
+            icon: History,
+            collapsible: true,
+            defaultExpanded: true,
+            badge: {
+              value: dealFollowUps?.length ?? 0,
+              variant: 'secondary'
+            },
+            ...(dealFollowUps?.length
+              ? {
+                  customContent: (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {(dealFollowUps || []).map((fu: any) => (
+                        <div
+                          key={fu.id}
+                          style={{
+                            padding: '12px',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            fontSize: '13px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                              {fu.follow_up_date ? moment(fu.follow_up_date).format(GlobalDateFormat) : '-'}
+                            </span>
+                            <span style={{ color: '#64748b', fontSize: '12px' }}>
+                              {fu.communication_channel || fu.communication_channel_other || '-'}
+                            </span>
+                          </div>
+                          {fu.follow_up_status && (
+                            <div style={{ marginBottom: '4px', color: '#475569' }}>
+                              <span style={{ color: '#94a3b8' }}>Status: </span>{fu.follow_up_status}
+                            </div>
+                          )}
+                          {fu.notes && (
+                            <div style={{ color: '#475569', lineHeight: 1.4 }}>
+                              {fu.notes.length > 120 ? `${fu.notes.slice(0, 120)}...` : fu.notes}
+                            </div>
+                          )}
+                          <div style={{ marginTop: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-0"
+                              title="Edit"
+                              
+                              onClick={() => {
+                                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                                if (dealId) {
+                                  setFollowupData({
+                                    dealId: Number(dealId),
+                                    dealName: selectedDeal?.name || '',
+                                    followUpDate: fu.follow_up_date ? moment(fu.follow_up_date).format('YYYY-MM-DD') : '',
+                                    followUpStatus: fu.follow_up_status || 'Pending',
+                                    communicationChannel: fu.communication_channel || 'Phone Call',
+                                    communicationChannelOther: fu.communication_channel_other || '',
+                                    notes: fu.notes || '',
+                                    userExtension: (session?.user as any)?.extension || '',
+                                  });
+                                  setFollowUpIdToEdit(fu.id);
+                                  setShowAddFollowupModal(true);
+                                }
+                              }}
+                            >
+                              <Edit size={14} className="me-1" />
+                            </Button>
+
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-0 text-danger"
+                              title="Delete"
+                              onClick={() => {
+                                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                                if (dealId) {
+                                  setFollowUpToDelete({
+                                    dealId: Number(dealId),
+                                    followUpId: fu.id,
+                                    label: fu.follow_up_date ? moment(fu.follow_up_date).format(GlobalDateFormat) : 'Follow-up',
+                                  });
+                                  setShowDeleteFollowUpModal(true);
+                                }
+                              }}
+                            >
+                              <Trash size={14} className="me-1" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        style={{ alignSelf: 'flex-start', marginTop: '4px' }}
+                        onClick={() => {
+                          const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                          if (dealId) {
+                            setFollowupData({
+                              dealId: Number(dealId),
+                              dealName: selectedDeal?.name || '',
+                              followUpDate: '',
+                              followUpStatus: 'Pending',
+                              communicationChannel: 'Phone Call',
+                              communicationChannelOther: '',
+                              notes: '',
+                              userExtension: (session?.user as any)?.extension || '',
+                            });
+                            setFollowUpIdToEdit(null);
+                            setShowAddFollowupModal(true);
+                          }
+                        }}
+                      >
+                        <Plus size={14} className="me-1" /> Add Follow Up
+                      </Button>
+                    </div>
+                  )
+                }
+              : {
+                  emptyState: {
+                    icon: History,
+                    message: 'No follow-ups yet',
+                    action: {
+                      label: 'Add Follow Up',
+                      onClick: () => {
+                        const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                        if (dealId) {
+                          setFollowupData({
+                            dealId: Number(dealId),
+                            dealName: selectedDeal?.name || '',
+                            followUpDate: '',
+                            followUpStatus: 'Pending',
+                            communicationChannel: 'Phone Call',
+                            communicationChannelOther: '',
+                            notes: '',
+                            userExtension: (session?.user as any)?.extension || '',
+                          });
+                          setFollowUpIdToEdit(null);
+                          setShowAddFollowupModal(true);
+                        }
+                      }
+                    }
+                  }
+                })
+          }
+        ]}
+      />
+      )}
       </div>
 
       {/* Delete Deal Modal */}
@@ -5152,204 +5948,6 @@ const handleCloseEditModal = useCallback(() => {
         itemType="attachment"
       />
 
-      {/* Deal Sidebar */}
-      <GenericSidebar
-        isOpen={showDealSidebar}
-        onClose={() => {
-          setShowDealSidebar(false);
-          setSelectedDeal(null);
-        }}
-        moduleSlug={ModuleSlug.CRM_DEALS}
-        title={selectedDeal?.name || 'Deal Details'}
-        subtitle={selectedDeal?.company || selectedDeal?.company_name || ''}
-        metadata={selectedDeal?.id ? `Deal ID: ${selectedDeal.id}` : ''}
-        avatar={{
-          name: selectedDeal?.name || 'Deal',
-          useIcon: true
-        }}
-        width="420px"
-        tabs={[
-          {
-            id: 'general',
-            label: 'General Information',
-            sections: [
-              {
-                id: 'deal-info',
-                title: 'Deal Information',
-                icon: Handshake,
-                fields: [
-                  {
-                    label: 'Deal Name',
-                    value: selectedDeal?.name || 'N/A',
-                    type: 'text' as const
-                  },
-                  {
-                    label: 'Stage',
-                    value: typeof selectedDeal?.stage === 'string' 
-                      ? selectedDeal.stage 
-                      : (selectedDeal?.stage?.name || selectedDeal?.rawData?.stage?.name || 'N/A'),
-                    type: 'badge' as const,
-                    badgeVariant: 'primary'
-                  },
-                  {
-                    label: 'Deal Value',
-                    value: selectedDeal?.value 
-                      ? `${selectedDeal?.currency || 'AED'} ${parseFloat(String(selectedDeal.value)).toLocaleString()}`
-                      : 'N/A',
-                    type: 'text' as const,
-                    icon: DollarSign
-                  },
-                  {
-                    label: 'Probability',
-                    value: selectedDeal?.probability ? `${selectedDeal.probability}%` : 'N/A',
-                    type: 'text' as const
-                  },
-                  {
-                    label: 'Deal Type',
-                    value: selectedDeal?.dealType || selectedDeal?.deal_type || 'N/A',
-                    type: 'badge' as const,
-                    badgeVariant: 'info',
-                    show: !!(selectedDeal?.dealType || selectedDeal?.deal_type)
-                  },
-                  {
-                    label: 'Assigned To',
-                    value: selectedDeal?.assignedUser || 'Unassigned',
-                    type: 'text' as const,
-                    icon: User
-                  },
-                  {
-                    label: 'Created Date',
-                    value: selectedDeal?.created || selectedDeal?.created_at,
-                    type: 'date' as const,
-                    icon: Calendar
-                  },
-                  {
-                    label: 'Expected Close Date',
-                    value: selectedDeal?.closeDate || selectedDeal?.expected_close_date,
-                    type: 'date' as const,
-                    show: !!(selectedDeal?.closeDate || selectedDeal?.expected_close_date)
-                  },
-                  {
-                    label: 'Risk Level',
-                    value: selectedDeal?.riskLevel || selectedDeal?.risk_level || 'N/A',
-                    type: 'badge' as const,
-                    badgeVariant: selectedDeal?.riskLevel === 'High' || selectedDeal?.risk_level === 'High' ? 'danger' : 
-                                 selectedDeal?.riskLevel === 'Medium' || selectedDeal?.risk_level === 'Medium' ? 'warning' : 'success',
-                    show: !!(selectedDeal?.riskLevel || selectedDeal?.risk_level)
-                  }
-                ]
-              },
-              {
-                id: 'client-info',
-                title: 'Client Information',
-                icon: Building2,
-                fields: [
-                  {
-                    label: 'Client Name',
-                    value: selectedDeal?.company || selectedDeal?.company_name || 'N/A',
-                    type: 'text' as const,
-                    icon: Building2
-                  },
-                  {
-                    label: 'Industry',
-                    value: selectedDeal?.industry || 'N/A',
-                    type: 'text' as const,
-                    show: !!selectedDeal?.industry
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            id: 'campaign-prospect',
-            label: 'Campaign & Prospect',
-            sections: [
-              {
-                id: 'campaign-info',
-                title: 'Campaign Information',
-                icon: Target,
-                emptyState: {
-                  icon: Target,
-                  message: 'No campaign information available'
-                }
-              },
-              {
-                id: 'prospect-info',
-                title: 'Prospect Information',
-                icon: User,
-                emptyState: {
-                  icon: User,
-                  message: 'No prospect information available'
-                }
-              },
-              {
-                id: 'prospect-fields',
-                title: 'Prospect Fields',
-                icon: FileText,
-                emptyState: {
-                  icon: FileText,
-                  message: 'No prospect fields available'
-                }
-              },
-              {
-                id: 'meetings',
-                title: 'Meetings',
-                icon: Calendar,
-                badge: {
-                  value: 0,
-                  variant: 'secondary'
-                },
-                emptyState: {
-                  icon: Calendar,
-                  message: 'No meetings scheduled yet',
-                  action: {
-                    label: 'Schedule Meeting',
-                    onClick: () => {
-                      const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
-                      if (dealId) {
-                        setMeetingData({
-                          dealId: dealId,
-                          dealName: selectedDeal?.name || '',
-                          meetingName: '',
-                          meetingType: 'Online',
-                          meetingDate: '',
-                          meetingTime: '',
-                          meetingOutcome: '',
-                          extensions: []
-                        });
-                        setMeetingAttendees([]);
-                        setShowAddMeetingModal(true);
-                      }
-                    }
-                  }
-                }
-              }
-            ]
-          }
-        ]}
-        actions={[
-          {
-            label: 'Edit Deal',
-            icon: Edit,
-            onClick: () => {
-              setShowDealSidebar(false);
-              window.location.href = `/crm/deals/${selectedDeal?.id || selectedDeal?.rawData?.id}/edit`;
-            },
-            variant: 'primary',
-            show: session?.user?.permissions?.includes('edit-crm-deals') && activeFilter !== 'lost'
-          },
-          {
-            label: 'View History',
-            icon: History,
-            onClick: () => {
-              setShowDealSidebar(false);
-              handleViewDeal(selectedDeal?.id || selectedDeal?.rawData?.id);
-              setShowDealHistoryModal(true);
-            },
-            variant: 'outline-primary'
-          }
-        ]}
-      />
 
       {/* Filters Sidebar */}
       <GenericFilterSidebar
@@ -6682,6 +7280,23 @@ const handleCloseEditModal = useCallback(() => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+     {/* Convert to Order Modal */}
+{dealToConvert && (
+  <ConvertToOrderModal
+    show={showConvertToOrderModal}
+    onHide={() => {
+      setShowConvertToOrderModal(false);
+      setDealToConvert(null);
+    }}
+    dealId={dealToConvert}
+    onSuccess={() => {
+      // Optionally refresh deals list or show success message
+    // toast.success("Order created successfully!");
+      setRefreshKey((prev) => prev + 1);
+    }}
+  />
+)}
 
     </React.Fragment>
   );

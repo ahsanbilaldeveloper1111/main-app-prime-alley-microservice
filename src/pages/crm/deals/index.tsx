@@ -17,7 +17,7 @@ import GenericTable, {
   FilterPill,
   TabConfig,
 } from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebar";
+import GenericSidebar from '@components/GenericSidebarNew';
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import ConvertToOrderModal from "@components/ConvertToOrderModal";
@@ -132,7 +132,9 @@ import {
   Building2,
   Mail,
   Phone,
+  Phone as PhoneIcon,
   Paperclip,
+  CheckSquare,
   Upload,
   Download as DownloadIcon,
   AlertCircle,
@@ -1260,6 +1262,59 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
       console.error("Failed to fetch deal:", error);
       toast.error("Failed to load deal details");
     }
+  }, []);
+
+  const handlePreviewClick = useCallback(async (deal: any) => {
+    const dealId = deal.rawData?.id || deal.id;
+    // Set the deal immediately to show sidebar
+    setSelectedDeal(deal.rawData || deal);
+    setShowDealSidebar(true);
+    
+    // Fetch additional data (follow-ups, meetings) in the background
+    if (dealId) {
+      try {
+        await fetchDealFollowUps(dealId);
+        await fetchDealMeetings(dealId);
+        // Optionally refresh the deal data to get latest info
+        const dealData: any = await getDeal(dealId);
+        setSelectedDeal(dealData);
+      } catch (error) {
+        console.error("Failed to fetch deal details:", error);
+        // Don't show error toast as sidebar is already open with basic data
+      }
+    }
+  }, [fetchDealFollowUps, fetchDealMeetings]);
+
+  // Handle first column click - navigates to detail page
+  const handleFirstColumnClick = useCallback((deal: any) => {
+    router.push('/crm/deals/deals-detailpage');
+  }, [router]);
+
+  const handleCallClick = useCallback(async (deal: any) => {
+    const phone = deal?.phone || deal?.rawData?.phone || relatedLead?.phone;
+    if (!phone) {
+      toast.error("No phone number available for this deal");
+      return;
+    }
+    // Handle call logic here - similar to leads page
+    // This might integrate with CTI or open a phone dialer
+    console.log("Calling:", phone);
+  }, [relatedLead]);
+
+  const handleNoteCreate = useCallback((note: string, createTask: boolean, taskDueDate?: string) => {
+    console.log('Note created:', {
+      dealId: selectedDeal?.id || selectedDeal?.rawData?.id,
+      note,
+      createTask,
+      taskDueDate
+    });
+    // Implement note creation logic here
+    toast.success('Note created successfully');
+  }, [selectedDeal]);
+
+  const handleCloseDealSidebar = useCallback(() => {
+    setShowDealSidebar(false);
+    setSelectedDeal(null);
   }, []);
 
   const handleDeleteDeal = useCallback((dealId: number, dealName?: string) => {
@@ -2658,10 +2713,13 @@ const handleCloseEditModal = useCallback(() => {
           data={filteredDeals}
           columns={dealsColumns}
           actions={dealsActions}
+          showActions={false}
           customizableColumns={true}
           defaultSelectedColumns={['name', 'company', 'stage', 'status', 'approvalStatus', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner']}
           columnStorageKey="dealsSelectedColumns"
           onColumnChange={(cols) => setSelectedDealsColumns(cols)}
+          onPreviewClick={(deal) => handlePreviewClick(deal)}
+          onFirstColumnClick={(deal) => handleFirstColumnClick(deal)}
           pagination={{
             currentPage: dealsPagination.currentPage,
             rowsPerPage: dealsPagination.rowsPerPage,
@@ -2684,11 +2742,6 @@ const handleCloseEditModal = useCallback(() => {
               sortColumn: column,
               sortDirection: direction
             });
-          }}
-          onRowClick={(row) => {
-            if (session?.user?.permissions?.includes('list-crm-deals')) {
-              handleRowClicked(row.rawData?.id || row.id);
-            }
           }}
           onRowDoubleClick={(row) => {
             if (session?.user?.permissions?.includes('list-crm-deals')) {
@@ -2800,6 +2853,449 @@ const handleCloseEditModal = useCallback(() => {
         </div>
         </div>
         </div>
+
+      {/* Deal Sidebar */}
+      {showDealSidebar && (
+      <GenericSidebar
+        isOpen={showDealSidebar}
+        onClose={handleCloseDealSidebar}
+        title={selectedDeal?.name || 'Deal Details'}
+        subtitle={selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone || selectedDeal?.company || selectedDeal?.company_name || ''}
+        email={selectedDeal?.email || selectedDeal?.rawData?.email || relatedLead?.email}
+        phone={selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone}
+        avatar={{
+          initials: getInitials(selectedDeal?.name || 'NA'),
+          name: selectedDeal?.name || 'NA',
+          gradient: getRandomColor(selectedDeal?.name || '')
+        }}
+        onNoteCreate={handleNoteCreate}
+        breezeRecordSummary={{
+          content: `This deal was created on ${selectedDeal?.created_at ? moment(selectedDeal.created_at).format('MMMM DD, YYYY') : 'recent date'}. ${selectedDeal?.stage?.name ? `Currently in ${selectedDeal.stage.name} stage.` : ''} ${selectedDeal?.value ? `Deal value: ${selectedDeal.currency || 'AED'} ${parseFloat(String(selectedDeal.value)).toLocaleString()}.` : ''} ${selectedDeal?.company_name || selectedDeal?.company ? `Company: ${selectedDeal.company_name || selectedDeal.company}.` : ''}`,
+          timestamp: selectedDeal?.updated_at ? `Generated on ${moment(selectedDeal.updated_at).format('MMM DD, YYYY [at] h:mm A')}` : 'Generated recently',
+          onRefresh: () => console.log('Refresh AI summary'),
+          onThumbsUp: () => console.log('Thumbs up'),
+          onThumbsDown: () => console.log('Thumbs down'),
+          onCopy: () => {
+            const summaryText = `This deal was created on ${selectedDeal?.created_at ? moment(selectedDeal.created_at).format('MMMM DD, YYYY') : 'recent date'}. ${selectedDeal?.stage?.name ? `Currently in ${selectedDeal.stage.name} stage.` : ''} ${selectedDeal?.value ? `Deal value: ${selectedDeal.currency || 'AED'} ${parseFloat(String(selectedDeal.value)).toLocaleString()}.` : ''} ${selectedDeal?.company_name || selectedDeal?.company ? `Company: ${selectedDeal.company_name || selectedDeal.company}.` : ''}`;
+            navigator.clipboard.writeText(summaryText);
+            toast.success('Summary copied to clipboard');
+          },
+          onAskQuestion: () => console.log('Ask AI a question')
+        }}
+        recordLink={{
+          label: 'View record',
+          onClick: () => {
+            const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+            if (dealId) {
+              router.push(`/crm/deals/${dealId}/edit`);
+            }
+          }
+        }}
+        actionsDropdown={{
+          label: 'Actions',
+          items: [
+            { 
+              label: 'Edit Deal', 
+              onClick: () => {
+                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                if (dealId) {
+                  router.push(`/crm/deals/${dealId}/edit`);
+                }
+              }
+            },
+            ...((selectedDeal?.approval_status ?? selectedDeal?.rawData?.approval_status) === 'approved' ? [{
+              label: 'Convert to Order', 
+              onClick: () => {
+                setShowDealSidebar(false);
+                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                if (dealId) {
+                  setDealToConvert(dealId);
+                  setShowConvertToOrderModal(true);
+                }
+              }
+            }] : []),
+            { 
+              label: 'View History', 
+              onClick: () => {
+                setShowDealSidebar(false);
+                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                if (dealId) {
+                  handleViewDeal(dealId);
+                  setShowDealHistoryModal(true);
+                }
+              }
+            },
+            { 
+              label: 'Delete', 
+              onClick: () => {
+                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                if (dealId) {
+                  handleDeleteDeal(dealId, selectedDeal?.name);
+                }
+              }
+            }
+          ]
+        }}
+        quickActions={[
+          { 
+            id: 'note', 
+            label: 'Note', 
+            icon: FileText, 
+            onClick: () => {}, // This is handled internally now
+            disabled: false 
+          },
+          { 
+            id: 'call', 
+            label: 'Call', 
+            icon: Phone, 
+            onClick: () => {
+              const phone = selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone;
+              if (phone) {
+                handleCallClick(selectedDeal);
+              }
+            },
+            disabled: !(selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone)
+          },
+          { 
+            id: 'email', 
+            label: 'Email', 
+            icon: Mail, 
+            onClick: () => {},
+            disabled: !(selectedDeal?.email || selectedDeal?.rawData?.email || relatedLead?.email)
+          },
+          { 
+            id: 'task', 
+            label: 'Task', 
+            icon: CheckSquare, 
+            onClick: () => {},
+            disabled: false 
+          },
+          { 
+            id: 'meeting', 
+            label: 'Meeting', 
+            icon: Calendar, 
+            onClick: () => {
+              const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+              if (dealId) {
+                setMeetingData({
+                  dealId: Number(dealId),
+                  dealName: selectedDeal?.name || '',
+                  meetingName: '',
+                  meetingType: 'Online',
+                  meetingDate: '',
+                  meetingTime: '',
+                  meetingOutcome: '',
+                  extensions: []
+                });
+                setMeetingAttendees([]);
+                setShowAddMeetingModal(true);
+              }
+            },
+            disabled: false 
+          },
+          { 
+            id: 'more', 
+            label: 'More', 
+            icon: MoreVertical, 
+            onClick: () => console.log('More actions'),
+            disabled: false 
+          }
+        ]}
+        sections={[
+          {
+            id: 'about-deal',
+            title: 'About this deal',
+            icon: Handshake,
+            collapsible: true,
+            defaultExpanded: true,
+            actions: [
+              { label: 'Edit all properties', onClick: () => {
+                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                if (dealId) {
+                  router.push(`/crm/deals/${dealId}/edit`);
+                }
+              }}
+            ],
+            fields: [
+              {
+                label: 'Name',
+                value: selectedDeal?.name || 'N/A',
+                copyable: true
+              },
+              {
+                label: 'Phone',
+                value: selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone || 'N/A',
+                type: 'phone',
+                copyable: true,
+                externalLink: (selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone) ? `tel:${selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone}` : undefined,
+                show: !!(selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone)
+              },
+              {
+                label: 'Email',
+                value: selectedDeal?.email || selectedDeal?.rawData?.email || relatedLead?.email || 'N/A',
+                type: 'email',
+                copyable: true,
+                externalLink: (selectedDeal?.email || selectedDeal?.rawData?.email || relatedLead?.email) ? `mailto:${selectedDeal?.email || selectedDeal?.rawData?.email || relatedLead?.email}` : undefined,
+                show: !!(selectedDeal?.email || selectedDeal?.rawData?.email || relatedLead?.email)
+              },
+              {
+                label: 'Company',
+                value: selectedDeal?.company_name || selectedDeal?.company || 'N/A',
+                copyable: true,
+                show: !!(selectedDeal?.company_name || selectedDeal?.company)
+              },
+              {
+                label: 'Stage',
+                value: typeof selectedDeal?.stage === 'string' 
+                  ? selectedDeal.stage 
+                  : (selectedDeal?.stage?.name || selectedDeal?.rawData?.stage?.name || 'N/A'),
+                type: 'badge',
+                badgeVariant: 'primary'
+              },
+              {
+                label: 'Deal Value',
+                value: selectedDeal?.value 
+                  ? `${selectedDeal?.currency || 'AED'} ${parseFloat(String(selectedDeal.value)).toLocaleString()}`
+                  : 'N/A',
+                copyable: true,
+                show: !!selectedDeal?.value
+              },
+              {
+                label: 'Probability',
+                value: selectedDeal?.probability ? `${selectedDeal.probability}%` : 'N/A',
+                show: !!selectedDeal?.probability
+              },
+              {
+                label: 'Deal Type',
+                value: selectedDeal?.dealType || selectedDeal?.deal_type || 'N/A',
+                type: 'badge',
+                badgeVariant: 'info',
+                show: !!(selectedDeal?.dealType || selectedDeal?.deal_type)
+              },
+              {
+                label: 'Assigned To',
+                value: selectedDeal?.assigned_user?.display_name || selectedDeal?.assigned_user?.name || selectedDeal?.assignedUser || 'Unassigned',
+                hasDetails: true,
+                onDetailsClick: () => console.log('Show user details')
+              },
+              {
+                label: 'Created Date',
+                value: selectedDeal?.created_at || selectedDeal?.created ? moment(selectedDeal.created_at || selectedDeal.created).format('MMM DD, YYYY') : 'N/A',
+                type: 'date'
+              },
+              {
+                label: 'Last Updated',
+                value: selectedDeal?.updated_at || selectedDeal?.last_activity_at ? moment(selectedDeal.updated_at || selectedDeal.last_activity_at).format('MMM DD, YYYY') : 'N/A',
+                type: 'date'
+              }
+            ]
+          },
+          {
+            id: 'recent-activities',
+            title: 'Recent activities',
+            icon: History,
+            collapsible: true,
+            defaultExpanded: true,
+            count: 0,
+            emptyState: {
+              icon: History,
+              message: 'No recent activities for this deal.',
+              action: {
+                label: 'Log activity',
+                onClick: () => console.log('Log activity')
+              }
+            }
+          },
+          {
+            id: 'call-recordings',
+            title: 'Call Recordings',
+            icon: PhoneIcon,
+            collapsible: true,
+            defaultExpanded: true,
+            count: 0,
+            actions: [
+              { label: 'View all recordings', onClick: () => console.log('View all') }
+            ],
+            emptyState: {
+              icon: PhoneIcon,
+              message: 'No call recordings available yet.',
+              action: {
+                label: 'Make a call',
+                onClick: () => {
+                  const phone = selectedDeal?.phone || selectedDeal?.rawData?.phone || relatedLead?.phone;
+                  if (phone) {
+                    handleCallClick(selectedDeal);
+                  }
+                }
+              }
+            }
+          },
+          {
+            id: 'notes',
+            title: 'Notes',
+            icon: FileText,
+            collapsible: true,
+            defaultExpanded: true,
+            count: 0,
+            emptyState: {
+              icon: FileText,
+              message: 'No notes added yet.',
+              action: {
+                label: 'Add note',
+                onClick: () => console.log('Add note')
+              }
+            }
+          },
+          {
+            id: 'follow-ups',
+            title: 'Follow-ups',
+            icon: History,
+            collapsible: true,
+            defaultExpanded: true,
+            badge: {
+              value: dealFollowUps?.length ?? 0,
+              variant: 'secondary'
+            },
+            ...(dealFollowUps?.length
+              ? {
+                  customContent: (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {(dealFollowUps || []).map((fu: any) => (
+                        <div
+                          key={fu.id}
+                          style={{
+                            padding: '12px',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            fontSize: '13px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                              {fu.follow_up_date ? moment(fu.follow_up_date).format(GlobalDateFormat) : '-'}
+                            </span>
+                            <span style={{ color: '#64748b', fontSize: '12px' }}>
+                              {fu.communication_channel || fu.communication_channel_other || '-'}
+                            </span>
+                          </div>
+                          {fu.follow_up_status && (
+                            <div style={{ marginBottom: '4px', color: '#475569' }}>
+                              <span style={{ color: '#94a3b8' }}>Status: </span>{fu.follow_up_status}
+                            </div>
+                          )}
+                          {fu.notes && (
+                            <div style={{ color: '#475569', lineHeight: 1.4 }}>
+                              {fu.notes.length > 120 ? `${fu.notes.slice(0, 120)}...` : fu.notes}
+                            </div>
+                          )}
+                          <div style={{ marginTop: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-0"
+                              title="Edit"
+                              
+                              onClick={() => {
+                                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                                if (dealId) {
+                                  setFollowupData({
+                                    dealId: Number(dealId),
+                                    dealName: selectedDeal?.name || '',
+                                    followUpDate: fu.follow_up_date ? moment(fu.follow_up_date).format('YYYY-MM-DD') : '',
+                                    followUpStatus: fu.follow_up_status || 'Pending',
+                                    communicationChannel: fu.communication_channel || 'Phone Call',
+                                    communicationChannelOther: fu.communication_channel_other || '',
+                                    notes: fu.notes || '',
+                                    userExtension: (session?.user as any)?.extension || '',
+                                  });
+                                  setFollowUpIdToEdit(fu.id);
+                                  setShowAddFollowupModal(true);
+                                }
+                              }}
+                            >
+                              <Edit size={14} className="me-1" />
+                            </Button>
+
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-0 text-danger"
+                              title="Delete"
+                              onClick={() => {
+                                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                                if (dealId) {
+                                  setFollowUpToDelete({
+                                    dealId: Number(dealId),
+                                    followUpId: fu.id,
+                                    label: fu.follow_up_date ? moment(fu.follow_up_date).format(GlobalDateFormat) : 'Follow-up',
+                                  });
+                                  setShowDeleteFollowUpModal(true);
+                                }
+                              }}
+                            >
+                              <Trash size={14} className="me-1" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        style={{ alignSelf: 'flex-start', marginTop: '4px' }}
+                        onClick={() => {
+                          const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                          if (dealId) {
+                            setFollowupData({
+                              dealId: Number(dealId),
+                              dealName: selectedDeal?.name || '',
+                              followUpDate: '',
+                              followUpStatus: 'Pending',
+                              communicationChannel: 'Phone Call',
+                              communicationChannelOther: '',
+                              notes: '',
+                              userExtension: (session?.user as any)?.extension || '',
+                            });
+                            setFollowUpIdToEdit(null);
+                            setShowAddFollowupModal(true);
+                          }
+                        }}
+                      >
+                        <Plus size={14} className="me-1" /> Add Follow Up
+                      </Button>
+                    </div>
+                  )
+                }
+              : {
+                  emptyState: {
+                    icon: History,
+                    message: 'No follow-ups yet',
+                    action: {
+                      label: 'Add Follow Up',
+                      onClick: () => {
+                        const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
+                        if (dealId) {
+                          setFollowupData({
+                            dealId: Number(dealId),
+                            dealName: selectedDeal?.name || '',
+                            followUpDate: '',
+                            followUpStatus: 'Pending',
+                            communicationChannel: 'Phone Call',
+                            communicationChannelOther: '',
+                            notes: '',
+                            userExtension: (session?.user as any)?.extension || '',
+                          });
+                          setFollowUpIdToEdit(null);
+                          setShowAddFollowupModal(true);
+                        }
+                      }
+                    }
+                  }
+                })
+          }
+        ]}
+      />
+      )}
       </div>
 
       {/* Delete Deal Modal */}
@@ -5401,493 +5897,6 @@ const handleCloseEditModal = useCallback(() => {
           </Button>
         </Modal.Footer>
       </Modal>
-
-      {/* Deal Sidebar */}
-      <GenericSidebar
-        isOpen={showDealSidebar}
-        onClose={() => {
-          setShowDealSidebar(false);
-          setSelectedDeal(null);
-        }}
-        moduleSlug={ModuleSlug.CRM_DEALS}
-        title={selectedDeal?.name || 'Deal Details'}
-        subtitle={selectedDeal?.company || selectedDeal?.company_name || ''}
-        metadata={selectedDeal?.id ? `Deal ID: ${selectedDeal.id}` : ''}
-        avatar={{
-          name: selectedDeal?.name || 'Deal',
-          useIcon: true
-        }}
-        contextPayload={
-          selectedDeal
-            ? (() => {
-                const { follow_ups, meetings, audit_trail, ...dealRest } = selectedDeal ?? {};
-                const dealForPayload = selectedDeal ? { ...dealRest } : undefined;
-                return { deal: dealForPayload };
-              })()
-            : undefined
-        }
-        width="420px"
-        tabs={[
-          {
-            id: 'general',
-            label: 'General Information',
-            sections: [
-              {
-                id: 'deal-info',
-                title: 'Deal Information',
-                icon: Handshake,
-                fields: [
-                  {
-                    label: 'Deal Name',
-                    value: selectedDeal?.name || 'N/A',
-                    type: 'text' as const
-                  },
-                  {
-                    label: 'Stage',
-                    value: typeof selectedDeal?.stage === 'string' 
-                      ? selectedDeal.stage 
-                      : (selectedDeal?.stage?.name || selectedDeal?.rawData?.stage?.name || 'N/A'),
-                    type: 'badge' as const,
-                    badgeVariant: 'primary'
-                  },
-                  {
-                    label: 'Deal Value',
-                    value: selectedDeal?.value 
-                      ? `${selectedDeal?.currency || 'AED'} ${parseFloat(String(selectedDeal.value)).toLocaleString()}`
-                      : 'N/A',
-                    type: 'text' as const,
-                    icon: DollarSign
-                  },
-                  {
-                    label: 'Probability',
-                    value: selectedDeal?.probability ? `${selectedDeal.probability}%` : 'N/A',
-                    type: 'text' as const
-                  },
-                  {
-                    label: 'Deal Type',
-                    value: selectedDeal?.dealType || selectedDeal?.deal_type || 'N/A',
-                    type: 'badge' as const,
-                    badgeVariant: 'info',
-                    show: !!(selectedDeal?.dealType || selectedDeal?.deal_type)
-                  },
-                  {
-                    label: 'Assigned To',
-                    value: selectedDeal?.assignedUser || 'Unassigned',
-                    type: 'text' as const,
-                    icon: User
-                  },
-                  {
-                    label: 'Created Date',
-                    value: selectedDeal?.created || selectedDeal?.created_at,
-                    type: 'date' as const,
-                    icon: Calendar
-                  },
-                  {
-                    label: 'Expected Close Date',
-                    value: selectedDeal?.closeDate || selectedDeal?.expected_close_date,
-                    type: 'date' as const,
-                    show: !!(selectedDeal?.closeDate || selectedDeal?.expected_close_date)
-                  },
-                  {
-                    label: 'Risk Level',
-                    value: selectedDeal?.riskLevel || selectedDeal?.risk_level || 'N/A',
-                    type: 'badge' as const,
-                    badgeVariant: selectedDeal?.riskLevel === 'High' || selectedDeal?.risk_level === 'High' ? 'danger' : 
-                                 selectedDeal?.riskLevel === 'Medium' || selectedDeal?.risk_level === 'Medium' ? 'warning' : 'success',
-                    show: !!(selectedDeal?.riskLevel || selectedDeal?.risk_level)
-                  },
-                  {
-                    label: 'Follow-ups',
-                    value: `${selectedDeal?.follow_ups?.length ?? (selectedDeal?.follow_up_date ? 1 : 0)} follow-up(s)`,
-                    type: 'text' as const,
-                    icon: History,
-                    show: true
-                  }
-                ]
-              },
-              {
-                id: 'client-info',
-                title: 'Client Information',
-                icon: Building2,
-                fields: [
-                  {
-                    label: 'Client Name',
-                    value: selectedDeal?.company || selectedDeal?.company_name || 'N/A',
-                    type: 'text' as const,
-                    icon: Building2
-                  },
-                  {
-                    label: 'Industry',
-                    value: selectedDeal?.industry || 'N/A',
-                    type: 'text' as const,
-                    show: !!selectedDeal?.industry
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            id: 'campaign-prospect',
-            label: 'Campaign & Prospect',
-            sections: [
-              {
-                id: 'campaign-info',
-                title: 'Campaign Information',
-                icon: Target,
-                emptyState: {
-                  icon: Target,
-                  message: 'No campaign information available'
-                }
-              },
-              {
-                id: 'prospect-info',
-                title: 'Prospect Information',
-                icon: User,
-                emptyState: {
-                  icon: User,
-                  message: 'No prospect information available'
-                }
-              },
-              {
-                id: 'prospect-fields',
-                title: 'Prospect Fields',
-                icon: FileText,
-                emptyState: {
-                  icon: FileText,
-                  message: 'No prospect fields available'
-                }
-              },
-              {
-                id: 'follow-ups',
-                title: 'Follow-ups',
-                icon: History,
-                badge: {
-                  value: dealFollowUps?.length ?? 0,
-                  variant: 'secondary'
-                },
-                ...(dealFollowUps?.length
-                  ? {
-                      customContent: (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {(dealFollowUps || []).map((fu: any) => (
-                            <div
-                              key={fu.id}
-                              style={{
-                                padding: '12px',
-                                backgroundColor: '#f8fafc',
-                                borderRadius: '8px',
-                                border: '1px solid #e2e8f0',
-                                fontSize: '13px'
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                <span style={{ fontWeight: 600, color: '#1e293b' }}>
-                                  {fu.follow_up_date ? moment(fu.follow_up_date).format(GlobalDateFormat) : '-'}
-                                </span>
-                                <span style={{ color: '#64748b', fontSize: '12px' }}>
-                                  {fu.communication_channel || fu.communication_channel_other || '-'}
-                                </span>
-                              </div>
-                              {fu.follow_up_status && (
-                                <div style={{ marginBottom: '4px', color: '#475569' }}>
-                                  <span style={{ color: '#94a3b8' }}>Status: </span>{fu.follow_up_status}
-                                </div>
-                              )}
-                              {fu.notes && (
-                                <div style={{ color: '#475569', lineHeight: 1.4 }}>
-                                  {fu.notes.length > 120 ? `${fu.notes.slice(0, 120)}...` : fu.notes}
-                                </div>
-                              )}
-                              <div style={{ marginTop: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-0"
-                                  title="Edit"
-                                  
-                                  onClick={() => {
-                                    const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
-                                    if (dealId) {
-                                      setFollowupData({
-                                        dealId: Number(dealId),
-                                        dealName: selectedDeal?.name || '',
-                                        followUpDate: fu.follow_up_date ? moment(fu.follow_up_date).format('YYYY-MM-DD') : '',
-                                        followUpStatus: fu.follow_up_status || 'Pending',
-                                        communicationChannel: fu.communication_channel || 'Phone Call',
-                                        communicationChannelOther: fu.communication_channel_other || '',
-                                        notes: fu.notes || '',
-                                        userExtension: (session?.user as any)?.extension || '',
-                                      });
-                                      setFollowUpIdToEdit(fu.id);
-                                      setShowAddFollowupModal(true);
-                                    }
-                                  }}
-                                >
-                                  <Edit size={14} className="me-1" />
-                                </Button>
-
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-0 text-danger"
-                                  title="Delete"
-                                  onClick={() => {
-                                    const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
-                                    if (dealId) {
-                                      setFollowUpToDelete({
-                                        dealId: Number(dealId),
-                                        followUpId: fu.id,
-                                        label: fu.follow_up_date ? moment(fu.follow_up_date).format(GlobalDateFormat) : 'Follow-up',
-                                      });
-                                      setShowDeleteFollowUpModal(true);
-                                    }
-                                  }}
-                                >
-                                  <Trash size={14} className="me-1" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                          <Button
-                            variant="outline-primary"
-                            size="sm"
-                            style={{ alignSelf: 'flex-start', marginTop: '4px' }}
-                            onClick={() => {
-                              const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
-                              if (dealId) {
-                                setFollowupData({
-                                  dealId: Number(dealId),
-                                  dealName: selectedDeal?.name || '',
-                                  followUpDate: '',
-                                  followUpStatus: 'Pending',
-                                  communicationChannel: 'Phone Call',
-                                  communicationChannelOther: '',
-                                  notes: '',
-                                  userExtension: (session?.user as any)?.extension || '',
-                                });
-                                setFollowUpIdToEdit(null);
-                                setShowAddFollowupModal(true);
-                              }
-                            }}
-                          >
-                            <Plus size={14} className="me-1" /> Add Follow Up
-                          </Button>
-                        </div>
-                      )
-                    }
-                  : {
-                      emptyState: {
-                        icon: History,
-                        message: 'No follow-ups yet',
-                        action: {
-                          label: 'Add Follow Up',
-                          onClick: () => {
-                            const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
-                            if (dealId) {
-                              setFollowupData({
-                                dealId: Number(dealId),
-                                dealName: selectedDeal?.name || '',
-                                followUpDate: '',
-                                followUpStatus: 'Pending',
-                                communicationChannel: 'Phone Call',
-                                communicationChannelOther: '',
-                                notes: '',
-                                userExtension: (session?.user as any)?.extension || '',
-                              });
-                              setFollowUpIdToEdit(null);
-                              setShowAddFollowupModal(true);
-                            }
-                          }
-                        }
-                      }
-                    })
-              },
-              {
-                id: 'meetings',
-                title: 'Meetings',
-                icon: Calendar,
-                badge: {
-                  value: dealMeetings?.length ?? 0,
-                  variant: 'secondary'
-                },
-                ...(dealMeetings?.length
-                  ? {
-                      customContent: (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {(dealMeetings || []).map((m: any) => (
-                            <div
-                              key={m.id}
-                              style={{
-                                padding: '12px',
-                                backgroundColor: '#f8fafc',
-                                borderRadius: '8px',
-                                border: '1px solid #e2e8f0',
-                                fontSize: '13px'
-                              }}
-                            >
-                              <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: '6px' }}>
-                                {m.name || 'Meeting'}
-                              </div>
-                              <div style={{ color: '#64748b', marginBottom: '4px' }}>
-                                {m.meeting_date ? moment(m.meeting_date).format(GlobalDateFormat) : '-'}
-                                {m.meeting_time && ` at ${m.meeting_time}`}
-                              </div>
-                              <div style={{ color: '#475569', marginBottom: '4px' }}>
-                                <span style={{ color: '#94a3b8' }}>Type: </span>
-                                {m.meeting_type || '-'}
-                              </div>
-                              {m.meeting_outcome && (
-                                <div style={{ color: '#475569', marginBottom: '4px' }}>
-                                  <span style={{ color: '#94a3b8' }}>Outcome: </span>
-                                  {m.meeting_outcome}
-                                </div>
-                              )}
-                              {m.extensions?.length > 0 && (
-                                <div style={{ color: '#475569', marginBottom: '4px' }}>
-                                  <span style={{ color: '#94a3b8' }}>Attendees: </span>
-                                  {m.extensions.map((ext: any) => {
-                                    const user = extensions.find((e: any) => String(e?.extension) === String(ext?.extension) || String(e?.id) === String(ext?.extension));
-                                    return user?.display_name || user?.name || ext?.extension || '';
-                                  }).filter(Boolean).join(', ')}
-                                </div>
-                              )}
-                              <div style={{ marginTop: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-0"
-                                  title="Edit"
-                                  onClick={() => {
-                                    const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
-                                    if (dealId) {
-                                      const extList = Array.isArray(m.extensions) ? m.extensions : [];
-                                      const attendees = extList.map((ext: any) => {
-                                        const user = extensions.find((e: any) =>
-                                          String(e?.extension) === String(ext?.extension) || String(e?.id) === String(ext?.extension) || String(e?.id) === String(ext?.id)
-                                        );
-                                        return {
-                                          value: user?.id ?? ext.extension ?? ext.id,
-                                          label: (user?.display_name || user?.name || ext.extension) ?? String(ext?.id ?? '')
-                                        };
-                                      }).filter((a: any) => a.value != null);
-                                      setMeetingData({
-                                        dealId: Number(dealId),
-                                        dealName: selectedDeal?.name || '',
-                                        meetingName: m.name || '',
-                                        meetingType: m.meeting_type || 'Online',
-                                        meetingDate: m.meeting_date ? moment(m.meeting_date).format('YYYY-MM-DD') : '',
-                                        meetingTime: m.meeting_time || '',
-                                        meetingOutcome: m.meeting_outcome || '',
-                                        extensions: extList
-                                      });
-                                      setMeetingAttendees(attendees.length > 0 ? attendees : []);
-                                      setMeetingIdToEdit(m.id);
-                                      setShowAddMeetingModal(true);
-                                    }
-                                  }}
-                                >
-                                  <Edit size={14} className="me-1" />
-                                </Button>
-
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-0 text-danger"
-                                  title="Delete"
-                                  onClick={() => {
-                                    const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
-                                    handleDeleteMeeting(m.id, m.name, dealId ? Number(dealId) : undefined);
-                                  }}
-                                >
-                                  <Trash size={14} className="me-1" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-
-                          {dealMeetings.length > 0 && (
-                             <Button
-                             variant="outline-primary"
-                             size="sm"
-                             style={{ alignSelf: 'flex-start', marginTop: '4px' }}
-                             onClick={() => {
-                                const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
-                                if (dealId) {
-                                  setMeetingData({
-                                    dealId: dealId,
-                                    dealName: selectedDeal?.name || '',
-                                    meetingName: '',
-                                    meetingType: 'Online',
-                                    meetingDate: '',
-                                    meetingTime: '',
-                                    meetingOutcome: '',
-                                    extensions: []
-                                  });
-                                  setMeetingAttendees([]);
-                                  setShowAddMeetingModal(true);
-                                }
-                            }}
-                           >
-                             <Plus size={14} className="me-1" /> Add Meeting
-                           </Button>
-                          )}
-                         
-                        </div>
-                      )
-                    }
-                  : {
-                      emptyState: {
-                        icon: Calendar,
-                        message: 'No meetings scheduled yet',
-                        action: {
-                          label: 'Schedule Meeting',
-                          onClick: () => {
-                            const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
-                            if (dealId) {
-                              setMeetingData({
-                                dealId: dealId,
-                                dealName: selectedDeal?.name || '',
-                                meetingName: '',
-                                meetingType: 'Online',
-                                meetingDate: '',
-                                meetingTime: '',
-                                meetingOutcome: '',
-                                extensions: []
-                              });
-                              setMeetingAttendees([]);
-                              setShowAddMeetingModal(true);
-                            }
-                          }
-                        }
-                      }
-                    })
-              }
-            ]
-          }
-        ]}
-        actions={[
-          {
-            label: 'Edit Deal',
-            icon: Edit,
-            onClick: () => {
-              setShowDealSidebar(false);
-              window.location.href = `/crm/deals/${selectedDeal?.id || selectedDeal?.rawData?.id}/edit`;
-            },
-            variant: 'primary',
-            show: session?.user?.permissions?.includes('edit-crm-deals') && activeFilter !== 'lost'
-          },
-          {
-            label: 'View History',
-            icon: History,
-            onClick: () => {
-              setShowDealSidebar(false);
-              handleViewDeal(selectedDeal?.id || selectedDeal?.rawData?.id);
-              setShowDealHistoryModal(true);
-            },
-            variant: 'outline-primary'
-          }
-        ]}
-      />
 
       {/* Filters Sidebar */}
       <GenericFilterSidebar

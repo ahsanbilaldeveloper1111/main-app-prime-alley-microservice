@@ -12,7 +12,7 @@ import React, {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, TableAction, TabConfig } from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebar";
+import GenericSidebar from '@components/GenericSidebarNew';
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import {
   getLeads,
@@ -89,6 +89,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Mail,
+  Phone as PhoneIcon,
   Phone,
   ChartLine,
   Building2,
@@ -100,7 +101,7 @@ import {
   UserCheck,
   AlertCircle,
   RotateCcw,
- 
+  CheckSquare,
 } from "lucide-react";
 import {
   PieChart,
@@ -134,7 +135,6 @@ import {
   FiMoreVertical,
   FiPlus,
 } from "react-icons/fi";
-import Link from "next/link";
 import { toast } from "react-toastify";
 import moment from "moment";
 
@@ -145,7 +145,7 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import { useCti } from "../../../contexts/CtiContext";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import type { StatsCardData } from "@components/GenericStatsCards";
 import CreateLeadModal from "@components/CreateLeadModal";
 
 import ConvertToDealModal from "@components/ConvertToDealModal";
@@ -1126,7 +1126,34 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       console.error("Failed to fetch lead:", error);
       toast.error("Failed to load lead details");
     }
-  }, []);
+  }, [fetchLeadFollowUps, fetchMeetings]);
+
+  // Handle preview button click - shows sidebar
+  const handlePreviewClick = useCallback(async (lead: LeadData) => {
+    const leadId = lead.rawData?.id || lead.id;
+    // Set the lead immediately to show sidebar
+    setSelectedLead(lead.rawData || lead);
+    setShowLeadSidebar(true);
+    
+    // Fetch additional data (follow-ups, meetings) in the background
+    if (leadId) {
+      try {
+        await fetchLeadFollowUps(leadId);
+        await fetchMeetings(leadId);
+        // Optionally refresh the lead data to get latest info
+        const leadData: any = await getLead(leadId);
+        setSelectedLead(leadData);
+      } catch (error) {
+        console.error("Failed to fetch lead details:", error);
+        // Don't show error toast as sidebar is already open with basic data
+      }
+    }
+  }, [fetchLeadFollowUps, fetchMeetings]);
+
+  // Handle first column click - navigates to detail page
+  const handleFirstColumnClick = useCallback((lead: LeadData) => {
+    router.push('/crm/leads/leads-detailpage');
+  }, [router]);
 
   const fetchStages = async () => {
     try {
@@ -1505,6 +1532,36 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       toast.error("Failed to make call");
     }
   }, [dialNumber, isInitialized]);
+
+  // Helper function to get name by extension
+  function getNameByExtension(extension: string) {
+    const extensionData = extensions.find((ext) => ext.id === extension || ext.extension === extension);
+    return extensionData?.display_name || extensionData?.name || extension;
+  }
+
+  // Handle note creation
+  const handleNoteCreate = useCallback((note: string, createTask: boolean, taskDueDate?: string) => {
+    console.log('Note created:', {
+      leadId: selectedLead?.id || selectedLead?.rawData?.id,
+      note,
+      createTask,
+      taskDueDate
+    });
+    
+    // Here you would typically:
+    // 1. Save the note to your backend/database
+    // 2. If createTask is true, create a task with the due date
+    // 3. Update the UI to show the new note
+    // 4. Maybe refresh the notes section
+    
+    toast.success(`Note saved successfully!${createTask ? ' Task created.' : ''}`);
+  }, [selectedLead]);
+
+  // Handle close lead sidebar
+  const handleCloseLeadSidebar = useCallback(() => {
+    setShowLeadSidebar(false);
+    setSelectedLead(null);
+  }, []);
 
   const handleDeleteLead = useCallback((leadId: number, leadName?: string) => {
     setLeadToDelete({ id: leadId, name: leadName });
@@ -2568,6 +2625,68 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     return { total, qualified, hot, stageCounts, potentialCounts };
   }, [leadsData, extensions, summaryTiles, totalLeads]);
 
+  // Stats cards data for metrics
+  const leadsStatsCards: StatsCardData[] = useMemo(() => [
+    {
+      title: 'All Leads',
+      value: summaryTiles?.total_leads || totalLeads || 0,
+      icon: Users,
+      iconColor: '#6366F1',
+      iconBgColor: '#EEF2FF',
+      subtitle: 'Total in system'
+    },
+    {
+      title: 'New',
+      value: summaryTiles?.new_leads || analyticsData.stageCounts['New'] || 0,
+      icon: UserCheck,
+      iconColor: '#3B82F6',
+      iconBgColor: '#DBEAFE',
+      metric: {
+        text: 'Fresh leads',
+        dotColor: '#2563EB'
+      }
+    },
+    {
+      title: 'Qualified',
+      value: summaryTiles?.qualified_leads || analyticsData.stageCounts['Qualified'] || 0,
+      icon: CheckCircle,
+      iconColor: '#10B981',
+      iconBgColor: '#D1FAE5',
+      subtitle: 'Verified & ready'
+    },
+    {
+      title: 'Proposal',
+      value: analyticsData.stageCounts['Proposal'] || 0,
+      icon: FileText,
+      iconColor: '#8B5CF6',
+      iconBgColor: '#EDE9FE',
+      metric: {
+        text: 'In review',
+        dotColor: '#7C3AED'
+      }
+    },
+    {
+      title: 'Negotiation',
+      value: analyticsData.stageCounts['Negotiation'] || 0,
+      icon: Handshake,
+      iconColor: '#F59E0B',
+      iconBgColor: '#FEF3C7',
+      subtitle: 'Active discussions'
+    },
+    {
+      title: 'Closed Won',
+      value: analyticsData.stageCounts['Closed Won'] || analyticsData.stageCounts['Won'] || 0,
+      icon: Target,
+      iconColor: '#059669',
+      iconBgColor: '#D1FAE5',
+      badge: {
+        text: 'Success',
+        bgColor: '#D1FAE5',
+        textColor: '#065F46'
+      }
+    }
+  ], [summaryTiles, totalLeads, analyticsData]);
+
   // Custom select styles
   const customSelectStyles = {
     control: (provided: any, state: any) => ({
@@ -2825,42 +2944,24 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
     });
   }
 
+  // Add Change Stage and Lost actions (only when not viewing lost leads)
   if (activeFilter !== 'lost') {
-    actions.push({
-      label: 'More Actions',
-      icon: <MoreVertical size={16} />,
-      onClick: () => {},
-      render: (lead: LeadData) => (
-        <Dropdown className="d-inline">
-          <Dropdown.Toggle
-            as={Button}
-            variant="link"
-            size="sm"
-            className="p-1"
-            title="More Actions"
-          >
-            <MoreVertical size={16} />
-          </Dropdown.Toggle>
-          <Dropdown.Menu align="end">
-            {session?.user?.permissions?.includes('edit-crm-leads') && (
-              <Dropdown.Item onClick={() => handleChangeStage(lead.rawData || lead)}>
-                <GitBranch size={14} className="me-2" />
-                Change Stage
-              </Dropdown.Item>
-            )}
-            {session?.user?.permissions?.includes('mark-as-lost-crm-leads') && (
-              <Dropdown.Item
-                className="text-danger"
-                onClick={() => handleMarkLost(lead.rawData || lead)}
-              >
-                <X size={14} className="me-2" />
-                Lost
-              </Dropdown.Item>
-            )}
-          </Dropdown.Menu>
-        </Dropdown>
-      )
-    });
+    if (session?.user?.permissions?.includes('edit-crm-leads')) {
+      actions.push({
+        label: 'Change Stage',
+        icon: <GitBranch size={16} />,
+        onClick: (lead: LeadData) => handleChangeStage(lead.rawData || lead)
+      });
+    }
+    
+    if (session?.user?.permissions?.includes('mark-as-lost-crm-leads')) {
+      actions.push({
+        label: 'Lost',
+        icon: <X size={16} />,
+        onClick: (lead: LeadData) => handleMarkLost(lead.rawData || lead),
+        className: 'text-danger'
+      });
+    }
   }
 
   return actions;
@@ -3085,71 +3186,6 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         )}
 
         <div className="container-fluid">
-        {/* Stats Cards */}
-        <StatsCards 
-          data={[
-            {
-              title: 'All Leads',
-              value: summaryTiles?.total_leads || totalLeads || 0,
-              icon: Users,
-              iconColor: '#6366F1',
-              iconBgColor: '#EEF2FF',
-              subtitle: 'Total in system'
-            },
-            {
-              title: 'New',
-              value: summaryTiles?.new_leads || analyticsData.stageCounts['New'] || 0,
-              icon: UserCheck,
-              iconColor: '#3B82F6',
-              iconBgColor: '#DBEAFE',
-              metric: {
-                text: 'Fresh leads',
-                dotColor: '#2563EB'
-              }
-            },
-            {
-              title: 'Qualified',
-              value: summaryTiles?.qualified_leads || analyticsData.stageCounts['Qualified'] || 0,
-              icon: CheckCircle,
-              iconColor: '#10B981',
-              iconBgColor: '#D1FAE5',
-              subtitle: 'Verified & ready'
-            },
-            {
-              title: 'Proposal',
-              value: analyticsData.stageCounts['Proposal'] || 0,
-              icon: FileText,
-              iconColor: '#8B5CF6',
-              iconBgColor: '#EDE9FE',
-              metric: {
-                text: 'In review',
-                dotColor: '#7C3AED'
-              }
-            },
-            {
-              title: 'Negotiation',
-              value: analyticsData.stageCounts['Negotiation'] || 0,
-              icon: Handshake,
-              iconColor: '#F59E0B',
-              iconBgColor: '#FEF3C7',
-              subtitle: 'Active discussions'
-            },
-            {
-              title: 'Closed Won',
-              value: analyticsData.stageCounts['Closed Won'] || analyticsData.stageCounts['Won'] || 0,
-              icon: Target,
-              iconColor: '#059669',
-              iconBgColor: '#D1FAE5',
-              badge: {
-                text: 'Success',
-                bgColor: '#D1FAE5',
-                textColor: '#065F46'
-              }
-            }
-          ]}
-          gridMinWidth="180px"
-        />
-
         {/* Filter Bar */}
         {showFilterBar && (
           <FilterBar
@@ -3572,6 +3608,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           data={filteredLeads}
           columns={leadsColumns}
           actions={leadsActions}
+          showActions={false}
           pagination={{
             currentPage: leadsPagination.currentPage,
             rowsPerPage: leadsPagination.rowsPerPage,
@@ -3602,9 +3639,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           ]}
           columnStorageKey="leadsSelectedColumns"
           onColumnChange={(cols) => setSelectedLeadsColumns(cols)}
-          onRowClick={(lead) => {
-            handleRowClicked(lead.rawData?.id || lead.id);
-          }}
+          onPreviewClick={(lead) => handlePreviewClick(lead)}
+          onFirstColumnClick={(lead) => handleFirstColumnClick(lead)}
           onRowDoubleClick={(lead) => {
             if (session?.user?.permissions?.includes("list-crm-leads")) {
               handleViewLead(lead.rawData?.id || lead.id);
@@ -3664,6 +3700,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             tableViewLabel: "Table view",
             showViewSwitcher: true,
             showEditColumns: true,
+            showPipelineDropdown: true,
+            pipelineLabel: "All Pipelines",
             showFiltersButton: true,
             onFiltersClick: handleOpenFiltersSidebar,
             showSortButton: true,
@@ -3776,6 +3814,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
 
             // Right-aligned custom actions
             rightActions: session?.user?.permissions?.includes("add-crm-leads") ? (
+              <div style={{ position: 'absolute', right: '40px', top: '18px', width: 'auto' }}>
               <button
                 onClick={() => setShowCreateLeadModal(true)}
                 style={{
@@ -3800,12 +3839,303 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               >
                 Add Lead
               </button>
+              </div>
             ) : undefined
           }}
+          statsCards={leadsStatsCards}
         />
         </div>
         </div>
         </div>
+
+        {/* Lead Details Sidebar */}
+        {showLeadSidebar && (
+        <GenericSidebar
+          isOpen={showLeadSidebar}
+          onClose={handleCloseLeadSidebar}
+          title={selectedLead?.name || 'Lead Details'}
+          subtitle={selectedLead?.phone || selectedLead?.rawData?.phone || ''}
+          email={selectedLead?.email || selectedLead?.rawData?.email}
+          phone={selectedLead?.phone || selectedLead?.rawData?.phone}
+          avatar={{
+            initials: getInitials(selectedLead?.name || 'NA'),
+            name: selectedLead?.name || 'NA',
+            gradient: getRandomColor(selectedLead?.name || '')
+          }}
+          onNoteCreate={handleNoteCreate}
+          breezeRecordSummary={{
+            content: `This lead was created on ${selectedLead?.created_at ? moment(selectedLead.created_at).format('MMMM DD, YYYY') : 'recent date'}. ${selectedLead?.stage?.name ? `Currently in ${selectedLead.stage.name} stage.` : ''} ${selectedLead?.lead_potential || selectedLead?.leadPotential ? `Lead potential: ${selectedLead.lead_potential || selectedLead.leadPotential}.` : ''} ${selectedLead?.company_name || selectedLead?.company ? `Company: ${selectedLead.company_name || selectedLead.company}.` : ''}`,
+            timestamp: selectedLead?.updated_at ? `Generated on ${moment(selectedLead.updated_at).format('MMM DD, YYYY [at] h:mm A')}` : 'Generated recently',
+            onRefresh: () => console.log('Refresh AI summary'),
+            onThumbsUp: () => console.log('Thumbs up'),
+            onThumbsDown: () => console.log('Thumbs down'),
+            onCopy: () => {
+              const summaryText = `This lead was created on ${selectedLead?.created_at ? moment(selectedLead.created_at).format('MMMM DD, YYYY') : 'recent date'}. ${selectedLead?.stage?.name ? `Currently in ${selectedLead.stage.name} stage.` : ''} ${selectedLead?.lead_potential || selectedLead?.leadPotential ? `Lead potential: ${selectedLead.lead_potential || selectedLead.leadPotential}.` : ''} ${selectedLead?.company_name || selectedLead?.company ? `Company: ${selectedLead.company_name || selectedLead.company}.` : ''}`;
+              navigator.clipboard.writeText(summaryText);
+              toast.success('Summary copied to clipboard');
+            },
+            onAskQuestion: () => console.log('Ask AI a question')
+          }}
+          recordLink={{
+            label: 'View record',
+            onClick: () => {
+              const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+              if (leadId) {
+                router.push(`/crm/leads/${leadId}/edit`);
+              }
+            }
+          }}
+          actionsDropdown={{
+            label: 'Actions',
+            items: [
+              { 
+                label: 'Edit Lead', 
+                onClick: () => {
+                  const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                  if (leadId) {
+                    router.push(`/crm/leads/${leadId}/edit`);
+                  }
+                }
+              },
+              { 
+                label: 'Convert to Deal', 
+                onClick: () => {
+                  setShowLeadSidebar(false);
+                  handleConvertLead(selectedLead?.rawData || selectedLead);
+                }
+              },
+              { 
+                label: 'View History', 
+                onClick: () => {
+                  setShowLeadSidebar(false);
+                  const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                  if (leadId) {
+                    handleViewLead(leadId);
+                    setShowLeadHistoryModal(true);
+                  }
+                }
+              },
+              { 
+                label: 'Delete', 
+                onClick: () => {
+                  const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                  if (leadId) {
+                    handleDeleteLead(leadId, selectedLead?.name);
+                  }
+                }
+              }
+            ]
+          }}
+          quickActions={[
+            { 
+              id: 'note', 
+              label: 'Note', 
+              icon: FileText, 
+              onClick: () => {}, // This is handled internally now
+              disabled: false 
+            },
+            { 
+              id: 'call', 
+              label: 'Call', 
+              icon: Phone, 
+              onClick: () => {
+                const phone = selectedLead?.phone || selectedLead?.rawData?.phone;
+                if (phone) {
+                  handleCallClick(selectedLead);
+                }
+              },
+              disabled: !(selectedLead?.phone || selectedLead?.rawData?.phone)
+            },
+            { 
+              id: 'email', 
+              label: 'Email', 
+              icon: Mail, 
+              onClick: () => {},
+              disabled: !(selectedLead?.email || selectedLead?.rawData?.email)
+            },
+            { 
+              id: 'task', 
+              label: 'Task', 
+              icon: CheckSquare, 
+              onClick: () => {},
+              disabled: false 
+            },
+            { 
+              id: 'meeting', 
+              label: 'Meeting', 
+              icon: Calendar, 
+              onClick: () => {
+                const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                if (leadId) {
+                  setMeetingData({
+                    leadId: Number(leadId),
+                    leadName: selectedLead?.name || '',
+                    meetingName: '',
+                    meetingType: 'Online',
+                    meetingDate: '',
+                    meetingTime: '',
+                    meetingOutcome: '',
+                    extensions: []
+                  });
+                  setMeetingAttendees([]);
+                  setShowAddMeetingModal(true);
+                }
+              },
+              disabled: false 
+            },
+            { 
+              id: 'more', 
+              label: 'More', 
+              icon: MoreVertical, 
+              onClick: () => console.log('More actions'),
+              disabled: false 
+            }
+          ]}
+          sections={[
+            {
+              id: 'about-lead',
+              title: 'About this lead',
+              icon: Target,
+              collapsible: true,
+              defaultExpanded: true,
+              actions: [
+                { label: 'Edit all properties', onClick: () => {
+                  const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                  if (leadId) {
+                    router.push(`/crm/leads/${leadId}/edit`);
+                  }
+                }}
+              ],
+              fields: [
+                {
+                  label: 'Name',
+                  value: selectedLead?.name || 'N/A',
+                  copyable: true
+                },
+                {
+                  label: 'Phone',
+                  value: selectedLead?.phone || selectedLead?.rawData?.phone || 'N/A',
+                  type: 'phone',
+                  copyable: true,
+                  externalLink: (selectedLead?.phone || selectedLead?.rawData?.phone) ? `tel:${selectedLead?.phone || selectedLead?.rawData?.phone}` : undefined
+                },
+                {
+                  label: 'Email',
+                  value: selectedLead?.email || selectedLead?.rawData?.email || 'N/A',
+                  type: 'email',
+                  copyable: true,
+                  externalLink: (selectedLead?.email || selectedLead?.rawData?.email) ? `mailto:${selectedLead?.email || selectedLead?.rawData?.email}` : undefined,
+                  show: !!(selectedLead?.email || selectedLead?.rawData?.email)
+                },
+                {
+                  label: 'Company',
+                  value: selectedLead?.company_name || selectedLead?.company || 'N/A',
+                  copyable: true,
+                  show: !!(selectedLead?.company_name || selectedLead?.company)
+                },
+                {
+                  label: 'Stage',
+                  value: (selectedLead?.is_lost || selectedLead?.isLost) ? 'Lost' : (selectedLead?.stage?.name || selectedLead?.stage || 'N/A'),
+                  type: 'badge',
+                  badgeVariant: (selectedLead?.is_lost || selectedLead?.isLost) ? 'danger' : 'primary'
+                },
+                {
+                  label: 'Lead Potential',
+                  value: selectedLead?.lead_potential || selectedLead?.leadPotential || 'N/A',
+                  type: 'badge',
+                  badgeVariant: selectedLead?.lead_potential === 'Hot' || selectedLead?.leadPotential === 'Hot' 
+                    ? 'danger' 
+                    : selectedLead?.lead_potential === 'Warm' || selectedLead?.leadPotential === 'Warm'
+                    ? 'warning'
+                    : 'secondary'
+                },
+                {
+                  label: 'Assigned To',
+                  value: selectedLead?.assigned_user?.display_name || selectedLead?.assigned_user?.name || selectedLead?.assignedUser || 'Unassigned',
+                  hasDetails: true,
+                  onDetailsClick: () => console.log('Show user details')
+                },
+                {
+                  label: 'Lead Score',
+                  value: selectedLead?.stage?.score ? `${selectedLead.stage.score}%` : selectedLead?.lead_score ? `${selectedLead.lead_score}%` : 'N/A',
+                  show: !!(selectedLead?.stage?.score || selectedLead?.lead_score)
+                },
+                {
+                  label: 'Source',
+                  value: selectedLead?.source || 'N/A',
+                  show: !!selectedLead?.source
+                },
+                {
+                  label: 'Created Date',
+                  value: selectedLead?.created_at || selectedLead?.created ? moment(selectedLead.created_at || selectedLead.created).format('MMM DD, YYYY') : 'N/A',
+                  type: 'date'
+                },
+                {
+                  label: 'Last Updated',
+                  value: selectedLead?.updated_at || selectedLead?.last_activity_at ? moment(selectedLead.updated_at || selectedLead.last_activity_at).format('MMM DD, YYYY') : 'N/A',
+                  type: 'date'
+                }
+              ]
+            },
+            {
+              id: 'recent-activities',
+              title: 'Recent activities',
+              icon: History,
+              collapsible: true,
+              defaultExpanded: true,
+              count: 0,
+              emptyState: {
+                icon: History,
+                message: 'No recent activities for this lead.',
+                action: {
+                  label: 'Log activity',
+                  onClick: () => console.log('Log activity')
+                }
+              }
+            },
+            {
+              id: 'call-recordings',
+              title: 'Call Recordings',
+              icon: PhoneIcon,
+              collapsible: true,
+              defaultExpanded: true,
+              count: 0,
+              actions: [
+                { label: 'View all recordings', onClick: () => console.log('View all') }
+              ],
+              emptyState: {
+                icon: PhoneIcon,
+                message: 'No call recordings available yet.',
+                action: {
+                  label: 'Make a call',
+                  onClick: () => {
+                    const phone = selectedLead?.phone || selectedLead?.rawData?.phone;
+                    if (phone) {
+                      handleCallClick(selectedLead);
+                    }
+                  }
+                }
+              }
+            },
+            {
+              id: 'notes',
+              title: 'Notes',
+              icon: FileText,
+              collapsible: true,
+              defaultExpanded: true,
+              count: 0,
+              emptyState: {
+                icon: FileText,
+                message: 'No notes added yet.',
+                action: {
+                  label: 'Add note',
+                  onClick: () => console.log('Add note')
+                }
+              }
+            }
+          ]}
+        />
+        )}
       </div>
 
       {/* Delete Lead Modal */}
@@ -7794,464 +8124,6 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           )}
         </Modal.Footer>
       </Modal>
-
-      {/* Lead Details Sidebar */}
-      <GenericSidebar
-        isOpen={showLeadSidebar}
-        onClose={() => {
-          setShowLeadSidebar(false);
-          setSelectedLead(null);
-        }}
-        moduleSlug={ModuleSlug.CRM_LEADS}
-        onCall={handleSidebarCall}
-        title={selectedLead?.name || 'Lead Details'}
-        subtitle={selectedLead?.company_name || selectedLead?.company || ''}
-        metadata={selectedLead?.id ? `Lead ID: ${selectedLead.id}` : ''}
-        email={selectedLead?.email || selectedLead?.rawData?.email || ''}
-        phone={selectedLead?.phone || selectedLead?.rawData?.phone || ''}
-        completePhone={(() => {
-          const raw = selectedLead?.contact_persons;
-          if (!raw) return '';
-          let arr: Array<{ phone_country_code?: string; phone?: string }> = [];
-          if (typeof raw === 'string') {
-            try {
-              arr = JSON.parse(raw);
-            } catch {
-              return '';
-            }
-          } else if (Array.isArray(raw)) {
-            arr = raw;
-          }
-          const first = arr[0];
-          if (!first) return '';
-          const code = first.phone_country_code ?? '';
-          const num = first.phone ?? '';
-          return `${code}${num}`.trim();
-        })()}
-        avatar={{
-          name: selectedLead?.name || 'Lead',
-          useIcon: true
-        }}
-        contextPayload={
-          selectedLead
-            ? (() => {
-                const { follow_ups, meetings, audit_trail, ...leadRest } = selectedLead ?? {};
-                const leadForPayload = selectedLead ? { ...leadRest } : undefined;
-                return {
-                  lead: leadForPayload,
-                };
-              })()
-            : undefined
-        }
-        width="420px"
-        tabs={[
-          {
-            id: 'general',
-            label: 'General Information',
-            sections: [
-          {
-            id: 'lead-info',
-            title: 'Lead Information',
-            icon: Target,
-            fields: [
-              {
-                label: 'Lead Name',
-                value: selectedLead?.name || 'N/A'
-              },
-              {
-                label: 'Stage',
-                value: (selectedLead?.is_lost || selectedLead?.isLost) ? 'Lost' : (selectedLead?.stage?.name || selectedLead?.stage || 'N/A'),
-                type: 'badge',
-                badgeVariant: 'primary'
-              },
-              {
-                label: 'Lead Potential',
-                value: selectedLead?.lead_potential || selectedLead?.leadPotential || 'N/A',
-                type: 'badge',
-                badgeVariant: selectedLead?.lead_potential === 'Hot' || selectedLead?.leadPotential === 'Hot' 
-                  ? 'danger' 
-                  : selectedLead?.lead_potential === 'Warm' || selectedLead?.leadPotential === 'Warm'
-                  ? 'warning'
-                  : 'secondary'
-              },
-              {
-                label: 'Assigned To',
-                value: selectedLead?.assigned_user?.display_name || selectedLead?.assigned_user?.name || selectedLead?.assignedUser || 'Unassigned',
-                icon: User
-              },
-              {
-                label: 'Created Date',
-                value: selectedLead?.created_at || selectedLead?.created,
-                type: 'date',
-                icon: Calendar
-              },
-              {
-                label: 'Lead Score (Based on Stage)',
-                value: selectedLead?.stage?.score ? `${selectedLead.stage.score}%` : selectedLead?.lead_score ? `${selectedLead.lead_score}%` : 'N/A',
-                show: !!(selectedLead?.stage?.score || selectedLead?.lead_score)
-              },
-              {
-                label: 'Source',
-                value: selectedLead?.source || 'N/A',
-                show: !!selectedLead?.source
-              },
-              {
-                label: 'Last Activity',
-                value: selectedLead?.last_activity_at || selectedLead?.updated_at,
-                type: 'datetime',
-                show: !!(selectedLead?.last_activity_at || selectedLead?.updated_at)
-              },
-              {
-                label: 'Follow-ups',
-                value: `${selectedLead?.follow_ups?.length || 0} follow-up(s)`,
-                icon: History,
-                show: true
-              },
-              {
-                label: 'Meetings',
-                value: `${selectedLead?.meetings?.length || 0} meeting(s)`,
-                icon: Calendar,
-                show: true
-              }
-            ]
-          },
-          {
-            id: 'company-info',
-            title: 'Company Information',
-            icon: Building2,
-            fields: [
-              {
-                label: 'Company Name',
-                value: selectedLead?.company_name || selectedLead?.company || 'N/A'
-              },
-              {
-                label: 'Company Size',
-                value: selectedLead?.company_size || 'N/A',
-                show: !!selectedLead?.company_size
-              },
-              {
-                label: 'Location',
-                value: selectedLead?.location || 'N/A',
-                show: !!selectedLead?.location
-              }
-            ]
-          }
-            ]
-          },
-          {
-            id: 'campaign-prospects',
-            label: 'Campaign and Prospects',
-            sections: [
-              {
-                id: 'campaign-info',
-                title: 'Campaign Information',
-                icon: Target,
-                emptyState: {
-                  icon: Target,
-                  message: 'No campaign information available'
-                }
-              },
-              {
-                id: 'prospect-info',
-                title: 'Prospect Information',
-                icon: User,
-                emptyState: {
-                  icon: User,
-                  message: 'No prospect information available'
-                }
-              },
-              {
-                id: 'prospect-fields',
-                title: 'Prospect Fields',
-                icon: FileText,
-                emptyState: {
-                  icon: FileText,
-                  message: 'No prospect fields available'
-                }
-              },
-              {
-                id: 'follow-ups',
-                title: 'Follow-ups',
-                icon: History,
-                badge: {
-                  value: leadFollowUps?.length || 0,
-                  variant: 'secondary'
-                },
-                ...(leadFollowUps?.length
-                  ? {
-                      customContent: (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {(leadFollowUps || []).map((fu: any) => (
-                            <div
-                              key={fu.id}
-                              style={{
-                                padding: '12px',
-                                backgroundColor: '#f8fafc',
-                                borderRadius: '8px',
-                                border: '1px solid #e2e8f0',
-                                fontSize: '13px'
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                <span style={{ fontWeight: 600, color: '#1e293b' }}>
-                                  {fu.follow_up_date ? moment(fu.follow_up_date).format(GlobalDateFormat) : '-'}
-                                </span>
-                                <span style={{ color: '#64748b', fontSize: '12px' }}>
-                                  {fu.communication_channel || fu.communication_channel_other || '-'}
-                                </span>
-                              </div>
-                              {fu.follow_up_status && (
-                                <div style={{ marginBottom: '4px', color: '#475569' }}>
-                                  <span style={{ color: '#94a3b8' }}>Status: </span>{fu.follow_up_status}
-                                </div>
-                              )}
-                              {fu.notes && (
-                                <div style={{ color: '#475569', lineHeight: 1.4 }}>
-                                  {fu.notes.length > 120 ? `${fu.notes.slice(0, 120)}...` : fu.notes}
-                                </div>
-                              )}
-                              <div style={{ marginTop: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-0"
-                                  style={{ fontSize: '12px', color: '#6366f1' }}
-                                  onClick={() => {
-                                    const leadId = selectedLead?.id || selectedLead?.rawData?.id;
-                                    if (leadId) {
-                                      const followUpDate = fu.follow_up_date ? new Date(fu.follow_up_date).toISOString().split('T')[0] : '';
-                                      setFollowUpIdToEdit(fu.id);
-                                      setFollowupData({
-                                        leadId: Number(leadId),
-                                        leadName: selectedLead?.name || '',
-                                        followUpDate,
-                                        followUpStatus: fu.follow_up_status || 'Pending',
-                                        communicationChannel: fu.communication_channel || 'Phone Call',
-                                        communicationChannelOther: fu.communication_channel_other || '',
-                                        notes: fu.notes || '',
-                                        userExtension: (session?.user as any)?.extension || ''
-                                      });
-                                      setShowAddFollowupModal(true);
-                                    }
-                                  }}
-                                >
-                                  <Edit size={14} className="me-1" /> Edit
-                                </Button>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-0 text-danger"
-                                  title="Delete"
-                                  onClick={() => {
-                                    const leadId = selectedLead?.id || selectedLead?.rawData?.id;
-                                    if (leadId) {
-                                      handleDeleteFollowUp(Number(leadId), fu.id, selectedLead?.name);
-                                    }
-                                  }}
-                                >
-                                  <Trash2 size={14} className="me-1" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                          <Button
-                            variant="outline-primary"
-                            size="sm"
-                            style={{ alignSelf: 'flex-start', marginTop: '4px' }}
-                            onClick={() => {
-                              const leadId = selectedLead?.id || selectedLead?.rawData?.id;
-                              if (leadId) {
-                                setFollowupData({
-                                  leadId: Number(leadId),
-                                  leadName: selectedLead?.name || '',
-                                  followUpDate: '',
-                                  followUpStatus: 'Pending',
-                                  communicationChannel: 'Phone Call',
-                                  communicationChannelOther: '',
-                                  notes: '',
-                                  userExtension: ''
-                                });
-                                setShowAddFollowupModal(true);
-                              }
-                            }}
-                          >
-                            <Plus size={14} className="me-1" /> Add Follow Up
-                          </Button>
-                        </div>
-                      )
-                    }
-                  : {
-                      emptyState: {
-                        icon: History,
-                        message: 'No follow-ups yet',
-                        action: {
-                          label: 'Add Follow Up',
-                          onClick: () => {
-                            setFollowupData({
-                              leadId: selectedLead?.id || selectedLead?.rawData?.id || null,
-                              leadName: selectedLead?.name || '',
-                              followUpDate: '',
-                              followUpStatus: 'Pending',
-                              communicationChannel: 'Phone Call',
-                              communicationChannelOther: '',
-                              notes: '',
-                              userExtension: ''
-                            });
-                            setShowAddFollowupModal(true);
-                          }
-                        }
-                      }
-                    })
-              },
-              {
-                id: 'meetings',
-                title: 'Meetings',
-                icon: Calendar,
-                badge: {
-                  value: leadMeetings?.length || 0,
-                  variant: 'secondary'
-                },
-                ...(leadMeetings?.length
-                  ? {
-                      customContent: (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          {(leadMeetings || []).map((m: any) => (
-                            <div
-                              key={m.id}
-                              style={{
-                                padding: '12px',
-                                backgroundColor: '#f8fafc',
-                                borderRadius: '8px',
-                                border: '1px solid #e2e8f0',
-                                fontSize: '13px'
-                              }}
-                            >
-                              <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: '6px' }}>
-                                {m.name || 'Meeting'}
-                              </div>
-                              <div style={{ color: '#64748b', marginBottom: '4px' }}>
-                                {m.meeting_date ? moment(m.meeting_date).format(GlobalDateFormat) : '-'}
-                                {m.meeting_time && ` at ${m.meeting_time}`}
-                              </div>
-                              <div style={{ color: '#475569', marginBottom: '4px' }}>
-                                <span style={{ color: '#94a3b8' }}>Type: </span>
-                                {m.meeting_type || '-'}
-                              </div>
-                              {m.meeting_outcome && (
-                                <div style={{ color: '#475569', marginBottom: '4px' }}>
-                                  <span style={{ color: '#94a3b8' }}>Outcome: </span>
-                                  {m.meeting_outcome}
-                                </div>
-                              )}
-                              <div style={{ color: '#475569', marginBottom: '4px' }}>
-                                <span style={{ color: '#94a3b8' }}>Attendees: </span>
-                                {m.extensions?.map((ext: any) => {
-                                  const user = extensions.find((e: any) => String(e?.extension) === String(ext?.extension) || String(e?.id) === String(ext?.extension));
-                                  return user?.display_name || user?.name || ext?.extension || '';
-                                }).filter(Boolean).join(', ') || '-'}
-                              </div>
-                              <div style={{ marginTop: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-0 text-danger"
-                                  title="Delete"
-                                  onClick={() => {
-                                    const leadId = selectedLead?.id || selectedLead?.rawData?.id;
-                                    handleDeleteMeeting(m.id, m.name, leadId ? Number(leadId) : undefined);
-                                  }}
-                                >
-                                  <Trash2 size={14} className="me-1" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                          <Button
-                            variant="outline-primary"
-                            size="sm"
-                            style={{ alignSelf: 'flex-start', marginTop: '4px' }}
-                            onClick={() => {
-                              const leadId = selectedLead?.id || selectedLead?.rawData?.id;
-                              if (leadId) {
-                                setMeetingData({
-                                  leadId: Number(leadId),
-                                  leadName: selectedLead?.name || '',
-                                  meetingName: '',
-                                  meetingType: 'Online',
-                                  meetingDate: '',
-                                  meetingTime: '',
-                                  meetingOutcome: '',
-                                  extensions: []
-                                });
-                                setMeetingAttendees([]);
-                                setShowAddMeetingModal(true);
-                              }
-                            }}
-                          >
-                            <Plus size={14} className="me-1" /> Schedule Meeting
-                          </Button>
-                        </div>
-                      )
-                    }
-                  : {
-                      emptyState: {
-                        icon: Calendar,
-                        message: 'No meetings scheduled yet',
-                        action: {
-                          label: 'Schedule Meeting',
-                          onClick: () => {
-                            setMeetingData({
-                              leadId: selectedLead?.id || selectedLead?.rawData?.id || null,
-                              leadName: selectedLead?.name || '',
-                              meetingName: '',
-                              meetingType: 'Online',
-                              meetingDate: '',
-                              meetingTime: '',
-                              meetingOutcome: '',
-                              extensions: []
-                            });
-                            setMeetingAttendees([]);
-                            setShowAddMeetingModal(true);
-                          }
-                        }
-                      }
-                    })
-              }
-            ]
-          }
-        ]}
-        actions={[
-          {
-            label: 'Edit Lead',
-            icon: Edit,
-            onClick: () => {
-              router.push(`/crm/leads/${selectedLead?.id || selectedLead?.rawData?.id}/edit`);
-            },
-            variant: 'primary',
-            show: session?.user?.permissions?.includes('edit-crm-leads') && activeFilter !== 'lost'
-          },
-          {
-            label: 'Convert to Deal',
-            icon: Handshake,
-            onClick: () => {
-              setShowLeadSidebar(false);
-              handleConvertLead(selectedLead?.rawData || selectedLead);
-            },
-            variant: 'success',
-            show: session?.user?.permissions?.includes('add-crm-deals')
-          },
-          {
-            label: 'View History',
-            icon: History,
-            onClick: () => {
-              setShowLeadSidebar(false);
-              handleViewLead(selectedLead?.id || selectedLead?.rawData?.id);
-              setShowLeadHistoryModal(true);
-            },
-            variant: 'outline-primary'
-          }
-        ]}
-      />
 
       {/* Filters Sidebar */}
       <GenericFilterSidebar
