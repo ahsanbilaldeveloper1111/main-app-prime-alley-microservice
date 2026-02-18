@@ -33,7 +33,6 @@ import {
   getCampaignById,
   getCrmData,
   getCrmDataById,
-  getIndustries,
   getBusinessTypes,
   getLeadFollowUps,
   getMeetings
@@ -659,7 +658,6 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   const [editSelectedState, setEditSelectedState] = useState<{ value: string; label: string; } | null>(null);
   const [editSelectedCity, setEditSelectedCity] = useState<{ value: string; label: string; } | null>(null);
   const isEditInitialLoad = useRef(true);
-  const [allIndustries, setAllIndustries] = useState<IndustryData[]>([]);
 
   // Follow-up Modal
   const [showAddFollowupModal, setShowAddFollowupModal] = useState(false);
@@ -1819,10 +1817,6 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       const businessTypesResponse = await getBusinessTypes({ per_page: 1000 });
       setEditBusinessTypes(businessTypesResponse?.data || []);
 
-      // Fetch industries
-      const industriesResponse = await getIndustries({ per_page: 1000 });
-      setAllIndustries(industriesResponse?.data || []);
-
       // Fetch campaign if available
       if (campaignId) {
         try {
@@ -2822,7 +2816,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         setConvertingLeadId(lead.rawData?.id || lead.id);
         setShowConvertToDealModal(true);
       },
-      className: 'text-success'
+      className: 'text-success',
+      disabled: () => activeFilter === 'lost'
     });
   }
 
@@ -5112,12 +5107,13 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                   
                   {session?.user?.permissions?.includes("add-crm-deals") && (
                     <button
+                      disabled={activeFilter === "lost"}
                       style={{
                         background: "white",
                         border: "1px solid #e5e7eb",
                         borderRadius: "10px",
                         padding: "12px 16px",
-                        cursor: "pointer",
+                        cursor: activeFilter === "lost" ? "not-allowed" : "pointer",
                         transition: "all 0.2s ease",
                         display: "flex",
                         alignItems: "center",
@@ -5125,15 +5121,20 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                         fontSize: "14px",
                         fontWeight: 500,
                         color: "#1f2937",
+                        opacity: activeFilter === "lost" ? 0.6 : 1,
                       }}
                       onClick={() => {
-                        setShowLeadViewModal(false);
-                        handleConvertLead(viewingLead);
+                        if (activeFilter !== "lost") {
+                          setShowLeadViewModal(false);
+                          handleConvertLead(viewingLead);
+                        }
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.borderColor = "#10b981";
-                        e.currentTarget.style.background = "#f0fdf4";
-                        e.currentTarget.style.transform = "translateX(4px)";
+                        if (activeFilter !== "lost") {
+                          e.currentTarget.style.borderColor = "#10b981";
+                          e.currentTarget.style.background = "#f0fdf4";
+                          e.currentTarget.style.transform = "translateX(4px)";
+                        }
                       }}
                       onMouseOut={(e) => {
                         e.currentTarget.style.borderColor = "#e5e7eb";
@@ -7251,13 +7252,22 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                             value={editFormData.company_size}
                             onChange={(e) => handleEditInputChange("company_size", e.target.value)}
                           >
-                            <option value="">Select Company Size</option>
-                            <option value="1-10">1-10 employees</option>
-                            <option value="11-50">11-50 employees</option>
-                            <option value="51-200">51-200 employees</option>
-                            <option value="201-500">201-500 employees</option>
-                            <option value="501-1000">501-1000 employees</option>
-                            <option value="1000+">1000+ employees</option>
+                            <option value="">Select Size</option>
+                            <option value="Micro (1-10 employees)">
+                              Micro (1-10 employees)
+                            </option>
+                            <option value="Small (11-50 employees)">
+                              Small (11-50 employees)
+                            </option>
+                            <option value="Medium (51-200 employees)">
+                              Medium (51-200 employees)
+                            </option>
+                            <option value="Large (201-500 employees)">
+                              Large (201-500 employees)
+                            </option>
+                            <option value="Enterprise (500+ employees)">
+                              Enterprise (500+ employees)
+                            </option>
                           </Form.Select>
                         </Form.Group>
                       </Col>
@@ -7270,33 +7280,6 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                             value={editFormData.company_location_other}
                             onChange={(e) => handleEditInputChange("company_location_other", e.target.value)}
                             placeholder="Any additional location details"
-                          />
-                        </Form.Group>
-                      </Col>
-                      <Col md={12}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Industries</Form.Label>
-                          <Select
-                            isMulti
-                            value={editFormData.industry_ids.map((id) => {
-                              const industry = allIndustries.find((ind) => ind.id === id);
-                              return industry
-                                ? { value: industry.id, label: industry.name }
-                                : null;
-                            }).filter(Boolean)}
-                            onChange={(selectedOptions: any) => {
-                              handleEditInputChange(
-                                "industry_ids",
-                                selectedOptions ? selectedOptions.map((opt: any) => opt.value) : []
-                              );
-                            }}
-                            options={allIndustries.map((industry) => ({
-                              value: industry.id,
-                              label: industry.name,
-                            }))}
-                            placeholder="Select industries (Optional)"
-                            isClearable
-                            isSearchable
                           />
                         </Form.Group>
                       </Col>
@@ -8034,7 +8017,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               handleConvertLead(selectedLead?.rawData || selectedLead);
             },
             variant: 'success',
-            show: session?.user?.permissions?.includes('add-crm-deals')
+            show: session?.user?.permissions?.includes('add-crm-deals'),
+            disabled: activeFilter === 'lost'
           },
           {
             label: 'View History',
