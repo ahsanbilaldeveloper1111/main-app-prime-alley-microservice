@@ -8029,8 +8029,9 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             icon: History,
             onClick: () => {
               setShowLeadSidebar(false);
-              handleViewLead(selectedLead?.id || selectedLead?.rawData?.id);
-              setShowLeadHistoryModal(true);
+              void handleViewLead(selectedLead?.id || selectedLead?.rawData?.id).then(() => {
+                setShowLeadHistoryModal(true);
+              });
             },
             variant: 'outline-primary'
           }
