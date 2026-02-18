@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, ReactElement } from 'react';
 import {
-  X, ChevronDown, ChevronRight, Mail, Phone, MoreHorizontal,
+  X, ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
   Calendar, MessageSquare, ClipboardList, ExternalLink, Copy, RefreshCw,
   ThumbsUp, ThumbsDown, Sparkles, User, Building2, Briefcase,
   FileText, Ticket, Paperclip, Link2, Tag, DollarSign,
@@ -80,6 +80,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [activityFilter, setActivityFilter] = useState('activity');
 const [searchActivity, setSearchActivity] = useState('');
 const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Set());
+  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
 
@@ -202,7 +203,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
                   border: 'none',
                   padding: '4px',
                   cursor: 'pointer',
-                  color: '#33475b',
+                  color: '#141414',
                   display: 'flex',
                   alignItems: 'center',
                 }}
@@ -221,7 +222,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
                 <h4 style={{
                   fontSize: '14px',
                   fontWeight: '600',
-                  color: '#33475b',
+                  color: '#141414',
                   margin: 0,
                 }}>
                   {activity.title}
@@ -231,7 +232,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
               
               <p style={{
                 fontSize: '14px',
-                color: '#33475b',
+                color: '#141414',
                 margin: '4px 0',
                 lineHeight: '1.6',
               }}>
@@ -240,7 +241,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
                     <a
                       href={activity.userLink}
                       style={{
-                        color: '#0091ae',
+                        color: '#006162',
                         textDecoration: 'none',
                         fontWeight: '500',
                       }}
@@ -257,7 +258,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
                     <a
                       href={activity.entityLink}
                       style={{
-                        color: '#0091ae',
+                        color: '#006162',
                         textDecoration: 'none',
                         fontWeight: '500',
                       }}
@@ -285,7 +286,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
                     <div>
                       <p style={{
                         fontSize: '14px',
-                        color: '#33475b',
+                        color: '#141414',
                         margin: 0,
                         lineHeight: '1.6',
                       }}>
@@ -298,7 +299,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
                             <a
                               href={activity.alert.link}
                               style={{
-                                color: '#0091ae',
+                                color: '#006162',
                                 textDecoration: 'none',
                                 fontWeight: '500',
                               }}
@@ -488,7 +489,7 @@ const revenueSections: RevenueSection[] = [
               </div>
               <div style={{
                 fontSize: '14px',
-                color: '#33475b',
+                color: '#141414',
                 fontWeight: '400',
               }}>
                 Opportunity
@@ -506,9 +507,9 @@ const revenueSections: RevenueSection[] = [
                 href="#"
                 style={{
                   fontSize: '14px',
-                  color: '#0091ae',
+                  color: '#006162',
                   textDecoration: 'none',
-                  fontWeight: '400',
+                  fontWeight: '500',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.textDecoration = 'underline';
@@ -530,7 +531,7 @@ const revenueSections: RevenueSection[] = [
               </div>
               <div style={{
                 fontSize: '14px',
-                color: '#33475b',
+                color: '#141414',
                 fontWeight: '400',
               }}>
                 --
@@ -546,7 +547,7 @@ const revenueSections: RevenueSection[] = [
               </div>
               <div style={{
                 fontSize: '14px',
-                color: '#33475b',
+                color: '#141414',
                 fontWeight: '400',
               }}>
                 --
@@ -562,7 +563,7 @@ const revenueSections: RevenueSection[] = [
               </div>
               <div style={{
                 fontSize: '14px',
-                color: '#33475b',
+                color: '#141414',
                 fontWeight: '400',
               }}>
                 --
@@ -578,7 +579,7 @@ const revenueSections: RevenueSection[] = [
               </div>
               <div style={{
                 fontSize: '14px',
-                color: '#33475b',
+                color: '#141414',
                 fontWeight: '400',
               }}>
                 --
@@ -685,7 +686,7 @@ const revenueSections: RevenueSection[] = [
               </div>
               <div style={{
                 fontSize: '14px',
-                color: '#33475b',
+                color: '#141414',
                 fontWeight: '400',
               }}>
                 --
@@ -702,7 +703,7 @@ const revenueSections: RevenueSection[] = [
               </div>
               <div style={{
                 fontSize: '14px',
-                color: '#33475b',
+                color: '#141414',
                 fontWeight: '400',
               }}>
                 --
@@ -719,7 +720,7 @@ const revenueSections: RevenueSection[] = [
               </div>
               <div style={{
                 fontSize: '14px',
-                color: '#33475b',
+                color: '#141414',
                 fontWeight: '400',
               }}>
                 --
@@ -737,7 +738,7 @@ const revenueSections: RevenueSection[] = [
             <h3 style={{
               fontSize: '16px',
               fontWeight: '600',
-              color: '#33475b',
+              color: '#141414',
               margin: '0 0 16px 0',
             }}>
               Contact Outreach
@@ -753,7 +754,7 @@ const revenueSections: RevenueSection[] = [
               </div>
               <div style={{
                 fontSize: '14px',
-                color: '#33475b',
+                color: '#141414',
                 fontWeight: '400',
               }}>
                 ahmad@gmail.com
@@ -776,7 +777,7 @@ const revenueSections: RevenueSection[] = [
                 </div>
                 <div style={{
                   fontSize: '14px',
-                  color: '#33475b',
+                  color: '#141414',
                   fontWeight: '400',
                 }}>
                   --
@@ -792,7 +793,7 @@ const revenueSections: RevenueSection[] = [
                 </div>
                 <div style={{
                   fontSize: '14px',
-                  color: '#33475b',
+                  color: '#141414',
                   fontWeight: '400',
                 }}>
                   --
@@ -810,7 +811,7 @@ const revenueSections: RevenueSection[] = [
               </div>
               <div style={{
                 fontSize: '14px',
-                color: '#33475b',
+                color: '#141414',
                 fontWeight: '400',
               }}>
                 --
@@ -844,7 +845,7 @@ const revenueSections: RevenueSection[] = [
           <h3 style={{
             fontSize: '16px',
             fontWeight: '600',
-            color: '#33475b',
+            color: '#141414',
             margin: 0,
           }}>
             {section.title} ({section.count})
@@ -858,7 +859,7 @@ const revenueSections: RevenueSection[] = [
                 border: 'none',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#0091ae',
+                color: '#006162',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -904,7 +905,7 @@ const revenueSections: RevenueSection[] = [
                     style={{
                       fontSize: '15px',
                       fontWeight: '600',
-                      color: '#0091ae',
+                      color: '#006162',
                       textDecoration: 'none',
                     }}
                     onMouseEnter={(e) => {
@@ -925,12 +926,12 @@ const revenueSections: RevenueSection[] = [
                   fontSize: '14px',
                 }}>
                   <div>
-                    <span style={{ color: '#33475b' }}>Status: </span>
+                    <span style={{ color: '#141414' }}>Status: </span>
                     <span style={{
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px',
-                      color: '#33475b',
+                      color: '#141414',
                     }}>
                       <span style={{
                         width: '8px',
@@ -942,18 +943,18 @@ const revenueSections: RevenueSection[] = [
                       {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                     </span>
                   </div>
-                  <div style={{ color: '#33475b' }}>
+                  <div style={{ color: '#141414' }}>
                     Next billing date: {item.nextBillingDate}
                   </div>
-                  <div style={{ color: '#33475b' }}>
+                  <div style={{ color: '#141414' }}>
                     Next payment amount: {item.nextPaymentAmount}
                   </div>
                   <div>
-                    <span style={{ color: '#33475b' }}>Contact email: </span>
+                    <span style={{ color: '#141414' }}>Contact email: </span>
                     <a
                       href={`mailto:${item.contactEmail}`}
                       style={{
-                        color: '#0091ae',
+                        color: '#006162',
                         textDecoration: 'none',
                       }}
                       onMouseEnter={(e) => {
@@ -980,7 +981,7 @@ const revenueSections: RevenueSection[] = [
                 borderRadius: '4px',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#33475b',
+                color: '#141414',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -1002,7 +1003,7 @@ const revenueSections: RevenueSection[] = [
             {/* Empty State */}
             <p style={{
               fontSize: '14px',
-              color: '#33475b',
+              color: '#141414',
               lineHeight: '1.6',
               marginBottom: '16px',
             }}>
@@ -1019,7 +1020,7 @@ const revenueSections: RevenueSection[] = [
                   borderRadius: '4px',
                   fontSize: '14px',
                   fontWeight: '500',
-                  color: '#33475b',
+                  color: '#141414',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -1085,7 +1086,7 @@ const revenueSections: RevenueSection[] = [
               alignItems: 'center',
               gap: '8px',
               fontSize: '14px',
-              color: '#33475b',
+              color: '#141414',
               fontWeight: '500',
             }}
           >
@@ -1102,7 +1103,7 @@ const revenueSections: RevenueSection[] = [
                 border: 'none',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#33475b',
+                color: '#141414',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -1146,7 +1147,7 @@ const revenueSections: RevenueSection[] = [
                       border: 'none',
                       textAlign: 'left',
                       fontSize: '14px',
-                      color: '#33475b',
+                      color: '#141414',
                       cursor: 'pointer',
                     }}
                     onMouseEnter={(e) => {
@@ -1220,9 +1221,9 @@ const revenueSections: RevenueSection[] = [
                   href="mailto:ahmad@gmail.com"
                   style={{
                     fontSize: '14px',
-                    color: '#0091ae',
+                    color: '#006162',
                     textDecoration: 'none',
-                    fontWeight: '400',
+                    fontWeight: '500',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.textDecoration = 'underline';
@@ -1272,7 +1273,7 @@ const revenueSections: RevenueSection[] = [
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '14px',
+          gap: '17px',
           paddingTop: '6px',
           paddingBottom: '4px',
           paddingLeft: '24px',
@@ -1294,27 +1295,27 @@ const revenueSections: RevenueSection[] = [
                 gap: '6px',
               }}>
                 <button
-                  disabled={action.disabled}
+                  // disabled={action.disabled}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: '11px 10px',
-                    background: action.disabled ? 'rgb(245, 245, 245)' : '#ffffff',
-                    border: action.disabled ? '1px solid rgb(230, 230, 230)' : '1px solid #8a8a8a',
+                    padding: '9px 7px',
+                    background: '#ffffff',
+                    border: '1px solid #8a8a8a',
                     borderRadius: '50%',
-                    cursor: action.disabled ? 'not-allowed' : 'pointer',
-                    width: '36px',
-                    height: '36px',
-                    color: action.disabled ? 'rgb(138, 138, 138)' : '#718096',
+                    cursor: 'pointer',
+                    width: '30px',
+                    height: '30px',
+                    color:  '#141414',
                   }}
                 >
                   <Icon size={20} />
                 </button>
                 <span style={{
                   fontSize: '12px',
-                  color: '#33475b',
-                  fontWeight: '500',
+                  color: '#141414',
+                  fontWeight: '300',
                 }}>
                   {action.label}
                 </span>
@@ -1334,22 +1335,22 @@ const revenueSections: RevenueSection[] = [
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '11px 10px',
+                padding: '9px 7px',
                 background: '#ffffff',
                 border: '1px solid #8a8a8a',
                 borderRadius: '50%',
                 cursor: 'pointer',
-                width: '36px',
-                height: '36px',
-                color: '#718096',
+                width: '30px',
+                height: '30px',
+                color: '#141414',
               }}
             >
               <MoreHorizontal size={20} />
             </button>
             <span style={{
               fontSize: '12px',
-              color: '#33475b',
-              fontWeight: '500',
+              color: '#141414',
+              fontWeight: '300',
             }}>
               More
             </span>
@@ -1378,7 +1379,7 @@ const revenueSections: RevenueSection[] = [
                       border: 'none',
                       textAlign: 'left',
                       fontSize: '14px',
-                      color: '#33475b',
+                      color: '#141414',
                       cursor: 'pointer',
                     }}
                     onMouseEnter={(e) => {
@@ -1528,13 +1529,13 @@ const revenueSections: RevenueSection[] = [
   const renderMainContent = () => (
     <div style={{
       flex: 1,
-      backgroundColor: '#ffffff',
+      backgroundColor: 'transparent',
       overflowY: 'auto',
       display: 'flex',
       flexDirection: 'column',
       marginLeft: '6px',
       marginRight: '6px',
-      border: '1px solid #cccccc',
+      borderTop: '1px solid #cccccc',
       borderRadius: '10px',
     }}>
       {/* Tabs */}
@@ -1548,6 +1549,9 @@ const revenueSections: RevenueSection[] = [
   top: 0,
   zIndex: 10,
   gap: '0',
+  borderLeft: '1px solid #cccccc',
+  borderRight: '1px solid #cccccc',
+  borderRadius: '10px 10px 0 0',
 }}>
   
   {tabs.map((tab, index) => (
@@ -1585,14 +1589,14 @@ const revenueSections: RevenueSection[] = [
 </div>
 
       {/* Tab Content */}
-      <div style={{ padding: '24px', flex: 1 }}>
+      <div style={{ padding: '14px 0', flex: 1 }}>
         {activeTab === 'about' && (
           <>
             {/* Breeze Record Summary */}
             <div style={{
               backgroundColor: '#ffffff',
-              border: '1px solid #eaf0f6',
-              borderRadius: '5px',
+              border: '1px solid #cccccc',
+              borderRadius: '10px',
               marginBottom: '20px',
               overflow: 'hidden',
             }}>
@@ -1611,7 +1615,7 @@ const revenueSections: RevenueSection[] = [
                   <ChevronDown
                     size={18}
                     style={{
-                      color: '#33475b',
+                      color: '#141414',
                       transform: collapsedSections.has('breeze') ? 'rotate(-90deg)' : 'rotate(0deg)',
                       transition: 'transform 0.2s ease',
                     }}
@@ -1619,7 +1623,7 @@ const revenueSections: RevenueSection[] = [
                   <h3 style={{
                     fontSize: '16px',
                     fontWeight: '600',
-                    color: '#33475b',
+                    color: '#141414',
                     margin: 0,
                   }}>
                     Breeze record summary
@@ -1645,7 +1649,7 @@ const revenueSections: RevenueSection[] = [
                     alignItems: 'center',
                     gap: '6px',
                     fontSize: '13px',
-                    color: '#666666',
+                    color: '#141414',
                     marginBottom: '12px',
                   }}>
                     <span>Generated Feb 14, 2026</span>
@@ -1655,8 +1659,11 @@ const revenueSections: RevenueSection[] = [
                         border: 'none',
                         padding: '2px',
                         cursor: 'pointer',
-                        color: '#666666',
+                        color: '#141414',
+                        display: 'flex',
+                        alignItems: 'center',
                       }}
+                      title="Refresh"
                     >
                       <RefreshCw size={12} />
                     </button>
@@ -1664,15 +1671,14 @@ const revenueSections: RevenueSection[] = [
 
                   <div style={{
                     fontSize: '14px',
-                    color: '#33475b',
+                    color: '#141414',
                     lineHeight: '1.6',
                     marginBottom: '16px',
-                    padding: '18px 20px',
                     border: '1px solid #ff9fcc',
-                    borderRadius: '5px',
-                    backgroundColor: '#fff5f7',
+                    padding: '18px 20px',
+                    borderRadius: '10px',
                   }}>
-                    There are no associated activities and further details are needed to provide a comprehensive summary
+                    Ahmad Hussain is a Director at Ahmad Hussain LTD, currently in the Opportunity stage. Recent activity shows strong engagement: Invoice INV-1004 ($500.00) was sent on Feb 14, and the contact maintains an active Connect Pro subscription with the next billing scheduled for Mar 13, 2026. However, there's a critical email deliverability issue - a recent marketing email bounced, which may impact future communications. The contact is revenue-generating with stable MRR from the subscription. Recommended next steps: address the email bounce issue immediately and consider a follow-up call to discuss potential upsell opportunities.
                   </div>
 
                   <div style={{
@@ -1688,7 +1694,19 @@ const revenueSections: RevenueSection[] = [
                         border: 'none',
                         padding: '6px',
                         cursor: 'pointer',
-                        color: '#718096',
+                        color: '#141414',
+                        display: 'flex',
+                        alignItems: 'center',
+                        borderRadius: '3px',
+                      }}
+                      title="Good summary"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f7fafc';
+                        e.currentTarget.style.color = '#2d3748';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = '#141414';
                       }}
                     >
                       <ThumbsUp size={16} />
@@ -1699,7 +1717,19 @@ const revenueSections: RevenueSection[] = [
                         border: 'none',
                         padding: '6px',
                         cursor: 'pointer',
-                        color: '#718096',
+                        color: '#141414',
+                        display: 'flex',
+                        alignItems: 'center',
+                        borderRadius: '3px',
+                      }}
+                      title="Bad summary"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f7fafc';
+                        e.currentTarget.style.color = '#2d3748';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = '#141414';
                       }}
                     >
                       <ThumbsDown size={16} />
@@ -1710,7 +1740,19 @@ const revenueSections: RevenueSection[] = [
                         border: 'none',
                         padding: '6px',
                         cursor: 'pointer',
-                        color: '#718096',
+                        color: '#141414',
+                        display: 'flex',
+                        alignItems: 'center',
+                        borderRadius: '3px',
+                      }}
+                      title="Copy"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f7fafc';
+                        e.currentTarget.style.color = '#2d3748';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = '#141414';
                       }}
                     >
                       <Copy size={16} />
@@ -1731,6 +1773,13 @@ const revenueSections: RevenueSection[] = [
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#fff5f7';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
                     <Sparkles size={16} />
@@ -1743,9 +1792,10 @@ const revenueSections: RevenueSection[] = [
             {/* Contact Profile */}
             <div style={{
               backgroundColor: '#ffffff',
-              border: '1px solid #eaf0f6',
-              borderRadius: '5px',
+              border: '1px solid #cccccc',
+              borderRadius: '10px',
               marginBottom: '20px',
+
             }}>
               <div style={{
                 padding: '16px 20px',
@@ -1754,7 +1804,7 @@ const revenueSections: RevenueSection[] = [
                 <h3 style={{
                   fontSize: '16px',
                   fontWeight: '600',
-                  color: '#33475b',
+                  color: '#141414',
                   margin: 0,
                 }}>
                   Contact profile
@@ -1785,7 +1835,7 @@ const revenueSections: RevenueSection[] = [
                       </div>
                       <div style={{
                         fontSize: '14px',
-                        color: field.link ? '#0091ae' : '#33475b',
+                        color: field.link ? '#006162' : '#141414',
                       }}>
                         {field.value}
                       </div>
@@ -1798,8 +1848,8 @@ const revenueSections: RevenueSection[] = [
             {/* Enrollments */}
             <div style={{
               backgroundColor: '#ffffff',
-              border: '1px solid #eaf0f6',
-              borderRadius: '5px',
+              border: '1px solid #cccccc',
+              borderRadius: '10px',
             }}>
               <div
                 style={{
@@ -1814,7 +1864,7 @@ const revenueSections: RevenueSection[] = [
                 <ChevronDown
                   size={18}
                   style={{
-                    color: '#33475b',
+                    color: '#141414',
                     marginRight: '10px',
                     transform: collapsedSections.has('enrollments') ? 'rotate(-90deg)' : 'rotate(0deg)',
                     transition: 'transform 0.2s ease',
@@ -1823,7 +1873,7 @@ const revenueSections: RevenueSection[] = [
                 <h3 style={{
                   fontSize: '16px',
                   fontWeight: '600',
-                  color: '#33475b',
+                  color: '#141414',
                   margin: 0,
                 }}>
                   Enrollments
@@ -1835,7 +1885,7 @@ const revenueSections: RevenueSection[] = [
                   <h4 style={{
                     fontSize: '14px',
                     fontWeight: '600',
-                    color: '#33475b',
+                    color: '#141414',
                     marginBottom: '12px',
                   }}>
                     Communication subscriptions
@@ -1851,7 +1901,7 @@ const revenueSections: RevenueSection[] = [
                     href="#"
                     style={{
                       fontSize: '14px',
-                      color: '#0091ae',
+                      color: '#006162',
                       textDecoration: 'none',
                       fontWeight: '500',
                     }}
@@ -1919,7 +1969,7 @@ const revenueSections: RevenueSection[] = [
           borderRadius: '4px',
           fontSize: '14px',
           fontWeight: '500',
-          color: '#33475b',
+          color: '#141414',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -1954,11 +2004,11 @@ const revenueSections: RevenueSection[] = [
             padding: '10px 0',
             backgroundColor: 'transparent',
             border: 'none',
-            borderBottom: activityFilter === filter.id ? '2px solid #33475b' : '2px solid transparent',
+            borderBottom: activityFilter === filter.id ? '2px solid #141414' : '2px solid transparent',
             cursor: 'pointer',
             fontSize: '14px',
             fontWeight: activityFilter === filter.id ? '600' : '400',
-            color: activityFilter === filter.id ? '#33475b' : '#7c98b6',
+            color: activityFilter === filter.id ? '#141414' : '#7c98b6',
             transition: 'all 0.2s',
             marginBottom: '-2px',
           }}
@@ -1977,7 +2027,7 @@ const revenueSections: RevenueSection[] = [
     }}>
       <span style={{
         fontSize: '14px',
-        color: '#33475b',
+        color: '#141414',
       }}>
         Filter by:
       </span>
@@ -1988,7 +2038,7 @@ const revenueSections: RevenueSection[] = [
           border: 'none',
           fontSize: '14px',
           fontWeight: '600',
-          color: '#33475b',
+          color: '#141414',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -2005,7 +2055,7 @@ const revenueSections: RevenueSection[] = [
           border: 'none',
           fontSize: '14px',
           fontWeight: '600',
-          color: '#33475b',
+          color: '#141414',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -2021,7 +2071,7 @@ const revenueSections: RevenueSection[] = [
     <h3 style={{
       fontSize: '16px',
       fontWeight: '600',
-      color: '#33475b',
+      color: '#141414',
       marginBottom: '16px',
     }}>
       February 2026
@@ -2053,7 +2103,7 @@ const revenueSections: RevenueSection[] = [
         <ChevronDown
           size={20}
           style={{
-            color: '#33475b',
+            color: '#141414',
             transform: collapsedSections.has('quote-to-cash') ? 'rotate(-90deg)' : 'rotate(0deg)',
             transition: 'transform 0.2s ease',
           }}
@@ -2061,7 +2111,7 @@ const revenueSections: RevenueSection[] = [
         <h2 style={{
           fontSize: '18px',
           fontWeight: '600',
-          color: '#33475b',
+          color: '#141414',
           margin: 0,
         }}>
           Quote-to-cash
@@ -2096,7 +2146,7 @@ const revenueSections: RevenueSection[] = [
         <ChevronDown
           size={20}
           style={{
-            color: '#33475b',
+            color: '#141414',
             transform: collapsedSections.has('e-commerce') ? 'rotate(-90deg)' : 'rotate(0deg)',
             transition: 'transform 0.2s ease',
           }}
@@ -2104,7 +2154,7 @@ const revenueSections: RevenueSection[] = [
         <h2 style={{
           fontSize: '18px',
           fontWeight: '600',
-          color: '#33475b',
+          color: '#141414',
           margin: 0,
         }}>
           e-Commerce
@@ -2142,37 +2192,81 @@ const revenueSections: RevenueSection[] = [
   // ============================================================================
 
   const renderRightSidebar = () => (
-    <div className="sidebar-scrollbar" style={{
-      width: '385px',
-      backgroundColor: '#f0f0f0',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
+    <div style={{
+      position: 'relative',
+      width: isRightSidebarCollapsed ? '0px' : '385px',
+      marginLeft: isRightSidebarCollapsed ? '0px' : '10px',
       flexShrink: 0,
-      overflowY: 'auto',
-      padding: '0',
-      marginLeft: '10px',
-      border: '1px solid #cccccc',
-      borderRadius: '10px',
+      transition: 'width 0.3s ease, margin-left 0.3s ease',
     }}>
-      <div style={{ paddingTop: '0', paddingBottom: '0' }}>
-      {/* Companies */}
+      {/* Toggle Button */}
+      <button
+        onClick={() => setIsRightSidebarCollapsed(!isRightSidebarCollapsed)}
+        style={{
+          position: 'fixed',
+          top: '100px',
+          right: isRightSidebarCollapsed ? '10px' : 'calc(395px)',
+          zIndex: 101,
+          backgroundColor: '#ffffff',
+          border: '1px solid #8a8a8a',
+          borderRadius: '30px',
+          padding: '3px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'all 0.3s ease',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#f5f8fa';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = '#ffffff';
+        }}
+        title={isRightSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {isRightSidebarCollapsed ? (
+          <ChevronLeft size={20} style={{ color: '#141414' }} />
+        ) : (
+          <ChevronRight size={20} style={{ color: '#141414' }} />
+        )}
+      </button>
+
+      {!isRightSidebarCollapsed && (
+      <div className="sidebar-scrollbar" style={{
+        width: '100%',
+        backgroundColor: '#f0f0f0',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflowY: 'auto',
+        padding: '0',
+       
+        borderRadius: '10px',
+      }}>
+        <div style={{ 
+          paddingTop: '0px', 
+          paddingBottom: '0',
+        }}>
+        {/* Companies */}
       <div style={{
         backgroundColor: '#ffffff',
-        borderRadius: '5px',
+        borderRadius: '10px',
         marginBottom: '12px',
         overflow: 'hidden',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
+        border: '1px solid #cccccc',
       }}>
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '14px 20px',
+            padding: '14px 20px 0',
             cursor: 'pointer',
             backgroundColor: '#ffffff',
-            borderBottom: collapsedSections.has('companies') ? 'none' : '1px solid #eaf0f6',
+            
           }}
           onClick={() => toggleSection('companies')}
         >
@@ -2204,7 +2298,8 @@ const revenueSections: RevenueSection[] = [
               border: 'none',
               cursor: 'pointer',
               color: '#141414',
-              fontSize: '20px',
+              fontSize: '12px',
+              fontWeight: '500',
               padding: '6px',
               borderRadius: '3px',
               transition: 'background-color 0.2s',
@@ -2216,7 +2311,7 @@ const revenueSections: RevenueSection[] = [
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            +
+            <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
           </button>
         </div>
 
@@ -2233,7 +2328,7 @@ const revenueSections: RevenueSection[] = [
                   href="#"
                   style={{
                     fontSize: '14px',
-                    color: '#0091ae',
+                    color: '#006162',
                     textDecoration: 'none',
                     fontWeight: '500',
                   }}
@@ -2243,7 +2338,7 @@ const revenueSections: RevenueSection[] = [
                 <span style={{
                   padding: '2px 8px',
                   backgroundColor: '#e6f3ff',
-                  color: '#0091ae',
+                  color: '#006162',
                   borderRadius: '3px',
                   fontSize: '11px',
                   fontWeight: '600',
@@ -2306,20 +2401,21 @@ const revenueSections: RevenueSection[] = [
       {/* Deals */}
       <div style={{
         backgroundColor: '#ffffff',
-        borderRadius: '5px',
+        borderRadius: '10px',
         marginBottom: '12px',
         overflow: 'hidden',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
+        border: '1px solid #cccccc',
       }}>
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '14px 20px',
+            padding: '14px 20px 0',
             cursor: 'pointer',
             backgroundColor: '#ffffff',
-            borderBottom: collapsedSections.has('deals') ? 'none' : '1px solid #eaf0f6',
+            
           }}
           onClick={() => toggleSection('deals')}
         >
@@ -2363,7 +2459,7 @@ const revenueSections: RevenueSection[] = [
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            +
+            <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
           </button>
         </div>
 
@@ -2374,7 +2470,7 @@ const revenueSections: RevenueSection[] = [
                 href="#"
                 style={{
                   fontSize: '14px',
-                  color: '#0091ae',
+                  color: '#006162',
                   textDecoration: 'none',
                   fontWeight: '500',
                   display: 'block',
@@ -2423,7 +2519,7 @@ const revenueSections: RevenueSection[] = [
               href="#"
               style={{
                 fontSize: '13px',
-                color: '#0091ae',
+                color: '#006162',
                 textDecoration: 'none',
                 fontWeight: '500',
                 display: 'flex',
@@ -2441,20 +2537,21 @@ const revenueSections: RevenueSection[] = [
       {/* Tickets */}
       <div style={{
         backgroundColor: '#ffffff',
-        borderRadius: '5px',
+        borderRadius: '10px',
         marginBottom: '12px',
         overflow: 'hidden',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
+        border: '1px solid #cccccc',
       }}>
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '14px 20px',
+            padding: '14px 20px 0',
             cursor: 'pointer',
             backgroundColor: '#ffffff',
-            borderBottom: collapsedSections.has('tickets') ? 'none' : '1px solid #eaf0f6',
+            
           }}
           onClick={() => toggleSection('tickets')}
         >
@@ -2498,7 +2595,7 @@ const revenueSections: RevenueSection[] = [
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            +
+            <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
           </button>
         </div>
 
@@ -2523,19 +2620,20 @@ const revenueSections: RevenueSection[] = [
       {/* Attachments */}
       <div style={{
         backgroundColor: '#ffffff',
-        borderRadius: '5px',
+        borderRadius: '10px',
         overflow: 'hidden',
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
+        border: '1px solid #cccccc',
       }}>
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '14px 20px',
+            padding: '14px 20px 0',
             cursor: 'pointer',
             backgroundColor: '#ffffff',
-            borderBottom: collapsedSections.has('attachments') ? 'none' : '1px solid #eaf0f6',
+           
           }}
           onClick={() => toggleSection('attachments')}
         >
@@ -2580,7 +2678,7 @@ const revenueSections: RevenueSection[] = [
               e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            Add
+            <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
           </button>
         </div>
 
@@ -2600,8 +2698,10 @@ const revenueSections: RevenueSection[] = [
             </p>
           </div>
         )}
-      </div>
-      </div>
+        </div>
+        </div>
+        </div>
+      )}
     </div>
   );
 

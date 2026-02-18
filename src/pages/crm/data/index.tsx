@@ -4251,7 +4251,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   
   // Fixed height mode
   fixedHeight={true}
-  maxHeight="calc(100vh - 380px)"
+  maxHeight="calc(100vh - 345px)"
   
   // Toolbar
   showToolbar={true}
@@ -6744,7 +6744,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             id: 'meeting', 
             label: 'Meeting', 
             icon: Calendar, 
-            onClick: () => console.log('Schedule meeting'),
+            onClick: () => {},
             disabled: false 
           },
           { 
