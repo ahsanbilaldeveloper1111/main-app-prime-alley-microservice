@@ -21,6 +21,7 @@ import GenericSidebar from '@components/GenericSidebarNew';
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import ConvertToOrderModal from "@components/ConvertToOrderModal";
+import { CreateDealSidebar } from "@components/renderCreateDealForm";
 import {
   FiUpload,
   FiDatabase,
@@ -40,6 +41,7 @@ import {
   FiTarget,
   FiMoreVertical,
 } from "react-icons/fi";
+import { ChevronDown } from 'lucide-react';
 import {
   getDeals,
   getStages,
@@ -534,6 +536,11 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showCreateDealSidebar, setShowCreateDealSidebar] = useState(false);
+  
+  // Add Deals button states
+  const [showAddDealsDropdown, setShowAddDealsDropdown] = useState(false);
+  const addDealsRef = React.useRef<HTMLDivElement>(null);
   
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -730,6 +737,19 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
     fetchLostReasons();
     fetchExtensions(ModuleSlug.CRM_DEALS);
   }, []);
+
+  // Handle click outside for Add Deals dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (addDealsRef.current && !addDealsRef.current.contains(event.target as Node)) {
+        setShowAddDealsDropdown(false);
+      }
+    };
+    if (showAddDealsDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showAddDealsDropdown]);
 
   // Fetch deals when filters or search change
   const fetchDeals = useCallback(
@@ -2555,6 +2575,110 @@ const handleCloseEditModal = useCallback(() => {
     },
     [session, activeFilter, handleViewDeal, handleRestoreDeal, handleDeleteDeal, handleMarkLost]
   );
+
+  // Render Add Deals button with dropdown
+  const renderAddDealsButton = () => (
+    <div
+      ref={addDealsRef}
+      style={{
+        position: 'absolute',
+        right: '19px',
+        top: '18px',
+        width: '146px',
+      }}
+    >
+      <button
+        onClick={() => setShowAddDealsDropdown(!showAddDealsDropdown)}
+        style={{
+          padding: '9px 13px',
+          backgroundColor: '#000000',
+          color: '#ffffff',
+          border: 'none',
+          borderRadius: '4px',
+          fontSize: '12px',
+          fontWeight: '500',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#1a1a1a';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = '#000000';
+        }}
+      >
+        Add deals
+        <ChevronDown size={16} />
+      </button>
+
+      {showAddDealsDropdown && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          right: 0,
+          marginTop: '4px',
+          backgroundColor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '5px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          minWidth: '160px',
+          zIndex: 1000,
+          overflow: 'hidden',
+        }}>
+          <button
+            onClick={() => {
+              setShowAddDealsDropdown(false);
+              setShowCreateDealSidebar(true);
+            }}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              textAlign: 'left',
+              fontSize: '14px',
+              color: '#141414',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f7fafc';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            Create new
+          </button>
+          <button
+            onClick={() => {
+              setShowAddDealsDropdown(false);
+              console.log('Import deals');
+            }}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              textAlign: 'left',
+              fontSize: '14px',
+              color: '#d97706',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f7fafc';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            Import
+          </button>
+        </div>
+      )}
+    </div>
+  );
  
   if (!session?.user?.permissions?.includes('list-crm-deals')) {
     return null;
@@ -2610,6 +2734,9 @@ const handleCloseEditModal = useCallback(() => {
         mainLink="/crm/dashboard"
         subTitle="Deals"
       />
+
+      {/* Add Deals Button */}
+      {renderAddDealsButton()}
 
       {/* Main flex container for content and sidebar */}
       <div style={{ display: 'flex', gap: '0', height: 'calc(100vh)', overflow: 'hidden' }}>
@@ -7393,6 +7520,11 @@ const handleCloseEditModal = useCallback(() => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Create Deal Sidebar */}
+      {showCreateDealSidebar && (
+        <CreateDealSidebar onClose={() => setShowCreateDealSidebar(false)} />
+      )}
 
     </React.Fragment>
   );
