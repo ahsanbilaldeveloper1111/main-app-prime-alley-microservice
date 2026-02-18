@@ -143,7 +143,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'accounts',            // 10. Billing & Payments
     'work-planner',        // 11. Work Planner
     'staff-management', // 12. Staff Management
-    'reports',             // 12. Unified Reports
+    'reports',
+    'audit-logs', // 13. Audit Logs
     'settings',
     'resources',
 	  
@@ -895,6 +896,17 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/call-reports'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
+    },
+
+    {
+      id: 'audit-logs',
+      key: 'audit-logs',
+      permission: '',
+      icon: <FileText size={16} />,
+      color: '#0d6efd',
+      title: "Audit Logs",
+      label: "Audit Logs",
+      url: '/audit-logs'
     },
 
     {
