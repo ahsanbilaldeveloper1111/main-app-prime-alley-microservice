@@ -33,7 +33,6 @@ import {
   getCampaignById,
   getCrmData,
   getCrmDataById,
-  getIndustries,
   getBusinessTypes,
   getLeadFollowUps,
   getMeetings
@@ -578,6 +577,7 @@ const CrmLeads = () => {
   const [lostReasons, setLostReasons] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [filterBusinessTypes, setFilterBusinessTypes] = useState<BusinessTypeData[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const [leadsData, setLeadsData] = useState<any[]>([]);
@@ -660,7 +660,6 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   const [editSelectedState, setEditSelectedState] = useState<{ value: string; label: string; } | null>(null);
   const [editSelectedCity, setEditSelectedCity] = useState<{ value: string; label: string; } | null>(null);
   const isEditInitialLoad = useRef(true);
-  const [allIndustries, setAllIndustries] = useState<IndustryData[]>([]);
 
   // Follow-up Modal
   const [showAddFollowupModal, setShowAddFollowupModal] = useState(false);
@@ -727,10 +726,11 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   const [leadsFilters, setLeadsFilters] = useState({
     assignedTo: null as string | null,
     stage: null as string | null,
-    industry: null as string | null,
+    businessType: null as string | null,
     source: null as string | null,
     leadPotential: null as string | null,
     campaign: null as string | null,
+    lostReason: null as string | null,
     leadScoreMin: null as string | null,
     leadScoreMax: null as string | null,
     dateFrom: null as string | null,
@@ -743,7 +743,17 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     fetchLostReasons();
     fetchExtensions(ModuleSlug.CRM_LEADS);
     fetchCampaigns();
+    fetchFilterBusinessTypes();
   }, []);
+
+  const fetchFilterBusinessTypes = async () => {
+    try {
+      const res = await getBusinessTypes({ per_page: 1000 });
+      setFilterBusinessTypes(res?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch business types:", error);
+    }
+  };
 
   // Fetch leads when filters or search change
   const fetchLeads = useCallback(
@@ -769,8 +779,8 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         if (currentFilters.assigned_to) {
           params.assigned_to = currentFilters.assigned_to;
         }
-        if (currentFilters.industry) {
-          params.industry = currentFilters.industry;
+        if (currentFilters.business_type_id) {
+          params.business_type_id = currentFilters.business_type_id;
         }
         if (currentFilters.source) {
           params.source = currentFilters.source;
@@ -780,6 +790,9 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         }
         if (currentFilters.campaign_id) {
           params.campaign_id = currentFilters.campaign_id;
+        }
+        if (currentFilters.lost_reason_id) {
+          params.lost_reason_id = currentFilters.lost_reason_id;
         }
         if (currentFilters.lead_score_min) {
           params.lead_score_min = currentFilters.lead_score_min;
@@ -917,15 +930,13 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         (stages.length > 0 && stages.some((s: any) => s.id.toString() === tabFromUrl));
       if (isValidFilter && tabFromUrl !== activeFilter) {
         setActiveFilter(tabFromUrl);
+        setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
       }
     }
   }, [router.isReady, router.query.tab, stages, activeFilter]);
   
   // Handler to update filter and URL
-  const handleFilterChange = useCallback((filterId: string) => {
-    setActiveFilter(filterId);
-    setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
-    
+  const handleFilterChange = useCallback((filterId: string) => {    
     // Update URL with tab query parameter
     router.push(
       {
@@ -1006,12 +1017,12 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         }
       }
 
-      // Handle industry filter
-      if ("industry" in filters) {
-        if (filters.industry) {
-          newFilters.industry = filters.industry;
+      // Handle business type filter
+      if ("business_type_id" in filters) {
+        if (filters.business_type_id) {
+          newFilters.business_type_id = String(filters.business_type_id);
         } else {
-          delete newFilters.industry;
+          delete newFilters.business_type_id;
         }
       }
 
@@ -1039,6 +1050,15 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
           newFilters.campaign_id = String(filters.campaign_id);
         } else {
           delete newFilters.campaign_id;
+        }
+      }
+
+      // Handle lost_reason_id filter
+      if ("lost_reason_id" in filters) {
+        if (filters.lost_reason_id) {
+          newFilters.lost_reason_id = String(filters.lost_reason_id);
+        } else {
+          delete newFilters.lost_reason_id;
         }
       }
 
@@ -1855,10 +1875,6 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       // Fetch business types
       const businessTypesResponse = await getBusinessTypes({ per_page: 1000 });
       setEditBusinessTypes(businessTypesResponse?.data || []);
-
-      // Fetch industries
-      const industriesResponse = await getIndustries({ per_page: 1000 });
-      setAllIndustries(industriesResponse?.data || []);
 
       // Fetch campaign if available
       if (campaignId) {
@@ -2931,7 +2947,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         setConvertingLeadId(lead.rawData?.id || lead.id);
         setShowConvertToDealModal(true);
       },
-      className: 'text-success'
+      className: 'text-success',
+      disabled: () => activeFilter === 'lost'
     });
   }
 
@@ -3313,44 +3330,30 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                 </Col>
                 <Col md={4}>
                   <Form.Label className="small fw-bold mb-2">
-                    Industry
+                    Business Type
                   </Form.Label>
                   <Select
-                    options={[
-                      { value: "Technology", label: "Technology" },
-                      { value: "Healthcare", label: "Healthcare" },
-                      { value: "Finance", label: "Finance" },
-                      {
-                        value: "Banking & Financial Services",
-                        label: "Banking & Financial Services",
-                      },
-                      { value: "Manufacturing", label: "Manufacturing" },
-                      { value: "Retail", label: "Retail" },
-                      { value: "Education", label: "Education" },
-                      { value: "Real Estate", label: "Real Estate" },
-                      {
-                        value: "Telecommunications",
-                        label: "Telecommunications",
-                      },
-                      { value: "Construction", label: "Construction" },
-                      { value: "Other", label: "Other" },
-                    ]}
+                    options={filterBusinessTypes.map((bt: BusinessTypeData) => ({
+                      value: bt.id.toString(),
+                      label: bt.name,
+                    }))}
                     value={
-                      leadsFilters.industry
-                        ? {
-                            value: leadsFilters.industry,
-                            label: leadsFilters.industry,
-                          }
+                      leadsFilters.businessType
+                        ? (() => {
+                            const btId = leadsFilters.businessType;
+                            const bt = filterBusinessTypes.find((b: BusinessTypeData) => b.id.toString() === btId);
+                            return bt ? { value: btId, label: bt.name } : { value: btId, label: btId };
+                          })()
                         : null
                     }
                     onChange={(selected) => {
-                      const industryValue = selected ? selected.value : null;
+                      const businessTypeValue = selected ? selected.value : null;
                       setLeadsFilters((prev) => ({
                         ...prev,
-                        industry: industryValue,
+                        businessType: businessTypeValue,
                       }));
                     }}
-                    placeholder="Select industry..."
+                    placeholder="Select business type..."
                     styles={customSelectStyles}
                     isClearable
                   />
@@ -3534,8 +3537,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                         if (leadsFilters.stage) {
                           filtersToApply.stage_id = leadsFilters.stage;
                         }
-                        if (leadsFilters.industry) {
-                          filtersToApply.industry = leadsFilters.industry;
+                        if (leadsFilters.businessType) {
+                          filtersToApply.business_type_id = leadsFilters.businessType;
                         }
                         if (leadsFilters.source) {
                           filtersToApply.source = leadsFilters.source;
@@ -3545,6 +3548,9 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                         }
                         if (leadsFilters.campaign) {
                           filtersToApply.campaign_id = leadsFilters.campaign;
+                        }
+                        if (leadsFilters.lostReason) {
+                          filtersToApply.lost_reason_id = leadsFilters.lostReason;
                         }
                         if (leadsFilters.leadScoreMin) {
                           filtersToApply.lead_score_min = leadsFilters.leadScoreMin;
@@ -3574,10 +3580,11 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                         setLeadsFilters({
                           assignedTo: null,
                           stage: null,
-                          industry: null,
+                          businessType: null,
                           source: null,
                           leadPotential: null,
                           campaign: null,
+                          lostReason: null,
                           leadScoreMin: null,
                           leadScoreMax: null,
                           dateFrom: null,
@@ -5646,12 +5653,13 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                   
                   {session?.user?.permissions?.includes("add-crm-deals") && (
                     <button
+                      disabled={activeFilter === "lost"}
                       style={{
                         background: "white",
                         border: "1px solid #e5e7eb",
                         borderRadius: "10px",
                         padding: "12px 16px",
-                        cursor: "pointer",
+                        cursor: activeFilter === "lost" ? "not-allowed" : "pointer",
                         transition: "all 0.2s ease",
                         display: "flex",
                         alignItems: "center",
@@ -5659,15 +5667,20 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                         fontSize: "14px",
                         fontWeight: 500,
                         color: "#1f2937",
+                        opacity: activeFilter === "lost" ? 0.6 : 1,
                       }}
                       onClick={() => {
-                        setShowLeadViewModal(false);
-                        handleConvertLead(viewingLead);
+                        if (activeFilter !== "lost") {
+                          setShowLeadViewModal(false);
+                          handleConvertLead(viewingLead);
+                        }
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.borderColor = "#10b981";
-                        e.currentTarget.style.background = "#f0fdf4";
-                        e.currentTarget.style.transform = "translateX(4px)";
+                        if (activeFilter !== "lost") {
+                          e.currentTarget.style.borderColor = "#10b981";
+                          e.currentTarget.style.background = "#f0fdf4";
+                          e.currentTarget.style.transform = "translateX(4px)";
+                        }
                       }}
                       onMouseOut={(e) => {
                         e.currentTarget.style.borderColor = "#e5e7eb";
@@ -7785,13 +7798,22 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                             value={editFormData.company_size}
                             onChange={(e) => handleEditInputChange("company_size", e.target.value)}
                           >
-                            <option value="">Select Company Size</option>
-                            <option value="1-10">1-10 employees</option>
-                            <option value="11-50">11-50 employees</option>
-                            <option value="51-200">51-200 employees</option>
-                            <option value="201-500">201-500 employees</option>
-                            <option value="501-1000">501-1000 employees</option>
-                            <option value="1000+">1000+ employees</option>
+                            <option value="">Select Size</option>
+                            <option value="Micro (1-10 employees)">
+                              Micro (1-10 employees)
+                            </option>
+                            <option value="Small (11-50 employees)">
+                              Small (11-50 employees)
+                            </option>
+                            <option value="Medium (51-200 employees)">
+                              Medium (51-200 employees)
+                            </option>
+                            <option value="Large (201-500 employees)">
+                              Large (201-500 employees)
+                            </option>
+                            <option value="Enterprise (500+ employees)">
+                              Enterprise (500+ employees)
+                            </option>
                           </Form.Select>
                         </Form.Group>
                       </Col>
@@ -7804,33 +7826,6 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                             value={editFormData.company_location_other}
                             onChange={(e) => handleEditInputChange("company_location_other", e.target.value)}
                             placeholder="Any additional location details"
-                          />
-                        </Form.Group>
-                      </Col>
-                      <Col md={12}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Industries</Form.Label>
-                          <Select
-                            isMulti
-                            value={editFormData.industry_ids.map((id) => {
-                              const industry = allIndustries.find((ind) => ind.id === id);
-                              return industry
-                                ? { value: industry.id, label: industry.name }
-                                : null;
-                            }).filter(Boolean)}
-                            onChange={(selectedOptions: any) => {
-                              handleEditInputChange(
-                                "industry_ids",
-                                selectedOptions ? selectedOptions.map((opt: any) => opt.value) : []
-                              );
-                            }}
-                            options={allIndustries.map((industry) => ({
-                              value: industry.id,
-                              label: industry.name,
-                            }))}
-                            placeholder="Select industries (Optional)"
-                            isClearable
-                            isSearchable
                           />
                         </Form.Group>
                       </Col>
@@ -8125,6 +8120,466 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         </Modal.Footer>
       </Modal>
 
+      {/* Lead Details Sidebar */}
+      <GenericSidebar
+        isOpen={showLeadSidebar}
+        onClose={() => {
+          setShowLeadSidebar(false);
+          setSelectedLead(null);
+        }}
+        moduleSlug={ModuleSlug.CRM_LEADS}
+        onCall={handleSidebarCall}
+        title={selectedLead?.name || 'Lead Details'}
+        subtitle={selectedLead?.company_name || selectedLead?.company || ''}
+        metadata={selectedLead?.id ? `Lead ID: ${selectedLead.id}` : ''}
+        email={selectedLead?.email || selectedLead?.rawData?.email || ''}
+        phone={selectedLead?.phone || selectedLead?.rawData?.phone || ''}
+        completePhone={(() => {
+          const raw = selectedLead?.contact_persons;
+          if (!raw) return '';
+          let arr: Array<{ phone_country_code?: string; phone?: string }> = [];
+          if (typeof raw === 'string') {
+            try {
+              arr = JSON.parse(raw);
+            } catch {
+              return '';
+            }
+          } else if (Array.isArray(raw)) {
+            arr = raw;
+          }
+          const first = arr[0];
+          if (!first) return '';
+          const code = first.phone_country_code ?? '';
+          const num = first.phone ?? '';
+          return `${code}${num}`.trim();
+        })()}
+        avatar={{
+          name: selectedLead?.name || 'Lead',
+          useIcon: true
+        }}
+        contextPayload={
+          selectedLead
+            ? (() => {
+                const { follow_ups, meetings, audit_trail, ...leadRest } = selectedLead ?? {};
+                const leadForPayload = selectedLead ? { ...leadRest } : undefined;
+                return {
+                  lead: leadForPayload,
+                };
+              })()
+            : undefined
+        }
+        width="420px"
+        tabs={[
+          {
+            id: 'general',
+            label: 'General Information',
+            sections: [
+          {
+            id: 'lead-info',
+            title: 'Lead Information',
+            icon: Target,
+            fields: [
+              {
+                label: 'Lead Name',
+                value: selectedLead?.name || 'N/A'
+              },
+              {
+                label: 'Stage',
+                value: (selectedLead?.is_lost || selectedLead?.isLost) ? 'Lost' : (selectedLead?.stage?.name || selectedLead?.stage || 'N/A'),
+                type: 'badge',
+                badgeVariant: 'primary'
+              },
+              {
+                label: 'Lead Potential',
+                value: selectedLead?.lead_potential || selectedLead?.leadPotential || 'N/A',
+                type: 'badge',
+                badgeVariant: selectedLead?.lead_potential === 'Hot' || selectedLead?.leadPotential === 'Hot' 
+                  ? 'danger' 
+                  : selectedLead?.lead_potential === 'Warm' || selectedLead?.leadPotential === 'Warm'
+                  ? 'warning'
+                  : 'secondary'
+              },
+              {
+                label: 'Assigned To',
+                value: selectedLead?.assigned_user?.display_name || selectedLead?.assigned_user?.name || selectedLead?.assignedUser || 'Unassigned',
+                icon: User
+              },
+              {
+                label: 'Created Date',
+                value: selectedLead?.created_at || selectedLead?.created,
+                type: 'date',
+                icon: Calendar
+              },
+              {
+                label: 'Lead Score (Based on Stage)',
+                value: selectedLead?.stage?.score ? `${selectedLead.stage.score}%` : selectedLead?.lead_score ? `${selectedLead.lead_score}%` : 'N/A',
+                show: !!(selectedLead?.stage?.score || selectedLead?.lead_score)
+              },
+              {
+                label: 'Source',
+                value: selectedLead?.source || 'N/A',
+                show: !!selectedLead?.source
+              },
+              {
+                label: 'Last Activity',
+                value: selectedLead?.last_activity_at || selectedLead?.updated_at,
+                type: 'datetime',
+                show: !!(selectedLead?.last_activity_at || selectedLead?.updated_at)
+              },
+              {
+                label: 'Follow-ups',
+                value: `${selectedLead?.follow_ups?.length || 0} follow-up(s)`,
+                icon: History,
+                show: true
+              },
+              {
+                label: 'Meetings',
+                value: `${selectedLead?.meetings?.length || 0} meeting(s)`,
+                icon: Calendar,
+                show: true
+              }
+            ]
+          },
+          {
+            id: 'company-info',
+            title: 'Company Information',
+            icon: Building2,
+            fields: [
+              {
+                label: 'Company Name',
+                value: selectedLead?.company_name || selectedLead?.company || 'N/A'
+              },
+              {
+                label: 'Company Size',
+                value: selectedLead?.company_size || 'N/A',
+                show: !!selectedLead?.company_size
+              },
+              {
+                label: 'Location',
+                value: selectedLead?.location || 'N/A',
+                show: !!selectedLead?.location
+              }
+            ]
+          }
+            ]
+          },
+          {
+            id: 'campaign-prospects',
+            label: 'Campaign and Prospects',
+            sections: [
+              {
+                id: 'campaign-info',
+                title: 'Campaign Information',
+                icon: Target,
+                emptyState: {
+                  icon: Target,
+                  message: 'No campaign information available'
+                }
+              },
+              {
+                id: 'prospect-info',
+                title: 'Prospect Information',
+                icon: User,
+                emptyState: {
+                  icon: User,
+                  message: 'No prospect information available'
+                }
+              },
+              {
+                id: 'prospect-fields',
+                title: 'Prospect Fields',
+                icon: FileText,
+                emptyState: {
+                  icon: FileText,
+                  message: 'No prospect fields available'
+                }
+              },
+              {
+                id: 'follow-ups',
+                title: 'Follow-ups',
+                icon: History,
+                badge: {
+                  value: leadFollowUps?.length || 0,
+                  variant: 'secondary'
+                },
+                ...(leadFollowUps?.length
+                  ? {
+                      customContent: (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {(leadFollowUps || []).map((fu: any) => (
+                            <div
+                              key={fu.id}
+                              style={{
+                                padding: '12px',
+                                backgroundColor: '#f8fafc',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0',
+                                fontSize: '13px'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                                  {fu.follow_up_date ? moment(fu.follow_up_date).format(GlobalDateFormat) : '-'}
+                                </span>
+                                <span style={{ color: '#64748b', fontSize: '12px' }}>
+                                  {fu.communication_channel || fu.communication_channel_other || '-'}
+                                </span>
+                              </div>
+                              {fu.follow_up_status && (
+                                <div style={{ marginBottom: '4px', color: '#475569' }}>
+                                  <span style={{ color: '#94a3b8' }}>Status: </span>{fu.follow_up_status}
+                                </div>
+                              )}
+                              {fu.notes && (
+                                <div style={{ color: '#475569', lineHeight: 1.4 }}>
+                                  {fu.notes.length > 120 ? `${fu.notes.slice(0, 120)}...` : fu.notes}
+                                </div>
+                              )}
+                              <div style={{ marginTop: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0"
+                                  style={{ fontSize: '12px', color: '#6366f1' }}
+                                  onClick={() => {
+                                    const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                                    if (leadId) {
+                                      const followUpDate = fu.follow_up_date ? new Date(fu.follow_up_date).toISOString().split('T')[0] : '';
+                                      setFollowUpIdToEdit(fu.id);
+                                      setFollowupData({
+                                        leadId: Number(leadId),
+                                        leadName: selectedLead?.name || '',
+                                        followUpDate,
+                                        followUpStatus: fu.follow_up_status || 'Pending',
+                                        communicationChannel: fu.communication_channel || 'Phone Call',
+                                        communicationChannelOther: fu.communication_channel_other || '',
+                                        notes: fu.notes || '',
+                                        userExtension: (session?.user as any)?.extension || ''
+                                      });
+                                      setShowAddFollowupModal(true);
+                                    }
+                                  }}
+                                >
+                                  <Edit size={14} className="me-1" /> Edit
+                                </Button>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 text-danger"
+                                  title="Delete"
+                                  onClick={() => {
+                                    const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                                    if (leadId) {
+                                      handleDeleteFollowUp(Number(leadId), fu.id, selectedLead?.name);
+                                    }
+                                  }}
+                                >
+                                  <Trash2 size={14} className="me-1" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline-primary"
+                            size="sm"
+                            style={{ alignSelf: 'flex-start', marginTop: '4px' }}
+                            onClick={() => {
+                              const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                              if (leadId) {
+                                setFollowupData({
+                                  leadId: Number(leadId),
+                                  leadName: selectedLead?.name || '',
+                                  followUpDate: '',
+                                  followUpStatus: 'Pending',
+                                  communicationChannel: 'Phone Call',
+                                  communicationChannelOther: '',
+                                  notes: '',
+                                  userExtension: ''
+                                });
+                                setShowAddFollowupModal(true);
+                              }
+                            }}
+                          >
+                            <Plus size={14} className="me-1" /> Add Follow Up
+                          </Button>
+                        </div>
+                      )
+                    }
+                  : {
+                      emptyState: {
+                        icon: History,
+                        message: 'No follow-ups yet',
+                        action: {
+                          label: 'Add Follow Up',
+                          onClick: () => {
+                            setFollowupData({
+                              leadId: selectedLead?.id || selectedLead?.rawData?.id || null,
+                              leadName: selectedLead?.name || '',
+                              followUpDate: '',
+                              followUpStatus: 'Pending',
+                              communicationChannel: 'Phone Call',
+                              communicationChannelOther: '',
+                              notes: '',
+                              userExtension: ''
+                            });
+                            setShowAddFollowupModal(true);
+                          }
+                        }
+                      }
+                    })
+              },
+              {
+                id: 'meetings',
+                title: 'Meetings',
+                icon: Calendar,
+                badge: {
+                  value: leadMeetings?.length || 0,
+                  variant: 'secondary'
+                },
+                ...(leadMeetings?.length
+                  ? {
+                      customContent: (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {(leadMeetings || []).map((m: any) => (
+                            <div
+                              key={m.id}
+                              style={{
+                                padding: '12px',
+                                backgroundColor: '#f8fafc',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0',
+                                fontSize: '13px'
+                              }}
+                            >
+                              <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: '6px' }}>
+                                {m.name || 'Meeting'}
+                              </div>
+                              <div style={{ color: '#64748b', marginBottom: '4px' }}>
+                                {m.meeting_date ? moment(m.meeting_date).format(GlobalDateFormat) : '-'}
+                                {m.meeting_time && ` at ${m.meeting_time}`}
+                              </div>
+                              <div style={{ color: '#475569', marginBottom: '4px' }}>
+                                <span style={{ color: '#94a3b8' }}>Type: </span>
+                                {m.meeting_type || '-'}
+                              </div>
+                              {m.meeting_outcome && (
+                                <div style={{ color: '#475569', marginBottom: '4px' }}>
+                                  <span style={{ color: '#94a3b8' }}>Outcome: </span>
+                                  {m.meeting_outcome}
+                                </div>
+                              )}
+                              <div style={{ color: '#475569', marginBottom: '4px' }}>
+                                <span style={{ color: '#94a3b8' }}>Attendees: </span>
+                                {m.extensions?.map((ext: any) => {
+                                  const user = extensions.find((e: any) => String(e?.extension) === String(ext?.extension) || String(e?.id) === String(ext?.extension));
+                                  return user?.display_name || user?.name || ext?.extension || '';
+                                }).filter(Boolean).join(', ') || '-'}
+                              </div>
+                              <div style={{ marginTop: '8px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 text-danger"
+                                  title="Delete"
+                                  onClick={() => {
+                                    const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                                    handleDeleteMeeting(m.id, m.name, leadId ? Number(leadId) : undefined);
+                                  }}
+                                >
+                                  <Trash2 size={14} className="me-1" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline-primary"
+                            size="sm"
+                            style={{ alignSelf: 'flex-start', marginTop: '4px' }}
+                            onClick={() => {
+                              const leadId = selectedLead?.id || selectedLead?.rawData?.id;
+                              if (leadId) {
+                                setMeetingData({
+                                  leadId: Number(leadId),
+                                  leadName: selectedLead?.name || '',
+                                  meetingName: '',
+                                  meetingType: 'Online',
+                                  meetingDate: '',
+                                  meetingTime: '',
+                                  meetingOutcome: '',
+                                  extensions: []
+                                });
+                                setMeetingAttendees([]);
+                                setShowAddMeetingModal(true);
+                              }
+                            }}
+                          >
+                            <Plus size={14} className="me-1" /> Schedule Meeting
+                          </Button>
+                        </div>
+                      )
+                    }
+                  : {
+                      emptyState: {
+                        icon: Calendar,
+                        message: 'No meetings scheduled yet',
+                        action: {
+                          label: 'Schedule Meeting',
+                          onClick: () => {
+                            setMeetingData({
+                              leadId: selectedLead?.id || selectedLead?.rawData?.id || null,
+                              leadName: selectedLead?.name || '',
+                              meetingName: '',
+                              meetingType: 'Online',
+                              meetingDate: '',
+                              meetingTime: '',
+                              meetingOutcome: '',
+                              extensions: []
+                            });
+                            setMeetingAttendees([]);
+                            setShowAddMeetingModal(true);
+                          }
+                        }
+                      }
+                    })
+              }
+            ]
+          }
+        ]}
+        actions={[
+          {
+            label: 'Edit Lead',
+            icon: Edit,
+            onClick: () => {
+              router.push(`/crm/leads/${selectedLead?.id || selectedLead?.rawData?.id}/edit`);
+            },
+            variant: 'primary',
+            show: session?.user?.permissions?.includes('edit-crm-leads') && activeFilter !== 'lost'
+          },
+          {
+            label: 'Convert to Deal',
+            icon: Handshake,
+            onClick: () => {
+              setShowLeadSidebar(false);
+              handleConvertLead(selectedLead?.rawData || selectedLead);
+            },
+            variant: 'success',
+            show: session?.user?.permissions?.includes('add-crm-deals'),
+            disabled: activeFilter === 'lost'
+          },
+          {
+            label: 'View History',
+            icon: History,
+            onClick: () => {
+              setShowLeadSidebar(false);
+              void handleViewLead(selectedLead?.id || selectedLead?.rawData?.id).then(() => {
+                setShowLeadHistoryModal(true);
+              });
+            },
+            variant: 'outline-primary'
+          }
+        ]}
+      />
+
       {/* Filters Sidebar */}
       <GenericFilterSidebar
         isOpen={showFiltersSidebar}
@@ -8192,33 +8647,28 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             isClearable: true
           },
           {
-            id: 'industry',
-            label: 'Industry',
+            id: 'businessType',
+            label: 'Business Type',
             type: 'select',
-            value: leadsFilters.industry
-              ? { value: leadsFilters.industry, label: leadsFilters.industry }
+            value: leadsFilters.businessType
+              ? (() => {
+                  const btId = leadsFilters.businessType;
+                  const bt = filterBusinessTypes.find((b: BusinessTypeData) => b.id.toString() === btId);
+                  return bt ? { value: btId, label: bt.name } : { value: btId, label: btId };
+                })()
               : null,
             onChange: (selected) => {
-              const industryValue = selected ? selected.value : null;
+              const businessTypeValue = selected ? selected.value : null;
               setLeadsFilters((prev) => ({
                 ...prev,
-                industry: industryValue
+                businessType: businessTypeValue
               }));
             },
-            options: [
-              { value: "Technology", label: "Technology" },
-              { value: "Healthcare", label: "Healthcare" },
-              { value: "Finance", label: "Finance" },
-              { value: "Banking & Financial Services", label: "Banking & Financial Services" },
-              { value: "Manufacturing", label: "Manufacturing" },
-              { value: "Retail", label: "Retail" },
-              { value: "Education", label: "Education" },
-              { value: "Real Estate", label: "Real Estate" },
-              { value: "Telecommunications", label: "Telecommunications" },
-              { value: "Construction", label: "Construction" },
-              { value: "Other", label: "Other" },
-            ],
-            placeholder: 'Select industry...',
+            options: filterBusinessTypes.map((bt: BusinessTypeData) => ({
+              value: bt.id.toString(),
+              label: bt.name,
+            })),
+            placeholder: 'Select business type...',
             isClearable: true
           },
           {
@@ -8287,6 +8737,31 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             isClearable: true
           },
           {
+            id: 'lostReason',
+            label: 'Lost Lead Reason',
+            type: 'select',
+            value: leadsFilters.lostReason
+              ? (() => {
+                  const reasonId = leadsFilters.lostReason;
+                  const reason = lostReasons.find((r: any) => r.id.toString() === reasonId);
+                  return reason ? { value: reasonId, label: reason.name } : { value: reasonId, label: reasonId };
+                })()
+              : null,
+            onChange: (selected) => {
+              const lostReasonValue = selected ? selected.value : null;
+              setLeadsFilters((prev) => ({
+                ...prev,
+                lostReason: lostReasonValue
+              }));
+            },
+            options: lostReasons.map((r: any) => ({
+              value: r.id.toString(),
+              label: r.name,
+            })),
+            placeholder: 'Select lost reason...',
+            isClearable: true
+          },
+          {
             id: 'leadScoreMin',
             label: 'Lead Score (Min)',
             type: 'text',
@@ -8346,17 +8821,18 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         onApply={() => {
           const filtersToApply: Record<string, any> = {};
           
-          if (leadsSearch) filtersToApply.search = leadsSearch;
-          if (leadsFilters.assignedTo) filtersToApply.assigned_to = leadsFilters.assignedTo;
-          if (leadsFilters.stage) filtersToApply.stage_id = leadsFilters.stage;
-          if (leadsFilters.industry) filtersToApply.industry = leadsFilters.industry;
-          if (leadsFilters.source) filtersToApply.source = leadsFilters.source;
-          if (leadsFilters.leadPotential) filtersToApply.lead_potential = leadsFilters.leadPotential;
-          if (leadsFilters.campaign) filtersToApply.campaign_id = leadsFilters.campaign;
-          if (leadsFilters.leadScoreMin) filtersToApply.lead_score_min = leadsFilters.leadScoreMin;
-          if (leadsFilters.leadScoreMax) filtersToApply.lead_score_max = leadsFilters.leadScoreMax;
-          if (leadsFilters.dateFrom) filtersToApply.date_from = leadsFilters.dateFrom;
-          if (leadsFilters.dateTo) filtersToApply.date_to = leadsFilters.dateTo;
+          filtersToApply.search = leadsSearch;
+          filtersToApply.assigned_to = leadsFilters.assignedTo;
+          filtersToApply.stage_id = leadsFilters.stage;
+          filtersToApply.business_type_id = leadsFilters.businessType;
+          filtersToApply.source = leadsFilters.source;
+          filtersToApply.lead_potential = leadsFilters.leadPotential;
+          filtersToApply.campaign_id = leadsFilters.campaign;
+          filtersToApply.lost_reason_id = leadsFilters.lostReason;
+          filtersToApply.lead_score_min = leadsFilters.leadScoreMin;
+          filtersToApply.lead_score_max = leadsFilters.leadScoreMax;
+          filtersToApply.date_from = leadsFilters.dateFrom;
+          filtersToApply.date_to = leadsFilters.dateTo;
           
           handleFiltersChange(filtersToApply);
           setLeadsPagination({ ...leadsPagination, currentPage: 1 });
@@ -8368,10 +8844,11 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           setLeadsFilters({
             assignedTo: null,
             stage: null,
-            industry: null,
+            businessType: null,
             source: null,
             leadPotential: null,
             campaign: null,
+            lostReason: null,
             leadScoreMin: null,
             leadScoreMax: null,
             dateFrom: null,
@@ -8507,8 +8984,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
   onHide={() => setShowCreateLeadModal(false)}
   onSuccess={() => {
     setShowCreateLeadModal(false);
-    // Refresh your leads list here
-    // e.g., fetchLeads();
+    // Refresh leads list
+    fetchLeads();
   }}
   type="lead" // or "opportunity"
 />
