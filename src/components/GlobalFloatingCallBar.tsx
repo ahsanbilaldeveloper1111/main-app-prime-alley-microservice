@@ -1726,6 +1726,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                     pause
                   </i>
                 </button>
+                {hasPermission("transfer-call-cti") && (
                 <button
                   type="button"
                   role="button"
@@ -1759,6 +1760,7 @@ const GlobalFloatingCallBar: React.FC = () => {
                     call_made
                   </i>
                 </button>
+                )}
               </>
             )}
 

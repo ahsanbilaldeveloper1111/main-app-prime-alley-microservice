@@ -267,11 +267,12 @@ const handlePublishMessage = (req, res) => {
   const connectionKey = `${userAddress}:${screenId}`;
   let existingConnection = connectionPool.get(connectionKey);
   
+  // Connection pool is in-memory per process. If GET (SSE) and POST hit different instances, POST will not find the connection.
   if (!existingConnection || !existingConnection.client || !existingConnection.client.connected) {
     return res.status(400).json({
       success: false,
       error: 'No active STOMP connection found. Please establish SSE connection first.',
-      hint: 'Open GET /api/cti-stomp-stream (SSE) with the same token, userAddress and screenId before calling this POST. If using a load balancer, ensure sticky sessions so GET and POST hit the same instance.'
+      hint: 'Open GET /api/cti-stomp-stream (SSE) with the same token, userAddress and screenId before calling this POST. If using a load balancer, ensure sticky sessions so GET and POST hit the same instance. After call end (DROPPED/DISCONNECTED) the client retries with delay and backoff.'
     });
   }
   

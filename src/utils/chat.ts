@@ -172,11 +172,18 @@ export const submitChatSurvey = async (
 
 /**
  * Get tenant-specific FAQs
+ * @param tenantId - Optional tenant identifier; when not provided or empty, request is sent without tenant_id (no default tenant_123)
+ * @param search - Optional search term to filter FAQs (sent as query param for server-side search)
  * @returns Promise with list of tenant FAQs
  */
-export const getTenantFAQs = async (): Promise<FAQData[]> => {
+export const getTenantFAQs = async (tenantId?: string, search?: string): Promise<FAQData[]> => {
   try {
-    const response = await axiosInstance.get<FAQListResponse>(`/chat/tenant-faqs?tenant_id=${tenant_id}`);
+    const params = new URLSearchParams();
+    const id = tenantId?.trim();
+    if (id) params.set("tenant_id", id);
+    if (search?.trim()) params.set("search", search.trim());
+    const query = params.toString() ? `?${params.toString()}` : "";
+    const response = await axiosInstance.get<FAQListResponse>(`/chat/tenant-faqs${query}`);
     
     // Check if response contains an error
     if (response.data?.error) {
@@ -295,11 +302,15 @@ export const deleteTenantFAQ = async (params: DeleteTenantFAQParams): Promise<vo
 
 /**
  * Get global FAQs
+ * @param search - Optional search term (sent as query param for server-side search)
  * @returns Promise with list of global FAQs
  */
-export const getGlobalFAQs = async (): Promise<FAQData[]> => {
+export const getGlobalFAQs = async (search?: string): Promise<FAQData[]> => {
   try {
-    const response = await axiosInstance.get<FAQListResponse>('/chat/global-faqs/');
+    const url = search?.trim()
+      ? `/chat/global-faqs?search=${encodeURIComponent(search.trim())}`
+      : "/chat/global-faqs/";
+    const response = await axiosInstance.get<FAQListResponse>(url);
     
     // Check if response contains an error
     if (response.data?.error) {

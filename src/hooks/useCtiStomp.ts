@@ -99,6 +99,8 @@ const globalConnectionRefs = {
   lastMessageTimeRef: { current: null as number | null }, // Track last message time for health check
   healthCheckIntervalRef: { current: null as NodeJS.Timeout | null }, // Health check interval
   hasRequestedInitialStateRef: { current: false }, // Request initial-state only once per connection to avoid loops
+  pendingRefreshAfterCallEndRef: { current: null as ReturnType<typeof setTimeout> | null }, // Single timeout for refresh after call end
+  lastRefreshAfterCallEndRef: { current: 0 }, // Throttle: last time we requested refresh after call end (ms)
 };
 
 /**
@@ -151,6 +153,7 @@ export default function useCtiStomp(
   const [eventLog, setEventLog] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [userAddress, setUserAddress] = useState<string>("");
   const [summaryData, setSummaryData] = useState<SummaryData>({
     extensions: 0,
@@ -181,6 +184,8 @@ export default function useCtiStomp(
   const localLastMessageTimeRef = useRef<number | null>(null);
   const localHealthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const localHasRequestedInitialStateRef = useRef(false);
+  const localPendingRefreshAfterCallEndRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localLastRefreshAfterCallEndRef = useRef(0);
 
   // Use shared refs for global instance, individual refs for other instances
   const clientRef = isGlobalInstance ? globalConnectionRefs.clientRef : localClientRef;
@@ -200,6 +205,8 @@ export default function useCtiStomp(
   const lastMessageTimeRef = isGlobalInstance ? globalConnectionRefs.lastMessageTimeRef : localLastMessageTimeRef;
   const healthCheckIntervalRef = isGlobalInstance ? globalConnectionRefs.healthCheckIntervalRef : localHealthCheckIntervalRef;
   const hasRequestedInitialStateRef = isGlobalInstance ? globalConnectionRefs.hasRequestedInitialStateRef : localHasRequestedInitialStateRef;
+  const pendingRefreshAfterCallEndRef = isGlobalInstance ? globalConnectionRefs.pendingRefreshAfterCallEndRef : localPendingRefreshAfterCallEndRef;
+  const lastRefreshAfterCallEndRef = isGlobalInstance ? globalConnectionRefs.lastRefreshAfterCallEndRef : localLastRefreshAfterCallEndRef;
 
   // Store attemptReconnection function in a ref so it can be accessed from multiple useEffects
   const attemptReconnectionRef = useRef<((maxAttempts?: number) => Promise<void>) | null>(null);
@@ -956,7 +963,8 @@ export default function useCtiStomp(
   );
 
   // Helper function to publish STOMP messages via API.
-  // If the API returns "No active STOMP connection" (e.g. POST hit a different instance than SSE), retry once after a short delay.
+  // If the API returns "No active STOMP connection" (e.g. POST hit different instance than SSE, or connection briefly unavailable after call end), retry with backoff.
+  const PUBLISH_RETRY_DELAYS_MS = [0, 400, 800, 1200]; // 4 attempts: immediate, then +400ms, +800ms, +1200ms
   const publishStompMessage = useCallback(
     async (destination: string, body: string = "", retry = true): Promise<boolean> => {
       if (!tokenRef.current || !userAddressRef.current) {
@@ -974,24 +982,50 @@ export default function useCtiStomp(
         return response.data.success === true;
       };
 
-      try {
-        return await doPost();
-      } catch (error: any) {
-        const errMsg = error?.response?.data?.error || "";
-        const isNoConnection = typeof errMsg === "string" && errMsg.includes("No active STOMP connection");
-        if (retry && isNoConnection) {
-          await new Promise((r) => setTimeout(r, 600));
-          try {
-            return await doPost();
-          } catch {
+      for (let attempt = 0; attempt < (retry ? PUBLISH_RETRY_DELAYS_MS.length : 1); attempt++) {
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, PUBLISH_RETRY_DELAYS_MS[attempt]));
+        }
+        try {
+          return await doPost();
+        } catch (error: any) {
+          const errMsg = error?.response?.data?.error || "";
+          const isNoConnection = typeof errMsg === "string" && errMsg.includes("No active STOMP connection");
+          if (!retry || !isNoConnection || attempt === PUBLISH_RETRY_DELAYS_MS.length - 1) {
             return false;
           }
         }
-        return false;
       }
+      return false;
     },
     []
   );
+
+  // Schedule at most one refresh (initial-state + ongoing-calls) after call end, throttled to once per 2s. Prevents infinite loop when multiple DROPPED/DISCONNECTED events or response data re-trigger.
+  const REFRESH_AFTER_CALL_END_THROTTLE_MS = 2000;
+  const REFRESH_AFTER_CALL_END_DELAY_MS = 300;
+  const scheduleRefreshAfterCallEnd = useCallback(() => {
+    if (pendingRefreshAfterCallEndRef.current) {
+      clearTimeout(pendingRefreshAfterCallEndRef.current);
+      pendingRefreshAfterCallEndRef.current = null;
+    }
+    const now = Date.now();
+    if (lastRefreshAfterCallEndRef.current && now - lastRefreshAfterCallEndRef.current < REFRESH_AFTER_CALL_END_THROTTLE_MS) {
+      return;
+    }
+    pendingRefreshAfterCallEndRef.current = setTimeout(() => {
+      pendingRefreshAfterCallEndRef.current = null;
+      lastRefreshAfterCallEndRef.current = Date.now();
+      const pub = publishStompMessageRef.current;
+      if (pub) {
+        pub("/app/request/initial-state", "");
+        pub("/app/request/ongoing-calls", "");
+      }
+    }, REFRESH_AFTER_CALL_END_DELAY_MS);
+  }, []);
+
+  const scheduleRefreshAfterCallEndRef = useRef(scheduleRefreshAfterCallEnd);
+  scheduleRefreshAfterCallEndRef.current = scheduleRefreshAfterCallEnd;
 
   // Update refs when callbacks change (after all functions are defined)
   useEffect(() => {
@@ -1058,6 +1092,8 @@ export default function useCtiStomp(
       const response = await axiosInstance.get("/cti/connect", {
         headers: {
           "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store",
+          "Pragma": "no-cache",
         },
       });
 
@@ -1151,6 +1187,7 @@ export default function useCtiStomp(
         isGettingTokenRef.current = false;
         connectionStartTimeRef.current = null;
         isReconnectingRef.current = false;
+        setIsReconnecting(false);
         hasRequestedInitialStateRef.current = false;
 
         // Clear token, userAddress, userTeams, and userDataExtensions refs
@@ -1271,9 +1308,11 @@ export default function useCtiStomp(
       // Only reset reconnecting flag if not preserving it
       if (!preserveReconnecting) {
         isReconnectingRef.current = false;
+        setIsReconnecting(false);
       } else {
         // Restore the reconnecting flag if we're preserving it
         isReconnectingRef.current = wasReconnecting;
+        setIsReconnecting(!!wasReconnecting);
       }
 
       // Clear token, userAddress, userTeams, and userDataExtensions refs to force fresh token on next connection
@@ -1306,6 +1345,7 @@ export default function useCtiStomp(
         if (!manager.isMasterTab()) {
           console.log(`[${currentInstanceId}] ⚠️ No longer master, cancelling reconnection`);
           isReconnectingRef.current = false;
+          setIsReconnecting(false);
           setIsInitialized(true); // Keep UI enabled
           setError(null);
           return;
@@ -1319,6 +1359,7 @@ export default function useCtiStomp(
       if (attempt >= maxAttempts) {
         console.error(`[${currentInstanceId}] ❌ Max reconnection attempts (${maxAttempts}) reached`);
         isReconnectingRef.current = false;
+        setIsReconnecting(false);
         reconnectionAttemptsRef.current = 0;
         setError(`Failed to reconnect after ${maxAttempts} attempts. Please refresh the page.`);
         return;
@@ -1362,6 +1403,7 @@ export default function useCtiStomp(
         // Reset reconnection attempts on successful token retrieval
         reconnectionAttemptsRef.current = 0;
         isReconnectingRef.current = false;
+        setIsReconnecting(false);
 
         // Create new connection
         console.log(`[${currentInstanceId}] ✅ Got fresh token, creating new connection...`);
@@ -1475,6 +1517,7 @@ export default function useCtiStomp(
         setIsInitialized(true);
         setError(null);
         isReconnectingRef.current = false; // Reset reconnection flag
+        setIsReconnecting(false);
         reconnectionAttemptsRef.current = 0; // Reset reconnection attempts
         lastMessageTimeRef.current = Date.now(); // Initialize last message time
 
@@ -1514,9 +1557,15 @@ export default function useCtiStomp(
           // Check if connection exists and is open
           if (!eventSourceRef.current || eventSourceRef.current.readyState !== EventSource.OPEN) {
             console.log(`[${currentInstanceId}] ⚠️ Health check: Connection is not OPEN, triggering reconnection...`);
-            if (!isReconnectingRef.current) {
+            if (!isReconnectingRef.current && attemptReconnectionRef.current) {
+              // Stop health check immediately so only one reconnection runs; new connection will set its own interval
+              if (healthCheckIntervalRef.current) {
+                clearInterval(healthCheckIntervalRef.current);
+                healthCheckIntervalRef.current = null;
+              }
               isReconnectingRef.current = true;
-              attemptReconnection();
+              setIsReconnecting(true);
+              attemptReconnectionRef.current();
             }
             return;
           }
@@ -1535,9 +1584,14 @@ export default function useCtiStomp(
             console.log(
               `[${currentInstanceId}] ⚠️ Health check: No CTI event received in ${Math.round(timeSinceLastMessage / 1000)}s (connection is OPEN but no events), triggering reconnection...`
             );
-            if (!isReconnectingRef.current) {
+            if (!isReconnectingRef.current && attemptReconnectionRef.current) {
+              if (healthCheckIntervalRef.current) {
+                clearInterval(healthCheckIntervalRef.current);
+                healthCheckIntervalRef.current = null;
+              }
               isReconnectingRef.current = true;
-              attemptReconnection();
+              setIsReconnecting(true);
+              attemptReconnectionRef.current();
             }
           }
         }, 30000); // Check every 30 seconds
@@ -1637,10 +1691,7 @@ export default function useCtiStomp(
                   handleCallEventRef.current(data.data);
                 }
                 if (data.data?.eventType === "DROPPED" || data.data?.eventType === "DISCONNECTED") {
-                  if (publishStompMessageRef.current) {
-                    publishStompMessageRef.current("/app/request/initial-state", "");
-                    publishStompMessageRef.current("/app/request/ongoing-calls", "");
-                  }
+                  scheduleRefreshAfterCallEndRef.current?.();
                 }
               } catch (err) {
                 setError("Failed to process call event");
@@ -1684,6 +1735,7 @@ export default function useCtiStomp(
                 if (!isReconnectingRef.current) {
                   const currentInstanceId = instanceIdRef.current;
                   isReconnectingRef.current = true;
+                  setIsReconnecting(true);
                   console.log(
                     `[${currentInstanceId}] 🔄 Server reconnecting, starting reconnection with retry logic...`
                   );
@@ -1753,6 +1805,7 @@ export default function useCtiStomp(
           // Reconnect with retry logic and exponential backoff
           if (!isReconnectingRef.current) {
             isReconnectingRef.current = true;
+            setIsReconnecting(true);
             console.log(
               `[${currentInstanceId}] 🔄 Connection closed, starting reconnection with retry logic...`
             );
@@ -1788,6 +1841,7 @@ export default function useCtiStomp(
         isGettingTokenRef.current = false; // Reset token flag
         connectionStartTimeRef.current = null;
         isReconnectingRef.current = false;
+        setIsReconnecting(false);
         reconnectionAttemptsRef.current = 0;
         lastMessageTimeRef.current = null;
         hasRequestedInitialStateRef.current = false;
@@ -2484,6 +2538,7 @@ export default function useCtiStomp(
             setIsInitialized(true);
             setError(null);
             isReconnectingRef.current = false;
+            setIsReconnecting(false);
             reconnectionAttemptsRef.current = 0;
             lastMessageTimeRef.current = Date.now();
             connectionStartTimeRef.current = Date.now();
@@ -2515,28 +2570,33 @@ export default function useCtiStomp(
               if (!eventSourceRef.current || eventSourceRef.current.readyState !== EventSource.OPEN) {
                 console.log(`[${currentInstanceId}] ⚠️ Health check: Connection is not OPEN, triggering reconnection...`);
                 if (!isReconnectingRef.current && attemptReconnectionRef.current) {
+                  if (healthCheckIntervalRef.current) {
+                    clearInterval(healthCheckIntervalRef.current);
+                    healthCheckIntervalRef.current = null;
+                  }
                   isReconnectingRef.current = true;
+                  setIsReconnecting(true);
                   attemptReconnectionRef.current();
                 }
                 return;
               }
 
               // Check if we've received a message recently (within last 5 minutes)
-              // Note: We check for CTI events (not pings) to detect if the connection is actually working
-              // If connection is OPEN, it means SSE is alive. We only reconnect if no CTI events for 5 minutes
               const now = Date.now();
               const lastMessageTime = lastMessageTimeRef.current || connectionStartTimeRef.current || now;
               const timeSinceLastMessage = now - lastMessageTime;
 
-              // If no CTI event received in 5 minutes AND connection is open, it might be stale
-              // But if connection is OPEN, it's likely still alive (SSE keeps connection open with pings)
-              // Only trigger reconnection if it's been a very long time (5 minutes) without any CTI events
-              if (timeSinceLastMessage > 300000) { // 5 minutes instead of 2 minutes
+              if (timeSinceLastMessage > 300000) {
                 console.log(
                   `[${currentInstanceId}] ⚠️ Health check: No CTI event received in ${Math.round(timeSinceLastMessage / 1000)}s (connection is OPEN but no events), triggering reconnection...`
                 );
                 if (!isReconnectingRef.current && attemptReconnectionRef.current) {
+                  if (healthCheckIntervalRef.current) {
+                    clearInterval(healthCheckIntervalRef.current);
+                    healthCheckIntervalRef.current = null;
+                  }
                   isReconnectingRef.current = true;
+                  setIsReconnecting(true);
                   attemptReconnectionRef.current();
                 }
               }
@@ -2615,10 +2675,7 @@ export default function useCtiStomp(
                     handleCallEventRef.current(data.data);
                   }
                   if (data.data?.eventType === "DROPPED" || data.data?.eventType === "DISCONNECTED") {
-                    if (publishStompMessageRef.current) {
-                      publishStompMessageRef.current("/app/request/initial-state", "");
-                      publishStompMessageRef.current("/app/request/ongoing-calls", "");
-                    }
+                    scheduleRefreshAfterCallEndRef.current?.();
                   }
                   break;
 
@@ -2686,6 +2743,7 @@ export default function useCtiStomp(
               // Reconnect with retry logic and exponential backoff
               if (!isReconnectingRef.current && attemptReconnectionRef.current) {
                 isReconnectingRef.current = true;
+                setIsReconnecting(true);
                 console.log(
                   `[${currentInstanceId}] 🔄 Connection closed, starting reconnection with retry logic...`
                 );
@@ -3004,6 +3062,7 @@ export default function useCtiStomp(
     eventLog,
     error,
     isInitialized,
+    isReconnecting,
     userAddress, // Return userAddress
     summaryData,
     getDevicesForDn,

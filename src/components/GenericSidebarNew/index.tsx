@@ -5,7 +5,8 @@ import {
   ThumbsUp, ThumbsDown, Paperclip, Users, Building2, DollarSign,
   FileText, Tag, Zap, ShoppingCart, CreditCard, Link2, Instagram,
   Briefcase, FileCheck, ListTodo, User, Sparkles, Maximize2, Bold,
-  Italic, Underline, List, Link, Image, Smile, Plus, Clock
+  Italic, Underline, List, Link, Image, Smile, Plus, Clock, Repeat,
+  Linkedin, MessageCircle, Smartphone, Search
 } from 'lucide-react';
 import { Badge } from 'react-bootstrap';
 
@@ -59,7 +60,7 @@ export interface QuickAction {
   id: string;
   label: string;
   icon: LucideIcon;
-  onClick: () => void;
+  onClick: (e?: React.MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
 }
 
@@ -153,6 +154,21 @@ export interface GenericSidebarProps {
 
   onCall?: (phoneNumber: string) => void;
   callerNumber?: string;
+  
+  // Meeting modal callbacks
+  onMeetingSchedule?: (meetingData: {
+    title: string;
+    hostType: 'user' | 'rotation';
+    hostEmail: string;
+    startDate: string;
+    startTime: string;
+    endTime: string;
+    attendees: string[];
+    location: string;
+    reminders: string[];
+    description: string;
+    internalNote: string;
+  }) => void;
 }
 
 
@@ -202,19 +218,51 @@ interface CallModalProps {
           animation: 'slideInUp 0.3s ease-out',
         }}
       >
+        {/* Header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 16px',
+            borderBottom: '1px solid #e2e8f0',
+          }}
+        >
+          <h3 style={{ 
+            fontSize: '16px', 
+            fontWeight: '600', 
+            color: '#141414', 
+            margin: 0 
+          }}>
+            {contactName}
+          </h3>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f5f8fa';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+            title="Close"
+          >
+            <X size={18} style={{ color: '#141414' }} />
+          </button>
+        </div>
+
         {/* Content */}
         <div style={{ padding: '16px' }}>
-          {/* Contact Name */}
-          <div style={{ marginBottom: '12px' }}>
-            <h3 style={{ 
-              fontSize: '16px', 
-              fontWeight: '600', 
-              color: '#141414', 
-              margin: 0 
-            }}>
-              {contactName}
-            </h3>
-          </div>
   
           {/* Call Button */}
           <button
@@ -1966,6 +2014,267 @@ interface EmailModalProps {
   };
   
 
+  // ============================================================================
+// MORE ACTIONS MODAL COMPONENT
+// Add this after CallModal component
+// ============================================================================
+
+interface MoreActionsModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    position: { top: number; left: number };
+    onActionSelect: (actionId: string) => void;
+  }
+  
+  const MoreActionsModal: React.FC<MoreActionsModalProps> = ({ 
+    isOpen, 
+    onClose, 
+    position,
+    onActionSelect 
+  }) => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const modalRef = useRef<HTMLDivElement>(null);
+  
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+          onClose();
+        }
+      };
+  
+      const handleEscape = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          onClose();
+        }
+      };
+  
+      if (isOpen) {
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+      }
+  
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }, [isOpen, onClose]);
+  
+    if (!isOpen) return null;
+  
+    const actions = [
+      {
+        id: 'enroll-sequence',
+        icon: Repeat,
+        label: 'Enroll in a sequence',
+        hasSubmenu: false,
+      },
+      {
+        id: 'engage-linkedin',
+        icon: Linkedin,
+        label: 'Engage on LinkedIn',
+        hasSubmenu: true,
+        highlighted: 'LinkedIn',
+      },
+      {
+        id: 'log-sms',
+        icon: MessageSquare,
+        label: 'Log SMS',
+        hasSubmenu: false,
+      },
+      {
+        id: 'log-linkedin',
+        icon: Linkedin,
+        label: 'Log a LinkedIn message',
+        hasSubmenu: false,
+        highlighted: 'LinkedIn',
+      },
+      {
+        id: 'log-whatsapp',
+        icon: MessageCircle,
+        label: 'Log a WhatsApp message',
+        hasSubmenu: false,
+        highlighted: 'WhatsApp',
+      },
+      {
+        id: 'log-call',
+        icon: Phone,
+        label: 'Log a call',
+        hasSubmenu: false,
+      },
+    ];
+  
+    const filteredActions = actions.filter(action =>
+      action.label.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  
+    const handleActionClick = (actionId: string) => {
+      onActionSelect(actionId);
+      onClose();
+    };
+  
+    const highlightText = (text: string, highlight?: string) => {
+      if (!highlight) return text;
+      
+      const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
+      return (
+        <>
+          {parts.map((part, index) => 
+            part.toLowerCase() === highlight.toLowerCase() ? (
+              <span key={index} style={{ color: '#0073b1' }}>{part}</span>
+            ) : (
+              part
+            )
+          )}
+        </>
+      );
+    };
+  
+    return (
+      <div
+        ref={modalRef}
+        style={{
+          position: 'fixed',
+          top: `${position.top}px`,
+          right: '0px',
+          width: '280px',
+          backgroundColor: '#ffffff',
+          border: '1px solid #cbd5e0',
+          borderRadius: '8px',
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+          zIndex: 1001,
+          overflow: 'hidden',
+          animation: 'fadeIn 0.15s ease-out',
+        }}
+      >
+        {/* Search Bar */}
+        <div style={{
+          padding: '12px',
+          borderBottom: '1px solid #e2e8f0',
+        }}>
+          <div style={{
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+          }}>
+            <input
+              type="text"
+              placeholder="Search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              autoFocus
+              style={{
+                width: '100%',
+                padding: '8px 12px 8px 36px',
+                border: '1px solid #cbd5e0',
+                borderRadius: '20px',
+                fontSize: '14px',
+                color: '#141414',
+                outline: 'none',
+                backgroundColor: '#ffffff',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#0091ae';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#cbd5e0';
+              }}
+            />
+            <Search
+              size={16}
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#718096',
+                pointerEvents: 'none',
+              }}
+            />
+          </div>
+        </div>
+  
+        {/* Actions List */}
+        <div style={{
+          maxHeight: '320px',
+          overflowY: 'auto',
+        }}>
+          {filteredActions.length === 0 ? (
+            <div style={{
+              padding: '24px',
+              textAlign: 'center',
+              color: '#718096',
+              fontSize: '14px',
+            }}>
+              No actions found
+            </div>
+          ) : (
+            filteredActions.map((action) => {
+              const ActionIcon = action.icon;
+              return (
+                <button
+                  key={action.id}
+                  onClick={() => handleActionClick(action.id)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                    textAlign: 'left',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f7fafc';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    flex: 1,
+                  }}>
+                    <ActionIcon size={18} style={{ color: '#718096', flexShrink: 0 }} />
+                    <span style={{
+                      fontSize: '14px',
+                      color: '#141414',
+                      fontWeight: '400',
+                    }}>
+                      {highlightText(action.label, action.highlighted)}
+                    </span>
+                  </div>
+                  {action.hasSubmenu && (
+                    <ChevronRight size={16} style={{ color: '#718096' }} />
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+  
+        {/* Footer */}
+        <div style={{
+          padding: '12px 16px',
+          borderTop: '1px solid #e2e8f0',
+          backgroundColor: '#fafafa',
+        }}>
+          <div style={{
+            fontSize: '13px',
+            color: '#141414',
+            fontWeight: '600',
+            marginBottom: '4px',
+          }}>
+            Reorder activity buttons
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // ============================================================================
 // TASK MODAL COMPONENT
@@ -3037,6 +3346,1254 @@ interface TaskModalProps {
     );
   };
   
+
+
+  // ============================================================================
+// MEETING/SCHEDULE MODAL COMPONENT - Add this after TaskModal in your file
+// ============================================================================
+
+interface MeetingModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    hostEmail?: string;
+    hostName?: string;
+    attendeeEmail?: string;
+    attendeeName?: string;
+    onSchedule: (meetingData: {
+      title: string;
+      hostType: 'user' | 'rotation';
+      hostEmail: string;
+      startDate: string;
+      startTime: string;
+      endTime: string;
+      attendees: string[];
+      location: string;
+      reminders: string[];
+      description: string;
+      internalNote: string;
+    }) => void;
+  }
+  
+  const MeetingModal: React.FC<MeetingModalProps> = ({ 
+    isOpen, 
+    onClose, 
+    hostEmail = 'user@example.com',
+    hostName = 'Your Name',
+    attendeeEmail,
+    attendeeName,
+    onSchedule 
+  }) => {
+    // State management
+    const [title, setTitle] = useState('');
+    const [hostType, setHostType] = useState<'user' | 'rotation'>('user');
+    const [selectedHost, setSelectedHost] = useState(hostEmail);
+    const [startDate, setStartDate] = useState(new Date());
+    const [startTime, setStartTime] = useState('01:00');
+    const [endTime, setEndTime] = useState('01:30');
+    const [attendees, setAttendees] = useState<string[]>(attendeeEmail ? [attendeeEmail] : []);
+    const [attendeeCount, setAttendeeCount] = useState(attendeeEmail ? 1 : 2);
+    const [location, setLocation] = useState('');
+    const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+    const [reminders, setReminders] = useState<string[]>([]);
+    const [description, setDescription] = useState('');
+    const [internalNote, setInternalNote] = useState('');
+    const [hideWeekends, setHideWeekends] = useState(false);
+    const [isMaximized, setIsMaximized] = useState(false);
+    const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [showHostDropdown, setShowHostDropdown] = useState(false);
+    const [showAttendeesDropdown, setShowAttendeesDropdown] = useState(false);
+    const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false);
+    
+    const titleInputRef = useRef<HTMLInputElement>(null);
+    const locationDropdownRef = useRef<HTMLDivElement>(null);
+  
+    useEffect(() => {
+      if (isOpen && titleInputRef.current) {
+        titleInputRef.current.focus();
+      }
+    }, [isOpen]);
+  
+    // Close dropdowns when clicking outside
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (locationDropdownRef.current && !locationDropdownRef.current.contains(event.target as Node)) {
+          setShowLocationDropdown(false);
+        }
+      };
+  
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+  
+    if (!isOpen) return null;
+  
+    // Calendar utilities
+    const getDaysInMonth = (date: Date) => {
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      return new Date(year, month + 1, 0).getDate();
+    };
+  
+    const getFirstDayOfMonth = (date: Date) => {
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      return new Date(year, month, 1).getDay();
+    };
+  
+    const formatDateRange = (date: Date) => {
+      const startOfWeek = new Date(date);
+      startOfWeek.setDate(date.getDate() - date.getDay());
+      
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 4); // 5 days for weekdays
+  
+      const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+      return `${startOfWeek.toLocaleDateString('en-US', options)} - ${endOfWeek.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    };
+  
+    const generateCalendarDays = () => {
+      const daysInMonth = getDaysInMonth(currentMonth);
+      const firstDay = getFirstDayOfMonth(currentMonth);
+      const days = [];
+      
+      // Previous month days
+      const prevMonthDays = getDaysInMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+      for (let i = firstDay - 1; i >= 0; i--) {
+        days.push({
+          day: prevMonthDays - i,
+          isCurrentMonth: false,
+          date: new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, prevMonthDays - i)
+        });
+      }
+      
+      // Current month days
+      for (let i = 1; i <= daysInMonth; i++) {
+        days.push({
+          day: i,
+          isCurrentMonth: true,
+          date: new Date(currentMonth.getFullYear(), currentMonth.getMonth(), i)
+        });
+      }
+      
+      // Next month days to fill the grid
+      const remainingDays = 35 - days.length; // 5 weeks * 7 days
+      for (let i = 1; i <= remainingDays; i++) {
+        days.push({
+          day: i,
+          isCurrentMonth: false,
+          date: new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, i)
+        });
+      }
+      
+      return days;
+    };
+  
+    const isToday = (date: Date) => {
+      const today = new Date();
+      return date.getDate() === today.getDate() &&
+             date.getMonth() === today.getMonth() &&
+             date.getFullYear() === today.getFullYear();
+    };
+  
+    const isSelected = (date: Date) => {
+      return date.getDate() === startDate.getDate() &&
+             date.getMonth() === startDate.getMonth() &&
+             date.getFullYear() === startDate.getFullYear();
+    };
+  
+    const handleDateSelect = (date: Date) => {
+      setStartDate(date);
+    };
+  
+    const handlePrevWeek = () => {
+      const newDate = new Date(currentMonth);
+      newDate.setDate(newDate.getDate() - 7);
+      setCurrentMonth(newDate);
+    };
+  
+    const handleNextWeek = () => {
+      const newDate = new Date(currentMonth);
+      newDate.setDate(newDate.getDate() + 7);
+      setCurrentMonth(newDate);
+    };
+  
+    const handleSchedule = () => {
+      if (!title.trim()) {
+        alert('Please enter a meeting title');
+        return;
+      }
+  
+      onSchedule({
+        title,
+        hostType,
+        hostEmail: selectedHost,
+        startDate: startDate.toISOString(),
+        startTime,
+        endTime,
+        attendees,
+        location,
+        reminders,
+        description,
+        internalNote,
+      });
+  
+      // Reset form
+      setTitle('');
+      setHostType('user');
+      setStartDate(new Date());
+      setStartTime('01:00');
+      setEndTime('01:30');
+      setAttendees([]);
+      setLocation('');
+      setReminders([]);
+      setDescription('');
+      setInternalNote('');
+      onClose();
+    };
+  
+    const weekDays = hideWeekends 
+      ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+      : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  
+    const timeSlots = [];
+    for (let hour = 0; hour < 24; hour++) {
+      timeSlots.push(`${hour.toString().padStart(2, '0')}:00`);
+      timeSlots.push(`${hour.toString().padStart(2, '0')}:30`);
+    }
+  
+    const locations = [
+      'Conference Room A',
+      'Conference Room B',
+      'Video Call',
+      'Phone Call',
+      'Client Office',
+      'Custom Location'
+    ];
+  
+    return (
+      <div
+        style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            height: isMaximized ? 'auto' : '750px',
+            width: isMaximized ? 'auto' : '1320px',
+            backgroundColor: '#ffffff',
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+            borderRadius: '8px',
+            border: '1px solid #cbd5e0',
+            overflow: 'hidden',
+            opacity: 1,
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px 20px',
+            borderBottom: '1px solid #e2e8f0',
+            backgroundColor: '#ffffff',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                color: '#141414',
+                padding: '4px',
+              }}
+            >
+              <ChevronDown size={20} />
+            </button>
+            <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#141414', margin: 0 }}>
+              Schedule
+            </h2>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              onClick={() => setIsMaximized(!isMaximized)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '6px',
+                color: '#141414',
+              }}
+              title={isMaximized ? "Restore" : "Maximize"}
+            >
+              <Maximize2 size={18} />
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '6px',
+                color: '#141414',
+              }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+  
+        {/* Main Content Area */}
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          {/* Left Panel - Form */}
+          <div style={{ 
+            width: '480px', 
+            borderRight: '1px solid #e2e8f0',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: '#ffffff',
+          }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+              {/* Host Section */}
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ 
+                  fontSize: '14px', 
+                  fontWeight: '600', 
+                  color: '#141414',
+                  display: 'block',
+                  marginBottom: '12px'
+                }}>
+                  Host
+                </label>
+                
+                <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    color: '#141414',
+                  }}>
+                    <input
+                      type="radio"
+                      name="hostType"
+                      checked={hostType === 'user'}
+                      onChange={() => setHostType('user')}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        cursor: 'pointer',
+                      }}
+                    />
+                    User
+                  </label>
+                  
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    color: '#141414',
+                  }}>
+                    <input
+                      type="radio"
+                      name="hostType"
+                      checked={hostType === 'rotation'}
+                      onChange={() => setHostType('rotation')}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        cursor: 'pointer',
+                      }}
+                    />
+                    Meeting rotation
+                  </label>
+                </div>
+  
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setShowHostDropdown(!showHostDropdown)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #cbd5e0',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      color: '#141414',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>{hostName} &lt;{selectedHost}&gt;</span>
+                    <ChevronDown size={16} />
+                  </button>
+                </div>
+              </div>
+  
+              {/* Title */}
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ 
+                  fontSize: '14px', 
+                  fontWeight: '600', 
+                  color: '#141414',
+                  display: 'block',
+                  marginBottom: '8px'
+                }}>
+                  Title
+                </label>
+                <input
+                  ref={titleInputRef}
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder=""
+                  style={{
+                    width: '100%',
+                    border: '1px solid #cccccc',
+                    outline: 'none',
+                    fontSize: '14px',
+                    color: '#141414',
+                    padding: '10px 12px',
+                    borderRadius: '4px',
+                  }}
+                />
+              </div>
+  
+              {/* Date and Time */}
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ 
+                      fontSize: '13px', 
+                      fontWeight: '600', 
+                      color: '#141414',
+                      display: 'block',
+                      marginBottom: '8px'
+                    }}>
+                      Start date
+                    </label>
+                    <div style={{
+                      padding: '8px 12px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #cbd5e0',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      color: '#141414',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}>
+                      <Calendar size={16} style={{ color: '#718096' }} />
+                      <span>{startDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</span>
+                    </div>
+                  </div>
+  
+                  <div>
+                    <label style={{ 
+                      fontSize: '13px', 
+                      fontWeight: '600', 
+                      color: '#141414',
+                      display: 'block',
+                      marginBottom: '8px'
+                    }}>
+                      Start time
+                    </label>
+                    <div style={{
+                      padding: '8px 12px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #cbd5e0',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      color: '#141414',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}>
+                      <Clock size={16} style={{ color: '#718096' }} />
+                      <select
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        style={{
+                          border: 'none',
+                          outline: 'none',
+                          fontSize: '14px',
+                          color: '#141414',
+                          backgroundColor: 'transparent',
+                          cursor: 'pointer',
+                          width: '100%',
+                        }}
+                      >
+                        {timeSlots.map(time => (
+                          <option key={time} value={time}>{time}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+  
+                  <div>
+                    <label style={{ 
+                      fontSize: '13px', 
+                      fontWeight: '600', 
+                      color: '#141414',
+                      display: 'block',
+                      marginBottom: '8px'
+                    }}>
+                      End time
+                    </label>
+                    <div style={{
+                      padding: '8px 12px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #cbd5e0',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      color: '#141414',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}>
+                      <Clock size={16} style={{ color: '#718096' }} />
+                      <select
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                        style={{
+                          border: 'none',
+                          outline: 'none',
+                          fontSize: '14px',
+                          color: '#141414',
+                          backgroundColor: 'transparent',
+                          cursor: 'pointer',
+                          width: '100%',
+                        }}
+                      >
+                        {timeSlots.map(time => (
+                          <option key={time} value={time}>{time}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+  
+              {/* Attendees */}
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ 
+                  fontSize: '14px', 
+                  fontWeight: '600', 
+                  color: '#141414',
+                  display: 'block',
+                  marginBottom: '8px'
+                }}>
+                  Attendees
+                </label>
+                <button
+                  onClick={() => setShowAttendeesDropdown(!showAttendeesDropdown)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e0',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    color: '#141414',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>{attendeeCount} attendees</span>
+                  <ChevronDown size={16} />
+                </button>
+              </div>
+  
+              {/* Location */}
+              <div style={{ marginBottom: '24px', position: 'relative' }} ref={locationDropdownRef}>
+                <label style={{ 
+                  fontSize: '14px', 
+                  fontWeight: '600', 
+                  color: '#141414',
+                  display: 'block',
+                  marginBottom: '8px'
+                }}>
+                  Location
+                </label>
+                <button
+                  onClick={() => setShowLocationDropdown(!showLocationDropdown)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e0',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    color: location ? '#141414' : '#718096',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>{location || 'Select location'}</span>
+                  <ChevronDown size={16} />
+                </button>
+  
+                {showLocationDropdown && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '5px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                    zIndex: 1001,
+                    overflow: 'hidden',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                  }}>
+                    {locations.map((loc) => (
+                      <button
+                        key={loc}
+                        onClick={() => {
+                          setLocation(loc);
+                          setShowLocationDropdown(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          textAlign: 'left',
+                          fontSize: '14px',
+                          color: '#141414',
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f7fafc';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        {loc}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+  
+              {/* Scheduled reminder emails */}
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ 
+                  fontSize: '14px', 
+                  fontWeight: '600', 
+                  color: '#141414',
+                  display: 'block',
+                  marginBottom: '8px'
+                }}>
+                  Scheduled reminder emails
+                </label>
+                <button
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#0091ae',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    padding: '0',
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.textDecoration = 'underline';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.textDecoration = 'none';
+                  }}
+                >
+                  <Plus size={16} />
+                  Add reminder
+                </button>
+              </div>
+  
+              {/* Attendee description */}
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ 
+                  fontSize: '14px', 
+                  fontWeight: '600', 
+                  color: '#141414',
+                  display: 'block',
+                  marginBottom: '8px'
+                }}>
+                  Attendee description
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Send a description to your attendees..."
+                  style={{
+                    width: '100%',
+                    minHeight: '80px',
+                    border: '1px solid #cbd5e0',
+                    borderRadius: '4px',
+                    padding: '10px 12px',
+                    fontSize: '14px',
+                    color: '#141414',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+  
+              {/* Associated with */}
+              <div style={{ marginBottom: '24px' }}>
+                <button
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#141414',
+                  }}
+                >
+                  Associated with 1 record
+                  <ChevronDown size={14} />
+                </button>
+              </div>
+  
+              {/* Add internal note */}
+              <div>
+                <button
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#0091ae',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    padding: '0',
+                    textDecoration: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.textDecoration = 'underline';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.textDecoration = 'none';
+                  }}
+                >
+                  <Plus size={16} />
+                  Add internal note
+                </button>
+              </div>
+            </div>
+  
+            {/* Footer */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderTop: '1px solid #e2e8f0',
+                display: 'flex',
+                gap: '12px',
+                backgroundColor: '#ffffff',
+              }}
+            >
+              <button
+                onClick={handleSchedule}
+                disabled={!title.trim()}
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: title.trim() ? '#cbd5e0' : '#e2e8f0',
+                  color: '#141414',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: title.trim() ? 'pointer' : 'not-allowed',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  if (title.trim()) {
+                    e.currentTarget.style.backgroundColor = '#b8c5d0';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (title.trim()) {
+                    e.currentTarget.style.backgroundColor = '#cbd5e0';
+                  }
+                }}
+              >
+                Schedule meeting
+              </button>
+              <button
+                onClick={onClose}
+                style={{
+                  padding: '10px 24px',
+                  backgroundColor: 'transparent',
+                  color: '#141414',
+                  border: '1px solid #cbd5e0',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f7fafc';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+  
+          {/* Right Panel - Calendar */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#fafafa' }}>
+            {/* Calendar Header */}
+            {/* <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid #e2e8f0',
+              backgroundColor: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button
+                  onClick={() => setStartDate(new Date())}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e0',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: '#141414',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Today
+                </button>
+                
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: '#141414',
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={hideWeekends}
+                    onChange={(e) => setHideWeekends(e.target.checked)}
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      cursor: 'pointer',
+                    }}
+                  />
+                  Hide weekends
+                </label>
+              </div>
+  
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ 
+                  fontSize: '16px', 
+                  fontWeight: '600', 
+                  color: '#141414',
+                }}>
+                  {formatDateRange(currentMonth)}
+                </div>
+                
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button
+                    onClick={handlePrevWeek}
+                    style={{
+                      background: 'transparent',
+                      border: '1px solid #cbd5e0',
+                      borderRadius: '4px',
+                      padding: '6px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: '#141414',
+                    }}
+                  >
+                    <ChevronDown size={16} style={{ transform: 'rotate(90deg)' }} />
+                  </button>
+                  <button
+                    onClick={handleNextWeek}
+                    style={{
+                      background: 'transparent',
+                      border: '1px solid #cbd5e0',
+                      borderRadius: '4px',
+                      padding: '6px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: '#141414',
+                    }}
+                  >
+                    <ChevronDown size={16} style={{ transform: 'rotate(-90deg)' }} />
+                  </button>
+                </div>
+              </div>
+  
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowTimezoneDropdown(!showTimezoneDropdown)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: '#141414',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  UTC +05:00 Almaty, Aqtau, Aqtobe, Ashgabat
+                  <ChevronDown size={14} />
+                </button>
+              </div>
+            </div> */}
+
+<div style={{
+  padding: '16px 20px',
+  borderBottom: '1px solid #e2e8f0',
+  backgroundColor: '#ffffff',
+}}>
+  {/* First Row - Today Button, Date Range with Arrows */}
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '12px',
+  }}>
+    {/* Left - Today Button */}
+    <button
+      onClick={() => setStartDate(new Date())}
+      style={{
+        padding: '8px 16px',
+        backgroundColor: '#ffffff',
+        border: '1px solid #cbd5e0',
+        borderRadius: '4px',
+        fontSize: '14px',
+        fontWeight: '400',
+        color: '#141414',
+        cursor: 'pointer',
+        transition: 'background-color 0.2s',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = '#f7fafc';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = '#ffffff';
+      }}
+    >
+      Today
+    </button>
+
+    {/* Center - Date Range with Navigation Arrows */}
+    <div style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      gap: '12px',
+    }}>
+      <button
+        onClick={handlePrevWeek}
+        style={{
+          background: 'transparent',
+          border: '1px solid #cbd5e0',
+          borderRadius: '4px',
+          padding: '6px 8px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          color: '#141414',
+          transition: 'background-color 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#f7fafc';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        <ChevronDown size={16} style={{ transform: 'rotate(90deg)' }} />
+      </button>
+      
+      <div style={{ 
+        fontSize: '16px', 
+        fontWeight: '600', 
+        color: '#141414',
+        minWidth: '240px',
+        textAlign: 'center',
+      }}>
+        {formatDateRange(currentMonth)}
+      </div>
+      
+      <button
+        onClick={handleNextWeek}
+        style={{
+          background: 'transparent',
+          border: '1px solid #cbd5e0',
+          borderRadius: '4px',
+          padding: '6px 8px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          color: '#141414',
+          transition: 'background-color 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#f7fafc';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        <ChevronDown size={16} style={{ transform: 'rotate(-90deg)' }} />
+      </button>
+    </div>
+
+    {/* Right - Empty space for alignment */}
+    <div style={{ width: '80px' }}></div>
+  </div>
+
+  {/* Second Row - Hide Weekends and Timezone */}
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  }}>
+    {/* Left - Hide Weekends Checkbox */}
+    <label style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      color: '#141414',
+      fontWeight: '400',
+    }}>
+      <input
+        type="checkbox"
+        checked={hideWeekends}
+        onChange={(e) => setHideWeekends(e.target.checked)}
+        style={{
+          width: '18px',
+          height: '18px',
+          cursor: 'pointer',
+          accentColor: '#141414',
+        }}
+      />
+      Hide weekends
+    </label>
+
+    {/* Right - Timezone Selector */}
+    <div style={{ position: 'relative' }}>
+      <button
+        onClick={() => setShowTimezoneDropdown(!showTimezoneDropdown)}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          padding: '8px 12px',
+          cursor: 'pointer',
+          fontSize: '14px',
+          fontWeight: '400',
+          color: '#141414',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          transition: 'background-color 0.2s',
+          borderRadius: '4px',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#f7fafc';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        UTC +05:00 Almaty, Aqtau, Aqtobe, Ashgabat
+        <ChevronDown size={14} />
+      </button>
+    </div>
+  </div>
+</div>
+  
+            {/* Calendar Grid */}
+            <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
+              {/* Week Days Header */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: hideWeekends ? '80px repeat(5, 1fr)' : '80px repeat(7, 1fr)',
+                borderBottom: '1px solid #e2e8f0',
+                backgroundColor: '#ffffff',
+                position: 'sticky',
+                top: 0,
+                zIndex: 10,
+              }}>
+                <div style={{ padding: '12px', borderRight: '1px solid #e2e8f0' }}></div>
+                {weekDays.map((day, index) => {
+                  const dayDate = new Date(currentMonth);
+                  const startOfWeek = new Date(dayDate);
+                  startOfWeek.setDate(dayDate.getDate() - dayDate.getDay() + (hideWeekends ? 1 : 0));
+                  const currentDayDate = new Date(startOfWeek);
+                  currentDayDate.setDate(startOfWeek.getDate() + index);
+                  
+                  const isCurrentDay = isToday(currentDayDate);
+                  
+                  return (
+                    <div
+                      key={day}
+                      style={{
+                        padding: '12px',
+                        textAlign: 'center',
+                        borderRight: index < weekDays.length - 1 ? '1px solid #e2e8f0' : 'none',
+                        backgroundColor: '#ffffff',
+                      }}
+                    >
+                      <div style={{
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: '#718096',
+                        marginBottom: '4px',
+                      }}>
+                        {day}
+                      </div>
+                      <div style={{
+                        fontSize: '16px',
+                        fontWeight: isCurrentDay ? '600' : '400',
+                        color: isCurrentDay ? '#ffffff' : '#141414',
+                        backgroundColor: isCurrentDay ? '#ff3842' : 'transparent',
+                        borderRadius: '50%',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto',
+                      }}>
+                        {currentDayDate.getDate()}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+  
+              {/* Time Slots */}
+              <div style={{ position: 'relative' }}>
+                {Array.from({ length: 24 }, (_, hour) => (
+                  <div
+                    key={hour}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: hideWeekends ? '80px repeat(5, 1fr)' : '80px repeat(7, 1fr)',
+                      borderBottom: '1px solid #e2e8f0',
+                      minHeight: '60px',
+                    }}
+                  >
+                    {/* Time Label */}
+                    <div style={{
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      color: '#718096',
+                      borderRight: '1px solid #e2e8f0',
+                      backgroundColor: '#ffffff',
+                      position: 'sticky',
+                      left: 0,
+                    }}>
+                      {`${hour.toString().padStart(2, '0')}:00`}
+                    </div>
+  
+                    {/* Day Cells */}
+                    {weekDays.map((_, dayIndex) => (
+                      <div
+                        key={dayIndex}
+                        style={{
+                          borderRight: dayIndex < weekDays.length - 1 ? '1px solid #e2e8f0' : 'none',
+                          backgroundColor: '#fafafa',
+                          cursor: 'pointer',
+                          position: 'relative',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f0f4f8';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#fafafa';
+                        }}
+                      >
+                        {/* Sample Event on Wednesday at 18:00 */}
+                        {dayIndex === 2 && hour === 18 && (
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: '-60px',
+                            backgroundColor: '#e3f2fd',
+                            border: '1px solid #2196f3',
+                            borderRadius: '4px',
+                            padding: '4px 8px',
+                            fontSize: '12px',
+                            color: '#141414',
+                            fontWeight: '500',
+                            overflow: 'hidden',
+                          }}>
+                            Prime alley x Hub...
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -3066,6 +4623,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   onTaskCreate,
   onCall,
   callerNumber,
+  onMeetingSchedule,
 }) => {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
@@ -3074,8 +4632,12 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showCallModal, setShowCallModal] = useState(false);
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [showMoreModal, setShowMoreModal] = useState(false);
+  const [moreModalPosition, setMoreModalPosition] = useState({ top: 0, left: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
   const sectionDropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   // Initialize collapsed sections based on defaultExpanded
   useEffect(() => {
@@ -3199,6 +4761,72 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     onCall?.(phoneNumber);
     console.log('Calling:', phoneNumber);
   };
+
+  const handleMeetingClick = () => {
+    setShowMeetingModal(true);
+  };
+
+  const handleMeetingClose = () => {
+    setShowMeetingModal(false);
+  };
+
+  const handleMeetingSchedule = (meetingData: {
+    title: string;
+    hostType: 'user' | 'rotation';
+    hostEmail: string;
+    startDate: string;
+    startTime: string;
+    endTime: string;
+    attendees: string[];
+    location: string;
+    reminders: string[];
+    description: string;
+    internalNote: string;
+  }) => {
+    onMeetingSchedule?.(meetingData);
+    console.log('Meeting scheduled:', meetingData);
+  };
+
+  const handleMoreClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (moreButtonRef.current) {
+      const rect = moreButtonRef.current.getBoundingClientRect();
+      setMoreModalPosition({
+        top: rect.bottom + 8,
+        left: rect.left,
+      });
+    }
+    setShowMoreModal(true);
+  };
+
+  const handleMoreClose = () => {
+    setShowMoreModal(false);
+  };
+
+  const handleMoreActionSelect = (actionId: string) => {
+    console.log('Selected action:', actionId);
+    // Handle different actions
+    switch(actionId) {
+      case 'enroll-sequence':
+        console.log('Enroll in sequence');
+        break;
+      case 'engage-linkedin':
+        console.log('Engage on LinkedIn');
+        break;
+      case 'log-sms':
+        console.log('Log SMS');
+        break;
+      case 'log-linkedin':
+        console.log('Log LinkedIn message');
+        break;
+      case 'log-whatsapp':
+        console.log('Log WhatsApp message');
+        break;
+      case 'log-call':
+        console.log('Log a call');
+        break;
+    }
+  };
+
   // Process quick actions to override note and email actions if provided
   const processedQuickActions = quickActions ? quickActions.map(action => {
     if (action.id === 'note') {
@@ -3237,14 +4865,32 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           }
         };
       }
+    if (action.id === 'meeting') {
+      return {
+        ...action,
+        onClick: () => {
+          handleMeetingClick();
+          action.onClick?.(); // Call the original onClick if provided
+        }
+      };
+    }
+    if (action.id === 'more') {
+      return {
+        ...action,
+        onClick: (e?: React.MouseEvent<HTMLButtonElement>) => {
+          if (e) handleMoreClick(e);
+          action.onClick?.();
+        }
+      };
+    }
     return action;
   }) : [
     { id: 'note', label: 'Note', icon: ClipboardList, onClick: handleNoteClick, disabled: false },
     { id: 'email', label: 'Email', icon: Mail, onClick: handleEmailClick, disabled: !email },
-    { id: 'call', label: 'Call', icon: Phone, onClick: () => console.log('Call'), disabled: true },
+    { id: 'call', label: 'Call', icon: Phone, onClick: handleCallClick, disabled: !phone },
     { id: 'task', label: 'Task', icon: ClipboardList, onClick: handleTaskClick, disabled: false },
-    { id: 'meeting', label: 'Meeting', icon: Calendar, onClick: () => console.log('Meeting'), disabled: false },
-    { id: 'more', label: 'More', icon: MoreHorizontal, onClick: () => console.log('More'), disabled: false }
+    { id: 'meeting', label: 'Meeting', icon: Calendar, onClick: handleMeetingClick, disabled: false },
+    { id: 'more', label: 'More', icon: MoreHorizontal, onClick: handleMoreClick, disabled: false }
   ];
 
   // Process sections to override note-related actions
@@ -3695,6 +5341,17 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
             to { transform: rotate(360deg); }
           }
 
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+              transform: translateY(-4px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+
           .spin {
             animation: spin 1s linear infinite;
           }
@@ -3809,6 +5466,25 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         onCall={handleCall}
       />
 
+      {/* Meeting Modal - Rendered as floating window */}
+      <MeetingModal
+        isOpen={showMeetingModal}
+        onClose={handleMeetingClose}
+        hostEmail={senderEmail}
+        hostName={senderName}
+        attendeeEmail={email}
+        attendeeName={title}
+        onSchedule={handleMeetingSchedule}
+      />
+
+      {/* More Actions Modal */}
+      <MoreActionsModal
+        isOpen={showMoreModal}
+        onClose={handleMoreClose}
+        position={moreModalPosition}
+        onActionSelect={handleMoreActionSelect}
+      />
+
       <div
         style={{
           width,
@@ -3884,7 +5560,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 flex: 1,
                 overflowY: 'auto',
                 backgroundColor: '#f0f0f0',
-                maxHeight: 'calc(100vh - 252px)',
+                maxHeight: 'calc(100vh - 217px)',
                 borderBottom: '1px solid #cccccc',
                 borderRadius: '0 0 10px 10px',
               }}
@@ -4191,9 +5867,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     return (
                       <div key={action.id} className="quick-action-wrapper">
                         <button
-                          onClick={() => {
+                          ref={action.id === 'more' ? moreButtonRef : undefined}
+                          onClick={(e) => {
                             if (!action.disabled) {
-                              action.onClick();
+                              action.onClick(e);
                               onQuickActionClick?.(action.id);
                             }
                           }}

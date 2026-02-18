@@ -80,6 +80,18 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
       onHide();
     }
   };
+
+  // Handle Enter key press to submit
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isValidConfirmation && !loading) {
+        handleConfirm();
+      }
+    }
+  };
+
   const displayPlaceholder = confirmationPlaceholder || `Type ${requiredConfirmationText.toUpperCase()}`;
 
   return (
@@ -108,24 +120,34 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
           )}
           
           {requireTextConfirmation && (
-            <div className="text-center mt-4">
-              <Form.Label className="fw-semibold">
-                {confirmationLabel || `Type `}
-                {!confirmationLabel && (
-                  <>
-                    <span className="text-danger fw-bold">{requiredConfirmationText.toUpperCase()}</span> to confirm
-                  </>
-                )}
-              </Form.Label>
-              <Form.Control
-                type="text"
-                placeholder={displayPlaceholder}
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                autoFocus
-                disabled={loading}
-              />
-            </div>
+            <Form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (isValidConfirmation && !loading) {
+                  handleConfirm();
+                }
+              }}
+            >
+              <div className="text-center mt-4">
+                <Form.Label className="fw-semibold">
+                  {confirmationLabel || `Type `}
+                  {!confirmationLabel && (
+                    <>
+                      <span className="text-danger fw-bold">{requiredConfirmationText.toUpperCase()}</span> to confirm
+                    </>
+                  )}
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder={displayPlaceholder}
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  autoFocus
+                  disabled={loading}
+                />
+              </div>
+            </Form>
           )}
         </div>
       </Modal.Body>
