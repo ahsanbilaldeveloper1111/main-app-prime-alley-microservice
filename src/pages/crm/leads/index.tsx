@@ -8121,13 +8121,12 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
       </Modal>
 
       {/* Lead Details Sidebar */}
-      <GenericSidebar
+      {/* <GenericSidebar
         isOpen={showLeadSidebar}
         onClose={() => {
           setShowLeadSidebar(false);
           setSelectedLead(null);
         }}
-        moduleSlug={ModuleSlug.CRM_LEADS}
         onCall={handleSidebarCall}
         title={selectedLead?.name || 'Lead Details'}
         subtitle={selectedLead?.company_name || selectedLead?.company || ''}
@@ -8155,7 +8154,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         })()}
         avatar={{
           name: selectedLead?.name || 'Lead',
-          useIcon: true
+          initials: getInitials(selectedLead?.name || 'Lead')
         }}
         contextPayload={
           selectedLead
@@ -8578,7 +8577,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             variant: 'outline-primary'
           }
         ]}
-      />
+      /> */}
 
       {/* Filters Sidebar */}
       <GenericFilterSidebar
