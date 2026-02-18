@@ -10,7 +10,13 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
+import GenericTable, {
+  TableColumn,
+  TableAction,
+  ToolbarConfig,
+  FilterPill,
+  TabConfig,
+} from "@components/GenericTable";
 import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
@@ -493,6 +499,10 @@ const CrmOrders = () => {
   const [showOrderSidebar, setShowOrderSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showTabModal, setShowTabModal] = useState(false);
+  const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
 
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -1123,6 +1133,22 @@ const CrmOrders = () => {
     }
   }, []);
 
+  const handleRowClicked = useCallback(async (orderId: number) => {
+    try {
+      const orderData: any = await getOrder(orderId);
+      setSelectedOrder(orderData);
+      setShowOrderSidebar(true);
+      await fetchOrderDetails(orderId);
+    } catch (error) {
+      console.error("Failed to fetch order:", error);
+      toast.error("Failed to load order details");
+    }
+  }, []);
+
+  const handleOpenFiltersSidebar = useCallback(() => {
+    setShowFiltersSidebar(true);
+  }, []);
+
   const handleDeleteOrder = useCallback(
     (orderId: number, orderNumber?: string) => {
       setOrderToDelete({ id: orderId, orderNumber });
@@ -1522,8 +1548,8 @@ const CrmOrders = () => {
       deleted: summaryTiles?.deleted_orders || 0,
     };
 
-    // Add counts for first 5 stages
-    stages.slice(0, 5).forEach((stage: any) => {
+    // Add counts for all stages (not just first 5, for custom tabs)
+    stages.forEach((stage: any) => {
       const stageOrders = transformed.filter(
         (o) => o.stage === stage.name || o.rawData?.order_stage_id === stage.id
       );
@@ -1532,6 +1558,75 @@ const CrmOrders = () => {
 
     return counts;
   }, [ordersData, extensions, stages, summaryTiles, totalOrders]);
+
+  // Update custom tabs counts when filterCounts change
+  useEffect(() => {
+    setCustomTabs(prevTabs => 
+      prevTabs.map(tab => {
+        const count = filterCounts[tab.id] || 0;
+        return { ...tab, count };
+      })
+    );
+  }, [filterCounts]);
+
+  // Define stats cards for GenericTable
+  const ordersStatsCards: StatsCardData[] = useMemo(() => [
+    {
+      title: 'All Orders',
+      value: summaryTiles?.total_orders || totalOrders || 0,
+      icon: ShoppingBag,
+      iconColor: '#6366F1',
+      iconBgColor: '#EEF2FF',
+      subtitle: 'Total in pipeline'
+    },
+    {
+      title: 'New',
+      value: summaryTiles?.new_orders || analyticsData.stageCounts['New'] || 0,
+      icon: PlusCircle,
+      iconColor: '#3B82F6',
+      iconBgColor: '#DBEAFE',
+      metric: {
+        text: 'Fresh orders',
+        dotColor: '#2563EB'
+      }
+    },
+    {
+      title: 'Qualified',
+      value: summaryTiles?.qualified_orders || analyticsData.stageCounts['Qualified'] || 0,
+      icon: CheckCircle,
+      iconColor: '#10B981',
+      iconBgColor: '#D1FAE5',
+      subtitle: 'Verified & ready'
+    },
+    {
+      title: 'In Progress',
+      value: analyticsData.inProgress || 0,
+      icon: Activity,
+      iconColor: '#F59E0B',
+      iconBgColor: '#FEF3C7',
+      subtitle: 'Being processed'
+    },
+    {
+      title: 'Delivered',
+      value: analyticsData.delivered || 0,
+      icon: Package,
+      iconColor: '#059669',
+      iconBgColor: '#D1FAE5',
+      badge: {
+        text: 'Completed',
+        bgColor: '#D1FAE5',
+        textColor: '#065F46'
+      }
+    },
+    {
+      title: 'Pending Approval',
+      value: analyticsData.pendingApproval || 0,
+      icon: AlertCircle,
+      iconColor: '#EF4444',
+      iconBgColor: '#FEE2E2',
+      subtitle: 'Requires review'
+    }
+  ], [summaryTiles, totalOrders, analyticsData]);
 
   // Custom select styles
   const customSelectStyles = {
@@ -1869,9 +1964,7 @@ const CrmOrders = () => {
 
   return (
     <React.Fragment>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
+      <style dangerouslySetInnerHTML={{__html: `
         .orders-table-wrapper {
           width: 100%;
           overflow: hidden;
@@ -1892,127 +1985,39 @@ const CrmOrders = () => {
           padding: 12px 16px;
           vertical-align: middle;
         }
-      `,
-        }}
-      />
+        
+        /* Page layout for full height */
+        .orders-page-container {
+          display: flex;
+          flex-direction: column;
+          height: calc(100vh - 100px);
+          overflow: hidden;
+        }
+        
+        .orders-content-area {
+          flex: 1;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .orders-scrollable-content {
+          flex: 1;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+      `}} />
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
         subTitle="Orders"
       />
-      <div>
-        {/* Page Header */}
-        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
-        <div className="mb-3 mb-md-0">
-  <nav aria-label="breadcrumb">
-    <ol className="breadcrumb mb-0">
-      <li className="breadcrumb-item">
-        <a href="/dashboard" className="text-decoration-none">
-          CRM
-        </a>
-      </li>
-      <li className="breadcrumb-item active fw-bold" aria-current="page">
-        Orders
-      </li>
-    </ol>
-  </nav>
-</div>
-          <div className="d-flex flex-wrap gap-2">
-            {/* <Button
-              variant={showOrdersAnalytics ? "primary" : "outline-secondary"}
-              onClick={() => setShowOrdersAnalytics(!showOrdersAnalytics)}
-            >
-              <BarChart3 size={16} className="me-2" />
-              {showOrdersAnalytics ? "Hide Analytics" : "Show Analytics"}
-            </Button> */}
-            <Button
-              variant={showFilterBar ? "secondary" : "outline-secondary"}
-              onClick={() => setShowFilterBar(!showFilterBar)}
-            >
-              <Layers size={16} className="me-2" />
-              {showFilterBar ? "Hide Tabs" : "Show Tabs"}
-            </Button>
-            <Button
-            variant={showFiltersSidebar ? "secondary" : "outline-secondary"}
-            onClick={() => setShowFiltersSidebar(!showFiltersSidebar)}
-          >
-            <FiFilter size={16} className="me-2" />
-            {showFiltersSidebar ? "Hide Filters" : "Show Filters"}
-          </Button>
-          </div>
-        </div>
 
-        {/* Stats Cards */}
-        <StatsCards 
-          data={[
-            {
-              title: 'All Orders',
-              value: summaryTiles?.total_orders || totalOrders || 0,
-              icon: ShoppingBag,
-              iconColor: '#6366F1',
-              iconBgColor: '#EEF2FF',
-              subtitle: 'Total orders'
-            },
-            {
-              title: 'New',
-              value: summaryTiles?.new_orders || analyticsData.stageCounts['New'] || 0,
-              icon: PlusCircle,
-              iconColor: '#3B82F6',
-              iconBgColor: '#DBEAFE',
-              metric: {
-                text: 'Fresh orders',
-                dotColor: '#2563EB'
-              }
-            },
-            {
-              title: 'Qualified',
-              value: summaryTiles?.qualified_orders || analyticsData.stageCounts['Qualified'] || 0,
-              icon: CheckCircle,
-              iconColor: '#10B981',
-              iconBgColor: '#D1FAE5',
-              subtitle: 'Verified & ready'
-            },
-            {
-              title: 'Proposal',
-              value: analyticsData.stageCounts['Proposal'] || 0,
-              icon: FileText,
-              iconColor: '#8B5CF6',
-              iconBgColor: '#EDE9FE',
-              metric: {
-                text: 'Under review',
-                dotColor: '#7C3AED'
-              }
-            },
-            {
-              title: 'Negotiation',
-              value: analyticsData.stageCounts['Negotiation'] || 0,
-              icon: Users,
-              iconColor: '#F59E0B',
-              iconBgColor: '#FEF3C7',
-              subtitle: 'In discussion'
-            },
-            {
-              title: 'Lost',
-              value: summaryTiles?.lost_orders || filterCounts.lost || 0,
-              icon: AlertCircle,
-              iconColor: '#EF4444',
-              iconBgColor: '#FEE2E2',
-              subtitle: 'Requires review'
-            }
-            // {
-            //   title: 'Deleted',
-            //   value: summaryTiles?.deleted_orders || filterCounts.deleted || 0,
-            //   icon: Trash2,
-            //   iconColor: '#6B7280',
-            //   iconBgColor: '#F3F4F6',
-            //   metric: {
-            //     text: 'Archived',
-            //     dotColor: '#9CA3AF'
-            //   }
-            // }
-          ]}
-          gridMinWidth="180px"
-        />
+      {/* Main flex container for content and sidebar */}
+      <div style={{ display: 'flex', gap: '0', height: 'calc(100vh)', overflow: 'hidden' }}>
+        {/* Main content area */}
+        <div className="orders-scrollable-content" style={{ flex: 1 }}>
+        <div className="container-fluid">
 
         {/* Analytics Section - Collapsible */}
         {showOrdersAnalytics && (
@@ -2547,14 +2552,16 @@ const CrmOrders = () => {
           </Card>
         )}
 
-        {/* Orders Table with GenericTable */}
-        <GenericTable
+          {/* Orders Table with GenericTable */}
+          <div className="orders-table-wrapper" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <GenericTable
           data={filteredOrders}
           columns={ordersColumns}
           actions={ordersActions}
           customizableColumns={true}
           defaultSelectedColumns={['orderNumber', 'customer', 'deal', 'stage', 'value', 'approvalStatus', 'fulfillmentStatus', 'assignedUser', 'orderDate', 'owner']}
           columnStorageKey="ordersSelectedColumns"
+          onColumnChange={(cols) => setSelectedOrdersColumns(cols)}
           pagination={{
             currentPage: ordersPagination.currentPage,
             rowsPerPage: ordersPagination.rowsPerPage,
@@ -2569,12 +2576,23 @@ const CrmOrders = () => {
             });
           }}
           sortable={true}
-          onRowClick={async (row) => {
+          defaultSortColumn={ordersPagination.sortColumn}
+          defaultSortDirection={ordersPagination.sortDirection}
+          onSort={(column, direction) => {
+            setOrdersPagination({
+              ...ordersPagination,
+              sortColumn: column,
+              sortDirection: direction
+            });
+          }}
+          onRowClick={(row) => {
             if (session?.user?.permissions?.includes('list-crm-orders')) {
-              setSelectedOrder(row.rawData || row);
-              setShowOrderSidebar(true);
-              // Fetch full order details including related deal and lead
-              await fetchOrderDetails(row.rawData?.id || row.id);
+              handleRowClicked(row.rawData?.id || row.id);
+            }
+          }}
+          onRowDoubleClick={(row) => {
+            if (session?.user?.permissions?.includes('list-crm-orders')) {
+              handleViewOrder(row.rawData?.id || row.id);
             }
           }}
           loading={loading}
@@ -2582,7 +2600,106 @@ const CrmOrders = () => {
           loadingMessage="Loading orders..."
           hover={true}
           uniqueKey="id"
+          
+          // Fixed height mode
+          fixedHeight={true}
+          maxHeight="calc(100vh - 380px)"
+          
+          // Toolbar
+          showToolbar={true}
+          toolbar={{
+            // Tabs
+            showTabs: true,
+            tabsDropdownLabel: "Orders",
+            tabs: [
+              { id: 'all', label: 'All orders', count: filterCounts.all, removable: false },
+              ...customTabs
+            ],
+            activeTab: activeFilter,
+            onTabChange: handleFilterChange,
+            onTabAdd: () => setShowTabModal(true),
+            onTabRemove: (tabId) => {
+              setCustomTabs(tabs => tabs.filter(t => t.id !== tabId));
+              if (activeFilter === tabId) {
+                handleFilterChange('all');
+              }
+            },
+            
+            // Search
+            showSearch: true,
+            searchValue: ordersSearch,
+            searchPlaceholder: "Search orders by number, customer, deal...",
+            onSearchChange: (value) => {
+              setOrdersSearch(value);
+              // Clear search on empty value
+              if (!value) {
+                const newFilters = { ...currentFilters };
+                delete newFilters.search;
+                handleFiltersChange(newFilters);
+                setRefreshKey((prev) => prev + 1);
+              }
+            },
+            onSearch: () => {
+              if (ordersSearch) {
+                handleFiltersChange({
+                  ...currentFilters,
+                  search: ordersSearch
+                });
+                setOrdersPagination({ ...ordersPagination, currentPage: 1 });
+                setRefreshKey((prev) => prev + 1);
+              }
+            },
+            
+            // Actions
+            showTableViewDropdown: true,
+            tableViewLabel: "Table view",
+            showViewSwitcher: true,
+            showEditColumns: true,
+            onEditColumnsClick: () => setShowColumnEditor(true),
+            showPipelineDropdown: true,
+            pipelineLabel: "All Pipelines",
+            showFiltersButton: true,
+            onFiltersClick: handleOpenFiltersSidebar,
+            showSortButton: true,
+            showExportButton: true,
+            onExportClick: () => setShowExportModal(true),
+            showSaveButton: true,
+            onSaveClick: () => console.log('Save view'),
+            
+            // Filter Pills
+            filterPills: [
+              { 
+                id: 'contact_owner', 
+                label: 'Contact Owner', 
+                showDropdown: true,
+                dropdownOptions: [
+                  { label: 'All Owners', value: 'all', onClick: () => {
+                    const newFilters = { ...currentFilters };
+                    delete newFilters.assigned_to;
+                    handleFiltersChange(newFilters);
+                    setRefreshKey((prev) => prev + 1);
+                  }},
+                  ...extensions.map(ext => ({
+                    label: ext.display_name || ext.name || ext.extension,
+                    value: ext.id || ext.extension,
+                    onClick: () => {
+                      handleFiltersChange({ ...currentFilters, assigned_to: ext.id || ext.extension });
+                      setRefreshKey((prev) => prev + 1);
+                    }
+                  }))
+                ]
+              }
+            ],
+            showAdvancedFilters: true,
+            onAdvancedFiltersClick: handleOpenFiltersSidebar
+          }}
+          
+          // Stats cards for metrics
+          statsCards={ordersStatsCards}
         />
+          </div>
+        </div>
+        </div>
       </div>
 
       {/* Delete Order Modal */}
@@ -3092,14 +3209,6 @@ const CrmOrders = () => {
         subtitle="Filter and refine your orders"
         width="400px"
         filters={[
-          {
-            id: 'search',
-            label: 'Search',
-            type: 'text' as const,
-            value: ordersSearch,
-            onChange: (value) => setOrdersSearch(value),
-            placeholder: 'Search orders by number, customer, deal...'
-          },
           {
             id: 'assignedTo',
             label: 'Assigned To',
