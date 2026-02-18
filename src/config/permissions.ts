@@ -53,7 +53,8 @@ export const routePermissions: RoutePermission[] = [
     { path: '/chat/usage-reports', permissions: [PERMISSIONS.TMS_SERVICES] },
     {path:'/chat/tools-profiles',permissions: [PERMISSIONS.TMS_SERVICES]},
     
-    {path:'/company',permissions: ['set-company-image-users']},
+    { path: '/company', permissions: ['set-company-image-users'] },
+    { path: '/audit-logs', permissions: [''] },
 
     
     {

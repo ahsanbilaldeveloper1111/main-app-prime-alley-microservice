@@ -829,7 +829,7 @@ const NotesModal: React.FC<NotesModalProps> = ({ isOpen, onClose, recordName, on
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
           >
-            <Image size={16} />
+            <Image size={16} aria-label="Insert Image" />
           </button>
           <button
             onClick={handleCode}
@@ -1766,7 +1766,7 @@ interface EmailModalProps {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
             >
-              <Image size={16} />
+              <Image size={16} aria-label="Insert Image" />
             </button>
             <button
               style={{
@@ -3260,7 +3260,7 @@ interface TaskModalProps {
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f5f8fa')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
-                <Image size={16} />
+                <Image size={16} aria-label="Insert Image" />
               </button>
               <button
                 style={{

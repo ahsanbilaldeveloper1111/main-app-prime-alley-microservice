@@ -227,3 +227,28 @@ export const deleteStatus = async (id: string | number) => {
   }
 };
 
+// ==================== Audit Logs API ====================
+
+/**
+ * GET audit-logs
+ */
+export const AuditLogsWorkPlanner = async (params?: Record<string, unknown>) => {
+  try {
+    const response = await axiosInstance.get(`${prefix}/audit-logs`, { params });
+    if (response?.data) {
+      const responseData = response.data;
+      if (responseData.success === false) {
+        reportWorkPlannerApiError(response, responseData.message || 'Failed to fetch audit logs');
+        toast.error(responseData.message || 'Failed to fetch audit logs');
+        return null;
+      }
+      return responseData.data ?? responseData;
+    }
+    return null;
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to fetch audit logs');
+    throw error;
+  }
+};
+
