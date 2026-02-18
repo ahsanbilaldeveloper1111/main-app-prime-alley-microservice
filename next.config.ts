@@ -103,7 +103,4 @@ export default withSentryConfig(nextConfig, {
       removeDebugLogging: true,
     },
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
 });
