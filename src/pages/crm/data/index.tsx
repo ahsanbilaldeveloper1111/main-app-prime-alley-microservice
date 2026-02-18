@@ -678,6 +678,10 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   const handleFilterChange = useCallback((filterId: string) => {
     setActiveFilter(filterId);
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
+    // Prevent showing stale totalRecords on "Convert to Leads" tab until new data loads
+    if (filterId === 'has_leads') {
+      setLoading(true);
+    }
     
     // Update URL with tab query parameter
     router.push(
@@ -693,6 +697,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   const [prospectsSearch, setProspectsSearch] = useState("");
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [showTabModal, setShowTabModal] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   const [prospectsFilters, setProspectsFilters] = useState({
@@ -718,6 +723,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     "scheduled_call_at",
     "tags",
   ];
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => defaultSelectedColumns);
+  const [draftSelectedColumns, setDraftSelectedColumns] = useState<string[]>([]);
 
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -944,6 +951,31 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
+  const buildCrmDataParams = useCallback((overrides: { page?: number; per_page?: number } = {}) => {
+    const params: any = {
+      page: pagination.currentPage,
+      per_page: pagination.rowsPerPage,
+      ...overrides,
+    };
+    if (memoizedFilters.search) params.search = memoizedFilters.search;
+    if (memoizedFilters.campaign_id?.length) params.campaign_ids = memoizedFilters.campaign_id;
+    if (memoizedFilters.tags?.length) params.tags = memoizedFilters.tags;
+    if (memoizedFilters.assignment_status) params.assignment_status = memoizedFilters.assignment_status;
+    if (memoizedFilters.user_extension?.length) params.user_extensions = memoizedFilters.user_extension;
+    if (memoizedFilters.is_viewed !== undefined && memoizedFilters.is_viewed !== '') params.is_viewed = memoizedFilters.is_viewed;
+    if (memoizedFilters.start_date) params.date_from = memoizedFilters.start_date;
+    if (memoizedFilters.end_date) params.date_to = memoizedFilters.end_date;
+    if (memoizedFilters.has_scheduled_calls !== undefined) params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
+    if (memoizedFilters.has_tickets !== undefined) params.has_tickets = memoizedFilters.has_tickets;
+    if (memoizedFilters.scheduled_call_status) params.scheduled_call_status = memoizedFilters.scheduled_call_status;
+    if (memoizedFilters.scheduled_call_from) params.scheduled_call_from = memoizedFilters.scheduled_call_from;
+    if (memoizedFilters.scheduled_call_to) params.scheduled_call_to = memoizedFilters.scheduled_call_to;
+    if (memoizedFilters.source_file) params.source_file = memoizedFilters.source_file;
+    if (memoizedFilters.tag_ids?.length) params.tag_ids = memoizedFilters.tag_ids;
+    params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
+    return params;
+  }, [memoizedFilters, pagination.currentPage, pagination.rowsPerPage]);
+
   // Extract unique source_file values from dataList for creatable select
   const uniqueSources = useMemo(() => {
     const sources = new Set<string>();
@@ -957,6 +989,11 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
       label: source,
     }));
   }, [dataList]);
+
+  // Set draft selected columns when column editor is shown
+  useEffect(() => {
+    if (showColumnEditor) setDraftSelectedColumns([...selectedColumns]);
+  }, [showColumnEditor]);
 
   // Fetch extensions data
   useEffect(() => {
@@ -1257,83 +1294,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
 
     setLoading(true);
     try {
-      const params: any = {
-        page: pagination.currentPage,
-        per_page: pagination.rowsPerPage,
-      };
-
-      if (memoizedFilters.search) {
-        params.search = memoizedFilters.search;
-      }
-
-      if (
-        memoizedFilters.campaign_id &&
-        memoizedFilters.campaign_id.length > 0
-      ) {
-        params.campaign_ids = memoizedFilters.campaign_id;
-      }
-
-      if (memoizedFilters.tags && memoizedFilters.tags.length > 0) {
-        params.tags = memoizedFilters.tags;
-      }
-
-      if (memoizedFilters.assignment_status) {
-        params.assignment_status = memoizedFilters.assignment_status;
-      }
-
-      if (
-        memoizedFilters.user_extension &&
-        memoizedFilters.user_extension.length > 0
-      ) {
-        params.user_extensions = memoizedFilters.user_extension;
-      }
-
-      if (
-        memoizedFilters.is_viewed !== undefined &&
-        memoizedFilters.is_viewed !== ""
-      ) {
-        params.is_viewed = memoizedFilters.is_viewed;
-      }
-
-      if (memoizedFilters.start_date) {
-        params.date_from = memoizedFilters.start_date;
-      }
-
-      if (memoizedFilters.end_date) {
-        params.date_to = memoizedFilters.end_date;
-      }
-
-      if (memoizedFilters.has_scheduled_calls !== undefined) {
-        params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
-      }
-
-      if (memoizedFilters.has_tickets !== undefined) {
-        params.has_tickets = memoizedFilters.has_tickets;
-      }
-
-      if (memoizedFilters.scheduled_call_status) {
-        params.scheduled_call_status = memoizedFilters.scheduled_call_status;
-      }
-
-      if (memoizedFilters.scheduled_call_from) {
-        params.scheduled_call_from = memoizedFilters.scheduled_call_from;
-      }
-
-      if (memoizedFilters.scheduled_call_to) {
-        params.scheduled_call_to = memoizedFilters.scheduled_call_to;
-      }
-
-      if (memoizedFilters.source_file) {
-        params.source_file = memoizedFilters.source_file;
-      }
-
-      if (memoizedFilters.tag_ids && memoizedFilters.tag_ids.length > 0) {
-        params.tag_ids = memoizedFilters.tag_ids;
-      }
-
-      params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
-
-      const response = await getCrmData(params);
+      const response = await getCrmData(buildCrmDataParams());
 
       // Only update state if this is still the latest request
       if (currentRequestId !== requestIdRef.current) {
@@ -1373,7 +1334,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         setLoading(false);
       }
     }
-  }, [memoizedFilters, pagination]);
+  }, [buildCrmDataParams]);
 
   // Load data when filters or pagination changes
   useEffect(() => {
@@ -4228,7 +4189,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         <div className="prospects-table-wrapper" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <GenericTable
   data={dataList}
-  columns={prospectsColumns}
+  columns={prospectsColumns.filter((c) => selectedColumns.includes(c.key))}
   actions={prospectsActions}
   showActions={false}
   
@@ -4300,7 +4261,11 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     tabsDropdownLabel: "Prospects",
     tabs: [
       { id: 'all', label: 'All prospects', count: totalAllProspects, removable: false },
-      ...customTabs
+      ...customTabs.map(tab =>
+        tab.id === 'has_leads'
+          ? { ...tab, count: activeFilter === 'has_leads' && !loading ? totalRecords : undefined }
+          : tab
+      )
     ],
     activeTab: activeFilter,
     onTabChange: handleFilterChange,
@@ -7190,26 +7155,35 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         <Modal.Body>
           <p className="text-muted mb-3">Select which columns to display in the table</p>
           <Row>
-            {prospectsColumns.map((col) => (
-              <Col key={col.key} md={6} className="mb-2">
-                <Form.Check
-                  type="checkbox"
-                  label={col.label}
-                  checked={defaultSelectedColumns.includes(col.key)}
-                  onChange={(e) => {
-                    // Handle column toggle
-                    console.log('Toggle column:', col.key, e.target.checked);
-                  }}
-                />
-              </Col>
-            ))}
+            {prospectsColumns.map((col) => {
+              const isChecked = draftSelectedColumns.includes(col.key);
+              const isOnlySelected = isChecked && draftSelectedColumns.length === 1;
+              return (
+                <Col key={col.key} md={6} className="mb-2">
+                  <Form.Check
+                    type="checkbox"
+                    id={`column-check-${col.key}`}
+                    label={col.label}
+                    checked={isChecked}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      if (checked) {
+                        setDraftSelectedColumns((prev) => (prev.includes(col.key) ? prev : [...prev, col.key]));
+                      } else if (!isOnlySelected) {
+                        setDraftSelectedColumns((prev) => prev.filter((k) => k !== col.key));
+                      }
+                    }}
+                  />
+                </Col>
+              );
+            })}
           </Row>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowColumnEditor(false)}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={() => setShowColumnEditor(false)}>
+          <Button variant="primary" onClick={() => { setSelectedColumns(draftSelectedColumns); setShowColumnEditor(false); }}>
             Apply Changes
           </Button>
         </Modal.Footer>
@@ -7237,30 +7211,69 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
           </Button>
           <Button
             variant="primary"
-            onClick={() => {
-              const csvContent = [
-                prospectsColumns.map(col => col.label).join(','),
-                ...dataList.map(row =>
-                  prospectsColumns.map(col => {
-                    const value = row[col.key as keyof CrmDataItem];
-                    return typeof value === 'string' ? `"${value}"` : value;
-                  }).join(',')
-                )
-              ].join('\n');
+            disabled={exporting || totalRecords === 0}
+            onClick={async () => {
+              if (totalRecords === 0) {
+                toast.info('No prospects to export');
+                return;
+              }
+              setExporting(true);
+              try {
+                const PER_PAGE = 100;
+                const allData: CrmDataItem[] = [];
+                let page = 1;
+                for (;;) {
+                  const response = await getCrmData(buildCrmDataParams({ page, per_page: PER_PAGE }));
+                  const chunk = response?.data || [];
+                  allData.push(...chunk);
+                  if (chunk.length < PER_PAGE || allData.length >= totalRecords) break;
+                  page += 1;
+                }
+                const exportColumns = prospectsColumns.filter((c) => selectedColumns.includes(c.key));
+                const getCellValue = (row: any, col: TableColumn<any>) => {
+                  const raw = (col as any).accessor ? (col as any).accessor(row) : row[col.key as keyof CrmDataItem];
+                  if (raw == null) return '';
+                  return typeof raw === 'object' ? JSON.stringify(raw) : String(raw);
+                };
+                const escapeCsv = (val: string) => {
+                  const s = String(val);
+                  if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+                  return s;
+                };
+                const csvContent = [
+                  exportColumns.map((col) => escapeCsv(col.label)).join(','),
+                  ...allData.map((row) =>
+                    exportColumns.map((col) => escapeCsv(getCellValue(row, col))).join(',')
+                  ),
+                ].join('\n');
 
-              const blob = new Blob([csvContent], { type: 'text/csv' });
-              const url = window.URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `prospects_${moment().format('YYYY-MM-DD')}.csv`;
-              a.click();
-              window.URL.revokeObjectURL(url);
-              setShowExportModal(false);
-              toast.success('Prospects exported successfully!');
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `prospects_${moment().format('YYYY-MM-DD')}.csv`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                setShowExportModal(false);
+                toast.success(`Exported ${allData.length} prospects successfully!`);
+              } catch (err) {
+                toast.error('Failed to export prospects');
+              } finally {
+                setExporting(false);
+              }
             }}
           >
-            <Download size={16} className="me-2" />
-            Export
+            {exporting ? (
+              <>
+                <Spinner animation="border" size="sm" className="me-2" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download size={16} className="me-2" />
+                Export
+              </>
+            )}
           </Button>
         </Modal.Footer>
       </Modal>

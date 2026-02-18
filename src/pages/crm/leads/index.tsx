@@ -33,7 +33,6 @@ import {
   getCampaignById,
   getCrmData,
   getCrmDataById,
-  getIndustries,
   getBusinessTypes,
   getLeadFollowUps,
   getMeetings
@@ -578,6 +577,7 @@ const CrmLeads = () => {
   const [lostReasons, setLostReasons] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [filterBusinessTypes, setFilterBusinessTypes] = useState<BusinessTypeData[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const [leadsData, setLeadsData] = useState<any[]>([]);
@@ -658,7 +658,6 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   const [editSelectedState, setEditSelectedState] = useState<{ value: string; label: string; } | null>(null);
   const [editSelectedCity, setEditSelectedCity] = useState<{ value: string; label: string; } | null>(null);
   const isEditInitialLoad = useRef(true);
-  const [allIndustries, setAllIndustries] = useState<IndustryData[]>([]);
 
   // Follow-up Modal
   const [showAddFollowupModal, setShowAddFollowupModal] = useState(false);
@@ -725,10 +724,11 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   const [leadsFilters, setLeadsFilters] = useState({
     assignedTo: null as string | null,
     stage: null as string | null,
-    industry: null as string | null,
+    businessType: null as string | null,
     source: null as string | null,
     leadPotential: null as string | null,
     campaign: null as string | null,
+    lostReason: null as string | null,
     leadScoreMin: null as string | null,
     leadScoreMax: null as string | null,
     dateFrom: null as string | null,
@@ -741,7 +741,17 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     fetchLostReasons();
     fetchExtensions(ModuleSlug.CRM_LEADS);
     fetchCampaigns();
+    fetchFilterBusinessTypes();
   }, []);
+
+  const fetchFilterBusinessTypes = async () => {
+    try {
+      const res = await getBusinessTypes({ per_page: 1000 });
+      setFilterBusinessTypes(res?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch business types:", error);
+    }
+  };
 
   // Fetch leads when filters or search change
   const fetchLeads = useCallback(
@@ -767,8 +777,8 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         if (currentFilters.assigned_to) {
           params.assigned_to = currentFilters.assigned_to;
         }
-        if (currentFilters.industry) {
-          params.industry = currentFilters.industry;
+        if (currentFilters.business_type_id) {
+          params.business_type_id = currentFilters.business_type_id;
         }
         if (currentFilters.source) {
           params.source = currentFilters.source;
@@ -778,6 +788,9 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         }
         if (currentFilters.campaign_id) {
           params.campaign_id = currentFilters.campaign_id;
+        }
+        if (currentFilters.lost_reason_id) {
+          params.lost_reason_id = currentFilters.lost_reason_id;
         }
         if (currentFilters.lead_score_min) {
           params.lead_score_min = currentFilters.lead_score_min;
@@ -915,15 +928,13 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         (stages.length > 0 && stages.some((s: any) => s.id.toString() === tabFromUrl));
       if (isValidFilter && tabFromUrl !== activeFilter) {
         setActiveFilter(tabFromUrl);
+        setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
       }
     }
   }, [router.isReady, router.query.tab, stages, activeFilter]);
   
   // Handler to update filter and URL
-  const handleFilterChange = useCallback((filterId: string) => {
-    setActiveFilter(filterId);
-    setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
-    
+  const handleFilterChange = useCallback((filterId: string) => {    
     // Update URL with tab query parameter
     router.push(
       {
@@ -1004,12 +1015,12 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         }
       }
 
-      // Handle industry filter
-      if ("industry" in filters) {
-        if (filters.industry) {
-          newFilters.industry = filters.industry;
+      // Handle business type filter
+      if ("business_type_id" in filters) {
+        if (filters.business_type_id) {
+          newFilters.business_type_id = String(filters.business_type_id);
         } else {
-          delete newFilters.industry;
+          delete newFilters.business_type_id;
         }
       }
 
@@ -1037,6 +1048,15 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
           newFilters.campaign_id = String(filters.campaign_id);
         } else {
           delete newFilters.campaign_id;
+        }
+      }
+
+      // Handle lost_reason_id filter
+      if ("lost_reason_id" in filters) {
+        if (filters.lost_reason_id) {
+          newFilters.lost_reason_id = String(filters.lost_reason_id);
+        } else {
+          delete newFilters.lost_reason_id;
         }
       }
 
@@ -1796,10 +1816,6 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       // Fetch business types
       const businessTypesResponse = await getBusinessTypes({ per_page: 1000 });
       setEditBusinessTypes(businessTypesResponse?.data || []);
-
-      // Fetch industries
-      const industriesResponse = await getIndustries({ per_page: 1000 });
-      setAllIndustries(industriesResponse?.data || []);
 
       // Fetch campaign if available
       if (campaignId) {
@@ -2800,7 +2816,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         setConvertingLeadId(lead.rawData?.id || lead.id);
         setShowConvertToDealModal(true);
       },
-      className: 'text-success'
+      className: 'text-success',
+      disabled: () => activeFilter === 'lost'
     });
   }
 
@@ -3258,44 +3275,30 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                 </Col>
                 <Col md={4}>
                   <Form.Label className="small fw-bold mb-2">
-                    Industry
+                    Business Type
                   </Form.Label>
                   <Select
-                    options={[
-                      { value: "Technology", label: "Technology" },
-                      { value: "Healthcare", label: "Healthcare" },
-                      { value: "Finance", label: "Finance" },
-                      {
-                        value: "Banking & Financial Services",
-                        label: "Banking & Financial Services",
-                      },
-                      { value: "Manufacturing", label: "Manufacturing" },
-                      { value: "Retail", label: "Retail" },
-                      { value: "Education", label: "Education" },
-                      { value: "Real Estate", label: "Real Estate" },
-                      {
-                        value: "Telecommunications",
-                        label: "Telecommunications",
-                      },
-                      { value: "Construction", label: "Construction" },
-                      { value: "Other", label: "Other" },
-                    ]}
+                    options={filterBusinessTypes.map((bt: BusinessTypeData) => ({
+                      value: bt.id.toString(),
+                      label: bt.name,
+                    }))}
                     value={
-                      leadsFilters.industry
-                        ? {
-                            value: leadsFilters.industry,
-                            label: leadsFilters.industry,
-                          }
+                      leadsFilters.businessType
+                        ? (() => {
+                            const btId = leadsFilters.businessType;
+                            const bt = filterBusinessTypes.find((b: BusinessTypeData) => b.id.toString() === btId);
+                            return bt ? { value: btId, label: bt.name } : { value: btId, label: btId };
+                          })()
                         : null
                     }
                     onChange={(selected) => {
-                      const industryValue = selected ? selected.value : null;
+                      const businessTypeValue = selected ? selected.value : null;
                       setLeadsFilters((prev) => ({
                         ...prev,
-                        industry: industryValue,
+                        businessType: businessTypeValue,
                       }));
                     }}
-                    placeholder="Select industry..."
+                    placeholder="Select business type..."
                     styles={customSelectStyles}
                     isClearable
                   />
@@ -3479,8 +3482,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                         if (leadsFilters.stage) {
                           filtersToApply.stage_id = leadsFilters.stage;
                         }
-                        if (leadsFilters.industry) {
-                          filtersToApply.industry = leadsFilters.industry;
+                        if (leadsFilters.businessType) {
+                          filtersToApply.business_type_id = leadsFilters.businessType;
                         }
                         if (leadsFilters.source) {
                           filtersToApply.source = leadsFilters.source;
@@ -3490,6 +3493,9 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                         }
                         if (leadsFilters.campaign) {
                           filtersToApply.campaign_id = leadsFilters.campaign;
+                        }
+                        if (leadsFilters.lostReason) {
+                          filtersToApply.lost_reason_id = leadsFilters.lostReason;
                         }
                         if (leadsFilters.leadScoreMin) {
                           filtersToApply.lead_score_min = leadsFilters.leadScoreMin;
@@ -3519,10 +3525,11 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                         setLeadsFilters({
                           assignedTo: null,
                           stage: null,
-                          industry: null,
+                          businessType: null,
                           source: null,
                           leadPotential: null,
                           campaign: null,
+                          lostReason: null,
                           leadScoreMin: null,
                           leadScoreMax: null,
                           dateFrom: null,
@@ -5100,12 +5107,13 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                   
                   {session?.user?.permissions?.includes("add-crm-deals") && (
                     <button
+                      disabled={activeFilter === "lost"}
                       style={{
                         background: "white",
                         border: "1px solid #e5e7eb",
                         borderRadius: "10px",
                         padding: "12px 16px",
-                        cursor: "pointer",
+                        cursor: activeFilter === "lost" ? "not-allowed" : "pointer",
                         transition: "all 0.2s ease",
                         display: "flex",
                         alignItems: "center",
@@ -5113,15 +5121,20 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                         fontSize: "14px",
                         fontWeight: 500,
                         color: "#1f2937",
+                        opacity: activeFilter === "lost" ? 0.6 : 1,
                       }}
                       onClick={() => {
-                        setShowLeadViewModal(false);
-                        handleConvertLead(viewingLead);
+                        if (activeFilter !== "lost") {
+                          setShowLeadViewModal(false);
+                          handleConvertLead(viewingLead);
+                        }
                       }}
                       onMouseOver={(e) => {
-                        e.currentTarget.style.borderColor = "#10b981";
-                        e.currentTarget.style.background = "#f0fdf4";
-                        e.currentTarget.style.transform = "translateX(4px)";
+                        if (activeFilter !== "lost") {
+                          e.currentTarget.style.borderColor = "#10b981";
+                          e.currentTarget.style.background = "#f0fdf4";
+                          e.currentTarget.style.transform = "translateX(4px)";
+                        }
                       }}
                       onMouseOut={(e) => {
                         e.currentTarget.style.borderColor = "#e5e7eb";
@@ -7239,13 +7252,22 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                             value={editFormData.company_size}
                             onChange={(e) => handleEditInputChange("company_size", e.target.value)}
                           >
-                            <option value="">Select Company Size</option>
-                            <option value="1-10">1-10 employees</option>
-                            <option value="11-50">11-50 employees</option>
-                            <option value="51-200">51-200 employees</option>
-                            <option value="201-500">201-500 employees</option>
-                            <option value="501-1000">501-1000 employees</option>
-                            <option value="1000+">1000+ employees</option>
+                            <option value="">Select Size</option>
+                            <option value="Micro (1-10 employees)">
+                              Micro (1-10 employees)
+                            </option>
+                            <option value="Small (11-50 employees)">
+                              Small (11-50 employees)
+                            </option>
+                            <option value="Medium (51-200 employees)">
+                              Medium (51-200 employees)
+                            </option>
+                            <option value="Large (201-500 employees)">
+                              Large (201-500 employees)
+                            </option>
+                            <option value="Enterprise (500+ employees)">
+                              Enterprise (500+ employees)
+                            </option>
                           </Form.Select>
                         </Form.Group>
                       </Col>
@@ -7258,33 +7280,6 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                             value={editFormData.company_location_other}
                             onChange={(e) => handleEditInputChange("company_location_other", e.target.value)}
                             placeholder="Any additional location details"
-                          />
-                        </Form.Group>
-                      </Col>
-                      <Col md={12}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Industries</Form.Label>
-                          <Select
-                            isMulti
-                            value={editFormData.industry_ids.map((id) => {
-                              const industry = allIndustries.find((ind) => ind.id === id);
-                              return industry
-                                ? { value: industry.id, label: industry.name }
-                                : null;
-                            }).filter(Boolean)}
-                            onChange={(selectedOptions: any) => {
-                              handleEditInputChange(
-                                "industry_ids",
-                                selectedOptions ? selectedOptions.map((opt: any) => opt.value) : []
-                              );
-                            }}
-                            options={allIndustries.map((industry) => ({
-                              value: industry.id,
-                              label: industry.name,
-                            }))}
-                            placeholder="Select industries (Optional)"
-                            isClearable
-                            isSearchable
                           />
                         </Form.Group>
                       </Col>
@@ -8022,15 +8017,17 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               handleConvertLead(selectedLead?.rawData || selectedLead);
             },
             variant: 'success',
-            show: session?.user?.permissions?.includes('add-crm-deals')
+            show: session?.user?.permissions?.includes('add-crm-deals'),
+            disabled: activeFilter === 'lost'
           },
           {
             label: 'View History',
             icon: History,
             onClick: () => {
               setShowLeadSidebar(false);
-              handleViewLead(selectedLead?.id || selectedLead?.rawData?.id);
-              setShowLeadHistoryModal(true);
+              void handleViewLead(selectedLead?.id || selectedLead?.rawData?.id).then(() => {
+                setShowLeadHistoryModal(true);
+              });
             },
             variant: 'outline-primary'
           }
@@ -8112,33 +8109,28 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             isClearable: true
           },
           {
-            id: 'industry',
-            label: 'Industry',
+            id: 'businessType',
+            label: 'Business Type',
             type: 'select',
-            value: leadsFilters.industry
-              ? { value: leadsFilters.industry, label: leadsFilters.industry }
+            value: leadsFilters.businessType
+              ? (() => {
+                  const btId = leadsFilters.businessType;
+                  const bt = filterBusinessTypes.find((b: BusinessTypeData) => b.id.toString() === btId);
+                  return bt ? { value: btId, label: bt.name } : { value: btId, label: btId };
+                })()
               : null,
             onChange: (selected) => {
-              const industryValue = selected ? selected.value : null;
+              const businessTypeValue = selected ? selected.value : null;
               setLeadsFilters((prev) => ({
                 ...prev,
-                industry: industryValue
+                businessType: businessTypeValue
               }));
             },
-            options: [
-              { value: "Technology", label: "Technology" },
-              { value: "Healthcare", label: "Healthcare" },
-              { value: "Finance", label: "Finance" },
-              { value: "Banking & Financial Services", label: "Banking & Financial Services" },
-              { value: "Manufacturing", label: "Manufacturing" },
-              { value: "Retail", label: "Retail" },
-              { value: "Education", label: "Education" },
-              { value: "Real Estate", label: "Real Estate" },
-              { value: "Telecommunications", label: "Telecommunications" },
-              { value: "Construction", label: "Construction" },
-              { value: "Other", label: "Other" },
-            ],
-            placeholder: 'Select industry...',
+            options: filterBusinessTypes.map((bt: BusinessTypeData) => ({
+              value: bt.id.toString(),
+              label: bt.name,
+            })),
+            placeholder: 'Select business type...',
             isClearable: true
           },
           {
@@ -8207,6 +8199,31 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             isClearable: true
           },
           {
+            id: 'lostReason',
+            label: 'Lost Lead Reason',
+            type: 'select',
+            value: leadsFilters.lostReason
+              ? (() => {
+                  const reasonId = leadsFilters.lostReason;
+                  const reason = lostReasons.find((r: any) => r.id.toString() === reasonId);
+                  return reason ? { value: reasonId, label: reason.name } : { value: reasonId, label: reasonId };
+                })()
+              : null,
+            onChange: (selected) => {
+              const lostReasonValue = selected ? selected.value : null;
+              setLeadsFilters((prev) => ({
+                ...prev,
+                lostReason: lostReasonValue
+              }));
+            },
+            options: lostReasons.map((r: any) => ({
+              value: r.id.toString(),
+              label: r.name,
+            })),
+            placeholder: 'Select lost reason...',
+            isClearable: true
+          },
+          {
             id: 'leadScoreMin',
             label: 'Lead Score (Min)',
             type: 'text',
@@ -8266,17 +8283,18 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         onApply={() => {
           const filtersToApply: Record<string, any> = {};
           
-          if (leadsSearch) filtersToApply.search = leadsSearch;
-          if (leadsFilters.assignedTo) filtersToApply.assigned_to = leadsFilters.assignedTo;
-          if (leadsFilters.stage) filtersToApply.stage_id = leadsFilters.stage;
-          if (leadsFilters.industry) filtersToApply.industry = leadsFilters.industry;
-          if (leadsFilters.source) filtersToApply.source = leadsFilters.source;
-          if (leadsFilters.leadPotential) filtersToApply.lead_potential = leadsFilters.leadPotential;
-          if (leadsFilters.campaign) filtersToApply.campaign_id = leadsFilters.campaign;
-          if (leadsFilters.leadScoreMin) filtersToApply.lead_score_min = leadsFilters.leadScoreMin;
-          if (leadsFilters.leadScoreMax) filtersToApply.lead_score_max = leadsFilters.leadScoreMax;
-          if (leadsFilters.dateFrom) filtersToApply.date_from = leadsFilters.dateFrom;
-          if (leadsFilters.dateTo) filtersToApply.date_to = leadsFilters.dateTo;
+          filtersToApply.search = leadsSearch;
+          filtersToApply.assigned_to = leadsFilters.assignedTo;
+          filtersToApply.stage_id = leadsFilters.stage;
+          filtersToApply.business_type_id = leadsFilters.businessType;
+          filtersToApply.source = leadsFilters.source;
+          filtersToApply.lead_potential = leadsFilters.leadPotential;
+          filtersToApply.campaign_id = leadsFilters.campaign;
+          filtersToApply.lost_reason_id = leadsFilters.lostReason;
+          filtersToApply.lead_score_min = leadsFilters.leadScoreMin;
+          filtersToApply.lead_score_max = leadsFilters.leadScoreMax;
+          filtersToApply.date_from = leadsFilters.dateFrom;
+          filtersToApply.date_to = leadsFilters.dateTo;
           
           handleFiltersChange(filtersToApply);
           setLeadsPagination({ ...leadsPagination, currentPage: 1 });
@@ -8288,10 +8306,11 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           setLeadsFilters({
             assignedTo: null,
             stage: null,
-            industry: null,
+            businessType: null,
             source: null,
             leadPotential: null,
             campaign: null,
+            lostReason: null,
             leadScoreMin: null,
             leadScoreMax: null,
             dateFrom: null,
@@ -8324,8 +8343,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
   onHide={() => setShowCreateLeadModal(false)}
   onSuccess={() => {
     setShowCreateLeadModal(false);
-    // Refresh your leads list here
-    // e.g., fetchLeads();
+    // Refresh leads list
+    fetchLeads();
   }}
   type="lead" // or "opportunity"
 />

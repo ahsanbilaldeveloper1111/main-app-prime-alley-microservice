@@ -82,6 +82,7 @@ export interface TableAction<T = any> {
   variant?: string;
   className?: string;
   show?: (row: T) => boolean;
+  disabled?: (row: T) => boolean;
   render?: (row: T) => React.ReactNode; // For custom action rendering like dropdowns
   
   // Dropdown configuration
@@ -318,7 +319,7 @@ const GenericTable = <T extends Record<string, any>>({
   const [showMetrics, setShowMetrics] = useState(false);
   
   // Flatten actions into context menu items (buttons + dropdown options)
-  type ContextMenuItem = { label: string; icon?: React.ReactNode; onClick: (row: T) => void; divider?: boolean; className?: string };
+  type ContextMenuItem = { label: string; icon?: React.ReactNode; onClick: (row: T) => void; divider?: boolean; className?: string; disabled?: boolean };
   const getContextMenuItems = useMemo(() => {
     return (row: T): ContextMenuItem[] => {
       const items: ContextMenuItem[] = [];
@@ -343,6 +344,7 @@ const GenericTable = <T extends Record<string, any>>({
             onClick: action.onClick,
             divider: false,
             className: action.className,
+            disabled: action.disabled?.(row),
           });
         }
       }
@@ -967,10 +969,13 @@ const GenericTable = <T extends Record<string, any>>({
               <button
                 type="button"
                 className={`gt-context-menu-item ${item.className || ''}`}
+                disabled={item.disabled}
                 onClick={(e) => {
                   e.stopPropagation();
-                  item.onClick(contextMenu.row);
-                  setContextMenu(null);
+                  if (!item.disabled) {
+                    item.onClick(contextMenu.row);
+                    setContextMenu(null);
+                  }
                 }}
                 role="menuitem"
               >
@@ -1303,14 +1308,16 @@ const GenericTable = <T extends Record<string, any>>({
                                 );
                               }
                               
+                              const isDisabled = action.disabled?.(row);
                               return (
                                 <Button
                                   key={actionIndex}
                                   variant={action.variant || 'link'}
                                   size="sm"
+                                  disabled={isDisabled}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    action.onClick?.(row);
+                                    if (!isDisabled) action.onClick?.(row);
                                   }}
                                   className={`p-1 ${action.className || ''}`}
                                   title={action.label}

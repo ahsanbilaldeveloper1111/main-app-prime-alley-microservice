@@ -179,6 +179,7 @@ export interface SidebarAction {
   onClick: () => void;
   variant?: 'primary' | 'success' | 'danger' | 'warning' | 'secondary' | 'outline-primary' | 'outline-secondary';
   show?: boolean;
+  disabled?: boolean;
 }
 
 export interface GenericSidebarProps {
@@ -1229,10 +1230,12 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 return (
                   <button
                     key={index}
-                    onClick={action.onClick}
+                    disabled={action.disabled}
+                    onClick={() => { if (!action.disabled) action.onClick(); }}
                     style={{
                       ...baseStyles,
-                      ...(variantStyles[action.variant || 'primary'])
+                      ...(variantStyles[action.variant || 'primary']),
+                      ...(action.disabled && { opacity: 0.6, cursor: 'not-allowed' })
                     }}
                   >
                     {ActionIcon && <ActionIcon size={16} />}
