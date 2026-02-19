@@ -1526,13 +1526,12 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
 
   // Fetch call recordings (not call logs) for the selected prospect
   // Filters by current user's extension and prospect's phone number
-  const fetchCallRecordings = useCallback(async (phoneNumber: string) => {
+  const fetchCallRecordings = useCallback(async (phoneNumber: string, userExtension?: string) => {
     if (!phoneNumber) {
       setCallRecordings([]);
       return;
     }
-    console.log(session?.user, "ZEZ");
-    const userExtension = (session?.user as any)?.phone;
+
     if (!userExtension) {
       setCallRecordings([]);
       return;
@@ -1542,6 +1541,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     try {
       const filters = {
         remote_party_number: [phoneNumber],
+        extension: [userExtension],
       };
 
       // Use ListCallLogs with reportType 'recordings' to fetch call recordings
@@ -1587,6 +1587,16 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
       setCallRecordingsTotal(0);
     }
   }, [showViewModal, selectedDataItem, fetchCallRecordings]);
+
+  // Load call recordings when prospect sidebar (preview modal) opens
+  useEffect(() => {
+    if (showProspectSidebar && selectedProspect?.phone) {
+      fetchCallRecordings(selectedProspect.phone, selectedProspect.user_extension);
+    } else if (!showProspectSidebar && !showViewModal) {
+      setCallRecordings([]);
+      setCallRecordingsTotal(0);
+    }
+  }, [showProspectSidebar, selectedProspect, showViewModal, fetchCallRecordings]);
 
   // Handle play call recording
   const handlePlayCallRecording = useCallback((recording: any) => {
@@ -2166,9 +2176,9 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     setShowProspectSidebar(true);
   }, []);
 
-  // Handle first column click - navigates to detail page
+  // Handle first column click - navigates to detail page with prospect ID in URL
   const handleFirstColumnClick = useCallback((prospect: any) => {
-    router.push('/crm/data/prospects-detailpage');
+    router.push(`/crm/data/prospects-detailpage?id=${prospect?.id ?? ''}`);
   }, [router]);
 
   // Stats cards data for metrics
@@ -6670,7 +6680,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         onClose={handleCloseProspectSidebar}
         title={selectedProspect?.name || 'Prospect Details'}
         subtitle={selectedProspect?.phone || ''}
-        email={selectedProspect?.email}
+        email={selectedProspect?.data?.email}
         phone={selectedProspect?.phone}
         avatar={{
           initials: getInitials(selectedProspect?.name || 'NA'),
@@ -6780,11 +6790,11 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
               },
               {
                 label: 'Email',
-                value: selectedProspect?.email || 'N/A',
+                value: selectedProspect?.data?.email || 'N/A',
                 type: 'email',
                 copyable: true,
-                externalLink: selectedProspect?.email ? `mailto:${selectedProspect.email}` : undefined,
-                show: !!selectedProspect?.email
+                externalLink: selectedProspect?.data?.email ? `mailto:${selectedProspect.data.email}` : undefined,
+                show: !!selectedProspect?.data?.email
               },
               {
                 label: 'Assigned To',
@@ -6838,18 +6848,77 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             icon: PhoneIcon,
             collapsible: true,
             defaultExpanded: true,
-            count: 0,
+            count: callRecordingsTotal ?? callRecordings.length,
+            isLoading: callRecordingsLoading,
             actions: [
               { label: 'View all recordings', onClick: () => console.log('View all') }
             ],
-            emptyState: {
-              icon: PhoneIcon,
-              message: 'No call recordings available yet.',
-              action: {
-                label: 'Make a call',
-                onClick: () => selectedProspect?.phone && handleCallClick(selectedProspect)
-              }
-            }
+            ...(callRecordings.length > 0
+              ? {
+                  customContent: (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {callRecordings.map((recording: any, index: number) => {
+                        const duration = parseInt(recording.Duration?.toString() || '0') / 10000000 || 0;
+                        const isOutgoing = recording.Direction === 'CALL_OUTGOING';
+                        return (
+                          <div
+                            key={recording.Id || index}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 12px',
+                              background: '#f9fafb',
+                              borderRadius: '8px',
+                              border: '1px solid #e5e7eb',
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '13px', fontWeight: 500, color: '#1f2937' }}>
+                                {formatDateTimeToLocal(recording.DateTime, GlobalDateFormat)}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                                {formatDuration(duration)} · {isOutgoing ? 'Outgoing' : 'Incoming'}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#2563eb',
+                                cursor: 'pointer',
+                                padding: '6px',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                              title="Play Recording"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePlayCallRecording(recording);
+                              }}
+                            >
+                              <FiPlay size={18} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ),
+                }
+              : {
+                  emptyState: {
+                    icon: PhoneIcon,
+                    message: 'No call recordings available yet.',
+                    action: {
+                      label: 'Make a call',
+                      onClick: () => selectedProspect?.phone && handleCallClick(selectedProspect),
+                    },
+                  },
+                }
+            ),
           },
           {
             id: 'notes',

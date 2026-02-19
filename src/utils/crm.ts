@@ -678,7 +678,41 @@ export const deleteOpportunity = async (id: number): Promise<void> => {
   }
 };
 
-// CRM Data Management
+// CRM Data Management - Deal (nested under ticket/lead)
+export interface CrmDataDeal {
+  id: number;
+  name: string;
+  type?: string;
+  ticket_id?: string;
+  stage_id?: string;
+  assigned_to?: string;
+  probability?: number;
+  expected_close_date?: string | null;
+  company_name?: string | null;
+  status?: string;
+  grand_total?: string | null;
+  net_value?: string | null;
+  currency?: string | null;
+  is_lost?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: any;
+}
+
+// Ticket = Lead (nested under prospect)
+export interface CrmDataTicket {
+  id: number;
+  name: string;
+  type: string; // 'lead'
+  status?: string;
+  company_name?: string | null;
+  stage_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  deals?: CrmDataDeal[];
+  [key: string]: any;
+}
+
 export interface CrmDataItem {
   id: number;
   phone: string | null;
@@ -691,6 +725,8 @@ export interface CrmDataItem {
   updated_at: string;
   scheduled_call_at?: string | null;
   note?: string | null;
+  /** Leads associated with this prospect (API: tickets) */
+  tickets?: CrmDataTicket[];
 }
 
 export interface CrmDataPagination {
