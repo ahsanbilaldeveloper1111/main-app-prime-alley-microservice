@@ -745,3 +745,15 @@ export const ListUnifiedOps = async (params: ApiParams = {}) => {
         };
     }
 };
+
+
+export const GetTmsAuditLogs = async (params: any = {}) => {
+    try {
+        const response = await axiosInstance.get('tms/getAuditLogs', { params });
+        return response.data ?? [];
+    } catch (error) {
+        toast.error("Failed to fetch audit logs");
+        console.error('Error fetching audit logs:', error);
+        throw error;
+    }
+};

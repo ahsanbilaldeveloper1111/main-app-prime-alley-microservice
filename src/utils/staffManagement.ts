@@ -116,16 +116,9 @@ export const AuditLogsStaffManagement = async (
       `${PREFIX}/audit-logs`,
       { params }
     );
-    if (response?.data) {
-      const responseData = response.data;
-      if (responseData.pagination != null) {
-        return { data: responseData.data ?? [], pagination: responseData.pagination };
-      }
-      return responseData.data ?? responseData;
-    }
-    return null;
+   return response.data ?? response;
   } catch (error: unknown) {
-    handleApiError(error, "Failed to fetch audit logs");
+    throw error;
   }
 };
 

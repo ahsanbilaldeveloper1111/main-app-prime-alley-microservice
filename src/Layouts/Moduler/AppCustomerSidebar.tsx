@@ -145,8 +145,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'staff-management', // 12. Staff Management
     'reports',
     'audit-logs', // 13. Audit Logs
-    'settings',
-    'resources',
+    // 'settings',
+    // 'resources',
 	  
 
   ];
@@ -1323,6 +1323,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       color: rgba(255, 255, 255, 0.9);
       display: flex;
       flex-shrink: 0;
+      display:none !important;
     }
 
     .submenu-flyout-item.active .flyout-item-icon {

@@ -30,6 +30,7 @@ import {
   Sparkles,
   MessageCircle,
   Plus,
+  Ticket,
     } from 'lucide-react';
 import { Badge, Button, Dropdown } from 'react-bootstrap';
 import { useCti } from '@hooks/useCti';
@@ -1274,12 +1275,16 @@ const Layout = ({ children }: LayoutProps) => {
                 </Dropdown>
 
  {/* Help Icon */}
- <button className="crm-prime-topbar-icon" title="Help">
+                <button className="crm-prime-topbar-icon" title="Help"
+                onClick={() => router.push('/help-center')}
+                >
                 <HelpCircle size={18} />
               </button>
 
               {/* Settings Icon */}
-              <button className="crm-prime-topbar-icon" title="Settings">
+                <button className="crm-prime-topbar-icon" title="Settings"
+                onClick={() => router.push('/settings')}
+                >
                 <Settings size={18} />
               </button>
               {/* Divider */}
@@ -1373,27 +1378,27 @@ const Layout = ({ children }: LayoutProps) => {
                           <div className="user-dropdown-email">
                             {session?.user?.email || 'ocean1@sipzon.com'}
                           </div>
-                          <a href="#" className="user-dropdown-link">
+                          <a href="/profile" className="user-dropdown-link">
                             Profile & Preferences
                           </a>
                         </div>
                       </div>
 
                       {/* View Only Badge */}
-                      <div className="user-dropdown-view-only">
+                      {/* <div className="user-dropdown-view-only">
                         <Eye size={14} style={{ color: '#000000' }} />
                         <span>View Only</span>
-                      </div>
+                      </div> */}
 
                       {/* Request edit access */}
-                      <div className="user-dropdown-section">
+                      {/* <div className="user-dropdown-section">
                         <button className="user-dropdown-item">
                           <span className="user-dropdown-item-text">Request edit access</span>
                         </button>
-                      </div>
+                      </div> */}
 
                       {/* Theme */}
-                      <div className="user-dropdown-section">
+                      {/* <div className="user-dropdown-section">
                         <div className="user-dropdown-section-label">Theme</div>
                         <button className="user-dropdown-item">
                           <span className="user-dropdown-item-text">Switch to the classic theme</span>
@@ -1402,23 +1407,27 @@ const Layout = ({ children }: LayoutProps) => {
                           <MessageCircle className="user-dropdown-item-icon" size={14} />
                           <span className="user-dropdown-item-text">Give theme feedback</span>
                         </button>
-                      </div>
+                      </div> */}
 
                       {/* Account */}
                       <div className="user-dropdown-section">
                         <div className="user-dropdown-section-label">Account</div>
                         <div className="user-dropdown-account-info">
-                          <div className="user-dropdown-account-name">Prime Alley Technology</div>
-                          <div className="user-dropdown-account-id">147764492</div>
+                          <div className="user-dropdown-account-name">{session?.user?.company_name}</div>
+                          <div className="user-dropdown-account-id">{session?.user?.company_identifier}</div>
                         </div>
                       </div>
 
                       {/* Links */}
                       <div className="user-dropdown-section">
-                        <button className="user-dropdown-item">
-                          <BookOpen className="user-dropdown-item-icon" size={14} />
-                          <span className="user-dropdown-item-text">Trial Guide</span>
-                        </button>
+                        
+                          {session?.user?.permissions?.includes('tickets-tickets') && (
+                            <button className="user-dropdown-item" onClick={() => router.push('/tickets/list')}>
+                              <Ticket className="user-dropdown-item-icon" size={14} />
+                              <span className="user-dropdown-item-text">Raise a ticket</span>
+                            </button>
+                          )}
+                          
                         <button className="user-dropdown-item">
                           <CreditCard className="user-dropdown-item-icon" size={14} />
                           <span className="user-dropdown-item-text">Pricing & Features</span>

@@ -289,3 +289,13 @@ export const CompletePayment = async (payload: any) => {
     throw error;
   }
 };
+
+export const GetAccountAuditLogs = async (params: any = {}) => {
+  try {
+    const response = await axiosInstance.get('accounting/audit-logs', { params });
+    return response.data ?? [];
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch account audit logs");
+    throw error;
+  }
+};
