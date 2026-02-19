@@ -4,6 +4,7 @@ import { ModuleSlug } from "@utils/Helper";
 import { AuditLogsWorkPlanner } from "@utils/work-planner";
 import { GetTmsAuditLogs } from "@utils/tms/List";
 import { GetAccountAuditLogs } from "@utils/accounting";
+import { getCrmAuditLogs } from "@utils/crm";
 
 export interface AuditFilterService {
   serviceName: string;
@@ -12,6 +13,7 @@ export interface AuditFilterService {
   userKey?: string;
   isShow?: string;
   actions?: string[];
+  actionKey?: string;
   users?: string;
   moduleSlug?: string;
 }
@@ -24,10 +26,19 @@ export interface AuditFilterNode {
   responsePattern?: unknown[];
   pageKey?: string;
   perPageKey?: string;
-  timestamp?: string | [string, string];
+  timestamp?: string | [string, string] | [string];
 }
 
-export const AuditFilterActions = { CREATE: "Create", MODIFY: "Update", REMOVE: "Remove" } as const;
+export const AuditFilterActions = {
+  CREATE: "Create",
+  CREATED: "created",
+  MODIFY: "Update",
+  UPDATED: "updated",
+  REMOVE: "Remove",
+  REMOVED: "Removed",
+  DELETED: "deleted"
+
+} as const;
 
 const StaffManagementServices = {
   moduleName: "Staff management",
@@ -380,9 +391,89 @@ const TmsAuditLogsServices = {
   ],
 };
 
+const CrmAuditLogsServices = {
+  moduleName: "CRM",
+  isShow: HEADER_CONSTANTS.PERMISSIONS.CRM_SERVICES,
+  endpoint: getCrmAuditLogs as (params: Record<string, unknown>) => Promise<unknown>,
+  responsePattern: [],
+  perPageKey: "per_page",
+  pageKey: "page",
+  timestamp: ["date_from", "date_to"] as [string, string],
+  services: [
+    {
+      serviceName: "Lead",
+      serviceValue: "lead",
+      serviceKey: "entity_type",
+      isShow: HEADER_CONSTANTS.PERMISSIONS.VIEW_CRM_LEADS,
+      actions: [AuditFilterActions.CREATED, AuditFilterActions.UPDATED, AuditFilterActions.DELETED],
+      actionKey:"event",
+      users: "dropdown",
+      userKey:"user_extension",
+      moduleSlug: ModuleSlug.CRM_LEADS,
+    },
+    {
+      serviceName: "Deal",
+      serviceValue: "deal",
+      serviceKey: "entity_type",
+      isShow: HEADER_CONSTANTS.PERMISSIONS.VIEW_CRM_DEALS,
+      actions: [AuditFilterActions.CREATED, AuditFilterActions.UPDATED, AuditFilterActions.DELETED],
+      actionKey:"event",
+      users: "dropdown",
+      userKey:"user_extension",
+      moduleSlug: ModuleSlug.CRM_DEALS,
+    },
+    {
+      serviceName: "Deal Estimate",
+      serviceValue: "deal_estimate",
+      serviceKey: "entity_type",
+      isShow: HEADER_CONSTANTS.PERMISSIONS.VIEW_CRM_DEALS,
+      actions: [AuditFilterActions.CREATED, AuditFilterActions.UPDATED, AuditFilterActions.DELETED],
+      actionKey:"event",
+      users: "dropdown",
+      userKey:"user_extension",
+      moduleSlug: ModuleSlug.CRM_DEALS,
+    },
+    {
+      serviceName: "Order",
+      serviceValue: "order",
+      serviceKey: "entity_type",
+      isShow: HEADER_CONSTANTS.PERMISSIONS.VIEW_CRM_ORDERS,
+      actions: [AuditFilterActions.CREATED, AuditFilterActions.UPDATED, AuditFilterActions.DELETED],
+      actionKey:"event",
+      users: "dropdown",
+      userKey:"user_extension",
+      moduleSlug: ModuleSlug.CRM_ORDERS,
+    },
+    {
+      serviceName: "Prospect",
+      serviceValue: "prospect",
+      serviceKey: "entity_type",
+      isShow: HEADER_CONSTANTS.PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
+      actions: [AuditFilterActions.CREATED, AuditFilterActions.UPDATED, AuditFilterActions.DELETED],
+      actionKey:"event",
+      users: "dropdown",
+      userKey:"user_extension",
+      moduleSlug: ModuleSlug.CRM_DATA_MANAGEMENT,
+    },
+    {
+      serviceName: "Campaign",
+      serviceValue: "campaign",
+      serviceKey: "entity_type",
+      isShow: HEADER_CONSTANTS.PERMISSIONS.VIEW_CRM_CAMPAIGNS,
+      actions: [AuditFilterActions.CREATED, AuditFilterActions.UPDATED, AuditFilterActions.DELETED],
+      actionKey:"event",
+      users: "dropdown",
+      userKey:"user_extension",
+      moduleSlug: ModuleSlug.CRM_CAMPAIGNS,
+    }
+    
+  ],
+};
+
 export const AuditFilterConfig: AuditFilterNode[] = [
   StaffManagementServices,
   WorkPlannerServices,
   AccountingAuditLogsServices,
   TmsAuditLogsServices,
+  CrmAuditLogsServices,
 ];

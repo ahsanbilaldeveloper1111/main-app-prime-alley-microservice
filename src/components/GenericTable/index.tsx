@@ -115,6 +115,7 @@ export interface FilterPill {
   icon?: React.ReactNode;
   onClick?: () => void;
   showDropdown?: boolean;
+  searchable?: boolean;
   dropdownOptions?: Array<{
     label: string;
     value: string;
@@ -317,6 +318,7 @@ const GenericTable = <T extends Record<string, any>>({
   
   // Metrics visibility state (hidden by default)
   const [showMetrics, setShowMetrics] = useState(false);
+  const [filterPillSearch, setFilterPillSearch] = useState<Record<string, string>>({});
   
   // Flatten actions into context menu items (buttons + dropdown options)
   type ContextMenuItem = { label: string; icon?: React.ReactNode; onClick: (row: T) => void; divider?: boolean; className?: string; disabled?: boolean };
@@ -805,16 +807,34 @@ const GenericTable = <T extends Record<string, any>>({
                       {pill.icon && <span className="me-1">{pill.icon}</span>}
                       <span>{pill.label}</span>
                     </Dropdown.Toggle>
-                    <Dropdown.Menu>
+                    <Dropdown.Menu style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                      {pill.searchable && pill.dropdownOptions && pill.dropdownOptions.length > 0 && (
+                        <div className="px-2 pb-2" onClick={(e) => e.stopPropagation()}>
+                          <Form.Control
+                            size="sm"
+                            type="text"
+                            placeholder="Search..."
+                            value={filterPillSearch[pill.id] ?? ''}
+                            onChange={(e) => setFilterPillSearch((prev) => ({ ...prev, [pill.id]: e.target.value }))}
+                            autoFocus
+                          />
+                        </div>
+                      )}
                       {pill.dropdownOptions && pill.dropdownOptions.length > 0 ? (
-                        pill.dropdownOptions.map((option, idx) => (
-                          <Dropdown.Item 
-                            key={idx} 
-                            onClick={option.onClick || pill.onClick}
-                          >
-                            {option.label}
-                          </Dropdown.Item>
-                        ))
+                        (() => {
+                          const q = (filterPillSearch[pill.id] ?? '').trim().toLowerCase();
+                          const options = pill.searchable && q
+                            ? pill.dropdownOptions.filter((o) => (o.label ?? '').toLowerCase().includes(q) || (o.value ?? '').toLowerCase().includes(q))
+                            : pill.dropdownOptions;
+                          return options.map((option, idx) => (
+                            <Dropdown.Item
+                              key={idx}
+                              onClick={() => { (option.onClick || pill.onClick)?.(); setFilterPillSearch((prev) => ({ ...prev, [pill.id]: '' })); }}
+                            >
+                              {option.label}
+                            </Dropdown.Item>
+                          ));
+                        })()
                       ) : (
                         <>
                           <Dropdown.Item onClick={pill.onClick}>All</Dropdown.Item>

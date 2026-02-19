@@ -4022,3 +4022,16 @@ export const PDFDownloadDeal = async (
   }
 };
 
+export const getCrmAuditLogs = async (params: any = {}) => {
+  try {
+    const response = await axiosInstance.get(`/crm/audit-logs`, { params });
+    if (response.data.code === 200) {
+      return response.data.data;
+    }
+    return [];
+  } catch (error: unknown) {
+    toast.error("Failed to fetch audit logs");
+    console.error("Audit logs error:", error);
+    throw error;
+  }
+};
