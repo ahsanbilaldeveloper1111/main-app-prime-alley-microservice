@@ -678,7 +678,41 @@ export const deleteOpportunity = async (id: number): Promise<void> => {
   }
 };
 
-// CRM Data Management
+// CRM Data Management - Deal (nested under ticket/lead)
+export interface CrmDataDeal {
+  id: number;
+  name: string;
+  type?: string;
+  ticket_id?: string;
+  stage_id?: string;
+  assigned_to?: string;
+  probability?: number;
+  expected_close_date?: string | null;
+  company_name?: string | null;
+  status?: string;
+  grand_total?: string | null;
+  net_value?: string | null;
+  currency?: string | null;
+  is_lost?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: any;
+}
+
+// Ticket = Lead (nested under prospect)
+export interface CrmDataTicket {
+  id: number;
+  name: string;
+  type: string; // 'lead'
+  status?: string;
+  company_name?: string | null;
+  stage_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  deals?: CrmDataDeal[];
+  [key: string]: any;
+}
+
 export interface CrmDataItem {
   id: number;
   phone: string | null;
@@ -691,6 +725,8 @@ export interface CrmDataItem {
   updated_at: string;
   scheduled_call_at?: string | null;
   note?: string | null;
+  /** Leads associated with this prospect (API: tickets) */
+  tickets?: CrmDataTicket[];
 }
 
 export interface CrmDataPagination {
@@ -730,6 +766,25 @@ export interface CrmDataUploadResponse {
   errors: string[];
 }
 
+export const createCrmData = async (payload: {
+  name: string;
+  phone: string;
+  user_extension: string;
+  campaign_id: number | null;
+  data: Record<string, any>;
+}): Promise<any> => {
+  try {
+    const response = await axiosInstance.post("/crm/crm-data", payload);
+    if (response.data?.success !== false) {
+      toast.success(response.data?.message || "Prospect created successfully");
+    }
+    return response.data;
+  } catch (error: any) {
+    toast.error(error?.response?.data?.message || "Failed to create prospect");
+    throw error;
+  }
+};
+
 export const getCrmData = async (
   params: PaginationParams = {}
 ): Promise<CrmDataResponse> => {
@@ -750,6 +805,28 @@ export const getCrmDataById = async (id: number): Promise<CrmDataItem> => {
   } catch (error: any) {
     toast.error(
       error?.response?.data?.message || "Failed to fetch CRM data record"
+    );
+    throw error;
+  }
+};
+
+export const updateCrmData = async (
+  id: number,
+  payload: {
+    name: string;
+    phone: string;
+    data: Record<string, any>;
+  }
+): Promise<any> => {
+  try {
+    const response = await axiosInstance.put(`/crm/crm-data/${id}`, payload);
+    if (response.data?.success !== false) {
+      toast.success(response.data?.message || "Prospect updated successfully");
+    }
+    return response.data;
+  } catch (error: any) {
+    toast.error(
+      error?.response?.data?.message || "Failed to update prospect"
     );
     throw error;
   }

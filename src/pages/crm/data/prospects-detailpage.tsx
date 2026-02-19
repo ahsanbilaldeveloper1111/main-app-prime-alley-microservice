@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, ReactElement } from 'react';
+import { useRouter } from 'next/router';
 import {
   X, ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
   Calendar, MessageSquare, ClipboardList, ExternalLink, Copy, RefreshCw,
@@ -7,6 +8,7 @@ import {
   Search, Filter, AlertCircle, ShoppingCart
 } from 'lucide-react';
 import Layout from "@layout/index";
+import { getCrmDataById, type CrmDataItem } from '@utils/crm';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -73,6 +75,13 @@ interface RevenueSection {
 // ============================================================================
 
 const ContactRecordPage: NextPageWithLayout = () => {
+  const router = useRouter();
+  const { id: prospectId } = router.query;
+
+  const [prospect, setProspect] = useState<CrmDataItem | null>(null);
+  const [prospectLoading, setProspectLoading] = useState(true);
+  const [prospectError, setProspectError] = useState<string | null>(null);
+
   const [activeTab, setActiveTab] = useState('about');
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
@@ -83,6 +92,34 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
+
+  // Load prospect by ID from URL
+  useEffect(() => {
+    if (!router.isReady || prospectId == null || prospectId === '') {
+      setProspectLoading(false);
+      return;
+    }
+    const id = Number(prospectId);
+    if (Number.isNaN(id)) {
+      setProspectError('Invalid prospect ID');
+      setProspectLoading(false);
+      return;
+    }
+    setProspectLoading(true);
+    setProspectError(null);
+    getCrmDataById(id)
+      .then((data) => {
+        setProspect(data);
+        setProspectError(null);
+      })
+      .catch(() => {
+        setProspect(null);
+        setProspectError('Failed to load prospect');
+      })
+      .finally(() => {
+        setProspectLoading(false);
+      });
+  }, [router.isReady, prospectId]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -434,15 +471,16 @@ const revenueSections: RevenueSection[] = [
     { id: 'intelligence', label: 'Intelligence' },
   ];
 
-  // Key Information Fields
+  // Key Information Fields (from prospect + tickets/leads)
+  const firstTicket = prospect?.tickets?.[0];
   const keyInfoFields: KeyInfoField[] = [
-    { label: 'Email', value: 'ahmad@gmail.com', copyable: true },
-    { label: 'Phone Number', value: '+92-300-8009002', copyable: true },
-    { label: 'Company Name', value: 'Ahmad Hussain LTD' },
-    { label: 'Lead Status', value: 'New' },
-    { label: 'Lifecycle Stage', value: 'Opportunity' },
-    { label: 'Buying Role', value: '--' },
-    { label: 'Contact owner', value: 'Rizwan Haider' },
+    { label: 'Email', value: prospect?.data?.email ?? '--', copyable: true },
+    { label: 'Phone Number', value: prospect?.phone ?? '--', copyable: true },
+    { label: 'Company Name', value: firstTicket?.company_name ?? prospect?.data?.company_name ?? prospect?.name ?? '--' },
+    { label: 'Lead Status', value: firstTicket?.status ?? prospect?.data?.disposition ?? '--' },
+    { label: 'Lifecycle Stage', value: prospect?.data?.lifecycle_stage ?? '--' },
+    { label: 'Buying Role', value: prospect?.data?.buying_role ?? '--' },
+    { label: 'Contact owner', value: prospect?.data?.contact_owner ?? '--' },
   ];
 
   const renderIntelligenceTab = () => {
@@ -550,7 +588,7 @@ const revenueSections: RevenueSection[] = [
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                --
+                {firstTicket?.company_city ?? '--'}
               </div>
             </div>
             <div>
@@ -566,7 +604,7 @@ const revenueSections: RevenueSection[] = [
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                --
+                {firstTicket?.company_province ?? '--'}
               </div>
             </div>
             <div>
@@ -757,10 +795,10 @@ const revenueSections: RevenueSection[] = [
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                ahmad@gmail.com
+                {prospect?.data?.email ?? '--'}
               </div>
             </div>
-  
+
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
@@ -1192,7 +1230,7 @@ const revenueSections: RevenueSection[] = [
               color: '#141414',
               flexShrink: 0,
             }}>
-              AH
+              {prospect?.name ? prospect.name.trim().split(/\s+/).map((s) => s[0]).join('').toUpperCase().slice(0, 2) : 'NA'}
             </div>
             <div style={{ flex: 1 }}>
               <h2 style={{
@@ -1202,7 +1240,7 @@ const revenueSections: RevenueSection[] = [
                 margin: '0 0 4px 0',
                 lineHeight: '1.3',
               }}>
-                Ahmad Hussain
+                {prospect?.name ?? 'Unknown'}
               </h2>
               <p style={{
                 fontSize: '14px',
@@ -1210,59 +1248,65 @@ const revenueSections: RevenueSection[] = [
                 margin: '0 0 8px 0',
                 lineHeight: '1.4',
               }}>
-                Director at Ahmad Hussain LTD
+                {firstTicket?.company_name ? `Director at ${firstTicket?.company_name}` : 'Prospect'}
               </p>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
               }}>
-                <a
-                  href="mailto:ahmad@gmail.com"
-                  style={{
-                    fontSize: '14px',
-                    color: '#006162',
-                    textDecoration: 'none',
-                    fontWeight: '500',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.textDecoration = 'underline';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.textDecoration = 'none';
-                  }}
-                >
-                  ahmad@gmail.com
-                </a>
-                <button
-                  onClick={() => copyToClipboard('ahmad@gmail.com')}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    padding: '4px',
-                    cursor: 'pointer',
-                    color: '#718096',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                  title="Copy email"
-                >
-                  <Copy size={14} />
-                </button>
-                <button
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    padding: '4px',
-                    cursor: 'pointer',
-                    color: '#718096',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                  title="Link"
-                >
-                  <Link2 size={14} />
-                </button>
+                {prospect?.data?.email ? (
+                  <>
+                    <a
+                      href={`mailto:${prospect?.data?.email}`}
+                      style={{
+                        fontSize: '14px',
+                        color: '#006162',
+                        textDecoration: 'none',
+                        fontWeight: '500',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.textDecoration = 'underline';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.textDecoration = 'none';
+                      }}
+                    >
+                      {prospect?.data?.email}
+                    </a>
+                    <button
+                      onClick={() => copyToClipboard(prospect?.data?.email ?? '')}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        padding: '4px',
+                        cursor: 'pointer',
+                        color: '#718096',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                      title="Copy email"
+                    >
+                      <Copy size={14} />
+                    </button>
+                    <button
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        padding: '4px',
+                        cursor: 'pointer',
+                        color: '#718096',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                      title="Link"
+                    >
+                      <Link2 size={14} />
+                    </button>
+                  </>
+                ) : (
+                  <span style={{ fontSize: '14px', color: '#718096' }}>No email</span>
+                )}
               </div>
             </div>
           </div>
@@ -1678,7 +1722,7 @@ const revenueSections: RevenueSection[] = [
                     padding: '18px 20px',
                     borderRadius: '10px',
                   }}>
-                    Ahmad Hussain is a Director at Ahmad Hussain LTD, currently in the Opportunity stage. Recent activity shows strong engagement: Invoice INV-1004 ($500.00) was sent on Feb 14, and the contact maintains an active Connect Pro subscription with the next billing scheduled for Mar 13, 2026. However, there's a critical email deliverability issue - a recent marketing email bounced, which may impact future communications. The contact is revenue-generating with stable MRR from the subscription. Recommended next steps: address the email bounce issue immediately and consider a follow-up call to discuss potential upsell opportunities.
+                    {prospect?.name ?? 'This prospect'} is a Director at {firstTicket?.company_name ?? prospect?.data?.company_name ?? 'N/A'}, currently in the Opportunity stage. Recent activity shows strong engagement. The contact is revenue-generating. Recommended next steps: consider a follow-up call to discuss potential opportunities.
                   </div>
 
                   <div style={{
@@ -1818,12 +1862,12 @@ const revenueSections: RevenueSection[] = [
                   gap: '20px',
                 }}>
                   {[
-                    { label: 'Company name', value: 'Ahmad Hussain LTD' },
+                    { label: 'Company name', value: firstTicket?.company_name ?? '--' },
                     { label: 'Street address', value: '--' },
-                    { label: 'City', value: '--' },
+                    { label: 'City', value: firstTicket?.company_city ?? '--' },
                     { label: 'Postal code', value: '--' },
-                    { label: 'State/Region', value: '--' },
-                    { label: 'Email', value: 'ahmad@gmail.com', link: true },
+                    { label: 'State', value: firstTicket?.company_province ?? '--' },
+                    { label: 'Email', value: prospect?.data?.email ?? '--', link: true },
                   ].map((field, index) => (
                     <div key={index}>
                       <div style={{
@@ -2249,7 +2293,13 @@ const revenueSections: RevenueSection[] = [
           paddingTop: '0px', 
           paddingBottom: '0',
         }}>
-        {/* Companies */}
+        {/* Companies - from prospect name + unique company_name from tickets */}
+        {(() => {
+          const companyNames = prospect?.tickets?.length
+            ? Array.from(new Set(prospect.tickets.map((t: any) => t.company_name).filter(Boolean)))
+            : [];
+          const companiesCount = companyNames.length;
+          return (
       <div style={{
         backgroundColor: '#ffffff',
         borderRadius: '10px',
@@ -2286,7 +2336,7 @@ const revenueSections: RevenueSection[] = [
               margin: 0,
               lineHeight: '1.2',
             }}>
-              Companies (1)
+              Companies ({companiesCount})
             </h3>
           </div>
           <button
@@ -2317,88 +2367,60 @@ const revenueSections: RevenueSection[] = [
 
         {!collapsedSections.has('companies') && (
           <div style={{ padding: '20px' }}>
-            <div style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '8px',
-              }}>
+            {companiesCount === 0 ? (
+              <p style={{ fontSize: '13px', color: '#666666', margin: 0 }}>No companies associated.</p>
+            ) : (
+              <>
+                {companyNames.map((companyName: string, idx: number) => (
+                  <div key={idx} style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '14px', color: '#006162', fontWeight: '500' }}>{companyName}</span>
+                      {idx === 0 && (
+                        <span style={{ padding: '2px 8px', backgroundColor: '#e6f3ff', color: '#006162', borderRadius: '3px', fontSize: '11px', fontWeight: '600' }}>
+                          Primary
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Phone: {prospect?.phone ?? '--'}</p>
+                  </div>
+                ))}
                 <a
-                  href="#"
-                  style={{
-                    fontSize: '14px',
-                    color: '#006162',
-                    textDecoration: 'none',
-                    fontWeight: '500',
-                  }}
-                >
-                  Ahmad Hussain LTD
-                </a>
-                <span style={{
-                  padding: '2px 8px',
-                  backgroundColor: '#e6f3ff',
-                  color: '#006162',
-                  borderRadius: '3px',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                }}>
-                  Primary
-                </span>
-              </div>
-              <p style={{
-                fontSize: '13px',
-                color: '#666666',
-                margin: '4px 0',
-              }}>
-                Company Domain Name: ahmadhussain.com
-              </p>
-              <p style={{
-                fontSize: '13px',
-                color: '#666666',
-                margin: '4px 0',
-              }}>
-                Phone: --
-              </p>
-              <button
-                style={{
-                  marginTop: '8px',
-                  padding: '4px 0',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  fontSize: '13px',
-                  color: '#666666',
-                  cursor: 'pointer',
-                  textDecoration: 'none',
-                }}
-              >
-                Add association label
-              </button>
-            </div>
-            <a
-  href="#"
-  style={{
-    fontSize: '12px',
-    color: '#141414',
-    textDecoration: 'none',
-    fontWeight: '300',
-    display: 'inline-flex',   // ✅ change this
-    alignItems: 'center',
-    gap: '4px',
-    border: '1px solid #cccccc',
-    borderRadius: '6px',
-    padding: '6px 12px',
-  }}
->
-  View all associated Companies
-  <ExternalLink size={12} />
-</a>
-
+              href="#"
+              style={{
+                fontSize: '12px',
+                color: '#141414',
+                textDecoration: 'none',
+                fontWeight: '300',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                border: '1px solid #cccccc',
+                borderRadius: '6px',
+                padding: '6px 12px',
+              }}
+            >
+              View all associated Companies
+              <ExternalLink size={12} />
+            </a>
+              </>
+            )}
           </div>
         )}
       </div>
+          );
+        })()}
 
-      {/* Deals */}
+      {/* Deals - from prospect.tickets[].deals */}
+      {(() => {
+        const allDeals = prospect?.tickets?.flatMap((t: any) => t.deals ?? []) ?? [];
+        const dealsCount = allDeals.length;
+        const formatAmount = (deal: any) => {
+          const curr = deal.currency ?? '';
+          const val = deal.net_value ?? deal.grand_total ?? '';
+          return val ? `${curr} ${val}` : '--';
+        };
+        const formatDate = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '--';
+        return (
       <div style={{
         backgroundColor: '#ffffff',
         borderRadius: '10px',
@@ -2435,7 +2457,7 @@ const revenueSections: RevenueSection[] = [
               margin: 0,
               lineHeight: '1.2',
             }}>
-              Deals (1)
+              Deals ({dealsCount})
             </h3>
           </div>
           <button
@@ -2465,76 +2487,48 @@ const revenueSections: RevenueSection[] = [
 
         {!collapsedSections.has('deals') && (
           <div style={{ padding: '20px' }}>
-            <div style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
-              <a
-                href="#"
-                style={{
-                  fontSize: '14px',
-                  color: '#006162',
-                  textDecoration: 'none',
-                  fontWeight: '500',
-                  display: 'block',
-                  marginBottom: '8px',
-                }}
-              >
-                Ahmad Hussain LTD - New Deal
-              </a>
-              <p style={{
-                fontSize: '13px',
-                color: '#666666',
-                margin: '4px 0',
-              }}>
-                Amount: $500.00
-              </p>
-              <p style={{
-                fontSize: '13px',
-                color: '#666666',
-                margin: '4px 0',
-              }}>
-                Close Date: March 1, 2026
-              </p>
-              <p style={{
-                fontSize: '13px',
-                color: '#666666',
-                margin: '4px 0',
-              }}>
-                Deal Stage: Presentation Scheduled
-              </p>
-              <button
-                style={{
-                  marginTop: '8px',
-                  padding: '4px 0',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  fontSize: '13px',
-                  color: '#666666',
-                  cursor: 'pointer',
-                  textDecoration: 'none',
-                }}
-              >
-                Add association label
-              </button>
-            </div>
-            <a
-              href="#"
-              style={{
-                fontSize: '13px',
-                color: '#006162',
-                textDecoration: 'none',
-                fontWeight: '500',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              View all associated Deals
-              <ExternalLink size={12} />
-            </a>
+            {dealsCount === 0 ? (
+              <p style={{ fontSize: '13px', color: '#666666', margin: 0 }}>No deals associated.</p>
+            ) : (
+              <>
+                {allDeals.map((deal: any) => (
+                  <div key={deal.id} style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
+                    <span style={{ fontSize: '14px', color: '#006162', fontWeight: '500', display: 'block', marginBottom: '8px' }}>
+                      {deal.name}
+                    </span>
+                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Amount: {formatAmount(deal)}</p>
+                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Close Date: {formatDate(deal.expected_close_date)}</p>
+                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Deal Stage: {deal.status ?? '--'}</p>
+                  </div>
+                ))}
+                <a
+                  href="#"
+                  style={{
+                    fontSize: '13px',
+                    color: '#006162',
+                    textDecoration: 'none',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  View all associated Deals
+                  <ExternalLink size={12} />
+                </a>
+              </>
+            )}
           </div>
         )}
       </div>
+        );
+      })()}
 
-      {/* Tickets */}
+      {/* Leads (API: tickets) */}
+      {(() => {
+        const leads = prospect?.tickets ?? [];
+        const leadsCount = leads.length;
+        return (
       <div style={{
         backgroundColor: '#ffffff',
         borderRadius: '10px',
@@ -2551,7 +2545,6 @@ const revenueSections: RevenueSection[] = [
             padding: '14px 20px 0',
             cursor: 'pointer',
             backgroundColor: '#ffffff',
-            
           }}
           onClick={() => toggleSection('tickets')}
         >
@@ -2571,7 +2564,7 @@ const revenueSections: RevenueSection[] = [
               margin: 0,
               lineHeight: '1.2',
             }}>
-              Tickets (0)
+              Leads ({leadsCount})
             </h3>
           </div>
           <button
@@ -2600,22 +2593,50 @@ const revenueSections: RevenueSection[] = [
         </div>
 
         {!collapsedSections.has('tickets') && (
-          <div style={{
-            padding: '32px 20px',
-            textAlign: 'center',
-          }}>
-            <Ticket size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
-            <p style={{
-              fontSize: '14px',
-              color: '#718096',
-              margin: 0,
-              lineHeight: '1.6',
-            }}>
-              Track the customer requests associated with this record.
-            </p>
+          <div style={{ padding: '20px' }}>
+            {leadsCount === 0 ? (
+              <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+                <Ticket size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+                <p style={{ fontSize: '14px', color: '#718096', margin: 0, lineHeight: '1.6' }}>
+                  Track the customer requests associated with this record.
+                </p>
+              </div>
+            ) : (
+              <>
+                {leads.map((lead: any) => (
+                  <div key={lead.id} style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
+                    <span style={{ fontSize: '14px', color: '#006162', fontWeight: '500', display: 'block', marginBottom: '8px' }}>
+                      {lead.name}
+                    </span>
+                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Company: {lead.company_name ?? '--'}</p>
+                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Status: {lead.status ?? '--'}</p>
+                    {(lead.deals?.length ?? 0) > 0 && (
+                      <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Deals: {lead.deals.length}</p>
+                    )}
+                  </div>
+                ))}
+                <a
+                  href="#"
+                  style={{
+                    fontSize: '13px',
+                    color: '#006162',
+                    textDecoration: 'none',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  View all associated Leads
+                  <ExternalLink size={12} />
+                </a>
+              </>
+            )}
           </div>
         )}
       </div>
+        );
+      })()}
 
       {/* Attachments */}
       <div style={{
@@ -2708,6 +2729,65 @@ const revenueSections: RevenueSection[] = [
   // ============================================================================
   // MAIN RENDER
   // ============================================================================
+
+  if (prospectLoading) {
+    return (
+      <Layout>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 'calc(100vh - 120px)',
+          flexDirection: 'column',
+          gap: '12px',
+        }}>
+          <RefreshCw size={32} style={{ color: '#006162', animation: 'spin 1s linear infinite' }} />
+          <p style={{ fontSize: '14px', color: '#718096' }}>Loading prospect...</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (prospectError || (!prospectId && !prospect)) {
+    return (
+      <Layout>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 'calc(100vh - 120px)',
+          flexDirection: 'column',
+          gap: '12px',
+          padding: '24px',
+        }}>
+          <AlertCircle size={48} style={{ color: '#e53e3e' }} />
+          <p style={{ fontSize: '16px', color: '#141414', fontWeight: 500 }}>
+            {prospectError || 'No prospect selected'}
+          </p>
+          <button
+            onClick={() => router.push('/crm/data')}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#006162',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            Back to prospects
+          </button>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!prospect) {
+    return null;
+  }
 
   return (
     <>
