@@ -95,7 +95,7 @@ interface MainMenuItem {
 }
 
 const SIDEBAR_WIDTH_COLLAPSED = 65;
-const SIDEBAR_WIDTH_EXPANDED = 280;
+const SIDEBAR_WIDTH_EXPANDED = 235;
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -1098,7 +1098,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         top: 0;
         height: 100vh;
         z-index: 1001;
-        width: 280px;
+        width: 235px;
       }
       .sidebar-container:not(.mobile-hidden) {
         transform: translateX(0);
@@ -1124,7 +1124,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
     .sidebar-header {
       flex-shrink: 0;
-      padding: 24px 16px;
+      padding: 15px 16px 6px 25px;
       display: flex;
       align-items: center;
       justify-content: ${isSidebarExpanded ? 'flex-start' : 'center'};
@@ -1200,7 +1200,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }
 
     .menu-item {
-      margin-bottom: 14px;
+      margin-bottom: 10px;
       position: relative;
     }
 
@@ -1351,7 +1351,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       position: relative;
       text-decoration: none;
       color: white;
-      gap: 12px;
+      gap: 9px;
     }
 
     .menu-item-button:hover {
@@ -1371,8 +1371,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }
 
     .menu-item-text {
-      font-size: 14px;
-      font-weight: 500;
+      font-size: 13px;
+      font-weight: 300;
       color: white;
       opacity: ${isSidebarExpanded ? '1' : '0'};
       transition: opacity 0.3s;
@@ -1382,11 +1382,15 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
     .menu-item-chevron {
       color: white;
-      display: flex;
+      display: ${isSidebarExpanded ? 'flex' : 'none'};
       align-items: center;
       margin-left: auto;
-      opacity: ${isSidebarExpanded ? '1' : '0'};
-      transition: opacity 0.3s;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .menu-item-button:hover .menu-item-chevron {
+      opacity: 1;
     }
 
     /* Submenu Panel */
@@ -1395,7 +1399,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       left: ${isSidebarExpanded ? `${SIDEBAR_WIDTH_EXPANDED}px` : `${SIDEBAR_WIDTH_COLLAPSED}px`};
       top: 0;
       height: 100vh;
-      width: 280px;
+      width: 235px;
       background: white;
       border-right: 1px solid #e5e7eb;
       box-shadow: 2px 0 12px rgba(0, 0, 0, 0.08);
@@ -1411,7 +1415,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
     @media (max-width: 1199px) {
       .submenu-panel {
-        left: 280px;
+        left: 235px;
         top: 0;
         height: 100vh;
       }
