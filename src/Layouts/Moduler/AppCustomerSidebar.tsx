@@ -63,10 +63,13 @@ import {
   ChevronLeft
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
+import logodark from '@assets/images/Prime-Alley-Logo.png';
 
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
+import { getCurrentUserCompanyImage } from "@utils/company";
 
 // Destructure constants for easier use
 const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS, BASE_URL } = HEADER_CONSTANTS;
@@ -122,7 +125,35 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
   const prevPathnameRef = useRef<string>('');
-  
+  const [currentUserCompanyImageUrl, setCurrentUserCompanyImageUrl] = useState<string | null>(null);
+  const companyImageUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentUserCompanyImage()
+      .then((blob) => {
+        if (cancelled) return;
+        if (blob && blob.size > 0) {
+          const url = URL.createObjectURL(blob);
+          companyImageUrlRef.current = url;
+          setCurrentUserCompanyImageUrl(url);
+        } else {
+          setCurrentUserCompanyImageUrl(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCurrentUserCompanyImageUrl(null);
+      });
+    return () => {
+      cancelled = true;
+      const url = companyImageUrlRef.current;
+      if (url) {
+        URL.revokeObjectURL(url);
+        companyImageUrlRef.current = null;
+      }
+    };
+  }, []);
+
   // Get permissions hook for checking access
   const { hasPermission } = usePermissions();
 
@@ -1674,7 +1705,22 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       <div className={`sidebar-container ${!sidebarOpen ? 'mobile-hidden' : ''} ${!isSidebarExpanded ? 'collapsed' : ''}`}>
         {/* Header */}
         <div className="sidebar-header">
-          {isSidebarExpanded && <div className="sidebar-logo">Dashboard</div>}
+          {isSidebarExpanded && <div className="sidebar-logo">
+            PRIME ALLEY
+            {/* {currentUserCompanyImageUrl ? (
+              <img
+                src={currentUserCompanyImageUrl}
+                alt="Company logo"
+                style={{
+                  maxWidth: 160,
+                  objectFit: "contain",
+                  
+                }}
+              />
+            ) : (
+              <img src={logodark.src} alt="logo" className="img-fluid" />
+            )} */}
+          </div>}
         </div>
 
         {/* Menu Items */}
