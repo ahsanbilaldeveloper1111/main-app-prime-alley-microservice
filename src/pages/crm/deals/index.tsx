@@ -13,14 +13,13 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, {
   TableColumn,
   TableAction,
-  ToolbarConfig,
-  FilterPill,
   TabConfig,
 } from "@components/GenericTable";
 import GenericSidebar from '@components/GenericSidebarNew';
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import ConvertToOrderModal from "@components/ConvertToOrderModal";
+import { CreateDealSidebar } from "@components/renderCreateDealForm";
 import {
   FiUpload,
   FiDatabase,
@@ -40,6 +39,7 @@ import {
   FiTarget,
   FiMoreVertical,
 } from "react-icons/fi";
+import { ChevronDown } from 'lucide-react';
 import {
   getDeals,
   getStages,
@@ -90,12 +90,11 @@ import {
   
 } from "react-bootstrap";
 import Select from 'react-select';
-import { GlobalDateFormat, GlobalDateTimeFormat, ModuleSlug, formatDateForTable, checkRequiredFields } from "@utils/Helper";
+import { GlobalDateFormat, ModuleSlug, formatDateForTable, checkRequiredFields } from "@utils/Helper";
 import {
   Target,
   CheckCircle,
-  TrendingUp,
-  BarChart3,
+
   Plus,
   Eye,
   Edit,
@@ -534,6 +533,12 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showCreateDealSidebar, setShowCreateDealSidebar] = useState(false);
+  const [editingDealIdInSidebar, setEditingDealIdInSidebar] = useState<number | null>(null);
+  
+  // Add Deals button states
+  const [showAddDealsDropdown, setShowAddDealsDropdown] = useState(false);
+  const addDealsRef = React.useRef<HTMLDivElement>(null);
   
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -596,107 +601,6 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
   const [lostReasonId, setLostReasonId] = useState<number | null>(null);
   const [lostFeedback, setLostFeedback] = useState("");
   
-  // Edit Deal Modal
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingDealId, setEditingDealId] = useState<number | null>(null);
-  const [editFormStep, setEditFormStep] = useState(0);
-  const [editLoading, setEditLoading] = useState(false);
-  const [editFetching, setEditFetching] = useState(false);
-  const [editFormData, setEditFormData] = useState({
-    name: "",
-    ticket_id: null as number | null,
-    stage_id: undefined as number | undefined,
-    assigned_to: null as string | null,
-    expected_close_date: "",
-    company_name: "",
-    industry_ids: [] as number[],
-    decision_maker_title: "",
-    decision_maker_name: "",
-    decision_maker_phone_country_code: "",
-    decision_maker_phone: "",
-    decision_maker_email: "",
-    deal_type: "",
-    contract_length: "",
-    contract_length_custom: "",
-    billing_model: "",
-    payment_terms: "",
-    payment_terms_custom: "",
-    risk_level: "",
-    competitors: "",
-    quotation_sent: false,
-    contract_sent: false,
-    contract_received: false,
-    follow_up_date: "",
-    currency: "AED",
-    tax_percentage: "0",
-    standard_discount_percentage: "0",
-    special_discount_percentage: "0",
-    last_approved_at: null as string | null,
-    approval_status: null as string | null,
-  });
-  const [editProducts, setEditProducts] = useState<CrmProduct[]>([]);
-  const [editLoadingProducts, setEditLoadingProducts] = useState(false);
-  const [editCampaign, setEditCampaign] = useState<any>(null);
-  const [editCampaignIndustries, setEditCampaignIndustries] = useState<IndustryData[]>([]);
-  const [editSelectedIndustryId, setEditSelectedIndustryId] = useState<number | null>(null);
-  const [editLoadingIndustries, setEditLoadingIndustries] = useState(false);
-  const [editAllIndustries, setEditAllIndustries] = useState<IndustryData[]>([]);
-  const [editLoadingAllIndustries, setEditLoadingAllIndustries] = useState(false);
-  const [editSourceLead, setEditSourceLead] = useState<any>(null);
-  const [editDealTemplate, setEditDealTemplate] = useState<DealTemplateData | null>(null);
-  const [editTemplateFieldsData, setEditTemplateFieldsData] = useState<Record<string, any>>({});
-  const [editBusinessTypes, setEditBusinessTypes] = useState<BusinessTypeData[]>([]);
-  const [editBusinessTypeId, setEditBusinessTypeId] = useState<number | null>(null);
-  const [editBusinessTypeOther, setEditBusinessTypeOther] = useState<string>("");
-  const [editShowOtherBusinessType, setEditShowOtherBusinessType] = useState(false);
-  const [editShowAllIndustries, setEditShowAllIndustries] = useState(false);
-  const [editEstimationItems, setEditEstimationItems] = useState<Array<{
-    product_id: number;
-    product_service: string;
-    description: string;
-    qty: number;
-    unit_price: number;
-    original_currency: string;
-    original_price: number;
-  }>>([]);
-  const [editShowAddItemModal, setEditShowAddItemModal] = useState(false);
-  const [editEditingItemIndex, setEditEditingItemIndex] = useState<number | null>(null);
-  const [editItemFormData, setEditItemFormData] = useState({
-    product_id: null as number | null,
-    product_service: "",
-    description: "",
-    qty: 1,
-    unit_price: 0,
-  });
-  // Add/Edit Revision modal (replaces Add Item for Estimation step)
-  const [editShowAddRevisionModal, setEditShowAddRevisionModal] = useState(false);
-  const [editEditingRevisionIndex, setEditEditingRevisionIndex] = useState<number | null>(null);
-  const [editRevisionProducts, setEditRevisionProducts] = useState<Array<{
-    product_id: number;
-    product_service: string;
-    description: string;
-    qty: number;
-    unit_price: number;
-    original_currency: string;
-    original_price: number;
-    tax_percentage: string;
-    standard_discount_percentage: string;
-    special_discount_percentage: string;
-  }>>([]);
-  const [editRevisionFormData, setEditRevisionFormData] = useState({
-    tax_percentage: "0",
-    standard_discount_percentage: "0",
-    special_discount_percentage: "0",
-  });
-  const [editRevisionProductsCatalog, setEditRevisionProductsCatalog] = useState<CrmProduct[]>([]);
-  const [editRevisionLoadingProducts, setEditRevisionLoadingProducts] = useState(false);
-  const [editRevisionSelectedProductIds, setEditRevisionSelectedProductIds] = useState<Array<{ value: number; label: string }>>([]);
-  const [editConvertingPrice, setEditConvertingPrice] = useState(false);
-  const [editEstimates, setEditEstimates] = useState<any[]>([]);
-  const [editAttachments, setEditAttachments] = useState<any[]>([]);
-  const [editHistories, setEditHistories] = useState<any[]>([]);
-  const [editNegotiationBar, setEditNegotiationBar] = useState(0);
-  const [editProbability, setEditProbability] = useState(0);
   
   // UI State
   const [showDealsAnalytics, setShowDealsAnalytics] = useState(false);
@@ -730,6 +634,19 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
     fetchLostReasons();
     fetchExtensions(ModuleSlug.CRM_DEALS);
   }, []);
+
+  // Handle click outside for Add Deals dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (addDealsRef.current && !addDealsRef.current.contains(event.target as Node)) {
+        setShowAddDealsDropdown(false);
+      }
+    };
+    if (showAddDealsDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showAddDealsDropdown]);
 
   // Fetch deals when filters or search change
   const fetchDeals = useCallback(
@@ -1701,286 +1618,10 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
   }, []);
 
 
-  // Edit Deal Handlers
-const handleEditDeal = useCallback(async (dealId: number) => {
-  setEditingDealId(dealId);
-  setEditFetching(true);
-  setShowEditModal(true);
-  
-  try {
-    // Fetch deal data
-    const deal = await getDeal(dealId);
-    
-    // Format dates for input fields
-    const formatDate = (dateString: string | null) => {
-      if (!dateString) return "";
-      return dateString.split('T')[0];
-    };
-    // Set form data
-    setEditFormData({
-      name: deal.name || "",
-      ticket_id: deal.ticket_id ? Number(deal.ticket_id) : null,
-      stage_id: deal.stage_id ? Number(deal.stage_id) : undefined,
-      assigned_to: deal.assigned_to || null,
-      expected_close_date: formatDate(deal.expected_close_date),
-      company_name: deal.company_name || "",
-      industry_ids: (deal as any).industry_ids && Array.isArray((deal as any).industry_ids) 
-        ? (deal as any).industry_ids.map((id: any) => Number(id)).filter((id: number) => !Number.isNaN(id))
-        : (deal as any).industries && Array.isArray((deal as any).industries)
-        ? (deal as any).industries.map((ind: any) => typeof ind === 'object' ? Number(ind.id) : Number(ind)).filter((id: number) => !Number.isNaN(id))
-        : [],
-      decision_maker_title: deal.decision_maker_title || "",
-      decision_maker_name: deal.decision_maker_name || (deal as any).main_decision_maker?.name || "",
-      decision_maker_phone_country_code: deal.decision_maker_phone_country_code || (deal as any).main_decision_maker?.phone_country_code || "",
-      decision_maker_phone: deal.decision_maker_phone || (deal as any).main_decision_maker?.phone || "",
-      decision_maker_email: (deal as any).main_decision_maker?.email || "",
-      deal_type: deal.deal_type || "",
-      contract_length: deal.contract_length || "",
-      contract_length_custom: deal.contract_length_custom || "",
-      billing_model: deal.billing_model || "",
-      payment_terms: deal.payment_terms || "",
-      payment_terms_custom: deal.payment_terms_custom || "",
-      risk_level: deal.risk_level || "",
-      competitors: deal.competitors || "",
-      quotation_sent: deal.quotation_sent || false,
-      contract_sent: deal.contract_sent || false,
-      contract_received: deal.contract_received || false,
-      follow_up_date: formatDate(deal.follow_up_date),
-      currency: deal.currency || "AED",
-      tax_percentage: (deal as any).tax_percentage?.toString() || "0",
-      standard_discount_percentage: (deal as any).standard_discount_percentage?.toString() || "0",
-      special_discount_percentage: (deal as any).special_discount_percentage?.toString() || "0",
-      last_approved_at: (deal as any).last_approved_at || null,
-      approval_status: (deal as any).approval_status || null,
-    });
-    // Set business type
-    const dealAny = deal as any;
-    if (dealAny.business_type_id) {
-      setEditBusinessTypeId(Number(dealAny.business_type_id));
-      setEditBusinessTypeOther("");
-      setEditShowOtherBusinessType(false);
-    } else if (dealAny.business_type_other) {
-      setEditBusinessTypeId(null);
-      setEditBusinessTypeOther(dealAny.business_type_other);
-      setEditShowOtherBusinessType(true);
-    }
-    // Fetch lead data if ticket_id exists
-    if (deal.ticket_id) {
-      try {
-        const leadData: any = await getLead(Number(deal.ticket_id));
-        setEditSourceLead(leadData);
-      } catch (error) {
-        console.error("Failed to fetch lead:", error);
-      }
-    }
-    // Set deal template
-    const dealTemplateData = (deal as any).deal_template;
-    if (dealTemplateData) {
-      setEditDealTemplate(dealTemplateData);
-      const dealTemplateFieldValues = (deal as any).deal_template_field_values || {};
-      setEditTemplateFieldsData(dealTemplateFieldValues);
-    }
-    // Set estimates and other data
-    const sortedEstimates = deal.estimates && deal.estimates.length > 0
-      ? [...deal.estimates].sort((a: any, b: any) => {
-          const dateA = new Date(a.created_at).getTime();
-          const dateB = new Date(b.created_at).getTime();
-          return dateB - dateA;
-        })
-      : [];
-    setEditEstimates(sortedEstimates);
-    setEditAttachments((deal as any).attachments || []);
-    setEditHistories((deal as any).histories || []);
-    setEditNegotiationBar(deal.negotiation_bar || 0);
-    setEditProbability(deal.probability || 0);
-    // Load estimation chart from the most recent estimate
-    if (sortedEstimates.length > 0) {
-      const latestEstimate = sortedEstimates[0];
-      
-      if (latestEstimate.tax_percentage) {
-        setEditFormData(prev => ({ ...prev, tax_percentage: latestEstimate.tax_percentage.toString() }));
-      }
-      if (latestEstimate.standard_discount_percentage) {
-        setEditFormData(prev => ({ ...prev, standard_discount_percentage: latestEstimate.standard_discount_percentage.toString() }));
-      }
-      if (latestEstimate.special_discount_percentage) {
-        setEditFormData(prev => ({ ...prev, special_discount_percentage: latestEstimate.special_discount_percentage.toString() }));
-      }
-      
-      if (latestEstimate.estimation_chart && latestEstimate.estimation_chart.length > 0) {
-        setEditEstimationItems(latestEstimate.estimation_chart.map((item: any) => ({
-          product_id: item.product_id || 0,
-          product_service: item.product_service || "",
-          description: item.description || "",
-          qty: item.qty || 1,
-          unit_price: item.unit_price || 0,
-          original_currency: item.original_currency || deal.currency || "AED",
-          original_price: item.original_price || item.unit_price || 0,
-        })));
-      }
-    } else if (deal.estimation_chart && Array.isArray(deal.estimation_chart) && deal.estimation_chart.length > 0) {
-      setEditEstimationItems(deal.estimation_chart.map((item: any) => ({
-        product_id: item.product_id || 0,
-        product_service: item.product_service || "",
-        description: item.description || "",
-        qty: item.qty || 1,
-        unit_price: item.unit_price || 0,
-        original_currency: item.original_currency || deal.currency || "AED",
-        original_price: item.original_price || item.unit_price || 0,
-      })));
-    }
-    // Fetch business types
-    try {
-      const businessTypesResponse = await getBusinessTypes({ per_page: 1000 });
-      setEditBusinessTypes(businessTypesResponse?.data || []);
-    } catch (error) {
-      console.error("Failed to fetch business types:", error);
-    }
-    // Fetch all industries
-    try {
-      const response = await getIndustries({ per_page: 1000 });
-      setEditAllIndustries(response.data || []);
-    } catch (error) {
-      console.error("Failed to fetch industries:", error);
-    }
-    
-  } catch (error) {
-    console.error("Failed to fetch deal:", error);
-    toast.error("Failed to load deal data");
-    setShowEditModal(false);
-  } finally {
-    setEditFetching(false);
-  }
-}, []);
-const handleEditSubmit = useCallback(async (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  if (!editingDealId) return;
-  setEditLoading(true);
-  try {
-    const payload: any = {
-      name: editFormData.name,
-      stage_id: editFormData.stage_id ? String(editFormData.stage_id) : undefined,
-      assigned_to: editFormData.assigned_to,
-      expected_close_date: editFormData.expected_close_date,
-      company_name: editFormData.company_name,
-      industry_ids: editFormData.industry_ids,
-      ...(editBusinessTypeId ? { business_type_id: String(editBusinessTypeId) } : {}),
-      ...(editBusinessTypeOther ? { business_type_other: editBusinessTypeOther } : {}),
-      decision_maker_title: editFormData.decision_maker_title,
-      decision_maker_name: editFormData.decision_maker_name,
-      decision_maker_phone_country_code: editFormData.decision_maker_phone_country_code,
-      decision_maker_phone: editFormData.decision_maker_phone,
-      decision_maker_email: editFormData.decision_maker_email,
-      deal_type: editFormData.deal_type,
-      contract_length: editFormData.contract_length,
-      contract_length_custom: editFormData.contract_length_custom || "",
-      billing_model: editFormData.billing_model,
-      payment_terms: editFormData.payment_terms,
-      payment_terms_custom: editFormData.payment_terms_custom || "",
-      risk_level: editFormData.risk_level,
-      competitors: editFormData.competitors || "",
-      quotation_sent: editFormData.quotation_sent,
-      contract_sent: editFormData.contract_sent,
-      contract_received: editFormData.contract_received,
-      follow_up_date: editFormData.follow_up_date || "",
-      currency: editFormData.currency,
-      negotiation_bar: editNegotiationBar,
-      probability: editProbability,
-    };
-    // Add deal template data if template exists
-    if (editDealTemplate && editDealTemplate.id) {
-      payload.deal_template_id = editDealTemplate.id;
-      Object.entries(editTemplateFieldsData).forEach(([key, value]) => {
-        payload[`deal_template_field_values[${key}]`] = value;
-      });
-    }
-    if (editFormData.ticket_id) {
-      payload.ticket_id = editFormData.ticket_id;
-    }
-    // Update deal
-    await updateDeal(editingDealId, payload);
-    // Create/update estimation chart if items exist
-    if (editEstimationItems.length > 0) {
-      const estimatePayload = {
-        deal_id: editingDealId,
-        estimation_chart: editEstimationItems.map(item => ({
-          product_id: item.product_id,
-          product_service: item.product_service,
-          description: item.description || "",
-          qty: item.qty,
-          unit_price: item.unit_price,
-          original_currency: item.original_currency || editFormData.currency,
-          original_price: item.original_price || item.unit_price,
-        })),
-        standard_discount_percentage: parseFloat(editFormData.standard_discount_percentage || "0"),
-        special_discount_percentage: parseFloat(editFormData.special_discount_percentage || "0"),
-        tax_percentage: parseFloat(editFormData.tax_percentage || "0"),
-        currency: editFormData.currency,
-      };
-      //await createEstimate(estimatePayload, false);//dont need to use, already used in add/copy revision
-    }
-    setShowEditModal(false);
-    setRefreshKey((oldKey) => oldKey + 1);
-    
-    // Reset form
-    setEditFormStep(0);
-    setEditingDealId(null);
-  } catch (error: any) {
-    console.error("Failed to update deal:", error);
-  
-  } finally {
-    setEditLoading(false);
-  }
-}, [editingDealId, editFormData, editBusinessTypeId, editBusinessTypeOther, editDealTemplate, editTemplateFieldsData, editNegotiationBar, editProbability, editEstimationItems]);
-const handleCloseEditModal = useCallback(() => {
-  setShowEditModal(false);
-  setEditFormStep(0);
-  setEditingDealId(null);
-  // Reset all edit states
-  setEditFormData({
-    name: "",
-    ticket_id: null,
-    stage_id: undefined,
-    assigned_to: null,
-    expected_close_date: "",
-    company_name: "",
-    industry_ids: [],
-    decision_maker_title: "",
-    decision_maker_name: "",
-    decision_maker_phone_country_code: "",
-    decision_maker_phone: "",
-    decision_maker_email: "",
-    deal_type: "",
-    contract_length: "",
-    contract_length_custom: "",
-    billing_model: "",
-    payment_terms: "",
-    payment_terms_custom: "",
-    risk_level: "",
-    competitors: "",
-    quotation_sent: false,
-    contract_sent: false,
-    contract_received: false,
-    follow_up_date: "",
-    currency: "AED",
-    tax_percentage: "0",
-    standard_discount_percentage: "0",
-    special_discount_percentage: "0",
-    last_approved_at: null,
-    approval_status: null,
-  });
-  setEditEstimationItems([]);
-  setEditProducts([]);
-  setEditShowAddRevisionModal(false);
-  setEditEditingRevisionIndex(null);
-  setEditRevisionProducts([]);
-  setEditRevisionFormData({ tax_percentage: "0", standard_discount_percentage: "0", special_discount_percentage: "0" });
-  setEditDealTemplate(null);
-  setEditTemplateFieldsData({});
-  setEditBusinessTypeId(null);
-  setEditBusinessTypeOther("");
-  setEditShowOtherBusinessType(false);
+  // Edit Deal Handler - Opens sidebar for editing
+  const handleEditDeal = useCallback((dealId: number) => {
+    setEditingDealIdInSidebar(dealId);
+    setShowCreateDealSidebar(true);
 }, []);
 
   // Helper functions
@@ -2454,7 +2095,7 @@ const handleCloseEditModal = useCallback(() => {
           {
             label: 'View',
             icon: <Eye size={16} />,
-            onClick: (row: any) => handleViewDeal(row.rawData?.id || row.id),
+            onClick: (row: any) => handlePreviewClick(row),
             variant: 'link' as const
           },
           {
@@ -2471,7 +2112,7 @@ const handleCloseEditModal = useCallback(() => {
         {
           label: 'View',
           icon: <Eye size={16} />,
-          onClick: (row: any) => handleViewDeal(row.rawData?.id || row.id),
+          onClick: (row: any) => handlePreviewClick(row),
           variant: 'link' as const
         },
         ...(session?.user?.permissions?.includes('edit-crm-deals') ? [{
@@ -2553,7 +2194,111 @@ const handleCloseEditModal = useCallback(() => {
         }] : [])
       ];
     },
-    [session, activeFilter, handleViewDeal, handleRestoreDeal, handleDeleteDeal, handleMarkLost]
+    [session, activeFilter, handlePreviewClick, handleViewDeal, handleRestoreDeal, handleDeleteDeal, handleMarkLost]
+  );
+
+  // Render Add Deals button with dropdown
+  const renderAddDealsButton = () => (
+    <div
+      ref={addDealsRef}
+      style={{
+        position: 'absolute',
+        right: '19px',
+        top: '18px',
+        width: '146px',
+      }}
+    >
+      <button
+        onClick={() => setShowAddDealsDropdown(!showAddDealsDropdown)}
+        style={{
+          padding: '9px 13px',
+          backgroundColor: '#000000',
+          color: '#ffffff',
+          border: 'none',
+          borderRadius: '4px',
+          fontSize: '12px',
+          fontWeight: '500',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#1a1a1a';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = '#000000';
+        }}
+      >
+        Add deals
+        <ChevronDown size={16} />
+      </button>
+
+      {showAddDealsDropdown && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          right: 0,
+          marginTop: '4px',
+          backgroundColor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '5px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          minWidth: '160px',
+          zIndex: 1000,
+          overflow: 'hidden',
+        }}>
+          <button
+            onClick={() => {
+              setShowAddDealsDropdown(false);
+              setShowCreateDealSidebar(true);
+            }}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              textAlign: 'left',
+              fontSize: '14px',
+              color: '#141414',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f7fafc';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            Create new
+          </button>
+          <button
+            onClick={() => {
+              setShowAddDealsDropdown(false);
+              console.log('Import deals');
+            }}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              textAlign: 'left',
+              fontSize: '14px',
+              color: '#d97706',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f7fafc';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            Import
+          </button>
+        </div>
+      )}
+    </div>
   );
  
   if (!session?.user?.permissions?.includes('list-crm-deals')) {
@@ -2610,6 +2355,9 @@ const handleCloseEditModal = useCallback(() => {
         mainLink="/crm/dashboard"
         subTitle="Deals"
       />
+
+      {/* Add Deals Button */}
+      {renderAddDealsButton()}
 
       {/* Main flex container for content and sidebar */}
       <div style={{ display: 'flex', gap: '0', height: 'calc(100vh)', overflow: 'hidden' }}>
@@ -6128,1151 +5876,8 @@ const handleCloseEditModal = useCallback(() => {
         showResetButton={true}
       />
 
-      {/* Edit Deal Modal */}
-      <Modal 
-        show={showEditModal} 
-        onHide={handleCloseEditModal} 
-        size="xl"
-        fullscreen="lg-down"
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>
-            <Edit size={20} className="me-2" />
-            Edit Deal Information
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
-          {editFetching ? (
-            <div className="text-center py-5">
-              <Spinner animation="border" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </Spinner>
-              <p className="mt-3">Loading deal data...</p>
-            </div>
-          ) : (
-            <Form onSubmit={handleEditSubmit}>
-              {/* Timeline Navigation */}
-              <div className="mb-4">
-                <div className="d-flex align-items-center justify-content-between position-relative">
-                  <div 
-                    className="position-absolute bg-light" 
-                    style={{ 
-                      left: '0', 
-                      right: '0', 
-                      top: '20px', 
-                      height: '2px', 
-                      zIndex: 0 
-                    }}
-                  />
-                  <div 
-                    className="position-absolute bg-primary" 
-                    style={{ 
-                      left: '0', 
-                      top: '20px', 
-                      height: '2px', 
-                      width: `${(() => {
-                        const totalVisibleSteps = editDealTemplate ? 5 : 4;
-                        let visualPosition = editFormStep;
-                        if (!editDealTemplate && editFormStep > 2) {
-                          visualPosition = editFormStep - 1;
-                        }
-                        return ((visualPosition + 1) / totalVisibleSteps) * 100;
-                      })()}%`,
-                      zIndex: 0,
-                      transition: 'width 0.3s ease'
-                    }}
-                  />
-                  
-                  {[0, 1, 2, 3, 4].map((step) => {
-                    if (step === 2 && !editDealTemplate) {
-                      return null;
-                    }
-                    
-                    const displayNumber = (!editDealTemplate && step > 2) ? step : step + 1;
-                    
-                    return (
-                      <div 
-                        key={step}
-                        className="text-center position-relative" 
-                        style={{ cursor: 'pointer', flex: 1 }}
-                        onClick={() => setEditFormStep(step)}
-                      >
-                        <div 
-                          className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${editFormStep >= step ? 'bg-primary text-white' : 'bg-light text-muted'}`}
-                          style={{ width: '40px', height: '40px', zIndex: 1, position: 'relative' }}
-                        >
-                          {editFormStep > step ? <CheckCircle size={20} /> : displayNumber}
-                        </div>
-                        <small className={`d-block mt-2 ${editFormStep === step ? 'fw-bold text-primary' : 'text-muted'}`}>
-                          {step === 0 ? 'Deal Info' : step === 1 ? 'Company Info' : step === 2 ? 'Characteristics' : step === 3 ? 'Progress & Notes' : 'Estimation'}
-                        </small>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Form Content */}
-              <div style={{ minHeight: '400px' }}>
-                {/* Step 0: Deal Information */}
-                {editFormStep === 0 && (
-                  <Card className="mb-3 border-0 bg-light">
-                    <Card.Body>
-                      <h5 className="fw-bold mb-4 text-primary">DEAL INFORMATION</h5>
-                      <Row>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Deal Name <span className="text-danger">*</span></Form.Label>
-                            <Form.Control 
-                              type="text" 
-                              value={editFormData.name}
-                              onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                              placeholder="Enter deal name" 
-                              required 
-                            />
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Stage <span className="text-danger">*</span></Form.Label>
-                            <Form.Select 
-                              value={editFormData.stage_id || ''}
-                              onChange={(e) => setEditFormData({ ...editFormData, stage_id: e.target.value ? Number(e.target.value) : undefined })}
-                              required
-                            >
-                              <option value="">Select Stage</option>
-                              {stages.map((stage) => (
-                                <option key={stage.id} value={stage.id}>
-                                  {stage.name}
-                                </option>
-                              ))}
-                            </Form.Select>
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Expected Close Date <span className="text-danger">*</span></Form.Label>
-                            <Form.Control 
-                              type="date" 
-                              value={editFormData.expected_close_date}
-                              onChange={(e) => setEditFormData({ ...editFormData, expected_close_date: e.target.value })}
-                              required 
-                            />
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Assigned to <span className="text-danger">*</span></Form.Label>
-                            <Form.Select 
-                              value={editFormData.assigned_to || ''}
-                              onChange={(e) => setEditFormData({ ...editFormData, assigned_to: e.target.value || null })}
-                              required
-                            >
-                              <option value="">Select User</option>
-                              {extensions.map((ext: any) => (
-                                <option key={ext.id || ext.extension} value={ext.id || ext.extension}>
-                                  {ext.display_name || ext.name || ext.id}
-                                </option>
-                              ))}
-                            </Form.Select>
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Currency <span className="text-danger">*</span></Form.Label>
-                            <Form.Select 
-                              value={editFormData.currency}
-                              onChange={(e) => setEditFormData({ ...editFormData, currency: e.target.value })}
-                              required
-                            >
-                              <option value="AED">AED</option>
-                            </Form.Select>
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Follow-up Date</Form.Label>
-                            <Form.Control 
-                              type="date" 
-                              value={editFormData.follow_up_date}
-                              onChange={(e) => setEditFormData({ ...editFormData, follow_up_date: e.target.value })}
-                            />
-                          </Form.Group>
-                        </Col>
-                      </Row>
-                    </Card.Body>
-                  </Card>
-                )}
-
-                {/* Step 1: Company Information */}
-                {editFormStep === 1 && (
-                  <Card className="mb-3 border-0 bg-light">
-                    <Card.Body>
-                      <h5 className="fw-bold mb-4 text-success">COMPANY INFORMATION</h5>
-                      <Row>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Company Name <span className="text-danger">*</span></Form.Label>
-                            <Form.Control 
-                              type="text" 
-                              value={editFormData.company_name}
-                              onChange={(e) => setEditFormData({ ...editFormData, company_name: e.target.value })}
-                              placeholder="Enter company name" 
-                              required 
-                            />
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Select Business Type <span className="text-danger">*</span></Form.Label>
-                            <Form.Select
-                              value={editShowOtherBusinessType ? "other" : (editBusinessTypeId ? String(editBusinessTypeId) : "")}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                if (value === "other") {
-                                  setEditShowOtherBusinessType(true);
-                                  setEditBusinessTypeId(null);
-                                  setEditBusinessTypeOther("");
-                                } else if (value) {
-                                  setEditShowOtherBusinessType(false);
-                                  setEditBusinessTypeId(Number(value));
-                                  setEditBusinessTypeOther("");
-                                } else {
-                                  setEditShowOtherBusinessType(false);
-                                  setEditBusinessTypeId(null);
-                                  setEditBusinessTypeOther("");
-                                }
-                              }}
-                              required
-                            >
-                              <option value="">Select Business Type</option>
-                              {editBusinessTypes.map((businessType) => (
-                                <option key={businessType.id} value={businessType.id}>
-                                  {businessType.name}
-                                </option>
-                              ))}
-                              <option value="other">Other</option>
-                            </Form.Select>
-                          </Form.Group>
-                        </Col>
-
-                        {editShowOtherBusinessType && (
-                          <Col md={6}>
-                            <Form.Group className="mb-3">
-                              <Form.Label>Business Type (Other) <span className="text-danger">*</span></Form.Label>
-                              <Form.Control
-                                type="text"
-                                value={editBusinessTypeOther}
-                                onChange={(e) => setEditBusinessTypeOther(e.target.value)}
-                                placeholder="Enter business type"
-                                required
-                              />
-                            </Form.Group>
-                          </Col>
-                        )}
-                        <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Decision Maker Title</Form.Label>
-                            <Form.Select 
-                              value={editFormData.decision_maker_title}
-                              onChange={(e) => setEditFormData({ ...editFormData, decision_maker_title: e.target.value })}
-                            >
-                              <option value="">Select Title</option>
-                              <option value="Mr.">Mr.</option>
-                              <option value="Mrs.">Mrs.</option>
-                              <option value="Ms.">Ms.</option>
-                              <option value="Dr.">Dr.</option>
-                            </Form.Select>
-                          </Form.Group>
-                        </Col>
-                        <Col md={8}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Decision Maker Name <span className="text-danger">*</span></Form.Label>
-                            <Form.Control 
-                              type="text" 
-                              value={editFormData.decision_maker_name}
-                              onChange={(e) => setEditFormData({ ...editFormData, decision_maker_name: e.target.value })}
-                              placeholder="Decision maker name" 
-                              required 
-                            />
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Decision Maker Email <span className="text-danger">*</span></Form.Label>
-                            <Form.Control 
-                              type="email" 
-                              value={editFormData.decision_maker_email}
-                              onChange={(e) => setEditFormData({ ...editFormData, decision_maker_email: e.target.value })}
-                              placeholder="decisionmaker@company.com" 
-                              required 
-                            />
-                          </Form.Group>
-                        </Col>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Decision Maker Phone <span className="text-danger">*</span></Form.Label>
-                            <div className="phone-input-wrapper">
-                              <PhoneInput
-                                international
-                                defaultCountry="US"
-                                value={editFormData.decision_maker_phone_country_code && editFormData.decision_maker_phone 
-                                  ? `${editFormData.decision_maker_phone_country_code}${editFormData.decision_maker_phone}` 
-                                  : editFormData.decision_maker_phone || undefined}
-                                onChange={(value) => {
-                                  if (value) {
-                                    try {
-                                      const phoneNumber = parsePhoneNumberLib(value);
-                                      if (phoneNumber) {
-                                        setEditFormData(prev => ({
-                                          ...prev,
-                                          decision_maker_phone_country_code: `+${phoneNumber.countryCallingCode}`,
-                                          decision_maker_phone: phoneNumber.nationalNumber,
-                                        }));
-                                      } else {
-                                        setEditFormData(prev => ({
-                                          ...prev,
-                                          decision_maker_phone_country_code: "",
-                                          decision_maker_phone: value,
-                                        }));
-                                      }
-                                    } catch (error) {
-                                      setEditFormData(prev => ({
-                                        ...prev,
-                                        decision_maker_phone_country_code: "",
-                                        decision_maker_phone: value,
-                                      }));
-                                    }
-                                  } else {
-                                    setEditFormData(prev => ({
-                                      ...prev,
-                                      decision_maker_phone_country_code: "",
-                                      decision_maker_phone: "",
-                                    }));
-                                  }
-                                }}
-                                placeholder="Enter phone number"
-                              />
-                            </div>
-                          </Form.Group>
-                        </Col>
-                      </Row>
-                    </Card.Body>
-                  </Card>
-                )}
-
-                {/* Step 2: Deal Characteristics - Only show if template is available */}
-                {editFormStep === 2 && editDealTemplate && (
-                  <Card className="mb-3 border-0 bg-light">
-                    <Card.Body>
-                      <div className="d-flex justify-content-between align-items-center mb-4">
-                        <h5 className="fw-bold mb-0 text-info">DEAL CHARACTERISTICS</h5>
-                        {editDealTemplate.name && (
-                          <Badge bg="info" className="ms-2">
-                            Template: {editDealTemplate.name}
-                          </Badge>
-                        )}
-                      </div>
-                      {editDealTemplate.description && (
-                        <div className="alert alert-info mb-4">
-                          <small>{editDealTemplate.description}</small>
-                        </div>
-                      )}
-                      {editDealTemplate.fields && editDealTemplate.fields.length > 0 ? (
-                        <Row>
-                          {(() => {
-                            const fieldsArray = editDealTemplate.fields || [];
-                            const sortedFields = [...fieldsArray].sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
-                            return sortedFields.map((field: DealTemplateField) => {
-                              const fieldValue = editTemplateFieldsData[field.field_name] || '';
-                              
-                              return (
-                                <Col md={6} key={field.field_name}>
-                                  <Form.Group className="mb-3">
-                                    <Form.Label>
-                                      {field.field_name}
-                                      {field.is_required && <span className="text-danger"> *</span>}
-                                    </Form.Label>
-                                    {field.field_type === 'dropdown' ? (
-                                      <Form.Select
-                                        value={fieldValue}
-                                        onChange={(e) => setEditTemplateFieldsData({
-                                          ...editTemplateFieldsData,
-                                          [field.field_name]: e.target.value
-                                        })}
-                                        required={field.is_required}
-                                      >
-                                        <option value="">Select {field.field_name}</option>
-                                        {field.options && Array.isArray(field.options) && field.options.map((option: string, index: number) => (
-                                          <option key={index} value={option}>
-                                            {option}
-                                          </option>
-                                        ))}
-                                      </Form.Select>
-                                    ) : field.field_type === 'text' || !field.field_type ? (
-                                      <Form.Control
-                                        type="text"
-                                        value={fieldValue}
-                                        onChange={(e) => setEditTemplateFieldsData({
-                                          ...editTemplateFieldsData,
-                                          [field.field_name]: e.target.value
-                                        })}
-                                        placeholder={`Enter ${field.field_name}`}
-                                        required={field.is_required}
-                                      />
-                                    ) : (
-                                      <Form.Control
-                                        type={field.field_type === 'date' ? 'date' : field.field_type === 'email' ? 'email' : 'text'}
-                                        value={fieldValue}
-                                        onChange={(e) => setEditTemplateFieldsData({
-                                          ...editTemplateFieldsData,
-                                          [field.field_name]: e.target.value
-                                        })}
-                                        placeholder={`Enter ${field.field_name}`}
-                                        required={field.is_required}
-                                      />
-                                    )}
-                                  </Form.Group>
-                                </Col>
-                              );
-                            });
-                          })()}
-                        </Row>
-                      ) : (
-                        <div className="text-center py-4 text-muted">
-                          <p>No fields defined in this template.</p>
-                        </div>
-                      )}
-                    </Card.Body>
-                  </Card>
-                )}
-
-                {/* Step 3: Progress & Notes */}
-                {editFormStep === 3 && (
-                  <Card className="mb-3 border-0 bg-light">
-                    <Card.Body>
-                      <h5 className="fw-bold mb-4 text-warning">NEGOTIATION PROGRESS</h5>
-                      <Row>
-                        <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Quotation Sent</Form.Label>
-                            <Form.Check
-                              type="checkbox"
-                              checked={editFormData.quotation_sent}
-                              onChange={(e) => setEditFormData({ ...editFormData, quotation_sent: e.target.checked })}
-                            />
-                          </Form.Group>
-                        </Col>
-                        <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Contract Sent</Form.Label>
-                            <Form.Check
-                              type="checkbox"
-                              checked={editFormData.contract_sent}
-                              onChange={(e) => setEditFormData({ ...editFormData, contract_sent: e.target.checked })}
-                            />
-                          </Form.Group>
-                        </Col>
-                        <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Contract Received</Form.Label>
-                            <Form.Check
-                              type="checkbox"
-                              checked={editFormData.contract_received}
-                              onChange={(e) => setEditFormData({ ...editFormData, contract_received: e.target.checked })}
-                            />
-                          </Form.Group>
-                        </Col>
-                      </Row>
-                    </Card.Body>
-                  </Card>
-                )}
-
-                {/* Step 4: Estimation Chart */}
-                {editFormStep === 4 && (
-                  <Card className="mb-3 border-0 bg-light">
-                    <Card.Body>
-                      {/* <h5 className="fw-bold mb-4 text-success">ESTIMATION CHART</h5> */}
-                      
-                      {/* Deal-level settings */}
-                      {/* <Row className="mb-4">
-                        <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Tax Percentage (%)</Form.Label>
-                            <Form.Control
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              value={editFormData.tax_percentage}
-                              onChange={(e) => setEditFormData({ ...editFormData, tax_percentage: e.target.value })}
-                              placeholder="0"
-                            />
-                          </Form.Group>
-                        </Col>
-                        <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Standard Discount (%)</Form.Label>
-                            <Form.Select
-                              value={(editFormData.standard_discount_percentage && parseFloat(editFormData.standard_discount_percentage))}
-                              onChange={(e) => setEditFormData({ ...editFormData, standard_discount_percentage: e.target.value })}
-                            >
-                              <option value="0">0%</option>
-                              <option value="5">5%</option>
-                              <option value="10">10%</option>
-                              <option value="15">15%</option>
-                            </Form.Select>
-                          </Form.Group>
-                        </Col>
-                        {extensions?.length > 1 && <Col md={4}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Special Discount (%)</Form.Label>
-                            <Form.Control
-                              disabled={extensions?.length <= 1}
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              value={editFormData.special_discount_percentage}
-                              onChange={(e) => setEditFormData({ ...editFormData, special_discount_percentage: e.target.value })}
-                              placeholder="0"
-                            />
-                          </Form.Group>
-                        </Col>}
-                      </Row> */}
-
-                      {/* Action Button - Add Revision/Quotation */}
-                      <div className="d-flex justify-content-end align-items-center mb-3">
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={async () => {
-                            setEditEditingRevisionIndex(null);
-                            setEditRevisionProducts([]);
-                            setEditRevisionFormData({
-                              tax_percentage: editFormData.tax_percentage || "0",
-                              standard_discount_percentage: editFormData.standard_discount_percentage || "0",
-                              special_discount_percentage: editFormData.special_discount_percentage || "0",
-                            });
-                            setEditRevisionSelectedProductIds([]);
-                            setEditShowAddRevisionModal(true);
-                            setEditRevisionLoadingProducts(true);
-                            try {
-                              const res = await getCrmProducts({ per_page: 100 });
-                              setEditRevisionProductsCatalog(res?.data || []);
-                            } catch (_e) {
-                              setEditRevisionProductsCatalog([]);
-                            } finally {
-                              setEditRevisionLoadingProducts(false);
-                            }
-                          }}
-                        >
-                          <Plus size={14} className="me-1" />
-                          Add Revision
-                        </Button>
-                      </div>
-
-                      {/* Revision History Table (replaces product listing) */}
-                      <div className="table-responsive">
-                        <Table hover className="align-middle">
-                          <thead className="bg-light">
-                            <tr>
-                              <th>Version</th>
-                              <th>Created</th>
-                              <th>Grand Total</th>
-                              <th>Net Value</th>
-                              <th>Items</th>
-                              <th>Approval Status</th>
-                              <th style={{ minWidth: 'auto' }}>Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {editEstimates.map((estimate: any, index: number) => {
-                              const grandTotal = parseFloat(estimate.grand_total || "0");
-                              const netValue = parseFloat(estimate.net_value || "0");
-                              const itemCount = estimate.estimation_chart?.length || 0;
-
-                              return (
-                                <tr key={estimate.id || index}>
-                                  <td>
-                                    <Badge bg="secondary">
-                                      {estimate.version || `v${editEstimates.length - index}.0`}
-                                    </Badge>
-                                  </td>
-                                  <td>
-                                    <div className="d-flex align-items-center">
-                                      <Calendar size={14} className="me-2 text-muted" />
-                                      {estimate.created_at ? moment(estimate.created_at).format(GlobalDateTimeFormat) : '-'}
-                                    </div>
-                                  </td>
-                                  <td className="fw-bold text-success">
-                                    {grandTotal.toLocaleString()} {estimate.currency || editFormData.currency}
-                                  </td>
-                                  <td>
-                                    {netValue.toLocaleString()} {estimate.currency || editFormData.currency}
-                                  </td>
-                                  <td>
-                                    <Badge bg="secondary">{itemCount} items</Badge>
-                                  </td>
-                                  <td>
-                                    {(() => {
-                                      const isApprovedByStatus = editFormData.approval_status === 'approved';
-                                      const refApprovedAt = editFormData.last_approved_at ? moment(editFormData.last_approved_at) : null;
-                                      const isApprovedByDate = refApprovedAt && estimate.created_at && moment(estimate.created_at).isBefore(refApprovedAt);
-                                      const isApproved = isApprovedByStatus || isApprovedByDate;
-                                      return (
-                                        <Badge bg={isApproved ? 'success' : 'warning'}>
-                                          {isApproved ? 'Approved' : 'Pending'}
-                                        </Badge>
-                                      );
-                                    })()}
-                                  </td>
-                                  <td style={{ minWidth: 'auto' }}>
-                                    <div className="d-flex gap-1 justify-content-center">
-                                      <Button
-                                        variant="link"
-                                        size="sm"
-                                        className="p-1"
-                                        title="Duplicate revision"
-                                        onClick={async () => {
-                                          setEditEditingRevisionIndex(index);
-                                          setEditRevisionProducts((estimate.estimation_chart || []).map((item: any) => ({
-                                            product_id: item.product_id || 0,
-                                            product_service: item.product_service || "",
-                                            description: item.description || "",
-                                            qty: item.qty || 1,
-                                            unit_price: item.unit_price || 0,
-                                            original_currency: item.original_currency || estimate.currency || editFormData.currency,
-                                            original_price: item.original_price || item.unit_price || 0,
-                                            tax_percentage: (item.tax_percentage != null ? String(item.tax_percentage) : estimate.tax_percentage != null ? String(estimate.tax_percentage) : "0"),
-                                            standard_discount_percentage: (item.standard_discount_percentage != null ? String(item.standard_discount_percentage) : estimate.standard_discount_percentage != null ? String(estimate.standard_discount_percentage) : "0"),
-                                            special_discount_percentage: (item.special_discount_percentage != null ? String(item.special_discount_percentage) : estimate.special_discount_percentage != null ? String(estimate.special_discount_percentage) : "0"),
-                                          })));
-                                          setEditRevisionFormData({
-                                            tax_percentage: estimate.tax_percentage?.toString() || "0",
-                                            standard_discount_percentage: estimate.standard_discount_percentage?.toString() || "0",
-                                            special_discount_percentage: estimate.special_discount_percentage?.toString() || "0",
-                                          });
-                                          setEditRevisionSelectedProductIds([]);
-                                          setEditShowAddRevisionModal(true);
-                                          setEditRevisionLoadingProducts(true);
-                                          try {
-                                            const res = await getCrmProducts({ per_page: 100 });
-                                            setEditRevisionProductsCatalog(res?.data || []);
-                                          } catch (_e) {
-                                            setEditRevisionProductsCatalog([]);
-                                          } finally {
-                                            setEditRevisionLoadingProducts(false);
-                                          }
-                                        }}
-                                      >
-                                        <Copy size={16} />
-                                      </Button>
-                                      {/* <Button
-                                        variant="link"
-                                        size="sm"
-                                        className="p-1 text-danger"
-                                        title="Delete revision"
-                                        onClick={() => {
-                                          if (window.confirm(`Are you sure you want to delete ${estimate.version || `v${editEstimates.length - index}.0`}?`)) {
-                                            setEditEstimates(editEstimates.filter((_, i) => i !== index));
-                                            toast.success("Revision removed");
-                                          }
-                                        }}
-                                      >
-                                        <Trash2 size={16} />
-                                      </Button> */}
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-
-                            {/* EMPTY STATE */}
-                            {editEstimates.length === 0 && (
-                              <tr>
-                                <td colSpan={6} className="text-center text-muted py-5">
-                                  <History size={40} className="mb-3 text-muted d-block mx-auto" style={{ opacity: 0.5 }} />
-                                  <div>No revision history available</div>
-                                  <small>Revisions will appear here when estimates are created</small>
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </Table>
-                      </div>
-
-                      {/* Summary Card */}
-                      {editEstimates.length > 0 && (
-                        <Card className="border-0 bg-light mt-3">
-                          <Card.Body>
-                            <Row>
-                              <Col md={6}>
-                                <small className="text-muted">Total Revisions</small>
-                                <div className="fw-bold">{editEstimates.length}</div>
-                              </Col>
-                              <Col md={6}>
-                                <small className="text-muted">Latest Update</small>
-                                <div className="fw-bold">
-                                  {editEstimates.length > 0 ? (editEstimates[0].created_at ? moment(editEstimates[0].created_at).format(GlobalDateTimeFormat) : '-') : '-'}
-                                </div>
-                              </Col>
-                            </Row>
-                          </Card.Body>
-                        </Card>
-                      )}
-
-                    </Card.Body>
-                  </Card>
-                )}
-              </div>
-
-              {/* Form Footer */}
-              <div className="d-flex justify-content-between mt-4">
-                <Button 
-                  variant="secondary" 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (editFormStep > 0) {
-                      let prevStep = editFormStep - 1;
-                      if (prevStep === 2 && !editDealTemplate) {
-                        prevStep = 1;
-                      }
-                      setEditFormStep(prevStep);
-                    } else {
-                      handleCloseEditModal();
-                    }
-                  }}
-                >
-                  {editFormStep > 0 ? <><ChevronLeft size={16} className="me-1" /> Previous</> : 'Cancel'}
-                </Button>
-                <div className="d-flex gap-2">
-                  {editFormStep < 4 ? (
-                    <Button 
-                      variant="primary"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        let nextStep = editFormStep + 1;
-                        if (nextStep === 2 && !editDealTemplate) {
-                          nextStep = 3;
-                        }
-                        setEditFormStep(Math.min(4, nextStep));
-                      }}
-                    >
-                      Next <ChevronRight size={16} className="ms-1" />
-                    </Button>
-                  ) : (
-                    <Button variant="primary" type="submit" disabled={editLoading}>
-                      {editLoading ? 'Updating...' : 'Update Deal'}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </Form>
-          )}
-        </Modal.Body>
-      </Modal>
-
-      {/* Add/Edit Revision Modal (Quotation with multiple products) */}
-      <Modal 
-        show={editShowAddRevisionModal} 
-        onHide={() => {
-          setEditShowAddRevisionModal(false);
-          setEditEditingRevisionIndex(null);
-          setEditRevisionProducts([]);
-          setEditRevisionFormData({ tax_percentage: "0", standard_discount_percentage: "0", special_discount_percentage: "0" });
-        }} 
-        size="lg" 
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>{editEditingRevisionIndex !== null ? 'Copy Revision / Quotation' : 'Add Revision / Quotation'}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            {/* Default Tax & Discount (applied when adding new products) */}
-            {/* <Row className="g-3 mb-3">
-              <Col md={12}>
-                <Form.Text className="text-muted small">Default Tax & Discount — used when you add new products below. Each product can then have its own values in the table.</Form.Text>
-              </Col>
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Default Tax (%)</Form.Label>
-                  <Form.Control
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={editRevisionFormData.tax_percentage}
-                    onChange={(e) => setEditRevisionFormData({ ...editRevisionFormData, tax_percentage: e.target.value })}
-                    placeholder="0"
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Default Standard Discount (%)</Form.Label>
-                  <Form.Select
-                    value={editRevisionFormData.standard_discount_percentage}
-                    onChange={(e) => setEditRevisionFormData({ ...editRevisionFormData, standard_discount_percentage: e.target.value })}
-                  >
-                    <option value="0">0%</option>
-                    <option value="5">5%</option>
-                    <option value="10">10%</option>
-                    <option value="15">15%</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label>Default Special Discount (%)</Form.Label>
-                  <Form.Control
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={editRevisionFormData.special_discount_percentage}
-                    onChange={(e) => setEditRevisionFormData({ ...editRevisionFormData, special_discount_percentage: e.target.value })}
-                    placeholder="0"
-                  />
-                </Form.Group>
-              </Col>
-            </Row> */}
-
-            {/* Product selection - multi-select */}
-            <Form.Group className="mb-3">
-              <Form.Label>Add Products</Form.Label>
-              <Select
-                isMulti
-                value={editRevisionSelectedProductIds}
-                onChange={(selected) => setEditRevisionSelectedProductIds(selected ? [...selected] : [])}
-                options={editRevisionProductsCatalog.map((p) => ({
-                  value: p.id,
-                  label: `${p.name} - ${editFormData.currency || 'AED'} ${p.price || 0}`,
-                }))}
-                placeholder={editRevisionLoadingProducts ? "Loading products..." : "Select products to add..."}
-                isDisabled={editRevisionLoadingProducts}
-                isSearchable
-              />
-              <div className="d-flex gap-2 mt-2 flex-wrap">
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  onClick={() => {
-                    const toAdd = editRevisionProductsCatalog.filter((p) =>
-                      editRevisionSelectedProductIds.some((s) => s.value === p.id) &&
-                      !editRevisionProducts.some((ep) => ep.product_id === p.id)
-                    );
-                    const newItems = toAdd.map((p) => ({
-                      product_id: p.id,
-                      product_service: p.name || "",
-                      description: "",
-                      qty: 1,
-                      unit_price: parseFloat(p.price || "0"),
-                      original_currency: editFormData.currency || "AED",
-                      original_price: parseFloat(p.price || "0"),
-                      tax_percentage: editRevisionFormData.tax_percentage,
-                      standard_discount_percentage: editRevisionFormData.standard_discount_percentage,
-                      special_discount_percentage: editRevisionFormData.special_discount_percentage,
-                    }));
-                    setEditRevisionProducts([...editRevisionProducts, ...newItems]);
-                    setEditRevisionSelectedProductIds([]);
-                  }}
-                  disabled={editRevisionSelectedProductIds.length === 0}
-                >
-                  <Plus size={14} className="me-1" />
-                  Add Selected Products
-                </Button>
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={() => {
-                    setEditRevisionProducts([...editRevisionProducts, {
-                      product_id: Date.now(),
-                      product_service: "",
-                      description: "",
-                      qty: 1,
-                      unit_price: 0,
-                      original_currency: editFormData.currency || "AED",
-                      original_price: 0,
-                      tax_percentage: editRevisionFormData.tax_percentage,
-                      standard_discount_percentage: editRevisionFormData.standard_discount_percentage,
-                      special_discount_percentage: editRevisionFormData.special_discount_percentage,
-                    }]);
-                  }}
-                >
-                  <Plus size={14} className="me-1" />
-                  Add Custom Product
-                </Button>
-              </div>
-            </Form.Group>
-
-            {/* Products in this revision - each product has its own Tax, Standard discount, Special discount */}
-            <Form.Label>Products in this revision</Form.Label>
-            <div className="table-responsive mb-3">
-              <Table size="sm" hover>
-                <thead className="bg-light">
-                  <tr>
-                    <th>Product</th>
-                    <th>Qty</th>
-                    <th>Unit Price</th>
-                    <th>Tax (%)</th>
-                    <th>Std Disc (%)</th>
-                    <th>Spec Disc (%)</th>
-                    <th>Line Total</th>
-                    <th style={{ minWidth: 'auto' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {editRevisionProducts.map((item, idx) => {
-                    const subtotal = (item.qty || 0) * (item.unit_price || 0);
-                    const taxPct = parseFloat(String(item.tax_percentage ?? "0")) || 0;
-                    const stdPct = parseFloat(String(item.standard_discount_percentage ?? "0")) || 0;
-                    const specPct = parseFloat(String(item.special_discount_percentage ?? "0")) || 0;
-                    const discPct = stdPct + specPct;
-                    const disc = (subtotal * discPct) / 100;
-                    const afterDisc = subtotal - disc;
-                    const tax = (afterDisc * taxPct) / 100;
-                    const lineTotal = afterDisc + tax;
-                    return (
-                      <tr key={idx}>
-                        <td>
-                          <Form.Control
-                            type="text"
-                            size="sm"
-                            placeholder="Product name"
-                            value={item.product_service}
-                            onChange={(e) => {
-                              const updated = [...editRevisionProducts];
-                              updated[idx] = { ...item, product_service: e.target.value };
-                              setEditRevisionProducts(updated);
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <Form.Control
-                            type="number"
-                            min="1"
-                            size="sm"
-                            style={{ width: 70 }}
-                            value={item.qty}
-                            onChange={(e) => {
-                              const v = parseInt(e.target.value) || 1;
-                              const updated = [...editRevisionProducts];
-                              updated[idx] = { ...item, qty: v };
-                              setEditRevisionProducts(updated);
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <Form.Control
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            size="sm"
-                            style={{ width: 90 }}
-                            value={item.unit_price}
-                            onChange={(e) => {
-                              const v = parseFloat(e.target.value) || 0;
-                              const updated = [...editRevisionProducts];
-                              updated[idx] = { ...item, unit_price: v, original_price: v };
-                              setEditRevisionProducts(updated);
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <Form.Control
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            size="sm"
-                            style={{ width: 70 }}
-                            value={item.tax_percentage ?? "0"}
-                            onChange={(e) => {
-                              const updated = [...editRevisionProducts];
-                              updated[idx] = { ...item, tax_percentage: e.target.value };
-                              setEditRevisionProducts(updated);
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <Form.Control
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            size="sm"
-                            style={{ width: 70 }}
-                            value={item.standard_discount_percentage ?? "0"}
-                            onChange={(e) => {
-                              const updated = [...editRevisionProducts];
-                              updated[idx] = { ...item, standard_discount_percentage: e.target.value };
-                              setEditRevisionProducts(updated);
-                            }}
-                          />
-                        </td>
-                        <td>
-                          <Form.Control
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            size="sm"
-                            style={{ width: 70 }}
-                            value={item.special_discount_percentage ?? "0"}
-                            onChange={(e) => {
-                              const updated = [...editRevisionProducts];
-                              updated[idx] = { ...item, special_discount_percentage: e.target.value };
-                              setEditRevisionProducts(updated);
-                            }}
-                          />
-                        </td>
-                        <td>{editFormData.currency || 'AED'} {lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td style={{ minWidth: 'auto' }}>
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="p-0 text-danger"
-                            onClick={() => setEditRevisionProducts(editRevisionProducts.filter((_, i) => i !== idx))}
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-              {editRevisionProducts.length === 0 && (
-                <div className="text-center text-muted py-3 small">No products. Select products above and click "Add Selected Products".</div>
-              )}
-            </div>
-
-            {/* Grand total preview (sum of per-product line totals) */}
-            {editRevisionProducts.length > 0 && (() => {
-              const subtotalAll = editRevisionProducts.reduce((s, i) => s + (i.qty || 0) * (i.unit_price || 0), 0);
-              let totalDiscount = 0;
-              let totalTax = 0;
-              editRevisionProducts.forEach((i) => {
-                const st = (i.qty || 0) * (i.unit_price || 0);
-                const stdPct = parseFloat(String(i.standard_discount_percentage ?? "0")) || 0;
-                const specPct = parseFloat(String(i.special_discount_percentage ?? "0")) || 0;
-                const taxPct = parseFloat(String(i.tax_percentage ?? "0")) || 0;
-                const disc = (st * (stdPct + specPct)) / 100;
-                const afterDisc = st - disc;
-                totalDiscount += disc;
-                totalTax += (afterDisc * taxPct) / 100;
-              });
-              const grandTotal = subtotalAll - totalDiscount + totalTax;
-              return (
-                <Card className="bg-light border-0">
-                  <Card.Body className="py-2">
-                    <div className="d-flex justify-content-between">
-                      <span className="text-muted">Subtotal:</span>
-                      <span>{editFormData.currency} {subtotalAll.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    {totalDiscount > 0 && (
-                      <div className="d-flex justify-content-between text-danger">
-                        <span>Total Discount:</span>
-                        <span>- {editFormData.currency} {totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    )}
-                    {totalTax > 0 && (
-                      <div className="d-flex justify-content-between">
-                        <span>Total Tax:</span>
-                        <span>{editFormData.currency} {totalTax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    )}
-                    <div className="d-flex justify-content-between fw-bold mt-1 pt-1 border-top">
-                      <span>Grand Total:</span>
-                      <span className="text-success">{editFormData.currency} {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  </Card.Body>
-                </Card>
-              );
-            })()}
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => {
-            setEditShowAddRevisionModal(false);
-            setEditEditingRevisionIndex(null);
-            setEditRevisionProducts([]);
-          }}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            disabled={editRevisionProducts.length === 0}
-            onClick={async () => {
-              if (!editingDealId || editRevisionProducts.length === 0) return;
-              try {
-                const payload = {
-                  deal_id: editingDealId,
-                  estimation_chart: editRevisionProducts.map((item) => ({
-                    product_id: item.product_id,
-                    product_service: item.product_service,
-                    description: item.description || "",
-                    qty: item.qty,
-                    unit_price: item.unit_price,
-                    original_currency: item.original_currency || editFormData.currency,
-                    original_price: item.original_price ?? item.unit_price,
-                    tax_percentage: parseFloat(String(item.tax_percentage ?? "0")),
-                    standard_discount_percentage: parseFloat(String(item.standard_discount_percentage ?? "0")),
-                    special_discount_percentage: parseFloat(String(item.special_discount_percentage ?? "0")),
-                  })),
-                  standard_discount_percentage: parseFloat(editRevisionFormData.standard_discount_percentage || "0"),
-                  special_discount_percentage: parseFloat(editRevisionFormData.special_discount_percentage || "0"),
-                  tax_percentage: parseFloat(editRevisionFormData.tax_percentage || "0"),
-                  currency: editFormData.currency,
-                };
-                await createEstimate(payload, false);
-                handleEditDeal(editingDealId);
-                // let netValue = 0;
-                // editRevisionProducts.forEach((i) => {
-                //   const st = (i.qty || 0) * (i.unit_price || 0);
-                //   const stdPct = parseFloat(String(i.standard_discount_percentage ?? "0")) || 0;
-                //   const specPct = parseFloat(String(i.special_discount_percentage ?? "0")) || 0;
-                //   const taxPct = parseFloat(String(i.tax_percentage ?? "0")) || 0;
-                //   const disc = (st * (stdPct + specPct)) / 100;
-                //   const afterDisc = st - disc;
-                //   netValue += afterDisc + (afterDisc * taxPct) / 100;
-                // });
-                // const subtotal = editRevisionProducts.reduce((s, i) => s + (i.qty || 0) * (i.unit_price || 0), 0);
-                // const newEstimate = {
-                //   id: Date.now(),
-                //   estimation_chart: editRevisionProducts,
-                //   grand_total: subtotal,
-                //   net_value: netValue,
-                //   tax_percentage: editRevisionFormData.tax_percentage,
-                //   standard_discount_percentage: editRevisionFormData.standard_discount_percentage,
-                //   special_discount_percentage: editRevisionFormData.special_discount_percentage,
-                //   currency: editFormData.currency,
-                //   created_at: new Date().toISOString(),
-                //   version: `v${editEstimates.length + 1}.0`,
-                // };
-                // if (editEditingRevisionIndex !== null) {
-                //   const updated = [...editEstimates];
-                //   updated[editEditingRevisionIndex] = { ...updated[editEditingRevisionIndex], ...newEstimate };
-                //   setEditEstimates(updated);
-                // } else {
-                //   setEditEstimates([newEstimate, ...editEstimates]);
-                // }
-                toast.success(editEditingRevisionIndex !== null ? "Revision updated!" : "Revision added!");
-                setEditShowAddRevisionModal(false);
-                setEditEditingRevisionIndex(null);
-                setEditRevisionProducts([]);
-              } catch (err: any) {
-                toast.error(err?.message || "Failed to save revision");
-              }
-            }}
-          >
-            {editEditingRevisionIndex !== null ? 'Copy Revision' : 'Save Revision'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      {/* Edit Deal Modal - Removed, using sidebar instead */}
+      {/* Add/Edit Revision Modal - Removed, was part of Edit Deal Modal */}
 
      {/* Convert to Order Modal */}
 {dealToConvert && (
@@ -7393,6 +5998,20 @@ const handleCloseEditModal = useCallback(() => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Create Deal Sidebar */}
+      {showCreateDealSidebar && (
+        <CreateDealSidebar 
+          onClose={() => {
+            setShowCreateDealSidebar(false);
+            setEditingDealIdInSidebar(null);
+          }}
+          dealId={editingDealIdInSidebar}
+          onSuccess={() => {
+            setRefreshKey((oldKey) => oldKey + 1);
+          }}
+        />
+      )}
 
     </React.Fragment>
   );

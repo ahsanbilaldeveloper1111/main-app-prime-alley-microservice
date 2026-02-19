@@ -227,3 +227,20 @@ export const deleteStatus = async (id: string | number) => {
   }
 };
 
+// ==================== Audit Logs API ====================
+
+/**
+ * GET audit-logs
+ */
+export const AuditLogsWorkPlanner = async (params?: Record<string, unknown>) => {
+  try {
+    const response = await axiosInstance.get(`${prefix}/audit-logs`, { params });
+    if (response?.data) {
+     
+      return response.data ?? response;
+    }
+    return null;
+  } catch (error: unknown) {
+    throw error;
+  }
+};

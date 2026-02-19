@@ -1270,15 +1270,7 @@ const CrmDeals = () => {
 
   // Handle first column click - navigates to detail page
   const handleFirstColumnClick = useCallback((deal: any) => {
-    const dealId = deal?.rawData?.id || deal?.id;
-    if (dealId) {
-      router.push({
-        pathname: '/crm/deals-approval/deals-approval-detailpage',
-        query: { id: dealId }
-      });
-    } else {
-      router.push('/crm/deals-approval/deals-approval-detailpage');
-    }
+      router.push('/crm/deals-approval/approval-detailpage');
   }, [router]);
 
   const handleCallClick = useCallback(async (deal: any) => {
@@ -2462,7 +2454,7 @@ const handleCloseEditModal = useCallback(() => {
           {
             label: 'View',
             icon: <Eye size={16} />,
-            onClick: (row: any) => handleViewDeal(row.rawData?.id || row.id),
+            onClick: (row: any) => handlePreviewClick(row),
             variant: 'link' as const
           },
           {
@@ -2479,7 +2471,7 @@ const handleCloseEditModal = useCallback(() => {
         {
           label: 'View',
           icon: <Eye size={16} />,
-          onClick: (row: any) => handleViewDeal(row.rawData?.id || row.id),
+          onClick: (row: any) => handlePreviewClick(row),
           variant: 'link' as const
         },
         ...(session?.user?.permissions?.includes('edit-crm-deals') ? [{
@@ -2555,7 +2547,7 @@ const handleCloseEditModal = useCallback(() => {
         }] : [])
       ];
     },
-    [session, activeFilter, handleViewDeal, handleRestoreDeal, handleDeleteDeal, handleMarkLost, handleApproveDeal, handleRejectDeal]
+    [session, activeFilter, handlePreviewClick, handleViewDeal, handleRestoreDeal, handleDeleteDeal, handleMarkLost, handleApproveDeal, handleRejectDeal]
   );
  
   if (!session?.user?.permissions?.includes('list-crm-deals')) {

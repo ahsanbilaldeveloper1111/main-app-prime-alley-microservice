@@ -39,6 +39,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/faqs/types',permissions: ['']},
     {path:'/crm/approvals',permissions: ['']},
     {path:'/crm/deals-approval',permissions: ['']},
+    {path:'/crm/deals-approval/approval-detailpage',permissions: ['']},
     
     {path:'/ai-ml/tenant-faqs',permissions: ['']},
     { path: '/ai-ml/global-faqs', permissions: [''] },
@@ -53,7 +54,8 @@ export const routePermissions: RoutePermission[] = [
     { path: '/chat/usage-reports', permissions: [PERMISSIONS.TMS_SERVICES] },
     {path:'/chat/tools-profiles',permissions: [PERMISSIONS.TMS_SERVICES]},
     
-    {path:'/company',permissions: ['set-company-image-users']},
+    { path: '/company', permissions: ['set-company-image-users'] },
+    { path: '/audit-logs', permissions: [''] },
 
     
     {

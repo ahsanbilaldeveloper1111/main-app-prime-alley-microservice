@@ -161,7 +161,7 @@ const Signin = () => {
           );
         }
       } else {
-        toast.success("Login successful");
+        // toast.success("Login successful");
         
         // Set sessionStorage flag to indicate active browser session
         // This prevents browser close detection from clearing sessions after signin
@@ -353,14 +353,15 @@ const Signin = () => {
                 <div className="row">
                   <div className="col my-1">
                     <p className="m-0">
-                      © {new Date().getFullYear()} All rights reserved. Powered by{" "}
+                      © {new Date().getFullYear()} All rights reserved.
+                      {/* Powered by{" "}
                       <a
                         href="https://primealley.com/"
                         target="_blank"
                         className="text-primary"
                       >
                         Prime Alley Technology LLC
-                      </a>
+                      </a> */}
                     </p>
                   </div>
                   <div className="col-auto my-1">
@@ -382,10 +383,10 @@ const Signin = () => {
             <div className="auth-form">
               <div className="card my-5 mx-3">
                 <div className="card-body">
-                   <Image  
+                   {/* <Image  
                    src={logodark} className="img-brand img-fluid mb-3" alt="Business Workspace AI-Powered"
                    width={200}
-                    />
+                    /> */}
                   <h4 className="f-w-500 mb-1">Welcome Back</h4>
                   <p className="mb-3">Sign in to your account</p>
                   

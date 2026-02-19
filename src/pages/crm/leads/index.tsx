@@ -598,6 +598,7 @@ const CrmLeads = () => {
   const [showLeadHistoryModal, setShowLeadHistoryModal] = useState(false);
 
   const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
+  const [editLeadIdForSidebar, setEditLeadIdForSidebar] = useState<number | null>(null);
   const [showTabModal, setShowTabModal] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   // Sidebar states
@@ -1770,179 +1771,10 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     }
   }, []);
 
-  // Handle edit lead - open modal with lead data
-  const handleEditLead = useCallback(async (leadId: number) => {
-    setEditFetching(true);
-    setShowEditModal(true);
-    setEditFormStep(0);
-    isEditInitialLoad.current = true;
-    
-    try {
-      const leadData: any = await getLead(leadId);
-      setEditingLead(leadData);
-      
-      // Parse contact_persons
-      let contactPersonsArray: Array<{
-        title: string;
-        name: string;
-        phone_country_code: string;
-        phone: string;
-        email: string;
-      }> = [];
-      
-      if (leadData.contact_persons) {
-        if (typeof leadData.contact_persons === 'string') {
-          try {
-            contactPersonsArray = JSON.parse(leadData.contact_persons);
-          } catch (e) {
-            console.error("Failed to parse contact_persons:", e);
-          }
-        } else if (Array.isArray(leadData.contact_persons)) {
-          contactPersonsArray = leadData.contact_persons;
-        }
-      }
-
-      // Convert IDs to numbers
-      const stageId = leadData.stage_id ? Number(leadData.stage_id) : undefined;
-      const campaignId = leadData.campaign_id ? Number(leadData.campaign_id) : undefined;
-      const crmDataId = leadData.crm_data_id ? Number(leadData.crm_data_id) : undefined;
-      const userExtension = leadData.user_extension ? Number(leadData.user_extension) : null;
-
-      // Populate form data
-      setEditFormData({
-        name: leadData.name || "",
-        user_extension: userExtension,
-        type: "lead",
-        description: leadData.description || "",
-        source: leadData.source || "",
-        company_name: leadData.company_name || "",
-        industry_ids: (leadData.industry_ids && Array.isArray(leadData.industry_ids))
-          ? leadData.industry_ids.map((id: any) => Number(id)).filter((id: number) => !Number.isNaN(id))
-          : (leadData.industries && Array.isArray(leadData.industries))
-          ? leadData.industries.map((ind: any) => typeof ind === 'object' ? Number(ind.id) : Number(ind)).filter((id: number) => !Number.isNaN(id))
-          : [],
-        business_type: leadData.business_type || "",
-        company_country: leadData.company_country || "",
-        company_province: leadData.company_province || "",
-        company_city: leadData.company_city || "",
-        company_location_other: leadData.company_location_other || "",
-        company_size: leadData.company_size || "",
-        stage_id: stageId,
-        campaign_id: campaignId,
-        crm_data_id: crmDataId,
-        lead_potential: leadData.lead_potential || "",
-        campaign_field_values: leadData.campaign_field_values || {},
-        contact_persons: contactPersonsArray.length > 0 
-          ? contactPersonsArray 
-          : [{
-              title: "",
-              name: "",
-              phone_country_code: "",
-              phone: "",
-              email: "",
-            }],
-      });
-
-      // Set business type
-      if (leadData.business_type_id) {
-        setEditBusinessTypeId(Number(leadData.business_type_id));
-        setEditBusinessTypeOther("");
-        setEditShowOtherBusinessType(false);
-      } else if (leadData.business_type_other) {
-        setEditBusinessTypeId(null);
-        setEditBusinessTypeOther(leadData.business_type_other);
-        setEditShowOtherBusinessType(true);
-      }
-
-      // Fetch stages for lead
-      const stagesData = await getStages("lead");
-      setEditStages(stagesData || []);
-      
-      // Fetch extensions
-      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
-      if (hierarchyData?.extensions) {
-        setEditExtensions(hierarchyData.extensions);
-      }
-
-      // Fetch campaigns
-      const campaignsData = await getCampaigns({ per_page: 100 });
-      setEditCampaigns(campaignsData?.data || []);
-
-      // Fetch CRM data
-      const crmDataResponse = await getCrmData({ per_page: 100 });
-      setEditCrmData(crmDataResponse?.data || []);
-
-      // Fetch business types
-      const businessTypesResponse = await getBusinessTypes({ per_page: 1000 });
-      setEditBusinessTypes(businessTypesResponse?.data || []);
-
-      // Fetch campaign if available
-      if (campaignId) {
-        try {
-          const campaign = await getCampaignById(campaignId);
-          setEditSelectedCampaign(campaign);
-        } catch (error) {
-          console.error("Failed to fetch campaign:", error);
-        }
-      }
-
-      // Fetch CRM data if available
-      if (crmDataId) {
-        try {
-          const crmDataRecord = await getCrmDataById(crmDataId);
-          setEditSelectedCrmData(crmDataRecord);
-        } catch (error) {
-          console.error("Failed to fetch CRM data:", error);
-        }
-      }
-
-      // Initialize location dropdowns
-      if (leadData.company_country) {
-        const country = Country.getAllCountries().find(
-          (c: any) => c.name === leadData.company_country
-        );
-        if (country) {
-          setEditSelectedCountry({
-            value: country.isoCode,
-            label: country.name,
-            isoCode: country.isoCode,
-          });
-
-          if (leadData.company_province) {
-            const state = State.getStatesOfCountry(country.isoCode).find(
-              (s: any) => s.name === leadData.company_province
-            );
-            if (state) {
-              setEditSelectedState({
-                value: state.isoCode,
-                label: state.name,
-              });
-
-              if (leadData.company_city) {
-                const city = City.getCitiesOfState(
-                  country.isoCode,
-                  state.isoCode
-                ).find((c: any) => c.name === leadData.company_city);
-                if (city) {
-                  setEditSelectedCity({
-                    value: city.name,
-                    label: city.name,
-                  });
-                }
-              }
-            }
-          }
-        }
-      }
-
-      isEditInitialLoad.current = false;
-    } catch (error) {
-      console.error("Failed to fetch lead:", error);
-      toast.error("Failed to load lead data");
-      setShowEditModal(false);
-    } finally {
-      setEditFetching(false);
-    }
+  // Handle edit lead - open same sidebar as Create Lead with prefilled data
+  const handleEditLead = useCallback((leadId: number) => {
+    setEditLeadIdForSidebar(leadId);
+    setShowCreateLeadModal(true);
   }, []);
 
   // Edit Modal Helper Functions
@@ -5619,7 +5451,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                       onClick={() => {
                         if (activeFilter === "lost") return;
                         setShowLeadViewModal(false);
-                        window.location.href = `/crm/leads/${viewingLead.id}/edit`;
+                        setEditLeadIdForSidebar(viewingLead.id);
+                        setShowCreateLeadModal(true);
                       }}
                       disabled={activeFilter === "lost"}
                       onMouseOver={(e) => {
@@ -8121,13 +7954,12 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
       </Modal>
 
       {/* Lead Details Sidebar */}
-      <GenericSidebar
+      {/* <GenericSidebar
         isOpen={showLeadSidebar}
         onClose={() => {
           setShowLeadSidebar(false);
           setSelectedLead(null);
         }}
-        moduleSlug={ModuleSlug.CRM_LEADS}
         onCall={handleSidebarCall}
         title={selectedLead?.name || 'Lead Details'}
         subtitle={selectedLead?.company_name || selectedLead?.company || ''}
@@ -8155,7 +7987,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         })()}
         avatar={{
           name: selectedLead?.name || 'Lead',
-          useIcon: true
+          initials: getInitials(selectedLead?.name || 'Lead')
         }}
         contextPayload={
           selectedLead
@@ -8578,7 +8410,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             variant: 'outline-primary'
           }
         ]}
-      />
+      /> */}
 
       {/* Filters Sidebar */}
       <GenericFilterSidebar
@@ -8981,13 +8813,17 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
 {/* Add modal at the end */}
 <CreateLeadModal
   show={showCreateLeadModal}
-  onHide={() => setShowCreateLeadModal(false)}
+  onHide={() => {
+    setShowCreateLeadModal(false);
+    setEditLeadIdForSidebar(null);
+  }}
   onSuccess={() => {
     setShowCreateLeadModal(false);
-    // Refresh leads list
+    setEditLeadIdForSidebar(null);
     fetchLeads();
   }}
-  type="lead" // or "opportunity"
+  type="lead"
+  editLeadId={editLeadIdForSidebar}
 />
     </React.Fragment>
   );

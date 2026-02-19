@@ -1,14 +1,12 @@
 import React, { useState, useRef, useEffect, ReactElement } from 'react';
-import { useRouter } from 'next/router';
 import {
-  X, ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
-  Calendar, MessageSquare, ClipboardList, ExternalLink, Copy, RefreshCw,
-  ThumbsUp, ThumbsDown, Sparkles, User, Building2, Briefcase,
-  FileText, Ticket, Paperclip, Link2, Tag, DollarSign,
-  Search, Filter, AlertCircle, ShoppingCart
+  ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
+  Calendar, ClipboardList, ExternalLink, Copy, RefreshCw,
+  ThumbsUp, ThumbsDown, Sparkles,
+  FileText, Ticket, Paperclip, Link2,
+  Search, AlertCircle, ShoppingCart
 } from 'lucide-react';
 import Layout from "@layout/index";
-import { getCrmDataById, type CrmDataItem } from '@utils/crm';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -74,14 +72,7 @@ interface RevenueSection {
 // MAIN COMPONENT
 // ============================================================================
 
-const ContactRecordPage: NextPageWithLayout = () => {
-  const router = useRouter();
-  const { id: prospectId } = router.query;
-
-  const [prospect, setProspect] = useState<CrmDataItem | null>(null);
-  const [prospectLoading, setProspectLoading] = useState(true);
-  const [prospectError, setProspectError] = useState<string | null>(null);
-
+const DealRecordPage: NextPageWithLayout = () => {
   const [activeTab, setActiveTab] = useState('about');
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
@@ -92,34 +83,6 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
-
-  // Load prospect by ID from URL
-  useEffect(() => {
-    if (!router.isReady || prospectId == null || prospectId === '') {
-      setProspectLoading(false);
-      return;
-    }
-    const id = Number(prospectId);
-    if (Number.isNaN(id)) {
-      setProspectError('Invalid prospect ID');
-      setProspectLoading(false);
-      return;
-    }
-    setProspectLoading(true);
-    setProspectError(null);
-    getCrmDataById(id)
-      .then((data) => {
-        setProspect(data);
-        setProspectError(null);
-      })
-      .catch(() => {
-        setProspect(null);
-        setProspectError('Failed to load prospect');
-      })
-      .finally(() => {
-        setProspectLoading(false);
-      });
-  }, [router.isReady, prospectId]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -158,14 +121,14 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
       timestamp: 'Feb 14, 2026 at 2:50 AM GMT+5',
       user: 'Rizwan Haider',
       userLink: '#',
-      entityName: 'Ahmad Hussain <ahmad@gmail.com>',
+      entityName: 'Deal Name',
       entityLink: '#',
     },
     {
       id: '2',
       type: 'email',
       title: 'Marketing email',
-      description: 'sent to Ahmad Hussain <Ahmad Hussain <ahmad@gmail.com>>',
+      description: 'sent to Deal Name',
       timestamp: 'Feb 14, 2026 at 2:50 AM GMT+5',
       alert: {
         message: 'There was an issue sending an email to this contact. An email to this recipient has bounced.',
@@ -401,7 +364,7 @@ const subscriptionsData: SubscriptionItem[] = [
     status: 'active',
     nextBillingDate: '03/13/2026',
     nextPaymentAmount: '$500.00',
-    contactEmail: 'ahmad@gmail.com',
+    contactEmail: 'deal@example.com',
     link: '#',
   },
 ];
@@ -471,16 +434,15 @@ const revenueSections: RevenueSection[] = [
     { id: 'intelligence', label: 'Intelligence' },
   ];
 
-  // Key Information Fields (from prospect + tickets/leads)
-  const firstTicket = prospect?.tickets?.[0];
+  // Key Information Fields
   const keyInfoFields: KeyInfoField[] = [
-    { label: 'Email', value: prospect?.data?.email ?? '--', copyable: true },
-    { label: 'Phone Number', value: prospect?.phone ?? '--', copyable: true },
-    { label: 'Company Name', value: firstTicket?.company_name ?? prospect?.data?.company_name ?? prospect?.name ?? '--' },
-    { label: 'Lead Status', value: firstTicket?.status ?? prospect?.data?.disposition ?? '--' },
-    { label: 'Lifecycle Stage', value: prospect?.data?.lifecycle_stage ?? '--' },
-    { label: 'Buying Role', value: prospect?.data?.buying_role ?? '--' },
-    { label: 'Contact owner', value: prospect?.data?.contact_owner ?? '--' },
+    { label: 'Email', value: 'deal@example.com', copyable: true },
+    { label: 'Phone Number', value: '+92-300-8009002', copyable: true },
+    { label: 'Company Name', value: 'Company Name LTD' },
+    { label: 'Deal Stage', value: 'Presentation Scheduled' },
+    { label: 'Deal Value', value: 'AED 50,000' },
+    { label: 'Expected Close Date', value: 'March 1, 2026' },
+    { label: 'Contact owner', value: 'Rizwan Haider' },
   ];
 
   const renderIntelligenceTab = () => {
@@ -523,14 +485,14 @@ const revenueSections: RevenueSection[] = [
                 color: '#7c98b6',
                 marginBottom: '6px',
               }}>
-                Lifecycle stage
+                Deal Stage
               </div>
               <div style={{
                 fontSize: '14px',
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                Opportunity
+                Presentation Scheduled
               </div>
             </div>
             <div>
@@ -556,7 +518,7 @@ const revenueSections: RevenueSection[] = [
                   e.currentTarget.style.textDecoration = 'none';
                 }}
               >
-                Ahmad Hussain
+                Company Name
               </a>
             </div>
             <div>
@@ -588,7 +550,7 @@ const revenueSections: RevenueSection[] = [
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                {firstTicket?.company_city ?? '--'}
+                --
               </div>
             </div>
             <div>
@@ -604,7 +566,7 @@ const revenueSections: RevenueSection[] = [
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                {firstTicket?.company_province ?? '--'}
+                --
               </div>
             </div>
             <div>
@@ -795,10 +757,10 @@ const revenueSections: RevenueSection[] = [
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                {prospect?.data?.email ?? '--'}
+                deal@example.com
               </div>
             </div>
-
+  
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
@@ -1129,7 +1091,7 @@ const revenueSections: RevenueSection[] = [
             }}
           >
             <ChevronDown size={16} style={{ transform: 'rotate(90deg)' }} />
-            Contacts
+            Deals Approval
           </button>
 
           <div style={{ position: 'relative' }} ref={dropdownRef}>
@@ -1230,7 +1192,7 @@ const revenueSections: RevenueSection[] = [
               color: '#141414',
               flexShrink: 0,
             }}>
-              {prospect?.name ? prospect.name.trim().split(/\s+/).map((s) => s[0]).join('').toUpperCase().slice(0, 2) : 'NA'}
+              DN
             </div>
             <div style={{ flex: 1 }}>
               <h2 style={{
@@ -1240,7 +1202,7 @@ const revenueSections: RevenueSection[] = [
                 margin: '0 0 4px 0',
                 lineHeight: '1.3',
               }}>
-                {prospect?.name ?? 'Unknown'}
+                Deal Name
               </h2>
               <p style={{
                 fontSize: '14px',
@@ -1248,65 +1210,59 @@ const revenueSections: RevenueSection[] = [
                 margin: '0 0 8px 0',
                 lineHeight: '1.4',
               }}>
-                {firstTicket?.company_name ? `Director at ${firstTicket?.company_name}` : 'Prospect'}
+                Company Name LTD
               </p>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
               }}>
-                {prospect?.data?.email ? (
-                  <>
-                    <a
-                      href={`mailto:${prospect?.data?.email}`}
-                      style={{
-                        fontSize: '14px',
-                        color: '#006162',
-                        textDecoration: 'none',
-                        fontWeight: '500',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.textDecoration = 'underline';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.textDecoration = 'none';
-                      }}
-                    >
-                      {prospect?.data?.email}
-                    </a>
-                    <button
-                      onClick={() => copyToClipboard(prospect?.data?.email ?? '')}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        padding: '4px',
-                        cursor: 'pointer',
-                        color: '#718096',
-                        display: 'flex',
-                        alignItems: 'center',
-                      }}
-                      title="Copy email"
-                    >
-                      <Copy size={14} />
-                    </button>
-                    <button
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        padding: '4px',
-                        cursor: 'pointer',
-                        color: '#718096',
-                        display: 'flex',
-                        alignItems: 'center',
-                      }}
-                      title="Link"
-                    >
-                      <Link2 size={14} />
-                    </button>
-                  </>
-                ) : (
-                  <span style={{ fontSize: '14px', color: '#718096' }}>No email</span>
-                )}
+                <a
+                  href="mailto:deal@example.com"
+                  style={{
+                    fontSize: '14px',
+                    color: '#006162',
+                    textDecoration: 'none',
+                    fontWeight: '500',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.textDecoration = 'underline';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.textDecoration = 'none';
+                  }}
+                >
+                  deal@example.com
+                </a>
+                <button
+                  onClick={() => copyToClipboard('deal@example.com')}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '4px',
+                    cursor: 'pointer',
+                    color: '#718096',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                  title="Copy email"
+                >
+                  <Copy size={14} />
+                </button>
+                <button
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '4px',
+                    cursor: 'pointer',
+                    color: '#718096',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                  title="Link"
+                >
+                  <Link2 size={14} />
+                </button>
               </div>
             </div>
           </div>
@@ -1722,7 +1678,7 @@ const revenueSections: RevenueSection[] = [
                     padding: '18px 20px',
                     borderRadius: '10px',
                   }}>
-                    {prospect?.name ?? 'This prospect'} is a Director at {firstTicket?.company_name ?? prospect?.data?.company_name ?? 'N/A'}, currently in the Opportunity stage. Recent activity shows strong engagement. The contact is revenue-generating. Recommended next steps: consider a follow-up call to discuss potential opportunities.
+                    Deal Name is a deal at Company Name LTD, currently in the Presentation Scheduled stage. Recent activity shows strong engagement: Invoice INV-1004 ($500.00) was sent on Feb 14, and the deal maintains an active Connect Pro subscription with the next billing scheduled for Mar 13, 2026. However, there's a critical email deliverability issue - a recent marketing email bounced, which may impact future communications. The deal is revenue-generating with stable MRR from the subscription. Recommended next steps: address the email bounce issue immediately and consider a follow-up call to discuss potential upsell opportunities.
                   </div>
 
                   <div style={{
@@ -1851,7 +1807,7 @@ const revenueSections: RevenueSection[] = [
                   color: '#141414',
                   margin: 0,
                 }}>
-                  Contact profile
+                  Deal profile
                 </h3>
               </div>
 
@@ -1862,12 +1818,12 @@ const revenueSections: RevenueSection[] = [
                   gap: '20px',
                 }}>
                   {[
-                    { label: 'Company name', value: firstTicket?.company_name ?? '--' },
+                    { label: 'Company name', value: 'Company Name LTD' },
                     { label: 'Street address', value: '--' },
-                    { label: 'City', value: firstTicket?.company_city ?? '--' },
+                    { label: 'City', value: '--' },
                     { label: 'Postal code', value: '--' },
-                    { label: 'State', value: firstTicket?.company_province ?? '--' },
-                    { label: 'Email', value: prospect?.data?.email ?? '--', link: true },
+                    { label: 'State/Region', value: '--' },
+                    { label: 'Email', value: 'deal@example.com', link: true },
                   ].map((field, index) => (
                     <div key={index}>
                       <div style={{
@@ -1939,7 +1895,7 @@ const revenueSections: RevenueSection[] = [
                     color: '#666666',
                     marginBottom: '12px',
                   }}>
-                    Ahmad Hussain has not specified any preferences.
+                    Deal Name has not specified any preferences.
                   </p>
                   <a
                     href="#"
@@ -2293,13 +2249,7 @@ const revenueSections: RevenueSection[] = [
           paddingTop: '0px', 
           paddingBottom: '0',
         }}>
-        {/* Companies - from prospect name + unique company_name from tickets */}
-        {(() => {
-          const companyNames = prospect?.tickets?.length
-            ? Array.from(new Set(prospect.tickets.map((t: any) => t.company_name).filter(Boolean)))
-            : [];
-          const companiesCount = companyNames.length;
-          return (
+        {/* Companies */}
       <div style={{
         backgroundColor: '#ffffff',
         borderRadius: '10px',
@@ -2336,7 +2286,7 @@ const revenueSections: RevenueSection[] = [
               margin: 0,
               lineHeight: '1.2',
             }}>
-              Companies ({companiesCount})
+              Companies (1)
             </h3>
           </div>
           <button
@@ -2367,60 +2317,88 @@ const revenueSections: RevenueSection[] = [
 
         {!collapsedSections.has('companies') && (
           <div style={{ padding: '20px' }}>
-            {companiesCount === 0 ? (
-              <p style={{ fontSize: '13px', color: '#666666', margin: 0 }}>No companies associated.</p>
-            ) : (
-              <>
-                {companyNames.map((companyName: string, idx: number) => (
-                  <div key={idx} style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '14px', color: '#006162', fontWeight: '500' }}>{companyName}</span>
-                      {idx === 0 && (
-                        <span style={{ padding: '2px 8px', backgroundColor: '#e6f3ff', color: '#006162', borderRadius: '3px', fontSize: '11px', fontWeight: '600' }}>
-                          Primary
-                        </span>
-                      )}
-                    </div>
-                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Phone: {prospect?.phone ?? '--'}</p>
-                  </div>
-                ))}
-                <a
-              href="#"
-              style={{
-                fontSize: '12px',
-                color: '#141414',
-                textDecoration: 'none',
-                fontWeight: '300',
-                display: 'inline-flex',
+            <div style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
+              <div style={{
+                display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                border: '1px solid #cccccc',
-                borderRadius: '6px',
-                padding: '6px 12px',
-              }}
-            >
-              View all associated Companies
-              <ExternalLink size={12} />
-            </a>
-              </>
-            )}
+                gap: '8px',
+                marginBottom: '8px',
+              }}>
+                <a
+                  href="#"
+                  style={{
+                    fontSize: '14px',
+                    color: '#006162',
+                    textDecoration: 'none',
+                    fontWeight: '500',
+                  }}
+                >
+                  Company Name LTD
+                </a>
+                <span style={{
+                  padding: '2px 8px',
+                  backgroundColor: '#e6f3ff',
+                  color: '#006162',
+                  borderRadius: '3px',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                }}>
+                  Primary
+                </span>
+              </div>
+              <p style={{
+                fontSize: '13px',
+                color: '#666666',
+                margin: '4px 0',
+              }}>
+                Company Domain Name: companyname.com
+              </p>
+              <p style={{
+                fontSize: '13px',
+                color: '#666666',
+                margin: '4px 0',
+              }}>
+                Phone: --
+              </p>
+              <button
+                style={{
+                  marginTop: '8px',
+                  padding: '4px 0',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  fontSize: '13px',
+                  color: '#666666',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                }}
+              >
+                Add association label
+              </button>
+            </div>
+            <a
+  href="#"
+  style={{
+    fontSize: '12px',
+    color: '#141414',
+    textDecoration: 'none',
+    fontWeight: '300',
+    display: 'inline-flex',   // ✅ change this
+    alignItems: 'center',
+    gap: '4px',
+    border: '1px solid #cccccc',
+    borderRadius: '6px',
+    padding: '6px 12px',
+  }}
+>
+  View all associated Companies
+  <ExternalLink size={12} />
+</a>
+
           </div>
         )}
       </div>
-          );
-        })()}
 
-      {/* Deals - from prospect.tickets[].deals */}
-      {(() => {
-        const allDeals = prospect?.tickets?.flatMap((t: any) => t.deals ?? []) ?? [];
-        const dealsCount = allDeals.length;
-        const formatAmount = (deal: any) => {
-          const curr = deal.currency ?? '';
-          const val = deal.net_value ?? deal.grand_total ?? '';
-          return val ? `${curr} ${val}` : '--';
-        };
-        const formatDate = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '--';
-        return (
+      {/* Deals */}
       <div style={{
         backgroundColor: '#ffffff',
         borderRadius: '10px',
@@ -2457,7 +2435,7 @@ const revenueSections: RevenueSection[] = [
               margin: 0,
               lineHeight: '1.2',
             }}>
-              Deals ({dealsCount})
+              Deals (1)
             </h3>
           </div>
           <button
@@ -2487,48 +2465,76 @@ const revenueSections: RevenueSection[] = [
 
         {!collapsedSections.has('deals') && (
           <div style={{ padding: '20px' }}>
-            {dealsCount === 0 ? (
-              <p style={{ fontSize: '13px', color: '#666666', margin: 0 }}>No deals associated.</p>
-            ) : (
-              <>
-                {allDeals.map((deal: any) => (
-                  <div key={deal.id} style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
-                    <span style={{ fontSize: '14px', color: '#006162', fontWeight: '500', display: 'block', marginBottom: '8px' }}>
-                      {deal.name}
-                    </span>
-                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Amount: {formatAmount(deal)}</p>
-                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Close Date: {formatDate(deal.expected_close_date)}</p>
-                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Deal Stage: {deal.status ?? '--'}</p>
-                  </div>
-                ))}
-                <a
-                  href="#"
-                  style={{
-                    fontSize: '13px',
-                    color: '#006162',
-                    textDecoration: 'none',
-                    fontWeight: '500',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  View all associated Deals
-                  <ExternalLink size={12} />
-                </a>
-              </>
-            )}
+            <div style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
+              <a
+                href="#"
+                style={{
+                  fontSize: '14px',
+                  color: '#006162',
+                  textDecoration: 'none',
+                  fontWeight: '500',
+                  display: 'block',
+                  marginBottom: '8px',
+                }}
+              >
+                Company Name LTD - New Deal
+              </a>
+              <p style={{
+                fontSize: '13px',
+                color: '#666666',
+                margin: '4px 0',
+              }}>
+                Amount: $500.00
+              </p>
+              <p style={{
+                fontSize: '13px',
+                color: '#666666',
+                margin: '4px 0',
+              }}>
+                Close Date: March 1, 2026
+              </p>
+              <p style={{
+                fontSize: '13px',
+                color: '#666666',
+                margin: '4px 0',
+              }}>
+                Deal Stage: Presentation Scheduled
+              </p>
+              <button
+                style={{
+                  marginTop: '8px',
+                  padding: '4px 0',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  fontSize: '13px',
+                  color: '#666666',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                }}
+              >
+                Add association label
+              </button>
+            </div>
+            <a
+              href="#"
+              style={{
+                fontSize: '13px',
+                color: '#006162',
+                textDecoration: 'none',
+                fontWeight: '500',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              View all associated Deals
+              <ExternalLink size={12} />
+            </a>
           </div>
         )}
       </div>
-        );
-      })()}
 
-      {/* Leads (API: tickets) */}
-      {(() => {
-        const leads = prospect?.tickets ?? [];
-        const leadsCount = leads.length;
-        return (
+      {/* Tickets */}
       <div style={{
         backgroundColor: '#ffffff',
         borderRadius: '10px',
@@ -2545,6 +2551,7 @@ const revenueSections: RevenueSection[] = [
             padding: '14px 20px 0',
             cursor: 'pointer',
             backgroundColor: '#ffffff',
+            
           }}
           onClick={() => toggleSection('tickets')}
         >
@@ -2564,7 +2571,7 @@ const revenueSections: RevenueSection[] = [
               margin: 0,
               lineHeight: '1.2',
             }}>
-              Leads ({leadsCount})
+              Tickets (0)
             </h3>
           </div>
           <button
@@ -2593,50 +2600,22 @@ const revenueSections: RevenueSection[] = [
         </div>
 
         {!collapsedSections.has('tickets') && (
-          <div style={{ padding: '20px' }}>
-            {leadsCount === 0 ? (
-              <div style={{ padding: '32px 20px', textAlign: 'center' }}>
-                <Ticket size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
-                <p style={{ fontSize: '14px', color: '#718096', margin: 0, lineHeight: '1.6' }}>
-                  Track the customer requests associated with this record.
-                </p>
-              </div>
-            ) : (
-              <>
-                {leads.map((lead: any) => (
-                  <div key={lead.id} style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
-                    <span style={{ fontSize: '14px', color: '#006162', fontWeight: '500', display: 'block', marginBottom: '8px' }}>
-                      {lead.name}
-                    </span>
-                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Company: {lead.company_name ?? '--'}</p>
-                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Status: {lead.status ?? '--'}</p>
-                    {(lead.deals?.length ?? 0) > 0 && (
-                      <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Deals: {lead.deals.length}</p>
-                    )}
-                  </div>
-                ))}
-                <a
-                  href="#"
-                  style={{
-                    fontSize: '13px',
-                    color: '#006162',
-                    textDecoration: 'none',
-                    fontWeight: '500',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  View all associated Leads
-                  <ExternalLink size={12} />
-                </a>
-              </>
-            )}
+          <div style={{
+            padding: '32px 20px',
+            textAlign: 'center',
+          }}>
+            <Ticket size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+            <p style={{
+              fontSize: '14px',
+              color: '#718096',
+              margin: 0,
+              lineHeight: '1.6',
+            }}>
+              Track the customer requests associated with this record.
+            </p>
           </div>
         )}
       </div>
-        );
-      })()}
 
       {/* Attachments */}
       <div style={{
@@ -2730,65 +2709,6 @@ const revenueSections: RevenueSection[] = [
   // MAIN RENDER
   // ============================================================================
 
-  if (prospectLoading) {
-    return (
-      <Layout>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: 'calc(100vh - 120px)',
-          flexDirection: 'column',
-          gap: '12px',
-        }}>
-          <RefreshCw size={32} style={{ color: '#006162', animation: 'spin 1s linear infinite' }} />
-          <p style={{ fontSize: '14px', color: '#718096' }}>Loading prospect...</p>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (prospectError || (!prospectId && !prospect)) {
-    return (
-      <Layout>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: 'calc(100vh - 120px)',
-          flexDirection: 'column',
-          gap: '12px',
-          padding: '24px',
-        }}>
-          <AlertCircle size={48} style={{ color: '#e53e3e' }} />
-          <p style={{ fontSize: '16px', color: '#141414', fontWeight: 500 }}>
-            {prospectError || 'No prospect selected'}
-          </p>
-          <button
-            onClick={() => router.push('/crm/data')}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#006162',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            Back to prospects
-          </button>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!prospect) {
-    return null;
-  }
-
   return (
     <>
       <style>
@@ -2859,8 +2779,8 @@ const revenueSections: RevenueSection[] = [
   );
 };
 
-ContactRecordPage.getLayout = (page: ReactElement) => {
+DealRecordPage.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default ContactRecordPage;
+export default DealRecordPage;

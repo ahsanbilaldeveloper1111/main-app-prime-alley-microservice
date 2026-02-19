@@ -106,24 +106,19 @@ export const getDashboard = async (): Promise<DashboardData> => {
 
 // --- Audit Logs ---
 
-export interface AuditLogParams {
-  page?: number;
-  limit?: number;
-  sort_field?: string;
-  sort_direction?: "asc" | "desc";
-}
 
-export const getAuditLogs = async (
-  params: AuditLogParams = {}
-): Promise<{ data: unknown[]; pagination?: ApiPagination }> => {
+
+export const AuditLogsStaffManagement = async (
+  params: Record<string, unknown> = {}
+): Promise<{ data: unknown[]; pagination?: ApiPagination } | unknown[] | null> => {
   try {
     const response = await axiosInstance.get<ApiResponse<unknown[]>>(
       `${PREFIX}/audit-logs`,
-      { params: { sort_field: "created_at", sort_direction: "desc", ...params } }
+      { params }
     );
-    return extractDataWithPagination(response);
+   return response.data ?? response;
   } catch (error: unknown) {
-    handleApiError(error, "Failed to fetch audit logs");
+    throw error;
   }
 };
 
