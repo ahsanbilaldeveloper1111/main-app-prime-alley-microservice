@@ -1,6 +1,13 @@
-import React, { useState } from 'react';
-import { X, Plus, Trash2, Calendar, ChevronDown, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { Dropdown, Form } from 'react-bootstrap';
+import { getDeal, updateDeal, createDeal, getStages, getBusinessTypes, getIndustries } from '@utils/crm';
+import { GetHierarchyData } from "@utils/users";
+import { ModuleSlug } from '@utils/Helper';
+import { toast } from 'react-toastify';
+import PhoneInput, { parsePhoneNumber as parsePhoneNumberLib } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
+import Select from 'react-select';
 
 // ─── Type Definitions ─────────────────────────────────────────────────────────
 interface LineItem {
@@ -10,14 +17,43 @@ interface LineItem {
 }
 
 interface DealFormData {
+  // Deal Information (matching Edit modal)
+  name: string;
+  stage_id: number | undefined;
+  expected_close_date: string;
+  assigned_to: string | null;
+  currency: string;
+  follow_up_date: string;
+  // Company Information
+  company_name: string;
+  business_type_id: number | null;
+  business_type_other: string;
+  decision_maker_title: string;
+  decision_maker_name: string;
+  decision_maker_phone_country_code: string;
+  decision_maker_phone: string;
+  decision_maker_email: string;
+  industry_ids: number[];
+  // Deal Characteristics (template fields)
+  deal_type: string;
+  contract_length: string;
+  contract_length_custom: string;
+  billing_model: string;
+  payment_terms: string;
+  payment_terms_custom: string;
+  risk_level: string;
+  competitors: string;
+  // Progress & Notes
+  quotation_sent: boolean;
+  contract_sent: boolean;
+  contract_received: boolean;
+  // Legacy fields (keeping for backward compatibility)
   dealName: string;
   pipeline: string;
   dealStage: string;
   amount: string;
-  currency: string;
   closeDate: string;
   dealOwner: string;
-  dealType: string;
   priority: string;
   closedLostReason: string;
   closedWonReason: string;
@@ -49,18 +85,49 @@ interface SimpleDropdownProps {
 
 interface CreateDealSidebarProps {
   onClose: () => void;
+  dealId?: number | null;
+  onSuccess?: () => void;
 }
 
 // ─── Initial State ────────────────────────────────────────────────────────────
 const initialDealForm: DealFormData = {
+  // Deal Information
+  name: '',
+  stage_id: undefined,
+  expected_close_date: '',
+  assigned_to: null,
+  currency: 'AED',
+  follow_up_date: '',
+  // Company Information
+  company_name: '',
+  business_type_id: null,
+  business_type_other: '',
+  decision_maker_title: '',
+  decision_maker_name: '',
+  decision_maker_phone_country_code: '',
+  decision_maker_phone: '',
+  decision_maker_email: '',
+  industry_ids: [],
+  // Deal Characteristics
+  deal_type: '',
+  contract_length: '',
+  contract_length_custom: '',
+  billing_model: '',
+  payment_terms: '',
+  payment_terms_custom: '',
+  risk_level: '',
+  competitors: '',
+  // Progress & Notes
+  quotation_sent: false,
+  contract_sent: false,
+  contract_received: false,
+  // Legacy fields
   dealName: '',
   pipeline: 'Deals pipeline',
-  dealStage: 'Appointment Scheduled',
+  dealStage: '',
   amount: '',
-  currency: 'US Dollar (USD) $',
-  closeDate: '2026-02-28',
-  dealOwner: 'Rizwan Haider',
-  dealType: '',
+  closeDate: '',
+  dealOwner: '',
   priority: '',
   closedLostReason: '',
   closedWonReason: '',
@@ -73,14 +140,12 @@ const initialDealForm: DealFormData = {
   nextStep: '',
   sharedTeams: '',
   sharedUsers: 'No user',
-  // Associations
   contactAssociateRecord: '',
   contactAssociationLabel: 'No label',
   addTimelineContact: false,
   companyAssociateRecord: '',
   companyAssociationLabel: 'Primary',
   addTimelineCompany: false,
-  // Line items
   lineItems: [],
 };
 
@@ -189,20 +254,120 @@ export default renderCreateDeal;
 
 // ─── Sidebar component (self-contained for easy integration) ──────────────────
 
-export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose }) => {
+export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, dealId, onSuccess }) => {
+  const isEditMode = !!dealId;
   const [dealForm, setDealForm] = useState(initialDealForm);
   const [lineItemInput, setLineItemInput] = useState<string>('');
   const [lineItemQty, setLineItemQty] = useState<number>(0);
   const [isContactsExpanded, setIsContactsExpanded] = useState(true);
   const [isCompaniesExpanded, setIsCompaniesExpanded] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(isEditMode);
+  const [stages, setStages] = useState<any[]>([]);
+  const [extensions, setExtensions] = useState<any[]>([]);
+  const [businessTypes, setBusinessTypes] = useState<any[]>([]);
+  const [allIndustries, setAllIndustries] = useState<any[]>([]);
+  const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
 
   const set = (key: keyof DealFormData) => (val: any) => setDealForm((prev) => ({ ...prev, [key]: val }));
   const setE = (key: keyof DealFormData) => (e: React.ChangeEvent<HTMLInputElement>) => setDealForm((prev) => ({ ...prev, [key]: e.target.value }));
 
+  // Fetch stages, extensions, business types, and industries
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        const [stagesData, hierarchyData, businessTypesResponse, industriesResponse] = await Promise.all([
+          getStages('deal'),
+          GetHierarchyData(ModuleSlug.CRM_DEALS),
+          getBusinessTypes({ per_page: 1000 }),
+          getIndustries({ per_page: 1000 }),
+        ]);
+        setStages(stagesData || []);
+        if (hierarchyData?.extensions) {
+          setExtensions(hierarchyData.extensions);
+        }
+        setBusinessTypes(businessTypesResponse?.data || []);
+        setAllIndustries(industriesResponse?.data || []);
+      } catch (error) {
+        console.error("Failed to fetch initial data:", error);
+      }
+    };
+    fetchInitialData();
+  }, []);
+
+  // Fetch deal data when in edit mode
+  useEffect(() => {
+    if (isEditMode && dealId) {
+      const fetchDealData = async () => {
+        setFetching(true);
+        try {
+          const deal = await getDeal(dealId);
+          const formatDate = (dateString: string | null) => {
+            if (!dateString) return "";
+            return dateString.split('T')[0];
+          };
+          
+          const dealAny = deal as any;
+          setDealForm({
+            ...initialDealForm,
+            name: deal.name || "",
+            stage_id: deal.stage_id ? Number(deal.stage_id) : undefined,
+            assigned_to: deal.assigned_to || null,
+            expected_close_date: formatDate(deal.expected_close_date),
+            company_name: deal.company_name || "",
+            industry_ids: dealAny.industry_ids && Array.isArray(dealAny.industry_ids) 
+              ? dealAny.industry_ids.map((id: any) => Number(id)).filter((id: number) => !Number.isNaN(id))
+              : dealAny.industries && Array.isArray(dealAny.industries)
+              ? dealAny.industries.map((ind: any) => typeof ind === 'object' ? Number(ind.id) : Number(ind)).filter((id: number) => !Number.isNaN(id))
+              : [],
+            decision_maker_title: deal.decision_maker_title || "",
+            decision_maker_name: deal.decision_maker_name || dealAny.main_decision_maker?.name || "",
+            decision_maker_phone_country_code: deal.decision_maker_phone_country_code || dealAny.main_decision_maker?.phone_country_code || "",
+            decision_maker_phone: deal.decision_maker_phone || dealAny.main_decision_maker?.phone || "",
+            decision_maker_email: deal.decision_maker_email || dealAny.main_decision_maker?.email || "",
+            deal_type: deal.deal_type || "",
+            contract_length: deal.contract_length || "",
+            contract_length_custom: deal.contract_length_custom || "",
+            billing_model: deal.billing_model || "",
+            payment_terms: deal.payment_terms || "",
+            payment_terms_custom: deal.payment_terms_custom || "",
+            risk_level: deal.risk_level || "",
+            competitors: deal.competitors || "",
+            quotation_sent: deal.quotation_sent || false,
+            contract_sent: deal.contract_sent || false,
+            contract_received: deal.contract_received || false,
+            follow_up_date: formatDate(deal.follow_up_date),
+            currency: deal.currency || "AED",
+          });
+          
+          // Set business type
+          if (dealAny.business_type_id) {
+            setDealForm(prev => ({ ...prev, business_type_id: Number(dealAny.business_type_id) }));
+            setShowOtherBusinessType(false);
+          } else if (dealAny.business_type_other) {
+            setDealForm(prev => ({ ...prev, business_type_other: dealAny.business_type_other }));
+            setShowOtherBusinessType(true);
+          }
+        } catch (error) {
+          console.error("Failed to fetch deal:", error);
+          toast.error("Failed to load deal data");
+        } finally {
+          setFetching(false);
+        }
+      };
+      fetchDealData();
+    }
+  }, [dealId, isEditMode]);
+
   const isFormValid =
-    dealForm.dealName.trim() !== '' &&
-    dealForm.pipeline !== '' &&
-    dealForm.dealStage !== '';
+    dealForm.name.trim() !== '' &&
+    dealForm.stage_id !== undefined &&
+    dealForm.expected_close_date !== '' &&
+    dealForm.assigned_to !== null &&
+    dealForm.company_name.trim() !== '' &&
+    dealForm.decision_maker_name.trim() !== '' &&
+    dealForm.decision_maker_email.trim() !== '' &&
+    dealForm.decision_maker_phone.trim() !== '';
 
   // Line items
   const addLineItem = () => {
@@ -269,7 +434,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose })
           }}
         >
           <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#141414', margin: 0 }}>
-            Create Deal
+            {isEditMode ? 'Edit Deal' : 'Create Deal'}
           </h2>
           <button
             onClick={onClose}
@@ -289,280 +454,419 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose })
 
         {/* ── Content ── */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 40px 40px' }}>
+          {fetching ? (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <p>Loading deal data...</p>
+            </div>
+          ) : (
+            <>
+              {/* Deal Information Section */}
+              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', marginBottom: '16px', marginTop: 0 }}>
+                DEAL INFORMATION
+              </h3>
 
-          {/* Edit this form link */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-            <a
-              href="#"
-              style={{ fontSize: '13px', color: '#0091ae', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
-              onClick={(e) => e.preventDefault()}
-            >
-              Edit this form ↗
-            </a>
-          </div>
+              {/* Deal name */}
+              <div style={fieldWrap}>
+                {fieldLabel('Deal Name', true)}
+                <input
+                  type="text"
+                  data-test-id="dealname-input"
+                  value={dealForm.name}
+                  onChange={setE('name')}
+                  style={inputStyle}
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
+                  placeholder="Enter deal name"
+                />
+              </div>
 
-          {/* Deal name */}
-          <div style={fieldWrap}>
-            {fieldLabel('Deal name', true)}
-            <input
-              type="text"
-              data-test-id="dealname-input"
-              value={dealForm.dealName}
-              onChange={setE('dealName')}
-              style={inputStyle}
-              onFocus={focusStyle}
-              onBlur={blurStyle}
-            />
-          </div>
+              {/* Stage */}
+              <div style={fieldWrap}>
+                {fieldLabel('Stage', true)}
+                <Form.Select
+                  value={dealForm.stage_id || ''}
+                  onChange={(e) => setDealForm((prev) => ({ ...prev, stage_id: e.target.value ? Number(e.target.value) : undefined }))}
+                  style={inputStyle}
+                >
+                  <option value="">Select Stage</option>
+                  {stages.map((stage) => (
+                    <option key={stage.id} value={stage.id}>
+                      {stage.name}
+                    </option>
+                  ))}
+                </Form.Select>
+              </div>
 
-          {/* Pipeline */}
-          <div style={fieldWrap}>
-            {fieldLabel('Pipeline', true)}
-            <SimpleDropdown
-              value={dealForm.pipeline}
-              options={PIPELINE_OPTIONS}
-              onChange={set('pipeline')}
-              testId="pipeline-input"
-            />
-          </div>
+              {/* Expected Close Date */}
+              <div style={fieldWrap}>
+                {fieldLabel('Expected Close Date', true)}
+                <input
+                  type="date"
+                  data-test-id="expectedclosedate-input"
+                  value={dealForm.expected_close_date}
+                  onChange={setE('expected_close_date')}
+                  style={inputStyle}
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
+                />
+              </div>
 
-          {/* Deal stage */}
-          <div style={fieldWrap}>
-            {fieldLabel('Deal stage', true)}
-            <SimpleDropdown
-              value={dealForm.dealStage}
-              options={DEAL_STAGE_OPTIONS}
-              onChange={set('dealStage')}
-              testId="dealstage-input"
-            />
-          </div>
+              {/* Assigned to */}
+              <div style={fieldWrap}>
+                {fieldLabel('Assigned to', true)}
+                <Form.Select
+                  value={dealForm.assigned_to || ''}
+                  onChange={(e) => setDealForm((prev) => ({ ...prev, assigned_to: e.target.value || null }))}
+                  style={inputStyle}
+                >
+                  <option value="">Select User</option>
+                  {extensions.map((ext: any) => (
+                    <option key={ext.id || ext.extension} value={ext.id || ext.extension}>
+                      {ext.display_name || ext.name || ext.id}
+                    </option>
+                  ))}
+                </Form.Select>
+              </div>
 
-          {/* Amount */}
-          <div style={fieldWrap}>
-            {fieldLabel('Amount')}
-            <input
-              type="number"
-              data-test-id="amount-input"
-              value={dealForm.amount}
-              onChange={setE('amount')}
-              style={inputStyle}
-              onFocus={focusStyle}
-              onBlur={blurStyle}
-            />
-          </div>
+              {/* Currency */}
+              <div style={fieldWrap}>
+                {fieldLabel('Currency', true)}
+                <Form.Select
+                  value={dealForm.currency}
+                  onChange={(e) => setDealForm((prev) => ({ ...prev, currency: e.target.value }))}
+                  style={inputStyle}
+                >
+                  <option value="AED">AED</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                </Form.Select>
+              </div>
 
-          {/* Currency */}
-          <div style={fieldWrap}>
-            {fieldLabel('Currency')}
-            <SimpleDropdown
-              value={dealForm.currency}
-              options={CURRENCY_OPTIONS}
-              onChange={set('currency')}
-              testId="currency-input"
-            />
-          </div>
+              {/* Follow-up Date */}
+              <div style={fieldWrap}>
+                {fieldLabel('Follow-up Date')}
+                <input
+                  type="date"
+                  data-test-id="followupdate-input"
+                  value={dealForm.follow_up_date}
+                  onChange={setE('follow_up_date')}
+                  style={inputStyle}
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
+                />
+              </div>
 
-          {/* Close date */}
-          <div style={fieldWrap}>
-            {fieldLabel('Close date')}
-            <input
-              type="date"
-              data-test-id="closedate-input"
-              value={dealForm.closeDate}
-              onChange={setE('closeDate')}
-              style={inputStyle}
-              onFocus={focusStyle}
-              onBlur={blurStyle}
-            />
-          </div>
+              {/* Company Information Section */}
+              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', marginBottom: '16px', marginTop: '32px' }}>
+                COMPANY INFORMATION
+              </h3>
 
-          {/* Deal owner */}
-          <div style={fieldWrap}>
-            {fieldLabel('Deal owner')}
-            <SimpleDropdown
-              value={dealForm.dealOwner}
-              options={DEAL_OWNER_OPTIONS}
-              onChange={set('dealOwner')}
-              testId="dealowner-input"
-            />
-          </div>
+              {/* Company Name */}
+              <div style={fieldWrap}>
+                {fieldLabel('Company Name', true)}
+                <input
+                  type="text"
+                  data-test-id="companyname-input"
+                  value={dealForm.company_name}
+                  onChange={setE('company_name')}
+                  style={inputStyle}
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
+                  placeholder="Enter company name"
+                />
+              </div>
 
-          {/* Deal type */}
-          <div style={fieldWrap}>
-            {fieldLabel('Deal type')}
-            <SimpleDropdown
-              value={dealForm.dealType}
-              options={DEAL_TYPE_OPTIONS}
-              onChange={set('dealType')}
-              placeholder="Select..."
-              testId="dealtype-input"
-            />
-          </div>
+              {/* Business Type */}
+              <div style={fieldWrap}>
+                {fieldLabel('Select Business Type', true)}
+                <Form.Select
+                  value={showOtherBusinessType ? "other" : (dealForm.business_type_id ? String(dealForm.business_type_id) : "")}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === "other") {
+                      setShowOtherBusinessType(true);
+                      setDealForm((prev) => ({ ...prev, business_type_id: null, business_type_other: "" }));
+                    } else if (value) {
+                      setShowOtherBusinessType(false);
+                      setDealForm((prev) => ({ ...prev, business_type_id: Number(value), business_type_other: "" }));
+                    } else {
+                      setShowOtherBusinessType(false);
+                      setDealForm((prev) => ({ ...prev, business_type_id: null, business_type_other: "" }));
+                    }
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="">Select Business Type</option>
+                  {businessTypes.map((businessType) => (
+                    <option key={businessType.id} value={businessType.id}>
+                      {businessType.name}
+                    </option>
+                  ))}
+                  <option value="other">Other</option>
+                </Form.Select>
+              </div>
 
-          {/* Priority */}
-          <div style={fieldWrap}>
-            {fieldLabel('Priority')}
-            <SimpleDropdown
-              value={dealForm.priority}
-              options={PRIORITY_OPTIONS}
-              onChange={set('priority')}
-              placeholder="Select..."
-              testId="priority-input"
-            />
-          </div>
+              {showOtherBusinessType && (
+                <div style={fieldWrap}>
+                  {fieldLabel('Business Type (Other)', true)}
+                  <input
+                    type="text"
+                    value={dealForm.business_type_other}
+                    onChange={setE('business_type_other')}
+                    style={inputStyle}
+                    onFocus={focusStyle}
+                    onBlur={blurStyle}
+                    placeholder="Enter business type"
+                  />
+                </div>
+              )}
 
-          {/* Closed lost reason */}
-          <div style={fieldWrap}>
-            {fieldLabel('Closed lost reason')}
-            <input
-              type="text"
-              data-test-id="closedlostreason-input"
-              value={dealForm.closedLostReason}
-              onChange={setE('closedLostReason')}
-              style={inputStyle}
-              onFocus={focusStyle}
-              onBlur={blurStyle}
-            />
-          </div>
+              {/* Decision Maker Title */}
+              <div style={fieldWrap}>
+                {fieldLabel('Decision Maker Title')}
+                <Form.Select
+                  value={dealForm.decision_maker_title}
+                  onChange={(e) => setDealForm((prev) => ({ ...prev, decision_maker_title: e.target.value }))}
+                  style={inputStyle}
+                >
+                  <option value="">Select Title</option>
+                  <option value="Mr.">Mr.</option>
+                  <option value="Mrs.">Mrs.</option>
+                  <option value="Ms.">Ms.</option>
+                  <option value="Dr.">Dr.</option>
+                </Form.Select>
+              </div>
 
-          {/* Closed won reason */}
-          <div style={fieldWrap}>
-            {fieldLabel('Closed won reason')}
-            <input
-              type="text"
-              data-test-id="closedwonreason-input"
-              value={dealForm.closedWonReason}
-              onChange={setE('closedWonReason')}
-              style={inputStyle}
-              onFocus={focusStyle}
-              onBlur={blurStyle}
-            />
-          </div>
+              {/* Decision Maker Name */}
+              <div style={fieldWrap}>
+                {fieldLabel('Decision Maker Name', true)}
+                <input
+                  type="text"
+                  data-test-id="decisionmakername-input"
+                  value={dealForm.decision_maker_name}
+                  onChange={setE('decision_maker_name')}
+                  style={inputStyle}
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
+                  placeholder="Decision maker name"
+                />
+              </div>
 
-          {/* Create date */}
-          <div style={fieldWrap}>
-            {fieldLabel('Create date')}
-            <input
-              type="date"
-              data-test-id="createdate-input"
-              value={dealForm.createDate}
-              onChange={setE('createDate')}
-              style={inputStyle}
-              onFocus={focusStyle}
-              onBlur={blurStyle}
-            />
-          </div>
+              {/* Decision Maker Email */}
+              <div style={fieldWrap}>
+                {fieldLabel('Decision Maker Email', true)}
+                <input
+                  type="email"
+                  data-test-id="decisionmakeremail-input"
+                  value={dealForm.decision_maker_email}
+                  onChange={setE('decision_maker_email')}
+                  style={inputStyle}
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
+                  placeholder="decisionmaker@company.com"
+                />
+              </div>
 
-          {/* Deal Collaborator */}
-          <div style={fieldWrap}>
-            {fieldLabel('Deal Collaborator')}
-            <SimpleDropdown
-              value={dealForm.dealCollaborator}
-              options={COLLABORATOR_OPTIONS}
-              onChange={set('dealCollaborator')}
-              testId="dealcollaborator-input"
-            />
-          </div>
+              {/* Decision Maker Phone */}
+              <div style={fieldWrap}>
+                {fieldLabel('Decision Maker Phone', true)}
+                <PhoneInput
+                  international
+                  defaultCountry="US"
+                  value={dealForm.decision_maker_phone_country_code && dealForm.decision_maker_phone 
+                    ? `${dealForm.decision_maker_phone_country_code}${dealForm.decision_maker_phone}` 
+                    : dealForm.decision_maker_phone || undefined}
+                  onChange={(value) => {
+                    if (value) {
+                      try {
+                        const phoneNumber = parsePhoneNumberLib(value);
+                        if (phoneNumber) {
+                          setDealForm(prev => ({
+                            ...prev,
+                            decision_maker_phone_country_code: `+${phoneNumber.countryCallingCode}`,
+                            decision_maker_phone: phoneNumber.nationalNumber,
+                          }));
+                        } else {
+                          setDealForm(prev => ({
+                            ...prev,
+                            decision_maker_phone_country_code: "",
+                            decision_maker_phone: value,
+                          }));
+                        }
+                      } catch (error) {
+                        setDealForm(prev => ({
+                          ...prev,
+                          decision_maker_phone_country_code: "",
+                          decision_maker_phone: value,
+                        }));
+                      }
+                    } else {
+                      setDealForm(prev => ({
+                        ...prev,
+                        decision_maker_phone_country_code: "",
+                        decision_maker_phone: "",
+                      }));
+                    }
+                  }}
+                  placeholder="Enter phone number"
+                />
+              </div>
 
-          {/* Deal Description */}
-          <div style={fieldWrap}>
-            {fieldLabel('Deal Description')}
-            <input
-              type="text"
-              data-test-id="dealdescription-input"
-              value={dealForm.dealDescription}
-              onChange={setE('dealDescription')}
-              style={inputStyle}
-              onFocus={focusStyle}
-              onBlur={blurStyle}
-            />
-          </div>
+              {/* Industries */}
+              <div style={fieldWrap}>
+                {fieldLabel('Industries')}
+                <Select
+                  isMulti
+                  value={allIndustries
+                    .filter((ind) => dealForm.industry_ids.includes(ind.id))
+                    .map((ind) => ({ value: ind.id, label: ind.name }))}
+                  onChange={(selected) => {
+                    setDealForm((prev) => ({
+                      ...prev,
+                      industry_ids: selected ? selected.map((s) => s.value) : [],
+                    }));
+                  }}
+                  options={allIndustries.map((ind) => ({
+                    value: ind.id,
+                    label: ind.name,
+                  }))}
+                  placeholder="Select industries..."
+                  isSearchable
+                />
+              </div>
 
-          {/* Deal probability */}
-          <div style={fieldWrap}>
-            {fieldLabel('Deal probability')}
-            <input
-              type="number"
-              data-test-id="dealprobability-input"
-              value={dealForm.dealProbability}
-              onChange={setE('dealProbability')}
-              style={inputStyle}
-              onFocus={focusStyle}
-              onBlur={blurStyle}
-            />
-          </div>
+              {/* Deal Characteristics Section */}
+              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', marginBottom: '16px', marginTop: '32px' }}>
+                DEAL CHARACTERISTICS
+              </h3>
 
-          {/* Forecast category */}
-          <div style={fieldWrap}>
-            {fieldLabel('Forecast category')}
-            <SimpleDropdown
-              value={dealForm.forecastCategory}
-              options={FORECAST_CATEGORY_OPTIONS}
-              onChange={set('forecastCategory')}
-              placeholder="Select..."
-              testId="forecastcategory-input"
-            />
-          </div>
+              {/* Deal Type */}
+              <div style={fieldWrap}>
+                {fieldLabel('Deal Type')}
+                <input
+                  type="text"
+                  data-test-id="dealtype-input"
+                  value={dealForm.deal_type}
+                  onChange={setE('deal_type')}
+                  style={inputStyle}
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
+                  placeholder="Enter deal type"
+                />
+              </div>
 
-          {/* Forecast probability */}
-          <div style={fieldWrap}>
-            {fieldLabel('Forecast probability')}
-            <input
-              type="number"
-              data-test-id="forecastprobability-input"
-              value={dealForm.forecastProbability}
-              onChange={setE('forecastProbability')}
-              style={inputStyle}
-              onFocus={focusStyle}
-              onBlur={blurStyle}
-            />
-          </div>
+              {/* Contract Length */}
+              <div style={fieldWrap}>
+                {fieldLabel('Contract Length')}
+                <Form.Select
+                  value={dealForm.contract_length}
+                  onChange={(e) => setDealForm((prev) => ({ ...prev, contract_length: e.target.value }))}
+                  style={inputStyle}
+                >
+                  <option value="">Select Contract Length</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="yearly">Yearly</option>
+                  <option value="custom">Custom</option>
+                </Form.Select>
+              </div>
 
-          {/* Next step */}
-          <div style={fieldWrap}>
-            {fieldLabel('Next step')}
-            <input
-              type="text"
-              data-test-id="nextstep-input"
-              value={dealForm.nextStep}
-              onChange={setE('nextStep')}
-              style={inputStyle}
-              onFocus={focusStyle}
-              onBlur={blurStyle}
-            />
-          </div>
+              {dealForm.contract_length === 'custom' && (
+                <div style={fieldWrap}>
+                  {fieldLabel('Contract Length (Custom)')}
+                  <input
+                    type="text"
+                    value={dealForm.contract_length_custom}
+                    onChange={setE('contract_length_custom')}
+                    style={inputStyle}
+                    onFocus={focusStyle}
+                    onBlur={blurStyle}
+                    placeholder="Enter custom contract length"
+                  />
+                </div>
+              )}
 
-          {/* Shared teams */}
-          <div style={fieldWrap}>
-            {fieldLabel('Shared teams')}
-            <SimpleDropdown
-              value={dealForm.sharedTeams}
-              options={SHARED_TEAMS_OPTIONS}
-              onChange={set('sharedTeams')}
-              placeholder="Select..."
-              testId="sharedteams-input"
-            />
-          </div>
+              {/* Billing Model */}
+              <div style={fieldWrap}>
+                {fieldLabel('Billing Model')}
+                <input
+                  type="text"
+                  value={dealForm.billing_model}
+                  onChange={setE('billing_model')}
+                  style={inputStyle}
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
+                  placeholder="Enter billing model"
+                />
+              </div>
 
-          {/* Shared users */}
-          <div style={fieldWrap}>
-            {fieldLabel('Shared users')}
-            <SimpleDropdown
-              value={dealForm.sharedUsers}
-              options={SHARED_USERS_OPTIONS}
-              onChange={set('sharedUsers')}
-              testId="sharedusers-input"
-            />
-          </div>
+              {/* Payment Terms */}
+              <div style={fieldWrap}>
+                {fieldLabel('Payment Terms')}
+                <Form.Select
+                  value={dealForm.payment_terms}
+                  onChange={(e) => setDealForm((prev) => ({ ...prev, payment_terms: e.target.value }))}
+                  style={inputStyle}
+                >
+                  <option value="">Select Payment Terms</option>
+                  <option value="net_15">Net 15</option>
+                  <option value="net_30">Net 30</option>
+                  <option value="net_60">Net 60</option>
+                  <option value="custom">Custom</option>
+                </Form.Select>
+              </div>
 
-          {/* ── Associate Deal with ── */}
-          <div style={{ marginTop: '28px' }}>
+              {dealForm.payment_terms === 'custom' && (
+                <div style={fieldWrap}>
+                  {fieldLabel('Payment Terms (Custom)')}
+                  <input
+                    type="text"
+                    value={dealForm.payment_terms_custom}
+                    onChange={setE('payment_terms_custom')}
+                    style={inputStyle}
+                    onFocus={focusStyle}
+                    onBlur={blurStyle}
+                    placeholder="Enter custom payment terms"
+                  />
+                </div>
+              )}
+
+              {/* Risk Level */}
+              <div style={fieldWrap}>
+                {fieldLabel('Risk Level')}
+                <input
+                  type="text"
+                  value={dealForm.risk_level}
+                  onChange={setE('risk_level')}
+                  style={inputStyle}
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
+                  placeholder="Enter risk level"
+                />
+              </div>
+
+              {/* Competitors */}
+              <div style={fieldWrap}>
+                {fieldLabel('Competitors')}
+                <input
+                  type="text"
+                  value={dealForm.competitors}
+                  onChange={setE('competitors')}
+                  style={inputStyle}
+                  onFocus={focusStyle}
+                  onBlur={blurStyle}
+                  placeholder="Enter competitors"
+                />
+              </div>
+
+              <div style={{ marginTop: '28px' }}>
             <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#141414', marginBottom: '16px', marginTop: 0 }}>
               Associate Deal with
             </h3>
 
             {/* Contacts section */}
-            <div
+            {!isEditMode && <div
               style={{
                 border: '1px solid #cccccc',
                 borderRadius: '6px',
@@ -655,7 +959,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose })
                   </button>
                 </div>
               )}
-            </div>
+            </div>}
 
             {/* Companies section */}
             <div
@@ -764,97 +1068,43 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose })
             </div>
           </div>
 
-          {/* ── Add line item ── */}
-          <div style={{ marginTop: '28px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: '#141414' }}>Add line item</span>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: '#141414' }}>Quantity</span>
-            </div>
+              {/* Progress & Notes Section */}
+              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', marginBottom: '16px', marginTop: '32px' }}>
+                NEGOTIATION PROGRESS
+              </h3>
 
-            {/* Existing line items */}
-            {dealForm.lineItems.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  marginBottom: '8px',
-                }}
-              >
-                <div style={{ flex: 1, padding: '10px 12px', border: '1px solid #eaf0f6', borderRadius: '4px', fontSize: '14px', color: '#141414', backgroundColor: '#f7fafc' }}>
-                  {item.name}
-                </div>
-                <input
-                  type="number"
-                  value={item.quantity}
-                  onChange={(e) =>
-                    setDealForm((prev) => ({
-                      ...prev,
-                      lineItems: prev.lineItems.map((li) =>
-                        li.id === item.id ? { ...li, quantity: Number(e.target.value) } : li
-                      ),
-                    }))
-                  }
-                  style={{ ...inputStyle, width: '70px' }}
+              {/* Quotation Sent */}
+              <div style={fieldWrap}>
+                <Form.Check
+                  type="checkbox"
+                  label="Quotation Sent"
+                  checked={dealForm.quotation_sent}
+                  onChange={(e) => setDealForm((prev) => ({ ...prev, quotation_sent: e.target.checked }))}
                 />
-                <button
-                  onClick={() => removeLineItem(item.id)}
-                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#f2545b', display: 'flex', alignItems: 'center' }}
-                >
-                  <Trash2 size={16} />
-                </button>
               </div>
-            ))}
 
-            {/* Add new line item row */}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <div style={{ flex: 1 }}>
-                <Dropdown>
-                  <Dropdown.Toggle
-                    variant="outline-secondary"
-                    data-test-id="lineitem-input"
-                    style={{
-                      ...dropdownToggleStyle(!!lineItemInput),
-                      color: lineItemInput ? '#141414' : '#a0aec0',
-                    }}
-                  >
-                    {lineItemInput || 'Add a line item'}
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu style={{ width: '100%' }}>
-                    {LINE_ITEM_OPTIONS.map((opt) => (
-                      <Dropdown.Item key={opt} onClick={() => setLineItemInput(opt)}>
-                        {opt}
-                      </Dropdown.Item>
-                    ))}
-                  </Dropdown.Menu>
-                </Dropdown>
+              {/* Contract Sent */}
+              <div style={fieldWrap}>
+                <Form.Check
+                  type="checkbox"
+                  label="Contract Sent"
+                  checked={dealForm.contract_sent}
+                  onChange={(e) => setDealForm((prev) => ({ ...prev, contract_sent: e.target.checked }))}
+                />
               </div>
-              <input
-                type="number"
-                value={lineItemQty || ''}
-                placeholder="0"
-                onChange={(e) => setLineItemQty(Number(e.target.value))}
-                style={{ ...inputStyle, width: '70px' }}
-                onFocus={focusStyle}
-                onBlur={blurStyle}
-              />
-              <button
-                onClick={addLineItem}
-                disabled={!lineItemInput}
-                style={{
-                  background: lineItemInput ? '#0091ae' : '#cbd5e0',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '10px',
-                  cursor: lineItemInput ? 'pointer' : 'not-allowed',
-                  color: '#fff',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-          </div>
+
+              {/* Contract Received */}
+              <div style={fieldWrap}>
+                <Form.Check
+                  type="checkbox"
+                  label="Contract Received"
+                  checked={dealForm.contract_received}
+                  onChange={(e) => setDealForm((prev) => ({ ...prev, contract_received: e.target.checked }))}
+                />
+              </div>
+            </>
+          )}
+
         </div>
 
         {/* ── Footer ── */}
@@ -868,46 +1118,101 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose })
           }}
         >
           <button
-            type="submit"
-            disabled={!isFormValid}
+            type="button"
+            disabled={!isFormValid || loading}
+            onClick={async () => {
+              if (!isFormValid) return;
+              setLoading(true);
+              try {
+                const payload: any = {
+                  name: dealForm.name,
+                  stage_id: dealForm.stage_id ? String(dealForm.stage_id) : undefined,
+                  assigned_to: dealForm.assigned_to,
+                  expected_close_date: dealForm.expected_close_date,
+                  company_name: dealForm.company_name,
+                  industry_ids: dealForm.industry_ids,
+                  ...(dealForm.business_type_id ? { business_type_id: String(dealForm.business_type_id) } : {}),
+                  ...(dealForm.business_type_other ? { business_type_other: dealForm.business_type_other } : {}),
+                  decision_maker_title: dealForm.decision_maker_title,
+                  decision_maker_name: dealForm.decision_maker_name,
+                  decision_maker_phone_country_code: dealForm.decision_maker_phone_country_code,
+                  decision_maker_phone: dealForm.decision_maker_phone,
+                  decision_maker_email: dealForm.decision_maker_email,
+                  deal_type: dealForm.deal_type,
+                  contract_length: dealForm.contract_length,
+                  contract_length_custom: dealForm.contract_length_custom || "",
+                  billing_model: dealForm.billing_model,
+                  payment_terms: dealForm.payment_terms,
+                  payment_terms_custom: dealForm.payment_terms_custom || "",
+                  risk_level: dealForm.risk_level,
+                  competitors: dealForm.competitors || "",
+                  quotation_sent: dealForm.quotation_sent,
+                  contract_sent: dealForm.contract_sent,
+                  contract_received: dealForm.contract_received,
+                  follow_up_date: dealForm.follow_up_date || "",
+                  currency: dealForm.currency,
+                };
+                
+                if (isEditMode && dealId) {
+                  await updateDeal(dealId, payload);
+                  // Toast is already shown by updateDeal function
+                } else {
+                  await createDeal(payload);
+                  // Toast is already shown by createDeal function
+                }
+                
+                if (onSuccess) {
+                  onSuccess();
+                }
+                onClose();
+              } catch (error: any) {
+                console.error("Failed to save deal:", error);
+                toast.error(error?.message || "Failed to save deal");
+              } finally {
+                setLoading(false);
+              }
+            }}
             style={{
               padding: '10px 20px',
-              backgroundColor: isFormValid ? '#0091ae' : '#cbd5e0',
+              backgroundColor: isFormValid && !loading ? '#0091ae' : '#cbd5e0',
               color: '#ffffff',
               border: 'none',
               borderRadius: '4px',
               fontSize: '14px',
               fontWeight: '500',
-              cursor: isFormValid ? 'pointer' : 'not-allowed',
+              cursor: isFormValid && !loading ? 'pointer' : 'not-allowed',
             }}
-            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { if (isFormValid) e.currentTarget.style.backgroundColor = '#007a94'; }}
-            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { if (isFormValid) e.currentTarget.style.backgroundColor = '#0091ae'; }}
+            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { if (isFormValid && !loading) e.currentTarget.style.backgroundColor = '#007a94'; }}
+            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { if (isFormValid && !loading) e.currentTarget.style.backgroundColor = '#0091ae'; }}
           >
-            Create
+            {loading ? 'Saving...' : isEditMode ? 'Update Deal' : 'Create'}
           </button>
 
-          <button
-            type="button"
-            disabled={!isFormValid}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: 'transparent',
-              color: isFormValid ? '#141414' : '#a0aec0',
-              border: '1px solid #8a8a8a',
-              borderRadius: '4px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: isFormValid ? 'pointer' : 'not-allowed',
-            }}
-            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { if (isFormValid) e.currentTarget.style.backgroundColor = '#f7fafc'; }}
-            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { if (isFormValid) e.currentTarget.style.backgroundColor = 'transparent'; }}
-          >
-            Create and add another
-          </button>
+          {!isEditMode && (
+            <button
+              type="button"
+              disabled={!isFormValid || loading}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: 'transparent',
+                color: isFormValid && !loading ? '#141414' : '#a0aec0',
+                border: '1px solid #8a8a8a',
+                borderRadius: '4px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: isFormValid && !loading ? 'pointer' : 'not-allowed',
+              }}
+              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { if (isFormValid && !loading) e.currentTarget.style.backgroundColor = '#f7fafc'; }}
+              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { if (isFormValid && !loading) e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              Create and add another
+            </button>
+          )}
 
           <button
             type="button"
             onClick={onClose}
+            disabled={loading}
             style={{
               padding: '10px 20px',
               backgroundColor: 'transparent',
@@ -916,10 +1221,10 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose })
               borderRadius: '4px',
               fontSize: '14px',
               fontWeight: '500',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
             }}
-            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => e.currentTarget.style.backgroundColor = '#f7fafc'}
-            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => e.currentTarget.style.backgroundColor = 'transparent'}
+            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { if (!loading) e.currentTarget.style.backgroundColor = '#f7fafc'; }}
+            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { if (!loading) e.currentTarget.style.backgroundColor = 'transparent'; }}
           >
             Cancel
           </button>

@@ -2454,7 +2454,7 @@ const handleCloseEditModal = useCallback(() => {
           {
             label: 'View',
             icon: <Eye size={16} />,
-            onClick: (row: any) => handleViewDeal(row.rawData?.id || row.id),
+            onClick: (row: any) => handlePreviewClick(row),
             variant: 'link' as const
           },
           {
@@ -2471,7 +2471,7 @@ const handleCloseEditModal = useCallback(() => {
         {
           label: 'View',
           icon: <Eye size={16} />,
-          onClick: (row: any) => handleViewDeal(row.rawData?.id || row.id),
+          onClick: (row: any) => handlePreviewClick(row),
           variant: 'link' as const
         },
         ...(session?.user?.permissions?.includes('edit-crm-deals') ? [{
@@ -2547,7 +2547,7 @@ const handleCloseEditModal = useCallback(() => {
         }] : [])
       ];
     },
-    [session, activeFilter, handleViewDeal, handleRestoreDeal, handleDeleteDeal, handleMarkLost, handleApproveDeal, handleRejectDeal]
+    [session, activeFilter, handlePreviewClick, handleViewDeal, handleRestoreDeal, handleDeleteDeal, handleMarkLost, handleApproveDeal, handleRejectDeal]
   );
  
   if (!session?.user?.permissions?.includes('list-crm-deals')) {

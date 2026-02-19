@@ -1894,7 +1894,7 @@ const CrmOrders = () => {
           {
             label: 'View',
             icon: <Eye size={16} />,
-            onClick: (row: any) => handleViewOrder(row.rawData?.id || row.id),
+            onClick: (row: any) => handlePreviewClick(row),
             variant: 'link' as const
           },
           {
@@ -1911,7 +1911,7 @@ const CrmOrders = () => {
         {
           label: 'View',
           icon: <Eye size={16} />,
-          onClick: (row: any) => handleViewOrder(row.rawData?.id || row.id),
+          onClick: (row: any) => handlePreviewClick(row),
           variant: 'link' as const
         },
       
@@ -1993,7 +1993,7 @@ const CrmOrders = () => {
       ];
       
     },
-    [session, activeFilter, handleViewOrder, handleRestoreOrder, handleDeleteOrder, handleMarkLost, fetchOrderDetails]
+    [session, activeFilter, handlePreviewClick, handleViewOrder, handleRestoreOrder, handleDeleteOrder, handleMarkLost, fetchOrderDetails]
   );
 
   if (!session?.user?.permissions?.includes("list-crm-orders")) {
