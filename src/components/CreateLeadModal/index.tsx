@@ -37,6 +37,8 @@ import { useRouter } from "next/router";
 
 import {
   createLead,
+  getLead,
+  updateLead,
   getStages,
   StageData,
   getCampaigns,
@@ -64,6 +66,8 @@ interface CreateLeadModalProps {
   onSuccess?: () => void;
   type?: "lead" | "opportunity";
   crmDataId?: number;
+  /** When set, opens in edit mode: fetches lead, prefills form, and submits as update */
+  editLeadId?: number | null;
 }
 
 const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
@@ -72,6 +76,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
   onSuccess,
   type = "lead",
   crmDataId,
+  editLeadId,
 }) => {
   const router = useRouter();
   const [formStep, setFormStep] = useState(0);
@@ -133,8 +138,10 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     null
   );
   const [loading, setLoading] = useState(false);
+  const [editFetching, setEditFetching] = useState(false);
   const [isOpportunity, setIsOpportunity] = useState(type === "opportunity");
   const isInitialLoad = useRef(true);
+  const createAndAddAnotherRef = useRef(false);
 
   // Business type state
   const [businessTypeId, setBusinessTypeId] = useState<number | null>(null);
@@ -356,10 +363,10 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     }
   };
 
-  // Fetch specific CRM data record if crmDataId is provided
+  // Fetch specific CRM data record if crmDataId is provided (skip when editing)
   useEffect(() => {
     const fetchCrmDataRecord = async () => {
-      if (show && crmDataId) {
+      if (show && crmDataId && !editLeadId) {
         try {
           const crmDataRecord = await getCrmDataById(crmDataId);
           console.log("ZE CRM DATA RECORD", crmDataRecord);
@@ -490,6 +497,136 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
 
     fetchCrmDataRecord();
   }, [show, crmDataId]);
+
+  // Edit mode: fetch lead and prefill form when editLeadId is set
+  useEffect(() => {
+    if (!show || !editLeadId) return;
+    let cancelled = false;
+    setEditFetching(true);
+    getLead(editLeadId)
+      .then(async (leadData: any) => {
+        if (cancelled) return;
+        let contactPersonsArray: Array<{ title: string; name: string; phone_country_code: string; phone: string; email: string }> = [];
+        if (leadData.contact_persons) {
+          if (typeof leadData.contact_persons === "string") {
+            try {
+              contactPersonsArray = JSON.parse(leadData.contact_persons);
+            } catch {
+              contactPersonsArray = [];
+            }
+          } else if (Array.isArray(leadData.contact_persons)) {
+            contactPersonsArray = leadData.contact_persons;
+          }
+        }
+        if (contactPersonsArray.length === 0) {
+          contactPersonsArray = [{ title: "Mr.", name: "", phone_country_code: "", phone: "", email: "" }];
+        }
+        const stageId = leadData.stage_id != null ? Number(leadData.stage_id) : undefined;
+        const campaignId = leadData.campaign_id != null ? Number(leadData.campaign_id) : undefined;
+        const crmDataIdNum = leadData.crm_data_id != null ? Number(leadData.crm_data_id) : undefined;
+        const userExt = leadData.user_extension != null ? Number(leadData.user_extension) : null;
+        setFormData({
+          name: leadData.name || "",
+          user_extension: userExt as any,
+          type: (leadData.type || "lead") as "lead" | "opportunity",
+          description: leadData.description || "",
+          source: leadData.source || "",
+          company_name: leadData.company_name || "",
+          company_contact: "",
+          company_description: "",
+          industry: "",
+          business_type: "",
+          company_country: leadData.company_country || "",
+          company_province: leadData.company_province || "",
+          company_city: leadData.company_city || "",
+          company_location_other: leadData.company_location_other || "",
+          company_size: leadData.company_size || "",
+          contact_person_title: "",
+          contact_person_name: "",
+          contact_phone_country_code: "",
+          contact_phone: "",
+          stage_id: stageId,
+          campaign_id: campaignId,
+          crm_data_id: crmDataIdNum,
+          lead_potential: leadData.lead_potential || "",
+          other_information: leadData.other_information || {},
+          campaign_field_values: leadData.campaign_field_values || {},
+          contact_persons: contactPersonsArray,
+        });
+        if (leadData.business_type_id) {
+          setBusinessTypeId(Number(leadData.business_type_id));
+          setBusinessTypeOther("");
+          setShowOtherBusinessType(false);
+        } else if (leadData.business_type_other) {
+          setBusinessTypeId(null);
+          setBusinessTypeOther(leadData.business_type_other);
+          setShowOtherBusinessType(true);
+        } else {
+          setBusinessTypeId(null);
+          setBusinessTypeOther("");
+          setShowOtherBusinessType(false);
+        }
+        const countryName = leadData.company_country;
+        if (countryName) {
+          const country = Country.getAllCountries().find((c: { name: string }) => c.name === countryName);
+          if (country) {
+            setSelectedCountry({ value: country.isoCode, label: country.name, isoCode: country.isoCode });
+            const stateName = leadData.company_province;
+            if (stateName) {
+              const state = State.getStatesOfCountry(country.isoCode).find((s: { name: string }) => s.name === stateName);
+              if (state) {
+                setSelectedState({ value: state.isoCode, label: state.name });
+                const cityName = leadData.company_city;
+                if (cityName) {
+                  const city = City.getCitiesOfState(country.isoCode, state.isoCode).find((c: { name: string }) => c.name === cityName);
+                  if (city) {
+                    setSelectedCity({ value: city.name, label: city.name });
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          setSelectedCountry(null);
+          setSelectedState(null);
+          setSelectedCity(null);
+        }
+        if (campaignId) {
+          try {
+            const campaign = await getCampaignById(campaignId);
+            setSelectedCampaign(campaign);
+          } catch {
+            setSelectedCampaign(null);
+          }
+        } else {
+          setSelectedCampaign(null);
+        }
+        if (crmDataIdNum && crmData.length > 0) {
+          const found = crmData.find((d) => d.id === crmDataIdNum);
+          if (found) setSelectedCrmData(found);
+          else {
+            try {
+              const record = await getCrmDataById(crmDataIdNum);
+              setSelectedCrmData(record);
+            } catch {
+              setSelectedCrmData(null);
+            }
+          }
+        } else {
+          setSelectedCrmData(null);
+        }
+        setEditFetching(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEditFetching(false);
+          toast.error("Failed to load lead data");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [show, editLeadId]); // crmData dependency omitted to avoid re-run when crmData loads after lead; lead fetch runs once when sidebar opens
 
   // Auto-select campaign and pre-fill fields when CRM data is available
   useEffect(() => {
@@ -709,10 +846,10 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     setLoading(true);
 
     try {
-      // Format payload according to API structure
+      // Format payload according to API structure (user_extension must be string for API)
       const payload: any = {
         name: formData.name,
-        user_extension: formData.user_extension,
+        user_extension: formData.user_extension != null ? String(formData.user_extension) : "",
         stage_id: String(formData.stage_id),
         ...(formData.campaign_id && {
           campaign_id: String(formData.campaign_id),
@@ -772,18 +909,69 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         }),
       };
 
-      await createLead(payload);
-      toast.success("Lead created successfully!");
-
-      // Call onSuccess callback if provided
-      if (onSuccess) {
-        onSuccess();
+      if (editLeadId) {
+        await updateLead(editLeadId, payload);
+        toast.success("Lead updated successfully!");
+        if (onSuccess) onSuccess();
+        onHide();
+      } else {
+        await createLead(payload);
+        toast.success("Lead created successfully!");
+        if (onSuccess) onSuccess();
+        if (createAndAddAnotherRef.current) {
+        createAndAddAnotherRef.current = false;
+        // Reset form for another lead (keep type and fetched data)
+        setFormData({
+          name: "",
+          user_extension: null,
+          type: formData.type,
+          description: "",
+          source: "",
+          company_name: "",
+          company_contact: "",
+          company_description: "",
+          industry: "",
+          business_type: "",
+          company_country: "",
+          company_province: "",
+          company_city: "",
+          company_location_other: "",
+          company_size: "",
+          contact_person_title: "",
+          contact_person_name: "",
+          contact_phone_country_code: "",
+          contact_phone: "",
+          stage_id: undefined,
+          campaign_id: undefined,
+          crm_data_id: undefined,
+          lead_potential: "",
+          other_information: {},
+          campaign_field_values: {},
+          contact_persons: [
+            { title: "Mr.", name: "", phone_country_code: "", phone: "", email: "" },
+          ],
+        });
+        setFormStep(0);
+        setTemplateFieldsData({});
+        setEstimationItems([]);
+        setBusinessTypeId(null);
+        setBusinessTypeOther("");
+        setShowOtherBusinessType(false);
+        setSelectedIndustryId(null);
+        setItemFormData({
+          product_id: null,
+          product_service: "",
+          description: "",
+          qty: 1,
+          unit_price: 0,
+          industry_id: null,
+        });
+        } else {
+          onHide();
+        }
       }
-
-      // Close modal
-      onHide();
     } catch (error) {
-      toast.error("Failed to create lead");
+      toast.error(editLeadId ? "Failed to update lead" : "Failed to create lead");
       console.error("Create lead error:", error);
     } finally {
       setLoading(false);
@@ -1283,850 +1471,773 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     }
   }, [show, type]);
 
+  if (!show) return null;
+
+  // Sidebar UI (same pattern as prospects Create Contact sidebar)
   return (
     <>
-      <Modal
-        show={show}
-        onHide={onHide}
-        size="xl"
-        backdrop="static"
-        keyboard={false}
-        scrollable
+      {/* Overlay */}
+      <div
+        className="create-lead-sidebar-overlay"
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1000,
+        }}
+        onClick={onHide}
+      />
+
+      {/* Sidebar */}
+      <div
+        className="create-lead-sidebar-container"
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          width: "600px",
+          height: "100vh",
+          backgroundColor: "#ffffff",
+          boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
+          zIndex: 1001,
+          display: "flex",
+          flexDirection: "column",
+        }}
       >
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {crmDataId ? "Convert to Lead" : "Create Lead"}
-            {selectedCrmData && (
-              <Badge bg="info" className="ms-2">
+        {/* Header */}
+        <div
+          className="create-lead-sidebar-header"
+          style={{
+            padding: "20px 24px",
+            borderBottom: "1px solid #eaf0f6",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <h2
+            className="create-lead-sidebar-title"
+            style={{
+              fontSize: "20px",
+              fontWeight: "600",
+              color: "#141414",
+              margin: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            {editLeadId ? "Edit Lead" : crmDataId ? "Convert to Lead" : "Create Lead"}
+            {!editLeadId && selectedCrmData && (
+              <Badge bg="info" style={{ fontSize: "12px" }}>
                 <FiDatabase className="me-1" size={14} />
                 Pre-filled from Prospect:{" "}
                 {selectedCrmData?.name || `#${selectedCrmData?.id}`}
               </Badge>
             )}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {/* Timeline Navigation */}
-          <div className="mb-4">
-            <div className="d-flex align-items-center justify-content-between position-relative">
-              {/* Progress Line */}
-              <div
-                className="position-absolute bg-light"
-                style={{
-                  left: "0",
-                  right: "0",
-                  top: "20px",
-                  height: "2px",
-                  zIndex: 0,
-                }}
-              />
-              <div
-                className="position-absolute bg-primary"
-                style={{
-                  left: "0",
-                  top: "20px",
-                  height: "2px",
-                  width: `${(formStep / 3) * 100}%`,
-                  zIndex: 0,
-                  transition: "width 0.3s ease",
-                }}
-              />
+          </h2>
+          <button
+            type="button"
+            className="create-lead-sidebar-close-btn"
+            onClick={onHide}
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: "4px",
+              cursor: "pointer",
+              color: "#718096",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <X size={24} />
+          </button>
+        </div>
 
-              {/* Step 1 */}
-              <div
-                className="text-center position-relative"
-                style={{ cursor: "pointer", flex: 1 }}
-                onClick={() => setFormStep(0)}
-              >
-                <div
-                  className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${
-                    formStep >= 0
-                      ? "bg-primary text-white"
-                      : "bg-light text-muted"
-                  }`}
-                  style={{
-                    width: "40px",
-                    height: "40px",
-                    zIndex: 1,
-                    position: "relative",
-                  }}
-                >
-                  {formStep > 0 ? <CheckCircle size={20} /> : "1"}
-                </div>
-                <small
-                  className={`d-block mt-2 ${
-                    formStep === 0 ? "fw-bold text-primary" : "text-muted"
-                  }`}
-                >
-                  Lead Info
-                </small>
+        {/* Form Content - same structure as Create Contact sidebar (index.tsx 2969-3400) */}
+        <div
+          className="create-lead-sidebar-content contact-sidebar-content"
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "40px",
+          }}
+        >
+          {editFetching ? (
+            <div className="d-flex flex-column align-items-center justify-content-center py-5" style={{ flex: 1 }}>
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading...</span>
               </div>
-
-              {/* Step 2 */}
-              <div
-                className="text-center position-relative"
-                style={{ cursor: "pointer", flex: 1 }}
-                onClick={() => setFormStep(1)}
-              >
-                <div
-                  className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${
-                    formStep >= 1
-                      ? "bg-primary text-white"
-                      : "bg-light text-muted"
-                  }`}
-                  style={{
-                    width: "40px",
-                    height: "40px",
-                    zIndex: 1,
-                    position: "relative",
-                  }}
-                >
-                  {formStep > 1 ? <CheckCircle size={20} /> : "2"}
-                </div>
-                <small
-                  className={`d-block mt-2 ${
-                    formStep === 1 ? "fw-bold text-primary" : "text-muted"
-                  }`}
-                >
-                  Company Info
-                </small>
-              </div>
-
-              {/* Step 3 */}
-              <div
-                className="text-center position-relative"
-                style={{ cursor: "pointer", flex: 1 }}
-                onClick={() => setFormStep(2)}
-              >
-                <div
-                  className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${
-                    formStep >= 2
-                      ? "bg-primary text-white"
-                      : "bg-light text-muted"
-                  }`}
-                  style={{
-                    width: "40px",
-                    height: "40px",
-                    zIndex: 1,
-                    position: "relative",
-                  }}
-                >
-                  {formStep > 2 ? <CheckCircle size={20} /> : "3"}
-                </div>
-                <small
-                  className={`d-block mt-2 ${
-                    formStep === 2 ? "fw-bold text-primary" : "text-muted"
-                  }`}
-                >
-                  Contact Persons
-                </small>
-              </div>
-
-              {/* Step 4 */}
-              <div
-                className="text-center position-relative"
-                style={{ cursor: "pointer", flex: 1 }}
-                onClick={() => setFormStep(3)}
-              >
-                <div
-                  className={`rounded-circle d-flex align-items-center justify-content-center mx-auto ${
-                    formStep >= 3
-                      ? "bg-primary text-white"
-                      : "bg-light text-muted"
-                  }`}
-                  style={{
-                    width: "40px",
-                    height: "40px",
-                    zIndex: 1,
-                    position: "relative",
-                  }}
-                >
-                  {formStep > 3 ? <CheckCircle size={20} /> : "4"}
-                </div>
-                <small
-                  className={`d-block mt-2 ${
-                    formStep === 3 ? "fw-bold text-primary" : "text-muted"
-                  }`}
-                >
-                  Other Info
-                </small>
-              </div>
+              <p className="mt-3 mb-0" style={{ fontSize: "14px", color: "#64748b" }}>Loading lead data...</p>
             </div>
-          </div>
-
+          ) : (
           <Form onSubmit={handleSubmit}>
-            {/* Form Content Based on Step */}
-            <div style={{ minHeight: "400px" }}>
-              {formStep === 0 && (
-                <Card className="border-0 bg-light">
-                  <Card.Body>
-                    <h5 className="fw-bold mb-4 text-primary">
-                      LEAD INFORMATION
-                    </h5>
-                    <Row>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>
-                            Lead Name <span className="text-danger">*</span>
-                          </Form.Label>
-                          <Form.Control
-                            type="text"
-                            value={formData.name}
-                            onChange={(e) =>
-                              handleInputChange("name", e.target.value)
-                            }
-                            placeholder="Enter lead name"
-                            required
-                          />
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>
-                            Assigned To <span className="text-danger">*</span>
-                          </Form.Label>
-                          {formData.type === "opportunity" ? (
-                            <Select
-                              value={
-                                formData.user_extension
-                                  ? {
-                                      value: formData.user_extension,
-                                      label:
-                                        extensionsOpportunities.find(
-                                          (ext: any) =>
-                                            ext.id.toString() ===
-                                            formData.user_extension?.toString()
-                                        )?.display_name || "",
-                                    }
-                                  : null
-                              }
-                              onChange={(selectedOption: any) => {
-                                handleInputChange(
-                                  "user_extension",
-                                  selectedOption?.value || null
-                                );
-                              }}
-                              options={extensionsOpportunities.map(
-                                (extension: any) => ({
-                                  value: extension.id,
-                                  label: extension.display_name,
-                                })
-                              )}
-                              placeholder="Select User"
-                              isClearable
-                              isSearchable
-                              required
-                            />
-                          ) : (
-                            <Select
-                              value={
-                                formData.user_extension
-                                  ? {
-                                      value: formData.user_extension,
-                                      label:
-                                        extensions.find(
-                                          (ext: any) =>
-                                            ext.id.toString() ===
-                                            formData.user_extension?.toString()
-                                        )?.display_name || "",
-                                    }
-                                  : null
-                              }
-                              onChange={(selectedOption: any) => {
-                                handleInputChange(
-                                  "user_extension",
-                                  selectedOption?.value || null
-                                );
-                              }}
-                              options={extensions.map((extension: any) => ({
-                                value: extension.id,
-                                label: extension.display_name,
-                              }))}
-                              placeholder="Select User"
-                              isClearable
-                              isSearchable
-                              required
-                            />
-                          )}
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>
-                            Stage <span className="text-danger">*</span>
-                          </Form.Label>
-                          <Form.Select
-                            value={formData.stage_id || ""}
-                            onChange={(e) =>
-                              handleInputChange(
-                                "stage_id",
-                                e.target.value ? Number(e.target.value) : undefined
-                              )
-                            }
-                            required
-                          >
-                            <option value="">Select a stage</option>
-                            {stages.map((stage) => (
-                              <option key={stage.id} value={stage.id}>
-                                {stage.name}
-                              </option>
-                            ))}
-                          </Form.Select>
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Source</Form.Label>
-                          <Form.Control
-                            type="text"
-                            value={formData.source}
-                            onChange={(e) =>
-                              handleInputChange("source", e.target.value)
-                            }
-                            placeholder="e.g., LinkedIn, Website, Referral"
-                          />
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Campaign</Form.Label>
-                          <Select
-                            value={
-                              formData.campaign_id
-                                ? {
-                                    value: formData.campaign_id,
-                                    label:
-                                      campaigns.find(
-                                        (c) => c.id === formData.campaign_id
-                                      )?.name || "",
-                                  }
-                                : null
-                            }
-                            onChange={handleCampaignChange}
-                            options={campaigns.map((campaign) => ({
-                              value: campaign.id,
-                              label: campaign.name,
-                            }))}
-                            placeholder="Select a campaign (Optional)"
-                            isClearable
-                            isSearchable
-                          />
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Prospect</Form.Label>
-                          <Select
-                            isDisabled={!!crmDataId}
-                            value={
-                              formData.crm_data_id
-                                ? {
-                                    value: formData.crm_data_id,
-                                    label:
-                                      formData.crm_data_id ==
-                                      selectedCrmData?.id
-                                        ? `${selectedCrmData?.name || "No Name"}`
-                                        : `${
-                                            crmData.find(
-                                              (d) => d.id === formData.crm_data_id
-                                            )?.name || "No Name"
-                                          }`,
-                                  }
-                                : null
-                            }
-                            onChange={handleCrmDataChange}
-                            options={crmData.map((data) => ({
-                              value: data.id,
-                              label: `${data?.name || "No Name"} - ${
-                                data?.phone || "No Phone"
-                              }`,
-                            }))}
-                            placeholder="Select Prospect (Optional)"
-                            isClearable
-                            isSearchable
-                          />
-                        </Form.Group>
-                      </Col>
-                      <Col md={12}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Description</Form.Label>
-                          <Form.Control
-                            as="textarea"
-                            rows={3}
-                            value={formData.description}
-                            onChange={(e) =>
-                              handleInputChange("description", e.target.value)
-                            }
-                            placeholder="Preferred area/location, Budget, move-in"
-                          />
-                        </Form.Group>
-                      </Col>
-                    </Row>
-                  </Card.Body>
-                </Card>
-              )}
+            {/* Reusable contact-style label/input styles */}
+            {(() => {
+              const labelStyle: React.CSSProperties = {
+                display: "block",
+                fontSize: "14px",
+                fontWeight: 600,
+                color: "#141414",
+                marginBottom: "8px",
+              };
+              const inputStyle: React.CSSProperties = {
+                width: "100%",
+                padding: "10px 12px",
+                border: "1px solid #8a8a8a",
+                borderRadius: "4px",
+                fontSize: "14px",
+                outline: "none",
+              };
+              const selectControlStyle = {
+                control: (base: any) => ({
+                  ...base,
+                  minHeight: 40,
+                  border: "1px solid #8a8a8a",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                }),
+              };
 
-              {formStep === 1 && (
-                <Card className="border-0 bg-light">
-                  <Card.Body>
-                    <h5 className="fw-bold mb-4 text-success">
-                      COMPANY INFORMATION
-                    </h5>
-                    <Row>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>
-                            Company Name <span className="text-danger">*</span>
-                          </Form.Label>
-                          <Form.Control
-                            type="text"
-                            value={formData.company_name}
-                            onChange={(e) =>
-                              handleInputChange("company_name", e.target.value)
+              return (
+            <div>
+              {/* Primary Fields Section - Lead Information */}
+              <div className="contact-form-section">
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label contact-form-label-required" style={labelStyle}>
+                    Lead Name <span style={{ color: "#f2545b" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange("name", e.target.value)}
+                    placeholder="Enter lead name"
+                    required
+                    style={inputStyle}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
+                  />
+                </div>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label contact-form-label-required" style={labelStyle}>
+                    Assigned To <span style={{ color: "#f2545b" }}>*</span>
+                  </label>
+                  {formData.type === "opportunity" ? (
+                    <Select
+                      value={
+                        formData.user_extension
+                          ? {
+                              value: formData.user_extension,
+                              label:
+                                extensionsOpportunities.find(
+                                  (ext: any) =>
+                                    ext.id.toString() === formData.user_extension?.toString()
+                                )?.display_name || "",
                             }
-                            placeholder="Enter person name/company name"
-                          />
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>
-                            Business Type <span className="text-danger">*</span>
-                          </Form.Label>
-                          <Form.Select
-                            value={
-                              showOtherBusinessType
-                                ? "other"
-                                : businessTypeId
-                                ? String(businessTypeId)
-                                : ""
+                          : null
+                      }
+                      onChange={(selectedOption: any) =>
+                        handleInputChange("user_extension", selectedOption?.value || null)
+                      }
+                      options={extensionsOpportunities.map((extension: any) => ({
+                        value: extension.id,
+                        label: extension.display_name,
+                      }))}
+                      placeholder="Select User"
+                      isClearable
+                      isSearchable
+                      styles={selectControlStyle}
+                    />
+                  ) : (
+                    <Select
+                      value={
+                        formData.user_extension
+                          ? {
+                              value: formData.user_extension,
+                              label:
+                                extensions.find(
+                                  (ext: any) =>
+                                    ext.id.toString() === formData.user_extension?.toString()
+                                )?.display_name || "",
                             }
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              if (value === "other") {
-                                setShowOtherBusinessType(true);
-                                setBusinessTypeId(null);
-                                setBusinessTypeOther("");
-                              } else if (value) {
-                                setShowOtherBusinessType(false);
-                                setBusinessTypeId(Number(value));
-                                setBusinessTypeOther("");
-                              } else {
-                                setShowOtherBusinessType(false);
-                                setBusinessTypeId(null);
-                                setBusinessTypeOther("");
-                              }
-                            }}
-                          >
-                            <option value="">Select Business Type</option>
-                            {businessTypes.map((businessType) => (
-                              <option key={businessType.id} value={businessType.id}>
-                                {businessType.name}
-                              </option>
-                            ))}
-                            <option value="other">Other</option>
-                          </Form.Select>
-                        </Form.Group>
-                      </Col>
+                          : null
+                      }
+                      onChange={(selectedOption: any) =>
+                        handleInputChange("user_extension", selectedOption?.value || null)
+                      }
+                      options={extensions.map((extension: any) => ({
+                        value: extension.id,
+                        label: extension.display_name,
+                      }))}
+                      placeholder="Select User"
+                      isClearable
+                      isSearchable
+                      styles={selectControlStyle}
+                    />
+                  )}
+                </div>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label contact-form-label-required" style={labelStyle}>
+                    Stage <span style={{ color: "#f2545b" }}>*</span>
+                  </label>
+                  <Select
+                    value={
+                      formData.stage_id != null
+                        ? {
+                            value: formData.stage_id,
+                            label: stages.find((s) => s.id === formData.stage_id)?.name || "",
+                          }
+                        : null
+                    }
+                    onChange={(selectedOption: any) =>
+                      handleInputChange("stage_id", selectedOption?.value ?? undefined)
+                    }
+                    options={stages.map((stage) => ({
+                      value: stage.id,
+                      label: stage.name,
+                    }))}
+                    placeholder="Select a stage"
+                    isClearable
+                    isSearchable
+                    styles={selectControlStyle}
+                  />
+                </div>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label" style={labelStyle}>Source</label>
+                  <input
+                    type="text"
+                    value={formData.source}
+                    onChange={(e) => handleInputChange("source", e.target.value)}
+                    placeholder="e.g., LinkedIn, Website, Referral"
+                    style={inputStyle}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
+                  />
+                </div>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label" style={labelStyle}>Campaign</label>
+                  <Select
+                    value={
+                      formData.campaign_id
+                        ? {
+                            value: formData.campaign_id,
+                            label:
+                              campaigns.find((c) => c.id === formData.campaign_id)?.name || "",
+                          }
+                        : null
+                    }
+                    onChange={handleCampaignChange}
+                    options={campaigns.map((campaign) => ({
+                      value: campaign.id,
+                      label: campaign.name,
+                    }))}
+                    placeholder="Select a campaign (Optional)"
+                    isClearable
+                    isSearchable
+                    styles={selectControlStyle}
+                  />
+                </div>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label" style={labelStyle}>Prospect</label>
+                  <Select
+                    isDisabled={!!crmDataId}
+                    value={
+                      formData.crm_data_id
+                        ? {
+                            value: formData.crm_data_id,
+                            label:
+                              formData.crm_data_id === selectedCrmData?.id
+                                ? `${selectedCrmData?.name || "No Name"}`
+                                : `${crmData.find((d) => d.id === formData.crm_data_id)?.name || "No Name"}`,
+                          }
+                        : null
+                    }
+                    onChange={handleCrmDataChange}
+                    options={crmData.map((data) => ({
+                      value: data.id,
+                      label: `${data?.name || "No Name"} - ${data?.phone || "No Phone"}`,
+                    }))}
+                    placeholder="Select Prospect (Optional)"
+                    isClearable
+                    isSearchable
+                    styles={selectControlStyle}
+                  />
+                </div>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label" style={labelStyle}>Description</label>
+                  <textarea
+                    rows={3}
+                    value={formData.description}
+                    onChange={(e) => handleInputChange("description", e.target.value)}
+                    placeholder="Preferred area/location, Budget, move-in"
+                    style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
+                  />
+                </div>
+              </div>
 
-                      {showOtherBusinessType && (
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>
-                              Business Type (Other) <span className="text-danger">*</span>
-                            </Form.Label>
-                            <Form.Control
-                              type="text"
-                              value={businessTypeOther}
-                              onChange={(e) => setBusinessTypeOther(e.target.value)}
-                              placeholder="Enter business type"
-                            />
-                          </Form.Group>
-                        </Col>
-                      )}
-
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Company Country</Form.Label>
-                          <Select
-                            value={selectedCountry}
-                            onChange={handleCountryChange}
-                            options={getCountries()}
-                            placeholder="Select Country"
-                            isClearable
-                            isSearchable
-                            formatOptionLabel={({ label, isoCode }) => (
-                              <div className="d-flex align-items-center">
-                                {isoCode && (
-                                  <img
-                                    src={getCountryFlagUrl(isoCode)}
-                                    alt={isoCode}
-                                    className="me-2"
-                                    style={{
-                                      width: "20px",
-                                      height: "15px",
-                                    }}
-                                  />
-                                )}
-                                <span>{label}</span>
-                              </div>
-                            )}
+              {/* Secondary Fields Section - Company Information */}
+              <div className="contact-form-section" style={{ marginTop: "24px" }}>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label contact-form-label-required" style={labelStyle}>
+                    Company Name <span style={{ color: "#f2545b" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.company_name}
+                    onChange={(e) => handleInputChange("company_name", e.target.value)}
+                    placeholder="Enter person name/company name"
+                    style={inputStyle}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
+                  />
+                </div>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label contact-form-label-required" style={labelStyle}>
+                    Business Type <span style={{ color: "#f2545b" }}>*</span>
+                  </label>
+                  <Select
+                    value={
+                      showOtherBusinessType
+                        ? { value: "other", label: "Other" }
+                        : businessTypeId != null
+                        ? {
+                            value: businessTypeId,
+                            label: businessTypes.find((b) => b.id === businessTypeId)?.name || "",
+                          }
+                        : null
+                    }
+                    onChange={(selectedOption: any) => {
+                      if (!selectedOption) {
+                        setShowOtherBusinessType(false);
+                        setBusinessTypeId(null);
+                        setBusinessTypeOther("");
+                      } else if (selectedOption.value === "other") {
+                        setShowOtherBusinessType(true);
+                        setBusinessTypeId(null);
+                        setBusinessTypeOther("");
+                      } else {
+                        setShowOtherBusinessType(false);
+                        setBusinessTypeId(Number(selectedOption.value));
+                        setBusinessTypeOther("");
+                      }
+                    }}
+                    options={[
+                      ...businessTypes.map((bt) => ({ value: bt.id, label: bt.name })),
+                      { value: "other", label: "Other" },
+                    ]}
+                    placeholder="Select Business Type"
+                    isClearable
+                    isSearchable
+                    styles={selectControlStyle}
+                  />
+                </div>
+                {showOtherBusinessType && (
+                  <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                    <label className="contact-form-label contact-form-label-required" style={labelStyle}>
+                      Business Type (Other) <span style={{ color: "#f2545b" }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={businessTypeOther}
+                      onChange={(e) => setBusinessTypeOther(e.target.value)}
+                      placeholder="Enter business type"
+                      style={inputStyle}
+                      onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
+                      onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
+                    />
+                  </div>
+                )}
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label" style={labelStyle}>Company Country</label>
+                  <Select
+                    value={selectedCountry}
+                    onChange={handleCountryChange}
+                    options={getCountries()}
+                    placeholder="Select Country"
+                    isClearable
+                    isSearchable
+                    styles={selectControlStyle}
+                    formatOptionLabel={({ label, isoCode }: any) => (
+                      <div className="d-flex align-items-center">
+                        {isoCode && (
+                          <img
+                            src={getCountryFlagUrl(isoCode)}
+                            alt={isoCode}
+                            className="me-2"
+                            style={{ width: "20px", height: "15px" }}
                           />
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>State/Province</Form.Label>
-                          <Select
-                            value={selectedState}
-                            onChange={handleStateChange}
-                            options={getStates(selectedCountry?.value || "")}
-                            placeholder="Select State/Province"
-                            isClearable
-                            isSearchable
-                            isDisabled={!selectedCountry}
-                          />
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Company City</Form.Label>
-                          <Select
-                            value={selectedCity}
-                            onChange={handleCityChange}
-                            options={getCities(
-                              selectedCountry?.value || "",
-                              selectedState?.value || ""
-                            )}
-                            placeholder="Select City"
-                            isClearable
-                            isSearchable
-                            isDisabled={!selectedCountry || !selectedState}
-                          />
-                        </Form.Group>
-                      </Col>
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Company Size</Form.Label>
-                          <Form.Select
-                            value={formData.company_size}
-                            onChange={(e) =>
-                              handleInputChange("company_size", e.target.value)
-                            }
-                          >
-                            <option value="">Select Size</option>
-                            <option value="Micro (1-10 employees)">
-                              Micro (1-10 employees)
-                            </option>
-                            <option value="Small (11-50 employees)">
-                              Small (11-50 employees)
-                            </option>
-                            <option value="Medium (51-200 employees)">
-                              Medium (51-200 employees)
-                            </option>
-                            <option value="Large (201-500 employees)">
-                              Large (201-500 employees)
-                            </option>
-                            <option value="Enterprise (500+ employees)">
-                              Enterprise (500+ employees)
-                            </option>
-                          </Form.Select>
-                        </Form.Group>
-                      </Col>
-                      <Col md={12}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Location Notes</Form.Label>
-                          <Form.Control
-                            type="text"
-                            value={formData.company_location_other}
-                            onChange={(e) =>
-                              handleInputChange(
-                                "company_location_other",
-                                e.target.value
-                              )
-                            }
-                            placeholder="Landmark, Access Instructions, Directions, etc."
-                          />
-                        </Form.Group>
-                      </Col>
-                    </Row>
-                  </Card.Body>
-                </Card>
-              )}
-
-              {formStep === 2 && (
-                <Card className="border-0 bg-light">
-                  <Card.Body>
-                    <div className="d-flex justify-content-between align-items-center mb-4">
-                      <h5 className="fw-bold mb-0 text-warning">
-                        CONTACT PERSONS
-                      </h5>
-                      <Button
-                        variant="outline-primary"
-                        size="sm"
-                        onClick={addContactPerson}
-                      >
-                        <FiPlus className="me-1" size={14} />
-                        Add Contact Person
-                      </Button>
-                    </div>
-                    {formData.contact_persons.map((person, index) => (
-                      <Card key={index} className="mb-3 border">
-                        <Card.Body>
-                          <div className="d-flex justify-content-between align-items-center mb-3">
-                            <h6 className="mb-0">Contact Person {index + 1}</h6>
-                            <Button
-                              variant="outline-danger"
-                              size="sm"
-                              onClick={() => removeContactPerson(index)}
-                              disabled={formData.contact_persons.length <= 1}
-                            >
-                              <X size={16} />
-                            </Button>
-                          </div>
-                          <Row>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>
-                                  Title <span className="text-danger">*</span>
-                                </Form.Label>
-                                <Form.Select
-                                  value={person.title}
-                                  onChange={(e) =>
-                                    updateContactPerson(
-                                      index,
-                                      "title",
-                                      e.target.value
-                                    )
-                                  }
-                                >
-                                  <option value="">Select Title</option>
-                                  <option value="Mr.">Mr.</option>
-                                  <option value="Mrs.">Mrs.</option>
-                                  <option value="Ms.">Ms.</option>
-                                  <option value="Dr.">Dr.</option>
-                                  <option value="Prof.">Prof.</option>
-                                </Form.Select>
-                              </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>
-                                  Name <span className="text-danger">*</span>
-                                </Form.Label>
-                                <Form.Control
-                                  type="text"
-                                  value={person.name}
-                                  onChange={(e) =>
-                                    updateContactPerson(
-                                      index,
-                                      "name",
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="Enter contact name"
-                                />
-                              </Form.Group>
-                            </Col>
-                            <Col md={12}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>
-                                  Phone <span className="text-danger">*</span>
-                                </Form.Label>
-                                <div className="phone-input-wrapper">
-                                  <PhoneInput
-                                    international
-                                    defaultCountry="US"
-                                    value={
-                                      person.phone_country_code && person.phone
-                                        ? `${person.phone_country_code}${person.phone}`
-                                        : person.phone || undefined
-                                    }
-                                    onChange={(value: string | undefined) => {
-                                      if (value) {
-                                        try {
-                                          // Parse the phone number to extract country code and national number
-                                          const phoneNumber = parsePhoneNumber(value);
-                                          if (phoneNumber) {
-                                            updateContactPerson(
-                                              index,
-                                              "phone_country_code",
-                                              `+${phoneNumber.countryCallingCode}`
-                                            );
-                                            updateContactPerson(
-                                              index,
-                                              "phone",
-                                              phoneNumber.nationalNumber
-                                            );
-                                          } else {
-                                            // Fallback: store full number in phone field
-                                            updateContactPerson(
-                                              index,
-                                              "phone_country_code",
-                                              ""
-                                            );
-                                            updateContactPerson(
-                                              index,
-                                              "phone",
-                                              value
-                                            );
-                                          }
-                                        } catch (error) {
-                                          // If parsing fails, store full number in phone field
-                                          updateContactPerson(
-                                            index,
-                                            "phone_country_code",
-                                            ""
-                                          );
-                                          updateContactPerson(index, "phone", value);
-                                        }
-                                      } else {
-                                        updateContactPerson(
-                                          index,
-                                          "phone_country_code",
-                                          ""
-                                        );
-                                        updateContactPerson(index, "phone", "");
-                                      }
-                                    }}
-                                    placeholder="Enter phone number"
-                                  />
-                                </div>
-                              </Form.Group>
-                            </Col>
-                            <Col md={12}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>
-                                  Email <span className="text-danger">*</span>
-                                </Form.Label>
-                                <Form.Control
-                                  type="email"
-                                  value={person.email}
-                                  onChange={(e) =>
-                                    updateContactPerson(
-                                      index,
-                                      "email",
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="Enter email address"
-                                />
-                              </Form.Group>
-                            </Col>
-                          </Row>
-                        </Card.Body>
-                      </Card>
-                    ))}
-                  </Card.Body>
-                </Card>
-              )}
-
-              {formStep === 3 && (
-                <>
-                  <Card className="border-0 bg-light">
-                    <Card.Body>
-                      <h5 className="fw-bold mb-4 text-info">OTHER INFORMATION</h5>
-                      <Row>
-                        <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label>Lead Potential</Form.Label>
-                            <Form.Select
-                              value={formData.lead_potential}
-                              onChange={(e) =>
-                                handleInputChange("lead_potential", e.target.value)
-                              }
-                            >
-                              <option value="">Select Potential</option>
-                              <option value="Hot">Hot</option>
-                              <option value="Warm">Warm</option>
-                              <option value="Cold">Cold</option>
-                            </Form.Select>
-                            <Form.Text className="text-muted">
-                              Likelihood of converting based on engagement
-                            </Form.Text>
-                          </Form.Group>
-                        </Col>
-                      </Row>
-
-                      {/* Campaign Custom Fields */}
-                      {selectedCampaign &&
-                        selectedCampaign.fields &&
-                        selectedCampaign.fields.length > 0 && (
-                          <div className="border-top pt-3 mt-4">
-                            <div className="d-flex align-items-center mb-3">
-                              <FiTarget className="me-2" />
-                              <h6 className="mb-0">
-                                Custom Campaign Fields: {selectedCampaign.name}
-                              </h6>
-                              {selectedCrmData && (
-                                <Badge bg="success" className="ms-2 small">
-                                  Auto-filled from Prospect
-                                </Badge>
-                              )}
-                            </div>
-                            <Row>
-                              {selectedCampaign.fields.map((field: { field_name: string; is_required?: boolean }, index: number) => (
-                                <Col md={6} key={index} className="mb-3">
-                                  <Form.Group>
-                                    <Form.Label>
-                                      {field.field_name}
-                                      {field.is_required && (
-                                        <span className="text-danger ms-1">*</span>
-                                      )}
-                                    </Form.Label>
-                                    {renderCampaignField(field)}
-                                  </Form.Group>
-                                </Col>
-                              ))}
-                            </Row>
-                          </div>
                         )}
-
-                      <div className="alert alert-success small mt-3">
-                        <CheckCircle size={14} className="me-1" />
-                        All required fields are marked with{" "}
-                        <span className="text-danger">*</span>. Complete all sections
-                        to create the lead.
+                        <span>{label}</span>
                       </div>
-                    </Card.Body>
-                  </Card>
-                </>
-              )}
+                    )}
+                  />
+                </div>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label" style={labelStyle}>State/Province</label>
+                  <Select
+                    value={selectedState}
+                    onChange={handleStateChange}
+                    options={getStates(selectedCountry?.value || "")}
+                    placeholder="Select State/Province"
+                    isClearable
+                    isSearchable
+                    isDisabled={!selectedCountry}
+                    styles={selectControlStyle}
+                  />
+                </div>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label" style={labelStyle}>Company City</label>
+                  <Select
+                    value={selectedCity}
+                    onChange={handleCityChange}
+                    options={getCities(selectedCountry?.value || "", selectedState?.value || "")}
+                    placeholder="Select City"
+                    isClearable
+                    isSearchable
+                    isDisabled={!selectedCountry || !selectedState}
+                    styles={selectControlStyle}
+                  />
+                </div>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label" style={labelStyle}>Company Size</label>
+                  <Select
+                    value={
+                      formData.company_size
+                        ? { value: formData.company_size, label: formData.company_size }
+                        : null
+                    }
+                    onChange={(selectedOption: any) =>
+                      handleInputChange("company_size", selectedOption?.value ?? "")
+                    }
+                    options={[
+                      { value: "Micro (1-10 employees)", label: "Micro (1-10 employees)" },
+                      { value: "Small (11-50 employees)", label: "Small (11-50 employees)" },
+                      { value: "Medium (51-200 employees)", label: "Medium (51-200 employees)" },
+                      { value: "Large (201-500 employees)", label: "Large (201-500 employees)" },
+                      { value: "Enterprise (500+ employees)", label: "Enterprise (500+ employees)" },
+                    ]}
+                    placeholder="Select Size"
+                    isClearable
+                    isSearchable
+                    styles={selectControlStyle}
+                  />
+                </div>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label" style={labelStyle}>Location Notes</label>
+                  <input
+                    type="text"
+                    value={formData.company_location_other}
+                    onChange={(e) =>
+                      handleInputChange("company_location_other", e.target.value)
+                    }
+                    placeholder="Landmark, Access Instructions, Directions, etc."
+                    style={inputStyle}  
+                    onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
+                  />
+                </div>
+              </div>
+
+              {/* Contact Persons Section */}
+              <div className="contact-form-section" style={{ marginTop: "24px", paddingTop: "24px" }}>
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <span style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>Contact Persons</span>
+                  <button
+                    type="button"
+                    onClick={addContactPerson}
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: "13px",
+                      border: "1px solid #8a8a8a",
+                      borderRadius: "4px",
+                      background: "transparent",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    <FiPlus size={14} /> Add Contact Person
+                  </button>
+                </div>
+                {formData.contact_persons.map((person, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      marginBottom: "20px",
+                      padding: "16px",
+                      border: "1px solid #eaf0f6",
+                      borderRadius: "4px",
+                      backgroundColor: "#fafafa",
+                    }}
+                  >
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <span style={{ fontSize: "13px", fontWeight: 600, color: "#141414" }}>
+                        Contact Person {index + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeContactPerson(index)}
+                        disabled={formData.contact_persons.length <= 1}
+                        style={{
+                          padding: "4px",
+                          border: "none",
+                          background: "transparent",
+                          color: "#f2545b",
+                          cursor: formData.contact_persons.length <= 1 ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <div className="contact-form-field" style={{ marginBottom: "16px" }}>
+                      <label className="contact-form-label contact-form-label-required" style={labelStyle}>
+                        Title <span style={{ color: "#f2545b" }}>*</span>
+                      </label>
+                      <Select
+                        value={
+                          person.title
+                            ? { value: person.title, label: person.title }
+                            : null
+                        }
+                        onChange={(selectedOption: any) =>
+                          updateContactPerson(index, "title", selectedOption?.value ?? "")
+                        }
+                        options={[
+                          { value: "Mr.", label: "Mr." },
+                          { value: "Mrs.", label: "Mrs." },
+                          { value: "Ms.", label: "Ms." },
+                          { value: "Dr.", label: "Dr." },
+                          { value: "Prof.", label: "Prof." },
+                        ]}
+                        placeholder="Select Title"
+                        isClearable
+                        isSearchable
+                        styles={selectControlStyle}
+                      />
+                    </div>
+                    <div className="contact-form-field" style={{ marginBottom: "16px" }}>
+                      <label className="contact-form-label contact-form-label-required" style={labelStyle}>
+                        Name <span style={{ color: "#f2545b" }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={person.name}
+                        onChange={(e) => updateContactPerson(index, "name", e.target.value)}
+                        placeholder="Enter contact name"
+                        style={inputStyle}
+                        onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
+                        onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
+                      />
+                    </div>
+                    <div className="contact-form-field" style={{ marginBottom: "16px" }}>
+                      <label className="contact-form-label contact-form-label-required" style={labelStyle}>
+                        Phone <span style={{ color: "#f2545b" }}>*</span>
+                      </label>
+                      <div className="phone-input-wrapper" style={{ width: "100%" }}>
+                        <PhoneInput
+                          international
+                          defaultCountry="US"
+                          value={
+                            person.phone_country_code && person.phone
+                              ? `${person.phone_country_code}${person.phone}`
+                              : person.phone || undefined
+                          }
+                          onChange={(value: string | undefined) => {
+                            if (value) {
+                              try {
+                                const phoneNumber = parsePhoneNumber(value);
+                                if (phoneNumber) {
+                                  updateContactPerson(index, "phone_country_code", `+${phoneNumber.countryCallingCode}`);
+                                  updateContactPerson(index, "phone", phoneNumber.nationalNumber);
+                                } else {
+                                  updateContactPerson(index, "phone_country_code", "");
+                                  updateContactPerson(index, "phone", value);
+                                }
+                              } catch {
+                                updateContactPerson(index, "phone_country_code", "");
+                                updateContactPerson(index, "phone", value);
+                              }
+                            } else {
+                              updateContactPerson(index, "phone_country_code", "");
+                              updateContactPerson(index, "phone", "");
+                            }
+                          }}
+                          placeholder="Enter phone number"
+                        />
+                      </div>
+                    </div>
+                    <div className="contact-form-field" style={{ marginBottom: "0" }}>
+                      <label className="contact-form-label contact-form-label-required" style={labelStyle}>
+                        Email <span style={{ color: "#f2545b" }}>*</span>
+                      </label>
+                      <input
+                        type="email"
+                        value={person.email}
+                        onChange={(e) => updateContactPerson(index, "email", e.target.value)}
+                        placeholder="Enter email address"
+                        style={inputStyle}
+                        onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
+                        onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Other Information Section */}
+              <div className="contact-form-section" style={{ marginTop: "24px", paddingTop: "24px" }}>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label" style={labelStyle}>Lead Potential</label>
+                  <Select
+                    value={
+                      formData.lead_potential
+                        ? { value: formData.lead_potential, label: formData.lead_potential }
+                        : null
+                    }
+                    onChange={(selectedOption: any) =>
+                      handleInputChange("lead_potential", selectedOption?.value ?? "")
+                    }
+                    options={[
+                      { value: "Hot", label: "Hot" },
+                      { value: "Warm", label: "Warm" },
+                      { value: "Cold", label: "Cold" },
+                    ]}
+                    placeholder="Select Potential"
+                    isClearable
+                    isSearchable
+                    styles={selectControlStyle}
+                  />
+                  <p style={{ fontSize: "13px", color: "#6c757d", marginTop: "6px", marginBottom: 0 }}>
+                    Likelihood of converting based on engagement
+                  </p>
+                </div>
+
+                {selectedCampaign?.fields && selectedCampaign.fields.length > 0 && (
+                  <div style={{ marginTop: "20px" }}>
+                    <div className="d-flex align-items-center mb-3">
+                      <FiTarget className="me-2" size={16} />
+                      <span style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+                        Custom Campaign Fields: {selectedCampaign.name}
+                      </span>
+                      {selectedCrmData && (
+                        <Badge bg="success" className="ms-2" style={{ fontSize: "11px" }}>
+                          Auto-filled from Prospect
+                        </Badge>
+                      )}
+                    </div>
+                    {selectedCampaign.fields.map((field: { field_name: string; is_required?: boolean }, idx: number) => (
+                      <div key={idx} className="contact-form-field" style={{ marginBottom: "20px" }}>
+                        <label className="contact-form-label" style={labelStyle}>
+                          {field.field_name}
+                          {field.is_required && <span style={{ color: "#f2545b" }}> *</span>}
+                        </label>
+                        {renderCampaignField(field)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <p style={{ fontSize: "13px", color: "#6c757d", marginTop: "16px", marginBottom: 0 }}>
+                  <CheckCircle size={14} style={{ verticalAlign: "middle", marginRight: "4px" }} />
+                  All required fields are marked with <span style={{ color: "#f2545b" }}>*</span>.
+                </p>
+              </div>
             </div>
+              );
+            })()}
           </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <div className="d-flex justify-content-between w-100">
-            <Button
-              variant="outline-secondary"
-              onClick={() => setFormStep(Math.max(0, formStep - 1))}
-              disabled={formStep === 0}
-            >
-              <ChevronLeft size={16} className="me-1" />
-              Back
-            </Button>
-            <Button variant="secondary" onClick={onHide}>
-              Cancel
-            </Button>
-            {formStep < 3 ? (
-              <Button variant="primary" onClick={handleNextStep}>
-                Next
-                <ChevronRight size={16} className="ms-1" />
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="success"
-                disabled={loading}
-                onClick={handleSubmit}
-              >
-                <CheckCircle size={16} className="me-2" />
-                {loading ? "Creating..." : "Create Lead"}
-              </Button>
-            )}
-          </div>
-        </Modal.Footer>
-      </Modal>
+          )}
+        </div>
+
+        {/* Footer Buttons: Edit mode = Update + Cancel; Create mode = Create + Create and add another + Cancel */}
+        <div
+          className="create-lead-sidebar-footer"
+          style={{
+            padding: "16px 24px",
+            borderTop: "1px solid #eaf0f6",
+            display: "flex",
+            gap: "12px",
+            justifyContent: "flex-start",
+            flexWrap: "wrap",
+          }}
+        >
+          <button
+            type="button"
+            disabled={loading || editFetching}
+            onClick={(e) => handleSubmit(e)}
+            style={{
+              padding: "10px 20px",
+              backgroundColor: loading || editFetching ? "#cbd5e0" : "#0091ae",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: loading || editFetching ? "not-allowed" : "pointer",
+            }}
+            onMouseEnter={(e) => {
+              if (!loading && !editFetching) e.currentTarget.style.backgroundColor = "#007a94";
+            }}
+            onMouseLeave={(e) => {
+              if (!loading && !editFetching) e.currentTarget.style.backgroundColor = "#0091ae";
+            }}
+          >
+            <CheckCircle size={16} style={{ verticalAlign: "middle", marginRight: "6px" }} />
+            {loading ? (editLeadId ? "Updating..." : "Creating...") : (editLeadId ? "Update" : "Create")}
+          </button>
+          {!editLeadId && (
+          <button
+            type="button"
+            disabled={loading || editFetching}
+            onClick={(e) => {
+              createAndAddAnotherRef.current = true;
+              handleSubmit(e);
+            }}
+            style={{
+              padding: "10px 20px",
+              backgroundColor: "transparent",
+              color: loading || editFetching ? "#a0aec0" : "#141414",
+              border: "1px solid #8a8a8a",
+              borderRadius: "4px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: loading || editFetching ? "not-allowed" : "pointer",
+            }}
+            onMouseEnter={(e) => {
+              if (!loading && !editFetching) e.currentTarget.style.backgroundColor = "#f7fafc";
+            }}
+            onMouseLeave={(e) => {
+              if (!loading && !editFetching) e.currentTarget.style.backgroundColor = "transparent";
+            }}
+          >
+            Create and add another
+          </button>
+          )}
+          <button
+            type="button"
+            onClick={onHide}
+            style={{
+              padding: "10px 20px",
+              backgroundColor: "transparent",
+              color: "#141414",
+              border: "1px solid #8a8a8a",
+              borderRadius: "4px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f7fafc"}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
 
       {/* Add/Edit Item Modal for Deal Template */}
       {dealTemplate && (

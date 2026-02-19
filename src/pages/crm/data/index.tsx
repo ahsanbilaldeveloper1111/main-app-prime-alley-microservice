@@ -41,6 +41,7 @@ import {
   FiFilter,
   FiTrash2,
   FiEye,
+  FiEdit,
   FiUser,
   FiUsers,
   FiPhone,
@@ -104,6 +105,9 @@ import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSide
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import {
   getCrmData,
+  getCrmDataById,
+  createCrmData,
+  updateCrmData,
   uploadCrmDataCsv,
   deleteCrmData,
   assignCrmDataAdvanced,
@@ -620,17 +624,27 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   const [showCreateContactSidebar, setShowCreateContactSidebar] = useState(false);
   const addContactsRef = useRef<HTMLDivElement>(null);
   const [contactForm, setContactForm] = useState({
-    email: '',
     firstName: '',
     lastName: '',
-    contactOwner: 'Rizwan Haider',
-    jobTitle: '',
+    email: '',
     phoneNumber: '',
-    lifecycleStage: 'Lead',
-    leadStatus: '',
-    legalBasis: [] as string[],
-    isMarketingContact: false,
+    campaign_id: null as number | null,
+    contact_owner: null as string | null,
+    lifecycle_stage: 'Lead',
+    disposition: '',
+    legal_basis: [] as string[],
+    last_called: '',
+    last_call_status: '',
+    next_call: '',
+    scheduled_call_at: '',
+    tags: [] as Array<{ value: string; label: string; id?: number }>,
+    note: '',
+    is_viewed: false,
   });
+  const [createContactLoading, setCreateContactLoading] = useState(false);
+  const [editingContactId, setEditingContactId] = useState<number | null>(null);
+  const [contactFormLoadError, setContactFormLoadError] = useState<string | null>(null);
+  const [contactFormLoading, setContactFormLoading] = useState(false);
 
   // Call recordings state
   const [callRecordings, setCallRecordings] = useState<any[]>([]);
@@ -673,6 +687,61 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showAddContactsDropdown]);
+
+  // Load prospect into form when sidebar opens in edit mode
+  useEffect(() => {
+    if (!showCreateContactSidebar || !editingContactId) {
+      setContactFormLoadError(null);
+      setContactFormLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setContactFormLoadError(null);
+    setContactFormLoading(true);
+    getCrmDataById(editingContactId)
+      .then((item: CrmDataItem & { data?: Record<string, any> }) => {
+        if (cancelled) return;
+        const d = item.data || {};
+        const nameParts = (item.name || '').trim().split(/\s+/);
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        const toDatetimeLocal = (v: string | null | undefined) => {
+          if (!v) return '';
+          const m = moment(v);
+          return m.isValid() ? m.format('YYYY-MM-DDTHH:mm') : '';
+        };
+        const rawTags = item?.data?.tags ?? d.tags ?? [];
+        const tagsArray = Array.isArray(rawTags)
+          ? rawTags.map((t: any) => (typeof t === 'string' ? { value: t, label: t } : { value: t.name ?? t.value ?? '', label: t.name ?? t.label ?? t.value ?? '' }))
+          : [];
+        setContactForm({
+          firstName,
+          lastName,
+          email: d.email ?? (item as any).email ?? '',
+          phoneNumber: item.phone ?? '',
+          campaign_id: item.campaign_id ?? d.campaign_id ?? null,
+          contact_owner: d.contact_owner ?? (item as any).contact_owner ?? null,
+          lifecycle_stage: d.lifecycle_stage ?? 'Lead',
+          disposition: d.disposition ?? (item as any).disposition ?? '',
+          legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
+          last_called: toDatetimeLocal(d.last_called ?? (item as any).last_called_at),
+          last_call_status: d.last_call_status ?? (item as any).last_call_end_reason ?? '',
+          next_call: toDatetimeLocal(d.next_call),
+          scheduled_call_at: toDatetimeLocal(item.scheduled_call_at ?? d.scheduled_call_at),
+          tags: tagsArray,
+          note: item.note ?? d.note ?? '',
+          is_viewed: item.is_viewed ?? d.is_viewed ?? false,
+        });
+        if (!cancelled) setContactFormLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setContactFormLoadError('Failed to load prospect');
+          setContactFormLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [showCreateContactSidebar, editingContactId]);
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback((filterId: string) => {
@@ -2389,6 +2458,15 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         onClick: (row: any) => handleViewData(row),
         variant: 'link' as const
       }] : []),
+      ...(session?.user?.permissions?.includes('view-crm-data-management') ? [{
+        label: 'Edit',
+        icon: <FiEdit size={16} />,
+        onClick: (row: any) => {
+          setEditingContactId(row.id);
+          setShowCreateContactSidebar(true);
+        },
+        variant: 'link' as const
+      }] : []),
       ...(session?.user?.permissions?.includes('call-service-crm-data-management') ? [{
         label: 'Call',
         icon: <PhoneIcon size={16} />,
@@ -2844,6 +2922,25 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
           <button
             onClick={() => {
               setShowAddContactsDropdown(false);
+              setEditingContactId(null);
+              setContactForm({
+                firstName: '',
+                lastName: '',
+                email: '',
+                phoneNumber: '',
+                campaign_id: null,
+                contact_owner: null,
+                lifecycle_stage: 'Lead',
+                disposition: '',
+                legal_basis: [],
+                last_called: '',
+                last_call_status: '',
+                next_call: '',
+                scheduled_call_at: '',
+                tags: [],
+                note: '',
+                is_viewed: false,
+              });
               setShowCreateContactSidebar(true);
             }}
             style={{
@@ -2894,11 +2991,119 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     </div>
   );
 
+  // Create prospect (contact) API submit - POST crm/crm-data { name, phone, data }
+  const handleCreateContactSubmit = useCallback(async (addAnother: boolean) => {
+    const name = [contactForm.firstName, contactForm.lastName].filter(Boolean).join(' ').trim();
+    if (!name || !contactForm.email || !contactForm.phoneNumber?.trim()) {
+      toast.error("Name, email and phone are required");
+      return;
+    }
+    const sessionUser = session?.user as any;
+    const userExtension = String(sessionUser?.phone ?? "");
+    const assignedTo = userExtension;
+    const uploadedBy = userExtension;
+
+    setCreateContactLoading(true);
+    try {
+      await createCrmData({
+        name,
+        phone: contactForm.phoneNumber.trim(),
+        user_extension: userExtension,
+        campaign_id: contactForm.campaign_id ?? null,
+        data: {
+          email: contactForm.email.trim(),
+          assigned_to: assignedTo,
+          user_extension: userExtension,
+          uploaded_by: uploadedBy,
+          campaign_id: contactForm.campaign_id ?? undefined,
+          last_called: contactForm.last_called || undefined,
+          last_call_status: contactForm.last_call_status || undefined,
+          disposition: contactForm.disposition || undefined,
+          next_call: contactForm.next_call || undefined,
+          tags: contactForm.tags?.length ? contactForm.tags.map((t) => t.value || t.label) : undefined,
+          is_viewed: contactForm.is_viewed,
+          scheduled_call_at: contactForm.scheduled_call_at || undefined,
+          note: contactForm.note || undefined,
+          contact_owner: contactForm.contact_owner ?? undefined,
+          lifecycle_stage: contactForm.lifecycle_stage || undefined,
+          legal_basis: contactForm.legal_basis?.length ? contactForm.legal_basis : undefined,
+        },
+      });
+      fetchCrmData();
+      setContactForm({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        campaign_id: null,
+        contact_owner: null,
+        lifecycle_stage: 'Lead',
+        disposition: '',
+        legal_basis: [],
+        last_called: '',
+        last_call_status: '',
+        next_call: '',
+        scheduled_call_at: '',
+        tags: [],
+        note: '',
+        is_viewed: false,
+      });
+      if (!addAnother) {
+        setShowCreateContactSidebar(false);
+      }
+    } catch {
+      // Error already shown by createCrmData
+    } finally {
+      setCreateContactLoading(false);
+    }
+  }, [contactForm, fetchCrmData, session?.user]);
+
+  const handleUpdateContactSubmit = useCallback(async () => {
+    if (editingContactId == null) return;
+    const name = [contactForm.firstName, contactForm.lastName].filter(Boolean).join(' ').trim();
+    if (!name || !contactForm.email?.trim() || !contactForm.phoneNumber?.trim()) {
+      toast.error("Name, email and phone are required");
+      return;
+    }
+    setCreateContactLoading(true);
+    try {
+      await updateCrmData(editingContactId, {
+        name,
+        phone: contactForm.phoneNumber.trim(),
+        data: {
+          email: contactForm.email.trim(),
+          campaign_id: contactForm.campaign_id ?? undefined,
+          last_called: contactForm.last_called || undefined,
+          last_call_status: contactForm.last_call_status || undefined,
+          disposition: contactForm.disposition || undefined,
+          next_call: contactForm.next_call || undefined,
+          tags: contactForm.tags?.length ? contactForm.tags.map((t) => t.value || t.label) : undefined,
+          is_viewed: contactForm.is_viewed,
+          scheduled_call_at: contactForm.scheduled_call_at || undefined,
+          note: contactForm.note || undefined,
+          contact_owner: contactForm.contact_owner ?? undefined,
+          lifecycle_stage: contactForm.lifecycle_stage || undefined,
+          legal_basis: contactForm.legal_basis?.length ? contactForm.legal_basis : undefined,
+        },
+      });
+      fetchCrmData();
+      setShowCreateContactSidebar(false);
+      setEditingContactId(null);
+    } catch {
+      // Error already shown by updateCrmData
+    } finally {
+      setCreateContactLoading(false);
+    }
+  }, [editingContactId, contactForm, fetchCrmData]);
+
   // Render Create Contact Sidebar
   const renderCreateContactSidebar = () => {
     if (!showCreateContactSidebar) return null;
 
-    const isFormValid = contactForm.email && contactForm.firstName && contactForm.lastName;
+    const isFormValid =
+      contactForm.email?.trim() &&
+      contactForm.phoneNumber?.trim() &&
+      (contactForm.firstName?.trim() || contactForm.lastName?.trim());
 
     return (
       <>
@@ -2946,11 +3151,16 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
               color: '#141414',
               margin: 0,
             }}>
-              Create Contact
+              {editingContactId ? 'Edit Contact' : 'Create Contact'}
             </h2>
             <button
               className="contact-sidebar-close-btn"
-              onClick={() => setShowCreateContactSidebar(false)}
+              onClick={() => {
+                setShowCreateContactSidebar(false);
+                setEditingContactId(null);
+                setContactFormLoadError(null);
+                setContactFormLoading(false);
+              }}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -2965,355 +3175,153 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             </button>
           </div>
 
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!isFormValid || createContactLoading || (editingContactId != null && contactFormLoading)) return;
+              if (editingContactId) handleUpdateContactSubmit();
+              else handleCreateContactSubmit(false);
+            }}
+            style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+          >
+          {contactFormLoadError && (
+            <div style={{ padding: '12px 24px', background: '#fef2f2', color: '#b91c1c', fontSize: '14px' }}>
+              {contactFormLoadError}
+            </div>
+          )}
           {/* Form Content */}
           <div className="contact-sidebar-content" style={{
             flex: 1,
             overflowY: 'auto',
             padding: '40px',
           }}>
-            {/* Primary Fields Section */}
+            {editingContactId && contactFormLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 280, gap: '16px' }}>
+                <Spinner animation="border" role="status" style={{ width: '2.5rem', height: '2.5rem', color: '#0091ae' }} />
+                <span style={{ fontSize: '14px', color: '#64748b' }}>Loading prospect...</span>
+              </div>
+            ) : (
+            <>
+            {/* Required: Name, Email, Phone */}
             <div className="contact-form-section">
-              {/* Email Field */}
               <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label contact-form-label-required" style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  marginBottom: '8px',
-                }}>
+                <label className="contact-form-label contact-form-label-required" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>
+                  First name <span style={{ color: '#f2545b' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  data-test-id="firstname-input"
+                  value={contactForm.firstName}
+                  onChange={(e) => setContactForm({ ...contactForm, firstName: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = '#8a8a8a')}
+                />
+              </div>
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label contact-form-label-required" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>
+                  Last name <span style={{ color: '#f2545b' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  data-test-id="lastname-input"
+                  value={contactForm.lastName}
+                  onChange={(e) => setContactForm({ ...contactForm, lastName: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = '#8a8a8a')}
+                />
+              </div>
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label contact-form-label-required" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>
                   Email <span style={{ color: '#f2545b' }}>*</span>
                 </label>
                 <input
                   type="email"
-                  className="contact-form-input"
                   data-test-id="email-input"
                   value={contactForm.email}
                   onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #8a8a8a',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    outline: 'none',
-                  }}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = '#8a8a8a')}
                 />
               </div>
-
-              {/* First Name Field */}
               <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label contact-form-label-required" style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  marginBottom: '8px',
-                }}>
-                  First name <span style={{ color: '#f2545b' }}>*</span>
+                <label className="contact-form-label contact-form-label-required" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>
+                  Phone <span style={{ color: '#f2545b' }}>*</span>
                 </label>
                 <input
-                  className="contact-form-textarea"
-                  data-test-id="firstname-input"
-                  value={contactForm.firstName}
-                  onChange={(e) => setContactForm({ ...contactForm, firstName: e.target.value })}
-                  required
-                  
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #8a8a8a',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#0091ae'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e0'}
-                />
-              </div>
-
-              {/* Last Name Field */}
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label contact-form-label-required" style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  marginBottom: '8px',
-                }}>
-                  Last name <span style={{ color: '#f2545b' }}>*</span>
-                </label>
-                <input
-                  className="contact-form-textarea"
-                  data-test-id="lastname-input"
-                  value={contactForm.lastName}
-                  onChange={(e) => setContactForm({ ...contactForm, lastName: e.target.value })}
-                  required
-                  
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #8a8a8a',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#0091ae'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e0'}
+                  type="tel"
+                  data-test-id="phone-input"
+                  value={contactForm.phoneNumber}
+                  onChange={(e) => setContactForm({ ...contactForm, phoneNumber: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = '#8a8a8a')}
                 />
               </div>
             </div>
 
-            {/* Secondary Fields Section */}
+            {/* Optional: Campaign, Contact owner, Lifecycle stage, Disposition, Legal basis */}
             <div className="contact-form-section" style={{ marginTop: '24px' }}>
-              {/* Contact Owner Field */}
               <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  marginBottom: '8px',
-                }}>
-                  Contact owner
-                </label>
-                <Dropdown className="contact-form-dropdown">
-                  <Dropdown.Toggle
-                    className="contact-form-dropdown-toggle"
-                    data-test-id="hubspot_owner_id-input"
-                    variant="outline-secondary"
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '10px 12px',
-                      border: '1px solid #8a8a8a',
-                      borderRadius: '4px',
-                      fontSize: '14px',
-                      backgroundColor: '#ffffff',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    {contactForm.contactOwner}
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu style={{ width: '100%' }}>
-                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, contactOwner: 'Rizwan Haider' })}>
-                      Rizwan Haider
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, contactOwner: 'John Doe' })}>
-                      John Doe
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, contactOwner: 'Jane Smith' })}>
-                      Jane Smith
-                    </Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
-              </div>
-
-              {/* Job Title Field */}
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  marginBottom: '8px',
-                }}>
-                  Job title
-                </label>
-                <textarea
-                  className="contact-form-textarea"
-                  data-test-id="jobtitle-input"
-                  value={contactForm.jobTitle}
-                  onChange={(e) => setContactForm({ ...contactForm, jobTitle: e.target.value })}
-                  rows={1}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #8a8a8a',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#0091ae'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e0'}
+                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Campaign</label>
+                <Select
+                  value={contactForm.campaign_id != null ? (() => { const c = availableCampaigns.find((x) => x.id === contactForm.campaign_id); return c ? { value: String(c.id), label: c.label } : null; })() : null}
+                  onChange={(opt: any) => setContactForm({ ...contactForm, campaign_id: opt?.value ? Number(opt.value) : null })}
+                  options={availableCampaigns.map((c) => ({ value: String(c.id), label: c.label }))}
+                  placeholder="Select campaign"
+                  isClearable
+                  isSearchable
+                  styles={{ control: (base) => ({ ...base, minHeight: 40, border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px' }) }}
                 />
               </div>
-
-              {/* Phone Number Field */}
               <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  marginBottom: '8px',
-                }}>
-                  Phone number
-                </label>
-                <textarea
-                  className="contact-form-textarea"
-                  data-test-id="property-input-phone-button"
-                  value={contactForm.phoneNumber}
-                  onChange={(e) => setContactForm({ ...contactForm, phoneNumber: e.target.value })}
-                  rows={1}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid #8a8a8a',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = '#0091ae'}
-                  onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e0'}
+                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Contact owner</label>
+                <Select
+                  value={(() => {
+                    const opts = extensions.map((ext: any) => ({ value: String(ext.extension ?? ext.id ?? ''), label: ext.display_name || ext.name || ext.extension || String(ext.id || '') }));
+                    return contactForm.contact_owner != null ? opts.find((o) => o.value === contactForm.contact_owner) || null : null;
+                  })()}
+                  onChange={(opt: any) => setContactForm({ ...contactForm, contact_owner: opt?.value ?? null })}
+                  options={extensions.map((ext: any) => ({ value: String(ext.extension ?? ext.id ?? ''), label: ext.display_name || ext.name || ext.extension || String(ext.id || '') }))}
+                  placeholder="Select contact owner"
+                  isClearable
+                  isSearchable
+                  styles={{ control: (base) => ({ ...base, minHeight: 40, border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px' }) }}
                 />
               </div>
-
-              {/* Lifecycle Stage Field */}
               <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  marginBottom: '8px',
-                }}>
-                  Lifecycle stage
-                </label>
-                <Dropdown className="contact-form-dropdown">
-                  <Dropdown.Toggle
-                    className="contact-form-dropdown-toggle"
-                    data-test-id="lifecyclestage-input"
-                    variant="outline-secondary"
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '10px 12px',
-                      border: '1px solid #8a8a8a',
-                      borderRadius: '4px',
-                      fontSize: '14px',
-                      backgroundColor: '#ffffff',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    {contactForm.lifecycleStage}
+                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Lifecycle stage</label>
+                <Dropdown>
+                  <Dropdown.Toggle variant="outline-secondary" style={{ width: '100%', textAlign: 'left', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', backgroundColor: '#fff' }}>
+                    {contactForm.lifecycle_stage || 'Select...'}
                   </Dropdown.Toggle>
                   <Dropdown.Menu style={{ width: '100%' }}>
-                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, lifecycleStage: 'Lead' })}>
-                      Lead
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, lifecycleStage: 'Prospect' })}>
-                      Prospect
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, lifecycleStage: 'Customer' })}>
-                      Customer
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, lifecycleStage: 'Evangelist' })}>
-                      Evangelist
-                    </Dropdown.Item>
+                    {['Lead', 'Prospect', 'Customer', 'Evangelist'].map((stage) => (
+                      <Dropdown.Item key={stage} onClick={() => setContactForm({ ...contactForm, lifecycle_stage: stage })}>{stage}</Dropdown.Item>
+                    ))}
                   </Dropdown.Menu>
                 </Dropdown>
               </div>
-
-              {/* Lead Status Field */}
               <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  marginBottom: '8px',
-                }}>
-                  Lead status
-                </label>
-                <Dropdown className="contact-form-dropdown">
-                  <Dropdown.Toggle
-                    className="contact-form-dropdown-toggle"
-                    data-test-id="hs_lead_status-input"
-                    variant="outline-secondary"
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '10px 12px',
-                      border: '1px solid #8a8a8a',
-                      borderRadius: '4px',
-                      fontSize: '14px',
-                      backgroundColor: '#ffffff',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      color: contactForm.leadStatus ? '#141414' : '#a0aec0',
-                    }}
-                  >
-                    {contactForm.leadStatus || 'Select...'}
+                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Disposition</label>
+                <Dropdown>
+                  <Dropdown.Toggle variant="outline-secondary" style={{ width: '100%', textAlign: 'left', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', backgroundColor: '#fff', color: contactForm.disposition ? '#141414' : '#a0aec0' }}>
+                    {contactForm.disposition || 'Select...'}
                   </Dropdown.Toggle>
                   <Dropdown.Menu style={{ width: '100%' }}>
-                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, leadStatus: 'New' })}>
-                      New
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, leadStatus: 'Open' })}>
-                      Open
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, leadStatus: 'In Progress' })}>
-                      In Progress
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, leadStatus: 'Qualified' })}>
-                      Qualified
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => setContactForm({ ...contactForm, leadStatus: 'Unqualified' })}>
-                      Unqualified
-                    </Dropdown.Item>
+                    {['interested', 'not_interested', 'callback_requested', 'no_answer', 'busy', 'do_not_call', 'wrong_number', 'follow_up'].map((d) => (
+                      <Dropdown.Item key={d} onClick={() => setContactForm({ ...contactForm, disposition: d })}>{d.replace(/_/g, ' ')}</Dropdown.Item>
+                    ))}
                   </Dropdown.Menu>
                 </Dropdown>
               </div>
-
-              {/* Legal Basis Field */}
               <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  marginBottom: '8px',
-                }}>
-                  Legal basis for processing contact&apos;s data
-                </label>
-                <Dropdown className="contact-form-dropdown">
-                  <Dropdown.Toggle
-                    className="contact-form-dropdown-toggle"
-                    data-test-id="hs_legal_basis-input"
-                    data-fnd-select-multi-value="true"
-                    variant="outline-secondary"
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '10px 12px',
-                      border: '1px solid #8a8a8a',
-                      borderRadius: '4px',
-                      fontSize: '14px',
-                      backgroundColor: '#ffffff',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      color: contactForm.legalBasis.length > 0 ? '#141414' : '#a0aec0',
-                    }}
-                  >
-                    {contactForm.legalBasis.length > 0 
-                      ? contactForm.legalBasis.join(', ') 
-                      : 'Select...'}
+                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Legal basis for processing contact&apos;s data</label>
+                <Dropdown>
+                  <Dropdown.Toggle variant="outline-secondary" style={{ width: '100%', textAlign: 'left', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', backgroundColor: '#fff', color: contactForm.legal_basis?.length ? '#141414' : '#a0aec0' }}>
+                    {contactForm.legal_basis?.length ? contactForm.legal_basis.join(', ') : 'Select...'}
                   </Dropdown.Toggle>
                   <Dropdown.Menu style={{ width: '100%', padding: '8px' }}>
                     {['Legitimate interest', 'Consent', 'Contract', 'Legal obligation', 'Vital interests', 'Public task'].map((option) => (
@@ -3321,22 +3329,9 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                         key={option}
                         as="div"
                         style={{ padding: '4px 8px' }}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const isSelected = contactForm.legalBasis.includes(option);
-                          const newBasis = isSelected
-                            ? contactForm.legalBasis.filter(b => b !== option)
-                            : [...contactForm.legalBasis, option];
-                          setContactForm({ ...contactForm, legalBasis: newBasis });
-                        }}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); const isSelected = contactForm.legal_basis.includes(option); setContactForm({ ...contactForm, legal_basis: isSelected ? contactForm.legal_basis.filter((b) => b !== option) : [...contactForm.legal_basis, option] }); }}
                       >
-                        <Form.Check
-                          type="checkbox"
-                          label={option}
-                          checked={contactForm.legalBasis.includes(option)}
-                          onChange={() => {}} // Handled by parent onClick
-                        />
+                        <Form.Check type="checkbox" label={option} checked={contactForm.legal_basis.includes(option)} onChange={() => {}} />
                       </Dropdown.Item>
                     ))}
                   </Dropdown.Menu>
@@ -3344,59 +3339,81 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
               </div>
             </div>
 
-            {/* Marketing Contact Section */}
-            <div className="contact-form-section" style={{
-              marginTop: '24px',
-              paddingTop: '24px',
-              borderTop: '1px solid #eaf0f6',
-            }}>
+            {/* Optional: Datetime and text fields */}
+            <div className="contact-form-section" style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid #eaf0f6' }}>
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Last called</label>
+                <input
+                  type="datetime-local"
+                  value={contactForm.last_called}
+                  onChange={(e) => setContactForm({ ...contactForm, last_called: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
+                />
+              </div>
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Last call status</label>
+                <input
+                  type="text"
+                  value={contactForm.last_call_status}
+                  onChange={(e) => setContactForm({ ...contactForm, last_call_status: e.target.value })}
+                  placeholder="e.g. Answered, No answer"
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = '#8a8a8a')}
+                />
+              </div>
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Next call</label>
+                <input
+                  type="datetime-local"
+                  value={contactForm.next_call}
+                  onChange={(e) => setContactForm({ ...contactForm, next_call: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
+                />
+              </div>
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Scheduled call at</label>
+                <input
+                  type="datetime-local"
+                  value={contactForm.scheduled_call_at}
+                  onChange={(e) => setContactForm({ ...contactForm, scheduled_call_at: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
+                />
+              </div>
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Tags</label>
+                <CreatableSelect
+                  isMulti
+                  value={contactForm.tags}
+                  onChange={(selected) => setContactForm({ ...contactForm, tags: selected ? [...selected] : [] })}
+                  options={availableTags.map((t: any) => ({ value: t.value, label: t.label, id: t.id }))}
+                  placeholder="Select or create tags"
+                  styles={{ control: (base) => ({ ...base, minHeight: 40, border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px' }) }}
+                />
+              </div>
+              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
+                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Note</label>
+                <textarea
+                  rows={3}
+                  value={contactForm.note}
+                  onChange={(e) => setContactForm({ ...contactForm, note: e.target.value })}
+                  placeholder="Notes about this contact"
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = '#8a8a8a')}
+                />
+              </div>
               <div className="contact-form-field">
                 <Form.Check
                   type="checkbox"
-                  className="contact-form-checkbox"
-                  checked={contactForm.isMarketingContact}
-                  onChange={(e) => setContactForm({ ...contactForm, isMarketingContact: e.target.checked })}
-                  label={
-                    <span style={{
-                      fontSize: '14px',
-                      color: '#141414',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}>
-                      Set this contact as a marketing contact
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '50%',
-                          backgroundColor: '#e0e7ef',
-                          color: '#6c757d',
-                          fontSize: '12px',
-                          cursor: 'help',
-                        }}
-                        title="Marketing contacts can be used for marketing campaigns and automations"
-                      >
-                        i
-                      </span>
-                    </span>
-                  }
+                  checked={contactForm.is_viewed}
+                  onChange={(e) => setContactForm({ ...contactForm, is_viewed: e.target.checked })}
+                  label={<span style={{ fontSize: '14px', color: '#141414', fontWeight: 500 }}>Is viewed</span>}
                 />
-                <p style={{
-                  fontSize: '13px',
-                  color: '#6c757d',
-                  marginTop: '8px',
-                  marginLeft: '24px',
-                  marginBottom: 0,
-                }}>
-                  Allow your team to market to this Contact
-                </p>
               </div>
             </div>
+            </>
+            )}
           </div>
 
           {/* Footer Buttons */}
@@ -3410,53 +3427,64 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             <button
               type="submit"
               className="contact-form-btn-create"
-              disabled={!isFormValid}
+              disabled={!isFormValid || createContactLoading || (!!editingContactId && contactFormLoading)}
               style={{
                 padding: '10px 20px',
-                backgroundColor: isFormValid ? '#0091ae' : '#cbd5e0',
+                backgroundColor: isFormValid && !createContactLoading ? '#0091ae' : '#cbd5e0',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '4px',
                 fontSize: '14px',
                 fontWeight: '500',
-                cursor: isFormValid ? 'pointer' : 'not-allowed',
+                cursor: isFormValid && !createContactLoading ? 'pointer' : 'not-allowed',
               }}
               onMouseEnter={(e) => {
-                if (isFormValid) e.currentTarget.style.backgroundColor = '#007a94';
+                if (isFormValid && !createContactLoading) e.currentTarget.style.backgroundColor = '#007a94';
               }}
               onMouseLeave={(e) => {
-                if (isFormValid) e.currentTarget.style.backgroundColor = '#0091ae';
+                if (isFormValid && !createContactLoading) e.currentTarget.style.backgroundColor = '#0091ae';
               }}
             >
-              Create
+              {createContactLoading
+                ? (editingContactId ? 'Updating...' : 'Creating...')
+                : (editingContactId ? 'Update' : 'Create')}
             </button>
-            <button
-              type="button"
-              className="contact-form-btn-create-another"
-              disabled={!isFormValid}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: 'transparent',
-                color: isFormValid ? '#141414' : '#a0aec0',
-                border: '1px solid #8a8a8a',
-                borderRadius: '4px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: isFormValid ? 'pointer' : 'not-allowed',
-              }}
-              onMouseEnter={(e) => {
-                if (isFormValid) e.currentTarget.style.backgroundColor = '#f7fafc';
-              }}
-              onMouseLeave={(e) => {
-                if (isFormValid) e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              Create and add another
-            </button>
+            {!editingContactId && (
+              <button
+                type="button"
+                className="contact-form-btn-create-another"
+                disabled={!isFormValid || createContactLoading}
+                onClick={() => handleCreateContactSubmit(true)}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: 'transparent',
+                  color: isFormValid && !createContactLoading ? '#141414' : '#a0aec0',
+                  border: '1px solid #8a8a8a',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: isFormValid && !createContactLoading ? 'pointer' : 'not-allowed',
+                }}
+                onMouseEnter={(e) => {
+                  if (isFormValid && !createContactLoading) e.currentTarget.style.backgroundColor = '#f7fafc';
+                }}
+                onMouseLeave={(e) => {
+                  if (isFormValid && !createContactLoading) e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                Create and add another
+              </button>
+            )}
             <button
               type="button"
               className="contact-form-btn-cancel"
-              onClick={() => setShowCreateContactSidebar(false)}
+              disabled={createContactLoading}
+              onClick={() => {
+                setShowCreateContactSidebar(false);
+                setEditingContactId(null);
+                setContactFormLoadError(null);
+                setContactFormLoading(false);
+              }}
               style={{
                 padding: '10px 20px',
                 backgroundColor: 'transparent',
@@ -3473,6 +3501,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
               Cancel
             </button>
           </div>
+          </form>
         </div>
       </>
     );
