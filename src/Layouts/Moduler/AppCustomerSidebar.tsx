@@ -1350,12 +1350,15 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       background: rgba(255, 255, 255, 0.2);
     }
 
+
+
     .menu-item-icon {
       color: #dfdbdb;
       display: flex;
       align-items: center;
       flex-shrink: 0;
       transition: color 0.2s;
+      
     }
 
     .menu-item-text {
