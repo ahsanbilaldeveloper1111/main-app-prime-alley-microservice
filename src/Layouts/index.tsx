@@ -1274,12 +1274,16 @@ const Layout = ({ children }: LayoutProps) => {
                 </Dropdown>
 
  {/* Help Icon */}
- <button className="crm-prime-topbar-icon" title="Help">
+                <button className="crm-prime-topbar-icon" title="Help"
+                onClick={() => router.push('/help-center')}
+                >
                 <HelpCircle size={18} />
               </button>
 
               {/* Settings Icon */}
-              <button className="crm-prime-topbar-icon" title="Settings">
+                <button className="crm-prime-topbar-icon" title="Settings"
+                onClick={() => router.push('/settings')}
+                >
                 <Settings size={18} />
               </button>
               {/* Divider */}

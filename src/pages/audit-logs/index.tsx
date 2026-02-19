@@ -10,6 +10,7 @@ import GenericTable, { TableColumn, PaginationConfig, ToolbarConfig } from "@com
 import GenericSidebar from "@components/GenericSidebarNew";
 import { GetHierarchyData } from "@utils/users";
 import { AuditFilterConfig, AuditFilterNode, AuditFilterService } from "@config/auditFilterConfig";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 
 function normalizeAuditResponse(result: unknown): unknown[] {
   if (Array.isArray(result)) return result;
@@ -74,6 +75,68 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
     { key: "ip_address", label: "IP Address", sortable: true, type: "text", emptyValue: "—" },
     changesSummaryColumn(),
   ],
+  Accounts: [
+    { key: "formatted_timestamp", label: "Date & Time", sortable: true, type: "text", emptyValue: "—" },
+    { key: "formatted_action", label: "Action", sortable: true, type: "text", emptyValue: "—" },
+    {
+      key: "resource_type",
+      label: "Resource",
+      sortable: true,
+      type: "text",
+      accessor: (row: Record<string, unknown>) => formatLabel(row.resource_type),
+      emptyValue: "—",
+    },
+    {
+      key: "company",
+      label: "Company",
+      sortable: true,
+      type: "text",
+      accessor: (row: Record<string, unknown>) => (row.company as any)?.name || "—",
+      emptyValue: "—",
+    },
+    // { key: "message", label: "Message", sortable: false, type: "text", emptyValue: "—" },
+    { key: "ip_address", label: "IP Address", sortable: true, type: "text", emptyValue: "—" },
+    changesSummaryColumn(),
+  ],
+  Automation: [
+    {
+      key: "formatted_timestamp",
+      label: "Date & Time",
+      sortable: true,
+      type: "text",
+      accessor: (row: Record<string, unknown>) =>
+        (row.formatted_timestamp as string) || (row.created_at ? moment(String(row.created_at)).format("MMM D, YYYY HH:mm:ss") : null) || "—",
+      emptyValue: "—",
+    },
+    {
+      key: "formatted_action",
+      label: "Action",
+      sortable: true,
+      type: "text",
+      accessor: (row: Record<string, unknown>) =>
+        (row.formatted_action as string) || formatLabel(row.action) || (row.action as string) || "—",
+      emptyValue: "—",
+    },
+    {
+      key: "resource_type",
+      label: "Resource",
+      sortable: true,
+      type: "text",
+      accessor: (row: Record<string, unknown>) => formatLabel(row.resource_type),
+      emptyValue: "—",
+    },
+    {
+      key: "company",
+      label: "Company",
+      sortable: true,
+      type: "text",
+      accessor: (row: Record<string, unknown>) => (row.company as any)?.name || "—",
+      emptyValue: "—",
+    },
+    // { key: "message", label: "Message", sortable: false, type: "text", emptyValue: "—" },
+    { key: "ip_address", label: "IP Address", sortable: true, type: "text", emptyValue: "—" },
+    changesSummaryColumn(),
+  ],
 };
 
 /** Default columns when module has no specific definition. */
@@ -120,6 +183,22 @@ const AUDIT_SIDEBAR_FIELDS_BY_MODULE: Record<
     { label: "Message", key: "message", showWhenKey: "message" },
     { label: "IP address", key: "ip_address", copyable: true },
   ],
+  Accounts: [
+    { label: "Date & time", key: "formatted_timestamp", copyable: true },
+    { label: "Action", key: "formatted_action" },
+    { label: "Resource", key: "resource_type" },
+    { label: "Company", key: "company" },
+    { label: "Message", key: "message", showWhenKey: "message" },
+    { label: "IP address", key: "ip_address", copyable: true },
+  ],
+  Automation: [
+    { label: "Date & time", key: "formatted_timestamp", copyable: true },
+    { label: "Action", key: "formatted_action" },
+    { label: "Resource", key: "resource_type" },
+    { label: "Company", key: "company" },
+    { label: "Message", key: "message", showWhenKey: "message" },
+    { label: "IP address", key: "ip_address", copyable: true },
+  ],
 };
 
 const DEFAULT_SIDEBAR_FIELDS = AUDIT_SIDEBAR_FIELDS_BY_MODULE["Staff management"];
@@ -129,7 +208,21 @@ function getSidebarFieldValue(row: Record<string, unknown>, key: string): string
     const u = row.user as any;
     return u?.display_name || u?.email || (row.user_id as string) || "—";
   }
+  if (key === "company") {
+    return (row.company as any)?.name || "—";
+  }
   if (key === "resource_type") return formatLabel(row.resource_type);
+  if (key === "formatted_timestamp") {
+    const v = row.formatted_timestamp;
+    if (v != null && v !== "") return String(v);
+    if (row.created_at) return moment(String(row.created_at)).format("MMM D, YYYY HH:mm:ss");
+    return "—";
+  }
+  if (key === "formatted_action") {
+    const v = row.formatted_action;
+    if (v != null && v !== "") return String(v);
+    return formatLabel(row.action) || (row.action != null ? String(row.action) : "") || "—";
+  }
   const v = row[key];
   return v != null && v !== "" ? String(v) : "—";
 }
@@ -156,6 +249,32 @@ function getSidebarFieldsForModule(
 }
 
 type ChangeItem = { field?: string; type?: string; new?: string; old?: string };
+
+/** Derive changes_summary from old_values and new_values (e.g. Accounts, Automation APIs). */
+function deriveChangesFromOldNew(
+  oldValues: Record<string, unknown> | null | undefined,
+  newValues: Record<string, unknown> | null | undefined
+): ChangeItem[] {
+  const old = oldValues && typeof oldValues === "object" ? oldValues : {};
+  const newV = newValues && typeof newValues === "object" ? newValues : {};
+  const format = (v: unknown): string => (v == null || v === "" ? "—" : String(v));
+  const allKeys = new Set([...Object.keys(old), ...Object.keys(newV)]);
+  const items: ChangeItem[] = [];
+  allKeys.forEach((key) => {
+    const oldVal = old[key];
+    const newVal = newV[key];
+    const hasOld = key in old;
+    const hasNew = key in newV;
+    if (!hasOld && hasNew) {
+      items.push({ field: formatLabel(key), type: "added", old: "—", new: format(newVal) });
+    } else if (hasOld && !hasNew) {
+      items.push({ field: formatLabel(key), type: "removed", old: format(oldVal), new: "—" });
+    } else if (hasOld && hasNew && oldVal !== newVal) {
+      items.push({ field: formatLabel(key), type: "updated", old: format(oldVal), new: format(newVal) });
+    }
+  });
+  return items;
+}
 
 function ChangesSummaryTable({ changes }: { changes: ChangeItem[] }) {
   if (!changes?.length) {
@@ -198,6 +317,12 @@ const AuditLogsNewPage = () => {
   const [auditPage, setAuditPage] = useState(1);
   const [auditLimit, setAuditLimit] = useState(10);
   const [auditTotal, setAuditTotal] = useState(0);
+  const [auditLogsSummary, setAuditLogsSummary] = useState<{
+    total?: number;
+    created?: number;
+    updated?: number;
+    deleted?: number;
+  } | null>(null);
   const [auditUserOptions, setAuditUserOptions] = useState<{ value: string; label: string }[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
   const [selectedRow, setSelectedRow] = useState<Record<string, unknown> | null>(null);
@@ -213,7 +338,7 @@ const AuditLogsNewPage = () => {
   const visibleAuditServices = useMemo(() => {
     if (!selectedAuditModule) return [];
     const perms = session?.user?.permissions ?? [];
-    return selectedAuditModule.services.filter((s) => perms.includes(s.isShow));
+    return selectedAuditModule.services.filter((s) => perms.includes(s.isShow ?? ""));
   }, [selectedAuditModule, session?.user?.permissions]);
 
   const handleAuditModuleChange = useCallback((moduleName: string) => {
@@ -225,6 +350,7 @@ const AuditLogsNewPage = () => {
     setAuditEndDate("");
     setSelectedAuditUser("");
     setAuditLogsData(null);
+    setAuditLogsSummary(null);
     setAuditPage(1);
   }, [visibleAuditModules]);
 
@@ -236,8 +362,24 @@ const AuditLogsNewPage = () => {
     setAuditEndDate("");
     setSelectedAuditUser("");
     setAuditLogsData(null);
+    setAuditLogsSummary(null);
     setAuditPage(1);
   }, [visibleAuditServices]);
+
+
+  const auditLogsStatsCards: StatsCardData[] = useMemo(() => {
+    const s = auditLogsSummary;
+    if (s && (s.total != null || s.created != null || s.updated != null || s.deleted != null)) {
+      return [
+        { title: "Total", value: s.total ?? 0 },
+        { title: "Created", value: s.created ?? 0 },
+        { title: "Updated", value: s.updated ?? 0 },
+        { title: "Deleted", value: s.deleted ?? 0 },
+      ];
+    }
+    const total = auditLogsData?.length ?? auditTotal ?? 0;
+    return [{ title: "Total Audit Logs", value: total }];
+  }, [auditLogsSummary, auditLogsData?.length, auditTotal]);
 
   useEffect(() => {
     if (!selectedAuditService || (selectedAuditService.users !== "hierarchy" && selectedAuditService.users !== "dropdown")) {
@@ -295,14 +437,17 @@ const AuditLogsNewPage = () => {
         if (cancelled) return;
         const data = normalizeAuditResponse(result);
         setAuditLogsData(data);
-        const res = result as { pagination?: { total?: number } };
+        const res = result as { pagination?: { total?: number }; summary?: { total?: number; created?: number; updated?: number; deleted?: number } };
         if (res?.pagination?.total != null) setAuditTotal(res.pagination.total);
         else setAuditTotal(Array.isArray(data) ? data.length : 0);
+        if (res?.summary && typeof res.summary === "object") setAuditLogsSummary(res.summary);
+        else setAuditLogsSummary(null);
       })
       .catch(() => {
         if (!cancelled) {
           setAuditLogsData([]);
           setAuditTotal(0);
+          setAuditLogsSummary(null);
         }
       })
       .finally(() => { if (!cancelled) setAuditLogsLoading(false); });
@@ -319,7 +464,20 @@ const AuditLogsNewPage = () => {
     setSelectedRow(null);
   }, []);
 
-  const dataList = auditLogsData ?? [];
+  /** For Accounts & Automation, derive changes from old_values/new_values when API doesn't send changes_summary. */
+  const dataList = useMemo(() => {
+    const raw = auditLogsData ?? [];
+    const moduleName = selectedAuditModule?.moduleName ?? "";
+    const useOldNew = moduleName === "Accounts" || moduleName === "Automation";
+    if (!useOldNew) return raw;
+    return raw.map((row: any) => {
+      const existing = row.changes_summary;
+      if (existing && Array.isArray(existing) && existing.length > 0) return row;
+      const derived = deriveChangesFromOldNew(row.old_values, row.new_values);
+      return { ...row, changes_summary: derived };
+    });
+  }, [auditLogsData, selectedAuditModule?.moduleName]);
+
   const isReady = !!selectedAuditModule;
 
   const changesSummary = (selectedRow?.changes_summary as ChangeItem[] | undefined) ?? [];
@@ -355,7 +513,7 @@ const AuditLogsNewPage = () => {
       showDropdown: true,
       dropdownOptions: [
         { label: "All", value: "", onClick: () => setSelectedAuditAction("") },
-        ...actionOptions.map((a) => ({ label: a, value: a, onClick: () => setSelectedAuditAction(a) })),
+        ...actionOptions?.map((a) => ({ label: a, value: a, onClick: () => setSelectedAuditAction(a ?? "") })) ?? [],
       ],
     });
     pills.push({
@@ -440,7 +598,8 @@ const AuditLogsNewPage = () => {
                 fixedHeight
                 maxHeight="calc(100vh - 280px)"
                 showToolbar
-                toolbar={toolbarConfig}
+              toolbar={toolbarConfig}
+              statsCards={selectedAuditModule ? auditLogsStatsCards : []}
               />
             </div>
          

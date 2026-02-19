@@ -145,8 +145,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'staff-management', // 12. Staff Management
     'reports',
     'audit-logs', // 13. Audit Logs
-    'settings',
-    'resources',
+    // 'settings',
+    // 'resources',
 	  
 
   ];
