@@ -1270,15 +1270,7 @@ const CrmDeals = () => {
 
   // Handle first column click - navigates to detail page
   const handleFirstColumnClick = useCallback((deal: any) => {
-    const dealId = deal?.rawData?.id || deal?.id;
-    if (dealId) {
-      router.push({
-        pathname: '/crm/deals-approval/deals-approval-detailpage',
-        query: { id: dealId }
-      });
-    } else {
-      router.push('/crm/deals-approval/deals-approval-detailpage');
-    }
+      router.push('/crm/deals-approval/approval-detailpage');
   }, [router]);
 
   const handleCallClick = useCallback(async (deal: any) => {

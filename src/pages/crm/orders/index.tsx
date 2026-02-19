@@ -17,7 +17,7 @@ import GenericTable, {
   FilterPill,
   TabConfig,
 } from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebar";
+import GenericSidebar from '@components/GenericSidebarNew';
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import OrderEditModal from "@components/OrderEditModal";
@@ -1144,6 +1144,44 @@ const CrmOrders = () => {
       toast.error("Failed to load order details");
     }
   }, []);
+
+  // Handle preview button click - shows sidebar
+  const handlePreviewClick = useCallback(async (order: any) => {
+    const orderId = order.rawData?.id || order.id;
+    // Set the order immediately to show sidebar
+    setSelectedOrder(order.rawData || order);
+    setShowOrderSidebar(true);
+    
+    // Fetch additional data in the background
+    if (orderId) {
+      try {
+        await fetchOrderDetails(orderId);
+        // Optionally refresh the order data to get latest info
+        const orderData: any = await getOrder(orderId);
+        setSelectedOrder(orderData);
+      } catch (error) {
+        console.error("Failed to fetch order details:", error);
+        // Don't show error toast as sidebar is already open with basic data
+      }
+    }
+  }, [fetchOrderDetails]);
+
+  // Handle close order sidebar
+  const handleCloseOrderSidebar = useCallback(() => {
+    setShowOrderSidebar(false);
+    setSelectedOrder(null);
+    setViewingOrder(null);
+    setRelatedDeal(null);
+    setRelatedLead(null);
+  }, []);
+
+  // Handle first column click - navigates to detail page
+  const handleFirstColumnClick = useCallback((order: any) => {
+    const orderId = order.rawData?.id || order.id;
+    if (orderId) {
+      router.push(`/crm/orders/${orderId}/order-detailpage`);
+    }
+  }, [router]);
 
   const handleOpenFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(true);
@@ -2558,6 +2596,7 @@ const CrmOrders = () => {
           data={filteredOrders}
           columns={ordersColumns}
           actions={ordersActions}
+          showActions={false}
           customizableColumns={true}
           defaultSelectedColumns={['orderNumber', 'customer', 'deal', 'stage', 'value', 'approvalStatus', 'fulfillmentStatus', 'assignedUser', 'orderDate', 'owner']}
           columnStorageKey="ordersSelectedColumns"
@@ -2585,11 +2624,8 @@ const CrmOrders = () => {
               sortDirection: direction
             });
           }}
-          onRowClick={(row) => {
-            if (session?.user?.permissions?.includes('list-crm-orders')) {
-              handleRowClicked(row.rawData?.id || row.id);
-            }
-          }}
+          onPreviewClick={(order) => handlePreviewClick(order)}
+          onFirstColumnClick={(order) => handleFirstColumnClick(order)}
           onRowDoubleClick={(row) => {
             if (session?.user?.permissions?.includes('list-crm-orders')) {
               handleViewOrder(row.rawData?.id || row.id);
@@ -2700,6 +2736,221 @@ const CrmOrders = () => {
           </div>
         </div>
         </div>
+
+        {/* Order Details Sidebar */}
+        {showOrderSidebar && (
+        <GenericSidebar
+          isOpen={showOrderSidebar}
+          onClose={handleCloseOrderSidebar}
+          title={selectedOrder?.order_number || `Order #${selectedOrder?.id}` || 'Order Details'}
+          subtitle={selectedOrder?.customer_name || selectedOrder?.customer_phone || ''}
+          email={selectedOrder?.customer_email}
+          phone={selectedOrder?.customer_phone}
+          avatar={{
+            initials: getInitials(selectedOrder?.customer_name || 'NA'),
+            name: selectedOrder?.customer_name || 'NA',
+            gradient: getRandomColor(selectedOrder?.customer_name || '')
+          }}
+          breezeRecordSummary={{
+            content: `This order was created on ${selectedOrder?.created_at ? moment(selectedOrder.created_at).format('MMMM DD, YYYY') : 'recent date'}. ${selectedOrder?.stage?.name ? `Currently in ${selectedOrder.stage.name} stage.` : ''} ${selectedOrder?.final_amount || selectedOrder?.total_amount ? `Order value: ${selectedOrder.currency || 'AED'} ${parseFloat(String(selectedOrder.final_amount || selectedOrder.total_amount)).toLocaleString()}.` : ''} ${selectedOrder?.customer_name ? `Customer: ${selectedOrder.customer_name}.` : ''}`,
+            timestamp: selectedOrder?.updated_at ? `Generated on ${moment(selectedOrder.updated_at).format('MMM DD, YYYY [at] h:mm A')}` : 'Generated recently',
+            onRefresh: () => console.log('Refresh AI summary'),
+            onThumbsUp: () => console.log('Thumbs up'),
+            onThumbsDown: () => console.log('Thumbs down'),
+            onCopy: () => {
+              const summaryText = `This order was created on ${selectedOrder?.created_at ? moment(selectedOrder.created_at).format('MMMM DD, YYYY') : 'recent date'}. ${selectedOrder?.stage?.name ? `Currently in ${selectedOrder.stage.name} stage.` : ''} ${selectedOrder?.final_amount || selectedOrder?.total_amount ? `Order value: ${selectedOrder.currency || 'AED'} ${parseFloat(String(selectedOrder.final_amount || selectedOrder.total_amount)).toLocaleString()}.` : ''} ${selectedOrder?.customer_name ? `Customer: ${selectedOrder.customer_name}.` : ''}`;
+              navigator.clipboard.writeText(summaryText);
+              toast.success('Summary copied to clipboard');
+            },
+            onAskQuestion: () => console.log('Ask AI a question')
+          }}
+          recordLink={{
+            label: 'View record',
+            onClick: () => {
+              const orderId = selectedOrder?.id || selectedOrder?.rawData?.id;
+              if (orderId) {
+                router.push(`/crm/orders/${orderId}/edit`);
+              }
+            }
+          }}
+          actionsDropdown={{
+            label: 'Actions',
+            items: [
+              { 
+                label: 'Edit Order', 
+                onClick: () => {
+                  const orderId = selectedOrder?.id || selectedOrder?.rawData?.id;
+                  if (orderId) {
+                    router.push(`/crm/orders/${orderId}/edit`);
+                  }
+                }
+              },
+              { 
+                label: 'View History', 
+                onClick: () => {
+                  setShowOrderSidebar(false);
+                  const orderId = selectedOrder?.id || selectedOrder?.rawData?.id;
+                  if (orderId) {
+                    handleViewOrder(orderId);
+                  }
+                }
+              },
+              { 
+                label: 'Delete', 
+                onClick: () => {
+                  const orderId = selectedOrder?.id || selectedOrder?.rawData?.id;
+                  if (orderId) {
+                    handleDeleteOrder(orderId, selectedOrder?.order_number);
+                  }
+                }
+              }
+            ]
+          }}
+          quickActions={[
+            { 
+              id: 'note', 
+              label: 'Note', 
+              icon: FileText, 
+              onClick: () => {}, 
+              disabled: false 
+            },
+            { 
+              id: 'call', 
+              label: 'Call', 
+              icon: Phone, 
+              onClick: () => {
+                const phone = selectedOrder?.customer_phone;
+                if (phone) {
+                  // Handle call action
+                }
+              },
+              disabled: !selectedOrder?.customer_phone
+            },
+            { 
+              id: 'email', 
+              label: 'Email', 
+              icon: Mail, 
+              onClick: () => {},
+              disabled: !selectedOrder?.customer_email
+            },
+            { 
+              id: 'task', 
+              label: 'Task', 
+              icon: FileText, 
+              onClick: () => {},
+              disabled: false 
+            },
+            { 
+              id: 'meeting', 
+              label: 'Meeting', 
+              icon: Calendar, 
+              onClick: () => {},
+              disabled: false 
+            },
+            { 
+              id: 'more', 
+              label: 'More', 
+              icon: MoreVertical, 
+              onClick: () => console.log('More actions'),
+              disabled: false 
+            }
+          ]}
+          sections={[
+            {
+              id: 'about-order',
+              title: 'About this order',
+              icon: ShoppingBag,
+              collapsible: true,
+              defaultExpanded: true,
+              actions: [
+                { label: 'Edit all properties', onClick: () => {
+                  const orderId = selectedOrder?.id || selectedOrder?.rawData?.id;
+                  if (orderId) {
+                    router.push(`/crm/orders/${orderId}/edit`);
+                  }
+                }}
+              ],
+              fields: [
+                {
+                  label: 'Order Number',
+                  value: selectedOrder?.order_number || `ORD-${selectedOrder?.id}` || 'N/A',
+                  copyable: true
+                },
+                {
+                  label: 'Customer',
+                  value: selectedOrder?.customer_name || 'N/A',
+                  copyable: true
+                },
+                {
+                  label: 'Phone',
+                  value: selectedOrder?.customer_phone || 'N/A',
+                  type: 'phone',
+                  copyable: true,
+                  externalLink: selectedOrder?.customer_phone ? `tel:${selectedOrder.customer_phone}` : undefined
+                },
+                {
+                  label: 'Email',
+                  value: selectedOrder?.customer_email || 'N/A',
+                  type: 'email',
+                  copyable: true,
+                  externalLink: selectedOrder?.customer_email ? `mailto:${selectedOrder.customer_email}` : undefined,
+                  show: !!selectedOrder?.customer_email
+                },
+                {
+                  label: 'Stage',
+                  value: selectedOrder?.stage?.name || selectedOrder?.stage || 'N/A',
+                  type: 'badge',
+                  badgeVariant: 'primary'
+                },
+                {
+                  label: 'Order Value',
+                  value: selectedOrder?.final_amount || selectedOrder?.total_amount
+                    ? `${selectedOrder?.currency || 'AED'} ${parseFloat(String(selectedOrder.final_amount || selectedOrder.total_amount)).toLocaleString()}`
+                    : 'N/A',
+                  copyable: true
+                },
+                {
+                  label: 'Order Date',
+                  value: selectedOrder?.order_date || selectedOrder?.created_at || 'N/A',
+                  type: 'date',
+                  show: !!(selectedOrder?.order_date || selectedOrder?.created_at)
+                },
+                {
+                  label: 'Expected Delivery',
+                  value: selectedOrder?.expected_delivery_date || 'N/A',
+                  type: 'date',
+                  show: !!selectedOrder?.expected_delivery_date
+                },
+                {
+                  label: 'Approval Status',
+                  value: selectedOrder?.order_approval_status || 'N/A',
+                  type: 'badge',
+                  badgeVariant: selectedOrder?.order_approval_status?.toLowerCase() === 'approved' ? 'success' : 
+                                selectedOrder?.order_approval_status?.toLowerCase() === 'rejected' ? 'danger' : 'warning',
+                  show: !!selectedOrder?.order_approval_status
+                },
+                {
+                  label: 'Fulfillment Status',
+                  value: selectedOrder?.fulfillment_status || 'N/A',
+                  type: 'badge',
+                  badgeVariant: selectedOrder?.fulfillment_status?.toLowerCase()?.includes('completed') || 
+                                selectedOrder?.fulfillment_status?.toLowerCase()?.includes('delivered') ? 'success' : 
+                                selectedOrder?.fulfillment_status?.toLowerCase()?.includes('progress') ? 'primary' : 'secondary',
+                  show: !!selectedOrder?.fulfillment_status
+                },
+                {
+                  label: 'Payment Status',
+                  value: selectedOrder?.payment_status || 'N/A',
+                  type: 'badge',
+                  badgeVariant: selectedOrder?.payment_status?.toLowerCase() === 'paid' ? 'success' : 
+                                selectedOrder?.payment_status?.toLowerCase() === 'partial' ? 'warning' : 'danger',
+                  show: !!selectedOrder?.payment_status
+                }
+              ]
+            }
+          ]}
+        />
+        )}
       </div>
 
       {/* Delete Order Modal */}
@@ -2731,474 +2982,6 @@ const CrmOrders = () => {
         onConfirm={confirmDeleteAttachment}
         itemName={attachmentToDelete?.name}
         itemType="attachment"
-      />
-
-      {/* Order Sidebar */}
-      <GenericSidebar
-        isOpen={showOrderSidebar}
-        onClose={() => {
-          setShowOrderSidebar(false);
-          setSelectedOrder(null);
-          setViewingOrder(null);
-          setRelatedDeal(null);
-          setRelatedLead(null);
-        }}
-        moduleSlug={ModuleSlug.CRM_ORDERS}
-        title={viewingOrder?.order_number || `Order #${viewingOrder?.id}` || 'Order Details'}
-        subtitle={viewingOrder?.customer_name || ''}
-        metadata={viewingOrder?.id ? `Order ID: ${viewingOrder.id}` : ''}
-        email={viewingOrder?.customer_email || ''}
-        phone={viewingOrder?.customer_phone || ''}
-        avatar={{
-          name: viewingOrder?.customer_name || 'Order',
-          useIcon: true
-        }}
-        contextPayload={
-          viewingOrder
-            ? (() => {
-                const { follow_ups, meetings, audit_trail, ...orderRest } = viewingOrder ?? {};
-                const orderForPayload = viewingOrder ? { ...orderRest } : undefined;
-                return { order: orderForPayload };
-              })()
-            : undefined
-        }
-        width="420px"
-        tabs={[
-          {
-            id: 'general',
-            label: 'General Information',
-            sections: [
-              {
-                id: 'order-info',
-                title: 'Order Information',
-                icon: ShoppingBag,
-                fields: [
-                  {
-                    label: 'Order Number',
-                    value: viewingOrder?.order_number || `ORD-${viewingOrder?.id}` || 'N/A',
-                    type: 'text' as const
-                  },
-                  {
-                    label: 'Stage',
-                    value: viewingOrder?.stage?.name || 'Not assigned',
-                    type: 'badge' as const,
-                    badgeVariant: 'secondary',
-                    show: !!viewingOrder?.stage
-                  },
-                  {
-                    label: 'Status',
-                    value: viewingOrder?.status || 'N/A',
-                    type: 'badge' as const,
-                    badgeVariant: viewingOrder?.status?.toLowerCase() === 'completed' ? 'success' : 
-                                 viewingOrder?.status?.toLowerCase() === 'pending' ? 'warning' : 'secondary'
-                  },
-                  {
-                    label: 'Final Amount',
-                    value: viewingOrder?.final_amount || viewingOrder?.total_amount
-                      ? `${viewingOrder?.currency || 'AED'} ${parseFloat(String(viewingOrder.final_amount || viewingOrder.total_amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                      : 'N/A',
-                    type: 'text' as const,
-                    icon: DollarSign
-                  },
-                  {
-                    label: 'Order Date',
-                    value: viewingOrder?.order_date,
-                    type: 'date' as const,
-                    icon: Calendar,
-                    show: !!viewingOrder?.order_date
-                  },
-                  {
-                    label: 'Expected Delivery',
-                    value: viewingOrder?.expected_delivery_date,
-                    type: 'date' as const,
-                    icon: Calendar,
-                    show: !!viewingOrder?.expected_delivery_date
-                  },
-                  {
-                    label: 'Industry',
-                    value: viewingOrder?.industry || 'N/A',
-                    type: 'text' as const,
-                    show: !!viewingOrder?.industry
-                  }
-                ]
-              },
-              {
-                id: 'customer-info',
-                title: 'Company Information',
-                icon: User,
-                fields: [
-                  {
-                    label: 'Company Name',
-                    value: viewingOrder?.customer_name || 'N/A',
-                    type: 'text' as const,
-                    icon: Building2
-                  },
-                  {
-                    label: 'Email',
-                    value: viewingOrder?.customer_email || 'N/A',
-                    type: 'text' as const,
-                    icon: Mail,
-                    show: !!viewingOrder?.customer_email
-                  },
-                  {
-                    label: 'Phone',
-                    value: viewingOrder?.customer_phone || 'N/A',
-                    type: 'text' as const,
-                    icon: Phone,
-                    show: !!viewingOrder?.customer_phone
-                  },
-                  {
-                    label: 'Address',
-                    value: viewingOrder?.customer_address || 'N/A',
-                    type: 'text' as const,
-                    show: !!viewingOrder?.customer_address
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            id: 'lead-deal',
-            label: 'Lead/Deal Information',
-            sections: [
-              // Deal Information Section
-              ...(relatedDeal ? [{
-                id: 'deal-info',
-                title: 'Deal Information',
-                icon: Link2,
-                fields: [
-                  {
-                    label: 'Deal Name',
-                    value: relatedDeal?.name || 'N/A',
-                    type: 'text' as const
-                  },
-                  {
-                    label: 'Stage',
-                    value: relatedDeal?.stage?.name || 'Not assigned',
-                    type: 'badge' as const,
-                    badgeVariant: 'primary',
-                    show: !!relatedDeal?.stage
-                  },
-                  {
-                    label: 'Deal Value',
-                    value: relatedDeal?.net_value || relatedDeal?.grand_total
-                      ? `${relatedDeal?.currency || 'AED'} ${parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total)).toLocaleString()}`
-                      : 'N/A',
-                    type: 'text' as const,
-                    icon: DollarSign,
-                    show: !!(relatedDeal?.net_value || relatedDeal?.grand_total)
-                  },
-                  {
-                    label: 'Assigned To',
-                    value: extensions.find((ext: any) => ext?.id == relatedDeal?.assigned_to || ext?.extension == relatedDeal?.assigned_to)?.display_name ||
-                           extensions.find((ext: any) => ext?.id == relatedDeal?.assigned_to || ext?.extension == relatedDeal?.assigned_to)?.name ||
-                           relatedDeal?.assigned_to || 'Not assigned',
-                    type: 'text' as const,
-                    icon: User,
-                    show: !!relatedDeal?.assigned_to
-                  },
-                  {
-                    label: 'Created Date',
-                    value: relatedDeal?.created_at,
-                    type: 'date' as const,
-                    icon: Calendar,
-                    show: !!relatedDeal?.created_at
-                  }
-                ]
-              }] : []),
-              // Deal Company Information Section
-              ...(relatedDeal?.company_name ? [{
-                id: 'deal-company-info',
-                title: 'Deal Company Information',
-                icon: Building2,
-                fields: [
-                  {
-                    label: 'Company Name',
-                    value: relatedDeal?.company_name || 'N/A',
-                    type: 'text' as const,
-                    icon: Building2
-                  },
-                  {
-                    label: 'Industry',
-                    value: relatedDeal?.industry || 'N/A',
-                    type: 'text' as const,
-                    show: !!relatedDeal?.industry
-                  }
-                ]
-              }] : []),
-              // Lead Information Section
-              ...(relatedLead ? [{
-                id: 'lead-info',
-                title: 'Lead Information',
-                icon: Target,
-                fields: [
-                  {
-                    label: 'Lead Name',
-                    value: relatedLead?.name || 'N/A',
-                    type: 'text' as const
-                  },
-                  {
-                    label: 'Stage',
-                    value: relatedLead?.stage?.name || 'Not assigned',
-                    type: 'badge' as const,
-                    badgeVariant: 'primary',
-                    show: !!relatedLead?.stage
-                  },
-                  {
-                    label: 'Lead Potential',
-                    value: relatedLead?.lead_potential || 'N/A',
-                    type: 'badge' as const,
-                    badgeVariant: relatedLead?.lead_potential === 'Hot' ? 'danger' :
-                                 relatedLead?.lead_potential === 'Warm' ? 'warning' : 'secondary',
-                    show: !!relatedLead?.lead_potential
-                  },
-                  {
-                    label: 'Status',
-                    value: relatedLead?.status || 'N/A',
-                    type: 'text' as const,
-                    show: !!relatedLead?.status
-                  },
-                  {
-                    label: 'Assigned To',
-                    value: extensions.find((ext: any) => ext?.id == relatedLead?.assigned_to || ext?.extension == relatedLead?.assigned_to)?.display_name ||
-                           extensions.find((ext: any) => ext?.id == relatedLead?.assigned_to || ext?.extension == relatedLead?.assigned_to)?.name ||
-                           relatedLead?.assigned_to || 'Not assigned',
-                    type: 'text' as const,
-                    icon: User,
-                    show: !!relatedLead?.assigned_to
-                  },
-                  {
-                    label: 'Created Date',
-                    value: relatedLead?.created_at,
-                    type: 'date' as const,
-                    icon: Calendar,
-                    show: !!relatedLead?.created_at
-                  }
-                ]
-              }] : []),
-              // Campaign Information Section - only if campaign exists
-              ...(relatedLead?.campaign ? [{
-                id: 'campaign-info',
-                title: 'Campaign Information',
-                icon: FileText,
-                fields: [
-                  {
-                    label: 'Campaign Name',
-                    value: relatedLead?.campaign?.name || 'N/A',
-                    type: 'text' as const
-                  }
-                ]
-              }] : []),
-              // Prospect Information Section - only if crm_data exists
-              ...(relatedLead?.crm_data ? [{
-                id: 'prospect-info',
-                title: 'Prospect Information',
-                icon: User,
-                fields: [
-                  {
-                    label: 'CRM Data ID',
-                    value: relatedLead?.crm_data?.id ? `#${relatedLead.crm_data.id}` : 'N/A',
-                    type: 'text' as const,
-                    show: !!relatedLead?.crm_data?.id
-                  },
-                  {
-                    label: 'Name',
-                    value: relatedLead?.crm_data?.name || relatedLead?.crm_data?.data?.name || 'N/A',
-                    type: 'text' as const
-                  },
-                  {
-                    label: 'Phone',
-                    value: relatedLead?.crm_data?.phone || relatedLead?.crm_data?.data?.phone || 'N/A',
-                    type: 'text' as const,
-                    icon: Phone
-                  },
-                  {
-                    label: 'Source File',
-                    value: relatedLead?.crm_data?.source_file || 'N/A',
-                    type: 'text' as const,
-                    show: !!relatedLead?.crm_data?.source_file
-                  },
-                  {
-                    label: 'Uploaded By',
-                    value: relatedLead?.crm_data?.uploaded_by || 'N/A',
-                    type: 'text' as const,
-                    icon: User,
-                    show: !!relatedLead?.crm_data?.uploaded_by
-                  },
-                  {
-                    label: 'Created At',
-                    value: relatedLead?.crm_data?.created_at,
-                    type: 'date' as const,
-                    icon: Calendar,
-                    show: !!relatedLead?.crm_data?.created_at
-                  }
-                ]
-              }] : []),
-              // Empty state if no deal or lead information at all
-              ...(!relatedDeal && !relatedLead ? [{
-                id: 'no-info',
-                title: 'No Information Available',
-                icon: AlertCircle,
-                emptyState: {
-                  icon: AlertCircle,
-                  message: 'No deal or lead information available for this order'
-                }
-              }] : [])
-            ]
-          },
-          {
-            id: 'additional-info',
-            label: 'Additional Information',
-            sections: [
-              {
-                id: 'additional-details',
-                title: 'Additional Information',
-                icon: FileText,
-                fields: [
-                  {
-                    label: 'Approval Status',
-                    value: viewingOrder?.order_approval_status || 'Not Set',
-                    type: 'badge' as const,
-                    badgeVariant: viewingOrder?.order_approval_status?.toLowerCase() === 'approved' ? 'success' :
-                                 viewingOrder?.order_approval_status?.toLowerCase() === 'rejected' ? 'danger' : 'warning'
-                  },
-                  {
-                    label: 'Fulfillment Status',
-                    value: viewingOrder?.fulfillment_status || 'Not Set',
-                    type: 'badge' as const,
-                    badgeVariant: viewingOrder?.fulfillment_status?.toLowerCase().includes('completed') ||
-                                 viewingOrder?.fulfillment_status?.toLowerCase().includes('delivered') ? 'success' :
-                                 viewingOrder?.fulfillment_status?.toLowerCase().includes('progress') ? 'primary' : 'secondary'
-                  },
-                  {
-                    label: 'Payment Status',
-                    value: viewingOrder?.payment_status || 'Not Set',
-                    type: 'badge' as const,
-                    badgeVariant: viewingOrder?.payment_status?.toLowerCase() === 'paid' ? 'success' :
-                                 viewingOrder?.payment_status?.toLowerCase() === 'partial' ? 'warning' : 'danger'
-                  },
-                  {
-                    label: 'Assigned To',
-                    value: extensions.find((ext: any) => ext?.id == viewingOrder?.assigned_to || ext?.extension == viewingOrder?.assigned_to)?.display_name ||
-                           extensions.find((ext: any) => ext?.id == viewingOrder?.assigned_to || ext?.extension == viewingOrder?.assigned_to)?.name ||
-                           viewingOrder?.assigned_to || 'Not assigned',
-                    type: 'text' as const,
-                    icon: User,
-                    show: !!viewingOrder?.assigned_to
-                  },
-                  {
-                    label: 'Contract Length',
-                    value: viewingOrder?.contract_length || 'N/A',
-                    type: 'text' as const,
-                    show: !!viewingOrder?.contract_length
-                  }
-                ]
-              },
-              {
-                id: 'notes',
-                title: 'Notes',
-                icon: FileText,
-                fields: viewingOrder?.notes ? [
-                  {
-                    label: 'Notes',
-                    value: viewingOrder?.notes,
-                    type: 'text' as const
-                  }
-                ] : [],
-                emptyState: !viewingOrder?.notes ? {
-                  icon: FileText,
-                  message: 'No notes available'
-                } : undefined
-              }
-            ]
-          },
-          {
-            id: 'history',
-            label: 'History',
-            sections: [
-              {
-                id: 'activity-history',
-                title: 'Activity History',
-                icon: History,
-                badge: {
-                  value: viewingOrder?.histories?.length || 0,
-                  variant: 'secondary'
-                },
-                emptyState: !viewingOrder?.histories || viewingOrder.histories.length === 0 ? {
-                  icon: History,
-                  message: 'No activity history yet'
-                } : undefined,
-                customContent: viewingOrder?.histories && viewingOrder.histories.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {viewingOrder.histories.map((history: any, idx: number) => (
-                      <div key={history.id || idx} style={{
-                        padding: '16px',
-                        backgroundColor: '#f9fafb',
-                        borderRadius: '10px',
-                        border: '1px solid #f3f4f6',
-                        position: 'relative'
-                      }}>
-                        <div style={{
-                          fontSize: '13px',
-                          fontWeight: '600',
-                          color: '#111827',
-                          marginBottom: '6px'
-                        }}>
-                          {history.action || 'Activity'}
-                        </div>
-                        <div style={{
-                          fontSize: '12px',
-                          color: '#6b7280',
-                          marginBottom: '4px'
-                        }}>
-                          by {history.user?.name || history.created_by || 'System'}
-                        </div>
-                        <div style={{
-                          fontSize: '11px',
-                          color: '#9ca3af'
-                        }}>
-                          {history.created_at ? formatDateForTable(history.created_at) : 'N/A'}
-                        </div>
-                        {history.description && (
-                          <div style={{
-                            marginTop: '8px',
-                            fontSize: '12px',
-                            color: '#4b5563',
-                            fontStyle: 'italic'
-                          }}>
-                            {history.description}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : undefined
-              }
-            ]
-          }
-        ]}
-        actions={[
-          {
-            label: 'Edit Order',
-            icon: Edit,
-            onClick: () => {
-              setShowOrderSidebar(false);
-              setEditingOrderId(viewingOrder?.id);
-              setShowEditModal(true);
-            },
-            variant: 'primary',
-            show: session?.user?.permissions?.includes('edit-crm-orders') && activeFilter !== 'lost'
-          },
-          {
-            label: 'View Details',
-            icon: Eye,
-            onClick: () => {
-              setShowOrderSidebar(false);
-              handleViewOrder(viewingOrder?.id);
-            },
-            variant: 'outline-primary'
-          }
-        ]}
       />
 
       {/* Filters Sidebar */}
