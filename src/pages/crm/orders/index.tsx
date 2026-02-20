@@ -74,6 +74,7 @@ import Select from "react-select";
 import {
   GlobalDateFormat,
   ModuleSlug,
+  RECORD_TYPES,
   formatDateForTable,
 } from "@utils/Helper";
 import {
@@ -2882,6 +2883,10 @@ const CrmOrders = () => {
                 toast.success("Summary copied to clipboard");
               },
               onAskQuestion: () => console.log("Ask AI a question"),
+            }}
+            record={{
+              id: selectedOrder?.id || selectedOrder?.rawData?.id,
+              type: RECORD_TYPES.ORDER,
             }}
             recordLink={{
               label: "View record",

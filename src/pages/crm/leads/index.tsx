@@ -76,6 +76,7 @@ import {
   formatDateForTable,
   checkRequiredFields,
   GlobalDateFormat,
+  RECORD_TYPES,
 } from "@utils/Helper";
 import {
   Target,
@@ -129,26 +130,7 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import {
-  FiUpload,
-  FiDatabase,
-  FiSearch,
-  FiFilter,
-  FiTrash2,
-  FiEye,
-  FiUser,
-  FiUsers,
-  FiPhone,
-  FiMessageCircle,
-  FiPlay,
-  FiClock,
-  FiX,
-  FiAlertCircle,
-  FiCalendar,
-  FiTarget,
-  FiMoreVertical,
-  FiPlus,
-} from "react-icons/fi";
+import { FiPlus } from "react-icons/fi";
 import { toast } from "react-toastify";
 import moment from "moment";
 
@@ -785,6 +767,38 @@ const CrmLeads = () => {
     dateTo: null as string | null,
   });
 
+  const { contactEmail, contactPhone } = useMemo(() => {
+    if (!selectedLead) return { contactEmail: "", contactPhone: "" };
+    const raw = selectedLead?.contact_persons;
+    let contactPersons: any[] = [];
+    if (Array.isArray(raw)) {
+      contactPersons = raw;
+    } else if (typeof raw === "string") {
+      try {
+        const parsed = JSON.parse(raw);
+        contactPersons = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        contactPersons = [];
+      }
+    }
+    const contactEmail = contactPersons
+      .map((person: any) => person.email?.trim())
+      .filter(Boolean)
+      .join(", ");
+    const contactPhone = contactPersons
+      .map((person: any) => {
+        const code = person.phone_country_code?.trim() || "";
+        const num = person.phone?.trim() || "";
+        return code && num ? `${code} ${num}`.trim() : num || "";
+      })
+      .filter(Boolean)
+      .join(", ");
+    return {
+      contactEmail,
+      contactPhone,
+    };
+  }, [selectedLead]);
+  console.log({ contactEmail, contactPhone });
   // Fetch stages and extensions on component mount
   useEffect(() => {
     fetchStages();
@@ -3969,8 +3983,16 @@ const CrmLeads = () => {
             onClose={handleCloseLeadSidebar}
             title={selectedLead?.name || "Lead Details"}
             subtitle={selectedLead?.phone || selectedLead?.rawData?.phone || ""}
-            email={selectedLead?.email || selectedLead?.rawData?.email}
-            phone={selectedLead?.phone || selectedLead?.rawData?.phone}
+            email={
+              selectedLead?.email ||
+              selectedLead?.rawData?.email ||
+              contactEmail
+            }
+            phone={
+              selectedLead?.phone ||
+              selectedLead?.rawData?.phone ||
+              contactPhone
+            }
             avatar={{
               initials: getInitials(selectedLead?.name || "NA"),
               name: selectedLead?.name || "NA",
@@ -3991,6 +4013,10 @@ const CrmLeads = () => {
                 toast.success("Summary copied to clipboard");
               },
               onAskQuestion: () => console.log("Ask AI a question"),
+            }}
+            record={{
+              id: selectedLead?.id || selectedLead?.rawData?.id,
+              type: RECORD_TYPES.LEAD,
             }}
             recordLink={{
               label: "View record",
@@ -4057,25 +4083,15 @@ const CrmLeads = () => {
                 id: "call",
                 label: "Call",
                 icon: Phone,
-                onClick: () => {
-                  const phone =
-                    selectedLead?.phone || selectedLead?.rawData?.phone;
-                  if (phone) {
-                    handleCallClick(selectedLead);
-                  }
-                },
-                disabled: !(
-                  selectedLead?.phone || selectedLead?.rawData?.phone
-                ),
+                onClick: () => {},
+                disabled: !contactPhone,
               },
               {
                 id: "email",
                 label: "Email",
                 icon: Mail,
                 onClick: () => {},
-                disabled: !(
-                  selectedLead?.email || selectedLead?.rawData?.email
-                ),
+                disabled: !contactEmail,
               },
               {
                 id: "task",
