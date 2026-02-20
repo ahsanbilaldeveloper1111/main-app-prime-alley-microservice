@@ -434,6 +434,21 @@ export const getAssigneeComments = async (leadId: number): Promise<any[]> => {
   }
 };
 
+/** Create a CRM note for a record (prospect, lead, deal, order, or company). */
+export const createCrmNote = async (payload: {
+  record_type: "prospect" | "lead" | "deal" | "order";
+  record_id: number;
+  text: string;
+}): Promise<any> => {
+  try {
+    const response = await axiosInstance.post("/crm/notes", payload);
+    return extractData<any>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to create note");
+    throw error;
+  }
+};
+
 // Stage Management
 export const getStages = async (
   type?: "lead" | "lost_reason" | "deal" | "order",

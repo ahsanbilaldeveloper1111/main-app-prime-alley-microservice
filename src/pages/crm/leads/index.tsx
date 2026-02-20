@@ -3699,9 +3699,11 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           avatar={{
             initials: getInitials(selectedLead?.name || 'NA'),
             name: selectedLead?.name || 'NA',
-            gradient: getRandomColor(selectedLead?.name || '')
-          }}
-          onNoteCreate={handleNoteCreate}
+          gradient: getRandomColor(selectedLead?.name || '')
+        }}
+        recordType="lead"
+        recordId={selectedLead?.id ?? selectedLead?.rawData?.id ?? undefined}
+        onNoteCreate={handleNoteCreate}
           breezeRecordSummary={{
             content: `This lead was created on ${selectedLead?.created_at ? moment(selectedLead.created_at).format('MMMM DD, YYYY') : 'recent date'}. ${selectedLead?.stage?.name ? `Currently in ${selectedLead.stage.name} stage.` : ''} ${selectedLead?.lead_potential || selectedLead?.leadPotential ? `Lead potential: ${selectedLead.lead_potential || selectedLead.leadPotential}.` : ''} ${selectedLead?.company_name || selectedLead?.company ? `Company: ${selectedLead.company_name || selectedLead.company}.` : ''}`,
             timestamp: selectedLead?.updated_at ? `Generated on ${moment(selectedLead.updated_at).format('MMM DD, YYYY [at] h:mm A')}` : 'Generated recently',

@@ -6716,6 +6716,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
           name: selectedProspect?.name || 'NA',
           gradient: getRandomColor(selectedProspect?.name || '')
         }}
+        recordType="prospect"
+        recordId={selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined}
         onNoteCreate={handleNoteCreate}
         breezeRecordSummary={{
           content: "This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
