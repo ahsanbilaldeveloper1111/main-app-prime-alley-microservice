@@ -138,6 +138,8 @@ import { ListCallLogs, DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import CircularProgressCircle from "@components/CircularProgressCircle";
 
+import renderCreateCompany from '@components/renderCreateCompany';
+
 // KPI Card Component (from crm-new.tsx design)
 interface KPICardData {
   title: string;
@@ -516,7 +518,7 @@ const getRandomColor = (name: string): string => {
   return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
 };
 
-const CrmProspectsManagement = () => {
+const CrmCompanyManagement = () => {
   const { data: session } = useSession();
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
@@ -543,7 +545,7 @@ const CrmProspectsManagement = () => {
   const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
   const [assignToCampaignUsers, setAssignToCampaignUsers] = useState(false);
   const [showConvertToLeadModal, setShowConvertToLeadModal] = useState(false);
-const [convertingProspectId, setConvertingProspectId] = useState<number | null>(null);
+const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(null);
 
   // Data assignment modal states
   const [assignmentFilters, setAssignmentFilters] = useState({
@@ -614,14 +616,15 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Sidebar states
-  const [showProspectSidebar, setShowProspectSidebar] = useState(false);
+  const [showCompanySidebar, setShowCompanySidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
-  const [selectedProspect, setSelectedProspect] = useState<any>(null);
+  const [selectedCompany, setSelectedCompany] = useState<any>(null);
   const [showFilterBar, setShowFilterBar] = useState(false);
 
   // Add Contacts button states
   const [showAddContactsDropdown, setShowAddContactsDropdown] = useState(false);
   const [showCreateContactSidebar, setShowCreateContactSidebar] = useState(false);
+  const [showCreateCompanySidebar, setShowCreateCompanySidebar] = useState(false);
   const addContactsRef = useRef<HTMLDivElement>(null);
   const [contactForm, setContactForm] = useState({
     firstName: '',
@@ -655,8 +658,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   const [downloadingRecordings, setDownloadingRecordings] = useState<Set<string>>(new Set());
   const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
 
-  const [showProspectsAnalytics, setShowProspectsAnalytics] = useState(false);
-  const [showAllProspectStats, setShowAllProspectStats] = useState(false);
+  const [showCompanyAnalytics, setShowCompanyAnalytics] = useState(false);
+  const [showAllCompanyStats, setShowAllCompanyStats] = useState(false);
   
   // Valid filter IDs
   const validFilters = ["all", "scheduled", "has_leads"];
@@ -688,7 +691,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     }
   }, [showAddContactsDropdown]);
 
-  // Load prospect into form when sidebar opens in edit mode
+  // Load company into form when sidebar opens in edit mode
   useEffect(() => {
     if (!showCreateContactSidebar || !editingContactId) {
       setContactFormLoadError(null);
@@ -736,7 +739,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
       })
       .catch(() => {
         if (!cancelled) {
-          setContactFormLoadError('Failed to load prospect');
+          setContactFormLoadError('Failed to load company');
           setContactFormLoading(false);
         }
       });
@@ -763,13 +766,13 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     );
   }, [router]);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [prospectsSearch, setProspectsSearch] = useState("");
+  const [companySearch, setCompanySearch] = useState("");
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showTabModal, setShowTabModal] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
-  const [prospectsFilters, setProspectsFilters] = useState({
+  const [companyFilters, setCompanyFilters] = useState({
     assignedTo: null as string | null,
     campaigns: null as string[] | null,
     nextCallScheduled: null as string | null,
@@ -782,15 +785,12 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   // Column customization and pagination states
   const defaultSelectedColumns = [
     "name",
+    "created_at",
     "phone",
-    "source_file",
-    "user_extension",
-    "campaign",
     "last_called_at",
-    "last_call_end_reason",
-    "disposition",
-    "scheduled_call_at",
-    "tags",
+    "city",
+    "country",
+    "industry",
   ];
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => defaultSelectedColumns);
   const [draftSelectedColumns, setDraftSelectedColumns] = useState<string[]>([]);
@@ -803,8 +803,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   });
   const [dataList, setDataList] = useState<CrmDataItem[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
-  /** Total count of all prospects (unchanged when switching to Scheduled / Convert to Leads tab) */
-  const [totalAllProspects, setTotalAllProspects] = useState(0);
+  /** Total count of all companies (unchanged when switching to Scheduled / Convert to Leads tab) */
+  const [totalAllCompanies, setTotalAllCompanies] = useState(0);
   const [loading, setLoading] = useState(false);
   const [clearSelectedRows, setClearSelectedRows] = useState(false);
   const [metrics, setMetrics] = useState<CrmDataMetrics>({
@@ -1273,7 +1273,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         </div>
 
         <div className="text-muted small">
-          Showing {startRow} to {endRow} of {totalRecords} prospects
+          Showing {startRow} to {endRow} of {totalRecords} companies
         </div>
 
         <div className="d-flex gap-1">
@@ -1355,7 +1355,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     );
   };
 
-  // Fetch prospects data
+  // Fetch companies data
   const fetchCrmData = useCallback(async () => {
     // Increment request ID to track the latest request
     requestIdRef.current += 1;
@@ -1363,32 +1363,121 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
 
     setLoading(true);
     try {
-      const response = await getCrmData(buildCrmDataParams());
+      // Use static dummy data (recommended for development)
+      const dummyCompanies = [
+        {
+          id: 1,
+          name: 'Acme Corp',
+          phone: '+14155552671',
+          created_at: '2024-01-15T10:30:00Z',
+          updated_at: '2024-02-10T14:20:00Z',
+          last_called_at: '2024-02-10T14:20:00Z',
+          user_extension: '1001',
+          campaign_id: 1,
+          campaign: { id: 1, name: 'Winter Campaign 2024' },
+          is_viewed: true,
+          scheduled_call_at: null,
+          status: 'active',
+          source_file: null,
+          tags: null,
+          note: null,
+          data: {
+            email: 'contact@acmecorp.com',
+            city: 'New York',
+            country: 'United States',
+            industry: 'Technology'
+          }
+        },
+        {
+          id: 2,
+          name: 'TechVision Inc',
+          phone: '+14155552672',
+          created_at: '2024-01-20T09:15:00Z',
+          updated_at: '2024-02-12T11:45:00Z',
+          last_called_at: '2024-02-12T11:45:00Z',
+          user_extension: '1002',
+          campaign_id: 1,
+          campaign: { id: 1, name: 'Winter Campaign 2024' },
+          is_viewed: false,
+          scheduled_call_at: '2024-02-21T15:00:00Z',
+          status: 'active',
+          source_file: null,
+          tags: null,
+          note: 'Follow-up needed',
+          data: {
+            email: 'info@techvision.com',
+            city: 'Los Angeles',
+            country: 'United States',
+            industry: 'Healthcare'
+          }
+        },
+        {
+          id: 3,
+          name: 'Global Solutions Ltd',
+          phone: '+14155552673',
+          created_at: '2024-01-25T16:20:00Z',
+          updated_at: '2024-01-25T16:20:00Z',
+          last_called_at: null,
+          user_extension: null,
+          campaign_id: 2,
+          campaign: { id: 2, name: 'Spring Outreach' },
+          is_viewed: false,
+          scheduled_call_at: null,
+          status: 'active',
+          source_file: null,
+          tags: null,
+          note: null,
+          data: {
+            email: 'hello@globalsolutions.com',
+            city: 'Chicago',
+            country: 'United States',
+            industry: 'Finance'
+          }
+        },
+        {
+          id: 4,
+          name: 'Innovation Labs',
+          phone: '+14155552674',
+          created_at: '2024-02-01T08:30:00Z',
+          updated_at: '2024-02-14T10:15:00Z',
+          last_called_at: '2024-02-14T10:15:00Z',
+          user_extension: '1001',
+          campaign_id: 2,
+          campaign: { id: 2, name: 'Spring Outreach' },
+          is_viewed: true,
+          scheduled_call_at: '2024-02-22T09:30:00Z',
+          status: 'active',
+          source_file: null,
+          tags: null,
+          note: 'High priority client',
+          data: {
+            email: 'contact@innovationlabs.com',
+            city: 'Houston',
+            country: 'United States',
+            industry: 'Manufacturing'
+          }
+        }
+      ];
 
       // Only update state if this is still the latest request
       if (currentRequestId !== requestIdRef.current) {
         return;
       }
 
-      setDataList(response.data || []);
-      setTotalRecords(response.pagination.total || 0);
-      
-      // Keep total all prospects only when fetching without tab filter (all prospects)
-      const isAllProspects = memoizedFilters.has_scheduled_calls !== true && memoizedFilters.has_tickets !== true;
-      if (isAllProspects) {
-        setTotalAllProspects(response.pagination.total || 0);
-      }
+      // Use dummy data directly
+      setDataList(dummyCompanies);
+      setTotalRecords(dummyCompanies.length);
+      setTotalAllCompanies(dummyCompanies.length);
 
-      setMetrics(
-        response.metrics || {
-          assigned_records: 0,
-          unassigned_records: 0,
-          scheduled_records: 0,
-          not_scheduled_records: 0,
-          scheduled_next_hour_records: 0,
-          scheduled_next_24_hours_records: 0,
-        }
-      );
+      // Set dummy metrics
+      setMetrics({
+        assigned_records: 2,
+        unassigned_records: 2,
+        scheduled_records: 2,
+        not_scheduled_records: 2,
+        scheduled_next_hour_records: 0,
+        scheduled_next_24_hours_records: 1,
+      });
     } catch (error: any) {
       // Only handle error if this is still the latest request
       if (currentRequestId !== requestIdRef.current) {
@@ -1403,7 +1492,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         setLoading(false);
       }
     }
-  }, [buildCrmDataParams]);
+  }, []);
 
   // Load data when filters or pagination changes
   useEffect(() => {
@@ -1564,7 +1653,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
           } failed validation`
         );
       } else {
-        toast.error("Upload completed but no prospects were processed");
+        toast.error("Upload completed but no companies were processed");
       }
 
       setSelectedFile(null);
@@ -1593,8 +1682,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     setShowViewModal(true);
   }, []);
 
-  // Fetch call recordings (not call logs) for the selected prospect
-  // Filters by current user's extension and prospect's phone number
+  // Fetch call recordings (not call logs) for the selected company
+  // Filters by current user's extension and company's phone number
   const fetchCallRecordings = useCallback(async (phoneNumber: string, userExtension?: string) => {
     if (!phoneNumber) {
       setCallRecordings([]);
@@ -1657,15 +1746,15 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     }
   }, [showViewModal, selectedDataItem, fetchCallRecordings]);
 
-  // Load call recordings when prospect sidebar (preview modal) opens
+  // Load call recordings when company sidebar (preview modal) opens
   useEffect(() => {
-    if (showProspectSidebar && selectedProspect?.phone) {
-      fetchCallRecordings(selectedProspect.phone, selectedProspect.user_extension);
-    } else if (!showProspectSidebar && !showViewModal) {
+    if (showCompanySidebar && selectedCompany?.phone) {
+      fetchCallRecordings(selectedCompany.phone, selectedCompany.user_extension);
+    } else if (!showCompanySidebar && !showViewModal) {
       setCallRecordings([]);
       setCallRecordingsTotal(0);
     }
-  }, [showProspectSidebar, selectedProspect, showViewModal, fetchCallRecordings]);
+  }, [showCompanySidebar, selectedCompany, showViewModal, fetchCallRecordings]);
 
   // Handle play call recording
   const handlePlayCallRecording = useCallback((recording: any) => {
@@ -1972,7 +2061,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
 
   const handleNoteCreate = (note: string, createTask: boolean, taskDueDate?: string) => {
     console.log('Note created:', {
-      prospectId: selectedProspect.id,
+      companyId: selectedCompany.id,
       note,
       createTask,
       taskDueDate
@@ -2067,11 +2156,11 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     // Close the dialog
     handleAfterCallModalClose();
 
-    // If lead generation is selected, redirect to create lead page with prospect data
+    // If lead generation is selected, redirect to create lead page with company data
     if (afterCallData.generateLead === "yes" && selectedDataItem) {
       // Show success message and navigate to create lead page
       toast.success(
-        "Redirecting to create lead page with pre-filled prospect data..."
+        "Redirecting to create lead page with pre-filled company data..."
       );
       window.location.href = `/crm/leads/create?crm_data_id=${selectedDataItem.id}`;
     } else {
@@ -2217,16 +2306,16 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     setSelectedItems(selected.map((item) => item.id));
   }, []);
 
-  // Handle prospect row click
-  const handleProspectClick = useCallback((prospect: any) => {
-    setSelectedProspect(prospect);
-    setShowProspectSidebar(true);
+  // Handle company row click
+  const handleCompanyClick = useCallback((company: any) => {
+    setSelectedCompany(company);
+    setShowCompanySidebar(true);
   }, []);
 
-  // Handle close prospect sidebar
-  const handleCloseProspectSidebar = useCallback(() => {
-    setShowProspectSidebar(false);
-    setSelectedProspect(null);
+  // Handle close company sidebar
+  const handleCloseCompanySidebar = useCallback(() => {
+    setShowCompanySidebar(false);
+    setSelectedCompany(null);
   }, []);
 
   // Handle open filters sidebar
@@ -2240,32 +2329,32 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   }, []);
 
   // Handle preview button click - shows sidebar
-  const handlePreviewClick = useCallback((prospect: any) => {
-    setSelectedProspect(prospect);
-    setShowProspectSidebar(true);
+  const handlePreviewClick = useCallback((company: any) => {
+    setSelectedCompany(company);
+    setShowCompanySidebar(true);
   }, []);
 
-  // Handle first column click - navigates to detail page with prospect ID in URL
-  const handleFirstColumnClick = useCallback((prospect: any) => {
-    router.push(`/crm/data/prospects-detailpage?id=${prospect?.id ?? ''}`);
+  // Handle first column click - navigates to detail page with company ID in URL
+  const handleFirstColumnClick = useCallback((company: any) => {
+    router.push(`/crm/data/companies-detailpage?id=${company?.id ?? ''}`);
   }, [router]);
 
   // Stats cards data for metrics
-  const prospectsStatsCards: StatsCardData[] = useMemo(() => [
+  const companyStatsCards: StatsCardData[] = useMemo(() => [
     {
-      title: 'Prospects missing Owner',
+      title: 'Companies missing Owner',
       value: dataList.filter((p: any) => !p.user_extension || p.user_extension === '').length
     },
     {
-      title: 'Prospects missing Lead Status',
+      title: 'Companies missing Lead Status',
       value: dataList.filter((p: any) => !p.disposition || p.disposition === '').length
     },
     {
-      title: 'Prospects never called',
+      title: 'Companies never called',
       value: dataList.filter((p: any) => !p.last_called_at).length
     },
     {
-      title: 'Prospects with no recent activity',
+      title: 'Companies with no recent activity',
       value: dataList.filter((p: any) => {
         if (!p.last_called_at) return true;
         const daysSinceActivity = moment().diff(moment(p.last_called_at), 'days');
@@ -2275,11 +2364,11 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   ], [dataList]);
 
   // Define columns for GenericTable - Clean declarative definitions
- const prospectsColumns: TableColumn<any>[] = useMemo(
+ const companyColumns: TableColumn<any>[] = useMemo(
     () => [
       {
         key: 'name',
-        label: 'Name',
+        label: 'Company Name',
         sortable: true,
         type: 'avatar',
         avatar: {
@@ -2289,8 +2378,15 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         emptyValue: 'N/A'
       },
       {
+        key: 'created_at',
+        label: 'Create Date',
+        sortable: true,
+        type: 'text',
+        accessor: (row) => row.created_at ? moment(row.created_at).format("MMM DD, YYYY") : '-'
+      },
+      {
         key: 'phone',
-        label: 'Phone',
+        label: 'Phone Number',
         sortable: true,
         type: 'custom',
         align: 'left',
@@ -2299,158 +2395,45 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         )
       },
       {
-        key: 'source_file',
-        label: 'Source',
+        key: 'last_called_at',
+        label: 'Last Activity Date',
         sortable: true,
-        type: 'badge',
-        badge: {
-          getVariant: () => 'secondary'
-        },
+        type: 'text',
+        accessor: (row) => row.last_called_at ? moment(row.last_called_at).format("MMM DD, YYYY") : '-'
+      },
+      {
+        key: 'city',
+        label: 'City',
+        sortable: true,
+        type: 'text',
+        accessor: (row) => row.data?.city || row.city || 'N/A',
         emptyValue: 'N/A'
       },
       {
-        key: 'user_extension',
-        label: 'Assigned To',
-        sortable: true,
-        type: 'badge',
-        accessor: (row) => {
-          const extension = extensions.find(
-            (ext: any) => ext.id.toString() === row.user_extension?.toString()
-          );
-          return row.user_extension 
-            ? (extension?.display_name || row.user_extension)
-            : 'Unassigned';
-        },
-        badge: {
-          getVariant: (row) => row.user_extension ? 'success' : 'secondary',
-          showDot: () => true
-        }
-      },
-      {
-        key: 'campaign',
-        label: 'Campaign',
-        sortable: true,
-        type: 'badge',
-        accessor: (row) => row.campaign?.name || 'No Campaign',
-        badge: {
-          getVariant: (row) => row.campaign ? 'primary' : 'info'
-        }
-      },
-      {
-        key: 'last_called_at',
-        label: 'Last Called',
+        key: 'country',
+        label: 'Country/Region',
         sortable: true,
         type: 'text',
-        accessor: (row) => row.last_called_at ? moment(row.last_called_at).format("MMM DD, HH:mm") : '-'
+        accessor: (row) => row.data?.country || row.country || 'N/A',
+        emptyValue: 'N/A'
       },
       {
-        key: 'last_call_end_reason',
-        label: 'Last Call Status',
+        key: 'industry',
+        label: 'Industry',
         sortable: true,
         type: 'badge',
-        accessor: (row) => {
-          if (!row.last_call_end_reason) return null;
-          const endReason = callEndReasons.find(r => r.value === row.last_call_end_reason);
-          return endReason?.label || row.last_call_end_reason;
-        },
+        accessor: (row) => row.data?.industry || row.industry || 'N/A',
         badge: {
-          getVariant: (row) => {
-            if (!row.last_call_end_reason) return 'secondary';
-            const endReason = callEndReasons.find(r => r.value === row.last_call_end_reason);
-            return (endReason?.color as any) || 'secondary';
-          }
+          getVariant: () => 'primary'
         },
-        emptyValue: '-'
-      },
-      {
-        key: 'disposition',
-        label: 'Disposition',
-        sortable: true,
-        type: 'badge',
-        accessor: (row) => {
-          if (!row.disposition) return null;
-          const dispositions = [
-            { value: 'interested', label: 'Interested', color: 'success' },
-            { value: 'not_interested', label: 'Not Interested', color: 'danger' },
-            { value: 'callback_requested', label: 'Callback Requested', color: 'warning' },
-            { value: 'no_answer', label: 'No Answer', color: 'warning' },
-            { value: 'busy', label: 'Busy', color: 'info' },
-            { value: 'do_not_call', label: 'Do Not Call', color: 'danger' },
-            { value: 'wrong_number', label: 'Wrong Number', color: 'info' },
-            { value: 'follow_up', label: 'Follow Up', color: 'primary' }
-          ];
-          const disposition = dispositions.find(d => d.value === row.disposition);
-          if (disposition) return disposition.label;
-          // Fallback to random for demo
-          const randomDisposition = dispositions[Math.floor(Math.random() * dispositions.length)];
-          return randomDisposition.label;
-        },
-        badge: {
-          getVariant: (row) => {
-            if (!row.disposition) return 'secondary';
-            const dispositions = [
-              { value: 'interested', color: 'success' },
-              { value: 'not_interested', color: 'danger' },
-              { value: 'callback_requested', color: 'warning' },
-              { value: 'no_answer', color: 'warning' },
-              { value: 'busy', color: 'info' },
-              { value: 'do_not_call', color: 'danger' },
-              { value: 'wrong_number', color: 'info' },
-              { value: 'follow_up', color: 'primary' }
-            ];
-            const disposition = dispositions.find(d => d.value === row.disposition);
-            if (disposition) return disposition.color as any;
-            // Fallback to random for demo
-            const randomColors = ['success', 'danger', 'warning', 'info', 'primary'];
-            return randomColors[Math.floor(Math.random() * randomColors.length)] as any;
-          }
-        },
-        emptyValue: '-'
-      },
-      {
-        key: 'scheduled_call_at',
-        label: 'Next Call',
-        sortable: true,
-        type: 'badge',
-        accessor: (row) => {
-          if (!row.scheduled_call_at) return 'Not scheduled';
-          const isOverdue = moment(row.scheduled_call_at).isBefore(moment());
-          const isNextHour = moment(row.scheduled_call_at).isBefore(moment().add(1, 'hour'));
-          const formatted = moment(row.scheduled_call_at).format("MMM DD, HH:mm");
-          if (isOverdue) return `${formatted} (Overdue)`;
-          if (isNextHour) return `${formatted} (Soon)`;
-          return formatted;
-        },
-        badge: {
-          getVariant: (row) => {
-            if (!row.scheduled_call_at) return 'info';
-            const isOverdue = moment(row.scheduled_call_at).isBefore(moment());
-            const isNextHour = moment(row.scheduled_call_at).isBefore(moment().add(1, 'hour'));
-            return isOverdue ? 'danger' : isNextHour ? 'warning' : 'info';
-          }
-        }
-      },
-      {
-        key: 'tags',
-        label: 'Tags',
-        sortable: false,
-        type: 'custom',
-        render: (row) => (
-          <div className="d-flex gap-1 flex-wrap">
-            {(row.tags || []).map((tag: any, idx: number) => (
-              <span key={idx} className="gt-badge gt-badge-secondary">
-                {tag.name || tag}
-              </span>
-            ))}
-          </div>
-        )
+        emptyValue: 'N/A'
       }
     ],
     [extensions, callEndReasons, handleCallClick]
   );
 
   // Define table actions
-  const prospectsActions: TableAction<any>[] = useMemo(
+  const companyActions: TableAction<any>[] = useMemo(
     () => [
       ...(session?.user?.permissions?.includes('view-crm-data-management') ? [{
         label: 'View',
@@ -2507,7 +2490,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
               label: 'Convert to Lead',
               icon: <FiTarget size={14} />,
               onClick: (row: any) => {
-                setConvertingProspectId(row.id);
+                setConvertingCompanyId(row.id);
                 setShowConvertToLeadModal(true);
               }
             },
@@ -2901,7 +2884,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
           e.currentTarget.style.backgroundColor = '#000000';
         }}
       >
-        Add prospects
+        Add companies
         <ChevronDown size={16} />
       </button>
 
@@ -2922,26 +2905,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
           <button
             onClick={() => {
               setShowAddContactsDropdown(false);
-              setEditingContactId(null);
-              setContactForm({
-                firstName: '',
-                lastName: '',
-                email: '',
-                phoneNumber: '',
-                campaign_id: null,
-                contact_owner: null,
-                lifecycle_stage: 'Lead',
-                disposition: '',
-                legal_basis: [],
-                last_called: '',
-                last_call_status: '',
-                next_call: '',
-                scheduled_call_at: '',
-                tags: [],
-                note: '',
-                is_viewed: false,
-              });
-              setShowCreateContactSidebar(true);
+              setShowCreateCompanySidebar(true);
             }}
             style={{
               width: '100%',
@@ -2991,7 +2955,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     </div>
   );
 
-  // Create prospect (contact) API submit - POST crm/crm-data { name, phone, data }
+  // Create company (contact) API submit - POST crm/crm-data { name, phone, data }
   const handleCreateContactSubmit = useCallback(async (addAnother: boolean) => {
     const name = [contactForm.firstName, contactForm.lastName].filter(Boolean).join(' ').trim();
     if (!name || !contactForm.email || !contactForm.phoneNumber?.trim()) {
@@ -3198,7 +3162,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             {editingContactId && contactFormLoading ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 280, gap: '16px' }}>
                 <Spinner animation="border" role="status" style={{ width: '2.5rem', height: '2.5rem', color: '#0091ae' }} />
-                <span style={{ fontSize: '14px', color: '#64748b' }}>Loading prospect...</span>
+                <span style={{ fontSize: '14px', color: '#64748b' }}>Loading company...</span>
               </div>
             ) : (
             <>
@@ -3516,32 +3480,32 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
       <style
         dangerouslySetInnerHTML={{
           __html: `
-        .prospects-table-wrapper {
+        .companies-table-wrapper {
           width: 100%;
           overflow: hidden;
         }
-        .prospects-table-wrapper .table-responsive {
+        .companies-table-wrapper .table-responsive {
           width: 100%;
           overflow-x: auto;
           overflow-y: visible;
           -webkit-overflow-scrolling: touch;
         }
-        .prospects-table-wrapper .table-responsive table {
+        .companies-table-wrapper .table-responsive table {
           width: 100%;
           table-layout: auto;
           margin-bottom: 0;
         }
-        .prospects-table-wrapper .table-responsive table th,
-        .prospects-table-wrapper .table-responsive table td {
+        .companies-table-wrapper .table-responsive table th,
+        .companies-table-wrapper .table-responsive table td {
           padding: 12px 16px;
           vertical-align: middle;
         }
-        .prospects-table-wrapper .table-responsive table td:last-child,
-        .prospects-table-wrapper .table-responsive table th:last-child {
+        .companies-table-wrapper .table-responsive table td:last-child,
+        .companies-table-wrapper .table-responsive table th:last-child {
           max-width: none;
         }
-        .prospects-table-wrapper .table-responsive table td[style*="width"],
-        .prospects-table-wrapper .table-responsive table th[style*="width"] {
+        .companies-table-wrapper .table-responsive table td[style*="width"],
+        .companies-table-wrapper .table-responsive table th[style*="width"] {
           max-width: none;
         }
         .timeline-line {
@@ -3593,7 +3557,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
-        subTitle="Prospects"
+        subTitle="Companies"
       />
 
       {/* Main flex container for content and sidebar */}
@@ -3662,7 +3626,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
       {/* <StatsCards 
         data={[
           {
-            title: 'All Prospects',
+            title: 'All Companies',
             value: totalRecords,
             icon: Users,
             iconColor: '#6366F1',
@@ -3693,7 +3657,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             }
           },
           {
-            title: 'All Prospects',
+            title: 'All Companies',
             value: totalRecords,
             icon: Users,
             iconColor: '#6366F1',
@@ -3729,13 +3693,13 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
 
       <div className="container-fluid">
         {/* Analytics Section - Collapsible */}
-        {showProspectsAnalytics && (
+        {showCompanyAnalytics && (
           <>
             {/* Summary Stats Grid - Using KPICard design */}
             <Row className="mb-2">
               <Col xl={3} lg={4} md={6} className="mb-3">
                 <KPICard
-                  title="Total Prospects"
+                  title="Total Companies"
                   value={totalRecords}
                   icon={<Users size={24} />}
                   color="primary"
@@ -3743,7 +3707,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
               </Col>
               <Col xl={3} lg={4} md={6} className="mb-3">
                 <KPICard
-                  title="Prospects with Calls Scheduled"
+                  title="Companies with Calls Scheduled"
                   value={metrics.scheduled_records}
                   icon={<Calendar size={24} />}
                   color="success"
@@ -3751,7 +3715,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
               </Col>
               <Col xl={3} lg={4} md={6} className="mb-3">
                 <KPICard
-                  title="Prospects with No Calls Scheduled"
+                  title="Companies with No Calls Scheduled"
                   value={metrics.not_scheduled_records}
                   icon={<XCircle size={24} />}
                   color="secondary"
@@ -3765,7 +3729,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                   color="info"
                 />
               </Col>
-              {showAllProspectStats && (
+              {showAllCompanyStats && (
                 <>
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
@@ -3778,7 +3742,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
 
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
-                      title=" Prospects Assigned to Team Members"
+                      title=" Companies Assigned to Team Members"
                       value={metrics.assigned_records}
                       icon={<UserPlus size={24} />}
                       color="primary"
@@ -3786,7 +3750,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                   </Col>
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
-                      title="Prospects Not Assigned to Team Members"
+                      title="Companies Not Assigned to Team Members"
                       value={metrics.unassigned_records}
                       icon={<AlertCircleIcon size={24} />}
                       color="warning"
@@ -3799,10 +3763,10 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             <div className="text-center mb-4">
               <Button
                 variant="link"
-                onClick={() => setShowAllProspectStats(!showAllProspectStats)}
+                onClick={() => setShowAllCompanyStats(!showAllCompanyStats)}
                 className="text-decoration-none"
               >
-                {showAllProspectStats ? (
+                {showAllCompanyStats ? (
                   <>
                     <ArrowUp size={16} className="me-1" />
                     Show Less
@@ -3824,7 +3788,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             quickFilters={[
               {
                 id: "all",
-                label: "All Prospects",
+                label: "All Companies",
                 color: "#0d6efd",
                 icon: <Users size={16} />,
               },
@@ -3859,15 +3823,15 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             //   setShowAdvancedFilters(!showAdvancedFilters)
             // }
             // advancedFilterCount={
-            //   (prospectsFilters.assignedTo !== null ? 1 : 0) +
-            //   (prospectsFilters.campaigns !== null &&
-            //   prospectsFilters.campaigns.length > 0
+            //   (companyFilters.assignedTo !== null ? 1 : 0) +
+            //   (companyFilters.campaigns !== null &&
+            //   companyFilters.campaigns.length > 0
             //     ? 1
             //     : 0) +
-            //   (prospectsFilters.nextCallScheduled !== null ? 1 : 0) +
-            //   (prospectsFilters.sourceFile !== null ? 1 : 0) +
-            //   (prospectsFilters.tags !== null &&
-            //   prospectsFilters.tags.length > 0
+            //   (companyFilters.nextCallScheduled !== null ? 1 : 0) +
+            //   (companyFilters.sourceFile !== null ? 1 : 0) +
+            //   (companyFilters.tags !== null &&
+            //   companyFilters.tags.length > 0
             //     ? 1
             //     : 0)
             // }
@@ -3887,8 +3851,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                     <Form.Control
                       type="text"
                       placeholder="Search by name or phone..."
-                      value={prospectsSearch}
-                      onChange={(e) => setProspectsSearch(e.target.value)}
+                      value={companySearch}
+                      onChange={(e) => setCompanySearch(e.target.value)}
                     />
                   </Col>
                   <Col md={4}>
@@ -3905,9 +3869,9 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                           ext.extension,
                       }))}
                       value={
-                        prospectsFilters.assignedTo
+                        companyFilters.assignedTo
                           ? (() => {
-                              const assignedToId = prospectsFilters.assignedTo;
+                              const assignedToId = companyFilters.assignedTo;
                               const ext = extensions.find(
                                 (e: any) =>
                                   (e.id || e.extension) === assignedToId
@@ -3928,7 +3892,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                         const assignedToValue = selected
                           ? selected.value
                           : null;
-                        setProspectsFilters((prev) => ({
+                        setCompanyFilters((prev) => ({
                           ...prev,
                           assignedTo: assignedToValue,
                         }));
@@ -3951,8 +3915,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                         label: c.label,
                       }))}
                       value={
-                        prospectsFilters.campaigns
-                          ? prospectsFilters.campaigns.map(
+                        companyFilters.campaigns
+                          ? companyFilters.campaigns.map(
                               (campaignId: string) => {
                                 const campaign = availableCampaigns.find(
                                   (c: any) => c.value === campaignId
@@ -3968,7 +3932,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                         const campaignValues = selected
                           ? selected.map((s: any) => s.value)
                           : null;
-                        setProspectsFilters((prev) => ({
+                        setCompanyFilters((prev) => ({
                           ...prev,
                           campaigns: campaignValues,
                         }));
@@ -3985,10 +3949,10 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                       Next Call Scheduled
                     </Form.Label>
                     <Form.Select
-                      value={prospectsFilters.nextCallScheduled || ''}
+                      value={companyFilters.nextCallScheduled || ''}
                       onChange={(e) => {
                         const value = e.target.value || null;
-                        setProspectsFilters((prev) => ({
+                        setCompanyFilters((prev) => ({
                           ...prev,
                           nextCallScheduled: value,
                           nextCallDateFrom: null,
@@ -4006,7 +3970,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                       <option value="custom">Custom Date Range</option>
                     </Form.Select>
                   </Col>
-                  {prospectsFilters.nextCallScheduled === 'custom' && (
+                  {companyFilters.nextCallScheduled === 'custom' && (
                     <>
                       <Col md={4}>
                         <Form.Label className="small fw-bold mb-2">
@@ -4014,10 +3978,10 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                         </Form.Label>
                         <Form.Control
                           type="date"
-                          value={prospectsFilters.nextCallDateFrom || ''}
+                          value={companyFilters.nextCallDateFrom || ''}
                           onChange={(e) => {
                             const dateValue = e.target.value || null;
-                            setProspectsFilters((prev) => ({
+                            setCompanyFilters((prev) => ({
                               ...prev,
                               nextCallDateFrom: dateValue,
                             }));
@@ -4030,10 +3994,10 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                         </Form.Label>
                         <Form.Control
                           type="date"
-                          value={prospectsFilters.nextCallDateTo || ''}
+                          value={companyFilters.nextCallDateTo || ''}
                           onChange={(e) => {
                             const dateValue = e.target.value || null;
-                            setProspectsFilters((prev) => ({
+                            setCompanyFilters((prev) => ({
                               ...prev,
                               nextCallDateTo: dateValue,
                             }));
@@ -4049,13 +4013,13 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                     <CreatableSelect
                       options={uniqueSources}
                       value={
-                        prospectsFilters.sourceFile
-                          ? { value: prospectsFilters.sourceFile, label: prospectsFilters.sourceFile }
+                        companyFilters.sourceFile
+                          ? { value: companyFilters.sourceFile, label: companyFilters.sourceFile }
                           : null
                       }
                       onChange={(selected) => {
                         const sourceValue = selected ? selected.value : null;
-                        setProspectsFilters((prev) => ({
+                        setCompanyFilters((prev) => ({
                           ...prev,
                           sourceFile: sourceValue,
                         }));
@@ -4077,8 +4041,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                         label: tag.label,
                       }))}
                       value={
-                        prospectsFilters.tags
-                          ? prospectsFilters.tags.map((tagValue: string) => {
+                        companyFilters.tags
+                          ? companyFilters.tags.map((tagValue: string) => {
                               const tag = availableTags.find((t: any) => t.value === tagValue);
                               return tag
                                 ? { value: tagValue, label: tag.label }
@@ -4090,7 +4054,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                         const tagValues = selected
                           ? selected.map((s: any) => s.value)
                           : null;
-                        setProspectsFilters((prev) => ({
+                        setCompanyFilters((prev) => ({
                           ...prev,
                           tags: tagValues,
                         }));
@@ -4107,53 +4071,53 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                         variant="outline-secondary"
                         className="d-flex align-items-center justify-content-center"
                         onClick={() => {
-                          // Map prospectsFilters to the format expected by handleFiltersChange
+                          // Map companyFilters to the format expected by handleFiltersChange
                           const filtersToApply: Record<string, any> = {};
                           
-                          if (prospectsSearch) {
-                            filtersToApply.search = prospectsSearch;
+                          if (companySearch) {
+                            filtersToApply.search = companySearch;
                           }
-                          if (prospectsFilters.assignedTo) {
-                            filtersToApply.user_extension = [prospectsFilters.assignedTo];
+                          if (companyFilters.assignedTo) {
+                            filtersToApply.user_extension = [companyFilters.assignedTo];
                           }
-                          if (prospectsFilters.campaigns && prospectsFilters.campaigns.length > 0) {
-                            filtersToApply.campaign_id = prospectsFilters.campaigns;
+                          if (companyFilters.campaigns && companyFilters.campaigns.length > 0) {
+                            filtersToApply.campaign_id = companyFilters.campaigns;
                           }
-                          if (prospectsFilters.sourceFile) {
-                            filtersToApply.source_file = prospectsFilters.sourceFile;
+                          if (companyFilters.sourceFile) {
+                            filtersToApply.source_file = companyFilters.sourceFile;
                           }
-                          if (prospectsFilters.tags && prospectsFilters.tags.length > 0) {
-                            filtersToApply.tags = prospectsFilters.tags;
+                          if (companyFilters.tags && companyFilters.tags.length > 0) {
+                            filtersToApply.tags = companyFilters.tags;
                           }
                           
                           // Handle next call scheduled filters
                           const now = moment();
-                          if (prospectsFilters.nextCallScheduled === 'today') {
+                          if (companyFilters.nextCallScheduled === 'today') {
                             const today = now.format('YYYY-MM-DD');
                             filtersToApply.scheduled_call_from = today;
                             filtersToApply.scheduled_call_to = today;
-                          } else if (prospectsFilters.nextCallScheduled === 'tomorrow') {
+                          } else if (companyFilters.nextCallScheduled === 'tomorrow') {
                             const tomorrow = moment().add(1, 'day').format('YYYY-MM-DD');
                             filtersToApply.scheduled_call_from = tomorrow;
                             filtersToApply.scheduled_call_to = tomorrow;
-                          } else if (prospectsFilters.nextCallScheduled === 'this_week') {
+                          } else if (companyFilters.nextCallScheduled === 'this_week') {
                             const startOfWeek = moment().startOf('week').format('YYYY-MM-DD');
                             const endOfWeek = moment().endOf('week').format('YYYY-MM-DD');
                             filtersToApply.scheduled_call_from = startOfWeek;
                             filtersToApply.scheduled_call_to = endOfWeek;
-                          } else if (prospectsFilters.nextCallScheduled === 'next_week') {
+                          } else if (companyFilters.nextCallScheduled === 'next_week') {
                             const nextWeekStart = moment().add(1, 'week').startOf('week').format('YYYY-MM-DD');
                             const nextWeekEnd = moment().add(1, 'week').endOf('week').format('YYYY-MM-DD');
                             filtersToApply.scheduled_call_from = nextWeekStart;
                             filtersToApply.scheduled_call_to = nextWeekEnd;
-                          } else if (prospectsFilters.nextCallScheduled === 'overdue') {
+                          } else if (companyFilters.nextCallScheduled === 'overdue') {
                             filtersToApply.scheduled_call_status = 'overdue';
-                          } else if (prospectsFilters.nextCallScheduled === 'custom') {
-                            if (prospectsFilters.nextCallDateFrom) {
-                              filtersToApply.scheduled_call_from = prospectsFilters.nextCallDateFrom;
+                          } else if (companyFilters.nextCallScheduled === 'custom') {
+                            if (companyFilters.nextCallDateFrom) {
+                              filtersToApply.scheduled_call_from = companyFilters.nextCallDateFrom;
                             }
-                            if (prospectsFilters.nextCallDateTo) {
-                              filtersToApply.scheduled_call_to = prospectsFilters.nextCallDateTo;
+                            if (companyFilters.nextCallDateTo) {
+                              filtersToApply.scheduled_call_to = companyFilters.nextCallDateTo;
                             }
                           }
                           
@@ -4171,8 +4135,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                         variant="outline-secondary"
                         className="d-flex align-items-center justify-content-center"
                         onClick={() => {
-                          setProspectsSearch("");
-                          setProspectsFilters({
+                          setCompanySearch("");
+                          setCompanyFilters({
                             assignedTo: null,
                             campaigns: null,
                             nextCallScheduled: null,
@@ -4224,12 +4188,12 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             </div>
           )} */}
 
-        {/* Prospects Table */}
-        <div className="prospects-table-wrapper" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {/* Companies Table */}
+        <div className="companies-table-wrapper" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <GenericTable
   data={dataList}
-  columns={prospectsColumns.filter((c) => selectedColumns.includes(c.key))}
-  actions={prospectsActions}
+  columns={companyColumns.filter((c) => selectedColumns.includes(c.key))}
+  actions={companyActions}
   showActions={false}
   
   // Selection
@@ -4283,8 +4247,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   
   // Loading & styling
   loading={loading}
-  emptyMessage="No prospects found matching your criteria"
-  loadingMessage="Loading prospects..."
+  emptyMessage="No companies found matching your criteria"
+  loadingMessage="Loading companies..."
   hover={true}
   uniqueKey="id"
   
@@ -4297,9 +4261,9 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   toolbar={{
     // Tabs
     showTabs: true,
-    tabsDropdownLabel: "Prospects",
+    tabsDropdownLabel: "Companies",
     tabs: [
-      { id: 'all', label: 'All prospects', count: totalAllProspects, removable: false },
+      { id: 'all', label: 'All companies', count: totalAllCompanies, removable: false },
       ...customTabs.map(tab =>
         tab.id === 'has_leads'
           ? { ...tab, count: activeFilter === 'has_leads' && !loading ? totalRecords : undefined }
@@ -4318,10 +4282,10 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     
     // Search
     showSearch: true,
-    searchValue: prospectsSearch,
-    searchPlaceholder: "Search prospects...",
+    searchValue: companySearch,
+    searchPlaceholder: "Search companies...",
     onSearchChange: (value) => {
-      setProspectsSearch(value);
+      setCompanySearch(value);
       // Clear search on empty value
       if (!value) {
         const newFilters = { ...currentFilters };
@@ -4331,10 +4295,10 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
       }
     },
     onSearch: () => {
-      if (prospectsSearch) {
+      if (companySearch) {
         handleFiltersChange({
           ...currentFilters,
-          search: prospectsSearch
+          search: companySearch
         });
         setRefreshKey((prev) => prev + 1);
       }
@@ -4359,8 +4323,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
     // Filter Pills
     filterPills: [
       { 
-        id: 'contact_owner', 
-        label: 'Contact Owner', 
+        id: 'company_owner', 
+        label: 'Company owner', 
         showDropdown: true,
         dropdownOptions: [
           { label: 'All Owners', value: 'all', onClick: () => {
@@ -4483,7 +4447,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
   }}
   
   // Stats cards for metrics
-  statsCards={prospectsStatsCards}
+  statsCards={companyStatsCards}
 />
         </div>
       </div>
@@ -4497,7 +4461,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
           centered
         >
           <Modal.Header closeButton className="border-bottom bg-light">
-            <Modal.Title>Import Contacts - Prospects</Modal.Title>
+            <Modal.Title>Import Companies</Modal.Title>
           </Modal.Header>
           <Modal.Body className="p-4">
             <div className="alert alert-info mb-4">
@@ -4690,7 +4654,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
             }}>
-              {selectedDataItem.name || `Prospect #${selectedDataItem.id}`}
+              {selectedDataItem.name || `Company #${selectedDataItem.id}`}
             </h2>
             <div style={{ 
               marginTop: "6px", 
@@ -5516,7 +5480,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         alignItems: "center",
       }}>
         <div style={{ fontSize: "13px", color: "#6b7280" }}>
-          Prospect ID: <strong>#{selectedDataItem.id}</strong>
+          Company ID: <strong>#{selectedDataItem.id}</strong>
         </div>
         <Button
           variant="outline-secondary"
@@ -5660,9 +5624,9 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         }}
         onConfirm={confirmDelete}
         itemName={
-          itemToDelete ? `prospect entry #${itemToDelete.id}` : undefined
+          itemToDelete ? `company entry #${itemToDelete.id}` : undefined
         }
-        itemType="prospect entry"
+        itemType="company entry"
         additionalInfo={
           itemToDelete ? (
             <div className="alert alert-warning mb-3">
@@ -5690,8 +5654,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
       <FormModal
         show={showDataAssignmentModal}
         onHide={handleDataAssignmentModalClose}
-        title="Smart Prospect Distribution"
-        desc="Please fill the details below to smart prospect distribution."
+        title="Smart Company Distribution"
+        desc="Please fill the details below to smart company distribution."
         size="lg"
         formHtml={
           <>
@@ -6702,36 +6666,36 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
 
         </div> {/* End main content area */}
 
-      {/* Prospect Detail Sidebar */}
-      {showProspectSidebar && (
+      {/* Company Detail Sidebar */}
+      {showCompanySidebar && (
       <GenericSidebar
-        isOpen={showProspectSidebar}
-        onClose={handleCloseProspectSidebar}
-        title={selectedProspect?.name || 'Prospect Details'}
-        subtitle={selectedProspect?.phone || ''}
-        email={selectedProspect?.data?.email}
-        phone={selectedProspect?.phone}
+        isOpen={showCompanySidebar}
+        onClose={handleCloseCompanySidebar}
+        title={selectedCompany?.name || 'Company Details'}
+        subtitle={selectedCompany?.phone || ''}
+        email={selectedCompany?.data?.email}
+        phone={selectedCompany?.phone}
         avatar={{
-          initials: getInitials(selectedProspect?.name || 'NA'),
-          name: selectedProspect?.name || 'NA',
-          gradient: getRandomColor(selectedProspect?.name || '')
+          initials: getInitials(selectedCompany?.name || 'NA'),
+          name: selectedCompany?.name || 'NA',
+          gradient: getRandomColor(selectedCompany?.name || '')
         }}
         onNoteCreate={handleNoteCreate}
         breezeRecordSummary={{
-          content: "This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
+          content: "This company was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
           timestamp: "Generated on Feb 14, 2026 at 2:30 PM",
           onRefresh: () => console.log('Refresh AI summary'),
           onThumbsUp: () => console.log('Thumbs up'),
           onThumbsDown: () => console.log('Thumbs down'),
           onCopy: () => {
-            navigator.clipboard.writeText("This prospect was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.");
+            navigator.clipboard.writeText("This company was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.");
             console.log('Summary copied');
           },
           onAskQuestion: () => console.log('Ask AI a question')
         }}
         recordLink={{
           label: 'View record',
-          onClick: () => console.log('View full prospect record')
+          onClick: () => console.log('View full company record')
         }}
         actionsDropdown={{
           label: 'Actions',
@@ -6739,14 +6703,14 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             { 
               label: 'Convert to Lead', 
               onClick: () => {
-                setConvertingProspectId(selectedProspect?.id);
+                setConvertingCompanyId(selectedCompany?.id);
                 setShowConvertToLeadModal(true);
               }
             },
             { label: 'Assign to User', onClick: () => console.log('Assign') },
             { 
               label: 'Delete', 
-              onClick: () => handleDeleteData(selectedProspect)
+              onClick: () => handleDeleteData(selectedCompany)
             }
           ]
         }}
@@ -6763,14 +6727,14 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             label: 'Call', 
             icon: Phone, 
             onClick: () => {},
-            disabled: !selectedProspect?.phone 
+            disabled: !selectedCompany?.phone 
           },
           { 
             id: 'email', 
             label: 'Email', 
             icon: Mail, 
             onClick: () => {},
-            //disabled: !selectedProspect?.email 
+            //disabled: !selectedCompany?.email 
           },
           { 
             id: 'task', 
@@ -6796,8 +6760,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         ]}
         sections={[
           {
-            id: 'about-prospect',
-            title: 'About this prospect',
+            id: 'about-company',
+            title: 'About this company',
             icon: Target,
             collapsible: true,
             defaultExpanded: true,
@@ -6807,50 +6771,50 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             fields: [
               {
                 label: 'Name',
-                value: selectedProspect?.name || 'N/A',
+                value: selectedCompany?.name || 'N/A',
                 copyable: true
               },
               {
                 label: 'Phone',
-                value: selectedProspect?.phone || 'N/A',
+                value: selectedCompany?.phone || 'N/A',
                 type: 'phone',
                 copyable: true,
-                externalLink: selectedProspect?.phone ? `tel:${selectedProspect.phone}` : undefined
+                externalLink: selectedCompany?.phone ? `tel:${selectedCompany.phone}` : undefined
               },
               {
                 label: 'Email',
-                value: selectedProspect?.data?.email || 'N/A',
+                value: selectedCompany?.data?.email || 'N/A',
                 type: 'email',
                 copyable: true,
-                externalLink: selectedProspect?.data?.email ? `mailto:${selectedProspect.data.email}` : undefined,
-                show: !!selectedProspect?.data?.email
+                externalLink: selectedCompany?.data?.email ? `mailto:${selectedCompany.data.email}` : undefined,
+                show: !!selectedCompany?.data?.email
               },
               {
                 label: 'Assigned To',
-                value: selectedProspect?.user_extension ? getNameByExtension(selectedProspect.user_extension) : 'Unassigned',
+                value: selectedCompany?.user_extension ? getNameByExtension(selectedCompany.user_extension) : 'Unassigned',
                 hasDetails: true,
                 onDetailsClick: () => console.log('Show user details')
               },
               {
                 label: 'Campaign',
-                value: selectedProspect?.campaign?.name || 'No Campaign',
-                show: !!selectedProspect?.campaign,
-                hasDetails: !!selectedProspect?.campaign,
+                value: selectedCompany?.campaign?.name || 'No Campaign',
+                show: !!selectedCompany?.campaign,
+                hasDetails: !!selectedCompany?.campaign,
                 onDetailsClick: () => console.log('Show campaign details')
               },
               {
                 label: 'Status',
-                value: selectedProspect?.status || 'Active',
+                value: selectedCompany?.status || 'Active',
                 type: 'text'
               },
               {
                 label: 'Created Date',
-                value: selectedProspect?.created_at ? moment(selectedProspect.created_at).format('MMM DD, YYYY') : 'N/A',
+                value: selectedCompany?.created_at ? moment(selectedCompany.created_at).format('MMM DD, YYYY') : 'N/A',
                 type: 'date'
               },
               {
                 label: 'Last Updated',
-                value: selectedProspect?.updated_at ? moment(selectedProspect.updated_at).format('MMM DD, YYYY') : 'N/A',
+                value: selectedCompany?.updated_at ? moment(selectedCompany.updated_at).format('MMM DD, YYYY') : 'N/A',
                 type: 'date'
               }
             ]
@@ -6943,7 +6907,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                     message: 'No call recordings available yet.',
                     action: {
                       label: 'Make a call',
-                      onClick: () => selectedProspect?.phone && handleCallClick(selectedProspect),
+                      onClick: () => selectedCompany?.phone && handleCallClick(selectedCompany),
                     },
                   },
                 }
@@ -6974,24 +6938,24 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         isOpen={showFiltersSidebar}
         onClose={handleCloseFiltersSidebar}
         title="Filters"
-        subtitle="Filter prospects by various criteria"
+        subtitle="Filter companies by various criteria"
         width="400px"
         filters={[
           {
             id: 'search',
             label: 'Search',
             type: 'text',
-            value: prospectsSearch,
-            onChange: (value) => setProspectsSearch(value),
+            value: companySearch,
+            onChange: (value) => setCompanySearch(value),
             placeholder: 'Search by name or phone...'
           },
           {
             id: 'assignedTo',
             label: 'Assigned To',
             type: 'select',
-            value: prospectsFilters.assignedTo
+            value: companyFilters.assignedTo
               ? (() => {
-                  const assignedToId = prospectsFilters.assignedTo;
+                  const assignedToId = companyFilters.assignedTo;
                   const ext = extensions.find(
                     (e: any) => (e.id || e.extension) === assignedToId
                   );
@@ -7005,7 +6969,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
               : null,
             onChange: (selected) => {
               const assignedToValue = selected ? selected.value : null;
-              setProspectsFilters((prev) => ({
+              setCompanyFilters((prev) => ({
                 ...prev,
                 assignedTo: assignedToValue,
               }));
@@ -7023,8 +6987,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             id: 'campaigns',
             label: 'Campaigns',
             type: 'multi-select',
-            value: prospectsFilters.campaigns
-              ? prospectsFilters.campaigns.map((campaignId: string) => {
+            value: companyFilters.campaigns
+              ? companyFilters.campaigns.map((campaignId: string) => {
                   const campaign = availableCampaigns.find((c: any) => c.value === campaignId);
                   return campaign
                     ? { value: campaignId, label: campaign.label }
@@ -7033,7 +6997,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
               : [],
             onChange: (selected) => {
               const campaignValues = selected ? selected.map((s: any) => s.value) : null;
-              setProspectsFilters((prev) => ({
+              setCompanyFilters((prev) => ({
                 ...prev,
                 campaigns: campaignValues,
               }));
@@ -7051,10 +7015,10 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             id: 'nextCallScheduled',
             label: 'Next Call Scheduled',
             type: 'dropdown',
-            value: prospectsFilters.nextCallScheduled || '',
+            value: companyFilters.nextCallScheduled || '',
             onChange: (value) => {
               const selectedValue = value || null;
-              setProspectsFilters((prev) => ({
+              setCompanyFilters((prev) => ({
                 ...prev,
                 nextCallScheduled: selectedValue,
                 nextCallDateFrom: null,
@@ -7076,10 +7040,10 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             id: 'nextCallDateFrom',
             label: 'Next Call Date (From)',
             type: 'date',
-            value: prospectsFilters.nextCallDateFrom || '',
+            value: companyFilters.nextCallDateFrom || '',
             onChange: (value) => {
               const dateValue = value || null;
-              setProspectsFilters((prev) => ({
+              setCompanyFilters((prev) => ({
                 ...prev,
                 nextCallDateFrom: dateValue,
               }));
@@ -7090,10 +7054,10 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             id: 'nextCallDateTo',
             label: 'Next Call Date (To)',
             type: 'date',
-            value: prospectsFilters.nextCallDateTo || '',
+            value: companyFilters.nextCallDateTo || '',
             onChange: (value) => {
               const dateValue = value || null;
-              setProspectsFilters((prev) => ({
+              setCompanyFilters((prev) => ({
                 ...prev,
                 nextCallDateTo: dateValue,
               }));
@@ -7104,12 +7068,12 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             id: 'sourceFile',
             label: 'Source Name',
             type: 'select',
-            value: prospectsFilters.sourceFile
-              ? { value: prospectsFilters.sourceFile, label: prospectsFilters.sourceFile }
+            value: companyFilters.sourceFile
+              ? { value: companyFilters.sourceFile, label: companyFilters.sourceFile }
               : null,
             onChange: (selected) => {
               const sourceValue = selected ? selected.value : null;
-              setProspectsFilters((prev) => ({
+              setCompanyFilters((prev) => ({
                 ...prev,
                 sourceFile: sourceValue,
               }));
@@ -7124,15 +7088,15 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
             id: 'tags',
             label: 'Tags',
             type: 'multi-select',
-            value: prospectsFilters.tags
-              ? prospectsFilters.tags.map((tagValue: string) => {
+            value: companyFilters.tags
+              ? companyFilters.tags.map((tagValue: string) => {
                   const tag = availableTags.find((t: any) => t.value === tagValue);
                   return tag ? { value: tagValue, label: tag.label } : { value: tagValue, label: tagValue };
                 })
               : [],
             onChange: (selected) => {
               const tagValues = selected ? selected.map((s: any) => s.value) : null;
-              setProspectsFilters((prev) => ({
+              setCompanyFilters((prev) => ({
                 ...prev,
                 tags: tagValues,
               }));
@@ -7150,50 +7114,50 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         onApply={() => {
           const filtersToApply: Record<string, any> = {};
           
-          if (prospectsSearch) {
-            filtersToApply.search = prospectsSearch;
+          if (companySearch) {
+            filtersToApply.search = companySearch;
           }
-          if (prospectsFilters.assignedTo) {
-            filtersToApply.user_extension = [prospectsFilters.assignedTo];
+          if (companyFilters.assignedTo) {
+            filtersToApply.user_extension = [companyFilters.assignedTo];
           }
-          if (prospectsFilters.campaigns && prospectsFilters.campaigns.length > 0) {
-            filtersToApply.campaign_id = prospectsFilters.campaigns;
+          if (companyFilters.campaigns && companyFilters.campaigns.length > 0) {
+            filtersToApply.campaign_id = companyFilters.campaigns;
           }
-          if (prospectsFilters.sourceFile) {
-            filtersToApply.source_file = prospectsFilters.sourceFile;
+          if (companyFilters.sourceFile) {
+            filtersToApply.source_file = companyFilters.sourceFile;
           }
-          if (prospectsFilters.tags && prospectsFilters.tags.length > 0) {
-            filtersToApply.tags = prospectsFilters.tags;
+          if (companyFilters.tags && companyFilters.tags.length > 0) {
+            filtersToApply.tags = companyFilters.tags;
           }
           
           // Handle next call scheduled filters
           const now = moment();
-          if (prospectsFilters.nextCallScheduled === 'today') {
+          if (companyFilters.nextCallScheduled === 'today') {
             const today = now.format('YYYY-MM-DD');
             filtersToApply.scheduled_call_from = today;
             filtersToApply.scheduled_call_to = today;
-          } else if (prospectsFilters.nextCallScheduled === 'tomorrow') {
+          } else if (companyFilters.nextCallScheduled === 'tomorrow') {
             const tomorrow = moment().add(1, 'day').format('YYYY-MM-DD');
             filtersToApply.scheduled_call_from = tomorrow;
             filtersToApply.scheduled_call_to = tomorrow;
-          } else if (prospectsFilters.nextCallScheduled === 'this_week') {
+          } else if (companyFilters.nextCallScheduled === 'this_week') {
             const startOfWeek = moment().startOf('week').format('YYYY-MM-DD');
             const endOfWeek = moment().endOf('week').format('YYYY-MM-DD');
             filtersToApply.scheduled_call_from = startOfWeek;
             filtersToApply.scheduled_call_to = endOfWeek;
-          } else if (prospectsFilters.nextCallScheduled === 'next_week') {
+          } else if (companyFilters.nextCallScheduled === 'next_week') {
             const nextWeekStart = moment().add(1, 'week').startOf('week').format('YYYY-MM-DD');
             const nextWeekEnd = moment().add(1, 'week').endOf('week').format('YYYY-MM-DD');
             filtersToApply.scheduled_call_from = nextWeekStart;
             filtersToApply.scheduled_call_to = nextWeekEnd;
-          } else if (prospectsFilters.nextCallScheduled === 'overdue') {
+          } else if (companyFilters.nextCallScheduled === 'overdue') {
             filtersToApply.scheduled_call_status = 'overdue';
-          } else if (prospectsFilters.nextCallScheduled === 'custom') {
-            if (prospectsFilters.nextCallDateFrom) {
-              filtersToApply.scheduled_call_from = prospectsFilters.nextCallDateFrom;
+          } else if (companyFilters.nextCallScheduled === 'custom') {
+            if (companyFilters.nextCallDateFrom) {
+              filtersToApply.scheduled_call_from = companyFilters.nextCallDateFrom;
             }
-            if (prospectsFilters.nextCallDateTo) {
-              filtersToApply.scheduled_call_to = prospectsFilters.nextCallDateTo;
+            if (companyFilters.nextCallDateTo) {
+              filtersToApply.scheduled_call_to = companyFilters.nextCallDateTo;
             }
           }
           
@@ -7206,8 +7170,8 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
           setShowFiltersSidebar(false);
         }}
         onReset={() => {
-          setProspectsSearch("");
-          setProspectsFilters({
+          setCompanySearch("");
+          setCompanyFilters({
             assignedTo: null,
             campaigns: null,
             nextCallScheduled: null,
@@ -7230,17 +7194,17 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
       </div> {/* End flex container */}
 
       {/* Convert to Lead Modal */}
-{convertingProspectId && (
+{convertingCompanyId && (
   <ConvertToLeadModal
     show={showConvertToLeadModal}
     onHide={() => {
       setShowConvertToLeadModal(false);
-      setConvertingProspectId(null);
+      setConvertingCompanyId(null);
     }}
-    prospectId={convertingProspectId}
+    prospectId={convertingCompanyId}
     onSuccess={() => {
       setRefreshKey((prev) => prev + 1);
-      toast.success("Prospect converted to lead successfully!");
+      toast.success("Company converted to lead successfully!");
     }}
   />
 )}
@@ -7253,7 +7217,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
         <Modal.Body>
           <p className="text-muted mb-3">Select which columns to display in the table</p>
           <Row>
-            {prospectsColumns.map((col) => {
+            {companyColumns.map((col) => {
               const isChecked = draftSelectedColumns.includes(col.key);
               const isOnlySelected = isChecked && draftSelectedColumns.length === 1;
               return (
@@ -7327,7 +7291,7 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
                   if (chunk.length < PER_PAGE || allData.length >= totalRecords) break;
                   page += 1;
                 }
-                const exportColumns = prospectsColumns.filter((c) => selectedColumns.includes(c.key));
+                const exportColumns = companyColumns.filter((c) => selectedColumns.includes(c.key));
                 const getCellValue = (row: any, col: TableColumn<any>) => {
                   const raw = (col as any).accessor ? (col as any).accessor(row) : row[col.key as keyof CrmDataItem];
                   if (raw == null) return '';
@@ -7432,12 +7396,15 @@ const [convertingProspectId, setConvertingProspectId] = useState<number | null>(
 
       {/* Create Contact Sidebar */}
       {renderCreateContactSidebar()}
+
+      {/* Create Company Sidebar */}
+      {renderCreateCompany(showCreateCompanySidebar, setShowCreateCompanySidebar)}
     </React.Fragment>
   );
 };
 
-CrmProspectsManagement.getLayout = (page: ReactElement) => {
+CrmCompanyManagement.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default CrmProspectsManagement;
+export default CrmCompanyManagement;

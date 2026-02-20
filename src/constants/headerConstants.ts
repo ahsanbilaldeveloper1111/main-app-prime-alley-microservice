@@ -148,6 +148,7 @@ MENU_COLORS: {
     LOST_REASONS_CRM: 'Lost Reasons',
     DATA_MANAGEMENT: 'Prospects',
     CAMPAIGNS: 'Campaigns',
+    COMPANY: 'Companies',
     
     // Call Recordings
     RECORDINGS_DASHBOARD: 'Dashboard',

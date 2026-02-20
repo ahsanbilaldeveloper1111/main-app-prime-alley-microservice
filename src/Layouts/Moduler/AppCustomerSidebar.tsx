@@ -257,6 +257,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/crm/orders'
         },
         {
+          id: 'crm-company',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY,
+          icon: <ReceiptText size={16} />,
+          permission: PERMISSIONS.VIEW_CRM_ORDERS,
+          url: '/crm/company'
+        },
+        {
           id: 'crm-history',
           title: 'Activity Tracker',
           icon: <Activity size={16} />,
@@ -1394,12 +1401,15 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       background: rgba(255, 255, 255, 0.2);
     }
 
+
+
     .menu-item-icon {
       color: #dfdbdb;
       display: flex;
       align-items: center;
       flex-shrink: 0;
       transition: color 0.2s;
+      
     }
 
     .menu-item-text {
