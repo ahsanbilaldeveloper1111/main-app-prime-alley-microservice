@@ -8188,6 +8188,8 @@ const CrmProspectsManagement = () => {
               name: selectedProspect?.name || "NA",
               gradient: getRandomColor(selectedProspect?.name || ""),
             }}
+            recordType="prospect"
+            recordId={selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined}
             onNoteCreate={handleNoteCreate}
             breezeRecordSummary={{
               content:
