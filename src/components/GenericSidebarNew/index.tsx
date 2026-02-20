@@ -9,6 +9,9 @@ import {
   Linkedin, MessageCircle, Smartphone, Search
 } from 'lucide-react';
 import { Badge } from 'react-bootstrap';
+import { toast } from 'react-toastify';
+import { sendEmail } from '@utils/communication';
+import { createMeeting } from '@utils/crm';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -169,6 +172,12 @@ export interface GenericSidebarProps {
     description: string;
     internalNote: string;
   }) => void;
+  /** Lead (ticket) ID for CRM meeting association */
+  leadId?: number;
+  /** Deal ID for CRM meeting association */
+  dealId?: number;
+  /** Current user extension for meeting participants (required by CRM meetings API) */
+  userExtension?: string;
 }
 
 
@@ -1112,7 +1121,7 @@ interface EmailModalProps {
       createTask: boolean;
       taskDueDate?: string;
       attachments?: File[];
-    }) => void;
+    }) => void | Promise<void>;
   }
   
   const EmailModal: React.FC<EmailModalProps> = ({ 
@@ -1138,6 +1147,7 @@ interface EmailModalProps {
     const [activeTab, setActiveTab] = useState<'templates' | 'sequences' | 'documents' | 'meetings' | 'quotes'>('templates');
     const [createTask, setCreateTask] = useState(false);
     const [showSendDropdown, setShowSendDropdown] = useState(false);
+    const [sendLoading, setSendLoading] = useState(false);
     const emailBodyRef = useRef<HTMLTextAreaElement>(null);
     const sendDropdownRef = useRef<HTMLDivElement>(null);
   
@@ -1217,7 +1227,7 @@ interface EmailModalProps {
       }
     };
   
-    const handleSend = () => {
+    const handleSend = async () => {
       if (toEmails.length === 0) {
         alert('Please add at least one recipient');
         return;
@@ -1227,28 +1237,30 @@ interface EmailModalProps {
         const confirmSend = window.confirm('Send email without a subject?');
         if (!confirmSend) return;
       }
-  
-      onSend({
-        to: toEmails,
-        cc: ccEmails,
-        bcc: bccEmails,
-        subject,
-        body: emailBody,
-        createTask,
-        taskDueDate: createTask ? 'In 3 business days (Friday)' : undefined,
-      });
-  
-      // Reset form
-      setToEmails([]);
-      setCcEmails([]);
-      setBccEmails([]);
-      setSubject('');
-      setEmailBody('');
-      setShowCc(false);
-      setShowBcc(false);
-      setCreateTask(false);
-      setIsMaximized(false);
-      onClose();
+      setSendLoading(true);
+      try {
+        await onSend({
+          to: toEmails,
+          cc: ccEmails,
+          bcc: bccEmails,
+          subject,
+          body: emailBody,
+          createTask,
+          taskDueDate: createTask ? 'In 3 business days (Friday)' : undefined,
+        });
+        setToEmails([]);
+        setCcEmails([]);
+        setBccEmails([]);
+        setSubject('');
+        setEmailBody('');
+        setShowCc(false);
+        setShowBcc(false);
+        setCreateTask(false);
+        setIsMaximized(false);
+        onClose();
+      } finally {
+        setSendLoading(false);
+      }
     };
   
     return (
@@ -1844,55 +1856,65 @@ interface EmailModalProps {
             <div style={{ display: 'flex', alignItems: 'stretch' }}>
               <button
                 onClick={handleSend}
-                disabled={toEmails.length === 0}
+                disabled={toEmails.length === 0 || sendLoading}
                 style={{
                   padding: '8px 16px',
                   paddingRight: '12px',
-                  backgroundColor: toEmails.length > 0 ? '#cbd5e0' : '#e2e8f0',
+                  backgroundColor: toEmails.length > 0 && !sendLoading ? '#cbd5e0' : '#e2e8f0',
                   color: '#141414',
                   border: 'none',
                   borderRadius: '4px 0 0 4px',
                   fontSize: '14px',
                   fontWeight: '500',
-                  cursor: toEmails.length > 0 ? 'pointer' : 'not-allowed',
+                  cursor: toEmails.length > 0 && !sendLoading ? 'pointer' : 'not-allowed',
                   transition: 'background-color 0.2s',
                   borderRight: '1px solid #a0aec0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
                 }}
                 onMouseEnter={(e) => {
-                  if (toEmails.length > 0) {
+                  if (toEmails.length > 0 && !sendLoading) {
                     e.currentTarget.style.backgroundColor = '#b8c5d0';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (toEmails.length > 0) {
+                  if (toEmails.length > 0 && !sendLoading) {
                     e.currentTarget.style.backgroundColor = '#cbd5e0';
                   }
                 }}
               >
-                Send
+                {sendLoading ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" style={{ width: '14px', height: '14px', borderWidth: '2px' }} />
+                    Sending...
+                  </>
+                ) : (
+                  'Send'
+                )}
               </button>
               <button
                 onClick={() => setShowSendDropdown(!showSendDropdown)}
-                disabled={toEmails.length === 0}
+                disabled={toEmails.length === 0 || sendLoading}
                 style={{
                   padding: '8px 8px',
-                  backgroundColor: toEmails.length > 0 ? '#cbd5e0' : '#e2e8f0',
+                  backgroundColor: toEmails.length > 0 && !sendLoading ? '#cbd5e0' : '#e2e8f0',
                   color: '#141414',
                   border: 'none',
                   borderRadius: '0 4px 4px 0',
                   fontSize: '14px',
-                  cursor: toEmails.length > 0 ? 'pointer' : 'not-allowed',
+                  cursor: toEmails.length > 0 && !sendLoading ? 'pointer' : 'not-allowed',
                   transition: 'background-color 0.2s',
                   display: 'flex',
                   alignItems: 'center',
                 }}
                 onMouseEnter={(e) => {
-                  if (toEmails.length > 0) {
+                  if (toEmails.length > 0 && !sendLoading) {
                     e.currentTarget.style.backgroundColor = '#b8c5d0';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (toEmails.length > 0) {
+                  if (toEmails.length > 0 && !sendLoading) {
                     e.currentTarget.style.backgroundColor = '#cbd5e0';
                   }
                 }}
@@ -3371,7 +3393,7 @@ interface MeetingModalProps {
       reminders: string[];
       description: string;
       internalNote: string;
-    }) => void;
+    }) => void | Promise<void>;
   }
   
   const MeetingModal: React.FC<MeetingModalProps> = ({ 
@@ -3384,6 +3406,7 @@ interface MeetingModalProps {
     onSchedule 
   }) => {
     // State management
+    const [scheduleLoading, setScheduleLoading] = useState(false);
     const [title, setTitle] = useState('');
     const [hostType, setHostType] = useState<'user' | 'rotation'>('user');
     const [selectedHost, setSelectedHost] = useState(hostEmail);
@@ -3517,38 +3540,40 @@ interface MeetingModalProps {
       setCurrentMonth(newDate);
     };
   
-    const handleSchedule = () => {
+    const handleSchedule = async () => {
       if (!title.trim()) {
         alert('Please enter a meeting title');
         return;
       }
-  
-      onSchedule({
-        title,
-        hostType,
-        hostEmail: selectedHost,
-        startDate: startDate.toISOString(),
-        startTime,
-        endTime,
-        attendees,
-        location,
-        reminders,
-        description,
-        internalNote,
-      });
-  
-      // Reset form
-      setTitle('');
-      setHostType('user');
-      setStartDate(new Date());
-      setStartTime('01:00');
-      setEndTime('01:30');
-      setAttendees([]);
-      setLocation('');
-      setReminders([]);
-      setDescription('');
-      setInternalNote('');
-      onClose();
+      setScheduleLoading(true);
+      try {
+        await onSchedule({
+          title,
+          hostType,
+          hostEmail: selectedHost,
+          startDate: startDate.toISOString(),
+          startTime,
+          endTime,
+          attendees,
+          location,
+          reminders,
+          description,
+          internalNote,
+        });
+        setTitle('');
+        setHostType('user');
+        setStartDate(new Date());
+        setStartTime('01:00');
+        setEndTime('01:30');
+        setAttendees([]);
+        setLocation('');
+        setReminders([]);
+        setDescription('');
+        setInternalNote('');
+        onClose();
+      } finally {
+        setScheduleLoading(false);
+      }
     };
   
     const weekDays = hideWeekends 
@@ -4128,33 +4153,44 @@ interface MeetingModalProps {
             >
               <button
                 onClick={handleSchedule}
-                disabled={!title.trim()}
+                disabled={!title.trim() || scheduleLoading}
                 style={{
                   padding: '10px 24px',
-                  backgroundColor: title.trim() ? '#cbd5e0' : '#e2e8f0',
+                  backgroundColor: title.trim() && !scheduleLoading ? '#cbd5e0' : '#e2e8f0',
                   color: '#141414',
                   border: 'none',
                   borderRadius: '4px',
                   fontSize: '14px',
                   fontWeight: '500',
-                  cursor: title.trim() ? 'pointer' : 'not-allowed',
+                  cursor: title.trim() && !scheduleLoading ? 'pointer' : 'not-allowed',
                   transition: 'background-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
                 }}
                 onMouseEnter={(e) => {
-                  if (title.trim()) {
+                  if (title.trim() && !scheduleLoading) {
                     e.currentTarget.style.backgroundColor = '#b8c5d0';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (title.trim()) {
+                  if (title.trim() && !scheduleLoading) {
                     e.currentTarget.style.backgroundColor = '#cbd5e0';
                   }
                 }}
               >
-                Schedule meeting
+                {scheduleLoading ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" style={{ width: '14px', height: '14px', borderWidth: '2px' }} />
+                    Scheduling...
+                  </>
+                ) : (
+                  'Schedule meeting'
+                )}
               </button>
               <button
                 onClick={onClose}
+                disabled={scheduleLoading}
                 style={{
                   padding: '10px 24px',
                   backgroundColor: 'transparent',
@@ -4624,6 +4660,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   onCall,
   callerNumber,
   onMeetingSchedule,
+  leadId,
+  dealId,
+  userExtension,
 }) => {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
@@ -4709,7 +4748,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowEmailModal(false);
   };
 
-  const handleEmailSend = (emailData: {
+  const handleEmailSend = async (emailData: {
     to: string[];
     cc: string[];
     bcc: string[];
@@ -4717,8 +4756,27 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     body: string;
     attachments?: File[];
   }) => {
-    onEmailSend?.(emailData);
-    console.log('Email sent:', emailData);
+    if (!emailData.to?.length) return;
+    try {
+      await sendEmail({
+        to: emailData.to,
+        cc: emailData.cc?.length ? emailData.cc : undefined,
+        bcc: emailData.bcc?.length ? emailData.bcc : undefined,
+        subject: emailData.subject,
+        content: emailData.body,
+      });
+      onEmailSend?.(emailData);
+    } catch (err: unknown) {
+      let message = 'Failed to send email';
+      if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
+        message = (err as { message: string }).message;
+      } else if (err && typeof err === 'object' && 'response' in err) {
+        const res = (err as { response?: { data?: { message?: string } } }).response;
+        if (typeof res?.data?.message === 'string') message = res.data.message;
+      }
+      toast.error(message);
+      throw err;
+    }
   };
 
   const handleTaskClick = () => {
@@ -4770,7 +4828,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowMeetingModal(false);
   };
 
-  const handleMeetingSchedule = (meetingData: {
+  const handleMeetingSchedule = async (meetingData: {
     title: string;
     hostType: 'user' | 'rotation';
     hostEmail: string;
@@ -4783,8 +4841,27 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     description: string;
     internalNote: string;
   }) => {
-    onMeetingSchedule?.(meetingData);
-    console.log('Meeting scheduled:', meetingData);
+    const meeting_date = meetingData.startDate.slice(0, 10);
+    const meeting_time = meetingData.startTime.length === 5 ? meetingData.startTime : meetingData.startTime.slice(0, 5);
+    const extensions = userExtension ? [userExtension] : [meetingData.hostEmail?.slice(0, 15) || '0'];
+    try {
+      await createMeeting({
+        name: meetingData.title.trim(),
+        meeting_type: 'Video',
+        meeting_date,
+        meeting_time,
+        extensions,
+        ...(leadId != null && { lead_id: leadId }),
+        ...(dealId != null && { deal_id: dealId }),
+        ...(meetingData.attendees?.length ? { attendees: meetingData.attendees } : {}),
+        ...([meetingData.description, meetingData.internalNote].filter(Boolean).length
+          ? { summary: [meetingData.description, meetingData.internalNote].filter(Boolean).join('\n\n').slice(0, 255) }
+          : {}),
+      });
+      onMeetingSchedule?.(meetingData);
+    } catch (err: unknown) {
+      throw err;
+    }
   };
 
   const handleMoreClick = (e: React.MouseEvent<HTMLButtonElement>) => {
