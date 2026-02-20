@@ -825,3 +825,19 @@ export const resetUserPassword = async (
     throw error;
   }
 }
+
+export const mainAppAuditLogs = async (params: Record<string, unknown> = {}) => {
+  try {
+    const response = await axiosInstance.get(`users/audit-logs`, { params });
+    if (response) {
+      const responseData = response.data;
+      if (responseData.code === 200) {
+        return responseData.data;
+      }
+    }
+  } catch (error) {
+    reportApiErrorFromCatch(error, 'users');
+    console.error('API Error:', error);
+    throw error;
+  }
+};
