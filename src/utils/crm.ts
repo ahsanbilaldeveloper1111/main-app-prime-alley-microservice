@@ -66,6 +66,42 @@ export interface MeetingData {
   updated_at?: string;
 }
 
+/** Meeting list item from GET /crm/meetings (with record_type/record_id filter). */
+export interface CrmMeetingListItem {
+  id: number;
+  name: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  meeting_date: string;
+  meeting_time: string;
+  meeting_type: string;
+  meeting_outcome?: string | null;
+  meet_link?: string | null;
+  invite_link?: string | null;
+  record_type: string;
+  record_id: string;
+  record?: Record<string, unknown>;
+  extensions?: Array<{ id: number; extension: string; status?: string }>;
+}
+
+/** Paginated response from GET /crm/meetings. */
+export interface CrmMeetingsPaginatedResponse {
+  current_page: number;
+  data: CrmMeetingListItem[];
+  first_page_url: string;
+  from: number | null;
+  last_page: number;
+  last_page_url: string;
+  links: { url: string | null; label: string; active: boolean }[];
+  next_page_url: string | null;
+  path: string;
+  per_page: number;
+  prev_page_url: string | null;
+  to: number | null;
+  total: number;
+}
+
 export interface LeadData {
   id: number;
   name: string;
@@ -434,7 +470,7 @@ export const getAssigneeComments = async (leadId: number): Promise<any[]> => {
   }
 };
 
-/** Create a CRM note for a record (prospect, lead, deal, order, or company). */
+/** Create a CRM note for a record (prospect, lead, deal, or order). */
 export const createCrmNote = async (payload: {
   record_type: "prospect" | "lead" | "deal" | "order";
   record_id: number;
@@ -445,6 +481,76 @@ export const createCrmNote = async (payload: {
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create note");
+    throw error;
+  }
+};
+
+/** Single note item from GET /crm/notes */
+export interface CrmNoteItem {
+  id: number;
+  record_type: string;
+  record_id: string;
+  text: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Paginated response from GET /crm/notes */
+export interface CrmNotesPaginatedResponse {
+  current_page: number;
+  data: CrmNoteItem[];
+  first_page_url: string;
+  from: number | null;
+  last_page: number;
+  last_page_url: string;
+  links: { url: string | null; label: string; active: boolean }[];
+  next_page_url: string | null;
+  path: string;
+  per_page: number;
+  prev_page_url: string | null;
+  to: number | null;
+  total: number;
+}
+
+/** Fetch CRM notes for a record. */
+export const getCrmNotes = async (
+  recordType: "prospect" | "lead" | "deal" | "order",
+  recordId: number,
+  params?: { page?: number; per_page?: number }
+): Promise<CrmNotesPaginatedResponse> => {
+  try {
+    const response = await axiosInstance.get("/crm/notes", {
+      params: { record_type: recordType, record_id: recordId, ...params },
+    });
+    return extractData<CrmNotesPaginatedResponse>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch notes");
+    throw error;
+  }
+};
+
+/** Update a CRM note. */
+export const updateCrmNote = async (
+  noteId: number,
+  payload: { text: string }
+): Promise<any> => {
+  try {
+    const response = await axiosInstance.put(`/crm/notes/${noteId}`, payload);
+    toast.success("Note updated");
+    return extractData<any>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to update note");
+    throw error;
+  }
+};
+
+/** Delete a CRM note. */
+export const deleteCrmNote = async (noteId: number): Promise<void> => {
+  try {
+    await axiosInstance.delete(`/crm/notes/${noteId}`);
+    toast.success("Note deleted");
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to delete note");
     throw error;
   }
 };
@@ -606,6 +712,23 @@ export const getDealMeetings = async (
   try {
     const response = await axiosInstance.get("/crm/meetings", { params });
     return extractData<{ data: MeetingData[] }>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch meetings");
+    throw error;
+  }
+};
+
+/** Fetch meetings for a record (prospect, lead, deal, order). */
+export const getCrmMeetingsForRecord = async (
+  recordType: "prospect" | "lead" | "deal" | "order",
+  recordId: number,
+  params?: { page?: number; per_page?: number }
+): Promise<CrmMeetingsPaginatedResponse> => {
+  try {
+    const response = await axiosInstance.get("/crm/meetings", {
+      params: { record_type: recordType, record_id: recordId, ...params },
+    });
+    return extractData<CrmMeetingsPaginatedResponse>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch meetings");
     throw error;
