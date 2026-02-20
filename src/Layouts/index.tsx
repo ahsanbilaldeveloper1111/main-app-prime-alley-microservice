@@ -41,6 +41,7 @@ import UserDummyImage from "@assets/images/user-dummy.jpg";
 import { getStorageImageUrl } from "@utils/imageUtils";
 import DeviceSelectionModal from '../components/DeviceSelectionModal';
 import GlobalFloatingCallBar from '../components/GlobalFloatingCallBar';
+import NotificationSocketBridge from '../components/NotificationSocketBridge';
 
 interface LayoutProps {
 	children: ReactNode;
@@ -569,6 +570,7 @@ const Layout = ({ children }: LayoutProps) => {
 
 	return (
 		<>
+		<NotificationSocketBridge />
 		<style>{`
         .main-content-wrapper {
           transition: margin-left 0.3s ease-in-out;
@@ -1276,13 +1278,20 @@ const Layout = ({ children }: LayoutProps) => {
                       })()}
                     </div>
 
-                    <div className="p-3 border-top">
+                    <div className="p-3 border-top d-flex justify-content-between">
                       <button 
                         className="btn btn-link btn-sm p-0"
                         onClick={markAllAsRead}
                         style={{ fontSize: '13px' }}
                       >
                         Mark all as read
+                      </button>
+                        <button 
+                        className="btn btn-link btn-sm p-0"
+                        onClick={() => router.push('/notifications')}
+                        style={{ fontSize: '13px' }}
+                      >
+                        View all
                       </button>
                     </div>
                   </Dropdown.Menu>
