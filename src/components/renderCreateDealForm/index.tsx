@@ -1,19 +1,32 @@
-import React, { useState, useEffect } from 'react';
-import { X, Plus, ChevronDown, ChevronRight } from 'lucide-react';
-import { Dropdown, Form } from 'react-bootstrap';
-import { getDeal, updateDeal, createDeal, getStages, getBusinessTypes, getIndustries } from '@utils/crm';
+import React, { useState, useEffect } from "react";
+import { X, Plus, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { Dropdown, Form } from "react-bootstrap";
+import {
+  getDeal,
+  updateDeal,
+  createDeal,
+  getStages,
+  getBusinessTypes,
+  getIndustries,
+  getCrmProducts,
+} from "@utils/crm";
+import type { CrmProduct } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import { ModuleSlug } from '@utils/Helper';
-import { toast } from 'react-toastify';
-import PhoneInput, { parsePhoneNumber as parsePhoneNumberLib } from "react-phone-number-input";
+import { ModuleSlug } from "@utils/Helper";
+import { toast } from "react-toastify";
+import PhoneInput, {
+  parsePhoneNumber as parsePhoneNumberLib,
+} from "react-phone-number-input";
 import "react-phone-number-input/style.css";
-import Select from 'react-select';
+import Select from "react-select";
 
 // ─── Type Definitions ─────────────────────────────────────────────────────────
 interface LineItem {
   id: number;
   name: string;
   quantity: number;
+  tax: number;
+  discount: number;
 }
 
 interface DealFormData {
@@ -92,148 +105,171 @@ interface CreateDealSidebarProps {
 // ─── Initial State ────────────────────────────────────────────────────────────
 const initialDealForm: DealFormData = {
   // Deal Information
-  name: '',
+  name: "",
   stage_id: undefined,
-  expected_close_date: '',
+  expected_close_date: "",
   assigned_to: null,
-  currency: 'AED',
-  follow_up_date: '',
+  currency: "AED",
+  follow_up_date: "",
   // Company Information
-  company_name: '',
+  company_name: "",
   business_type_id: null,
-  business_type_other: '',
-  decision_maker_title: '',
-  decision_maker_name: '',
-  decision_maker_phone_country_code: '',
-  decision_maker_phone: '',
-  decision_maker_email: '',
+  business_type_other: "",
+  decision_maker_title: "",
+  decision_maker_name: "",
+  decision_maker_phone_country_code: "",
+  decision_maker_phone: "",
+  decision_maker_email: "",
   industry_ids: [],
   // Deal Characteristics
-  deal_type: '',
-  contract_length: '',
-  contract_length_custom: '',
-  billing_model: '',
-  payment_terms: '',
-  payment_terms_custom: '',
-  risk_level: '',
-  competitors: '',
+  deal_type: "",
+  contract_length: "",
+  contract_length_custom: "",
+  billing_model: "",
+  payment_terms: "",
+  payment_terms_custom: "",
+  risk_level: "",
+  competitors: "",
   // Progress & Notes
   quotation_sent: false,
   contract_sent: false,
   contract_received: false,
   // Legacy fields
-  dealName: '',
-  pipeline: 'Deals pipeline',
-  dealStage: '',
-  amount: '',
-  closeDate: '',
-  dealOwner: '',
-  priority: '',
-  closedLostReason: '',
-  closedWonReason: '',
-  createDate: '',
-  dealCollaborator: 'No owner',
-  dealDescription: '',
-  dealProbability: '',
-  forecastCategory: '',
-  forecastProbability: '',
-  nextStep: '',
-  sharedTeams: '',
-  sharedUsers: 'No user',
-  contactAssociateRecord: '',
-  contactAssociationLabel: 'No label',
+  dealName: "",
+  pipeline: "Deals pipeline",
+  dealStage: "",
+  amount: "",
+  closeDate: "",
+  dealOwner: "",
+  priority: "",
+  closedLostReason: "",
+  closedWonReason: "",
+  createDate: "",
+  dealCollaborator: "No owner",
+  dealDescription: "",
+  dealProbability: "",
+  forecastCategory: "",
+  forecastProbability: "",
+  nextStep: "",
+  sharedTeams: "",
+  sharedUsers: "No user",
+  contactAssociateRecord: "",
+  contactAssociationLabel: "No label",
   addTimelineContact: false,
-  companyAssociateRecord: '',
-  companyAssociationLabel: 'Primary',
+  companyAssociateRecord: "",
+  companyAssociationLabel: "Primary",
   addTimelineCompany: false,
   lineItems: [],
 };
 
 // ─── Dropdown options ─────────────────────────────────────────────────────────
-const PIPELINE_OPTIONS = ['Deals pipeline', 'Sales Pipeline', 'Partner Pipeline'];
+const PIPELINE_OPTIONS = [
+  "Deals pipeline",
+  "Sales Pipeline",
+  "Partner Pipeline",
+];
 const DEAL_STAGE_OPTIONS = [
-  'Appointment Scheduled',
-  'Qualified To Buy',
-  'Presentation Scheduled',
-  'Decision Maker Bought-In',
-  'Contract Sent',
-  'Closed Won',
-  'Closed Lost',
+  "Appointment Scheduled",
+  "Qualified To Buy",
+  "Presentation Scheduled",
+  "Decision Maker Bought-In",
+  "Contract Sent",
+  "Closed Won",
+  "Closed Lost",
 ];
 const CURRENCY_OPTIONS = [
-  'US Dollar (USD) $',
-  'Euro (EUR) €',
-  'British Pound (GBP) £',
-  'Pakistani Rupee (PKR) ₨',
-  'Japanese Yen (JPY) ¥',
+  "US Dollar (USD) $",
+  "Euro (EUR) €",
+  "British Pound (GBP) £",
+  "Pakistani Rupee (PKR) ₨",
+  "Japanese Yen (JPY) ¥",
 ];
-const DEAL_OWNER_OPTIONS = ['Rizwan Haider', 'John Doe', 'Jane Smith'];
-const DEAL_TYPE_OPTIONS = ['New Business', 'Existing Business'];
-const PRIORITY_OPTIONS = ['Low', 'Medium', 'High'];
-const COLLABORATOR_OPTIONS = ['No owner', 'Rizwan Haider', 'John Doe', 'Jane Smith'];
-const FORECAST_CATEGORY_OPTIONS = ['Pipeline', 'Best Case', 'Commit', 'Closed'];
-const SHARED_TEAMS_OPTIONS = ['Team A', 'Team B', 'Team C'];
-const SHARED_USERS_OPTIONS = ['No user', 'Rizwan Haider', 'John Doe', 'Jane Smith'];
-const ASSOCIATION_LABEL_OPTIONS = ['No label', 'Decision Maker', 'Primary', 'Billing'];
-const LINE_ITEM_OPTIONS = ['Product A', 'Product B', 'Product C', 'Custom Item'];
-
+const DEAL_OWNER_OPTIONS = ["Rizwan Haider", "John Doe", "Jane Smith"];
+const DEAL_TYPE_OPTIONS = ["New Business", "Existing Business"];
+const PRIORITY_OPTIONS = ["Low", "Medium", "High"];
+const COLLABORATOR_OPTIONS = [
+  "No owner",
+  "Rizwan Haider",
+  "John Doe",
+  "Jane Smith",
+];
+const FORECAST_CATEGORY_OPTIONS = ["Pipeline", "Best Case", "Commit", "Closed"];
+const SHARED_TEAMS_OPTIONS = ["Team A", "Team B", "Team C"];
+const SHARED_USERS_OPTIONS = [
+  "No user",
+  "Rizwan Haider",
+  "John Doe",
+  "Jane Smith",
+];
+const ASSOCIATION_LABEL_OPTIONS = [
+  "No label",
+  "Decision Maker",
+  "Primary",
+  "Billing",
+];
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const fieldLabel = (text: string, required: boolean = false) => (
   <label
     style={{
-      display: 'block',
-      fontSize: '14px',
-      fontWeight: '600',
-      color: '#141414',
-      marginBottom: '8px',
+      display: "block",
+      fontSize: "14px",
+      fontWeight: "600",
+      color: "#141414",
+      marginBottom: "8px",
     }}
   >
     {text}
-    {required && <span style={{ color: '#f2545b', marginLeft: '2px' }}>*</span>}
+    {required && <span style={{ color: "#f2545b", marginLeft: "2px" }}>*</span>}
   </label>
 );
 
 const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 12px',
-  border: '1px solid #8a8a8a',
-  borderRadius: '4px',
-  fontSize: '16px',
-  fontWeight: '300',
-  outline: 'none',
-  fontFamily: 'inherit',
-  boxSizing: 'border-box',
+  width: "100%",
+  padding: "10px 12px",
+  border: "1px solid #8a8a8a",
+  borderRadius: "4px",
+  fontSize: "16px",
+  fontWeight: "300",
+  outline: "none",
+  fontFamily: "inherit",
+  boxSizing: "border-box",
 };
 
-const fieldWrap: React.CSSProperties = { marginBottom: '20px' };
+const fieldWrap: React.CSSProperties = { marginBottom: "20px" };
 
 const dropdownToggleStyle = (hasValue: boolean): React.CSSProperties => ({
-  width: '100%',
-  textAlign: 'left',
-  padding: '10px 12px',
-  border: '1px solid #8a8a8a',
-  borderRadius: '4px',
-  fontSize: '16px',
-  fontWeight: '300',
-  backgroundColor: '#ffffff',
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  color: hasValue ? '#141414' : '#a0aec0',
+  width: "100%",
+  textAlign: "left",
+  padding: "10px 12px",
+  border: "1px solid #8a8a8a",
+  borderRadius: "4px",
+  fontSize: "16px",
+  fontWeight: "300",
+  backgroundColor: "#ffffff",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  color: hasValue ? "#141414" : "#a0aec0",
 });
 
 // Simple reusable single-select dropdown
-const SimpleDropdown: React.FC<SimpleDropdownProps> = ({ value, options, onChange, placeholder, testId }) => (
+const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
+  value,
+  options,
+  onChange,
+  placeholder,
+  testId,
+}) => (
   <Dropdown>
     <Dropdown.Toggle
       data-test-id={testId}
       variant="outline-secondary"
       style={dropdownToggleStyle(!!value)}
     >
-      {value || placeholder || 'Select...'}
+      {value || placeholder || "Select..."}
     </Dropdown.Toggle>
-    <Dropdown.Menu style={{ width: '100%' }}>
+    <Dropdown.Menu style={{ width: "100%" }}>
       {options.map((opt) => (
         <Dropdown.Item key={opt} onClick={() => onChange(opt)}>
           {opt}
@@ -245,7 +281,10 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({ value, options, onChang
 
 // ─── Main renderCreateDeal ────────────────────────────────────────────────────
 
-const renderCreateDeal = (showCreateDealSidebar: boolean, setShowCreateDealSidebar: (show: boolean) => void) => {
+const renderCreateDeal = (
+  showCreateDealSidebar: boolean,
+  setShowCreateDealSidebar: (show: boolean) => void,
+) => {
   if (!showCreateDealSidebar) return null;
   return <CreateDealSidebar onClose={() => setShowCreateDealSidebar(false)} />;
 };
@@ -254,11 +293,19 @@ export default renderCreateDeal;
 
 // ─── Sidebar component (self-contained for easy integration) ──────────────────
 
-export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, dealId, onSuccess }) => {
+export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
+  onClose,
+  dealId,
+  onSuccess,
+}) => {
   const isEditMode = !!dealId;
   const [dealForm, setDealForm] = useState(initialDealForm);
-  const [lineItemInput, setLineItemInput] = useState<string>('');
+  const [lineItemInput, setLineItemInput] = useState<string>("");
   const [lineItemQty, setLineItemQty] = useState<number>(0);
+  const [lineItemTax, setLineItemTax] = useState<number>(0);
+  const [lineItemDiscount, setLineItemDiscount] = useState<number>(0);
+  const [lineItemProducts, setLineItemProducts] = useState<CrmProduct[]>([]);
+  const [loadingLineItemProducts, setLoadingLineItemProducts] = useState(false);
   const [isContactsExpanded, setIsContactsExpanded] = useState(true);
   const [isCompaniesExpanded, setIsCompaniesExpanded] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -269,15 +316,23 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
   const [allIndustries, setAllIndustries] = useState<any[]>([]);
   const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
 
-  const set = (key: keyof DealFormData) => (val: any) => setDealForm((prev) => ({ ...prev, [key]: val }));
-  const setE = (key: keyof DealFormData) => (e: React.ChangeEvent<HTMLInputElement>) => setDealForm((prev) => ({ ...prev, [key]: e.target.value }));
+  const set = (key: keyof DealFormData) => (val: any) =>
+    setDealForm((prev) => ({ ...prev, [key]: val }));
+  const setE =
+    (key: keyof DealFormData) => (e: React.ChangeEvent<HTMLInputElement>) =>
+      setDealForm((prev) => ({ ...prev, [key]: e.target.value }));
 
   // Fetch stages, extensions, business types, and industries
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [stagesData, hierarchyData, businessTypesResponse, industriesResponse] = await Promise.all([
-          getStages('deal'),
+        const [
+          stagesData,
+          hierarchyData,
+          businessTypesResponse,
+          industriesResponse,
+        ] = await Promise.all([
+          getStages("deal"),
           GetHierarchyData(ModuleSlug.CRM_DEALS),
           getBusinessTypes({ per_page: 1000 }),
           getIndustries({ per_page: 1000 }),
@@ -304,9 +359,9 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
           const deal = await getDeal(dealId);
           const formatDate = (dateString: string | null) => {
             if (!dateString) return "";
-            return dateString.split('T')[0];
+            return dateString.split("T")[0];
           };
-          
+
           const dealAny = deal as any;
           setDealForm({
             ...initialDealForm,
@@ -315,16 +370,35 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
             assigned_to: deal.assigned_to || null,
             expected_close_date: formatDate(deal.expected_close_date),
             company_name: deal.company_name || "",
-            industry_ids: dealAny.industry_ids && Array.isArray(dealAny.industry_ids) 
-              ? dealAny.industry_ids.map((id: any) => Number(id)).filter((id: number) => !Number.isNaN(id))
-              : dealAny.industries && Array.isArray(dealAny.industries)
-              ? dealAny.industries.map((ind: any) => typeof ind === 'object' ? Number(ind.id) : Number(ind)).filter((id: number) => !Number.isNaN(id))
-              : [],
+            industry_ids:
+              dealAny.industry_ids && Array.isArray(dealAny.industry_ids)
+                ? dealAny.industry_ids
+                    .map((id: any) => Number(id))
+                    .filter((id: number) => !Number.isNaN(id))
+                : dealAny.industries && Array.isArray(dealAny.industries)
+                  ? dealAny.industries
+                      .map((ind: any) =>
+                        typeof ind === "object" ? Number(ind.id) : Number(ind),
+                      )
+                      .filter((id: number) => !Number.isNaN(id))
+                  : [],
             decision_maker_title: deal.decision_maker_title || "",
-            decision_maker_name: deal.decision_maker_name || dealAny.main_decision_maker?.name || "",
-            decision_maker_phone_country_code: deal.decision_maker_phone_country_code || dealAny.main_decision_maker?.phone_country_code || "",
-            decision_maker_phone: deal.decision_maker_phone || dealAny.main_decision_maker?.phone || "",
-            decision_maker_email: deal.decision_maker_email || dealAny.main_decision_maker?.email || "",
+            decision_maker_name:
+              deal.decision_maker_name ||
+              dealAny.main_decision_maker?.name ||
+              "",
+            decision_maker_phone_country_code:
+              deal.decision_maker_phone_country_code ||
+              dealAny.main_decision_maker?.phone_country_code ||
+              "",
+            decision_maker_phone:
+              deal.decision_maker_phone ||
+              dealAny.main_decision_maker?.phone ||
+              "",
+            decision_maker_email:
+              deal.decision_maker_email ||
+              dealAny.main_decision_maker?.email ||
+              "",
             deal_type: deal.deal_type || "",
             contract_length: deal.contract_length || "",
             contract_length_custom: deal.contract_length_custom || "",
@@ -339,15 +413,66 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
             follow_up_date: formatDate(deal.follow_up_date),
             currency: deal.currency || "AED",
           });
-          
+
           // Set business type
           if (dealAny.business_type_id) {
-            setDealForm(prev => ({ ...prev, business_type_id: Number(dealAny.business_type_id) }));
+            setDealForm((prev) => ({
+              ...prev,
+              business_type_id: Number(dealAny.business_type_id),
+            }));
             setShowOtherBusinessType(false);
           } else if (dealAny.business_type_other) {
-            setDealForm(prev => ({ ...prev, business_type_other: dealAny.business_type_other }));
+            setDealForm((prev) => ({
+              ...prev,
+              business_type_other: dealAny.business_type_other,
+            }));
             setShowOtherBusinessType(true);
           }
+
+          // Prefill line items (estimations) from latest estimate or deal.estimation_chart
+          const sortedEstimates =
+            dealAny.estimates && Array.isArray(dealAny.estimates) && dealAny.estimates.length > 0
+              ? [...dealAny.estimates].sort((a: any, b: any) => {
+                  const dateA = new Date(a.created_at || 0).getTime();
+                  const dateB = new Date(b.created_at || 0).getTime();
+                  return dateB - dateA;
+                })
+              : [];
+          const latestEstimate = sortedEstimates[0];
+          const chart =
+            latestEstimate?.estimation_chart && latestEstimate.estimation_chart.length > 0
+              ? latestEstimate.estimation_chart
+              : dealAny.estimation_chart && Array.isArray(dealAny.estimation_chart) && dealAny.estimation_chart.length > 0
+                ? dealAny.estimation_chart
+                : [];
+          const taxPct =
+            latestEstimate != null
+              ? parseFloat(String(latestEstimate.tax_percentage ?? "0")) || 0
+              : parseFloat(String(dealAny.tax_percentage ?? "0")) || 0;
+          const stdDisc =
+            latestEstimate != null
+              ? parseFloat(String(latestEstimate.standard_discount_percentage ?? "0")) || 0
+              : parseFloat(String(dealAny.standard_discount_percentage ?? "0")) || 0;
+          const specDisc =
+            latestEstimate != null
+              ? parseFloat(String(latestEstimate.special_discount_percentage ?? "0")) || 0
+              : parseFloat(String(dealAny.special_discount_percentage ?? "0")) || 0;
+          const discountPct = stdDisc + specDisc;
+          const lineItemsFromApi: LineItem[] = chart.map((item: any, idx: number) => ({
+            id: item.id ?? Date.now() + idx,
+            name: item.product_service || "",
+            quantity: item.qty ?? 1,
+            tax: parseFloat(String(item.tax_percentage ?? taxPct)) || 0,
+            discount:
+              item.standard_discount_percentage != null || item.special_discount_percentage != null
+                ? (parseFloat(String(item.standard_discount_percentage ?? "0")) || 0) +
+                  (parseFloat(String(item.special_discount_percentage ?? "0")) || 0)
+                : discountPct,
+          }));
+          setDealForm((prev) => ({
+            ...prev,
+            lineItems: lineItemsFromApi,
+          }));
         } catch (error) {
           console.error("Failed to fetch deal:", error);
           toast.error("Failed to load deal data");
@@ -359,15 +484,32 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
     }
   }, [dealId, isEditMode]);
 
+  // Fetch CRM products for line item dropdown
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoadingLineItemProducts(true);
+      try {
+        const response = await getCrmProducts({ per_page: 100 });
+        setLineItemProducts(response?.data || []);
+      } catch (error) {
+        console.error("Failed to fetch products:", error);
+        setLineItemProducts([]);
+      } finally {
+        setLoadingLineItemProducts(false);
+      }
+    };
+    fetchProducts();
+  }, []);
+
   const isFormValid =
-    dealForm.name.trim() !== '' &&
+    dealForm.name.trim() !== "" &&
     dealForm.stage_id !== undefined &&
-    dealForm.expected_close_date !== '' &&
+    dealForm.expected_close_date !== "" &&
     dealForm.assigned_to !== null &&
-    dealForm.company_name.trim() !== '' &&
-    dealForm.decision_maker_name.trim() !== '' &&
-    dealForm.decision_maker_email.trim() !== '' &&
-    dealForm.decision_maker_phone.trim() !== '';
+    dealForm.company_name.trim() !== "" &&
+    dealForm.decision_maker_name.trim() !== "" &&
+    dealForm.decision_maker_email.trim() !== "" &&
+    dealForm.decision_maker_phone.trim() !== "";
 
   // Line items
   const addLineItem = () => {
@@ -376,11 +518,19 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
       ...prev,
       lineItems: [
         ...prev.lineItems,
-        { id: Date.now(), name: lineItemInput, quantity: lineItemQty || 1 },
+        {
+          id: Date.now(),
+          name: lineItemInput,
+          quantity: lineItemQty || 1,
+          tax: lineItemTax ?? 0,
+          discount: lineItemDiscount ?? 0,
+        },
       ],
     }));
-    setLineItemInput('');
+    setLineItemInput("");
     setLineItemQty(0);
+    setLineItemTax(0);
+    setLineItemDiscount(0);
   };
 
   const removeLineItem = (id: number) =>
@@ -389,8 +539,10 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
       lineItems: prev.lineItems.filter((li) => li.id !== id),
     }));
 
-  const focusStyle = (e: React.FocusEvent<HTMLInputElement>) => (e.currentTarget.style.borderColor = '#0091ae');
-  const blurStyle = (e: React.FocusEvent<HTMLInputElement>) => (e.currentTarget.style.borderColor = '#8a8a8a');
+  const focusStyle = (e: React.FocusEvent<HTMLInputElement>) =>
+    (e.currentTarget.style.borderColor = "#0091ae");
+  const blurStyle = (e: React.FocusEvent<HTMLInputElement>) =>
+    (e.currentTarget.style.borderColor = "#8a8a8a");
 
   return (
     <>
@@ -398,54 +550,61 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
       <div
         onClick={onClose}
         style={{
-          position: 'fixed',
+          position: "fixed",
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
           zIndex: 1000,
-          background: 'transparent',
+          background: "transparent",
         }}
       />
 
       {/* Sidebar */}
       <div
         style={{
-          position: 'fixed',
+          position: "fixed",
           top: 0,
           right: 0,
-          width: '600px',
-          height: '100vh',
-          backgroundColor: '#ffffff',
-          boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
+          width: "600px",
+          height: "100vh",
+          backgroundColor: "#ffffff",
+          boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
           zIndex: 1001,
-          display: 'flex',
-          flexDirection: 'column',
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         {/* ── Header ── */}
         <div
           style={{
-            padding: '20px 24px',
-            borderBottom: '1px solid #eaf0f6',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            padding: "20px 24px",
+            borderBottom: "1px solid #eaf0f6",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
           }}
         >
-          <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#141414', margin: 0 }}>
-            {isEditMode ? 'Edit Deal' : 'Create Deal'}
+          <h2
+            style={{
+              fontSize: "20px",
+              fontWeight: "600",
+              color: "#141414",
+              margin: 0,
+            }}
+          >
+            {isEditMode ? "Edit Deal" : "Create Deal"}
           </h2>
           <button
             onClick={onClose}
             style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '4px',
-              cursor: 'pointer',
-              color: '#718096',
-              display: 'flex',
-              alignItems: 'center',
+              background: "transparent",
+              border: "none",
+              padding: "4px",
+              cursor: "pointer",
+              color: "#718096",
+              display: "flex",
+              alignItems: "center",
             }}
           >
             <X size={24} />
@@ -453,26 +612,34 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
         </div>
 
         {/* ── Content ── */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 40px 40px' }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "24px 40px 40px" }}>
           {fetching ? (
-            <div style={{ textAlign: 'center', padding: '40px' }}>
+            <div style={{ textAlign: "center", padding: "40px" }}>
               <p>Loading deal data...</p>
             </div>
           ) : (
             <>
               {/* Deal Information Section */}
-              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', marginBottom: '16px', marginTop: 0 }}>
+              <h3
+                style={{
+                  fontSize: "16px",
+                  fontWeight: "600",
+                  color: "#141414",
+                  marginBottom: "16px",
+                  marginTop: 0,
+                }}
+              >
                 DEAL INFORMATION
               </h3>
 
               {/* Deal name */}
               <div style={fieldWrap}>
-                {fieldLabel('Deal Name', true)}
+                {fieldLabel("Deal Name", true)}
                 <input
                   type="text"
                   data-test-id="dealname-input"
                   value={dealForm.name}
-                  onChange={setE('name')}
+                  onChange={setE("name")}
                   style={inputStyle}
                   onFocus={focusStyle}
                   onBlur={blurStyle}
@@ -482,10 +649,17 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Stage */}
               <div style={fieldWrap}>
-                {fieldLabel('Stage', true)}
+                {fieldLabel("Stage", true)}
                 <Form.Select
-                  value={dealForm.stage_id || ''}
-                  onChange={(e) => setDealForm((prev) => ({ ...prev, stage_id: e.target.value ? Number(e.target.value) : undefined }))}
+                  value={dealForm.stage_id || ""}
+                  onChange={(e) =>
+                    setDealForm((prev) => ({
+                      ...prev,
+                      stage_id: e.target.value
+                        ? Number(e.target.value)
+                        : undefined,
+                    }))
+                  }
                   style={inputStyle}
                 >
                   <option value="">Select Stage</option>
@@ -499,12 +673,12 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Expected Close Date */}
               <div style={fieldWrap}>
-                {fieldLabel('Expected Close Date', true)}
+                {fieldLabel("Expected Close Date", true)}
                 <input
                   type="date"
                   data-test-id="expectedclosedate-input"
                   value={dealForm.expected_close_date}
-                  onChange={setE('expected_close_date')}
+                  onChange={setE("expected_close_date")}
                   style={inputStyle}
                   onFocus={focusStyle}
                   onBlur={blurStyle}
@@ -513,15 +687,23 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Assigned to */}
               <div style={fieldWrap}>
-                {fieldLabel('Assigned to', true)}
+                {fieldLabel("Assigned to", true)}
                 <Form.Select
-                  value={dealForm.assigned_to || ''}
-                  onChange={(e) => setDealForm((prev) => ({ ...prev, assigned_to: e.target.value || null }))}
+                  value={dealForm.assigned_to || ""}
+                  onChange={(e) =>
+                    setDealForm((prev) => ({
+                      ...prev,
+                      assigned_to: e.target.value || null,
+                    }))
+                  }
                   style={inputStyle}
                 >
                   <option value="">Select User</option>
                   {extensions.map((ext: any) => (
-                    <option key={ext.id || ext.extension} value={ext.id || ext.extension}>
+                    <option
+                      key={ext.id || ext.extension}
+                      value={ext.id || ext.extension}
+                    >
                       {ext.display_name || ext.name || ext.id}
                     </option>
                   ))}
@@ -530,10 +712,15 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Currency */}
               <div style={fieldWrap}>
-                {fieldLabel('Currency', true)}
+                {fieldLabel("Currency", true)}
                 <Form.Select
                   value={dealForm.currency}
-                  onChange={(e) => setDealForm((prev) => ({ ...prev, currency: e.target.value }))}
+                  onChange={(e) =>
+                    setDealForm((prev) => ({
+                      ...prev,
+                      currency: e.target.value,
+                    }))
+                  }
                   style={inputStyle}
                 >
                   <option value="AED">AED</option>
@@ -545,12 +732,12 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Follow-up Date */}
               <div style={fieldWrap}>
-                {fieldLabel('Follow-up Date')}
+                {fieldLabel("Follow-up Date")}
                 <input
                   type="date"
                   data-test-id="followupdate-input"
                   value={dealForm.follow_up_date}
-                  onChange={setE('follow_up_date')}
+                  onChange={setE("follow_up_date")}
                   style={inputStyle}
                   onFocus={focusStyle}
                   onBlur={blurStyle}
@@ -558,18 +745,26 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
               </div>
 
               {/* Company Information Section */}
-              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', marginBottom: '16px', marginTop: '32px' }}>
+              <h3
+                style={{
+                  fontSize: "16px",
+                  fontWeight: "600",
+                  color: "#141414",
+                  marginBottom: "16px",
+                  marginTop: "32px",
+                }}
+              >
                 COMPANY INFORMATION
               </h3>
 
               {/* Company Name */}
               <div style={fieldWrap}>
-                {fieldLabel('Company Name', true)}
+                {fieldLabel("Company Name", true)}
                 <input
                   type="text"
                   data-test-id="companyname-input"
                   value={dealForm.company_name}
-                  onChange={setE('company_name')}
+                  onChange={setE("company_name")}
                   style={inputStyle}
                   onFocus={focusStyle}
                   onBlur={blurStyle}
@@ -579,20 +774,38 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Business Type */}
               <div style={fieldWrap}>
-                {fieldLabel('Select Business Type', true)}
+                {fieldLabel("Select Business Type", true)}
                 <Form.Select
-                  value={showOtherBusinessType ? "other" : (dealForm.business_type_id ? String(dealForm.business_type_id) : "")}
+                  value={
+                    showOtherBusinessType
+                      ? "other"
+                      : dealForm.business_type_id
+                        ? String(dealForm.business_type_id)
+                        : ""
+                  }
                   onChange={(e) => {
                     const value = e.target.value;
                     if (value === "other") {
                       setShowOtherBusinessType(true);
-                      setDealForm((prev) => ({ ...prev, business_type_id: null, business_type_other: "" }));
+                      setDealForm((prev) => ({
+                        ...prev,
+                        business_type_id: null,
+                        business_type_other: "",
+                      }));
                     } else if (value) {
                       setShowOtherBusinessType(false);
-                      setDealForm((prev) => ({ ...prev, business_type_id: Number(value), business_type_other: "" }));
+                      setDealForm((prev) => ({
+                        ...prev,
+                        business_type_id: Number(value),
+                        business_type_other: "",
+                      }));
                     } else {
                       setShowOtherBusinessType(false);
-                      setDealForm((prev) => ({ ...prev, business_type_id: null, business_type_other: "" }));
+                      setDealForm((prev) => ({
+                        ...prev,
+                        business_type_id: null,
+                        business_type_other: "",
+                      }));
                     }
                   }}
                   style={inputStyle}
@@ -609,11 +822,11 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {showOtherBusinessType && (
                 <div style={fieldWrap}>
-                  {fieldLabel('Business Type (Other)', true)}
+                  {fieldLabel("Business Type (Other)", true)}
                   <input
                     type="text"
                     value={dealForm.business_type_other}
-                    onChange={setE('business_type_other')}
+                    onChange={setE("business_type_other")}
                     style={inputStyle}
                     onFocus={focusStyle}
                     onBlur={blurStyle}
@@ -624,10 +837,15 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Decision Maker Title */}
               <div style={fieldWrap}>
-                {fieldLabel('Decision Maker Title')}
+                {fieldLabel("Decision Maker Title")}
                 <Form.Select
                   value={dealForm.decision_maker_title}
-                  onChange={(e) => setDealForm((prev) => ({ ...prev, decision_maker_title: e.target.value }))}
+                  onChange={(e) =>
+                    setDealForm((prev) => ({
+                      ...prev,
+                      decision_maker_title: e.target.value,
+                    }))
+                  }
                   style={inputStyle}
                 >
                   <option value="">Select Title</option>
@@ -640,12 +858,12 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Decision Maker Name */}
               <div style={fieldWrap}>
-                {fieldLabel('Decision Maker Name', true)}
+                {fieldLabel("Decision Maker Name", true)}
                 <input
                   type="text"
                   data-test-id="decisionmakername-input"
                   value={dealForm.decision_maker_name}
-                  onChange={setE('decision_maker_name')}
+                  onChange={setE("decision_maker_name")}
                   style={inputStyle}
                   onFocus={focusStyle}
                   onBlur={blurStyle}
@@ -655,12 +873,12 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Decision Maker Email */}
               <div style={fieldWrap}>
-                {fieldLabel('Decision Maker Email', true)}
+                {fieldLabel("Decision Maker Email", true)}
                 <input
                   type="email"
                   data-test-id="decisionmakeremail-input"
                   value={dealForm.decision_maker_email}
-                  onChange={setE('decision_maker_email')}
+                  onChange={setE("decision_maker_email")}
                   style={inputStyle}
                   onFocus={focusStyle}
                   onBlur={blurStyle}
@@ -670,39 +888,42 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Decision Maker Phone */}
               <div style={fieldWrap}>
-                {fieldLabel('Decision Maker Phone', true)}
+                {fieldLabel("Decision Maker Phone", true)}
                 <PhoneInput
                   international
                   defaultCountry="US"
-                  value={dealForm.decision_maker_phone_country_code && dealForm.decision_maker_phone 
-                    ? `${dealForm.decision_maker_phone_country_code}${dealForm.decision_maker_phone}` 
-                    : dealForm.decision_maker_phone || undefined}
+                  value={
+                    dealForm.decision_maker_phone_country_code &&
+                    dealForm.decision_maker_phone
+                      ? `${dealForm.decision_maker_phone_country_code}${dealForm.decision_maker_phone}`
+                      : dealForm.decision_maker_phone || undefined
+                  }
                   onChange={(value) => {
                     if (value) {
                       try {
                         const phoneNumber = parsePhoneNumberLib(value);
                         if (phoneNumber) {
-                          setDealForm(prev => ({
+                          setDealForm((prev) => ({
                             ...prev,
                             decision_maker_phone_country_code: `+${phoneNumber.countryCallingCode}`,
                             decision_maker_phone: phoneNumber.nationalNumber,
                           }));
                         } else {
-                          setDealForm(prev => ({
+                          setDealForm((prev) => ({
                             ...prev,
                             decision_maker_phone_country_code: "",
                             decision_maker_phone: value,
                           }));
                         }
                       } catch (error) {
-                        setDealForm(prev => ({
+                        setDealForm((prev) => ({
                           ...prev,
                           decision_maker_phone_country_code: "",
                           decision_maker_phone: value,
                         }));
                       }
                     } else {
-                      setDealForm(prev => ({
+                      setDealForm((prev) => ({
                         ...prev,
                         decision_maker_phone_country_code: "",
                         decision_maker_phone: "",
@@ -715,7 +936,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Industries */}
               <div style={fieldWrap}>
-                {fieldLabel('Industries')}
+                {fieldLabel("Industries")}
                 <Select
                   isMulti
                   value={allIndustries
@@ -724,7 +945,9 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
                   onChange={(selected) => {
                     setDealForm((prev) => ({
                       ...prev,
-                      industry_ids: selected ? selected.map((s) => s.value) : [],
+                      industry_ids: selected
+                        ? selected.map((s) => s.value)
+                        : [],
                     }));
                   }}
                   options={allIndustries.map((ind) => ({
@@ -737,18 +960,26 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
               </div>
 
               {/* Deal Characteristics Section */}
-              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', marginBottom: '16px', marginTop: '32px' }}>
+              <h3
+                style={{
+                  fontSize: "16px",
+                  fontWeight: "600",
+                  color: "#141414",
+                  marginBottom: "16px",
+                  marginTop: "32px",
+                }}
+              >
                 DEAL CHARACTERISTICS
               </h3>
 
               {/* Deal Type */}
               <div style={fieldWrap}>
-                {fieldLabel('Deal Type')}
+                {fieldLabel("Deal Type")}
                 <input
                   type="text"
                   data-test-id="dealtype-input"
                   value={dealForm.deal_type}
-                  onChange={setE('deal_type')}
+                  onChange={setE("deal_type")}
                   style={inputStyle}
                   onFocus={focusStyle}
                   onBlur={blurStyle}
@@ -758,10 +989,15 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Contract Length */}
               <div style={fieldWrap}>
-                {fieldLabel('Contract Length')}
+                {fieldLabel("Contract Length")}
                 <Form.Select
                   value={dealForm.contract_length}
-                  onChange={(e) => setDealForm((prev) => ({ ...prev, contract_length: e.target.value }))}
+                  onChange={(e) =>
+                    setDealForm((prev) => ({
+                      ...prev,
+                      contract_length: e.target.value,
+                    }))
+                  }
                   style={inputStyle}
                 >
                   <option value="">Select Contract Length</option>
@@ -772,13 +1008,13 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
                 </Form.Select>
               </div>
 
-              {dealForm.contract_length === 'custom' && (
+              {dealForm.contract_length === "custom" && (
                 <div style={fieldWrap}>
-                  {fieldLabel('Contract Length (Custom)')}
+                  {fieldLabel("Contract Length (Custom)")}
                   <input
                     type="text"
                     value={dealForm.contract_length_custom}
-                    onChange={setE('contract_length_custom')}
+                    onChange={setE("contract_length_custom")}
                     style={inputStyle}
                     onFocus={focusStyle}
                     onBlur={blurStyle}
@@ -789,11 +1025,11 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Billing Model */}
               <div style={fieldWrap}>
-                {fieldLabel('Billing Model')}
+                {fieldLabel("Billing Model")}
                 <input
                   type="text"
                   value={dealForm.billing_model}
-                  onChange={setE('billing_model')}
+                  onChange={setE("billing_model")}
                   style={inputStyle}
                   onFocus={focusStyle}
                   onBlur={blurStyle}
@@ -803,10 +1039,15 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Payment Terms */}
               <div style={fieldWrap}>
-                {fieldLabel('Payment Terms')}
+                {fieldLabel("Payment Terms")}
                 <Form.Select
                   value={dealForm.payment_terms}
-                  onChange={(e) => setDealForm((prev) => ({ ...prev, payment_terms: e.target.value }))}
+                  onChange={(e) =>
+                    setDealForm((prev) => ({
+                      ...prev,
+                      payment_terms: e.target.value,
+                    }))
+                  }
                   style={inputStyle}
                 >
                   <option value="">Select Payment Terms</option>
@@ -817,13 +1058,13 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
                 </Form.Select>
               </div>
 
-              {dealForm.payment_terms === 'custom' && (
+              {dealForm.payment_terms === "custom" && (
                 <div style={fieldWrap}>
-                  {fieldLabel('Payment Terms (Custom)')}
+                  {fieldLabel("Payment Terms (Custom)")}
                   <input
                     type="text"
                     value={dealForm.payment_terms_custom}
-                    onChange={setE('payment_terms_custom')}
+                    onChange={setE("payment_terms_custom")}
                     style={inputStyle}
                     onFocus={focusStyle}
                     onBlur={blurStyle}
@@ -834,11 +1075,11 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Risk Level */}
               <div style={fieldWrap}>
-                {fieldLabel('Risk Level')}
+                {fieldLabel("Risk Level")}
                 <input
                   type="text"
                   value={dealForm.risk_level}
-                  onChange={setE('risk_level')}
+                  onChange={setE("risk_level")}
                   style={inputStyle}
                   onFocus={focusStyle}
                   onBlur={blurStyle}
@@ -848,11 +1089,11 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
 
               {/* Competitors */}
               <div style={fieldWrap}>
-                {fieldLabel('Competitors')}
+                {fieldLabel("Competitors")}
                 <input
                   type="text"
                   value={dealForm.competitors}
-                  onChange={setE('competitors')}
+                  onChange={setE("competitors")}
                   style={inputStyle}
                   onFocus={focusStyle}
                   onBlur={blurStyle}
@@ -860,216 +1101,563 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
                 />
               </div>
 
-              <div style={{ marginTop: '28px' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#141414', marginBottom: '16px', marginTop: 0 }}>
-              Associate Deal with
-            </h3>
+              <div style={{ marginTop: "28px" }}>
+                <h3
+                  style={{
+                    fontSize: "15px",
+                    fontWeight: "600",
+                    color: "#141414",
+                    marginBottom: "16px",
+                    marginTop: 0,
+                  }}
+                >
+                  Associate Deal with
+                </h3>
 
-            {/* Contacts section */}
-            {!isEditMode && <div
-              style={{
-                border: '1px solid #cccccc',
-                borderRadius: '6px',
-                marginBottom: '16px',
-                overflow: 'hidden',
-                borderLeft: '4px solid #ccc',
-              }}
-            >
-              {/* Contacts Header */}
-              <div
-                onClick={() => setIsContactsExpanded(!isContactsExpanded)}
-                style={{
-                  padding: '12px 16px',
-                  backgroundColor: 'transparent',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  
-                }}
-              >
-                {isContactsExpanded ? (
-                  <ChevronDown size={16} style={{ color: '#6c757d' }} />
-                ) : (
-                  <ChevronRight size={16} style={{ color: '#6c757d' }} />
-                )}
-                <span style={{ fontSize: '14px', fontWeight: '600', color: '#141414' }}>
-                  Contacts
-                </span>
-              </div>
-
-              {/* Contacts Content */}
-              {isContactsExpanded && (
-                <div style={{ padding: '16px' }}>
-                  <div style={fieldWrap}>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#141414', marginBottom: '6px' }}>
-                      Associate records
-                    </label>
-                    <SimpleDropdown
-                      value={dealForm.contactAssociateRecord}
-                      options={['Contact A', 'Contact B', 'Contact C']}
-                      onChange={set('contactAssociateRecord')}
-                      placeholder="Search"
-                      testId="contact-associate-input"
-                    />
-                  </div>
-
-                  <div style={fieldWrap}>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#141414', marginBottom: '6px' }}>
-                      Association label
-                    </label>
-                    <SimpleDropdown
-                      value={dealForm.contactAssociationLabel}
-                      options={ASSOCIATION_LABEL_OPTIONS}
-                      onChange={set('contactAssociationLabel')}
-                      testId="contact-label-input"
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: '8px' }}>
-                    <Form.Check
-                      type="checkbox"
-                      label={
-                        <span style={{ fontSize: '13px', color: '#6c757d' }}>
-                          Add timeline activity from this Contact{' '}
-                          <span
-                            title="Adds contact activity to the deal timeline"
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                              width: '14px', height: '14px', borderRadius: '50%',
-                              backgroundColor: '#e0e7ef', color: '#6c757d', fontSize: '11px', cursor: 'help',
-                            }}
-                          >
-                            i
-                          </span>
-                        </span>
-                      }
-                      checked={dealForm.addTimelineContact}
-                      onChange={(e) => setDealForm((p) => ({ ...p, addTimelineContact: e.target.checked }))}
-                    />
-                  </div>
-
-                  <button
+                {/* Contacts section */}
+                {!isEditMode && (
+                  <div
                     style={{
-                      background: 'transparent', border: 'none', color: '#0091ae',
-                      fontSize: '13px', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '4px',
+                      border: "1px solid #cccccc",
+                      borderRadius: "6px",
+                      marginBottom: "16px",
+                      overflow: "hidden",
+                      borderLeft: "4px solid #ccc",
                     }}
                   >
-                    <Plus size={14} /> Add more
-                  </button>
-                </div>
-              )}
-            </div>}
-
-            {/* Companies section */}
-            <div
-              style={{
-                border: '1px solid #ccc',
-                borderRadius: '6px',
-                marginBottom: '16px',
-                overflow: 'hidden',
-                borderLeft: '4px solid #ccc',
-              }}
-            >
-              {/* Companies Header */}
-              <div
-                onClick={() => setIsCompaniesExpanded(!isCompaniesExpanded)}
-                style={{
-                  padding: '12px 16px',
-                  backgroundColor: 'transparent',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  
-                }}
-              >
-                {isCompaniesExpanded ? (
-                  <ChevronDown size={16} style={{ color: '#6c757d' }} />
-                ) : (
-                  <ChevronRight size={16} style={{ color: '#6c757d' }} />
-                )}
-                <span style={{ fontSize: '14px', fontWeight: '600', color: '#141414' }}>
-                  Companies
-                </span>
-              </div>
-
-              {/* Companies Content */}
-              {isCompaniesExpanded && (
-                <div style={{ padding: '16px' }}>
-                  <div style={fieldWrap}>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#141414', marginBottom: '6px' }}>
-                      Associate records
-                    </label>
-                    <SimpleDropdown
-                      value={dealForm.companyAssociateRecord}
-                      options={['Company A', 'Company B', 'Company C']}
-                      onChange={set('companyAssociateRecord')}
-                      placeholder="Search"
-                      testId="company-associate-input"
-                    />
-                  </div>
-
-                  <div style={fieldWrap}>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#141414', marginBottom: '6px' }}>
-                      Association label <span style={{ color: '#f2545b' }}>*</span>{' '}
+                    {/* Contacts Header */}
+                    <div
+                      onClick={() => setIsContactsExpanded(!isContactsExpanded)}
+                      style={{
+                        padding: "12px 16px",
+                        backgroundColor: "transparent",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      {isContactsExpanded ? (
+                        <ChevronDown size={16} style={{ color: "#6c757d" }} />
+                      ) : (
+                        <ChevronRight size={16} style={{ color: "#6c757d" }} />
+                      )}
                       <span
-                        title="Required association label"
                         style={{
-                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                          width: '14px', height: '14px', borderRadius: '50%',
-                          backgroundColor: '#e0e7ef', color: '#6c757d', fontSize: '11px', cursor: 'help',
+                          fontSize: "14px",
+                          fontWeight: "600",
+                          color: "#141414",
                         }}
                       >
-                        i
+                        Contacts
                       </span>
-                    </label>
-                    <input
-                      type="text"
-                      value={dealForm.companyAssociationLabel}
-                      readOnly
-                      style={{ ...inputStyle, backgroundColor: '#f7fafc', color: '#a0aec0' }}
-                    />
+                    </div>
+
+                    {/* Contacts Content */}
+                    {isContactsExpanded && (
+                      <div style={{ padding: "16px" }}>
+                        <div style={fieldWrap}>
+                          <label
+                            style={{
+                              display: "block",
+                              fontSize: "13px",
+                              fontWeight: "600",
+                              color: "#141414",
+                              marginBottom: "6px",
+                            }}
+                          >
+                            Associate records
+                          </label>
+                          <SimpleDropdown
+                            value={dealForm.contactAssociateRecord}
+                            options={["Contact A", "Contact B", "Contact C"]}
+                            onChange={set("contactAssociateRecord")}
+                            placeholder="Search"
+                            testId="contact-associate-input"
+                          />
+                        </div>
+
+                        <div style={fieldWrap}>
+                          <label
+                            style={{
+                              display: "block",
+                              fontSize: "13px",
+                              fontWeight: "600",
+                              color: "#141414",
+                              marginBottom: "6px",
+                            }}
+                          >
+                            Association label
+                          </label>
+                          <SimpleDropdown
+                            value={dealForm.contactAssociationLabel}
+                            options={ASSOCIATION_LABEL_OPTIONS}
+                            onChange={set("contactAssociationLabel")}
+                            testId="contact-label-input"
+                          />
+                        </div>
+
+                        <div style={{ marginBottom: "8px" }}>
+                          <Form.Check
+                            type="checkbox"
+                            label={
+                              <span
+                                style={{ fontSize: "13px", color: "#6c757d" }}
+                              >
+                                Add timeline activity from this Contact{" "}
+                                <span
+                                  title="Adds contact activity to the deal timeline"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    width: "14px",
+                                    height: "14px",
+                                    borderRadius: "50%",
+                                    backgroundColor: "#e0e7ef",
+                                    color: "#6c757d",
+                                    fontSize: "11px",
+                                    cursor: "help",
+                                  }}
+                                >
+                                  i
+                                </span>
+                              </span>
+                            }
+                            checked={dealForm.addTimelineContact}
+                            onChange={(e) =>
+                              setDealForm((p) => ({
+                                ...p,
+                                addTimelineContact: e.target.checked,
+                              }))
+                            }
+                          />
+                        </div>
+
+                        <button
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: "#0091ae",
+                            fontSize: "13px",
+                            cursor: "pointer",
+                            padding: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                          }}
+                        >
+                          <Plus size={14} /> Add more
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Companies section */}
+                <div
+                  style={{
+                    border: "1px solid #ccc",
+                    borderRadius: "6px",
+                    marginBottom: "16px",
+                    overflow: "hidden",
+                    borderLeft: "4px solid #ccc",
+                  }}
+                >
+                  {/* Companies Header */}
+                  <div
+                    onClick={() => setIsCompaniesExpanded(!isCompaniesExpanded)}
+                    style={{
+                      padding: "12px 16px",
+                      backgroundColor: "transparent",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    {isCompaniesExpanded ? (
+                      <ChevronDown size={16} style={{ color: "#6c757d" }} />
+                    ) : (
+                      <ChevronRight size={16} style={{ color: "#6c757d" }} />
+                    )}
+                    <span
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: "600",
+                        color: "#141414",
+                      }}
+                    >
+                      Companies
+                    </span>
                   </div>
 
-                  <div style={{ marginBottom: '8px' }}>
-                    <Form.Check
-                      type="checkbox"
-                      label={
-                        <span style={{ fontSize: '13px', color: '#6c757d' }}>
-                          Add timeline activity from this Company{' '}
+                  {/* Companies Content */}
+                  {isCompaniesExpanded && (
+                    <div style={{ padding: "16px" }}>
+                      <div style={fieldWrap}>
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: "13px",
+                            fontWeight: "600",
+                            color: "#141414",
+                            marginBottom: "6px",
+                          }}
+                        >
+                          Associate records
+                        </label>
+                        <SimpleDropdown
+                          value={dealForm.companyAssociateRecord}
+                          options={["Company A", "Company B", "Company C"]}
+                          onChange={set("companyAssociateRecord")}
+                          placeholder="Search"
+                          testId="company-associate-input"
+                        />
+                      </div>
+
+                      <div style={fieldWrap}>
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: "13px",
+                            fontWeight: "600",
+                            color: "#141414",
+                            marginBottom: "6px",
+                          }}
+                        >
+                          Association label{" "}
+                          <span style={{ color: "#f2545b" }}>*</span>{" "}
                           <span
-                            title="Adds company activity to the deal timeline"
+                            title="Required association label"
                             style={{
-                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                              width: '14px', height: '14px', borderRadius: '50%',
-                              backgroundColor: '#e0e7ef', color: '#6c757d', fontSize: '11px', cursor: 'help',
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: "14px",
+                              height: "14px",
+                              borderRadius: "50%",
+                              backgroundColor: "#e0e7ef",
+                              color: "#6c757d",
+                              fontSize: "11px",
+                              cursor: "help",
                             }}
                           >
                             i
                           </span>
-                        </span>
-                      }
-                      checked={dealForm.addTimelineCompany}
-                      onChange={(e) => setDealForm((p) => ({ ...p, addTimelineCompany: e.target.checked }))}
-                    />
-                  </div>
+                        </label>
+                        <input
+                          type="text"
+                          value={dealForm.companyAssociationLabel}
+                          readOnly
+                          style={{
+                            ...inputStyle,
+                            backgroundColor: "#f7fafc",
+                            color: "#a0aec0",
+                          }}
+                        />
+                      </div>
 
-                  <button
+                      <div style={{ marginBottom: "8px" }}>
+                        <Form.Check
+                          type="checkbox"
+                          label={
+                            <span
+                              style={{ fontSize: "13px", color: "#6c757d" }}
+                            >
+                              Add timeline activity from this Company{" "}
+                              <span
+                                title="Adds company activity to the deal timeline"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  width: "14px",
+                                  height: "14px",
+                                  borderRadius: "50%",
+                                  backgroundColor: "#e0e7ef",
+                                  color: "#6c757d",
+                                  fontSize: "11px",
+                                  cursor: "help",
+                                }}
+                              >
+                                i
+                              </span>
+                            </span>
+                          }
+                          checked={dealForm.addTimelineCompany}
+                          onChange={(e) =>
+                            setDealForm((p) => ({
+                              ...p,
+                              addTimelineCompany: e.target.checked,
+                            }))
+                          }
+                        />
+                      </div>
+
+                      <button
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: "#0091ae",
+                          fontSize: "13px",
+                          cursor: "pointer",
+                          padding: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        <Plus size={14} /> Add more
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Add line item ── */}
+              <div style={{ marginTop: "28px" }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 70px 70px 70px auto",
+                    gap: "8px",
+                    alignItems: "center",
+                    marginBottom: "12px",
+                  }}
+                >
+                  <span
                     style={{
-                      background: 'transparent', border: 'none', color: '#0091ae',
-                      fontSize: '13px', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '4px',
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      color: "#141414",
                     }}
                   >
-                    <Plus size={14} /> Add more
+                    Add line item
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      color: "#141414",
+                    }}
+                  >
+                    Quantity
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      color: "#141414",
+                    }}
+                  >
+                    Tax (%)
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      color: "#141414",
+                    }}
+                  >
+                    Discount (%)
+                  </span>
+                  <span style={{ width: "36px" }} />
+                </div>
+
+                {/* Existing line items */}
+                {dealForm.lineItems.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 70px 70px 70px auto",
+                      gap: "8px",
+                      alignItems: "center",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: "10px 12px",
+                        border: "1px solid #eaf0f6",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        color: "#141414",
+                        backgroundColor: "#f7fafc",
+                      }}
+                    >
+                      {item.name}
+                    </div>
+                    <input
+                      type="number"
+                      min={1}
+                      value={item.quantity}
+                      onChange={(e) =>
+                        setDealForm((prev) => ({
+                          ...prev,
+                          lineItems: prev.lineItems.map((li) =>
+                            li.id === item.id
+                              ? { ...li, quantity: Number(e.target.value) || 1 }
+                              : li,
+                          ),
+                        }))
+                      }
+                      style={{ ...inputStyle, width: "70px" }}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={item.tax ?? 0}
+                      onChange={(e) =>
+                        setDealForm((prev) => ({
+                          ...prev,
+                          lineItems: prev.lineItems.map((li) =>
+                            li.id === item.id
+                              ? { ...li, tax: Number(e.target.value) || 0 }
+                              : li,
+                          ),
+                        }))
+                      }
+                      style={{ ...inputStyle, width: "70px" }}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={item.discount ?? 0}
+                      onChange={(e) =>
+                        setDealForm((prev) => ({
+                          ...prev,
+                          lineItems: prev.lineItems.map((li) =>
+                            li.id === item.id
+                              ? { ...li, discount: Number(e.target.value) || 0 }
+                              : li,
+                          ),
+                        }))
+                      }
+                      style={{ ...inputStyle, width: "70px" }}
+                    />
+                    <button
+                      onClick={() => removeLineItem(item.id)}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "#f2545b",
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+
+                {/* Add new line item row */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 70px 70px 70px auto",
+                    gap: "8px",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <Dropdown>
+                      <Dropdown.Toggle
+                        variant="outline-secondary"
+                        data-test-id="lineitem-input"
+                        disabled={loadingLineItemProducts}
+                        style={{
+                          ...dropdownToggleStyle(!!lineItemInput),
+                          color: lineItemInput ? "#141414" : "#a0aec0",
+                        }}
+                      >
+                        {loadingLineItemProducts
+                          ? "Loading products..."
+                          : lineItemInput || "Add a line item"}
+                      </Dropdown.Toggle>
+                      <Dropdown.Menu style={{ width: "100%" }}>
+                        {lineItemProducts.length === 0 && !loadingLineItemProducts ? (
+                          <Dropdown.Item disabled>No products available</Dropdown.Item>
+                        ) : (
+                          lineItemProducts.map((p) => (
+                            <Dropdown.Item
+                              key={p.id}
+                              onClick={() => setLineItemInput(p.name)}
+                            >
+                              {p.name} – {dealForm.currency} {p.price || "0"}
+                            </Dropdown.Item>
+                          ))
+                        )}
+                      </Dropdown.Menu>
+                    </Dropdown>
+                  </div>
+                  <input
+                    type="number"
+                    min={1}
+                    value={lineItemQty || ""}
+                    placeholder="0"
+                    onChange={(e) => setLineItemQty(Number(e.target.value) ? Number(e.target.value) : 0)}
+                    style={{ ...inputStyle, width: "70px" }}
+                    onFocus={focusStyle}
+                    onBlur={blurStyle}
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.01}
+                    value={lineItemTax || ""}
+                    placeholder="0"
+                    onChange={(e) => setLineItemTax(Number(e.target.value) || 0)}
+                    style={{ ...inputStyle, width: "70px" }}
+                    onFocus={focusStyle}
+                    onBlur={blurStyle}
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.01}
+                    value={lineItemDiscount || ""}
+                    placeholder="0"
+                    onChange={(e) => setLineItemDiscount(Number(e.target.value) || 0)}
+                    style={{ ...inputStyle, width: "70px" }}
+                    onFocus={focusStyle}
+                    onBlur={blurStyle}
+                  />
+                  <button
+                    onClick={addLineItem}
+                    disabled={!lineItemInput}
+                    style={{
+                      background: lineItemInput ? "#0091ae" : "#cbd5e0",
+                      border: "none",
+                      borderRadius: "4px",
+                      padding: "10px",
+                      cursor: lineItemInput ? "pointer" : "not-allowed",
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Plus size={16} />
                   </button>
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
 
               {/* Progress & Notes Section */}
-              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#141414', marginBottom: '16px', marginTop: '32px' }}>
+              <h3
+                style={{
+                  fontSize: "16px",
+                  fontWeight: "600",
+                  color: "#141414",
+                  marginBottom: "16px",
+                  marginTop: "32px",
+                }}
+              >
                 NEGOTIATION PROGRESS
               </h3>
 
@@ -1079,7 +1667,12 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
                   type="checkbox"
                   label="Quotation Sent"
                   checked={dealForm.quotation_sent}
-                  onChange={(e) => setDealForm((prev) => ({ ...prev, quotation_sent: e.target.checked }))}
+                  onChange={(e) =>
+                    setDealForm((prev) => ({
+                      ...prev,
+                      quotation_sent: e.target.checked,
+                    }))
+                  }
                 />
               </div>
 
@@ -1089,7 +1682,12 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
                   type="checkbox"
                   label="Contract Sent"
                   checked={dealForm.contract_sent}
-                  onChange={(e) => setDealForm((prev) => ({ ...prev, contract_sent: e.target.checked }))}
+                  onChange={(e) =>
+                    setDealForm((prev) => ({
+                      ...prev,
+                      contract_sent: e.target.checked,
+                    }))
+                  }
                 />
               </div>
 
@@ -1099,22 +1697,26 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
                   type="checkbox"
                   label="Contract Received"
                   checked={dealForm.contract_received}
-                  onChange={(e) => setDealForm((prev) => ({ ...prev, contract_received: e.target.checked }))}
+                  onChange={(e) =>
+                    setDealForm((prev) => ({
+                      ...prev,
+                      contract_received: e.target.checked,
+                    }))
+                  }
                 />
               </div>
             </>
           )}
-
         </div>
 
         {/* ── Footer ── */}
         <div
           style={{
-            padding: '16px 24px',
-            borderTop: '1px solid #eaf0f6',
-            display: 'flex',
-            gap: '12px',
-            justifyContent: 'flex-start',
+            padding: "16px 24px",
+            borderTop: "1px solid #eaf0f6",
+            display: "flex",
+            gap: "12px",
+            justifyContent: "flex-start",
           }}
         >
           <button
@@ -1126,16 +1728,23 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
               try {
                 const payload: any = {
                   name: dealForm.name,
-                  stage_id: dealForm.stage_id ? String(dealForm.stage_id) : undefined,
+                  stage_id: dealForm.stage_id
+                    ? String(dealForm.stage_id)
+                    : undefined,
                   assigned_to: dealForm.assigned_to,
                   expected_close_date: dealForm.expected_close_date,
                   company_name: dealForm.company_name,
                   industry_ids: dealForm.industry_ids,
-                  ...(dealForm.business_type_id ? { business_type_id: String(dealForm.business_type_id) } : {}),
-                  ...(dealForm.business_type_other ? { business_type_other: dealForm.business_type_other } : {}),
+                  ...(dealForm.business_type_id
+                    ? { business_type_id: String(dealForm.business_type_id) }
+                    : {}),
+                  ...(dealForm.business_type_other
+                    ? { business_type_other: dealForm.business_type_other }
+                    : {}),
                   decision_maker_title: dealForm.decision_maker_title,
                   decision_maker_name: dealForm.decision_maker_name,
-                  decision_maker_phone_country_code: dealForm.decision_maker_phone_country_code,
+                  decision_maker_phone_country_code:
+                    dealForm.decision_maker_phone_country_code,
                   decision_maker_phone: dealForm.decision_maker_phone,
                   decision_maker_email: dealForm.decision_maker_email,
                   deal_type: dealForm.deal_type,
@@ -1152,7 +1761,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
                   follow_up_date: dealForm.follow_up_date || "",
                   currency: dealForm.currency,
                 };
-                
+
                 if (isEditMode && dealId) {
                   await updateDeal(dealId, payload);
                   // Toast is already shown by updateDeal function
@@ -1160,7 +1769,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
                   await createDeal(payload);
                   // Toast is already shown by createDeal function
                 }
-                
+
                 if (onSuccess) {
                   onSuccess();
                 }
@@ -1173,19 +1782,25 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
               }
             }}
             style={{
-              padding: '10px 20px',
-              backgroundColor: isFormValid && !loading ? '#0091ae' : '#cbd5e0',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: isFormValid && !loading ? 'pointer' : 'not-allowed',
+              padding: "10px 20px",
+              backgroundColor: isFormValid && !loading ? "#0091ae" : "#cbd5e0",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: isFormValid && !loading ? "pointer" : "not-allowed",
             }}
-            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { if (isFormValid && !loading) e.currentTarget.style.backgroundColor = '#007a94'; }}
-            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { if (isFormValid && !loading) e.currentTarget.style.backgroundColor = '#0091ae'; }}
+            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+              if (isFormValid && !loading)
+                e.currentTarget.style.backgroundColor = "#007a94";
+            }}
+            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+              if (isFormValid && !loading)
+                e.currentTarget.style.backgroundColor = "#0091ae";
+            }}
           >
-            {loading ? 'Saving...' : isEditMode ? 'Update Deal' : 'Create'}
+            {loading ? "Saving..." : isEditMode ? "Update Deal" : "Create"}
           </button>
 
           {!isEditMode && (
@@ -1193,17 +1808,23 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
               type="button"
               disabled={!isFormValid || loading}
               style={{
-                padding: '10px 20px',
-                backgroundColor: 'transparent',
-                color: isFormValid && !loading ? '#141414' : '#a0aec0',
-                border: '1px solid #8a8a8a',
-                borderRadius: '4px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: isFormValid && !loading ? 'pointer' : 'not-allowed',
+                padding: "10px 20px",
+                backgroundColor: "transparent",
+                color: isFormValid && !loading ? "#141414" : "#a0aec0",
+                border: "1px solid #8a8a8a",
+                borderRadius: "4px",
+                fontSize: "14px",
+                fontWeight: "500",
+                cursor: isFormValid && !loading ? "pointer" : "not-allowed",
               }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { if (isFormValid && !loading) e.currentTarget.style.backgroundColor = '#f7fafc'; }}
-              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { if (isFormValid && !loading) e.currentTarget.style.backgroundColor = 'transparent'; }}
+              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                if (isFormValid && !loading)
+                  e.currentTarget.style.backgroundColor = "#f7fafc";
+              }}
+              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                if (isFormValid && !loading)
+                  e.currentTarget.style.backgroundColor = "transparent";
+              }}
             >
               Create and add another
             </button>
@@ -1214,17 +1835,22 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
             onClick={onClose}
             disabled={loading}
             style={{
-              padding: '10px 20px',
-              backgroundColor: 'transparent',
-              color: '#141414',
-              border: '1px solid #8a8a8a',
-              borderRadius: '4px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: loading ? 'not-allowed' : 'pointer',
+              padding: "10px 20px",
+              backgroundColor: "transparent",
+              color: "#141414",
+              border: "1px solid #8a8a8a",
+              borderRadius: "4px",
+              fontSize: "14px",
+              fontWeight: "500",
+              cursor: loading ? "not-allowed" : "pointer",
             }}
-            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { if (!loading) e.currentTarget.style.backgroundColor = '#f7fafc'; }}
-            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { if (!loading) e.currentTarget.style.backgroundColor = 'transparent'; }}
+            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+              if (!loading) e.currentTarget.style.backgroundColor = "#f7fafc";
+            }}
+            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+              if (!loading)
+                e.currentTarget.style.backgroundColor = "transparent";
+            }}
           >
             Cancel
           </button>
@@ -1232,7 +1858,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({ onClose, d
       </div>
     </>
   );
-}
+};
 
 /**
  * Usage in your parent component:

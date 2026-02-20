@@ -11,8 +11,12 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, { TableColumn, TableAction, TabConfig } from "@components/GenericTable";
-import GenericSidebar from '@components/GenericSidebarNew';
+import GenericTable, {
+  TableColumn,
+  TableAction,
+  TabConfig,
+} from "@components/GenericTable";
+import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import {
   getLeads,
@@ -35,9 +39,15 @@ import {
   getCrmDataById,
   getBusinessTypes,
   getLeadFollowUps,
-  getMeetings
+  getMeetings,
 } from "@utils/crm";
-import type { StageData, CampaignData, CrmDataItem, IndustryData, BusinessTypeData } from "@utils/crm";
+import type {
+  StageData,
+  CampaignData,
+  CrmDataItem,
+  IndustryData,
+  BusinessTypeData,
+} from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
   Button,
@@ -61,7 +71,12 @@ import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber as parsePhoneLib } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { Country, State, City } from "country-state-city";
-import { ModuleSlug, formatDateForTable, checkRequiredFields, GlobalDateFormat } from "@utils/Helper";
+import {
+  ModuleSlug,
+  formatDateForTable,
+  checkRequiredFields,
+  GlobalDateFormat,
+} from "@utils/Helper";
 import {
   Target,
   CheckCircle,
@@ -175,7 +190,13 @@ interface LeadData {
 
 const ignoredKeys = ["stage_id", "contact_persons"];
 // Phone Container Component (with Badge for tables)
-const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => void }) => {
+const PhoneContainer = ({
+  phone,
+  onClick,
+}: {
+  phone: string;
+  onClick?: () => void;
+}) => {
   const [showPopover, setShowPopover] = useState(false);
 
   const parsePhone = useCallback((phone: string) => {
@@ -213,10 +234,10 @@ const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => voi
   const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
 
   const phoneBadge = (
-    <Badge 
-      bg="info" 
+    <Badge
+      bg="info"
       className="bg-opacity-10 text-dark"
-      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      style={{ cursor: onClick ? "pointer" : "default" }}
       onMouseEnter={() => setShowPopover(true)}
       onMouseLeave={() => setShowPopover(false)}
     >
@@ -234,23 +255,23 @@ const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => voi
   }
 
   const popover = (
-    <Popover 
-      id={`phone-popover-${phone}`} 
-      style={{ 
-        maxWidth: '160px', 
-        pointerEvents: 'auto',
-        border: 'none',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-        borderRadius: '8px'
+    <Popover
+      id={`phone-popover-${phone}`}
+      style={{
+        maxWidth: "160px",
+        pointerEvents: "auto",
+        border: "none",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+        borderRadius: "8px",
       }}
       onMouseEnter={() => setShowPopover(true)}
       onMouseLeave={() => setShowPopover(false)}
     >
-      <Popover.Body 
+      <Popover.Body
         className="p-0"
-        style={{ 
-          padding: '8px',
-          borderRadius: '8px'
+        style={{
+          padding: "8px",
+          borderRadius: "8px",
         }}
       >
         <Button
@@ -262,27 +283,27 @@ const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => voi
             setShowPopover(false);
           }}
           className="d-flex align-items-center justify-content-center gap-2 w-100"
-          style={{ 
-            fontSize: '13px', 
-            fontWeight: '600',
-            padding: '8px 16px',
-            borderRadius: '6px',
-            border: '1px solid #dee2e6',
-            backgroundColor: 'transparent',
-            color: '#212529',
-            boxShadow: 'none',
-            transition: 'all 0.2s ease',
-            minHeight: '36px'
+          style={{
+            fontSize: "13px",
+            fontWeight: "600",
+            padding: "8px 16px",
+            borderRadius: "6px",
+            border: "1px solid #dee2e6",
+            backgroundColor: "transparent",
+            color: "#212529",
+            boxShadow: "none",
+            transition: "all 0.2s ease",
+            minHeight: "36px",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-1px)';
-            e.currentTarget.style.backgroundColor = '#f8f9fa';
-            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+            e.currentTarget.style.transform = "translateY(-1px)";
+            e.currentTarget.style.backgroundColor = "#f8f9fa";
+            e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.boxShadow = "none";
           }}
         >
           <Phone size={18} style={{ strokeWidth: 2.5 }} />
@@ -299,7 +320,7 @@ const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => voi
       overlay={popover}
       trigger={[]}
     >
-      <span style={{ display: 'inline-block' }}>{phoneBadge}</span>
+      <span style={{ display: "inline-block" }}>{phoneBadge}</span>
     </OverlayTrigger>
   );
 };
@@ -527,8 +548,8 @@ const FilterBar: React.FC<FilterBarProps> = ({
                     hasCustomColor
                       ? undefined
                       : isActive
-                      ? filter.variant || "primary"
-                      : "outline-secondary"
+                        ? filter.variant || "primary"
+                        : "outline-secondary"
                   }
                   onClick={() => onFilterChange && onFilterChange(filter.id)}
                   className="d-flex align-items-center gap-2"
@@ -548,7 +569,9 @@ const FilterBar: React.FC<FilterBarProps> = ({
           <div className="d-flex gap-2 align-items-center flex-shrink-0">
             {onToggleAdvancedFilters && (
               <Button
-                variant={advancedFilterCount > 0 ? "primary" : "outline-secondary"}
+                variant={
+                  advancedFilterCount > 0 ? "primary" : "outline-secondary"
+                }
                 onClick={onToggleAdvancedFilters}
                 className="d-flex align-items-center gap-2"
               >
@@ -577,7 +600,9 @@ const CrmLeads = () => {
   const [lostReasons, setLostReasons] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [filterBusinessTypes, setFilterBusinessTypes] = useState<BusinessTypeData[]>([]);
+  const [filterBusinessTypes, setFilterBusinessTypes] = useState<
+    BusinessTypeData[]
+  >([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const [leadsData, setLeadsData] = useState<any[]>([]);
@@ -598,7 +623,9 @@ const CrmLeads = () => {
   const [showLeadHistoryModal, setShowLeadHistoryModal] = useState(false);
 
   const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
-  const [editLeadIdForSidebar, setEditLeadIdForSidebar] = useState<number | null>(null);
+  const [editLeadIdForSidebar, setEditLeadIdForSidebar] = useState<
+    number | null
+  >(null);
   const [showTabModal, setShowTabModal] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   // Sidebar states
@@ -607,7 +634,7 @@ const CrmLeads = () => {
   const [selectedLead, setSelectedLead] = useState<any>(null);
 
   const [showConvertToDealModal, setShowConvertToDealModal] = useState(false);
-const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
+  const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   // Edit Modal states
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingLead, setEditingLead] = useState<any>(null);
@@ -631,13 +658,15 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     crm_data_id: undefined as number | undefined,
     lead_potential: "",
     campaign_field_values: {} as Record<string, any>,
-    contact_persons: [{
-      title: "",
-      name: "",
-      phone_country_code: "",
-      phone: "",
-      email: "",
-    }] as Array<{
+    contact_persons: [
+      {
+        title: "",
+        name: "",
+        phone_country_code: "",
+        phone: "",
+        email: "",
+      },
+    ] as Array<{
       title: string;
       name: string;
       phone_country_code: string;
@@ -649,17 +678,35 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   const [editExtensions, setEditExtensions] = useState<any[]>([]);
   const [editCampaigns, setEditCampaigns] = useState<CampaignData[]>([]);
   const [editCrmData, setEditCrmData] = useState<CrmDataItem[]>([]);
-  const [editSelectedCampaign, setEditSelectedCampaign] = useState<CampaignData | null>(null);
-  const [editSelectedCrmData, setEditSelectedCrmData] = useState<CrmDataItem | null>(null);
+  const [editSelectedCampaign, setEditSelectedCampaign] =
+    useState<CampaignData | null>(null);
+  const [editSelectedCrmData, setEditSelectedCrmData] =
+    useState<CrmDataItem | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editFetching, setEditFetching] = useState(false);
-  const [editBusinessTypes, setEditBusinessTypes] = useState<BusinessTypeData[]>([]);
-  const [editBusinessTypeId, setEditBusinessTypeId] = useState<number | null>(null);
-  const [editBusinessTypeOther, setEditBusinessTypeOther] = useState<string>("");
-  const [editShowOtherBusinessType, setEditShowOtherBusinessType] = useState(false);
-  const [editSelectedCountry, setEditSelectedCountry] = useState<{ value: string; label: string; isoCode: string; } | null>(null);
-  const [editSelectedState, setEditSelectedState] = useState<{ value: string; label: string; } | null>(null);
-  const [editSelectedCity, setEditSelectedCity] = useState<{ value: string; label: string; } | null>(null);
+  const [editBusinessTypes, setEditBusinessTypes] = useState<
+    BusinessTypeData[]
+  >([]);
+  const [editBusinessTypeId, setEditBusinessTypeId] = useState<number | null>(
+    null,
+  );
+  const [editBusinessTypeOther, setEditBusinessTypeOther] =
+    useState<string>("");
+  const [editShowOtherBusinessType, setEditShowOtherBusinessType] =
+    useState(false);
+  const [editSelectedCountry, setEditSelectedCountry] = useState<{
+    value: string;
+    label: string;
+    isoCode: string;
+  } | null>(null);
+  const [editSelectedState, setEditSelectedState] = useState<{
+    value: string;
+    label: string;
+  } | null>(null);
+  const [editSelectedCity, setEditSelectedCity] = useState<{
+    value: string;
+    label: string;
+  } | null>(null);
   const isEditInitialLoad = useRef(true);
 
   // Follow-up Modal
@@ -716,7 +763,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
             "assignedUser",
             "created",
           ];
-    }
+    },
   );
   const [leadsPagination, setLeadsPagination] = useState({
     currentPage: 1,
@@ -833,7 +880,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         setTotalLeads(
           pagination?.total ||
             (Array.isArray(leadsArray) ? leadsArray.length : 0) ||
-            0
+            0,
         );
         setSummaryTiles(summary);
 
@@ -856,7 +903,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
         setLoading(false);
       }
     },
-    [currentFilters] // Only currentFilters as dependency
+    [currentFilters], // Only currentFilters as dependency
   );
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
@@ -903,7 +950,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     } else if (activeFilter && stages.length > 0) {
       // Find stage by id (activeFilter should be stage id as string)
       const selectedStage = stages.find(
-        (s: any) => s.id.toString() === activeFilter
+        (s: any) => s.id.toString() === activeFilter,
       );
       if (selectedStage) {
         setCurrentFilters((prev) => {
@@ -921,39 +968,46 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       }
     }
   }, [activeFilter, stages]);
-  
+
   // Read tab from URL on mount and when router is ready
   useEffect(() => {
     if (router.isReady && router.query.tab) {
       const tabFromUrl = String(router.query.tab);
       // Allow "all", "lost", "deleted", or any stage ID
-      const isValidFilter = tabFromUrl === "all" || tabFromUrl === "lost" || tabFromUrl === "deleted" || 
-        (stages.length > 0 && stages.some((s: any) => s.id.toString() === tabFromUrl));
+      const isValidFilter =
+        tabFromUrl === "all" ||
+        tabFromUrl === "lost" ||
+        tabFromUrl === "deleted" ||
+        (stages.length > 0 &&
+          stages.some((s: any) => s.id.toString() === tabFromUrl));
       if (isValidFilter && tabFromUrl !== activeFilter) {
         setActiveFilter(tabFromUrl);
         setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
       }
     }
   }, [router.isReady, router.query.tab, stages, activeFilter]);
-  
+
   // Handler to update filter and URL
-  const handleFilterChange = useCallback((filterId: string) => {    
-    // Update URL with tab query parameter
-    router.push(
-      {
-        pathname: router.pathname,
-        query: { ...router.query, tab: filterId }
-      },
-      undefined,
-      { shallow: true }
-    );
-  }, [router]);
+  const handleFilterChange = useCallback(
+    (filterId: string) => {
+      // Update URL with tab query parameter
+      router.push(
+        {
+          pathname: router.pathname,
+          query: { ...router.query, tab: filterId },
+        },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [router],
+  );
 
   useEffect(() => {
     fetchLeads(
       leadsPagination.currentPage,
       leadsPagination.rowsPerPage,
-      leadsSearch
+      leadsSearch,
     );
   }, [
     refreshKey,
@@ -1104,15 +1158,13 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     setRefreshKey((prev) => prev + 1);
   }, []);
 
-
   const [leadFollowUps, setLeadFollowUps] = useState<any[]>([]);
   const [loadingLeadFollowUps, setLoadingLeadFollowUps] = useState(false);
   const fetchLeadFollowUps = useCallback(async (leadId: number) => {
-
     try {
       setLoadingLeadFollowUps(true);
-      const leadFollowUps  = await getLeadFollowUps(leadId);
-      setLeadFollowUps(leadFollowUps || [] as any);
+      const leadFollowUps = await getLeadFollowUps(leadId);
+      setLeadFollowUps(leadFollowUps || ([] as any));
       console.log("leadFollowUps", leadFollowUps);
     } catch (error) {
       console.error("Failed to fetch lead follow-ups:", error);
@@ -1126,7 +1178,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   const fetchMeetings = useCallback(async (leadId: number) => {
     try {
       setLoadingMeetings(true);
-      const meetings  = await getMeetings({lead_id: leadId});
+      const meetings = await getMeetings({ lead_id: leadId });
       console.log("meetings", meetings);
       setLeadMeetings(meetings?.data || []);
     } catch (error) {
@@ -1136,45 +1188,54 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     }
   }, []);
 
-  const handleRowClicked = useCallback(async (leadId: number) => {
-    try {
-      const leadData: any = await getLead(leadId);
-      await fetchLeadFollowUps(leadId);
-      await fetchMeetings(leadId);
-      setSelectedLead(leadData);
-      setShowLeadSidebar(true);
-    } catch (error) {
-      console.error("Failed to fetch lead:", error);
-      toast.error("Failed to load lead details");
-    }
-  }, [fetchLeadFollowUps, fetchMeetings]);
-
-  // Handle preview button click - shows sidebar
-  const handlePreviewClick = useCallback(async (lead: LeadData) => {
-    const leadId = lead.rawData?.id || lead.id;
-    // Set the lead immediately to show sidebar
-    setSelectedLead(lead.rawData || lead);
-    setShowLeadSidebar(true);
-    
-    // Fetch additional data (follow-ups, meetings) in the background
-    if (leadId) {
+  const handleRowClicked = useCallback(
+    async (leadId: number) => {
       try {
+        const leadData: any = await getLead(leadId);
         await fetchLeadFollowUps(leadId);
         await fetchMeetings(leadId);
-        // Optionally refresh the lead data to get latest info
-        const leadData: any = await getLead(leadId);
         setSelectedLead(leadData);
+        setShowLeadSidebar(true);
       } catch (error) {
-        console.error("Failed to fetch lead details:", error);
-        // Don't show error toast as sidebar is already open with basic data
+        console.error("Failed to fetch lead:", error);
+        toast.error("Failed to load lead details");
       }
-    }
-  }, [fetchLeadFollowUps, fetchMeetings]);
+    },
+    [fetchLeadFollowUps, fetchMeetings],
+  );
+
+  // Handle preview button click - shows sidebar
+  const handlePreviewClick = useCallback(
+    async (lead: LeadData) => {
+      const leadId = lead.rawData?.id || lead.id;
+      // Set the lead immediately to show sidebar
+      setSelectedLead(lead.rawData || lead);
+      setShowLeadSidebar(true);
+
+      // Fetch additional data (follow-ups, meetings) in the background
+      if (leadId) {
+        try {
+          await fetchLeadFollowUps(leadId);
+          await fetchMeetings(leadId);
+          // Optionally refresh the lead data to get latest info
+          const leadData: any = await getLead(leadId);
+          setSelectedLead(leadData);
+        } catch (error) {
+          console.error("Failed to fetch lead details:", error);
+          // Don't show error toast as sidebar is already open with basic data
+        }
+      }
+    },
+    [fetchLeadFollowUps, fetchMeetings],
+  );
 
   // Handle first column click - navigates to detail page
-  const handleFirstColumnClick = useCallback((lead: LeadData) => {
-    router.push('/crm/leads/leads-detailpage');
-  }, [router]);
+  const handleFirstColumnClick = useCallback(
+    (lead: LeadData) => {
+      router.push("/crm/leads/leads-detailpage");
+    },
+    [router],
+  );
 
   const fetchStages = async () => {
     try {
@@ -1221,7 +1282,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   const handleSort = (
     column: string,
     paginationState: any,
-    setPaginationState: (state: any) => void
+    setPaginationState: (state: any) => void,
   ) => {
     const newDirection =
       paginationState.sortColumn === column &&
@@ -1239,7 +1300,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   const sortData = <T extends Record<string, any>>(
     data: T[],
     sortColumn: string,
-    sortDirection: "asc" | "desc"
+    sortDirection: "asc" | "desc",
   ): T[] => {
     if (!sortColumn) return data;
 
@@ -1262,7 +1323,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   const paginateData = <T,>(
     data: T[],
     currentPage: number,
-    rowsPerPage: number
+    rowsPerPage: number,
   ): T[] => {
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
@@ -1277,7 +1338,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     dataLength: number,
     paginationState: any,
     setPaginationState: (state: any) => void,
-    label: string
+    label: string,
   ) => {
     const totalPages = getTotalPages(dataLength, paginationState.rowsPerPage);
     const { currentPage, rowsPerPage } = paginationState;
@@ -1445,8 +1506,8 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
           contactPerson.phone
         }`.trim()
       : lead.contact_phone
-      ? `${lead.contact_phone_country_code || ""} ${lead.contact_phone}`.trim()
-      : "";
+        ? `${lead.contact_phone_country_code || ""} ${lead.contact_phone}`.trim()
+        : "";
 
     return {
       id: lead.id,
@@ -1455,20 +1516,22 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       phone: phone,
       company: lead.company_name || "",
       industry: lead.industry || "",
-      stage: lead.is_lost ? "Lost" : (lead.stage?.name || (lead.stage_id ? "Unknown" : "New")),
-      stageColor: lead.is_lost ? "grey" : (lead.stage?.color || "grey"),
+      stage: lead.is_lost
+        ? "Lost"
+        : lead.stage?.name || (lead.stage_id ? "Unknown" : "New"),
+      stageColor: lead.is_lost ? "grey" : lead.stage?.color || "grey",
       leadPotential: lead?.lead_potential || "Not Set",
       lead_score: lead?.stage?.score || 0,
       assignedUser:
         extensions.find(
           (ext: any) =>
             ext?.id == lead?.user_extension ||
-            ext?.extension == lead?.user_extension
+            ext?.extension == lead?.user_extension,
         )?.display_name ||
         extensions.find(
           (ext: any) =>
             ext?.id == lead?.user_extension ||
-            ext?.extension == lead?.user_extension
+            ext?.extension == lead?.user_extension,
         )?.name ||
         lead.user_extension ||
         "",
@@ -1505,78 +1568,91 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   } | null>(null);
 
   // Handle call button click
-  const handleCallClick = useCallback(async (lead: any) => {
-    const phone = lead.phone;
-    if (!phone) {
-      toast.error("No phone number available for this entry");
-      return;
-    }
-    
-    if (!isInitialized) {
-      toast.error("CTI not initialized. Please wait...");
-      return;
-    }
-    
-    try {
-      const result = await dialNumber(phone);
-      
-      if (result.success) {
-       // toast.success(`Calling ${lead.name || phone}...`);
-      } else {
-       // toast.error(result.error || "Failed to make call");
+  const handleCallClick = useCallback(
+    async (lead: any) => {
+      const phone = lead.phone;
+      if (!phone) {
+        toast.error("No phone number available for this entry");
+        return;
       }
-    } catch (error) {
-      console.error("Call error:", error);
-      toast.error("Failed to make call");
-    }
-  }, [dialNumber, isInitialized]);
+
+      if (!isInitialized) {
+        toast.error("CTI not initialized. Please wait...");
+        return;
+      }
+
+      try {
+        const result = await dialNumber(phone);
+
+        if (result.success) {
+          // toast.success(`Calling ${lead.name || phone}...`);
+        } else {
+          // toast.error(result.error || "Failed to make call");
+        }
+      } catch (error) {
+        console.error("Call error:", error);
+        toast.error("Failed to make call");
+      }
+    },
+    [dialNumber, isInitialized],
+  );
 
   /** Sidebar Call button: when completePhone is passed, dial via CTI (same as dialer API) */
-  const handleSidebarCall = useCallback(async (phone?: string) => {
-    if (!phone?.trim()) {
-      toast.error("No phone number available to call");
-      return;
-    }
-    if (!isInitialized) {
-      toast.error("CTI not initialized. Please wait...");
-      return;
-    }
-    try {
-      const result = await dialNumber(phone.trim());
-      if (result.success) {
-        // toast.success(`Calling ${phone}...`);
-      } else {
-        toast.error(result.error || "Failed to make call");
+  const handleSidebarCall = useCallback(
+    async (phone?: string) => {
+      if (!phone?.trim()) {
+        toast.error("No phone number available to call");
+        return;
       }
-    } catch (error) {
-      console.error("Call error:", error);
-      toast.error("Failed to make call");
-    }
-  }, [dialNumber, isInitialized]);
+      if (!isInitialized) {
+        toast.error("CTI not initialized. Please wait...");
+        return;
+      }
+      try {
+        const result = await dialNumber(phone.trim());
+        if (result.success) {
+          // toast.success(`Calling ${phone}...`);
+        } else {
+          toast.error(result.error || "Failed to make call");
+        }
+      } catch (error) {
+        console.error("Call error:", error);
+        toast.error("Failed to make call");
+      }
+    },
+    [dialNumber, isInitialized],
+  );
 
   // Helper function to get name by extension
   function getNameByExtension(extension: string) {
-    const extensionData = extensions.find((ext) => ext.id === extension || ext.extension === extension);
+    const extensionData = extensions.find(
+      (ext) => ext.id === extension || ext.extension === extension,
+    );
     return extensionData?.display_name || extensionData?.name || extension;
   }
 
   // Handle note creation
-  const handleNoteCreate = useCallback((note: string, createTask: boolean, taskDueDate?: string) => {
-    console.log('Note created:', {
-      leadId: selectedLead?.id || selectedLead?.rawData?.id,
-      note,
-      createTask,
-      taskDueDate
-    });
-    
-    // Here you would typically:
-    // 1. Save the note to your backend/database
-    // 2. If createTask is true, create a task with the due date
-    // 3. Update the UI to show the new note
-    // 4. Maybe refresh the notes section
-    
-    toast.success(`Note saved successfully!${createTask ? ' Task created.' : ''}`);
-  }, [selectedLead]);
+  const handleNoteCreate = useCallback(
+    (note: string, createTask: boolean, taskDueDate?: string) => {
+      console.log("Note created:", {
+        leadId: selectedLead?.id || selectedLead?.rawData?.id,
+        note,
+        createTask,
+        taskDueDate,
+      });
+
+      // Here you would typically:
+      // 1. Save the note to your backend/database
+      // 2. If createTask is true, create a task with the due date
+      // 3. Update the UI to show the new note
+      // 4. Maybe refresh the notes section
+
+      toast.success(
+        `Note saved successfully!${createTask ? " Task created." : ""}`,
+      );
+    },
+    [selectedLead],
+  );
 
   // Handle close lead sidebar
   const handleCloseLeadSidebar = useCallback(() => {
@@ -1787,7 +1863,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
 
   const handleEditCampaignChange = async (campaignId: number | undefined) => {
     handleEditInputChange("campaign_id", campaignId);
-    
+
     if (!campaignId) {
       setEditSelectedCampaign(null);
       handleEditInputChange("campaign_field_values", {});
@@ -1852,7 +1928,11 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     }));
   };
 
-  const updateEditContactPerson = (index: number, field: string, value: any) => {
+  const updateEditContactPerson = (
+    index: number,
+    field: string,
+    value: any,
+  ) => {
     setEditFormData((prev) => {
       const updated = [...prev.contact_persons];
       updated[index] = { ...updated[index], [field]: value };
@@ -1943,7 +2023,10 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   const validateEditStep3 = (): boolean => {
     if ((editSelectedCampaign as any)?.custom_fields) {
       for (const field of (editSelectedCampaign as any).custom_fields) {
-        if (field.required && !editFormData.campaign_field_values?.[field.field_key]) {
+        if (
+          field.required &&
+          !editFormData.campaign_field_values?.[field.field_key]
+        ) {
           toast.error(`${field.field_name} is required`);
           return false;
         }
@@ -1970,7 +2053,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       default:
         isValid = true;
     }
-    
+
     if (isValid && editFormStep < 3) {
       setEditFormStep((prev) => prev + 1);
     }
@@ -1978,7 +2061,12 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
 
   const handleEditSubmit = async () => {
     // Validate all steps
-    if (!validateEditStep0() || !validateEditStep1() || !validateEditStep2() || !validateEditStep3()) {
+    if (
+      !validateEditStep0() ||
+      !validateEditStep1() ||
+      !validateEditStep2() ||
+      !validateEditStep3()
+    ) {
       return;
     }
 
@@ -1986,7 +2074,10 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     try {
       const payload: any = {
         name: editFormData.name,
-        user_extension: String(editFormData.user_extension) || String((session?.user as any)?.extension) || "admin",
+        user_extension:
+          String(editFormData.user_extension) ||
+          String((session?.user as any)?.extension) ||
+          "admin",
         type: editFormData.type,
         description: editFormData.description,
         source: editFormData.source,
@@ -2069,7 +2160,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
           followupData.communicationChannelOther;
       }
 
-      if(followupData.leadId) {
+      if (followupData.leadId) {
         await createLeadFollowUp(followupData.leadId, payload);
       }
 
@@ -2166,19 +2257,16 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     }
   }, [followUpIdToEdit, followupData, session, handleRowClicked]);
   const getTodayDate = useCallback((startDateParam: string = "") => {
-    
     let today = new Date();
-    if(startDateParam)
-      {
-       const startDate = new Date(startDateParam);
-       if (moment(startDate).isBefore(today))
-       {
+    if (startDateParam) {
+      const startDate = new Date(startDateParam);
+      if (moment(startDate).isBefore(today)) {
         today = startDate;
-       }
       }
+    }
     const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   }, []);
   // Handle edit follow-up click
@@ -2205,7 +2293,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       });
       setShowAddFollowupModal(true);
     },
-    [viewingLead, session]
+    [viewingLead, session],
   );
 
   // Handle follow-up deletion
@@ -2214,7 +2302,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       setFollowUpToDelete({ leadId, followUpId, leadName });
       setShowDeleteFollowUpModal(true);
     },
-    []
+    [],
   );
 
   const confirmDeleteFollowUp = useCallback(async () => {
@@ -2223,7 +2311,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     try {
       await deleteLeadFollowUp(
         followUpToDelete.leadId,
-        followUpToDelete.followUpId
+        followUpToDelete.followUpId,
       );
 
       // Refresh lead data
@@ -2236,7 +2324,6 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
 
       setShowDeleteFollowUpModal(false);
       setFollowUpToDelete(null);
-      
     } catch (error) {
       console.error("Failed to delete follow-up:", error);
       toast.error("Failed to delete follow-up");
@@ -2349,12 +2436,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     } finally {
       setLoadingMeeting(false);
     }
-  }, [
-    meetingIdToEdit,
-    meetingData,
-    meetingAttendees,
-    handleRowClicked,
-  ]);
+  }, [meetingIdToEdit, meetingData, meetingAttendees, handleRowClicked]);
 
   // Handle edit meeting click
   const handleEditMeeting = useCallback(
@@ -2372,7 +2454,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       const meetingExtensionStrings =
         meeting.extensions && Array.isArray(meeting.extensions)
           ? meeting.extensions.map(
-              (extObj: any) => extObj.extension || String(extObj.id)
+              (extObj: any) => extObj.extension || String(extObj.id),
             )
           : [];
 
@@ -2385,7 +2467,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
                 const extId = String(ext.id || "");
                 return meetingExtensionStrings.some(
                   (meetingExt: string) =>
-                    meetingExt === extExtension || meetingExt === extId
+                    meetingExt === extExtension || meetingExt === extId,
                 );
               })
               .map((ext: any) => ({
@@ -2408,7 +2490,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       setMeetingAttendees(attendees);
       setShowAddMeetingModal(true);
     },
-    [viewingLead, extensions]
+    [viewingLead, extensions],
   );
 
   // Handle meeting deletion
@@ -2417,7 +2499,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
       setMeetingToDelete({ meetingId, meetingName, leadId });
       setShowDeleteMeetingModal(true);
     },
-    []
+    [],
   );
 
   const confirmDeleteMeeting = useCallback(async () => {
@@ -2453,7 +2535,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     // Removed lead score calculation
     const qualified = transformedLeads.filter(
       (l) =>
-        l.stage === "Qualified" || l.stage?.toLowerCase().includes("qualified")
+        l.stage === "Qualified" || l.stage?.toLowerCase().includes("qualified"),
     ).length;
 
     // Stage distribution
@@ -2474,66 +2556,75 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
   }, [leadsData, extensions, summaryTiles, totalLeads]);
 
   // Stats cards data for metrics
-  const leadsStatsCards: StatsCardData[] = useMemo(() => [
-    {
-      title: 'All Leads',
-      value: summaryTiles?.total_leads || totalLeads || 0,
-      icon: Users,
-      iconColor: '#6366F1',
-      iconBgColor: '#EEF2FF',
-      subtitle: 'Total in system'
-    },
-    {
-      title: 'New',
-      value: summaryTiles?.new_leads || analyticsData.stageCounts['New'] || 0,
-      icon: UserCheck,
-      iconColor: '#3B82F6',
-      iconBgColor: '#DBEAFE',
-      metric: {
-        text: 'Fresh leads',
-        dotColor: '#2563EB'
-      }
-    },
-    {
-      title: 'Qualified',
-      value: summaryTiles?.qualified_leads || analyticsData.stageCounts['Qualified'] || 0,
-      icon: CheckCircle,
-      iconColor: '#10B981',
-      iconBgColor: '#D1FAE5',
-      subtitle: 'Verified & ready'
-    },
-    {
-      title: 'Proposal',
-      value: analyticsData.stageCounts['Proposal'] || 0,
-      icon: FileText,
-      iconColor: '#8B5CF6',
-      iconBgColor: '#EDE9FE',
-      metric: {
-        text: 'In review',
-        dotColor: '#7C3AED'
-      }
-    },
-    {
-      title: 'Negotiation',
-      value: analyticsData.stageCounts['Negotiation'] || 0,
-      icon: Handshake,
-      iconColor: '#F59E0B',
-      iconBgColor: '#FEF3C7',
-      subtitle: 'Active discussions'
-    },
-    {
-      title: 'Closed Won',
-      value: analyticsData.stageCounts['Closed Won'] || analyticsData.stageCounts['Won'] || 0,
-      icon: Target,
-      iconColor: '#059669',
-      iconBgColor: '#D1FAE5',
-      badge: {
-        text: 'Success',
-        bgColor: '#D1FAE5',
-        textColor: '#065F46'
-      }
-    }
-  ], [summaryTiles, totalLeads, analyticsData]);
+  const leadsStatsCards: StatsCardData[] = useMemo(
+    () => [
+      {
+        title: "All Leads",
+        value: summaryTiles?.total_leads || totalLeads || 0,
+        icon: Users,
+        iconColor: "#6366F1",
+        iconBgColor: "#EEF2FF",
+        subtitle: "Total in system",
+      },
+      {
+        title: "New",
+        value: summaryTiles?.new_leads || analyticsData.stageCounts["New"] || 0,
+        icon: UserCheck,
+        iconColor: "#3B82F6",
+        iconBgColor: "#DBEAFE",
+        metric: {
+          text: "Fresh leads",
+          dotColor: "#2563EB",
+        },
+      },
+      {
+        title: "Qualified",
+        value:
+          summaryTiles?.qualified_leads ||
+          analyticsData.stageCounts["Qualified"] ||
+          0,
+        icon: CheckCircle,
+        iconColor: "#10B981",
+        iconBgColor: "#D1FAE5",
+        subtitle: "Verified & ready",
+      },
+      {
+        title: "Proposal",
+        value: analyticsData.stageCounts["Proposal"] || 0,
+        icon: FileText,
+        iconColor: "#8B5CF6",
+        iconBgColor: "#EDE9FE",
+        metric: {
+          text: "In review",
+          dotColor: "#7C3AED",
+        },
+      },
+      {
+        title: "Negotiation",
+        value: analyticsData.stageCounts["Negotiation"] || 0,
+        icon: Handshake,
+        iconColor: "#F59E0B",
+        iconBgColor: "#FEF3C7",
+        subtitle: "Active discussions",
+      },
+      {
+        title: "Closed Won",
+        value:
+          analyticsData.stageCounts["Closed Won"] ||
+          analyticsData.stageCounts["Won"] ||
+          0,
+        icon: Target,
+        iconColor: "#059669",
+        iconBgColor: "#D1FAE5",
+        badge: {
+          text: "Success",
+          bgColor: "#D1FAE5",
+          textColor: "#065F46",
+        },
+      },
+    ],
+    [summaryTiles, totalLeads, analyticsData],
+  );
 
   // Custom select styles
   const customSelectStyles = {
@@ -2608,7 +2699,7 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
     // Add counts for all stages (not just first 5, for custom tabs)
     stages.forEach((stage: any) => {
       const stageLeads = transformed.filter(
-        (l) => l.stage === stage.name || l.rawData?.stage_id === stage.id
+        (l) => l.stage === stage.name || l.rawData?.stage_id === stage.id,
       );
       counts[stage.id] = stageLeads.length;
     });
@@ -2618,203 +2709,233 @@ const [convertingLeadId, setConvertingLeadId] = useState<number | null>(null);
 
   // Update custom tabs counts when filterCounts change
   useEffect(() => {
-    setCustomTabs(prevTabs => 
-      prevTabs.map(tab => {
+    setCustomTabs((prevTabs) =>
+      prevTabs.map((tab) => {
         const count = filterCounts[tab.id] || 0;
         return { ...tab, count };
-      })
+      }),
     );
   }, [filterCounts]);
 
   // Define table columns - Clean data definitions only
-  const leadsColumns: TableColumn<LeadData>[] = useMemo(() => [
-    {
-      key: 'name',
-      label: 'Name',
-      sortable: true,
-      type: 'avatar',
-      avatar: {
-        getInitials: (lead) => getInitials(lead.name),
-        getColor: (lead) => getRandomColor(lead.name)
+  const leadsColumns: TableColumn<LeadData>[] = useMemo(
+    () => [
+      {
+        key: "name",
+        label: "Name",
+        sortable: true,
+        type: "avatar",
+        avatar: {
+          getInitials: (lead) => getInitials(lead.name),
+          getColor: (lead) => getRandomColor(lead.name),
+        },
+        emptyValue: "N/A",
       },
-      emptyValue: 'N/A'
-    },
-    {
-      key: 'company',
-      label: 'Individual/Company',
-      sortable: true,
-      type: 'multi-field',
-      fields: {
-        primary: 'company',
-        secondary: 'industry',
-        secondaryClass: 'gt-company-industry'
+      {
+        key: "company",
+        label: "Individual/Company",
+        sortable: true,
+        type: "multi-field",
+        fields: {
+          primary: "company",
+          secondary: "industry",
+          secondaryClass: "gt-company-industry",
+        },
+        emptyValue: "No Company",
       },
-      emptyValue: 'No Company'
-    },
-    {
-      key: 'email',
-      label: 'Email',
-      sortable: true,
-      type: 'text'
-    },
-    {
-      key: 'phone',
-      label: 'Phone',
-      sortable: true,
-      align: 'left',
-      type: 'custom',
-      render: (lead: LeadData) => lead.phone ? (
-        <PhoneContainer phone={lead.phone} onClick={() => handleCallClick(lead)} />
-      ) : <span className="gt-empty-cell">-</span>
-    },
-    {
-      key: 'stage',
-      label: 'Stage',
-      sortable: true,
-      type: 'custom',
-      render: (lead: LeadData) => {
-        const badge = (
-          <Badge bg="" style={{ backgroundColor: lead.stageColor || '#6c757d' }}>
-            {lead.stage || '-'}
-          </Badge>
-        );
-        if (lead.isLost && lead.lostReasonName) {
-          return (
-            <OverlayTrigger
-              placement="top"
-              overlay={<BsTooltip id={`stage-${lead.id}`}>Reason: {lead.lostReasonName}</BsTooltip>}
+      {
+        key: "email",
+        label: "Email",
+        sortable: true,
+        type: "text",
+      },
+      {
+        key: "phone",
+        label: "Phone",
+        sortable: true,
+        align: "left",
+        type: "custom",
+      },
+      {
+        key: "stage",
+        label: "Stage",
+        sortable: true,
+        type: "custom",
+        render: (lead: LeadData) => {
+          const badge = (
+            <Badge
+              bg=""
+              style={{ backgroundColor: lead.stageColor || "#6c757d" }}
             >
-              <span className="d-inline-block" style={{ cursor: 'help' }}>{badge}</span>
-            </OverlayTrigger>
+              {lead.stage || "-"}
+            </Badge>
           );
-        }
-        return badge;
-      }
-    },
-    {
-      key: 'leadPotential',
-      label: 'Lead Potential',
-      sortable: true,
-      type: 'badge',
-      badge: {
-        getVariant: (lead) => 
-          lead.leadPotential === 'Hot' ? 'danger' :
-          lead.leadPotential === 'Warm' ? 'warning' : 'secondary'
-      }
-    },
-    {
-      key: 'followUps',
-      label: 'Follow-up Date',
-      sortable: false,
-      align: 'center',
-      type: 'text',
-      accessor: (lead: LeadData) => {
-        const followUps = lead.followUps || [];
-        if (followUps.length === 0) return null;
-        const sortedFollowUps = [...followUps].sort((a, b) => {
-          const dateA = a.follow_up_date ? new Date(a.follow_up_date).getTime() : Infinity;
-          const dateB = b.follow_up_date ? new Date(b.follow_up_date).getTime() : Infinity;
-          return dateA - dateB;
-        });
-        const earliestFollowUp = sortedFollowUps[0];
-        return earliestFollowUp?.follow_up_date
-          ? moment(earliestFollowUp.follow_up_date).format(GlobalDateFormat)
-          : null;
-      }
-    },
-    {
-      key: 'assignedUser',
-      label: 'Assigned To',
-      sortable: true,
-      type: 'text'
-    },
-    {
-      key: 'created',
-      label: 'Created',
-      sortable: true,
-      type: 'text'
-    }
-  ], []);
+          if (lead.isLost && lead.lostReasonName) {
+            return (
+              <OverlayTrigger
+                placement="top"
+                overlay={
+                  <BsTooltip id={`stage-${lead.id}`}>
+                    Reason: {lead.lostReasonName}
+                  </BsTooltip>
+                }
+              >
+                <span className="d-inline-block" style={{ cursor: "help" }}>
+                  {badge}
+                </span>
+              </OverlayTrigger>
+            );
+          }
+          return badge;
+        },
+      },
+      {
+        key: "leadPotential",
+        label: "Lead Potential",
+        sortable: true,
+        type: "badge",
+        badge: {
+          getVariant: (lead) =>
+            lead.leadPotential === "Hot"
+              ? "danger"
+              : lead.leadPotential === "Warm"
+                ? "warning"
+                : "secondary",
+        },
+      },
+      {
+        key: "followUps",
+        label: "Follow-up Date",
+        sortable: false,
+        align: "center",
+        type: "text",
+        accessor: (lead: LeadData) => {
+          const followUps = lead.followUps || [];
+          if (followUps.length === 0) return null;
+          const sortedFollowUps = [...followUps].sort((a, b) => {
+            const dateA = a.follow_up_date
+              ? new Date(a.follow_up_date).getTime()
+              : Infinity;
+            const dateB = b.follow_up_date
+              ? new Date(b.follow_up_date).getTime()
+              : Infinity;
+            return dateA - dateB;
+          });
+          const earliestFollowUp = sortedFollowUps[0];
+          return earliestFollowUp?.follow_up_date
+            ? moment(earliestFollowUp.follow_up_date).format(GlobalDateFormat)
+            : null;
+        },
+      },
+      {
+        key: "assignedUser",
+        label: "Assigned To",
+        sortable: true,
+        type: "text",
+      },
+      {
+        key: "created",
+        label: "Created",
+        sortable: true,
+        type: "text",
+      },
+    ],
+    [],
+  );
 
   // Define table actions
- 
-const leadsActions: TableAction<LeadData>[] = useMemo(() => {
-  if (activeFilter === "deleted") {
-    return [
+
+  const leadsActions: TableAction<LeadData>[] = useMemo(() => {
+    if (activeFilter === "deleted") {
+      return [
+        {
+          label: "View",
+          icon: <Eye size={16} />,
+          onClick: (lead: LeadData) =>
+            handleViewLead(lead.rawData?.id || lead.id),
+        },
+        {
+          label: "Restore",
+          icon: <RotateCcw size={16} />,
+          onClick: (lead: LeadData) =>
+            handleRestoreLead(lead.rawData?.id || lead.id),
+        },
+      ];
+    }
+
+    const actions: TableAction<LeadData>[] = [
       {
-        label: 'View',
+        label: "View",
         icon: <Eye size={16} />,
-        onClick: (lead: LeadData) => handleViewLead(lead.rawData?.id || lead.id),
+        onClick: (lead: LeadData) =>
+          handleViewLead(lead.rawData?.id || lead.id),
       },
-      {
-        label: 'Restore',
-        icon: <RotateCcw size={16} />,
-        onClick: (lead: LeadData) => handleRestoreLead(lead.rawData?.id || lead.id),
-      }
     ];
-  }
 
-  const actions: TableAction<LeadData>[] = [
-    {
-      label: 'View',
-      icon: <Eye size={16} />,
-      onClick: (lead: LeadData) => handleViewLead(lead.rawData?.id || lead.id),
-    }
-  ];
-
-  if (session?.user?.permissions?.includes('edit-crm-leads')) {
-    actions.push({
-      label: 'Edit',
-      icon: <Edit size={16} />,
-      onClick: (lead: LeadData) => handleEditLead(lead.rawData?.id || lead.id),
-      show: () => activeFilter !== 'lost'
-    });
-  }
-
-  if (session?.user?.permissions?.includes('add-crm-deals')) {
-    actions.push({
-      label: 'Convert to Deal',
-      icon: <Handshake size={16} />,
-      onClick: (lead: LeadData) => {
-        setConvertingLeadId(lead.rawData?.id || lead.id);
-        setShowConvertToDealModal(true);
-      },
-      className: 'text-success',
-      disabled: () => activeFilter === 'lost'
-    });
-  }
-
-  if (session?.user?.permissions?.includes('delete-crm-leads')) {
-    actions.push({
-      label: 'Delete',
-      icon: <Trash2 size={16} />,
-      onClick: (lead: LeadData) => handleDeleteLead(lead.rawData?.id || lead.id, lead.name),
-      className: 'text-danger'
-    });
-  }
-
-  // Add Change Stage and Lost actions (only when not viewing lost leads)
-  if (activeFilter !== 'lost') {
-    if (session?.user?.permissions?.includes('edit-crm-leads')) {
+    if (session?.user?.permissions?.includes("edit-crm-leads")) {
       actions.push({
-        label: 'Change Stage',
-        icon: <GitBranch size={16} />,
-        onClick: (lead: LeadData) => handleChangeStage(lead.rawData || lead)
+        label: "Edit",
+        icon: <Edit size={16} />,
+        onClick: (lead: LeadData) =>
+          handleEditLead(lead.rawData?.id || lead.id),
+        show: () => activeFilter !== "lost",
       });
     }
-    
-    if (session?.user?.permissions?.includes('mark-as-lost-crm-leads')) {
+
+    if (session?.user?.permissions?.includes("add-crm-deals")) {
       actions.push({
-        label: 'Lost',
-        icon: <X size={16} />,
-        onClick: (lead: LeadData) => handleMarkLost(lead.rawData || lead),
-        className: 'text-danger'
+        label: "Convert to Deal",
+        icon: <Handshake size={16} />,
+        onClick: (lead: LeadData) => {
+          setConvertingLeadId(lead.rawData?.id || lead.id);
+          setShowConvertToDealModal(true);
+        },
+        className: "text-success",
+        disabled: () => activeFilter === "lost",
       });
     }
-  }
 
-  return actions;
-}, [session, activeFilter, handleViewLead, handleConvertLead, handleDeleteLead, handleRestoreLead, handleChangeStage, handleMarkLost]);
+    if (session?.user?.permissions?.includes("delete-crm-leads")) {
+      actions.push({
+        label: "Delete",
+        icon: <Trash2 size={16} />,
+        onClick: (lead: LeadData) =>
+          handleDeleteLead(lead.rawData?.id || lead.id, lead.name),
+        className: "text-danger",
+      });
+    }
+
+    // Add Change Stage and Lost actions (only when not viewing lost leads)
+    if (activeFilter !== "lost") {
+      if (session?.user?.permissions?.includes("edit-crm-leads")) {
+        actions.push({
+          label: "Change Stage",
+          icon: <GitBranch size={16} />,
+          onClick: (lead: LeadData) => handleChangeStage(lead.rawData || lead),
+        });
+      }
+
+      if (session?.user?.permissions?.includes("mark-as-lost-crm-leads")) {
+        actions.push({
+          label: "Lost",
+          icon: <X size={16} />,
+          onClick: (lead: LeadData) => handleMarkLost(lead.rawData || lead),
+          className: "text-danger",
+        });
+      }
+    }
+
+    return actions;
+  }, [
+    session,
+    activeFilter,
+    handleViewLead,
+    handleConvertLead,
+    handleDeleteLead,
+    handleRestoreLead,
+    handleChangeStage,
+    handleMarkLost,
+  ]);
 
   // Handler to open filters sidebar
   const handleOpenFiltersSidebar = useCallback(() => {
@@ -2911,1069 +3032,1295 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
       />
 
       {/* Main flex container for content and sidebar */}
-      <div style={{ display: 'flex', gap: '0', height: 'calc(100vh)', overflow: 'hidden' }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "0",
+          height: "calc(100vh)",
+          overflow: "hidden",
+        }}
+      >
         {/* Main content area */}
         <div className="leads-scrollable-content" style={{ flex: 1 }}>
-
-        {/* Analytics Section - Collapsible */}
-        {showLeadsAnalytics && (
-          <>
-            {/* Summary Stats using KPICard */}
-            <Row className="mb-4">
-              <Col lg={3} md={6} className="mb-3">
-                <KPICard
-                  title="Total Leads"
-                  value={analyticsData.total.toString()}
-                  icon={<Target size={24} />}
-                  color="primary"
-                />
-              </Col>
-              <Col lg={3} md={6} className="mb-3">
-                <KPICard
-                  title="Qualified Leads"
-                  value={summaryTiles?.qualified_leads?.toString() || "0"}
-                  icon={<CheckCircle size={24} />}
-                  color="success"
-                />
-              </Col>
-              <Col lg={3} md={6} className="mb-3">
-                <KPICard
-                  title="New Leads"
-                  value={summaryTiles?.new_leads?.toString() || "0"}
-                  icon={<TrendingUp size={24} />}
-                  color="danger"
-                />
-              </Col>
-            </Row>
-
-            {/* Analytics Charts */}
-            <Row className="mb-4">
-              <Col md={6} className="mb-3">
-                <Card className="border-0 shadow-sm h-100">
-                  <Card.Body>
-                    <h6 className="fw-bold mb-3">
-                      Lead Potential Distribution
-                    </h6>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <PieChart>
-                        <Pie
-                          data={[
-                            {
-                              name: "Hot",
-                              value: analyticsData.potentialCounts["Hot"] || 0,
-                              color: "#dc3545",
-                            },
-                            {
-                              name: "Warm",
-                              value: analyticsData.potentialCounts["Warm"] || 0,
-                              color: "#ffc107",
-                            },
-                            {
-                              name: "Cold",
-                              value: analyticsData.potentialCounts["Cold"] || 0,
-                              color: "#0dcaf0",
-                            },
-                          ]}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }: any) =>
-                            `${name}: ${(percent * 100).toFixed(0)}%`
-                          }
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {[
-                            {
-                              name: "Hot",
-                              value: analyticsData.potentialCounts["Hot"] || 0,
-                              color: "#dc3545",
-                            },
-                            {
-                              name: "Warm",
-                              value: analyticsData.potentialCounts["Warm"] || 0,
-                              color: "#ffc107",
-                            },
-                            {
-                              name: "Cold",
-                              value: analyticsData.potentialCounts["Cold"] || 0,
-                              color: "#0dcaf0",
-                            },
-                          ].map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col md={6} className="mb-3">
-                <Card className="border-0 shadow-sm h-100">
-                  <Card.Body>
-                    <h6 className="fw-bold mb-3">Lead Stage Distribution</h6>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart
-                        data={Object.entries(analyticsData.stageCounts).map(
-                          ([stage, count]) => ({ stage, count })
-                        )}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="stage" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#0d6efd" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
-          </>
-        )}
-
-        <div className="container-fluid">
-        {/* Filter Bar */}
-        {showFilterBar && (
-          <FilterBar
-            quickFilters={[
-              {
-                id: "all",
-                label: "All Leads",
-                count: filterCounts.all,
-                color: "#0d6efd",
-                icon: <Users size={16} />,
-              },
-              ...stages.slice(0, 5).map((stage: any) => ({
-                id: stage.id.toString(),
-                label: stage.name,
-                count: filterCounts[stage.id] || 0,
-                color: stage.color || "#6c757d",
-                icon: <Layers size={16} />,
-              })),
-              {
-                id: "lost",
-                label: "Lost",
-                count: filterCounts.lost || 0,
-                color: "#fd7e14",
-                icon: <X size={16} />,
-              },
-              {
-                id: "deleted",
-                label: "Deleted",
-                count: filterCounts.deleted || 0,
-                color: "#dc3545",
-                icon: <Trash2 size={16} />,
-              },
-            ]}
-            activeFilter={activeFilter}
-            onFilterChange={handleFilterChange}
-          />
-        )}
-
-        {/* Advanced Filters */}
-        {showAdvancedFilters &&
-          session?.user?.permissions?.includes("list-crm-leads") && (
-          <Card className="border-0 shadow-sm mb-4">
-            <Card.Body>
-              <Row className="g-3 align-items-end">
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">
-                    Assigned To
-                  </Form.Label>
-                  <Select
-                    options={extensions.map((ext: any) => ({
-                      value: ext.id || ext.extension,
-                      label:
-                        ext.display_name || ext.name || ext.id || ext.extension,
-                    }))}
-                    value={
-                      leadsFilters.assignedTo
-                        ? (() => {
-                            const assignedToId = leadsFilters.assignedTo;
-                            const ext = extensions.find(
-                              (e: any) => (e.id || e.extension) === assignedToId
-                            );
-                            return ext
-                              ? {
-                                  value: assignedToId,
-                                  label:
-                                    ext.display_name ||
-                                    ext.name ||
-                                    assignedToId,
-                                }
-                              : { value: assignedToId, label: assignedToId };
-                          })()
-                        : null
-                    }
-                    onChange={(selected) => {
-                      const assignedToValue = selected ? selected.value : null;
-                      setLeadsFilters((prev) => ({
-                        ...prev,
-                        assignedTo: assignedToValue,
-                      }));
-                      // Reset to all when assigned filter changes
-                      setActiveFilter("all");
-                    }}
-                    placeholder="Select user..."
-                    styles={customSelectStyles}
-                    isClearable
+          {/* Analytics Section - Collapsible */}
+          {showLeadsAnalytics && (
+            <>
+              {/* Summary Stats using KPICard */}
+              <Row className="mb-4">
+                <Col lg={3} md={6} className="mb-3">
+                  <KPICard
+                    title="Total Leads"
+                    value={analyticsData.total.toString()}
+                    icon={<Target size={24} />}
+                    color="primary"
                   />
                 </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Stages</Form.Label>
-                  <Select
-                    options={stages.map((s) => ({
-                      value: s.id.toString(),
-                      label: s.name,
-                    }))}
-                    value={
-                      leadsFilters.stage
-                        ? (() => {
-                            const stageId = leadsFilters.stage;
-                            const stage = stages.find(
-                              (st: any) => st.id.toString() === stageId
-                            );
-                            return stage
-                              ? { value: stageId, label: stage.name }
-                              : { value: stageId, label: stageId };
-                          })()
-                        : null
-                    }
-                    onChange={(selected) => {
-                      const stageValue = selected ? selected.value : null;
-                      setLeadsFilters((prev) => ({
-                        ...prev,
-                        stage: stageValue,
-                      }));
-                      // Update activeFilter to match selected stage
-                      if (stageValue) {
-                        setActiveFilter(stageValue);
-                      } else {
-                        setActiveFilter("all");
-                      }
-                    }}
-                    placeholder="Select stage..."
-                    styles={customSelectStyles}
-                    isClearable
+                <Col lg={3} md={6} className="mb-3">
+                  <KPICard
+                    title="Qualified Leads"
+                    value={summaryTiles?.qualified_leads?.toString() || "0"}
+                    icon={<CheckCircle size={24} />}
+                    color="success"
                   />
                 </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">
-                    Business Type
-                  </Form.Label>
-                  <Select
-                    options={filterBusinessTypes.map((bt: BusinessTypeData) => ({
-                      value: bt.id.toString(),
-                      label: bt.name,
-                    }))}
-                    value={
-                      leadsFilters.businessType
-                        ? (() => {
-                            const btId = leadsFilters.businessType;
-                            const bt = filterBusinessTypes.find((b: BusinessTypeData) => b.id.toString() === btId);
-                            return bt ? { value: btId, label: bt.name } : { value: btId, label: btId };
-                          })()
-                        : null
-                    }
-                    onChange={(selected) => {
-                      const businessTypeValue = selected ? selected.value : null;
-                      setLeadsFilters((prev) => ({
-                        ...prev,
-                        businessType: businessTypeValue,
-                      }));
-                    }}
-                    placeholder="Select business type..."
-                    styles={customSelectStyles}
-                    isClearable
+                <Col lg={3} md={6} className="mb-3">
+                  <KPICard
+                    title="New Leads"
+                    value={summaryTiles?.new_leads?.toString() || "0"}
+                    icon={<TrendingUp size={24} />}
+                    color="danger"
                   />
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">Source</Form.Label>
-                  <CreatableSelect
-                    options={uniqueSources}
-                    value={
-                      leadsFilters.source
-                        ? {
-                            value: leadsFilters.source,
-                            label: leadsFilters.source,
-                          }
-                        : null
-                    }
-                    onChange={(selected) => {
-                      const sourceValue = selected ? selected.value : null;
-                      setLeadsFilters((prev) => ({
-                        ...prev,
-                        source: sourceValue,
-                      }));
-                    }}
-                    placeholder="Select or create source..."
-                    styles={customSelectStyles}
-                    isClearable
-                    formatCreateLabel={(inputValue) => `Create "${inputValue}"`}
-                  />
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">
-                    Lead Potential
-                  </Form.Label>
-                  <Select
-                    options={[
-                      { value: "Hot", label: "Hot" },
-                      { value: "Warm", label: "Warm" },
-                      { value: "Cold", label: "Cold" },
-                    ]}
-                    value={
-                      leadsFilters.leadPotential
-                        ? {
-                            value: leadsFilters.leadPotential,
-                            label: leadsFilters.leadPotential,
-                          }
-                        : null
-                    }
-                    onChange={(selected) => {
-                      const leadPotentialValue = selected
-                        ? selected.value
-                        : null;
-                      setLeadsFilters((prev) => ({
-                        ...prev,
-                        leadPotential: leadPotentialValue,
-                      }));
-                    }}
-                    placeholder="Select lead potential..."
-                    styles={customSelectStyles}
-                    isClearable
-                  />
-                </Col>
-                <Col md={4}>
-                  <Form.Label className="small fw-bold mb-2">
-                    Campaign
-                  </Form.Label>
-                  <Select
-                    options={campaigns.map((campaign: any) => ({
-                      value: campaign.id.toString(),
-                      label: campaign.name,
-                    }))}
-                    value={
-                      leadsFilters.campaign
-                        ? (() => {
-                            const campaignId = leadsFilters.campaign;
-                            const campaign = campaigns.find(
-                              (c: any) => c.id.toString() === campaignId
-                            );
-                            return campaign
-                              ? { value: campaignId, label: campaign.name }
-                              : { value: campaignId, label: campaignId };
-                          })()
-                        : null
-                    }
-                    onChange={(selected) => {
-                      const campaignValue = selected ? selected.value : null;
-                      setLeadsFilters((prev) => ({
-                        ...prev,
-                        campaign: campaignValue,
-                      }));
-                    }}
-                    placeholder="Select campaign..."
-                    styles={customSelectStyles}
-                    isClearable
-                  />
-                </Col>
-                <Col md={6}>
-                  <Form.Label className="small fw-bold mb-2">
-                    Lead Score Range
-                  </Form.Label>
-                  <div className="d-flex gap-2 align-items-center">
-                    <Form.Control
-                      type="number"
-                      min="0"
-                      value={leadsFilters.leadScoreMin || ""}
-                      onChange={(e) => {
-                        const minValue = e.target.value || null;
-                        setLeadsFilters((prev) => ({
-                          ...prev,
-                          leadScoreMin: minValue,
-                        }));
-                      }}
-                      placeholder="Min"
-                      style={{ flex: 1 }}
-                    />
-                    <span className="text-muted">to</span>
-                    <Form.Control
-                      type="number"
-                      min="0"
-                      value={leadsFilters.leadScoreMax || ""}
-                      onChange={(e) => {
-                        const maxValue = e.target.value || null;
-                        setLeadsFilters((prev) => ({
-                          ...prev,
-                          leadScoreMax: maxValue,
-                        }));
-                      }}
-                      placeholder="Max"
-                      style={{ flex: 1 }}
-                    />
-                  </div>
-                </Col>
-                <Col md={6}>
-                  <Form.Label className="small fw-bold mb-2">
-                    Date Range
-                  </Form.Label>
-                  <div className="d-flex gap-2 align-items-center">
-                    <Form.Control
-                      type="date"
-                      value={leadsFilters.dateFrom || ""}
-                      onChange={(e) => {
-                        const dateFromValue = e.target.value || null;
-                        setLeadsFilters((prev) => ({
-                          ...prev,
-                          dateFrom: dateFromValue,
-                        }));
-                      }}
-                      placeholder="From"
-                      style={{ flex: 1 }}
-                    />
-                    <span className="text-muted">to</span>
-                    <Form.Control
-                      type="date"
-                      value={leadsFilters.dateTo || ""}
-                      onChange={(e) => {
-                        const dateToValue = e.target.value || null;
-                        setLeadsFilters((prev) => ({
-                          ...prev,
-                          dateTo: dateToValue,
-                        }));
-                      }}
-                      placeholder="To"
-                      style={{ flex: 1 }}
-                    />
-                  </div>
-                </Col>
-                <Col md={4}>
-                  <div className="d-flex gap-2">
-                    <Button
-                      variant="outline-secondary"
-                      className="d-flex align-items-center justify-content-center"
-                      onClick={() => {
-                        // Map leadsFilters to the format expected by handleFiltersChange
-                        const filtersToApply: Record<string, any> = {};
-                        
-                        if (leadsSearch) {
-                          filtersToApply.search = leadsSearch;
-                        }
-                        if (leadsFilters.assignedTo) {
-                          filtersToApply.assigned_to = leadsFilters.assignedTo;
-                        }
-                        if (leadsFilters.stage) {
-                          filtersToApply.stage_id = leadsFilters.stage;
-                        }
-                        if (leadsFilters.businessType) {
-                          filtersToApply.business_type_id = leadsFilters.businessType;
-                        }
-                        if (leadsFilters.source) {
-                          filtersToApply.source = leadsFilters.source;
-                        }
-                        if (leadsFilters.leadPotential) {
-                          filtersToApply.lead_potential = leadsFilters.leadPotential;
-                        }
-                        if (leadsFilters.campaign) {
-                          filtersToApply.campaign_id = leadsFilters.campaign;
-                        }
-                        if (leadsFilters.lostReason) {
-                          filtersToApply.lost_reason_id = leadsFilters.lostReason;
-                        }
-                        if (leadsFilters.leadScoreMin) {
-                          filtersToApply.lead_score_min = leadsFilters.leadScoreMin;
-                        }
-                        if (leadsFilters.leadScoreMax) {
-                          filtersToApply.lead_score_max = leadsFilters.leadScoreMax;
-                        }
-                        if (leadsFilters.dateFrom) {
-                          filtersToApply.date_from = leadsFilters.dateFrom;
-                        }
-                        if (leadsFilters.dateTo) {
-                          filtersToApply.date_to = leadsFilters.dateTo;
-                        }
-                        
-                        handleFiltersChange(filtersToApply);
-                        setLeadsPagination({ ...leadsPagination, currentPage: 1 });
-                        setRefreshKey((prev) => prev + 1);
-                      }}
-                    >
-                      Submit Filters
-                    </Button>
-                    <Button
-                      variant="outline-secondary"
-                      className="d-flex align-items-center justify-content-center"
-                      onClick={() => {
-                        setLeadsSearch("");
-                        setLeadsFilters({
-                          assignedTo: null,
-                          stage: null,
-                          businessType: null,
-                          source: null,
-                          leadPotential: null,
-                          campaign: null,
-                          lostReason: null,
-                          leadScoreMin: null,
-                          leadScoreMax: null,
-                          dateFrom: null,
-                          dateTo: null,
-                        });
-                        handleFiltersChange({});
-                        setCurrentFilters({});
-                        setActiveFilter("all");
-                        setLeadsPagination({
-                          ...leadsPagination,
-                          currentPage: 1,
-                        });
-                        setRefreshKey((prev) => prev + 1);
-                      }}
-                    >
-                      Reset Filters
-                    </Button>
-                  </div>
                 </Col>
               </Row>
-            </Card.Body>
-          </Card>
-        )}
 
-        {/* Leads Table */}
-        <div className="leads-table-wrapper" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <GenericTable
-          data={filteredLeads}
-          columns={leadsColumns}
-          actions={leadsActions}
-          showActions={false}
-          pagination={{
-            currentPage: leadsPagination.currentPage,
-            rowsPerPage: leadsPagination.rowsPerPage,
-            totalRows: totalLeads,
-            pageSizeOptions: [10, 15, 25, 50, 100]
-          }}
-          onPaginationChange={(page, rowsPerPage) => {
-            setLeadsPagination({
-              ...leadsPagination,
-              currentPage: page,
-              rowsPerPage
-            });
-          }}
-          sortable={true}
-          defaultSortColumn={leadsPagination.sortColumn}
-          defaultSortDirection={leadsPagination.sortDirection}
-          onSort={(column, direction) => {
-            setLeadsPagination({
-              ...leadsPagination,
-              sortColumn: column,
-              sortDirection: direction
-            });
-          }}
-          customizableColumns={true}
-          defaultSelectedColumns={[
-            'name', 'company', 'email', 'phone', 'stage',
-            'leadPotential', 'followUps', 'assignedUser', 'created'
-          ]}
-          columnStorageKey="leadsSelectedColumns"
-          onColumnChange={(cols) => setSelectedLeadsColumns(cols)}
-          onPreviewClick={(lead) => handlePreviewClick(lead)}
-          onFirstColumnClick={(lead) => handleFirstColumnClick(lead)}
-          onRowDoubleClick={(lead) => {
-            if (session?.user?.permissions?.includes("list-crm-leads")) {
-              handleViewLead(lead.rawData?.id || lead.id);
-            }
-          }}
-          loading={loading}
-          emptyMessage="No leads found matching your criteria"
-          loadingMessage="Loading leads..."
-          hover={true}
-          uniqueKey="id"
-          
-          // Fixed height mode
-          fixedHeight={true}
-          maxHeight="calc(100vh - 380px)"
-          
-          // Toolbar
-          showToolbar={true}
-          toolbar={{
-            // Tabs
-            showTabs: true,
-            tabsDropdownLabel: "Leads",
-            tabs: [
-              { id: 'all', label: 'All leads', count: filterCounts.all, removable: false },
-              ...customTabs
-            ],
-            activeTab: activeFilter,
-            onTabChange: handleFilterChange,
-            onTabAdd: () => setShowTabModal(true),
-            onTabRemove: (tabId) => {
-              setCustomTabs(tabs => tabs.filter(t => t.id !== tabId));
-              if (activeFilter === tabId) {
-                handleFilterChange('all');
-              }
-            },
-            
-            // Search
-            showSearch: true,
-            searchValue: leadsSearch,
-            searchPlaceholder: "Search leads by name, company, email...",
-            onSearchChange: (value) => {
-              setLeadsSearch(value);
-            },
-            onSearch: () => {
-              const filtersToApply: Record<string, any> = { ...currentFilters };
-              if (leadsSearch) {
-                filtersToApply.search = leadsSearch;
-              } else {
-                delete filtersToApply.search;
-              }
-              handleFiltersChange(filtersToApply);
-              setLeadsPagination({ ...leadsPagination, currentPage: 1 });
-              setRefreshKey((prev) => prev + 1);
-            },
-            
-            // Actions
-            showTableViewDropdown: true,
-            tableViewLabel: "Table view",
-            showViewSwitcher: true,
-            showEditColumns: true,
-            showPipelineDropdown: true,
-            pipelineLabel: "All Pipelines",
-            showFiltersButton: true,
-            onFiltersClick: handleOpenFiltersSidebar,
-            showSortButton: true,
-            showExportButton: true,
-            showSaveButton: true,
-            
-            // Filter Pills
-            filterPills: [
-              { 
-                id: 'contact_owner', 
-                label: 'Contact Owner', 
-                showDropdown: true,
-                dropdownOptions: [
-                  { label: 'All Owners', value: 'all', onClick: () => {
-                    const newFilters = { ...currentFilters };
-                    delete newFilters.assigned_to;
-                    handleFiltersChange(newFilters);
-                    setRefreshKey((prev) => prev + 1);
-                  }},
-                  ...extensions.map(ext => ({
-                    label: ext.display_name || ext.name || ext.extension,
-                    value: ext.id || ext.extension,
-                    onClick: () => {
-                      handleFiltersChange({ ...currentFilters, assigned_to: ext.id || ext.extension });
-                      setRefreshKey((prev) => prev + 1);
-                    }
-                  }))
-                ]
-              },
-              { 
-                id: 'create_date', 
-                label: 'Create date', 
-                showDropdown: true,
-                dropdownOptions: [
-                  { label: 'All Time', value: 'all', onClick: () => {
-                    const newFilters = { ...currentFilters };
-                    delete newFilters.date_from;
-                    delete newFilters.date_to;
-                    handleFiltersChange(newFilters);
-                    setRefreshKey((prev) => prev + 1);
-                  }},
-                  { label: 'Today', value: 'today', onClick: () => {
-                    const today = moment().format('YYYY-MM-DD');
-                    handleFiltersChange({ ...currentFilters, date_from: today, date_to: today });
-                    setRefreshKey((prev) => prev + 1);
-                  }},
-                  { label: 'Last 7 Days', value: 'week', onClick: () => {
-                    const from = moment().subtract(7, 'days').format('YYYY-MM-DD');
-                    const to = moment().format('YYYY-MM-DD');
-                    handleFiltersChange({ ...currentFilters, date_from: from, date_to: to });
-                    setRefreshKey((prev) => prev + 1);
-                  }},
-                  { label: 'Last 30 Days', value: 'month', onClick: () => {
-                    const from = moment().subtract(30, 'days').format('YYYY-MM-DD');
-                    const to = moment().format('YYYY-MM-DD');
-                    handleFiltersChange({ ...currentFilters, date_from: from, date_to: to });
-                    setRefreshKey((prev) => prev + 1);
-                  }}
-                ]
-              },
-              { 
-                id: 'lead_stage', 
-                label: 'Lead Stage', 
-                showDropdown: true,
-                dropdownOptions: [
-                  { label: 'All Stages', value: 'all', onClick: () => {
-                    const newFilters = { ...currentFilters };
-                    delete newFilters.stage_id;
-                    handleFiltersChange(newFilters);
-                    setRefreshKey((prev) => prev + 1);
-                  }},
-                  ...stages.map(stage => ({
+              {/* Analytics Charts */}
+              <Row className="mb-4">
+                <Col md={6} className="mb-3">
+                  <Card className="border-0 shadow-sm h-100">
+                    <Card.Body>
+                      <h6 className="fw-bold mb-3">
+                        Lead Potential Distribution
+                      </h6>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie
+                            data={[
+                              {
+                                name: "Hot",
+                                value:
+                                  analyticsData.potentialCounts["Hot"] || 0,
+                                color: "#dc3545",
+                              },
+                              {
+                                name: "Warm",
+                                value:
+                                  analyticsData.potentialCounts["Warm"] || 0,
+                                color: "#ffc107",
+                              },
+                              {
+                                name: "Cold",
+                                value:
+                                  analyticsData.potentialCounts["Cold"] || 0,
+                                color: "#0dcaf0",
+                              },
+                            ]}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percent }: any) =>
+                              `${name}: ${(percent * 100).toFixed(0)}%`
+                            }
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {[
+                              {
+                                name: "Hot",
+                                value:
+                                  analyticsData.potentialCounts["Hot"] || 0,
+                                color: "#dc3545",
+                              },
+                              {
+                                name: "Warm",
+                                value:
+                                  analyticsData.potentialCounts["Warm"] || 0,
+                                color: "#ffc107",
+                              },
+                              {
+                                name: "Cold",
+                                value:
+                                  analyticsData.potentialCounts["Cold"] || 0,
+                                color: "#0dcaf0",
+                              },
+                            ].map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={6} className="mb-3">
+                  <Card className="border-0 shadow-sm h-100">
+                    <Card.Body>
+                      <h6 className="fw-bold mb-3">Lead Stage Distribution</h6>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart
+                          data={Object.entries(analyticsData.stageCounts).map(
+                            ([stage, count]) => ({ stage, count }),
+                          )}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="stage" />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="count" fill="#0d6efd" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+            </>
+          )}
+
+          <div className="container-fluid">
+            {/* Filter Bar */}
+            {showFilterBar && (
+              <FilterBar
+                quickFilters={[
+                  {
+                    id: "all",
+                    label: "All Leads",
+                    count: filterCounts.all,
+                    color: "#0d6efd",
+                    icon: <Users size={16} />,
+                  },
+                  ...stages.slice(0, 5).map((stage: any) => ({
+                    id: stage.id.toString(),
                     label: stage.name,
-                    value: stage.id.toString(),
-                    onClick: () => {
-                      handleFiltersChange({ ...currentFilters, stage_id: stage.id.toString() });
-                      setRefreshKey((prev) => prev + 1);
-                    }
-                  }))
-                ]
-              },
-              { 
-                id: 'lead_potential', 
-                label: 'Lead Potential', 
-                showDropdown: true,
-                dropdownOptions: [
-                  { label: 'All Potential', value: 'all', onClick: () => {
-                    const newFilters = { ...currentFilters };
-                    delete newFilters.lead_potential;
-                    handleFiltersChange(newFilters);
-                    setRefreshKey((prev) => prev + 1);
-                  }},
-                  { label: 'Hot', value: 'Hot', onClick: () => {
-                    handleFiltersChange({ ...currentFilters, lead_potential: 'Hot' });
-                    setRefreshKey((prev) => prev + 1);
-                  }},
-                  { label: 'Warm', value: 'Warm', onClick: () => {
-                    handleFiltersChange({ ...currentFilters, lead_potential: 'Warm' });
-                    setRefreshKey((prev) => prev + 1);
-                  }},
-                  { label: 'Cold', value: 'Cold', onClick: () => {
-                    handleFiltersChange({ ...currentFilters, lead_potential: 'Cold' });
-                    setRefreshKey((prev) => prev + 1);
-                  }}
-                ]
-              },
-            ],
-            showAdvancedFilters: true,
-            onAdvancedFiltersClick: handleOpenFiltersSidebar,
+                    count: filterCounts[stage.id] || 0,
+                    color: stage.color || "#6c757d",
+                    icon: <Layers size={16} />,
+                  })),
+                  {
+                    id: "lost",
+                    label: "Lost",
+                    count: filterCounts.lost || 0,
+                    color: "#fd7e14",
+                    icon: <X size={16} />,
+                  },
+                  {
+                    id: "deleted",
+                    label: "Deleted",
+                    count: filterCounts.deleted || 0,
+                    color: "#dc3545",
+                    icon: <Trash2 size={16} />,
+                  },
+                ]}
+                activeFilter={activeFilter}
+                onFilterChange={handleFilterChange}
+              />
+            )}
 
-            // Right-aligned custom actions
-            rightActions: session?.user?.permissions?.includes("add-crm-leads") ? (
-              <div style={{ position: 'absolute', right: '40px', top: '18px', width: 'auto' }}>
-              <button
-                onClick={() => setShowCreateLeadModal(true)}
-                style={{
-                  padding: '9px 13px',
-                  backgroundColor: '#000000',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
+            {/* Advanced Filters */}
+            {showAdvancedFilters &&
+              session?.user?.permissions?.includes("list-crm-leads") && (
+                <Card className="border-0 shadow-sm mb-4">
+                  <Card.Body>
+                    <Row className="g-3 align-items-end">
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Assigned To
+                        </Form.Label>
+                        <Select
+                          options={extensions.map((ext: any) => ({
+                            value: ext.id || ext.extension,
+                            label:
+                              ext.display_name ||
+                              ext.name ||
+                              ext.id ||
+                              ext.extension,
+                          }))}
+                          value={
+                            leadsFilters.assignedTo
+                              ? (() => {
+                                  const assignedToId = leadsFilters.assignedTo;
+                                  const ext = extensions.find(
+                                    (e: any) =>
+                                      (e.id || e.extension) === assignedToId,
+                                  );
+                                  return ext
+                                    ? {
+                                        value: assignedToId,
+                                        label:
+                                          ext.display_name ||
+                                          ext.name ||
+                                          assignedToId,
+                                      }
+                                    : {
+                                        value: assignedToId,
+                                        label: assignedToId,
+                                      };
+                                })()
+                              : null
+                          }
+                          onChange={(selected) => {
+                            const assignedToValue = selected
+                              ? selected.value
+                              : null;
+                            setLeadsFilters((prev) => ({
+                              ...prev,
+                              assignedTo: assignedToValue,
+                            }));
+                            // Reset to all when assigned filter changes
+                            setActiveFilter("all");
+                          }}
+                          placeholder="Select user..."
+                          styles={customSelectStyles}
+                          isClearable
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Stages
+                        </Form.Label>
+                        <Select
+                          options={stages.map((s) => ({
+                            value: s.id.toString(),
+                            label: s.name,
+                          }))}
+                          value={
+                            leadsFilters.stage
+                              ? (() => {
+                                  const stageId = leadsFilters.stage;
+                                  const stage = stages.find(
+                                    (st: any) => st.id.toString() === stageId,
+                                  );
+                                  return stage
+                                    ? { value: stageId, label: stage.name }
+                                    : { value: stageId, label: stageId };
+                                })()
+                              : null
+                          }
+                          onChange={(selected) => {
+                            const stageValue = selected ? selected.value : null;
+                            setLeadsFilters((prev) => ({
+                              ...prev,
+                              stage: stageValue,
+                            }));
+                            // Update activeFilter to match selected stage
+                            if (stageValue) {
+                              setActiveFilter(stageValue);
+                            } else {
+                              setActiveFilter("all");
+                            }
+                          }}
+                          placeholder="Select stage..."
+                          styles={customSelectStyles}
+                          isClearable
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Business Type
+                        </Form.Label>
+                        <Select
+                          options={filterBusinessTypes.map(
+                            (bt: BusinessTypeData) => ({
+                              value: bt.id.toString(),
+                              label: bt.name,
+                            }),
+                          )}
+                          value={
+                            leadsFilters.businessType
+                              ? (() => {
+                                  const btId = leadsFilters.businessType;
+                                  const bt = filterBusinessTypes.find(
+                                    (b: BusinessTypeData) =>
+                                      b.id.toString() === btId,
+                                  );
+                                  return bt
+                                    ? { value: btId, label: bt.name }
+                                    : { value: btId, label: btId };
+                                })()
+                              : null
+                          }
+                          onChange={(selected) => {
+                            const businessTypeValue = selected
+                              ? selected.value
+                              : null;
+                            setLeadsFilters((prev) => ({
+                              ...prev,
+                              businessType: businessTypeValue,
+                            }));
+                          }}
+                          placeholder="Select business type..."
+                          styles={customSelectStyles}
+                          isClearable
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Source
+                        </Form.Label>
+                        <CreatableSelect
+                          options={uniqueSources}
+                          value={
+                            leadsFilters.source
+                              ? {
+                                  value: leadsFilters.source,
+                                  label: leadsFilters.source,
+                                }
+                              : null
+                          }
+                          onChange={(selected) => {
+                            const sourceValue = selected
+                              ? selected.value
+                              : null;
+                            setLeadsFilters((prev) => ({
+                              ...prev,
+                              source: sourceValue,
+                            }));
+                          }}
+                          placeholder="Select or create source..."
+                          styles={customSelectStyles}
+                          isClearable
+                          formatCreateLabel={(inputValue) =>
+                            `Create "${inputValue}"`
+                          }
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Lead Potential
+                        </Form.Label>
+                        <Select
+                          options={[
+                            { value: "Hot", label: "Hot" },
+                            { value: "Warm", label: "Warm" },
+                            { value: "Cold", label: "Cold" },
+                          ]}
+                          value={
+                            leadsFilters.leadPotential
+                              ? {
+                                  value: leadsFilters.leadPotential,
+                                  label: leadsFilters.leadPotential,
+                                }
+                              : null
+                          }
+                          onChange={(selected) => {
+                            const leadPotentialValue = selected
+                              ? selected.value
+                              : null;
+                            setLeadsFilters((prev) => ({
+                              ...prev,
+                              leadPotential: leadPotentialValue,
+                            }));
+                          }}
+                          placeholder="Select lead potential..."
+                          styles={customSelectStyles}
+                          isClearable
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Campaign
+                        </Form.Label>
+                        <Select
+                          options={campaigns.map((campaign: any) => ({
+                            value: campaign.id.toString(),
+                            label: campaign.name,
+                          }))}
+                          value={
+                            leadsFilters.campaign
+                              ? (() => {
+                                  const campaignId = leadsFilters.campaign;
+                                  const campaign = campaigns.find(
+                                    (c: any) => c.id.toString() === campaignId,
+                                  );
+                                  return campaign
+                                    ? {
+                                        value: campaignId,
+                                        label: campaign.name,
+                                      }
+                                    : { value: campaignId, label: campaignId };
+                                })()
+                              : null
+                          }
+                          onChange={(selected) => {
+                            const campaignValue = selected
+                              ? selected.value
+                              : null;
+                            setLeadsFilters((prev) => ({
+                              ...prev,
+                              campaign: campaignValue,
+                            }));
+                          }}
+                          placeholder="Select campaign..."
+                          styles={customSelectStyles}
+                          isClearable
+                        />
+                      </Col>
+                      <Col md={6}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Lead Score Range
+                        </Form.Label>
+                        <div className="d-flex gap-2 align-items-center">
+                          <Form.Control
+                            type="number"
+                            min="0"
+                            value={leadsFilters.leadScoreMin || ""}
+                            onChange={(e) => {
+                              const minValue = e.target.value || null;
+                              setLeadsFilters((prev) => ({
+                                ...prev,
+                                leadScoreMin: minValue,
+                              }));
+                            }}
+                            placeholder="Min"
+                            style={{ flex: 1 }}
+                          />
+                          <span className="text-muted">to</span>
+                          <Form.Control
+                            type="number"
+                            min="0"
+                            value={leadsFilters.leadScoreMax || ""}
+                            onChange={(e) => {
+                              const maxValue = e.target.value || null;
+                              setLeadsFilters((prev) => ({
+                                ...prev,
+                                leadScoreMax: maxValue,
+                              }));
+                            }}
+                            placeholder="Max"
+                            style={{ flex: 1 }}
+                          />
+                        </div>
+                      </Col>
+                      <Col md={6}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Date Range
+                        </Form.Label>
+                        <div className="d-flex gap-2 align-items-center">
+                          <Form.Control
+                            type="date"
+                            value={leadsFilters.dateFrom || ""}
+                            onChange={(e) => {
+                              const dateFromValue = e.target.value || null;
+                              setLeadsFilters((prev) => ({
+                                ...prev,
+                                dateFrom: dateFromValue,
+                              }));
+                            }}
+                            placeholder="From"
+                            style={{ flex: 1 }}
+                          />
+                          <span className="text-muted">to</span>
+                          <Form.Control
+                            type="date"
+                            value={leadsFilters.dateTo || ""}
+                            onChange={(e) => {
+                              const dateToValue = e.target.value || null;
+                              setLeadsFilters((prev) => ({
+                                ...prev,
+                                dateTo: dateToValue,
+                              }));
+                            }}
+                            placeholder="To"
+                            style={{ flex: 1 }}
+                          />
+                        </div>
+                      </Col>
+                      <Col md={4}>
+                        <div className="d-flex gap-2">
+                          <Button
+                            variant="outline-secondary"
+                            className="d-flex align-items-center justify-content-center"
+                            onClick={() => {
+                              // Map leadsFilters to the format expected by handleFiltersChange
+                              const filtersToApply: Record<string, any> = {};
+
+                              if (leadsSearch) {
+                                filtersToApply.search = leadsSearch;
+                              }
+                              if (leadsFilters.assignedTo) {
+                                filtersToApply.assigned_to =
+                                  leadsFilters.assignedTo;
+                              }
+                              if (leadsFilters.stage) {
+                                filtersToApply.stage_id = leadsFilters.stage;
+                              }
+                              if (leadsFilters.businessType) {
+                                filtersToApply.business_type_id =
+                                  leadsFilters.businessType;
+                              }
+                              if (leadsFilters.source) {
+                                filtersToApply.source = leadsFilters.source;
+                              }
+                              if (leadsFilters.leadPotential) {
+                                filtersToApply.lead_potential =
+                                  leadsFilters.leadPotential;
+                              }
+                              if (leadsFilters.campaign) {
+                                filtersToApply.campaign_id =
+                                  leadsFilters.campaign;
+                              }
+                              if (leadsFilters.lostReason) {
+                                filtersToApply.lost_reason_id =
+                                  leadsFilters.lostReason;
+                              }
+                              if (leadsFilters.leadScoreMin) {
+                                filtersToApply.lead_score_min =
+                                  leadsFilters.leadScoreMin;
+                              }
+                              if (leadsFilters.leadScoreMax) {
+                                filtersToApply.lead_score_max =
+                                  leadsFilters.leadScoreMax;
+                              }
+                              if (leadsFilters.dateFrom) {
+                                filtersToApply.date_from =
+                                  leadsFilters.dateFrom;
+                              }
+                              if (leadsFilters.dateTo) {
+                                filtersToApply.date_to = leadsFilters.dateTo;
+                              }
+
+                              handleFiltersChange(filtersToApply);
+                              setLeadsPagination({
+                                ...leadsPagination,
+                                currentPage: 1,
+                              });
+                              setRefreshKey((prev) => prev + 1);
+                            }}
+                          >
+                            Submit Filters
+                          </Button>
+                          <Button
+                            variant="outline-secondary"
+                            className="d-flex align-items-center justify-content-center"
+                            onClick={() => {
+                              setLeadsSearch("");
+                              setLeadsFilters({
+                                assignedTo: null,
+                                stage: null,
+                                businessType: null,
+                                source: null,
+                                leadPotential: null,
+                                campaign: null,
+                                lostReason: null,
+                                leadScoreMin: null,
+                                leadScoreMax: null,
+                                dateFrom: null,
+                                dateTo: null,
+                              });
+                              handleFiltersChange({});
+                              setCurrentFilters({});
+                              setActiveFilter("all");
+                              setLeadsPagination({
+                                ...leadsPagination,
+                                currentPage: 1,
+                              });
+                              setRefreshKey((prev) => prev + 1);
+                            }}
+                          >
+                            Reset Filters
+                          </Button>
+                        </div>
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
+              )}
+
+            {/* Leads Table */}
+            <div
+              className="leads-table-wrapper"
+              style={{
+                flex: 1,
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <GenericTable
+                data={filteredLeads}
+                columns={leadsColumns}
+                actions={leadsActions}
+                showActions={false}
+                pagination={{
+                  currentPage: leadsPagination.currentPage,
+                  rowsPerPage: leadsPagination.rowsPerPage,
+                  totalRows: totalLeads,
+                  pageSizeOptions: [10, 15, 25, 50, 100],
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#1a1a1a';
+                onPaginationChange={(page, rowsPerPage) => {
+                  setLeadsPagination({
+                    ...leadsPagination,
+                    currentPage: page,
+                    rowsPerPage,
+                  });
                 }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#000000';
+                sortable={true}
+                defaultSortColumn={leadsPagination.sortColumn}
+                defaultSortDirection={leadsPagination.sortDirection}
+                onSort={(column, direction) => {
+                  setLeadsPagination({
+                    ...leadsPagination,
+                    sortColumn: column,
+                    sortDirection: direction,
+                  });
                 }}
-              >
-                Add Lead
-              </button>
-              </div>
-            ) : undefined
-          }}
-          statsCards={leadsStatsCards}
-        />
-        </div>
-        </div>
+                // customizableColumns={true}
+                defaultSelectedColumns={[
+                  "name",
+                  "company",
+                  "email",
+                  "phone",
+                  "stage",
+                  "leadPotential",
+                  "followUps",
+                  "assignedUser",
+                  "created",
+                ]}
+                columnStorageKey="leadsSelectedColumns"
+                onColumnChange={(cols) => setSelectedLeadsColumns(cols)}
+                onPreviewClick={(lead) => handlePreviewClick(lead)}
+                onFirstColumnClick={(lead) => handleFirstColumnClick(lead)}
+                onRowDoubleClick={(lead) => {
+                  if (session?.user?.permissions?.includes("list-crm-leads")) {
+                    handleViewLead(lead.rawData?.id || lead.id);
+                  }
+                }}
+                loading={loading}
+                emptyMessage="No leads found matching your criteria"
+                loadingMessage="Loading leads..."
+                hover={true}
+                uniqueKey="id"
+                // Fixed height mode
+                fixedHeight={true}
+                maxHeight="calc(100vh - 380px)"
+                // Toolbar
+                showToolbar={true}
+                toolbar={{
+                  // Tabs
+                  showTabs: true,
+                  tabsDropdownLabel: "Leads",
+                  tabs: [
+                    {
+                      id: "all",
+                      label: "All leads",
+                      count: filterCounts.all,
+                      removable: false,
+                    },
+                    ...customTabs,
+                  ],
+                  activeTab: activeFilter,
+                  onTabChange: handleFilterChange,
+                  onTabAdd: () => setShowTabModal(true),
+                  onTabRemove: (tabId) => {
+                    setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
+                    if (activeFilter === tabId) {
+                      handleFilterChange("all");
+                    }
+                  },
+
+                  // Search
+                  showSearch: true,
+                  searchValue: leadsSearch,
+                  searchPlaceholder: "Search leads by name, company, email...",
+                  onSearchChange: (value) => {
+                    setLeadsSearch(value);
+                  },
+                  onSearch: () => {
+                    const filtersToApply: Record<string, any> = {
+                      ...currentFilters,
+                    };
+                    if (leadsSearch) {
+                      filtersToApply.search = leadsSearch;
+                    } else {
+                      delete filtersToApply.search;
+                    }
+                    handleFiltersChange(filtersToApply);
+                    setLeadsPagination({ ...leadsPagination, currentPage: 1 });
+                    setRefreshKey((prev) => prev + 1);
+                  },
+
+                  // Actions
+                  showTableViewDropdown: true,
+                  tableViewLabel: "Table view",
+                  showViewSwitcher: true,
+                  showEditColumns: true,
+                  showPipelineDropdown: true,
+                  pipelineLabel: "All Pipelines",
+                  showFiltersButton: true,
+                  onFiltersClick: handleOpenFiltersSidebar,
+                  showSortButton: true,
+                  showExportButton: true,
+                  showSaveButton: true,
+
+                  // Filter Pills
+                  filterPills: [
+                    {
+                      id: "contact_owner",
+                      label: "Contact Owner",
+                      showDropdown: true,
+                      dropdownOptions: [
+                        {
+                          label: "All Owners",
+                          value: "all",
+                          onClick: () => {
+                            const newFilters = { ...currentFilters };
+                            delete newFilters.assigned_to;
+                            handleFiltersChange(newFilters);
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        ...extensions.map((ext) => ({
+                          label: ext.display_name || ext.name || ext.extension,
+                          value: ext.id || ext.extension,
+                          onClick: () => {
+                            handleFiltersChange({
+                              ...currentFilters,
+                              assigned_to: ext.id || ext.extension,
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        })),
+                      ],
+                    },
+                    {
+                      id: "create_date",
+                      label: "Create date",
+                      showDropdown: true,
+                      dropdownOptions: [
+                        {
+                          label: "All Time",
+                          value: "all",
+                          onClick: () => {
+                            const newFilters = { ...currentFilters };
+                            delete newFilters.date_from;
+                            delete newFilters.date_to;
+                            handleFiltersChange(newFilters);
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Today",
+                          value: "today",
+                          onClick: () => {
+                            const today = moment().format("YYYY-MM-DD");
+                            handleFiltersChange({
+                              ...currentFilters,
+                              date_from: today,
+                              date_to: today,
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Last 7 Days",
+                          value: "week",
+                          onClick: () => {
+                            const from = moment()
+                              .subtract(7, "days")
+                              .format("YYYY-MM-DD");
+                            const to = moment().format("YYYY-MM-DD");
+                            handleFiltersChange({
+                              ...currentFilters,
+                              date_from: from,
+                              date_to: to,
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Last 30 Days",
+                          value: "month",
+                          onClick: () => {
+                            const from = moment()
+                              .subtract(30, "days")
+                              .format("YYYY-MM-DD");
+                            const to = moment().format("YYYY-MM-DD");
+                            handleFiltersChange({
+                              ...currentFilters,
+                              date_from: from,
+                              date_to: to,
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      id: "lead_stage",
+                      label: "Lead Stage",
+                      showDropdown: true,
+                      dropdownOptions: [
+                        {
+                          label: "All Stages",
+                          value: "all",
+                          onClick: () => {
+                            const newFilters = { ...currentFilters };
+                            delete newFilters.stage_id;
+                            handleFiltersChange(newFilters);
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        ...stages.map((stage) => ({
+                          label: stage.name,
+                          value: stage.id.toString(),
+                          onClick: () => {
+                            handleFiltersChange({
+                              ...currentFilters,
+                              stage_id: stage.id.toString(),
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        })),
+                      ],
+                    },
+                    {
+                      id: "lead_potential",
+                      label: "Lead Potential",
+                      showDropdown: true,
+                      dropdownOptions: [
+                        {
+                          label: "All Potential",
+                          value: "all",
+                          onClick: () => {
+                            const newFilters = { ...currentFilters };
+                            delete newFilters.lead_potential;
+                            handleFiltersChange(newFilters);
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Hot",
+                          value: "Hot",
+                          onClick: () => {
+                            handleFiltersChange({
+                              ...currentFilters,
+                              lead_potential: "Hot",
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Warm",
+                          value: "Warm",
+                          onClick: () => {
+                            handleFiltersChange({
+                              ...currentFilters,
+                              lead_potential: "Warm",
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Cold",
+                          value: "Cold",
+                          onClick: () => {
+                            handleFiltersChange({
+                              ...currentFilters,
+                              lead_potential: "Cold",
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  showAdvancedFilters: true,
+                  onAdvancedFiltersClick: handleOpenFiltersSidebar,
+
+                  // Right-aligned custom actions
+                  rightActions: session?.user?.permissions?.includes(
+                    "add-crm-leads",
+                  ) ? (
+                    <div
+                      style={{
+                        position: "absolute",
+                        right: "40px",
+                        top: "18px",
+                        width: "auto",
+                      }}
+                    >
+                      <button
+                        onClick={() => setShowCreateLeadModal(true)}
+                        style={{
+                          padding: "9px 13px",
+                          backgroundColor: "#000000",
+                          color: "#ffffff",
+                          border: "none",
+                          borderRadius: "4px",
+                          fontSize: "12px",
+                          fontWeight: "500",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#1a1a1a";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "#000000";
+                        }}
+                      >
+                        Add Lead
+                      </button>
+                    </div>
+                  ) : undefined,
+                }}
+                statsCards={leadsStatsCards}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Lead Details Sidebar */}
         {showLeadSidebar && (
-        <GenericSidebar
-          isOpen={showLeadSidebar}
-          onClose={handleCloseLeadSidebar}
-          title={selectedLead?.name || 'Lead Details'}
-          subtitle={selectedLead?.phone || selectedLead?.rawData?.phone || ''}
-          email={selectedLead?.email || selectedLead?.rawData?.email}
-          phone={selectedLead?.phone || selectedLead?.rawData?.phone}
-          avatar={{
-            initials: getInitials(selectedLead?.name || 'NA'),
-            name: selectedLead?.name || 'NA',
-            gradient: getRandomColor(selectedLead?.name || '')
-          }}
-          onNoteCreate={handleNoteCreate}
-          breezeRecordSummary={{
-            content: `This lead was created on ${selectedLead?.created_at ? moment(selectedLead.created_at).format('MMMM DD, YYYY') : 'recent date'}. ${selectedLead?.stage?.name ? `Currently in ${selectedLead.stage.name} stage.` : ''} ${selectedLead?.lead_potential || selectedLead?.leadPotential ? `Lead potential: ${selectedLead.lead_potential || selectedLead.leadPotential}.` : ''} ${selectedLead?.company_name || selectedLead?.company ? `Company: ${selectedLead.company_name || selectedLead.company}.` : ''}`,
-            timestamp: selectedLead?.updated_at ? `Generated on ${moment(selectedLead.updated_at).format('MMM DD, YYYY [at] h:mm A')}` : 'Generated recently',
-            onRefresh: () => console.log('Refresh AI summary'),
-            onThumbsUp: () => console.log('Thumbs up'),
-            onThumbsDown: () => console.log('Thumbs down'),
-            onCopy: () => {
-              const summaryText = `This lead was created on ${selectedLead?.created_at ? moment(selectedLead.created_at).format('MMMM DD, YYYY') : 'recent date'}. ${selectedLead?.stage?.name ? `Currently in ${selectedLead.stage.name} stage.` : ''} ${selectedLead?.lead_potential || selectedLead?.leadPotential ? `Lead potential: ${selectedLead.lead_potential || selectedLead.leadPotential}.` : ''} ${selectedLead?.company_name || selectedLead?.company ? `Company: ${selectedLead.company_name || selectedLead.company}.` : ''}`;
-              navigator.clipboard.writeText(summaryText);
-              toast.success('Summary copied to clipboard');
-            },
-            onAskQuestion: () => console.log('Ask AI a question')
-          }}
-          recordLink={{
-            label: 'View record',
-            onClick: () => {
-              const leadId = selectedLead?.id || selectedLead?.rawData?.id;
-              if (leadId) {
-                router.push(`/crm/leads/${leadId}/edit`);
-              }
-            }
-          }}
-          actionsDropdown={{
-            label: 'Actions',
-            items: [
-              { 
-                label: 'Edit Lead', 
-                onClick: () => {
-                  const leadId = selectedLead?.id || selectedLead?.rawData?.id;
-                  if (leadId) {
-                    router.push(`/crm/leads/${leadId}/edit`);
-                  }
-                }
+          <GenericSidebar
+            isOpen={showLeadSidebar}
+            onClose={handleCloseLeadSidebar}
+            title={selectedLead?.name || "Lead Details"}
+            subtitle={selectedLead?.phone || selectedLead?.rawData?.phone || ""}
+            email={selectedLead?.email || selectedLead?.rawData?.email}
+            phone={selectedLead?.phone || selectedLead?.rawData?.phone}
+            avatar={{
+              initials: getInitials(selectedLead?.name || "NA"),
+              name: selectedLead?.name || "NA",
+              gradient: getRandomColor(selectedLead?.name || ""),
+            }}
+            onNoteCreate={handleNoteCreate}
+            breezeRecordSummary={{
+              content: `This lead was created on ${selectedLead?.created_at ? moment(selectedLead.created_at).format("MMMM DD, YYYY") : "recent date"}. ${selectedLead?.stage?.name ? `Currently in ${selectedLead.stage.name} stage.` : ""} ${selectedLead?.lead_potential || selectedLead?.leadPotential ? `Lead potential: ${selectedLead.lead_potential || selectedLead.leadPotential}.` : ""} ${selectedLead?.company_name || selectedLead?.company ? `Company: ${selectedLead.company_name || selectedLead.company}.` : ""}`,
+              timestamp: selectedLead?.updated_at
+                ? `Generated on ${moment(selectedLead.updated_at).format("MMM DD, YYYY [at] h:mm A")}`
+                : "Generated recently",
+              onRefresh: () => console.log("Refresh AI summary"),
+              onThumbsUp: () => console.log("Thumbs up"),
+              onThumbsDown: () => console.log("Thumbs down"),
+              onCopy: () => {
+                const summaryText = `This lead was created on ${selectedLead?.created_at ? moment(selectedLead.created_at).format("MMMM DD, YYYY") : "recent date"}. ${selectedLead?.stage?.name ? `Currently in ${selectedLead.stage.name} stage.` : ""} ${selectedLead?.lead_potential || selectedLead?.leadPotential ? `Lead potential: ${selectedLead.lead_potential || selectedLead.leadPotential}.` : ""} ${selectedLead?.company_name || selectedLead?.company ? `Company: ${selectedLead.company_name || selectedLead.company}.` : ""}`;
+                navigator.clipboard.writeText(summaryText);
+                toast.success("Summary copied to clipboard");
               },
-              { 
-                label: 'Convert to Deal', 
-                onClick: () => {
-                  setShowLeadSidebar(false);
-                  handleConvertLead(selectedLead?.rawData || selectedLead);
-                }
-              },
-              { 
-                label: 'View History', 
-                onClick: () => {
-                  setShowLeadSidebar(false);
-                  const leadId = selectedLead?.id || selectedLead?.rawData?.id;
-                  if (leadId) {
-                    handleViewLead(leadId);
-                    setShowLeadHistoryModal(true);
-                  }
-                }
-              },
-              { 
-                label: 'Delete', 
-                onClick: () => {
-                  const leadId = selectedLead?.id || selectedLead?.rawData?.id;
-                  if (leadId) {
-                    handleDeleteLead(leadId, selectedLead?.name);
-                  }
-                }
-              }
-            ]
-          }}
-          quickActions={[
-            { 
-              id: 'note', 
-              label: 'Note', 
-              icon: FileText, 
-              onClick: () => {}, // This is handled internally now
-              disabled: false 
-            },
-            { 
-              id: 'call', 
-              label: 'Call', 
-              icon: Phone, 
-              onClick: () => {
-                const phone = selectedLead?.phone || selectedLead?.rawData?.phone;
-                if (phone) {
-                  handleCallClick(selectedLead);
-                }
-              },
-              disabled: !(selectedLead?.phone || selectedLead?.rawData?.phone)
-            },
-            { 
-              id: 'email', 
-              label: 'Email', 
-              icon: Mail, 
-              onClick: () => {},
-              disabled: !(selectedLead?.email || selectedLead?.rawData?.email)
-            },
-            { 
-              id: 'task', 
-              label: 'Task', 
-              icon: CheckSquare, 
-              onClick: () => {},
-              disabled: false 
-            },
-            { 
-              id: 'meeting', 
-              label: 'Meeting', 
-              icon: Calendar, 
+              onAskQuestion: () => console.log("Ask AI a question"),
+            }}
+            recordLink={{
+              label: "View record",
               onClick: () => {
                 const leadId = selectedLead?.id || selectedLead?.rawData?.id;
                 if (leadId) {
-                  setMeetingData({
-                    leadId: Number(leadId),
-                    leadName: selectedLead?.name || '',
-                    meetingName: '',
-                    meetingType: 'Online',
-                    meetingDate: '',
-                    meetingTime: '',
-                    meetingOutcome: '',
-                    extensions: []
-                  });
-                  setMeetingAttendees([]);
-                  setShowAddMeetingModal(true);
+                  router.push(`/crm/leads/${leadId}/edit`);
                 }
               },
-              disabled: false 
-            },
-            { 
-              id: 'more', 
-              label: 'More', 
-              icon: MoreVertical, 
-              onClick: () => console.log('More actions'),
-              disabled: false 
-            }
-          ]}
-          sections={[
-            {
-              id: 'about-lead',
-              title: 'About this lead',
-              icon: Target,
-              collapsible: true,
-              defaultExpanded: true,
-              actions: [
-                { label: 'Edit all properties', onClick: () => {
+            }}
+            actionsDropdown={{
+              label: "Actions",
+              items: [
+                {
+                  label: "Edit Lead",
+                  onClick: () => {
+                    const leadId =
+                      selectedLead?.id || selectedLead?.rawData?.id;
+                    if (leadId) {
+                      router.push(`/crm/leads/${leadId}/edit`);
+                    }
+                  },
+                },
+                {
+                  label: "Convert to Deal",
+                  onClick: () => {
+                    setShowLeadSidebar(false);
+                    handleConvertLead(selectedLead?.rawData || selectedLead);
+                  },
+                },
+                {
+                  label: "View History",
+                  onClick: () => {
+                    setShowLeadSidebar(false);
+                    const leadId =
+                      selectedLead?.id || selectedLead?.rawData?.id;
+                    if (leadId) {
+                      handleViewLead(leadId);
+                      setShowLeadHistoryModal(true);
+                    }
+                  },
+                },
+                {
+                  label: "Delete",
+                  onClick: () => {
+                    const leadId =
+                      selectedLead?.id || selectedLead?.rawData?.id;
+                    if (leadId) {
+                      handleDeleteLead(leadId, selectedLead?.name);
+                    }
+                  },
+                },
+              ],
+            }}
+            quickActions={[
+              {
+                id: "note",
+                label: "Note",
+                icon: FileText,
+                onClick: () => {}, // This is handled internally now
+                disabled: false,
+              },
+              {
+                id: "call",
+                label: "Call",
+                icon: Phone,
+                onClick: () => {
+                  const phone =
+                    selectedLead?.phone || selectedLead?.rawData?.phone;
+                  if (phone) {
+                    handleCallClick(selectedLead);
+                  }
+                },
+                disabled: !(
+                  selectedLead?.phone || selectedLead?.rawData?.phone
+                ),
+              },
+              {
+                id: "email",
+                label: "Email",
+                icon: Mail,
+                onClick: () => {},
+                disabled: !(
+                  selectedLead?.email || selectedLead?.rawData?.email
+                ),
+              },
+              {
+                id: "task",
+                label: "Task",
+                icon: CheckSquare,
+                onClick: () => {},
+                disabled: false,
+              },
+              {
+                id: "meeting",
+                label: "Meeting",
+                icon: Calendar,
+                onClick: () => {
                   const leadId = selectedLead?.id || selectedLead?.rawData?.id;
                   if (leadId) {
-                    router.push(`/crm/leads/${leadId}/edit`);
+                    setMeetingData({
+                      leadId: Number(leadId),
+                      leadName: selectedLead?.name || "",
+                      meetingName: "",
+                      meetingType: "Online",
+                      meetingDate: "",
+                      meetingTime: "",
+                      meetingOutcome: "",
+                      extensions: [],
+                    });
+                    setMeetingAttendees([]);
+                    setShowAddMeetingModal(true);
                   }
-                }}
-              ],
-              fields: [
-                {
-                  label: 'Name',
-                  value: selectedLead?.name || 'N/A',
-                  copyable: true
                 },
-                {
-                  label: 'Phone',
-                  value: selectedLead?.phone || selectedLead?.rawData?.phone || 'N/A',
-                  type: 'phone',
-                  copyable: true,
-                  externalLink: (selectedLead?.phone || selectedLead?.rawData?.phone) ? `tel:${selectedLead?.phone || selectedLead?.rawData?.phone}` : undefined
-                },
-                {
-                  label: 'Email',
-                  value: selectedLead?.email || selectedLead?.rawData?.email || 'N/A',
-                  type: 'email',
-                  copyable: true,
-                  externalLink: (selectedLead?.email || selectedLead?.rawData?.email) ? `mailto:${selectedLead?.email || selectedLead?.rawData?.email}` : undefined,
-                  show: !!(selectedLead?.email || selectedLead?.rawData?.email)
-                },
-                {
-                  label: 'Company',
-                  value: selectedLead?.company_name || selectedLead?.company || 'N/A',
-                  copyable: true,
-                  show: !!(selectedLead?.company_name || selectedLead?.company)
-                },
-                {
-                  label: 'Stage',
-                  value: (selectedLead?.is_lost || selectedLead?.isLost) ? 'Lost' : (selectedLead?.stage?.name || selectedLead?.stage || 'N/A'),
-                  type: 'badge',
-                  badgeVariant: (selectedLead?.is_lost || selectedLead?.isLost) ? 'danger' : 'primary'
-                },
-                {
-                  label: 'Lead Potential',
-                  value: selectedLead?.lead_potential || selectedLead?.leadPotential || 'N/A',
-                  type: 'badge',
-                  badgeVariant: selectedLead?.lead_potential === 'Hot' || selectedLead?.leadPotential === 'Hot' 
-                    ? 'danger' 
-                    : selectedLead?.lead_potential === 'Warm' || selectedLead?.leadPotential === 'Warm'
-                    ? 'warning'
-                    : 'secondary'
-                },
-                {
-                  label: 'Assigned To',
-                  value: selectedLead?.assigned_user?.display_name || selectedLead?.assigned_user?.name || selectedLead?.assignedUser || 'Unassigned',
-                  hasDetails: true,
-                  onDetailsClick: () => console.log('Show user details')
-                },
-                {
-                  label: 'Lead Score',
-                  value: selectedLead?.stage?.score ? `${selectedLead.stage.score}%` : selectedLead?.lead_score ? `${selectedLead.lead_score}%` : 'N/A',
-                  show: !!(selectedLead?.stage?.score || selectedLead?.lead_score)
-                },
-                {
-                  label: 'Source',
-                  value: selectedLead?.source || 'N/A',
-                  show: !!selectedLead?.source
-                },
-                {
-                  label: 'Created Date',
-                  value: selectedLead?.created_at || selectedLead?.created ? moment(selectedLead.created_at || selectedLead.created).format('MMM DD, YYYY') : 'N/A',
-                  type: 'date'
-                },
-                {
-                  label: 'Last Updated',
-                  value: selectedLead?.updated_at || selectedLead?.last_activity_at ? moment(selectedLead.updated_at || selectedLead.last_activity_at).format('MMM DD, YYYY') : 'N/A',
-                  type: 'date'
-                }
-              ]
-            },
-            {
-              id: 'recent-activities',
-              title: 'Recent activities',
-              icon: History,
-              collapsible: true,
-              defaultExpanded: true,
-              count: 0,
-              emptyState: {
+                disabled: false,
+              },
+              {
+                id: "more",
+                label: "More",
+                icon: MoreVertical,
+                onClick: () => console.log("More actions"),
+                disabled: false,
+              },
+            ]}
+            sections={[
+              {
+                id: "about-lead",
+                title: "About this lead",
+                icon: Target,
+                collapsible: true,
+                defaultExpanded: true,
+                actions: [
+                  {
+                    label: "Edit all properties",
+                    onClick: () => {
+                      const leadId =
+                        selectedLead?.id || selectedLead?.rawData?.id;
+                      if (leadId) {
+                        router.push(`/crm/leads/${leadId}/edit`);
+                      }
+                    },
+                  },
+                ],
+                fields: [
+                  {
+                    label: "Name",
+                    value: selectedLead?.name || "N/A",
+                    copyable: true,
+                  },
+                  {
+                    label: "Phone",
+                    value:
+                      selectedLead?.phone ||
+                      selectedLead?.rawData?.phone ||
+                      "N/A",
+                    type: "phone",
+                    copyable: true,
+                    externalLink:
+                      selectedLead?.phone || selectedLead?.rawData?.phone
+                        ? `tel:${selectedLead?.phone || selectedLead?.rawData?.phone}`
+                        : undefined,
+                  },
+                  {
+                    label: "Email",
+                    value:
+                      selectedLead?.email ||
+                      selectedLead?.rawData?.email ||
+                      "N/A",
+                    type: "email",
+                    copyable: true,
+                    externalLink:
+                      selectedLead?.email || selectedLead?.rawData?.email
+                        ? `mailto:${selectedLead?.email || selectedLead?.rawData?.email}`
+                        : undefined,
+                    show: !!(
+                      selectedLead?.email || selectedLead?.rawData?.email
+                    ),
+                  },
+                  {
+                    label: "Company",
+                    value:
+                      selectedLead?.company_name ||
+                      selectedLead?.company ||
+                      "N/A",
+                    copyable: true,
+                    show: !!(
+                      selectedLead?.company_name || selectedLead?.company
+                    ),
+                  },
+                  {
+                    label: "Stage",
+                    value:
+                      selectedLead?.is_lost || selectedLead?.isLost
+                        ? "Lost"
+                        : selectedLead?.stage?.name ||
+                          selectedLead?.stage ||
+                          "N/A",
+                    type: "badge",
+                    badgeVariant:
+                      selectedLead?.is_lost || selectedLead?.isLost
+                        ? "danger"
+                        : "primary",
+                  },
+                  {
+                    label: "Lead Potential",
+                    value:
+                      selectedLead?.lead_potential ||
+                      selectedLead?.leadPotential ||
+                      "N/A",
+                    type: "badge",
+                    badgeVariant:
+                      selectedLead?.lead_potential === "Hot" ||
+                      selectedLead?.leadPotential === "Hot"
+                        ? "danger"
+                        : selectedLead?.lead_potential === "Warm" ||
+                            selectedLead?.leadPotential === "Warm"
+                          ? "warning"
+                          : "secondary",
+                  },
+                  {
+                    label: "Assigned To",
+                    value:
+                      selectedLead?.assigned_user?.display_name ||
+                      selectedLead?.assigned_user?.name ||
+                      selectedLead?.assignedUser ||
+                      "Unassigned",
+                    hasDetails: true,
+                    onDetailsClick: () => console.log("Show user details"),
+                  },
+                  {
+                    label: "Lead Score",
+                    value: selectedLead?.stage?.score
+                      ? `${selectedLead.stage.score}%`
+                      : selectedLead?.lead_score
+                        ? `${selectedLead.lead_score}%`
+                        : "N/A",
+                    show: !!(
+                      selectedLead?.stage?.score || selectedLead?.lead_score
+                    ),
+                  },
+                  {
+                    label: "Source",
+                    value: selectedLead?.source || "N/A",
+                    show: !!selectedLead?.source,
+                  },
+                  {
+                    label: "Created Date",
+                    value:
+                      selectedLead?.created_at || selectedLead?.created
+                        ? moment(
+                            selectedLead.created_at || selectedLead.created,
+                          ).format("MMM DD, YYYY")
+                        : "N/A",
+                    type: "date",
+                  },
+                  {
+                    label: "Last Updated",
+                    value:
+                      selectedLead?.updated_at || selectedLead?.last_activity_at
+                        ? moment(
+                            selectedLead.updated_at ||
+                              selectedLead.last_activity_at,
+                          ).format("MMM DD, YYYY")
+                        : "N/A",
+                    type: "date",
+                  },
+                ],
+              },
+              {
+                id: "recent-activities",
+                title: "Recent activities",
                 icon: History,
-                message: 'No recent activities for this lead.',
-                action: {
-                  label: 'Log activity',
-                  onClick: () => console.log('Log activity')
-                }
-              }
-            },
-            {
-              id: 'call-recordings',
-              title: 'Call Recordings',
-              icon: PhoneIcon,
-              collapsible: true,
-              defaultExpanded: true,
-              count: 0,
-              actions: [
-                { label: 'View all recordings', onClick: () => console.log('View all') }
-              ],
-              emptyState: {
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                emptyState: {
+                  icon: History,
+                  message: "No recent activities for this lead.",
+                  action: {
+                    label: "Log activity",
+                    onClick: () => console.log("Log activity"),
+                  },
+                },
+              },
+              {
+                id: "call-recordings",
+                title: "Call Recordings",
                 icon: PhoneIcon,
-                message: 'No call recordings available yet.',
-                action: {
-                  label: 'Make a call',
-                  onClick: () => {
-                    const phone = selectedLead?.phone || selectedLead?.rawData?.phone;
-                    if (phone) {
-                      handleCallClick(selectedLead);
-                    }
-                  }
-                }
-              }
-            },
-            {
-              id: 'notes',
-              title: 'Notes',
-              icon: FileText,
-              collapsible: true,
-              defaultExpanded: true,
-              count: 0,
-              emptyState: {
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                actions: [
+                  {
+                    label: "View all recordings",
+                    onClick: () => console.log("View all"),
+                  },
+                ],
+                emptyState: {
+                  icon: PhoneIcon,
+                  message: "No call recordings available yet.",
+                  action: {
+                    label: "Make a call",
+                    onClick: () => {
+                      const phone =
+                        selectedLead?.phone || selectedLead?.rawData?.phone;
+                      if (phone) {
+                        handleCallClick(selectedLead);
+                      }
+                    },
+                  },
+                },
+              },
+              {
+                id: "notes",
+                title: "Notes",
                 icon: FileText,
-                message: 'No notes added yet.',
-                action: {
-                  label: 'Add note',
-                  onClick: () => console.log('Add note')
-                }
-              }
-            }
-          ]}
-        />
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                emptyState: {
+                  icon: FileText,
+                  message: "No notes added yet.",
+                  action: {
+                    label: "Add note",
+                    onClick: () => console.log("Add note"),
+                  },
+                },
+              },
+            ]}
+          />
         )}
       </div>
 
@@ -4132,7 +4479,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                 value={lostReasonId || ""}
                 onChange={(e) =>
                   setLostReasonId(
-                    e.target.value ? Number(e.target.value) : null
+                    e.target.value ? Number(e.target.value) : null,
                   )
                 }
                 required
@@ -4174,142 +4521,171 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
 
       {/* Lead View Modal */}
       {viewingLead && (
-  <Modal
-    show={showLeadViewModal}
-    onHide={() => setShowLeadViewModal(false)}
-    size="xl"
-    centered
-    className="lead-view-modal"
-  >
-    {/* Modern Header with Gradient */}
-    <div
-      style={{
-        background: "#fff",
-        color: "black",
-        padding: "24px 32px",
-        position: "relative",
-        borderTopLeftRadius: "12px",
-        borderTopRightRadius: "12px",
-        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-        borderBottom: "1px solid #ccc",
-      }}
-    >
-      <button
-        onClick={() => setShowLeadViewModal(false)}
-        style={{
-          position: "absolute",
-          top: "16px",
-          right: "16px",
-          background: "rgba(255,255,255,0.15)",
-          backdropFilter: "blur(10px)",
-          border: "1px solid rgba(255,255,255,0.2)",
-          color: "black",
-          width: "32px",
-          height: "32px",
-          borderRadius: "8px",
-          cursor: "pointer",
-          transition: "all 0.2s ease",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-          e.currentTarget.style.transform = "scale(1.05)";
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-          e.currentTarget.style.transform = "scale(1)";
-        }}
-      >
-        <X size={18} />
-      </button>
-      
-      {/* Header Content */}
-      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-        <div
-          style={{
-            width: "64px",
-            height: "64px",
-            borderRadius: "16px",
-            background: "#2563eb",
-            backdropFilter: "blur(10px)",
-            border: "2px solid rgba(255,255,255,0.3)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "28px",
-            fontWeight: "700",
-            flexShrink: 0,
-            color: "#fff",
-          }}
+        <Modal
+          show={showLeadViewModal}
+          onHide={() => setShowLeadViewModal(false)}
+          size="xl"
+          centered
+          className="lead-view-modal"
         >
-          {viewingLead.name
-            ? viewingLead.name.charAt(0).toUpperCase()
-            : "L"}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h2 style={{ 
-            margin: 0, 
-            fontWeight: 700, 
-            fontSize: "26px",
-            textShadow: "0 2px 4px rgba(0,0,0,0.1)",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}>
-            {viewingLead.name}
-          </h2>
-          <div style={{ 
-            marginTop: "6px", 
-            opacity: 0.95, 
-            fontSize: "14px",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            flexWrap: "wrap",
-            color: "#000",
-          }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <Target size={14} />
-              {viewingLead.stage?.name || "No stage"}
-            </span>
-            <span>•</span>
-            <span>
-              Created {viewingLead.created_at
-                ? moment(viewingLead.created_at).format("MMM DD, YYYY")
-                : "N/A"}
-            </span>
-            {viewingLead.is_lost && (
-              <>
-                <span>•</span>
-                <Badge 
-                  bg="danger"
+          {/* Modern Header with Gradient */}
+          <div
+            style={{
+              background: "#fff",
+              color: "black",
+              padding: "24px 32px",
+              position: "relative",
+              borderTopLeftRadius: "12px",
+              borderTopRightRadius: "12px",
+              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+              borderBottom: "1px solid #ccc",
+            }}
+          >
+            <button
+              onClick={() => setShowLeadViewModal(false)}
+              style={{
+                position: "absolute",
+                top: "16px",
+                right: "16px",
+                background: "rgba(255,255,255,0.15)",
+                backdropFilter: "blur(10px)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                color: "black",
+                width: "32px",
+                height: "32px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+                e.currentTarget.style.transform = "scale(1.05)";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
+              <X size={18} />
+            </button>
+
+            {/* Header Content */}
+            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+              <div
+                style={{
+                  width: "64px",
+                  height: "64px",
+                  borderRadius: "16px",
+                  background: "#2563eb",
+                  backdropFilter: "blur(10px)",
+                  border: "2px solid rgba(255,255,255,0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "28px",
+                  fontWeight: "700",
+                  flexShrink: 0,
+                  color: "#fff",
+                }}
+              >
+                {viewingLead.name
+                  ? viewingLead.name.charAt(0).toUpperCase()
+                  : "L"}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h2
                   style={{
-                    fontWeight: 500,
+                    margin: 0,
+                    fontWeight: 700,
+                    fontSize: "26px",
+                    textShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  Lost
-                </Badge>
-              </>
-            )}
+                  {viewingLead.name}
+                </h2>
+                <div
+                  style={{
+                    marginTop: "6px",
+                    opacity: 0.95,
+                    fontSize: "14px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    flexWrap: "wrap",
+                    color: "#000",
+                  }}
+                >
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <Target size={14} />
+                    {viewingLead.stage?.name || "No stage"}
+                  </span>
+                  <span>•</span>
+                  <span>
+                    Created{" "}
+                    {viewingLead.created_at
+                      ? moment(viewingLead.created_at).format("MMM DD, YYYY")
+                      : "N/A"}
+                  </span>
+                  {viewingLead.is_lost && (
+                    <>
+                      <span>•</span>
+                      <Badge
+                        bg="danger"
+                        style={{
+                          fontWeight: 500,
+                        }}
+                      >
+                        Lost
+                      </Badge>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <Modal.Body style={{ padding: 0, maxHeight: "calc(90vh - 200px)", overflowY: "auto" }}>
-      {loadingLead ? (
-        <div style={{
-          padding: "48px 20px",
-          textAlign: "center",
-        }}>
-          <Spinner animation="border" variant="primary" size="sm" style={{ marginBottom: "12px" }} />
-          <p className="mb-0" style={{ color: "#6b7280", fontSize: "14px" }}>Loading lead details...</p>
-        </div>
-      ) : (
-        <>
-          <style>{`
+          <Modal.Body
+            style={{
+              padding: 0,
+              maxHeight: "calc(90vh - 200px)",
+              overflowY: "auto",
+            }}
+          >
+            {loadingLead ? (
+              <div
+                style={{
+                  padding: "48px 20px",
+                  textAlign: "center",
+                }}
+              >
+                <Spinner
+                  animation="border"
+                  variant="primary"
+                  size="sm"
+                  style={{ marginBottom: "12px" }}
+                />
+                <p
+                  className="mb-0"
+                  style={{ color: "#6b7280", fontSize: "14px" }}
+                >
+                  Loading lead details...
+                </p>
+              </div>
+            ) : (
+              <>
+                <style>{`
             .lead-detail-filter-buttons {
               display: flex;
               flex-direction: row;
@@ -4360,1733 +4736,2366 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             }
           `}</style>
 
-          {/* Main Content Grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", minHeight: "500px" }}>
-            
-            {/* Left Panel - Main Information */}
-            <div style={{ padding: "32px", borderRight: "1px solid #e5e7eb" }}>
-              
-              {/* Tabs Navigation */}
-              <div className="lead-detail-filter-buttons mb-4">
-                <button
-                  className={`lead-detail-filter-button ${activeTab === "general-info" ? 'active' : ''}`}
-                  onClick={() => setActiveTab("general-info")}
+                {/* Main Content Grid */}
+                <div
                   style={{
-                    backgroundColor: activeTab === "general-info" ? "#2563eb" : 'white',
-                    borderColor: "#2563eb",
-                    color: activeTab === "general-info" ? 'white' : "#2563eb"
+                    display: "grid",
+                    gridTemplateColumns: "1fr 360px",
+                    minHeight: "500px",
                   }}
                 >
-                  <Target className="filter-icon" size={18} />
-                  <span>General Information</span>
-                </button>
-                <button
-                  className={`lead-detail-filter-button ${activeTab === "campaign-prospect" ? 'active' : ''}`}
-                  onClick={() => setActiveTab("campaign-prospect")}
-                  style={{
-                    backgroundColor: activeTab === "campaign-prospect" ? "#2563eb" : 'white',
-                    borderColor: "#2563eb",
-                    color: activeTab === "campaign-prospect" ? 'white' : "#2563eb"
-                  }}
-                >
-                  <FileText className="filter-icon" size={18} />
-                  <span>Campaign & Prospect</span>
-                </button>
-              </div>
-
-              {/* Tab Content */}
-              {activeTab === "general-info" && (
-                <div>
-                  {/* Quick Info Cards */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px", marginBottom: "28px" }}>
-                    <div
-                      style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        padding: "20px",
-                        borderRadius: "12px",
-                        transition: "all 0.3s ease",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(37, 99, 235, 0.15)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <div style={{
-                          width: "44px",
-                          height: "44px",
-                          borderRadius: "10px",
-                          background: "#2563eb",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}>
-                          <User size={20} style={{ color: "white" }} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            color: "#2563eb",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.8px",
-                            marginBottom: "4px",
-                          }}>
-                            Assigned To
-                          </div>
-                          <div style={{
-                            fontSize: "15px",
-                            color: "#1f2937",
-                            fontWeight: 600,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}>
-                            {extensions.find(
-                              (ext: any) =>
-                                ext?.id == viewingLead?.user_extension ||
-                                ext?.extension == viewingLead?.user_extension
-                            )?.display_name ||
-                              extensions.find(
-                                (ext: any) =>
-                                  ext?.id == viewingLead?.user_extension ||
-                                  ext?.extension == viewingLead?.user_extension
-                              )?.name ||
-                              viewingLead.user_extension ||
-                              "Not assigned"}
-                          </div>
-                        </div>
-                      </div>
+                  {/* Left Panel - Main Information */}
+                  <div
+                    style={{
+                      padding: "32px",
+                      borderRight: "1px solid #e5e7eb",
+                    }}
+                  >
+                    {/* Tabs Navigation */}
+                    <div className="lead-detail-filter-buttons mb-4">
+                      <button
+                        className={`lead-detail-filter-button ${activeTab === "general-info" ? "active" : ""}`}
+                        onClick={() => setActiveTab("general-info")}
+                        style={{
+                          backgroundColor:
+                            activeTab === "general-info" ? "#2563eb" : "white",
+                          borderColor: "#2563eb",
+                          color:
+                            activeTab === "general-info" ? "white" : "#2563eb",
+                        }}
+                      >
+                        <Target className="filter-icon" size={18} />
+                        <span>General Information</span>
+                      </button>
+                      <button
+                        className={`lead-detail-filter-button ${activeTab === "campaign-prospect" ? "active" : ""}`}
+                        onClick={() => setActiveTab("campaign-prospect")}
+                        style={{
+                          backgroundColor:
+                            activeTab === "campaign-prospect"
+                              ? "#2563eb"
+                              : "white",
+                          borderColor: "#2563eb",
+                          color:
+                            activeTab === "campaign-prospect"
+                              ? "white"
+                              : "#2563eb",
+                        }}
+                      >
+                        <FileText className="filter-icon" size={18} />
+                        <span>Campaign & Prospect</span>
+                      </button>
                     </div>
 
-                    <div
-                      style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        padding: "20px",
-                        borderRadius: "12px",
-                        transition: "all 0.3s ease",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(37, 99, 235, 0.15)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <div style={{
-                          width: "44px",
-                          height: "44px",
-                          borderRadius: "10px",
-                          background: "#0284c7",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}>
-                          <Target size={20} style={{ color: "white" }} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            color: "#0284c7",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.8px",
-                            marginBottom: "4px",
-                          }}>
-                            Lead Potential
-                          </div>
-                          <div style={{
-                            fontSize: "15px",
-                            color: "#1f2937",
-                            fontWeight: 600,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}>
-                            <Badge
-                              bg={
-                                viewingLead.lead_potential === "Hot"
-                                  ? "danger"
-                                  : viewingLead.lead_potential === "Warm"
-                                  ? "warning"
-                                  : "secondary"
-                              }
-                              style={{
-                                padding: "6px 14px",
-                                borderRadius: "20px",
-                                fontSize: "12px",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {viewingLead.lead_potential || "N/A"}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        padding: "20px",
-                        borderRadius: "12px",
-                        transition: "all 0.3s ease",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(37, 99, 235, 0.15)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <div style={{
-                          width: "44px",
-                          height: "44px",
-                          borderRadius: "10px",
-                          background: viewingLead.stage?.color || "#6c757d",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}>
-                          <Target size={20} style={{ color: "white" }} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.8px",
-                            marginBottom: "4px",
-                          }}>
-                            Stage
-                          </div>
-                          <div style={{
-                            fontSize: "15px",
-                            color: "#1f2937",
-                            fontWeight: 600,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}>
-                            {viewingLead.stage?.name || "Not assigned"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        padding: "20px",
-                        borderRadius: "12px",
-                        transition: "all 0.3s ease",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(37, 99, 235, 0.15)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <div style={{
-                          width: "44px",
-                          height: "44px",
-                          borderRadius: "10px",
-                          background: "#10b981",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}>
-                          <ChartLine size={20} style={{ color: "white" }} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            color: "#10b981",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.8px",
-                            marginBottom: "4px",
-                          }}>
-                            Lead Score
-                          </div>
-                          <div style={{
-                            fontSize: "15px",
-                            color: "#1f2937",
-                            fontWeight: 600,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}>
-                            {viewingLead?.lead_score !== null
-                              ? `${viewingLead?.lead_score}%`
-                              : "Not Set"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Lead Information Section */}
-                  <div style={{ marginBottom: "28px" }}>
-                    <h5 style={{
-                      fontSize: "15px",
-                      fontWeight: 700,
-                      color: "#1f2937",
-                      marginBottom: "16px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}>
-                      <div style={{
-                        width: "4px",
-                        height: "18px",
-                        background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                        borderRadius: "2px",
-                      }} />
-                      Lead Details
-                    </h5>
-                    <div style={{
-                      background: "#f9fafb",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "12px",
-                      padding: "20px",
-                    }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "16px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
-                          <User size={16} style={{ color: "#2563eb" }} />
-                          Lead Name
-                        </div>
-                        <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
-                          {viewingLead.name}
-                        </div>
-                        
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
-                          <Calendar size={16} style={{ color: "#2563eb" }} />
-                          Created
-                        </div>
-                        <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
-                          {viewingLead.created_at
-                            ? moment(viewingLead.created_at).format("MMMM DD, YYYY [at] hh:mm A")
-                            : "N/A"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Company Information Section */}
-                  {viewingLead.company_name && (
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5 style={{
-                        fontSize: "15px",
-                        fontWeight: 700,
-                        color: "#1f2937",
-                        marginBottom: "16px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}>
-                        <div style={{
-                          width: "4px",
-                          height: "18px",
-                          background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                          borderRadius: "2px",
-                        }} />
-                        Company Information
-                      </h5>
-                      <div style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        padding: "20px",
-                      }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
-                          <div>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              Company Name
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              wordBreak: "break-word",
-                            }}>
-                              <Building2 size={14} style={{ color: "#2563eb", marginRight: "6px", display: "inline" }} />
-                              {viewingLead.company_name}
-                            </div>
-                          </div>
-                          {viewingLead.industry && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Industry
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                {viewingLead.industry}
-                              </div>
-                            </div>
-                          )}
-                          {viewingLead.business_type && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Business Type
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                {viewingLead.business_type}
-                              </div>
-                            </div>
-                          )}
-                          {viewingLead.company_size && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Company Size
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                {viewingLead.company_size}
-                              </div>
-                            </div>
-                          )}
-                          {viewingLead.company_city && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Location
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                {[viewingLead.company_city, viewingLead.company_country]
-                                  .filter(Boolean)
-                                  .join(", ") || "N/A"}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Contact Persons Section */}
-                  {viewingLead.contact_persons &&
-                    Array.isArray(viewingLead.contact_persons) &&
-                    viewingLead.contact_persons.length > 0 && (
-                      <div style={{ marginBottom: "28px" }}>
-                        <h5 style={{
-                          fontSize: "15px",
-                          fontWeight: 700,
-                          color: "#1f2937",
-                          marginBottom: "16px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}>
-                          <div style={{
-                            width: "4px",
-                            height: "18px",
-                            background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                            borderRadius: "2px",
-                          }} />
-                          Contact Persons
-                          <Badge 
-                            bg="secondary"
+                    {/* Tab Content */}
+                    {activeTab === "general-info" && (
+                      <div>
+                        {/* Quick Info Cards */}
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(2, 1fr)",
+                            gap: "16px",
+                            marginBottom: "28px",
+                          }}
+                        >
+                          <div
                             style={{
-                              marginLeft: "8px",
-                              fontSize: "11px",
-                              fontWeight: 600,
-                              padding: "4px 10px",
-                              borderRadius: "6px",
+                              background: "#f9fafb",
+                              border: "1px solid #e5e7eb",
+                              padding: "20px",
+                              borderRadius: "12px",
+                              transition: "all 0.3s ease",
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.transform =
+                                "translateY(-4px)";
+                              e.currentTarget.style.boxShadow =
+                                "0 8px 16px rgba(37, 99, 235, 0.15)";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.transform = "translateY(0)";
+                              e.currentTarget.style.boxShadow = "none";
                             }}
                           >
-                            {viewingLead.contact_persons.length}
-                          </Badge>
-                        </h5>
-                        <div style={{
-                          background: "#f9fafb",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "12px",
-                          padding: "20px",
-                        }}>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                            {viewingLead.contact_persons.map((person: any, index: number) => (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "12px",
+                              }}
+                            >
                               <div
-                                key={index}
                                 style={{
-                                  background: "white",
-                                  padding: "16px",
-                                  borderRadius: "8px",
-                                  border: "1px solid #e5e7eb",
+                                  width: "44px",
+                                  height: "44px",
+                                  borderRadius: "10px",
+                                  background: "#2563eb",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
                                 }}
                               >
-                                <div style={{
-                                  fontSize: "14px",
-                                  fontWeight: 600,
-                                  color: "#1f2937",
-                                  marginBottom: "8px",
-                                }}>
-                                  {person.title} {person.name}
-                                </div>
-                                {person.email && (
-                                  <div style={{
-                                    fontSize: "13px",
-                                    color: "#6b7280",
-                                    marginBottom: "4px",
-                                  }}>
-                                    <Mail size={12} style={{ marginRight: "6px", display: "inline" }} />
-                                    {person.email}
-                                  </div>
-                                )}
-                                {person.phone && (
-                                  <div style={{ fontSize: "13px", color: "#6b7280" }}>
-                                    <PhoneDisplay
-                                      phone={
-                                        person.phone_country_code && person.phone
-                                          ? `${person.phone_country_code}${person.phone}`
-                                          : person.phone
-                                      }
-                                    />
-                                  </div>
-                                )}
+                                <User size={20} style={{ color: "white" }} />
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                  {/* Description */}
-                  {viewingLead.description && (
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5 style={{
-                        fontSize: "15px",
-                        fontWeight: 700,
-                        color: "#1f2937",
-                        marginBottom: "16px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}>
-                        <div style={{
-                          width: "4px",
-                          height: "18px",
-                          background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                          borderRadius: "2px",
-                        }} />
-                        Description
-                      </h5>
-                      <div style={{
-                        background: "#fffbeb",
-                        border: "1px solid #fcd34d",
-                        borderRadius: "12px",
-                        padding: "16px 20px",
-                        fontSize: "14px",
-                        color: "#78350f",
-                        lineHeight: "1.6",
-                        whiteSpace: "pre-wrap",
-                      }}>
-                        {viewingLead.description}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Lost Reason */}
-                  {viewingLead.is_lost && viewingLead.lost_reason && (
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5 style={{
-                        fontSize: "15px",
-                        fontWeight: 700,
-                        color: "#1f2937",
-                        marginBottom: "16px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}>
-                        <div style={{
-                          width: "4px",
-                          height: "18px",
-                          background: "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
-                          borderRadius: "2px",
-                        }} />
-                        Lead Lost Information
-                      </h5>
-                      <div style={{
-                        background: "#fee2e2",
-                        border: "1px solid #fecaca",
-                        borderRadius: "12px",
-                        padding: "16px 20px",
-                      }}>
-                        <div style={{
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#dc2626",
-                          marginBottom: "8px",
-                        }}>
-                          Reason: {viewingLead.lost_reason.name}
-                        </div>
-                        {viewingLead.lost_feedback && (
-                          <div style={{
-                            fontSize: "13px",
-                            color: "#991b1b",
-                            lineHeight: "1.6",
-                          }}>
-                            Feedback: {viewingLead.lost_feedback}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === "campaign-prospect" && (
-                <div>
-                  {/* Campaign Information Section */}
-                  <div style={{ marginBottom: "28px" }}>
-                    <h5 style={{
-                      fontSize: "15px",
-                      fontWeight: 700,
-                      color: "#1f2937",
-                      marginBottom: "16px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}>
-                      <div style={{
-                        width: "4px",
-                        height: "18px",
-                        background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                        borderRadius: "2px",
-                      }} />
-                      Campaign Information
-                    </h5>
-                    {viewingLead.campaign ? (
-                      <div style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        padding: "20px",
-                      }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
-                          <div>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              Campaign Name
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              wordBreak: "break-word",
-                            }}>
-                              {viewingLead.campaign.name}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div
+                                  style={{
+                                    fontSize: "11px",
+                                    fontWeight: 700,
+                                    color: "#2563eb",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.8px",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  Assigned To
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "15px",
+                                    color: "#1f2937",
+                                    fontWeight: 600,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {extensions.find(
+                                    (ext: any) =>
+                                      ext?.id == viewingLead?.user_extension ||
+                                      ext?.extension ==
+                                        viewingLead?.user_extension,
+                                  )?.display_name ||
+                                    extensions.find(
+                                      (ext: any) =>
+                                        ext?.id ==
+                                          viewingLead?.user_extension ||
+                                        ext?.extension ==
+                                          viewingLead?.user_extension,
+                                    )?.name ||
+                                    viewingLead.user_extension ||
+                                    "Not assigned"}
+                                </div>
+                              </div>
                             </div>
                           </div>
-                          {viewingLead.campaign_field_values &&
-                            Object.keys(viewingLead.campaign_field_values).length > 0 &&
-                            Object.entries(viewingLead.campaign_field_values).map(
-                              ([key, value]: [string, any]) => (
-                                <div key={key}>
-                                  <div style={{
-                                    fontSize: "12px",
+
+                          <div
+                            style={{
+                              background: "#f9fafb",
+                              border: "1px solid #e5e7eb",
+                              padding: "20px",
+                              borderRadius: "12px",
+                              transition: "all 0.3s ease",
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.transform =
+                                "translateY(-4px)";
+                              e.currentTarget.style.boxShadow =
+                                "0 8px 16px rgba(37, 99, 235, 0.15)";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.transform = "translateY(0)";
+                              e.currentTarget.style.boxShadow = "none";
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "12px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "44px",
+                                  height: "44px",
+                                  borderRadius: "10px",
+                                  background: "#0284c7",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <Target size={20} style={{ color: "white" }} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div
+                                  style={{
+                                    fontSize: "11px",
+                                    fontWeight: 700,
+                                    color: "#0284c7",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.8px",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  Lead Potential
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "15px",
+                                    color: "#1f2937",
+                                    fontWeight: 600,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  <Badge
+                                    bg={
+                                      viewingLead.lead_potential === "Hot"
+                                        ? "danger"
+                                        : viewingLead.lead_potential === "Warm"
+                                          ? "warning"
+                                          : "secondary"
+                                    }
+                                    style={{
+                                      padding: "6px 14px",
+                                      borderRadius: "20px",
+                                      fontSize: "12px",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {viewingLead.lead_potential || "N/A"}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              background: "#f9fafb",
+                              border: "1px solid #e5e7eb",
+                              padding: "20px",
+                              borderRadius: "12px",
+                              transition: "all 0.3s ease",
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.transform =
+                                "translateY(-4px)";
+                              e.currentTarget.style.boxShadow =
+                                "0 8px 16px rgba(37, 99, 235, 0.15)";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.transform = "translateY(0)";
+                              e.currentTarget.style.boxShadow = "none";
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "12px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "44px",
+                                  height: "44px",
+                                  borderRadius: "10px",
+                                  background:
+                                    viewingLead.stage?.color || "#6c757d",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <Target size={20} style={{ color: "white" }} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div
+                                  style={{
+                                    fontSize: "11px",
                                     fontWeight: 700,
                                     color: "#6b7280",
                                     textTransform: "uppercase",
-                                    letterSpacing: "0.5px",
-                                    marginBottom: "6px",
-                                  }}>
-                                    {key}
-                                  </div>
-                                  <div style={{
-                                    fontSize: "14px",
-                                    color: "#1f2937",
-                                    fontWeight: 500,
-                                    wordBreak: "break-word",
-                                  }}>
-                                    {String(value)}
-                                  </div>
+                                    letterSpacing: "0.8px",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  Stage
                                 </div>
-                              )
-                            )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{
-                        padding: "40px",
-                        textAlign: "center",
-                        color: "#6b7280",
-                        background: "#f9fafb",
-                        border: "2px dashed #d1d5db",
-                        borderRadius: "12px"
-                      }}>
-                        No campaign information available
-                      </div>
-                    )}
-                  </div>
+                                <div
+                                  style={{
+                                    fontSize: "15px",
+                                    color: "#1f2937",
+                                    fontWeight: 600,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {viewingLead.stage?.name || "Not assigned"}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
 
-                  {/* Prospect Information Section */}
-                  <div style={{ marginBottom: "28px" }}>
-                    <h5 style={{
-                      fontSize: "15px",
-                      fontWeight: 700,
-                      color: "#1f2937",
-                      marginBottom: "16px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}>
-                      <div style={{
-                        width: "4px",
-                        height: "18px",
-                        background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                        borderRadius: "2px",
-                      }} />
-                      Prospect Information
-                    </h5>
-                    {viewingLead.crm_data ? (
-                      <div style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        padding: "20px",
-                      }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
-                          {viewingLead.crm_data.id && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                CRM Data ID
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                #{viewingLead.crm_data.id}
-                              </div>
-                            </div>
-                          )}
-                          {(viewingLead.crm_data.name || (viewingLead.crm_data.data && viewingLead.crm_data.data.name)) && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Name
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                {viewingLead.crm_data.name || (viewingLead.crm_data.data && viewingLead.crm_data.data.name) || "N/A"}
-                              </div>
-                            </div>
-                          )}
-                          {(viewingLead.crm_data.phone || (viewingLead.crm_data.data && viewingLead.crm_data.data.phone)) && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Phone
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                <PhoneDisplay
-                                  phone={
-                                    viewingLead.crm_data.phone ||
-                                    (viewingLead.crm_data.data && viewingLead.crm_data.data.phone) ||
-                                    ""
-                                  }
+                          <div
+                            style={{
+                              background: "#f9fafb",
+                              border: "1px solid #e5e7eb",
+                              padding: "20px",
+                              borderRadius: "12px",
+                              transition: "all 0.3s ease",
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.transform =
+                                "translateY(-4px)";
+                              e.currentTarget.style.boxShadow =
+                                "0 8px 16px rgba(37, 99, 235, 0.15)";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.transform = "translateY(0)";
+                              e.currentTarget.style.boxShadow = "none";
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "12px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "44px",
+                                  height: "44px",
+                                  borderRadius: "10px",
+                                  background: "#10b981",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <ChartLine
+                                  size={20}
+                                  style={{ color: "white" }}
                                 />
                               </div>
-                            </div>
-                          )}
-                          {viewingLead.crm_data.source_file && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Source File
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                {viewingLead.crm_data.source_file}
-                              </div>
-                            </div>
-                          )}
-                          {viewingLead.crm_data.uploaded_by && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Uploaded By
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                <User size={14} style={{ color: "#2563eb", marginRight: "6px", display: "inline" }} />
-                                {viewingLead.crm_data.uploaded_by}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div
+                                  style={{
+                                    fontSize: "11px",
+                                    fontWeight: 700,
+                                    color: "#10b981",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.8px",
+                                    marginBottom: "4px",
+                                  }}
+                                >
+                                  Lead Score
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "15px",
+                                    color: "#1f2937",
+                                    fontWeight: 600,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {viewingLead?.lead_score !== null
+                                    ? `${viewingLead?.lead_score}%`
+                                    : "Not Set"}
+                                </div>
                               </div>
                             </div>
-                          )}
-                          {viewingLead?.crm_data?.scheduled_call_at && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Scheduled Call
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                <Calendar size={14} style={{ color: "#2563eb", marginRight: "6px", display: "inline" }} />
-                                {(() => {
-                                  const scheduledAt = viewingLead.crm_data.scheduled_call_at;
-                                  const isOverdue = moment(scheduledAt).isBefore(moment());
-                                  const isNextHour = moment(scheduledAt).isBefore(moment().add(1, "hour"));
-                                  return (
-                                    <span>
-                                      {moment(scheduledAt).format("MMM DD, YYYY HH:mm")}
-                                      {isOverdue && (
-                                        <Badge bg="danger" className="ms-2" style={{ fontSize: "10px", padding: "2px 6px" }}>
-                                          Overdue
-                                        </Badge>
-                                      )}
-                                      {isNextHour && !isOverdue && (
-                                        <Badge bg="warning" className="ms-2" style={{ fontSize: "10px", padding: "2px 6px" }}>
-                                          Soon
-                                        </Badge>
-                                      )}
-                                    </span>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-                          )}
-                          {viewingLead.crm_data.created_at && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Created At
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                <Calendar size={14} style={{ color: "#2563eb", marginRight: "6px", display: "inline" }} />
-                                {formatDateForTable(viewingLead.crm_data.created_at)}
-                              </div>
-                            </div>
-                          )}
+                          </div>
                         </div>
-                        
-                        {/* Scheduled Call Notes */}
-                        {viewingLead.crm_data?.note && (
-                          <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: "1px solid #e5e7eb" }}>
-                            <div style={{
-                              fontSize: "12px",
+
+                        {/* Lead Information Section */}
+                        <div style={{ marginBottom: "28px" }}>
+                          <h5
+                            style={{
+                              fontSize: "15px",
                               fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "8px",
-                            }}>
-                              Scheduled Call Notes
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
                               color: "#1f2937",
-                              lineHeight: "1.6",
-                              whiteSpace: "pre-wrap",
-                            }}>
-                              {viewingLead.crm_data.note}
+                              marginBottom: "16px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "4px",
+                                height: "18px",
+                                background:
+                                  "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                                borderRadius: "2px",
+                              }}
+                            />
+                            Lead Details
+                          </h5>
+                          <div
+                            style={{
+                              background: "#f9fafb",
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "12px",
+                              padding: "20px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "140px 1fr",
+                                gap: "16px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  color: "#6b7280",
+                                  fontSize: "14px",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                <User size={16} style={{ color: "#2563eb" }} />
+                                Lead Name
+                              </div>
+                              <div
+                                style={{
+                                  color: "#1f2937",
+                                  fontSize: "15px",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {viewingLead.name}
+                              </div>
+
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  color: "#6b7280",
+                                  fontSize: "14px",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                <Calendar
+                                  size={16}
+                                  style={{ color: "#2563eb" }}
+                                />
+                                Created
+                              </div>
+                              <div
+                                style={{
+                                  color: "#1f2937",
+                                  fontSize: "15px",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {viewingLead.created_at
+                                  ? moment(viewingLead.created_at).format(
+                                      "MMMM DD, YYYY [at] hh:mm A",
+                                    )
+                                  : "N/A"}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Company Information Section */}
+                        {viewingLead.company_name && (
+                          <div style={{ marginBottom: "28px" }}>
+                            <h5
+                              style={{
+                                fontSize: "15px",
+                                fontWeight: 700,
+                                color: "#1f2937",
+                                marginBottom: "16px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "4px",
+                                  height: "18px",
+                                  background:
+                                    "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                                  borderRadius: "2px",
+                                }}
+                              />
+                              Company Information
+                            </h5>
+                            <div
+                              style={{
+                                background: "#f9fafb",
+                                border: "1px solid #e5e7eb",
+                                borderRadius: "12px",
+                                padding: "20px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "1fr 1fr",
+                                  gap: "16px 24px",
+                                }}
+                              >
+                                <div>
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: 700,
+                                      color: "#6b7280",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.5px",
+                                      marginBottom: "6px",
+                                    }}
+                                  >
+                                    Company Name
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "14px",
+                                      color: "#1f2937",
+                                      fontWeight: 500,
+                                      wordBreak: "break-word",
+                                    }}
+                                  >
+                                    <Building2
+                                      size={14}
+                                      style={{
+                                        color: "#2563eb",
+                                        marginRight: "6px",
+                                        display: "inline",
+                                      }}
+                                    />
+                                    {viewingLead.company_name}
+                                  </div>
+                                </div>
+                                {viewingLead.industry && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        color: "#6b7280",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        marginBottom: "6px",
+                                      }}
+                                    >
+                                      Industry
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "#1f2937",
+                                        fontWeight: 500,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      {viewingLead.industry}
+                                    </div>
+                                  </div>
+                                )}
+                                {viewingLead.business_type && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        color: "#6b7280",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        marginBottom: "6px",
+                                      }}
+                                    >
+                                      Business Type
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "#1f2937",
+                                        fontWeight: 500,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      {viewingLead.business_type}
+                                    </div>
+                                  </div>
+                                )}
+                                {viewingLead.company_size && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        color: "#6b7280",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        marginBottom: "6px",
+                                      }}
+                                    >
+                                      Company Size
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "#1f2937",
+                                        fontWeight: 500,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      {viewingLead.company_size}
+                                    </div>
+                                  </div>
+                                )}
+                                {viewingLead.company_city && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        color: "#6b7280",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        marginBottom: "6px",
+                                      }}
+                                    >
+                                      Location
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "#1f2937",
+                                        fontWeight: 500,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      {[
+                                        viewingLead.company_city,
+                                        viewingLead.company_country,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(", ") || "N/A"}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Contact Persons Section */}
+                        {viewingLead.contact_persons &&
+                          Array.isArray(viewingLead.contact_persons) &&
+                          viewingLead.contact_persons.length > 0 && (
+                            <div style={{ marginBottom: "28px" }}>
+                              <h5
+                                style={{
+                                  fontSize: "15px",
+                                  fontWeight: 700,
+                                  color: "#1f2937",
+                                  marginBottom: "16px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: "4px",
+                                    height: "18px",
+                                    background:
+                                      "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                                    borderRadius: "2px",
+                                  }}
+                                />
+                                Contact Persons
+                                <Badge
+                                  bg="secondary"
+                                  style={{
+                                    marginLeft: "8px",
+                                    fontSize: "11px",
+                                    fontWeight: 600,
+                                    padding: "4px 10px",
+                                    borderRadius: "6px",
+                                  }}
+                                >
+                                  {viewingLead.contact_persons.length}
+                                </Badge>
+                              </h5>
+                              <div
+                                style={{
+                                  background: "#f9fafb",
+                                  border: "1px solid #e5e7eb",
+                                  borderRadius: "12px",
+                                  padding: "20px",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "1fr 1fr",
+                                    gap: "16px",
+                                  }}
+                                >
+                                  {viewingLead.contact_persons.map(
+                                    (person: any, index: number) => (
+                                      <div
+                                        key={index}
+                                        style={{
+                                          background: "white",
+                                          padding: "16px",
+                                          borderRadius: "8px",
+                                          border: "1px solid #e5e7eb",
+                                        }}
+                                      >
+                                        <div
+                                          style={{
+                                            fontSize: "14px",
+                                            fontWeight: 600,
+                                            color: "#1f2937",
+                                            marginBottom: "8px",
+                                          }}
+                                        >
+                                          {person.title} {person.name}
+                                        </div>
+                                        {person.email && (
+                                          <div
+                                            style={{
+                                              fontSize: "13px",
+                                              color: "#6b7280",
+                                              marginBottom: "4px",
+                                            }}
+                                          >
+                                            <Mail
+                                              size={12}
+                                              style={{
+                                                marginRight: "6px",
+                                                display: "inline",
+                                              }}
+                                            />
+                                            {person.email}
+                                          </div>
+                                        )}
+                                        {person.phone && (
+                                          <div
+                                            style={{
+                                              fontSize: "13px",
+                                              color: "#6b7280",
+                                            }}
+                                          >
+                                            <PhoneDisplay
+                                              phone={
+                                                person.phone_country_code &&
+                                                person.phone
+                                                  ? `${person.phone_country_code}${person.phone}`
+                                                  : person.phone
+                                              }
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    ),
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                        {/* Description */}
+                        {viewingLead.description && (
+                          <div style={{ marginBottom: "28px" }}>
+                            <h5
+                              style={{
+                                fontSize: "15px",
+                                fontWeight: 700,
+                                color: "#1f2937",
+                                marginBottom: "16px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "4px",
+                                  height: "18px",
+                                  background:
+                                    "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                                  borderRadius: "2px",
+                                }}
+                              />
+                              Description
+                            </h5>
+                            <div
+                              style={{
+                                background: "#fffbeb",
+                                border: "1px solid #fcd34d",
+                                borderRadius: "12px",
+                                padding: "16px 20px",
+                                fontSize: "14px",
+                                color: "#78350f",
+                                lineHeight: "1.6",
+                                whiteSpace: "pre-wrap",
+                              }}
+                            >
+                              {viewingLead.description}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Lost Reason */}
+                        {viewingLead.is_lost && viewingLead.lost_reason && (
+                          <div style={{ marginBottom: "28px" }}>
+                            <h5
+                              style={{
+                                fontSize: "15px",
+                                fontWeight: 700,
+                                color: "#1f2937",
+                                marginBottom: "16px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "4px",
+                                  height: "18px",
+                                  background:
+                                    "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
+                                  borderRadius: "2px",
+                                }}
+                              />
+                              Lead Lost Information
+                            </h5>
+                            <div
+                              style={{
+                                background: "#fee2e2",
+                                border: "1px solid #fecaca",
+                                borderRadius: "12px",
+                                padding: "16px 20px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: "14px",
+                                  fontWeight: 600,
+                                  color: "#dc2626",
+                                  marginBottom: "8px",
+                                }}
+                              >
+                                Reason: {viewingLead.lost_reason.name}
+                              </div>
+                              {viewingLead.lost_feedback && (
+                                <div
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "#991b1b",
+                                    lineHeight: "1.6",
+                                  }}
+                                >
+                                  Feedback: {viewingLead.lost_feedback}
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
                       </div>
-                    ) : (
-                      <div style={{
-                        padding: "40px",
-                        textAlign: "center",
-                        color: "#6b7280",
-                        background: "#f9fafb",
-                        border: "2px dashed #d1d5db",
-                        borderRadius: "12px"
-                      }}>
-                        No prospect information available
+                    )}
+
+                    {activeTab === "campaign-prospect" && (
+                      <div>
+                        {/* Campaign Information Section */}
+                        <div style={{ marginBottom: "28px" }}>
+                          <h5
+                            style={{
+                              fontSize: "15px",
+                              fontWeight: 700,
+                              color: "#1f2937",
+                              marginBottom: "16px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "4px",
+                                height: "18px",
+                                background:
+                                  "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                                borderRadius: "2px",
+                              }}
+                            />
+                            Campaign Information
+                          </h5>
+                          {viewingLead.campaign ? (
+                            <div
+                              style={{
+                                background: "#f9fafb",
+                                border: "1px solid #e5e7eb",
+                                borderRadius: "12px",
+                                padding: "20px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "1fr 1fr",
+                                  gap: "16px 24px",
+                                }}
+                              >
+                                <div>
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: 700,
+                                      color: "#6b7280",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.5px",
+                                      marginBottom: "6px",
+                                    }}
+                                  >
+                                    Campaign Name
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "14px",
+                                      color: "#1f2937",
+                                      fontWeight: 500,
+                                      wordBreak: "break-word",
+                                    }}
+                                  >
+                                    {viewingLead.campaign.name}
+                                  </div>
+                                </div>
+                                {viewingLead.campaign_field_values &&
+                                  Object.keys(viewingLead.campaign_field_values)
+                                    .length > 0 &&
+                                  Object.entries(
+                                    viewingLead.campaign_field_values,
+                                  ).map(([key, value]: [string, any]) => (
+                                    <div key={key}>
+                                      <div
+                                        style={{
+                                          fontSize: "12px",
+                                          fontWeight: 700,
+                                          color: "#6b7280",
+                                          textTransform: "uppercase",
+                                          letterSpacing: "0.5px",
+                                          marginBottom: "6px",
+                                        }}
+                                      >
+                                        {key}
+                                      </div>
+                                      <div
+                                        style={{
+                                          fontSize: "14px",
+                                          color: "#1f2937",
+                                          fontWeight: 500,
+                                          wordBreak: "break-word",
+                                        }}
+                                      >
+                                        {String(value)}
+                                      </div>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                padding: "40px",
+                                textAlign: "center",
+                                color: "#6b7280",
+                                background: "#f9fafb",
+                                border: "2px dashed #d1d5db",
+                                borderRadius: "12px",
+                              }}
+                            >
+                              No campaign information available
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Prospect Information Section */}
+                        <div style={{ marginBottom: "28px" }}>
+                          <h5
+                            style={{
+                              fontSize: "15px",
+                              fontWeight: 700,
+                              color: "#1f2937",
+                              marginBottom: "16px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "4px",
+                                height: "18px",
+                                background:
+                                  "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                                borderRadius: "2px",
+                              }}
+                            />
+                            Prospect Information
+                          </h5>
+                          {viewingLead.crm_data ? (
+                            <div
+                              style={{
+                                background: "#f9fafb",
+                                border: "1px solid #e5e7eb",
+                                borderRadius: "12px",
+                                padding: "20px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "1fr 1fr",
+                                  gap: "16px 24px",
+                                }}
+                              >
+                                {viewingLead.crm_data.id && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        color: "#6b7280",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        marginBottom: "6px",
+                                      }}
+                                    >
+                                      CRM Data ID
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "#1f2937",
+                                        fontWeight: 500,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      #{viewingLead.crm_data.id}
+                                    </div>
+                                  </div>
+                                )}
+                                {(viewingLead.crm_data.name ||
+                                  (viewingLead.crm_data.data &&
+                                    viewingLead.crm_data.data.name)) && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        color: "#6b7280",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        marginBottom: "6px",
+                                      }}
+                                    >
+                                      Name
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "#1f2937",
+                                        fontWeight: 500,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      {viewingLead.crm_data.name ||
+                                        (viewingLead.crm_data.data &&
+                                          viewingLead.crm_data.data.name) ||
+                                        "N/A"}
+                                    </div>
+                                  </div>
+                                )}
+                                {(viewingLead.crm_data.phone ||
+                                  (viewingLead.crm_data.data &&
+                                    viewingLead.crm_data.data.phone)) && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        color: "#6b7280",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        marginBottom: "6px",
+                                      }}
+                                    >
+                                      Phone
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "#1f2937",
+                                        fontWeight: 500,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      <PhoneDisplay
+                                        phone={
+                                          viewingLead.crm_data.phone ||
+                                          (viewingLead.crm_data.data &&
+                                            viewingLead.crm_data.data.phone) ||
+                                          ""
+                                        }
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                                {viewingLead.crm_data.source_file && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        color: "#6b7280",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        marginBottom: "6px",
+                                      }}
+                                    >
+                                      Source File
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "#1f2937",
+                                        fontWeight: 500,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      {viewingLead.crm_data.source_file}
+                                    </div>
+                                  </div>
+                                )}
+                                {viewingLead.crm_data.uploaded_by && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        color: "#6b7280",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        marginBottom: "6px",
+                                      }}
+                                    >
+                                      Uploaded By
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "#1f2937",
+                                        fontWeight: 500,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      <User
+                                        size={14}
+                                        style={{
+                                          color: "#2563eb",
+                                          marginRight: "6px",
+                                          display: "inline",
+                                        }}
+                                      />
+                                      {viewingLead.crm_data.uploaded_by}
+                                    </div>
+                                  </div>
+                                )}
+                                {viewingLead?.crm_data?.scheduled_call_at && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        color: "#6b7280",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        marginBottom: "6px",
+                                      }}
+                                    >
+                                      Scheduled Call
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "#1f2937",
+                                        fontWeight: 500,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      <Calendar
+                                        size={14}
+                                        style={{
+                                          color: "#2563eb",
+                                          marginRight: "6px",
+                                          display: "inline",
+                                        }}
+                                      />
+                                      {(() => {
+                                        const scheduledAt =
+                                          viewingLead.crm_data
+                                            .scheduled_call_at;
+                                        const isOverdue =
+                                          moment(scheduledAt).isBefore(
+                                            moment(),
+                                          );
+                                        const isNextHour = moment(
+                                          scheduledAt,
+                                        ).isBefore(moment().add(1, "hour"));
+                                        return (
+                                          <span>
+                                            {moment(scheduledAt).format(
+                                              "MMM DD, YYYY HH:mm",
+                                            )}
+                                            {isOverdue && (
+                                              <Badge
+                                                bg="danger"
+                                                className="ms-2"
+                                                style={{
+                                                  fontSize: "10px",
+                                                  padding: "2px 6px",
+                                                }}
+                                              >
+                                                Overdue
+                                              </Badge>
+                                            )}
+                                            {isNextHour && !isOverdue && (
+                                              <Badge
+                                                bg="warning"
+                                                className="ms-2"
+                                                style={{
+                                                  fontSize: "10px",
+                                                  padding: "2px 6px",
+                                                }}
+                                              >
+                                                Soon
+                                              </Badge>
+                                            )}
+                                          </span>
+                                        );
+                                      })()}
+                                    </div>
+                                  </div>
+                                )}
+                                {viewingLead.crm_data.created_at && (
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        color: "#6b7280",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        marginBottom: "6px",
+                                      }}
+                                    >
+                                      Created At
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "#1f2937",
+                                        fontWeight: 500,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      <Calendar
+                                        size={14}
+                                        style={{
+                                          color: "#2563eb",
+                                          marginRight: "6px",
+                                          display: "inline",
+                                        }}
+                                      />
+                                      {formatDateForTable(
+                                        viewingLead.crm_data.created_at,
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Scheduled Call Notes */}
+                              {viewingLead.crm_data?.note && (
+                                <div
+                                  style={{
+                                    marginTop: "20px",
+                                    paddingTop: "20px",
+                                    borderTop: "1px solid #e5e7eb",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: 700,
+                                      color: "#6b7280",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.5px",
+                                      marginBottom: "8px",
+                                    }}
+                                  >
+                                    Scheduled Call Notes
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "14px",
+                                      color: "#1f2937",
+                                      lineHeight: "1.6",
+                                      whiteSpace: "pre-wrap",
+                                    }}
+                                  >
+                                    {viewingLead.crm_data.note}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                padding: "40px",
+                                textAlign: "center",
+                                color: "#6b7280",
+                                background: "#f9fafb",
+                                border: "2px dashed #d1d5db",
+                                borderRadius: "12px",
+                              }}
+                            >
+                              No prospect information available
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Prospect Fields Section */}
+                        {viewingLead.crm_data?.data &&
+                          typeof viewingLead.crm_data.data === "object" &&
+                          Object.keys(viewingLead.crm_data.data).length > 0 && (
+                            <div style={{ marginBottom: "28px" }}>
+                              <h5
+                                style={{
+                                  fontSize: "15px",
+                                  fontWeight: 700,
+                                  color: "#1f2937",
+                                  marginBottom: "16px",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: "4px",
+                                    height: "18px",
+                                    background:
+                                      "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                                    borderRadius: "2px",
+                                  }}
+                                />
+                                Prospect Fields
+                              </h5>
+                              <div
+                                style={{
+                                  background: "#f9fafb",
+                                  border: "1px solid #e5e7eb",
+                                  borderRadius: "12px",
+                                  padding: "20px",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "1fr 1fr",
+                                    gap: "16px 24px",
+                                  }}
+                                >
+                                  {Object.entries(viewingLead.crm_data.data)
+                                    .filter(
+                                      ([key]) =>
+                                        key.toLowerCase() !== "name" &&
+                                        key.toLowerCase() !== "phone",
+                                    )
+                                    .map(([key, value]: [string, any]) => (
+                                      <div key={key}>
+                                        <div
+                                          style={{
+                                            fontSize: "12px",
+                                            fontWeight: 700,
+                                            color: "#6b7280",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.5px",
+                                            marginBottom: "6px",
+                                          }}
+                                        >
+                                          {key}
+                                        </div>
+                                        <div
+                                          style={{
+                                            fontSize: "14px",
+                                            color: "#1f2937",
+                                            fontWeight: 500,
+                                            wordBreak: "break-word",
+                                          }}
+                                        >
+                                          {String(value || "N/A")}
+                                        </div>
+                                      </div>
+                                    ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>
 
-                  {/* Prospect Fields Section */}
-                  {viewingLead.crm_data?.data && typeof viewingLead.crm_data.data === "object" && Object.keys(viewingLead.crm_data.data).length > 0 && (
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5 style={{
-                        fontSize: "15px",
-                        fontWeight: 700,
-                        color: "#1f2937",
-                        marginBottom: "16px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}>
-                        <div style={{
-                          width: "4px",
-                          height: "18px",
-                          background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                          borderRadius: "2px",
-                        }} />
-                        Prospect Fields
-                      </h5>
-                      <div style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        padding: "20px",
-                      }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
-                          {Object.entries(viewingLead.crm_data.data)
-                            .filter(([key]) => key.toLowerCase() !== "name" && key.toLowerCase() !== "phone")
-                            .map(([key, value]: [string, any]) => (
-                              <div key={key}>
-                                <div style={{
-                                  fontSize: "12px",
-                                  fontWeight: 700,
-                                  color: "#6b7280",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.5px",
-                                  marginBottom: "6px",
-                                }}>
-                                  {key}
-                                </div>
-                                <div style={{
-                                  fontSize: "14px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                  wordBreak: "break-word",
-                                }}>
-                                  {String(value || "N/A")}
-                                </div>
-                              </div>
-                            ))}
+                  {/* Right Panel - Quick Actions & Timeline */}
+                  <div
+                    style={{
+                      padding: "32px 24px",
+                      background: "#fafbfc",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "24px",
+                    }}
+                  >
+                    {/* Quick Actions */}
+                    <div>
+                      <h6
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          color: "#6b7280",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          marginBottom: "14px",
+                        }}
+                      >
+                        Quick Actions
+                      </h6>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "10px",
+                        }}
+                      >
+                        {session?.user?.permissions?.includes(
+                          "edit-crm-leads",
+                        ) && (
+                          <button
+                            style={{
+                              background: "white",
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "10px",
+                              padding: "12px 16px",
+                              cursor:
+                                activeFilter === "lost"
+                                  ? "not-allowed"
+                                  : "pointer",
+                              opacity: activeFilter === "lost" ? 0.6 : 1,
+                              transition: "all 0.2s ease",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "12px",
+                              fontSize: "14px",
+                              fontWeight: 500,
+                              color: "#1f2937",
+                            }}
+                            onClick={() => {
+                              if (activeFilter === "lost") return;
+                              setShowLeadViewModal(false);
+                              setEditLeadIdForSidebar(viewingLead.id);
+                              setShowCreateLeadModal(true);
+                            }}
+                            disabled={activeFilter === "lost"}
+                            onMouseOver={(e) => {
+                              if (activeFilter === "lost") return;
+                              e.currentTarget.style.borderColor = "#2563eb";
+                              e.currentTarget.style.background = "#eff6ff";
+                              e.currentTarget.style.transform =
+                                "translateX(4px)";
+                            }}
+                            onMouseOut={(e) => {
+                              if (activeFilter === "lost") return;
+                              e.currentTarget.style.borderColor = "#e5e7eb";
+                              e.currentTarget.style.background = "white";
+                              e.currentTarget.style.transform = "translateX(0)";
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "32px",
+                                height: "32px",
+                                borderRadius: "8px",
+                                background: "#2563eb",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Edit size={16} style={{ color: "white" }} />
+                            </div>
+                            Edit Lead
+                          </button>
+                        )}
+
+                        {session?.user?.permissions?.includes(
+                          "add-crm-deals",
+                        ) && (
+                          <button
+                            disabled={activeFilter === "lost"}
+                            style={{
+                              background: "white",
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "10px",
+                              padding: "12px 16px",
+                              cursor:
+                                activeFilter === "lost"
+                                  ? "not-allowed"
+                                  : "pointer",
+                              transition: "all 0.2s ease",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "12px",
+                              fontSize: "14px",
+                              fontWeight: 500,
+                              color: "#1f2937",
+                              opacity: activeFilter === "lost" ? 0.6 : 1,
+                            }}
+                            onClick={() => {
+                              if (activeFilter !== "lost") {
+                                setShowLeadViewModal(false);
+                                handleConvertLead(viewingLead);
+                              }
+                            }}
+                            onMouseOver={(e) => {
+                              if (activeFilter !== "lost") {
+                                e.currentTarget.style.borderColor = "#10b981";
+                                e.currentTarget.style.background = "#f0fdf4";
+                                e.currentTarget.style.transform =
+                                  "translateX(4px)";
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.borderColor = "#e5e7eb";
+                              e.currentTarget.style.background = "white";
+                              e.currentTarget.style.transform = "translateX(0)";
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "32px",
+                                height: "32px",
+                                borderRadius: "8px",
+                                background: "#10b981",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Handshake size={16} style={{ color: "white" }} />
+                            </div>
+                            Convert to Deal
+                          </button>
+                        )}
+
+                        <button
+                          style={{
+                            background: "white",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "10px",
+                            padding: "12px 16px",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            color: "#1f2937",
+                          }}
+                          onClick={() => setShowLeadHistoryModal(true)}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.borderColor = "#2563eb";
+                            e.currentTarget.style.background = "#eff6ff";
+                            e.currentTarget.style.transform = "translateX(4px)";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.borderColor = "#e5e7eb";
+                            e.currentTarget.style.background = "white";
+                            e.currentTarget.style.transform = "translateX(0)";
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              borderRadius: "8px",
+                              background:
+                                "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <History size={16} style={{ color: "white" }} />
+                          </div>
+                          View History
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Status Overview */}
+                    <div>
+                      <h6
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          color: "#6b7280",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          marginBottom: "14px",
+                        }}
+                      >
+                        Status Overview
+                      </h6>
+                      <div
+                        style={{
+                          background: "white",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "10px",
+                          padding: "16px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "14px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: "#6b7280",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Stage
+                            </span>
+                            <Badge
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                padding: "4px 10px",
+                                borderRadius: "6px",
+                                backgroundColor:
+                                  viewingLead.stage?.color || "#6c757d",
+                              }}
+                            >
+                              {viewingLead.stage?.name || "N/A"}
+                            </Badge>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: "#6b7280",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Lead Score
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {viewingLead?.lead_score !== null
+                                ? `${viewingLead?.lead_score}%`
+                                : "N/A"}
+                            </span>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: "#6b7280",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Follow-ups
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {viewingLead.follow_ups?.length || 0}
+                            </span>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: "#6b7280",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Meetings
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {viewingLead.meetings?.length || 0}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
 
-            {/* Right Panel - Quick Actions & Timeline */}
-            <div style={{ 
-              padding: "32px 24px", 
-              background: "#fafbfc",
-              display: "flex",
-              flexDirection: "column",
-              gap: "24px",
-            }}>
-              
-              {/* Quick Actions */}
-              <div>
-                <h6 style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#6b7280",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                  marginBottom: "14px",
-                }}>
-                  Quick Actions
-                </h6>
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {session?.user?.permissions?.includes("edit-crm-leads") && (
-                    <button
-                      style={{
-                        background: "white",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "10px",
-                        padding: "12px 16px",
-                        cursor: activeFilter === "lost" ? "not-allowed" : "pointer",
-                        opacity: activeFilter === "lost" ? 0.6 : 1,
-                        transition: "all 0.2s ease",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        fontSize: "14px",
-                        fontWeight: 500,
-                        color: "#1f2937",
-                      }}
-                      onClick={() => {
-                        if (activeFilter === "lost") return;
-                        setShowLeadViewModal(false);
-                        setEditLeadIdForSidebar(viewingLead.id);
-                        setShowCreateLeadModal(true);
-                      }}
-                      disabled={activeFilter === "lost"}
-                      onMouseOver={(e) => {
-                        if (activeFilter === "lost") return;
-                        e.currentTarget.style.borderColor = "#2563eb";
-                        e.currentTarget.style.background = "#eff6ff";
-                        e.currentTarget.style.transform = "translateX(4px)";
-                      }}
-                      onMouseOut={(e) => {
-                        if (activeFilter === "lost") return;
-                        e.currentTarget.style.borderColor = "#e5e7eb";
-                        e.currentTarget.style.background = "white";
-                        e.currentTarget.style.transform = "translateX(0)";
-                      }}
-                    >
-                      <div style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "8px",
-                        background: "#2563eb",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}>
-                        <Edit size={16} style={{ color: "white" }} />
-                      </div>
-                      Edit Lead
-                    </button>
-                  )}
-                  
-                  {session?.user?.permissions?.includes("add-crm-deals") && (
-                    <button
-                      disabled={activeFilter === "lost"}
-                      style={{
-                        background: "white",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "10px",
-                        padding: "12px 16px",
-                        cursor: activeFilter === "lost" ? "not-allowed" : "pointer",
-                        transition: "all 0.2s ease",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        fontSize: "14px",
-                        fontWeight: 500,
-                        color: "#1f2937",
-                        opacity: activeFilter === "lost" ? 0.6 : 1,
-                      }}
-                      onClick={() => {
-                        if (activeFilter !== "lost") {
-                          setShowLeadViewModal(false);
-                          handleConvertLead(viewingLead);
-                        }
-                      }}
-                      onMouseOver={(e) => {
-                        if (activeFilter !== "lost") {
-                          e.currentTarget.style.borderColor = "#10b981";
-                          e.currentTarget.style.background = "#f0fdf4";
-                          e.currentTarget.style.transform = "translateX(4px)";
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.borderColor = "#e5e7eb";
-                        e.currentTarget.style.background = "white";
-                        e.currentTarget.style.transform = "translateX(0)";
-                      }}
-                    >
-                      <div style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "8px",
-                        background: "#10b981",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}>
-                        <Handshake size={16} style={{ color: "white" }} />
-                      </div>
-                      Convert to Deal
-                    </button>
-                  )}
-
-                  <button
-                    style={{
-                      background: "white",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "10px",
-                      padding: "12px 16px",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      fontSize: "14px",
-                      fontWeight: 500,
-                      color: "#1f2937",
-                    }}
-                    onClick={() => setShowLeadHistoryModal(true)}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.borderColor = "#2563eb";
-                      e.currentTarget.style.background = "#eff6ff";
-                      e.currentTarget.style.transform = "translateX(4px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.borderColor = "#e5e7eb";
-                      e.currentTarget.style.background = "white";
-                      e.currentTarget.style.transform = "translateX(0)";
-                    }}
-                  >
-                    <div style={{
-                      width: "32px",
-                      height: "32px",
-                      borderRadius: "8px",
-                      background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}>
-                      <History size={16} style={{ color: "white" }} />
-                    </div>
-                    View History
-                  </button>
-                </div>
-              </div>
-
-              {/* Status Overview */}
-              <div>
-                <h6 style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#6b7280",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                  marginBottom: "14px",
-                }}>
-                  Status Overview
-                </h6>
-                <div style={{
-                  background: "white",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "10px",
-                  padding: "16px",
-                }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
-                        Stage
-                      </span>
-                      <Badge 
+                    {/* Follow-ups Timeline */}
+                    <div style={{ flex: 1 }}>
+                      <div
                         style={{
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          padding: "4px 10px",
-                          borderRadius: "6px",
-                          backgroundColor: viewingLead.stage?.color || "#6c757d",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: "14px",
                         }}
                       >
-                        {viewingLead.stage?.name || "N/A"}
-                      </Badge>
-                    </div>
-                    
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
-                        Lead Score
-                      </span>
-                      <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
-                        {viewingLead?.lead_score !== null ? `${viewingLead?.lead_score}%` : "N/A"}
-                      </span>
+                        <h6
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.5px",
+                            margin: 0,
+                          }}
+                        >
+                          Recent Follow-ups
+                        </h6>
+                        {session?.user?.permissions?.includes(
+                          "add-follow-up-crm-leads",
+                        ) && (
+                          <button
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "#2563eb",
+                              cursor: "pointer",
+                              padding: "4px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: "6px",
+                              transition: "all 0.2s ease",
+                            }}
+                            onClick={() => {
+                              setFollowupData({
+                                leadId: viewingLead.id,
+                                leadName: viewingLead.name,
+                                followUpDate: "",
+                                followUpStatus: "Pending",
+                                communicationChannel: "Phone Call",
+                                communicationChannelOther: "",
+                                notes: "",
+                                userExtension:
+                                  (session?.user as any)?.extension || "admin",
+                              });
+                              setShowAddFollowupModal(true);
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = "#eff6ff";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = "transparent";
+                            }}
+                            title="Add Follow-up"
+                          >
+                            <Plus size={16} />
+                          </button>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          background: "white",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "10px",
+                          padding: "16px",
+                          maxHeight: "300px",
+                          overflowY: "auto",
+                        }}
+                      >
+                        {viewingLead.follow_ups &&
+                        viewingLead.follow_ups.length > 0 ? (
+                          <div style={{ position: "relative" }}>
+                            {/* Timeline line */}
+                            <div
+                              style={{
+                                position: "absolute",
+                                left: "7px",
+                                top: "8px",
+                                bottom: "8px",
+                                width: "2px",
+                                background: "#e5e7eb",
+                              }}
+                            />
+
+                            {viewingLead.follow_ups
+                              .slice(0, 5)
+                              .map((followUp: any, index: number) => {
+                                const isCompleted =
+                                  followUp.follow_up_status === "Completed";
+                                return (
+                                  <div
+                                    key={followUp.id || index}
+                                    style={{
+                                      position: "relative",
+                                      paddingLeft: "28px",
+                                      paddingBottom:
+                                        index <
+                                        Math.min(
+                                          viewingLead.follow_ups.length,
+                                          5,
+                                        ) -
+                                          1
+                                          ? "16px"
+                                          : "0",
+                                    }}
+                                  >
+                                    {/* Timeline dot */}
+                                    <div
+                                      style={{
+                                        position: "absolute",
+                                        left: "0",
+                                        top: "4px",
+                                        width: "16px",
+                                        height: "16px",
+                                        borderRadius: "50%",
+                                        background: isCompleted
+                                          ? "#10b981"
+                                          : "#2563eb",
+                                        border: "3px solid white",
+                                        boxShadow: "0 0 0 1px #e5e7eb",
+                                      }}
+                                    />
+
+                                    <div>
+                                      <div
+                                        style={{
+                                          fontSize: "12px",
+                                          color: "#1f2937",
+                                          fontWeight: 600,
+                                          marginBottom: "4px",
+                                        }}
+                                      >
+                                        {followUp.communication_channel ===
+                                        "Other"
+                                          ? followUp.communication_channel_other
+                                          : followUp.communication_channel}
+                                      </div>
+                                      <div
+                                        style={{
+                                          fontSize: "11px",
+                                          color: "#6b7280",
+                                          marginBottom: "4px",
+                                        }}
+                                      >
+                                        {followUp.follow_up_date
+                                          ? moment(
+                                              followUp.follow_up_date,
+                                            ).format("MMM DD, YYYY")
+                                          : "N/A"}
+                                      </div>
+                                      <Badge
+                                        bg={
+                                          followUp.follow_up_status ===
+                                          "Completed"
+                                            ? "success"
+                                            : followUp.follow_up_status ===
+                                                "In Progress"
+                                              ? "primary"
+                                              : "warning"
+                                        }
+                                        style={{
+                                          fontSize: "10px",
+                                          padding: "2px 8px",
+                                        }}
+                                      >
+                                        {followUp.follow_up_status}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                            {viewingLead.follow_ups.length > 5 && (
+                              <div
+                                style={{
+                                  textAlign: "center",
+                                  marginTop: "12px",
+                                  paddingTop: "12px",
+                                  borderTop: "1px solid #f3f4f6",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#2563eb",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  +{viewingLead.follow_ups.length - 5} more
+                                  follow-ups
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              textAlign: "center",
+                              padding: "20px",
+                              color: "#9ca3af",
+                            }}
+                          >
+                            <History
+                              size={32}
+                              style={{ marginBottom: "8px", opacity: 0.5 }}
+                            />
+                            <div style={{ fontSize: "13px" }}>
+                              No follow-ups yet
+                            </div>
+                            {session?.user?.permissions?.includes(
+                              "add-follow-up-crm-leads",
+                            ) && (
+                              <button
+                                style={{
+                                  marginTop: "12px",
+                                  padding: "8px 16px",
+                                  background: "#2563eb",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "6px",
+                                  fontSize: "12px",
+                                  fontWeight: 500,
+                                  cursor: "pointer",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  transition: "all 0.2s ease",
+                                }}
+                                onClick={() => {
+                                  setFollowupData({
+                                    leadId: viewingLead.id,
+                                    leadName: viewingLead.name,
+                                    followUpDate: "",
+                                    followUpStatus: "Pending",
+                                    communicationChannel: "Phone Call",
+                                    communicationChannelOther: "",
+                                    notes: "",
+                                    userExtension:
+                                      (session?.user as any)?.extension ||
+                                      "admin",
+                                  });
+                                  setShowAddFollowupModal(true);
+                                }}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.background = "#1d4ed8";
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.background = "#2563eb";
+                                }}
+                              >
+                                <Plus size={14} />
+                                Add Follow-up
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
-                        Follow-ups
-                      </span>
-                      <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
-                        {viewingLead.follow_ups?.length || 0}
-                      </span>
-                    </div>
+                    {/* Meetings Timeline */}
+                    <div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: "14px",
+                        }}
+                      >
+                        <h6
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.5px",
+                            margin: 0,
+                          }}
+                        >
+                          Recent Meetings
+                        </h6>
+                        {session?.user?.permissions?.includes(
+                          "add-meeting-crm-leads",
+                        ) && (
+                          <button
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "#2563eb",
+                              cursor: "pointer",
+                              padding: "4px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: "6px",
+                              transition: "all 0.2s ease",
+                            }}
+                            onClick={() => {
+                              setMeetingData({
+                                leadId: viewingLead.id,
+                                leadName: viewingLead.name,
+                                meetingName: "",
+                                meetingType: "Online",
+                                meetingDate: "",
+                                meetingTime: "",
+                                meetingOutcome: "Scheduled",
+                                extensions: [],
+                              });
+                              setMeetingAttendees([]);
+                              setShowAddMeetingModal(true);
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = "#eff6ff";
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = "transparent";
+                            }}
+                            title="Schedule Meeting"
+                          >
+                            <Plus size={16} />
+                          </button>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          background: "white",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "10px",
+                          padding: "16px",
+                          maxHeight: "300px",
+                          overflowY: "auto",
+                        }}
+                      >
+                        {viewingLead.meetings &&
+                        viewingLead.meetings.length > 0 ? (
+                          <div style={{ position: "relative" }}>
+                            {/* Timeline line */}
+                            <div
+                              style={{
+                                position: "absolute",
+                                left: "7px",
+                                top: "8px",
+                                bottom: "8px",
+                                width: "2px",
+                                background: "#e5e7eb",
+                              }}
+                            />
 
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
-                        Meetings
-                      </span>
-                      <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
-                        {viewingLead.meetings?.length || 0}
-                      </span>
+                            {viewingLead.meetings
+                              .slice(0, 5)
+                              .map((meeting: any, index: number) => {
+                                const isCompleted =
+                                  meeting.meeting_outcome ===
+                                  "Completed - Successful";
+                                const isCancelled =
+                                  meeting.meeting_outcome === "Cancelled";
+                                return (
+                                  <div
+                                    key={meeting.id || index}
+                                    style={{
+                                      position: "relative",
+                                      paddingLeft: "28px",
+                                      paddingBottom:
+                                        index <
+                                        Math.min(
+                                          viewingLead.meetings.length,
+                                          5,
+                                        ) -
+                                          1
+                                          ? "16px"
+                                          : "0",
+                                    }}
+                                  >
+                                    {/* Timeline dot */}
+                                    <div
+                                      style={{
+                                        position: "absolute",
+                                        left: "0",
+                                        top: "4px",
+                                        width: "16px",
+                                        height: "16px",
+                                        borderRadius: "50%",
+                                        background: isCompleted
+                                          ? "#10b981"
+                                          : isCancelled
+                                            ? "#dc3545"
+                                            : "#2563eb",
+                                        border: "3px solid white",
+                                        boxShadow: "0 0 0 1px #e5e7eb",
+                                      }}
+                                    />
+
+                                    <div>
+                                      <div
+                                        style={{
+                                          fontSize: "12px",
+                                          color: "#1f2937",
+                                          fontWeight: 600,
+                                          marginBottom: "4px",
+                                        }}
+                                      >
+                                        {meeting.name}
+                                      </div>
+                                      <div
+                                        style={{
+                                          fontSize: "11px",
+                                          color: "#6b7280",
+                                          marginBottom: "4px",
+                                        }}
+                                      >
+                                        {meeting.meeting_date
+                                          ? moment(meeting.meeting_date).format(
+                                              "MMM DD, YYYY",
+                                            )
+                                          : "N/A"}
+                                      </div>
+                                      {meeting.meeting_outcome && (
+                                        <Badge
+                                          bg={
+                                            meeting.meeting_outcome ===
+                                            "Completed - Successful"
+                                              ? "success"
+                                              : meeting.meeting_outcome ===
+                                                  "Completed - Needs Follow-up"
+                                                ? "info"
+                                                : meeting.meeting_outcome ===
+                                                    "Cancelled"
+                                                  ? "danger"
+                                                  : meeting.meeting_outcome ===
+                                                      "Rescheduled"
+                                                    ? "warning"
+                                                    : "secondary"
+                                          }
+                                          style={{
+                                            fontSize: "10px",
+                                            padding: "2px 8px",
+                                          }}
+                                        >
+                                          {meeting.meeting_outcome}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                            {viewingLead.meetings.length > 5 && (
+                              <div
+                                style={{
+                                  textAlign: "center",
+                                  marginTop: "12px",
+                                  paddingTop: "12px",
+                                  borderTop: "1px solid #f3f4f6",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#2563eb",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  +{viewingLead.meetings.length - 5} more
+                                  meetings
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              textAlign: "center",
+                              padding: "20px",
+                              color: "#9ca3af",
+                            }}
+                          >
+                            <Users
+                              size={32}
+                              style={{ marginBottom: "8px", opacity: 0.5 }}
+                            />
+                            <div style={{ fontSize: "13px" }}>
+                              No meetings yet
+                            </div>
+                            {session?.user?.permissions?.includes(
+                              "add-meeting-crm-leads",
+                            ) && (
+                              <button
+                                style={{
+                                  marginTop: "12px",
+                                  padding: "8px 16px",
+                                  background: "#2563eb",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "6px",
+                                  fontSize: "12px",
+                                  fontWeight: 500,
+                                  cursor: "pointer",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  transition: "all 0.2s ease",
+                                }}
+                                onClick={() => {
+                                  setMeetingData({
+                                    leadId: viewingLead.id,
+                                    leadName: viewingLead.name,
+                                    meetingName: "",
+                                    meetingType: "Online",
+                                    meetingDate: "",
+                                    meetingTime: "",
+                                    meetingOutcome: "Scheduled",
+                                    extensions: [],
+                                  });
+                                  setMeetingAttendees([]);
+                                  setShowAddMeetingModal(true);
+                                }}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.background = "#1d4ed8";
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.background = "#2563eb";
+                                }}
+                              >
+                                <Plus size={14} />
+                                Schedule Meeting
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              </>
+            )}
+          </Modal.Body>
 
-              {/* Follow-ups Timeline */}
-              <div style={{ flex: 1 }}>
-                <div style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "14px",
-                }}>
-                  <h6 style={{
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    color: "#6b7280",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    margin: 0,
-                  }}>
-                    Recent Follow-ups
-                  </h6>
-                  {session?.user?.permissions?.includes("add-follow-up-crm-leads") && (
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "#2563eb",
-                        cursor: "pointer",
-                        padding: "4px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderRadius: "6px",
-                        transition: "all 0.2s ease",
-                      }}
-                      onClick={() => {
-                        setFollowupData({
-                          leadId: viewingLead.id,
-                          leadName: viewingLead.name,
-                          followUpDate: "",
-                          followUpStatus: "Pending",
-                          communicationChannel: "Phone Call",
-                          communicationChannelOther: "",
-                          notes: "",
-                          userExtension: (session?.user as any)?.extension || "admin",
-                        });
-                        setShowAddFollowupModal(true);
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#eff6ff";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "transparent";
-                      }}
-                      title="Add Follow-up"
-                    >
-                      <Plus size={16} />
-                    </button>
-                  )}
-                </div>
-                <div style={{
-                  background: "white",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "10px",
-                  padding: "16px",
-                  maxHeight: "300px",
-                  overflowY: "auto",
-                }}>
-                  {viewingLead.follow_ups && viewingLead.follow_ups.length > 0 ? (
-                    <div style={{ position: "relative" }}>
-                      {/* Timeline line */}
-                      <div style={{
-                        position: "absolute",
-                        left: "7px",
-                        top: "8px",
-                        bottom: "8px",
-                        width: "2px",
-                        background: "#e5e7eb",
-                      }} />
-                      
-                      {viewingLead.follow_ups.slice(0, 5).map((followUp: any, index: number) => {
-                        const isCompleted = followUp.follow_up_status === "Completed";
-                        return (
-                          <div 
-                            key={followUp.id || index}
-                            style={{ 
-                              position: "relative",
-                              paddingLeft: "28px",
-                              paddingBottom: index < Math.min(viewingLead.follow_ups.length, 5) - 1 ? "16px" : "0",
-                            }}
-                          >
-                            {/* Timeline dot */}
-                            <div style={{
-                              position: "absolute",
-                              left: "0",
-                              top: "4px",
-                              width: "16px",
-                              height: "16px",
-                              borderRadius: "50%",
-                              background: isCompleted ? "#10b981" : "#2563eb",
-                              border: "3px solid white",
-                              boxShadow: "0 0 0 1px #e5e7eb",
-                            }} />
-                            
-                            <div>
-                              <div style={{ fontSize: "12px", color: "#1f2937", fontWeight: 600, marginBottom: "4px" }}>
-                                {followUp.communication_channel === "Other" ? followUp.communication_channel_other : followUp.communication_channel}
-                              </div>
-                              <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}>
-                                {followUp.follow_up_date ? moment(followUp.follow_up_date).format("MMM DD, YYYY") : "N/A"}
-                              </div>
-                              <Badge
-                                bg={
-                                  followUp.follow_up_status === "Completed"
-                                    ? "success"
-                                    : followUp.follow_up_status === "In Progress"
-                                    ? "primary"
-                                    : "warning"
-                                }
-                                style={{ fontSize: "10px", padding: "2px 8px" }}
-                              >
-                                {followUp.follow_up_status}
-                              </Badge>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      
-                      {viewingLead.follow_ups.length > 5 && (
-                        <div style={{
-                          textAlign: "center",
-                          marginTop: "12px",
-                          paddingTop: "12px",
-                          borderTop: "1px solid #f3f4f6",
-                        }}>
-                          <span style={{ fontSize: "12px", color: "#2563eb", fontWeight: 600 }}>
-                            +{viewingLead.follow_ups.length - 5} more follow-ups
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{
-                      textAlign: "center",
-                      padding: "20px",
-                      color: "#9ca3af",
-                    }}>
-                      <History size={32} style={{ marginBottom: "8px", opacity: 0.5 }} />
-                      <div style={{ fontSize: "13px" }}>No follow-ups yet</div>
-                      {session?.user?.permissions?.includes("add-follow-up-crm-leads") && (
-                        <button
-                          style={{
-                            marginTop: "12px",
-                            padding: "8px 16px",
-                            background: "#2563eb",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "6px",
-                            fontSize: "12px",
-                            fontWeight: 500,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "6px",
-                            transition: "all 0.2s ease",
-                          }}
-                          onClick={() => {
-                            setFollowupData({
-                              leadId: viewingLead.id,
-                              leadName: viewingLead.name,
-                              followUpDate: "",
-                              followUpStatus: "Pending",
-                              communicationChannel: "Phone Call",
-                              communicationChannelOther: "",
-                              notes: "",
-                              userExtension: (session?.user as any)?.extension || "admin",
-                            });
-                            setShowAddFollowupModal(true);
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#1d4ed8";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#2563eb";
-                          }}
-                        >
-                          <Plus size={14} />
-                          Add Follow-up
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Meetings Timeline */}
-              <div>
-                <div style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "14px",
-                }}>
-                  <h6 style={{
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    color: "#6b7280",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    margin: 0,
-                  }}>
-                    Recent Meetings
-                  </h6>
-                  {session?.user?.permissions?.includes("add-meeting-crm-leads") && (
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "#2563eb",
-                        cursor: "pointer",
-                        padding: "4px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderRadius: "6px",
-                        transition: "all 0.2s ease",
-                      }}
-                      onClick={() => {
-                        setMeetingData({
-                          leadId: viewingLead.id,
-                          leadName: viewingLead.name,
-                          meetingName: "",
-                          meetingType: "Online",
-                          meetingDate: "",
-                          meetingTime: "",
-                          meetingOutcome: "Scheduled",
-                          extensions: [],
-                        });
-                        setMeetingAttendees([]);
-                        setShowAddMeetingModal(true);
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = "#eff6ff";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "transparent";
-                      }}
-                      title="Schedule Meeting"
-                    >
-                      <Plus size={16} />
-                    </button>
-                  )}
-                </div>
-                <div style={{
-                  background: "white",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "10px",
-                  padding: "16px",
-                  maxHeight: "300px",
-                  overflowY: "auto",
-                }}>
-                  {viewingLead.meetings && viewingLead.meetings.length > 0 ? (
-                    <div style={{ position: "relative" }}>
-                      {/* Timeline line */}
-                      <div style={{
-                        position: "absolute",
-                        left: "7px",
-                        top: "8px",
-                        bottom: "8px",
-                        width: "2px",
-                        background: "#e5e7eb",
-                      }} />
-                      
-                      {viewingLead.meetings.slice(0, 5).map((meeting: any, index: number) => {
-                        const isCompleted = meeting.meeting_outcome === "Completed - Successful";
-                        const isCancelled = meeting.meeting_outcome === "Cancelled";
-                        return (
-                          <div 
-                            key={meeting.id || index}
-                            style={{ 
-                              position: "relative",
-                              paddingLeft: "28px",
-                              paddingBottom: index < Math.min(viewingLead.meetings.length, 5) - 1 ? "16px" : "0",
-                            }}
-                          >
-                            {/* Timeline dot */}
-                            <div style={{
-                              position: "absolute",
-                              left: "0",
-                              top: "4px",
-                              width: "16px",
-                              height: "16px",
-                              borderRadius: "50%",
-                              background: isCompleted ? "#10b981" : isCancelled ? "#dc3545" : "#2563eb",
-                              border: "3px solid white",
-                              boxShadow: "0 0 0 1px #e5e7eb",
-                            }} />
-                            
-                            <div>
-                              <div style={{ fontSize: "12px", color: "#1f2937", fontWeight: 600, marginBottom: "4px" }}>
-                                {meeting.name}
-                              </div>
-                              <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}>
-                                {meeting.meeting_date ? moment(meeting.meeting_date).format("MMM DD, YYYY") : "N/A"}
-                              </div>
-                              {meeting.meeting_outcome && (
-                                <Badge
-                                  bg={
-                                    meeting.meeting_outcome === "Completed - Successful"
-                                      ? "success"
-                                      : meeting.meeting_outcome === "Completed - Needs Follow-up"
-                                      ? "info"
-                                      : meeting.meeting_outcome === "Cancelled"
-                                      ? "danger"
-                                      : meeting.meeting_outcome === "Rescheduled"
-                                      ? "warning"
-                                      : "secondary"
-                                  }
-                                  style={{ fontSize: "10px", padding: "2px 8px" }}
-                                >
-                                  {meeting.meeting_outcome}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      
-                      {viewingLead.meetings.length > 5 && (
-                        <div style={{
-                          textAlign: "center",
-                          marginTop: "12px",
-                          paddingTop: "12px",
-                          borderTop: "1px solid #f3f4f6",
-                        }}>
-                          <span style={{ fontSize: "12px", color: "#2563eb", fontWeight: 600 }}>
-                            +{viewingLead.meetings.length - 5} more meetings
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{
-                      textAlign: "center",
-                      padding: "20px",
-                      color: "#9ca3af",
-                    }}>
-                      <Users size={32} style={{ marginBottom: "8px", opacity: 0.5 }} />
-                      <div style={{ fontSize: "13px" }}>No meetings yet</div>
-                      {session?.user?.permissions?.includes("add-meeting-crm-leads") && (
-                        <button
-                          style={{
-                            marginTop: "12px",
-                            padding: "8px 16px",
-                            background: "#2563eb",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "6px",
-                            fontSize: "12px",
-                            fontWeight: 500,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "6px",
-                            transition: "all 0.2s ease",
-                          }}
-                          onClick={() => {
-                            setMeetingData({
-                              leadId: viewingLead.id,
-                              leadName: viewingLead.name,
-                              meetingName: "",
-                              meetingType: "Online",
-                              meetingDate: "",
-                              meetingTime: "",
-                              meetingOutcome: "Scheduled",
-                              extensions: [],
-                            });
-                            setMeetingAttendees([]);
-                            setShowAddMeetingModal(true);
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = "#1d4ed8";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "#2563eb";
-                          }}
-                        >
-                          <Plus size={14} />
-                          Schedule Meeting
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+          {/* Footer */}
+          <div
+            style={{
+              padding: "20px 32px",
+              borderTop: "1px solid #e5e7eb",
+              background: "white",
+              borderBottomLeftRadius: "12px",
+              borderBottomRightRadius: "12px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <div style={{ fontSize: "13px", color: "#6b7280" }}>
+              Lead ID: <strong>#{viewingLead.id}</strong>
             </div>
+            <Button
+              variant="outline-secondary"
+              onClick={() => setShowLeadViewModal(false)}
+              style={{
+                padding: "10px 24px",
+                borderRadius: "8px",
+                fontWeight: 600,
+                fontSize: "14px",
+                border: "2px solid #e5e7eb",
+                transition: "all 0.2s ease",
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.borderColor = "#2563eb";
+                e.currentTarget.style.color = "#2563eb";
+                e.currentTarget.style.background = "#eff6ff";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.borderColor = "#e5e7eb";
+                e.currentTarget.style.color = "#6c757d";
+                e.currentTarget.style.background = "white";
+              }}
+            >
+              Close
+            </Button>
           </div>
-        </>
+        </Modal>
       )}
-    </Modal.Body>
-
-    {/* Footer */}
-    <div style={{
-      padding: "20px 32px",
-      borderTop: "1px solid #e5e7eb",
-      background: "white",
-      borderBottomLeftRadius: "12px",
-      borderBottomRightRadius: "12px",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-    }}>
-      <div style={{ fontSize: "13px", color: "#6b7280" }}>
-        Lead ID: <strong>#{viewingLead.id}</strong>
-      </div>
-      <Button
-        variant="outline-secondary"
-        onClick={() => setShowLeadViewModal(false)}
-        style={{
-          padding: "10px 24px",
-          borderRadius: "8px",
-          fontWeight: 600,
-          fontSize: "14px",
-          border: "2px solid #e5e7eb",
-          transition: "all 0.2s ease",
-        }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.borderColor = "#2563eb";
-          e.currentTarget.style.color = "#2563eb";
-          e.currentTarget.style.background = "#eff6ff";
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.borderColor = "#e5e7eb";
-          e.currentTarget.style.color = "#6c757d";
-          e.currentTarget.style.background = "white";
-        }}
-      >
-        Close
-      </Button>
-    </div>
-  </Modal>
-)}
-
 
       {/* Lead History Modal */}
       {viewingLead && (
@@ -6231,8 +7240,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                         viewingLead.is_lost
                           ? "danger"
                           : viewingLead.status === "new"
-                          ? "primary"
-                          : "success"
+                            ? "primary"
+                            : "success"
                       }
                       style={{ fontSize: "13px", padding: "6px 12px" }}
                     >
@@ -6255,12 +7264,12 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                       {extensions.find(
                         (ext: any) =>
                           ext?.id == viewingLead?.user_extension ||
-                          ext?.extension == viewingLead?.user_extension
+                          ext?.extension == viewingLead?.user_extension,
                       )?.display_name ||
                         extensions.find(
                           (ext: any) =>
                             ext?.id == viewingLead?.user_extension ||
-                            ext?.extension == viewingLead?.user_extension
+                            ext?.extension == viewingLead?.user_extension,
                         )?.name ||
                         viewingLead.user_extension ||
                         "Not assigned"}
@@ -6313,7 +7322,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                           (k) =>
                             k.includes("value") ||
                             k.includes("amount") ||
-                            k.includes("price")
+                            k.includes("price"),
                         )
                       ) {
                         return {
@@ -6327,7 +7336,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                           (k) =>
                             k.includes("assigned") ||
                             k.includes("owner") ||
-                            k.includes("user_extension")
+                            k.includes("user_extension"),
                         )
                       ) {
                         return {
@@ -6346,18 +7355,18 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
 
                   const { category, icon, color } = getCategoryAndIcon(
                     audit.event,
-                    audit.changes
+                    audit.changes,
                   );
                   const performedBy =
                     extensions.find(
                       (ext: any) =>
                         ext?.id == audit?.user_extension ||
-                        ext?.extension == audit?.user_extension
+                        ext?.extension == audit?.user_extension,
                     )?.display_name ||
                     extensions.find(
                       (ext: any) =>
                         ext?.id == audit?.user_extension ||
-                        ext?.extension == audit?.user_extension
+                        ext?.extension == audit?.user_extension,
                     )?.name ||
                     audit.user_extension ||
                     "System";
@@ -6370,16 +7379,16 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                   if (audit.changes && Object.keys(audit.changes).length > 0) {
                     Object.entries(audit.changes).forEach(
                       ([key, change]: [string, any]) => {
-                        if(ignoredKeys.includes(key)) return;
+                        if (ignoredKeys.includes(key)) return;
                         if (
                           change.old !== undefined &&
-                          change.new !== undefined 
+                          change.new !== undefined
                         ) {
                           metadata[key] = `${change.old} → ${change.new}`;
                         } else if (change.new !== undefined) {
                           metadata[key] = change.new;
                         }
-                      }
+                      },
                     );
                   }
 
@@ -6483,8 +7492,8 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                                     {audit.event === "created"
                                       ? "Created"
                                       : audit.event === "updated"
-                                      ? "Updated"
-                                      : audit.event}
+                                        ? "Updated"
+                                        : audit.event}
                                   </span>
                                   <div
                                     style={{
@@ -7094,7 +8103,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                           extension.display_name ||
                           extension.name ||
                           extension.id,
-                      })
+                      }),
                     )}
                     placeholder="Select attendees for this meeting..."
                     styles={customSelectStyles}
@@ -7192,7 +8201,10 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               </p>
               {(leadToChangeStage.stage || leadToChangeStage.is_lost) && (
                 <p className="mb-0 text-muted">
-                  <strong>Current Stage:</strong> {leadToChangeStage.is_lost ? "Lost" : leadToChangeStage.stage?.name}
+                  <strong>Current Stage:</strong>{" "}
+                  {leadToChangeStage.is_lost
+                    ? "Lost"
+                    : leadToChangeStage.stage?.name}
                 </p>
               )}
             </div>
@@ -7268,9 +8280,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         centered
       >
         <Modal.Header closeButton>
-          <Modal.Title>
-            Edit Lead: {editingLead?.name || ""}
-          </Modal.Title>
+          <Modal.Title>Edit Lead: {editingLead?.name || ""}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {editFetching ? (
@@ -7334,7 +8344,9 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                       </div>
                       <small
                         className={`mt-2 ${
-                          editFormStep === step ? "text-primary fw-bold" : "text-muted"
+                          editFormStep === step
+                            ? "text-primary fw-bold"
+                            : "text-muted"
                         }`}
                       >
                         {label}
@@ -7348,7 +8360,9 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               {editFormStep === 0 && (
                 <Card className="border-0 bg-light">
                   <Card.Body>
-                    <h5 className="fw-bold mb-4 text-primary">LEAD INFORMATION</h5>
+                    <h5 className="fw-bold mb-4 text-primary">
+                      LEAD INFORMATION
+                    </h5>
                     <Row>
                       <Col md={6}>
                         <Form.Group className="mb-3">
@@ -7358,7 +8372,9 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                           <Form.Control
                             type="text"
                             value={editFormData.name}
-                            onChange={(e) => handleEditInputChange("name", e.target.value)}
+                            onChange={(e) =>
+                              handleEditInputChange("name", e.target.value)
+                            }
                             placeholder="Enter lead name"
                             required
                           />
@@ -7372,7 +8388,10 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                           <Form.Select
                             value={editFormData.user_extension || ""}
                             onChange={(e) =>
-                              handleEditInputChange("user_extension", e.target.value ? Number(e.target.value) : null)
+                              handleEditInputChange(
+                                "user_extension",
+                                e.target.value ? Number(e.target.value) : null,
+                              )
                             }
                           >
                             <option value="">Select User</option>
@@ -7392,7 +8411,12 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                           <Form.Select
                             value={editFormData.stage_id || ""}
                             onChange={(e) =>
-                              handleEditInputChange("stage_id", e.target.value ? Number(e.target.value) : undefined)
+                              handleEditInputChange(
+                                "stage_id",
+                                e.target.value
+                                  ? Number(e.target.value)
+                                  : undefined,
+                              )
                             }
                             required
                           >
@@ -7411,7 +8435,9 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                           <Form.Control
                             type="text"
                             value={editFormData.source}
-                            onChange={(e) => handleEditInputChange("source", e.target.value)}
+                            onChange={(e) =>
+                              handleEditInputChange("source", e.target.value)
+                            }
                             placeholder="e.g., LinkedIn, Website, Referral"
                           />
                         </Form.Group>
@@ -7424,12 +8450,18 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                               editFormData.campaign_id
                                 ? {
                                     value: editFormData.campaign_id,
-                                    label: editCampaigns.find((c) => c.id === editFormData.campaign_id)?.name || "",
+                                    label:
+                                      editCampaigns.find(
+                                        (c) =>
+                                          c.id === editFormData.campaign_id,
+                                      )?.name || "",
                                   }
                                 : null
                             }
                             onChange={(selectedOption: any) => {
-                              handleEditCampaignChange(selectedOption?.value || undefined);
+                              handleEditCampaignChange(
+                                selectedOption?.value || undefined,
+                              );
                             }}
                             options={editCampaigns.map((campaign) => ({
                               value: campaign.id,
@@ -7454,7 +8486,10 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                                 : null
                             }
                             onChange={(selectedOption: any) => {
-                              handleEditInputChange("crm_data_id", selectedOption?.value || undefined);
+                              handleEditInputChange(
+                                "crm_data_id",
+                                selectedOption?.value || undefined,
+                              );
                             }}
                             options={editCrmData.map((data) => ({
                               value: data.id,
@@ -7473,7 +8508,12 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                             as="textarea"
                             rows={3}
                             value={editFormData.description}
-                            onChange={(e) => handleEditInputChange("description", e.target.value)}
+                            onChange={(e) =>
+                              handleEditInputChange(
+                                "description",
+                                e.target.value,
+                              )
+                            }
                             placeholder="Enter lead description or notes"
                           />
                         </Form.Group>
@@ -7487,7 +8527,9 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               {editFormStep === 1 && (
                 <Card className="border-0 bg-light">
                   <Card.Body>
-                    <h5 className="fw-bold mb-4 text-primary">COMPANY INFORMATION</h5>
+                    <h5 className="fw-bold mb-4 text-primary">
+                      COMPANY INFORMATION
+                    </h5>
                     <Row>
                       <Col md={6}>
                         <Form.Group className="mb-3">
@@ -7497,7 +8539,12 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                           <Form.Control
                             type="text"
                             value={editFormData.company_name}
-                            onChange={(e) => handleEditInputChange("company_name", e.target.value)}
+                            onChange={(e) =>
+                              handleEditInputChange(
+                                "company_name",
+                                e.target.value,
+                              )
+                            }
                             placeholder="Enter company name"
                           />
                         </Form.Group>
@@ -7508,7 +8555,13 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                             Business Type <span className="text-danger">*</span>
                           </Form.Label>
                           <Form.Select
-                            value={editShowOtherBusinessType ? "other" : (editBusinessTypeId ? String(editBusinessTypeId) : "")}
+                            value={
+                              editShowOtherBusinessType
+                                ? "other"
+                                : editBusinessTypeId
+                                  ? String(editBusinessTypeId)
+                                  : ""
+                            }
                             onChange={(e) => {
                               const value = e.target.value;
                               if (value === "other") {
@@ -7528,7 +8581,10 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                           >
                             <option value="">Select Business Type</option>
                             {editBusinessTypes.map((businessType) => (
-                              <option key={businessType.id} value={businessType.id}>
+                              <option
+                                key={businessType.id}
+                                value={businessType.id}
+                              >
                                 {businessType.name}
                               </option>
                             ))}
@@ -7540,12 +8596,15 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                         <Col md={6}>
                           <Form.Group className="mb-3">
                             <Form.Label>
-                              Specify Business Type <span className="text-danger">*</span>
+                              Specify Business Type{" "}
+                              <span className="text-danger">*</span>
                             </Form.Label>
                             <Form.Control
                               type="text"
                               value={editBusinessTypeOther}
-                              onChange={(e) => setEditBusinessTypeOther(e.target.value)}
+                              onChange={(e) =>
+                                setEditBusinessTypeOther(e.target.value)
+                              }
                               placeholder="Enter business type"
                             />
                           </Form.Group>
@@ -7557,11 +8616,13 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                           <Select
                             value={editSelectedCountry}
                             onChange={handleEditCountryChange}
-                            options={Country.getAllCountries().map((country: any) => ({
-                              value: country.isoCode,
-                              label: country.name,
-                              isoCode: country.isoCode,
-                            }))}
+                            options={Country.getAllCountries().map(
+                              (country: any) => ({
+                                value: country.isoCode,
+                                label: country.name,
+                                isoCode: country.isoCode,
+                              }),
+                            )}
                             placeholder="Select Country"
                             isClearable
                             isSearchable
@@ -7587,7 +8648,9 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                             onChange={handleEditStateChange}
                             options={
                               editSelectedCountry
-                                ? State.getStatesOfCountry(editSelectedCountry.value).map((state: any) => ({
+                                ? State.getStatesOfCountry(
+                                    editSelectedCountry.value,
+                                  ).map((state: any) => ({
                                     value: state.isoCode,
                                     label: state.name,
                                   }))
@@ -7610,7 +8673,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                               editSelectedCountry && editSelectedState
                                 ? City.getCitiesOfState(
                                     editSelectedCountry.value,
-                                    editSelectedState.value
+                                    editSelectedState.value,
                                   ).map((city: any) => ({
                                     value: city.name,
                                     label: city.name,
@@ -7620,7 +8683,9 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                             placeholder="Select City"
                             isClearable
                             isSearchable
-                            isDisabled={!editSelectedCountry || !editSelectedState}
+                            isDisabled={
+                              !editSelectedCountry || !editSelectedState
+                            }
                           />
                         </Form.Group>
                       </Col>
@@ -7629,7 +8694,12 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                           <Form.Label>Company Size</Form.Label>
                           <Form.Select
                             value={editFormData.company_size}
-                            onChange={(e) => handleEditInputChange("company_size", e.target.value)}
+                            onChange={(e) =>
+                              handleEditInputChange(
+                                "company_size",
+                                e.target.value,
+                              )
+                            }
                           >
                             <option value="">Select Size</option>
                             <option value="Micro (1-10 employees)">
@@ -7657,7 +8727,12 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                             as="textarea"
                             rows={2}
                             value={editFormData.company_location_other}
-                            onChange={(e) => handleEditInputChange("company_location_other", e.target.value)}
+                            onChange={(e) =>
+                              handleEditInputChange(
+                                "company_location_other",
+                                e.target.value,
+                              )
+                            }
                             placeholder="Any additional location details"
                           />
                         </Form.Group>
@@ -7672,7 +8747,9 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                 <Card className="border-0 bg-light">
                   <Card.Body>
                     <div className="d-flex justify-content-between align-items-center mb-4">
-                      <h5 className="fw-bold text-primary mb-0">CONTACT PERSONS</h5>
+                      <h5 className="fw-bold text-primary mb-0">
+                        CONTACT PERSONS
+                      </h5>
                       <Button
                         variant="primary"
                         size="sm"
@@ -7707,7 +8784,11 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                                   type="text"
                                   value={person.title}
                                   onChange={(e) =>
-                                    updateEditContactPerson(index, "title", e.target.value)
+                                    updateEditContactPerson(
+                                      index,
+                                      "title",
+                                      e.target.value,
+                                    )
                                   }
                                   placeholder="e.g., CEO, Manager"
                                 />
@@ -7722,7 +8803,11 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                                   type="text"
                                   value={person.name}
                                   onChange={(e) =>
-                                    updateEditContactPerson(index, "name", e.target.value)
+                                    updateEditContactPerson(
+                                      index,
+                                      "name",
+                                      e.target.value,
+                                    )
                                   }
                                   placeholder="Enter contact name"
                                 />
@@ -7738,15 +8823,20 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                                   defaultCountry="PK"
                                   value={person.phone}
                                   onChange={(value: any) => {
-                                    updateEditContactPerson(index, "phone", value || "");
+                                    updateEditContactPerson(
+                                      index,
+                                      "phone",
+                                      value || "",
+                                    );
                                     if (value) {
                                       try {
-                                        const phoneNumber = parsePhoneLib(value);
+                                        const phoneNumber =
+                                          parsePhoneLib(value);
                                         if (phoneNumber) {
                                           updateEditContactPerson(
                                             index,
                                             "phone_country_code",
-                                            `+${phoneNumber.countryCallingCode}`
+                                            `+${phoneNumber.countryCallingCode}`,
                                           );
                                         }
                                       } catch (e) {
@@ -7767,7 +8857,11 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                                   type="email"
                                   value={person.email}
                                   onChange={(e) =>
-                                    updateEditContactPerson(index, "email", e.target.value)
+                                    updateEditContactPerson(
+                                      index,
+                                      "email",
+                                      e.target.value,
+                                    )
                                   }
                                   placeholder="Enter email address"
                                 />
@@ -7785,14 +8879,21 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               {editFormStep === 3 && (
                 <Card className="border-0 bg-light">
                   <Card.Body>
-                    <h5 className="fw-bold mb-4 text-primary">OTHER INFORMATION</h5>
+                    <h5 className="fw-bold mb-4 text-primary">
+                      OTHER INFORMATION
+                    </h5>
                     <Row>
                       <Col md={6}>
                         <Form.Group className="mb-3">
                           <Form.Label>Lead Potential</Form.Label>
                           <Form.Select
                             value={editFormData.lead_potential}
-                            onChange={(e) => handleEditInputChange("lead_potential", e.target.value)}
+                            onChange={(e) =>
+                              handleEditInputChange(
+                                "lead_potential",
+                                e.target.value,
+                              )
+                            }
                           >
                             <option value="">Select Lead Potential</option>
                             <option value="Hot">Hot</option>
@@ -7804,94 +8905,148 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                     </Row>
 
                     {/* Campaign Custom Fields */}
-                    {(editSelectedCampaign as any)?.custom_fields && (editSelectedCampaign as any).custom_fields.length > 0 && (
-                      <>
-                        <h6 className="fw-bold mt-4 mb-3 text-primary">Campaign Custom Fields</h6>
-                        <Row>
-                          {(editSelectedCampaign as any).custom_fields.map((field: any) => (
-                            <Col md={6} key={field.field_key}>
-                              <Form.Group className="mb-3">
-                                <Form.Label>
-                                  {field.field_name}
-                                  {field.required && <span className="text-danger">*</span>}
-                                </Form.Label>
-                                {field.field_type === "string" && (
-                                  <Form.Control
-                                    type="text"
-                                    value={editFormData.campaign_field_values?.[field.field_key] || ""}
-                                    onChange={(e) =>
-                                      handleEditCampaignFieldChange(field.field_key, e.target.value)
-                                    }
-                                    placeholder={`Enter ${field.field_name.toLowerCase()}`}
-                                    required={field.required}
-                                  />
-                                )}
-                                {field.field_type === "email" && (
-                                  <Form.Control
-                                    type="email"
-                                    value={editFormData.campaign_field_values?.[field.field_key] || ""}
-                                    onChange={(e) =>
-                                      handleEditCampaignFieldChange(field.field_key, e.target.value)
-                                    }
-                                    placeholder={`Enter ${field.field_name.toLowerCase()}`}
-                                    required={field.required}
-                                  />
-                                )}
-                                {field.field_type === "text" && (
-                                  <Form.Control
-                                    as="textarea"
-                                    rows={3}
-                                    value={editFormData.campaign_field_values?.[field.field_key] || ""}
-                                    onChange={(e) =>
-                                      handleEditCampaignFieldChange(field.field_key, e.target.value)
-                                    }
-                                    placeholder={`Enter ${field.field_name.toLowerCase()}`}
-                                    required={field.required}
-                                  />
-                                )}
-                                {field.field_type === "integer" && (
-                                  <Form.Control
-                                    type="number"
-                                    value={editFormData.campaign_field_values?.[field.field_key] || ""}
-                                    onChange={(e) =>
-                                      handleEditCampaignFieldChange(field.field_key, e.target.value)
-                                    }
-                                    placeholder={`Enter ${field.field_name.toLowerCase()}`}
-                                    required={field.required}
-                                  />
-                                )}
-                                {field.field_type === "date" && (
-                                  <Form.Control
-                                    type="date"
-                                    value={editFormData.campaign_field_values?.[field.field_key] || ""}
-                                    onChange={(e) =>
-                                      handleEditCampaignFieldChange(field.field_key, e.target.value)
-                                    }
-                                    required={field.required}
-                                  />
-                                )}
-                                {field.field_type === "dropdown" && (
-                                  <Form.Select
-                                    value={editFormData.campaign_field_values?.[field.field_key] || ""}
-                                    onChange={(e) =>
-                                      handleEditCampaignFieldChange(field.field_key, e.target.value)
-                                    }
-                                    required={field.required}
-                                  >
-                                    <option value="">Select {field.field_name}</option>
-                                    {field.dropdown_options?.map((option: string) => (
-                                      <option key={option} value={option}>
-                                        {option}
-                                      </option>
-                                    ))}
-                                  </Form.Select>
-                                )}
-                              </Form.Group>
-                            </Col>
-                          ))}
-                        </Row>
-                      </>
-                    )}
+                    {(editSelectedCampaign as any)?.custom_fields &&
+                      (editSelectedCampaign as any).custom_fields.length >
+                        0 && (
+                        <>
+                          <h6 className="fw-bold mt-4 mb-3 text-primary">
+                            Campaign Custom Fields
+                          </h6>
+                          <Row>
+                            {(editSelectedCampaign as any).custom_fields.map(
+                              (field: any) => (
+                                <Col md={6} key={field.field_key}>
+                                  <Form.Group className="mb-3">
+                                    <Form.Label>
+                                      {field.field_name}
+                                      {field.required && (
+                                        <span className="text-danger">*</span>
+                                      )}
+                                    </Form.Label>
+                                    {field.field_type === "string" && (
+                                      <Form.Control
+                                        type="text"
+                                        value={
+                                          editFormData.campaign_field_values?.[
+                                            field.field_key
+                                          ] || ""
+                                        }
+                                        onChange={(e) =>
+                                          handleEditCampaignFieldChange(
+                                            field.field_key,
+                                            e.target.value,
+                                          )
+                                        }
+                                        placeholder={`Enter ${field.field_name.toLowerCase()}`}
+                                        required={field.required}
+                                      />
+                                    )}
+                                    {field.field_type === "email" && (
+                                      <Form.Control
+                                        type="email"
+                                        value={
+                                          editFormData.campaign_field_values?.[
+                                            field.field_key
+                                          ] || ""
+                                        }
+                                        onChange={(e) =>
+                                          handleEditCampaignFieldChange(
+                                            field.field_key,
+                                            e.target.value,
+                                          )
+                                        }
+                                        placeholder={`Enter ${field.field_name.toLowerCase()}`}
+                                        required={field.required}
+                                      />
+                                    )}
+                                    {field.field_type === "text" && (
+                                      <Form.Control
+                                        as="textarea"
+                                        rows={3}
+                                        value={
+                                          editFormData.campaign_field_values?.[
+                                            field.field_key
+                                          ] || ""
+                                        }
+                                        onChange={(e) =>
+                                          handleEditCampaignFieldChange(
+                                            field.field_key,
+                                            e.target.value,
+                                          )
+                                        }
+                                        placeholder={`Enter ${field.field_name.toLowerCase()}`}
+                                        required={field.required}
+                                      />
+                                    )}
+                                    {field.field_type === "integer" && (
+                                      <Form.Control
+                                        type="number"
+                                        value={
+                                          editFormData.campaign_field_values?.[
+                                            field.field_key
+                                          ] || ""
+                                        }
+                                        onChange={(e) =>
+                                          handleEditCampaignFieldChange(
+                                            field.field_key,
+                                            e.target.value,
+                                          )
+                                        }
+                                        placeholder={`Enter ${field.field_name.toLowerCase()}`}
+                                        required={field.required}
+                                      />
+                                    )}
+                                    {field.field_type === "date" && (
+                                      <Form.Control
+                                        type="date"
+                                        value={
+                                          editFormData.campaign_field_values?.[
+                                            field.field_key
+                                          ] || ""
+                                        }
+                                        onChange={(e) =>
+                                          handleEditCampaignFieldChange(
+                                            field.field_key,
+                                            e.target.value,
+                                          )
+                                        }
+                                        required={field.required}
+                                      />
+                                    )}
+                                    {field.field_type === "dropdown" && (
+                                      <Form.Select
+                                        value={
+                                          editFormData.campaign_field_values?.[
+                                            field.field_key
+                                          ] || ""
+                                        }
+                                        onChange={(e) =>
+                                          handleEditCampaignFieldChange(
+                                            field.field_key,
+                                            e.target.value,
+                                          )
+                                        }
+                                        required={field.required}
+                                      >
+                                        <option value="">
+                                          Select {field.field_name}
+                                        </option>
+                                        {field.dropdown_options?.map(
+                                          (option: string) => (
+                                            <option key={option} value={option}>
+                                              {option}
+                                            </option>
+                                          ),
+                                        )}
+                                      </Form.Select>
+                                    )}
+                                  </Form.Group>
+                                </Col>
+                              ),
+                            )}
+                          </Row>
+                        </>
+                      )}
                   </Card.Body>
                 </Card>
               )}
@@ -7920,10 +9075,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             Cancel
           </Button>
           {editFormStep < 3 ? (
-            <Button
-              variant="primary"
-              onClick={handleEditNextStep}
-            >
+            <Button variant="primary" onClick={handleEditNextStep}>
               Next
               <ChevronRight size={16} className="ms-1" />
             </Button>
@@ -8421,15 +9573,20 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         width="400px"
         filters={[
           {
-            id: 'assignedTo',
-            label: 'Assigned To',
-            type: 'select',
+            id: "assignedTo",
+            label: "Assigned To",
+            type: "select",
             value: leadsFilters.assignedTo
               ? (() => {
                   const assignedToId = leadsFilters.assignedTo;
-                  const ext = extensions.find((e: any) => (e.id || e.extension) === assignedToId);
+                  const ext = extensions.find(
+                    (e: any) => (e.id || e.extension) === assignedToId,
+                  );
                   return ext
-                    ? { value: assignedToId, label: ext.display_name || ext.name || assignedToId }
+                    ? {
+                        value: assignedToId,
+                        label: ext.display_name || ext.name || assignedToId,
+                      }
                     : { value: assignedToId, label: assignedToId };
                 })()
               : null,
@@ -8437,7 +9594,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               const assignedToValue = selected ? selected.value : null;
               setLeadsFilters((prev) => ({
                 ...prev,
-                assignedTo: assignedToValue
+                assignedTo: assignedToValue,
               }));
               setActiveFilter("all");
             },
@@ -8445,25 +9602,29 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               value: ext.id || ext.extension,
               label: ext.display_name || ext.name || ext.id || ext.extension,
             })),
-            placeholder: 'Select user...',
-            isClearable: true
+            placeholder: "Select user...",
+            isClearable: true,
           },
           {
-            id: 'stage',
-            label: 'Stages',
-            type: 'select',
+            id: "stage",
+            label: "Stages",
+            type: "select",
             value: leadsFilters.stage
               ? (() => {
                   const stageId = leadsFilters.stage;
-                  const stage = stages.find((st: any) => st.id.toString() === stageId);
-                  return stage ? { value: stageId, label: stage.name } : { value: stageId, label: stageId };
+                  const stage = stages.find(
+                    (st: any) => st.id.toString() === stageId,
+                  );
+                  return stage
+                    ? { value: stageId, label: stage.name }
+                    : { value: stageId, label: stageId };
                 })()
               : null,
             onChange: (selected) => {
               const stageValue = selected ? selected.value : null;
               setLeadsFilters((prev) => ({
                 ...prev,
-                stage: stageValue
+                stage: stageValue,
               }));
               if (stageValue) {
                 setActiveFilter(stageValue);
@@ -8475,38 +9636,42 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               value: s.id.toString(),
               label: s.name,
             })),
-            placeholder: 'Select stage...',
-            isClearable: true
+            placeholder: "Select stage...",
+            isClearable: true,
           },
           {
-            id: 'businessType',
-            label: 'Business Type',
-            type: 'select',
+            id: "businessType",
+            label: "Business Type",
+            type: "select",
             value: leadsFilters.businessType
               ? (() => {
                   const btId = leadsFilters.businessType;
-                  const bt = filterBusinessTypes.find((b: BusinessTypeData) => b.id.toString() === btId);
-                  return bt ? { value: btId, label: bt.name } : { value: btId, label: btId };
+                  const bt = filterBusinessTypes.find(
+                    (b: BusinessTypeData) => b.id.toString() === btId,
+                  );
+                  return bt
+                    ? { value: btId, label: bt.name }
+                    : { value: btId, label: btId };
                 })()
               : null,
             onChange: (selected) => {
               const businessTypeValue = selected ? selected.value : null;
               setLeadsFilters((prev) => ({
                 ...prev,
-                businessType: businessTypeValue
+                businessType: businessTypeValue,
               }));
             },
             options: filterBusinessTypes.map((bt: BusinessTypeData) => ({
               value: bt.id.toString(),
               label: bt.name,
             })),
-            placeholder: 'Select business type...',
-            isClearable: true
+            placeholder: "Select business type...",
+            isClearable: true,
           },
           {
-            id: 'source',
-            label: 'Source',
-            type: 'select',
+            id: "source",
+            label: "Source",
+            type: "select",
             value: leadsFilters.source
               ? { value: leadsFilters.source, label: leadsFilters.source }
               : null,
@@ -8514,25 +9679,28 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               const sourceValue = selected ? selected.value : null;
               setLeadsFilters((prev) => ({
                 ...prev,
-                source: sourceValue
+                source: sourceValue,
               }));
             },
             options: uniqueSources,
-            placeholder: 'Select source...',
-            isClearable: true
+            placeholder: "Select source...",
+            isClearable: true,
           },
           {
-            id: 'leadPotential',
-            label: 'Lead Potential',
-            type: 'select',
+            id: "leadPotential",
+            label: "Lead Potential",
+            type: "select",
             value: leadsFilters.leadPotential
-              ? { value: leadsFilters.leadPotential, label: leadsFilters.leadPotential }
+              ? {
+                  value: leadsFilters.leadPotential,
+                  label: leadsFilters.leadPotential,
+                }
               : null,
             onChange: (selected) => {
               const leadPotentialValue = selected ? selected.value : null;
               setLeadsFilters((prev) => ({
                 ...prev,
-                leadPotential: leadPotentialValue
+                leadPotential: leadPotentialValue,
               }));
             },
             options: [
@@ -8540,119 +9708,127 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
               { value: "Warm", label: "Warm" },
               { value: "Cold", label: "Cold" },
             ],
-            placeholder: 'Select lead potential...',
-            isClearable: true
+            placeholder: "Select lead potential...",
+            isClearable: true,
           },
           {
-            id: 'campaign',
-            label: 'Campaign',
-            type: 'select',
+            id: "campaign",
+            label: "Campaign",
+            type: "select",
             value: leadsFilters.campaign
               ? (() => {
                   const campaignId = leadsFilters.campaign;
-                  const campaign = campaigns.find((c: any) => c.id.toString() === campaignId);
-                  return campaign ? { value: campaignId, label: campaign.name } : { value: campaignId, label: campaignId };
+                  const campaign = campaigns.find(
+                    (c: any) => c.id.toString() === campaignId,
+                  );
+                  return campaign
+                    ? { value: campaignId, label: campaign.name }
+                    : { value: campaignId, label: campaignId };
                 })()
               : null,
             onChange: (selected) => {
               const campaignValue = selected ? selected.value : null;
               setLeadsFilters((prev) => ({
                 ...prev,
-                campaign: campaignValue
+                campaign: campaignValue,
               }));
             },
             options: campaigns.map((campaign: any) => ({
               value: campaign.id.toString(),
               label: campaign.name,
             })),
-            placeholder: 'Select campaign...',
-            isClearable: true
+            placeholder: "Select campaign...",
+            isClearable: true,
           },
           {
-            id: 'lostReason',
-            label: 'Lost Lead Reason',
-            type: 'select',
+            id: "lostReason",
+            label: "Lost Lead Reason",
+            type: "select",
             value: leadsFilters.lostReason
               ? (() => {
                   const reasonId = leadsFilters.lostReason;
-                  const reason = lostReasons.find((r: any) => r.id.toString() === reasonId);
-                  return reason ? { value: reasonId, label: reason.name } : { value: reasonId, label: reasonId };
+                  const reason = lostReasons.find(
+                    (r: any) => r.id.toString() === reasonId,
+                  );
+                  return reason
+                    ? { value: reasonId, label: reason.name }
+                    : { value: reasonId, label: reasonId };
                 })()
               : null,
             onChange: (selected) => {
               const lostReasonValue = selected ? selected.value : null;
               setLeadsFilters((prev) => ({
                 ...prev,
-                lostReason: lostReasonValue
+                lostReason: lostReasonValue,
               }));
             },
             options: lostReasons.map((r: any) => ({
               value: r.id.toString(),
               label: r.name,
             })),
-            placeholder: 'Select lost reason...',
-            isClearable: true
+            placeholder: "Select lost reason...",
+            isClearable: true,
           },
           {
-            id: 'leadScoreMin',
-            label: 'Lead Score (Min)',
-            type: 'text',
-            value: leadsFilters.leadScoreMin || '',
+            id: "leadScoreMin",
+            label: "Lead Score (Min)",
+            type: "text",
+            value: leadsFilters.leadScoreMin || "",
             onChange: (value) => {
               const minValue = value || null;
               setLeadsFilters((prev) => ({
                 ...prev,
-                leadScoreMin: minValue
+                leadScoreMin: minValue,
               }));
             },
-            placeholder: 'Minimum score'
+            placeholder: "Minimum score",
           },
           {
-            id: 'leadScoreMax',
-            label: 'Lead Score (Max)',
-            type: 'text',
-            value: leadsFilters.leadScoreMax || '',
+            id: "leadScoreMax",
+            label: "Lead Score (Max)",
+            type: "text",
+            value: leadsFilters.leadScoreMax || "",
             onChange: (value) => {
               const maxValue = value || null;
               setLeadsFilters((prev) => ({
                 ...prev,
-                leadScoreMax: maxValue
+                leadScoreMax: maxValue,
               }));
             },
-            placeholder: 'Maximum score'
+            placeholder: "Maximum score",
           },
           {
-            id: 'dateFrom',
-            label: 'Date (From)',
-            type: 'date',
-            value: leadsFilters.dateFrom || '',
+            id: "dateFrom",
+            label: "Date (From)",
+            type: "date",
+            value: leadsFilters.dateFrom || "",
             onChange: (value) => {
               const dateFromValue = value || null;
               setLeadsFilters((prev) => ({
                 ...prev,
-                dateFrom: dateFromValue
+                dateFrom: dateFromValue,
               }));
             },
-            placeholder: 'From date'
+            placeholder: "From date",
           },
           {
-            id: 'dateTo',
-            label: 'Date (To)',
-            type: 'date',
-            value: leadsFilters.dateTo || '',
+            id: "dateTo",
+            label: "Date (To)",
+            type: "date",
+            value: leadsFilters.dateTo || "",
             onChange: (value) => {
               const dateToValue = value || null;
               setLeadsFilters((prev) => ({
                 ...prev,
-                dateTo: dateToValue
+                dateTo: dateToValue,
               }));
             },
-            placeholder: 'To date'
-          }
+            placeholder: "To date",
+          },
         ]}
         onApply={() => {
           const filtersToApply: Record<string, any> = {};
-          
+
           filtersToApply.search = leadsSearch;
           filtersToApply.assigned_to = leadsFilters.assignedTo;
           filtersToApply.stage_id = leadsFilters.stage;
@@ -8665,7 +9841,7 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
           filtersToApply.lead_score_max = leadsFilters.leadScoreMax;
           filtersToApply.date_from = leadsFilters.dateFrom;
           filtersToApply.date_to = leadsFilters.dateTo;
-          
+
           handleFiltersChange(filtersToApply);
           setLeadsPagination({ ...leadsPagination, currentPage: 1 });
           setRefreshKey((prev) => prev + 1);
@@ -8692,20 +9868,20 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         }}
       />
 
-{convertingLeadId && (
-  <ConvertToDealModal
-    show={showConvertToDealModal}
-    onHide={() => {
-      setShowConvertToDealModal(false);
-      setConvertingLeadId(null);
-    }}
-    leadId={convertingLeadId}
-    onSuccess={() => {
-      setRefreshKey((prev) => prev + 1);
-      toast.success("Lead converted to deal successfully!");
-    }}
-  />
-)}
+      {convertingLeadId && (
+        <ConvertToDealModal
+          show={showConvertToDealModal}
+          onHide={() => {
+            setShowConvertToDealModal(false);
+            setConvertingLeadId(null);
+          }}
+          leadId={convertingLeadId}
+          onSuccess={() => {
+            setRefreshKey((prev) => prev + 1);
+            toast.success("Lead converted to deal successfully!");
+          }}
+        />
+      )}
 
       {/* Add Tab Modal */}
       <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>
@@ -8714,9 +9890,14 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         </Modal.Header>
         <Modal.Body>
           <p className="text-muted mb-3">Select a stage to add as a new tab</p>
-          <div className="d-grid gap-2" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+          <div
+            className="d-grid gap-2"
+            style={{ maxHeight: "400px", overflowY: "auto" }}
+          >
             {stages.map((stage: any) => {
-              const isAlreadyAdded = customTabs.some(t => t.id === stage.id.toString());
+              const isAlreadyAdded = customTabs.some(
+                (t) => t.id === stage.id.toString(),
+              );
               const stageCount = filterCounts[stage.id] || 0;
               return (
                 <Button
@@ -8724,19 +9905,22 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
                   variant="outline-primary"
                   onClick={() => {
                     if (!isAlreadyAdded) {
-                      setCustomTabs([...customTabs, {
-                        id: stage.id.toString(),
-                        label: stage.name,
-                        count: stageCount,
-                        removable: true
-                      }]);
+                      setCustomTabs([
+                        ...customTabs,
+                        {
+                          id: stage.id.toString(),
+                          label: stage.name,
+                          count: stageCount,
+                          removable: true,
+                        },
+                      ]);
                       setShowTabModal(false);
-                      toast.success('Tab added successfully!');
+                      toast.success("Tab added successfully!");
                     }
                   }}
                   disabled={isAlreadyAdded}
                   className="d-flex align-items-center justify-content-start"
-                  style={{ textAlign: 'left' }}
+                  style={{ textAlign: "left" }}
                 >
                   <Layers size={16} className="me-2" />
                   {stage.name}
@@ -8752,20 +9936,23 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             <Button
               variant="outline-primary"
               onClick={() => {
-                if (!customTabs.find(t => t.id === 'lost')) {
-                  setCustomTabs([...customTabs, {
-                    id: 'lost',
-                    label: 'Lost',
-                    count: filterCounts.lost || 0,
-                    removable: true
-                  }]);
+                if (!customTabs.find((t) => t.id === "lost")) {
+                  setCustomTabs([
+                    ...customTabs,
+                    {
+                      id: "lost",
+                      label: "Lost",
+                      count: filterCounts.lost || 0,
+                      removable: true,
+                    },
+                  ]);
                   setShowTabModal(false);
-                  toast.success('Tab added successfully!');
+                  toast.success("Tab added successfully!");
                 }
               }}
-              disabled={customTabs.some(t => t.id === 'lost')}
+              disabled={customTabs.some((t) => t.id === "lost")}
               className="d-flex align-items-center justify-content-start"
-              style={{ textAlign: 'left' }}
+              style={{ textAlign: "left" }}
             >
               <X size={16} className="me-2" />
               Lost
@@ -8778,20 +9965,23 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
             <Button
               variant="outline-primary"
               onClick={() => {
-                if (!customTabs.find(t => t.id === 'deleted')) {
-                  setCustomTabs([...customTabs, {
-                    id: 'deleted',
-                    label: 'Deleted',
-                    count: filterCounts.deleted || 0,
-                    removable: true
-                  }]);
+                if (!customTabs.find((t) => t.id === "deleted")) {
+                  setCustomTabs([
+                    ...customTabs,
+                    {
+                      id: "deleted",
+                      label: "Deleted",
+                      count: filterCounts.deleted || 0,
+                      removable: true,
+                    },
+                  ]);
                   setShowTabModal(false);
-                  toast.success('Tab added successfully!');
+                  toast.success("Tab added successfully!");
                 }
               }}
-              disabled={customTabs.some(t => t.id === 'deleted')}
+              disabled={customTabs.some((t) => t.id === "deleted")}
               className="d-flex align-items-center justify-content-start"
-              style={{ textAlign: 'left' }}
+              style={{ textAlign: "left" }}
             >
               <Trash2 size={16} className="me-2" />
               Deleted
@@ -8810,21 +10000,21 @@ const leadsActions: TableAction<LeadData>[] = useMemo(() => {
         </Modal.Footer>
       </Modal>
 
-{/* Add modal at the end */}
-<CreateLeadModal
-  show={showCreateLeadModal}
-  onHide={() => {
-    setShowCreateLeadModal(false);
-    setEditLeadIdForSidebar(null);
-  }}
-  onSuccess={() => {
-    setShowCreateLeadModal(false);
-    setEditLeadIdForSidebar(null);
-    fetchLeads();
-  }}
-  type="lead"
-  editLeadId={editLeadIdForSidebar}
-/>
+      {/* Add modal at the end */}
+      <CreateLeadModal
+        show={showCreateLeadModal}
+        onHide={() => {
+          setShowCreateLeadModal(false);
+          setEditLeadIdForSidebar(null);
+        }}
+        onSuccess={() => {
+          setShowCreateLeadModal(false);
+          setEditLeadIdForSidebar(null);
+          fetchLeads();
+        }}
+        type="lead"
+        editLeadId={editLeadIdForSidebar}
+      />
     </React.Fragment>
   );
 };
