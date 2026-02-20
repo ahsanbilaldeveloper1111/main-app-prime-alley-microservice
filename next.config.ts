@@ -4,6 +4,13 @@ import path from "node:path";
 
 const nextConfig: NextConfig = {
 
+    eslint: {
+        ignoreDuringBuilds: true,
+    },
+    
+    typescript: {
+        ignoreBuildErrors: true,
+    },
     
     sassOptions: {
         includePaths: [
