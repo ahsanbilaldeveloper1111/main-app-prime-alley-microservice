@@ -264,7 +264,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
                 }}>
                   {activity.title}
                 </h4>
-                <FileText size={14} color="#7c98b6" />
+                <FileText size={14} color="#141414" />
               </div>
               
               <p style={{
@@ -360,7 +360,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
                 }}>
                   <p style={{
                     fontSize: '13px',
-                    color: '#7c98b6',
+                    color: '#141414',
                     margin: 0,
                   }}>
                     Transactional email Invoice from Prime Alley Technology
@@ -372,7 +372,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
           
           <div style={{
             fontSize: '13px',
-            color: '#7c98b6',
+            color: '#141414',
             whiteSpace: 'nowrap',
           }}>
             {activity.timestamp}
@@ -487,21 +487,21 @@ const revenueSections: RevenueSection[] = [
     return (
       <div>
         {/* Info Banner */}
-        {/* <div style={{
+        <div style={{
           padding: '16px 20px',
-          backgroundColor: '#fffbeb',
-          border: '1px solid #fde68a',
+          backgroundColor: '#ffffff',
+          border: '1px solid #eaf0f6',
           borderRadius: '5px',
           marginBottom: '20px',
         }}>
           <p style={{
             fontSize: '14px',
-            color: '#92400e',
+            color: '#666',
             margin: 0,
           }}>
             HubSpot does not have enrichment data for this record, yet.
           </p>
-        </div> */}
+        </div>
   
         {/* Contact Information Card */}
         <div style={{
@@ -511,193 +511,140 @@ const revenueSections: RevenueSection[] = [
           padding: '20px',
           marginBottom: '20px',
         }}>
+          {/* Single row: all fields + social icons */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            display: 'flex',
+            alignItems: 'flex-start',
             gap: '20px',
-            marginBottom: '16px',
+            flexWrap: 'nowrap',
           }}>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
+            {/* Lifecycle stage */}
+            <div style={{ flex: '1 1 auto', minWidth: '100px' }}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                 Lifecycle stage
               </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
-                Opportunity
+              <div style={{ fontSize: '14px', color: '#141414', fontWeight: '700' }}>
+                Lead
               </div>
             </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
+  
+            {/* Related company */}
+            <div style={{ flex: '1 1 auto', minWidth: '100px' }}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                 Related company
               </div>
-              <a
-                href="#"
-                style={{
-                  fontSize: '14px',
-                  color: '#006162',
-                  textDecoration: 'none',
-                  fontWeight: '500',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.textDecoration = 'underline';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.textDecoration = 'none';
-                }}
-              >
-                Ahmad Hussain
-              </a>
-            </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
-                Employment role
-              </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
+              <div style={{ fontSize: '14px', color: '#141414', fontWeight: '400' }}>
                 --
               </div>
             </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
+  
+            {/* Employment role */}
+            <div style={{ flex: '1 1 auto', minWidth: '100px' }}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
+                Employment role
+              </div>
+              <div style={{ fontSize: '14px', color: '#141414', fontWeight: '400' }}>
+                --
+              </div>
+            </div>
+  
+            {/* City */}
+            <div style={{ flex: '1 1 auto', minWidth: '60px' }}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                 City
               </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
+              <div style={{ fontSize: '14px', color: '#141414', fontWeight: '400' }}>
                 {firstTicket?.company_city ?? '--'}
               </div>
             </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
+  
+            {/* State */}
+            <div style={{ flex: '1 1 auto', minWidth: '60px' }}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                 State
               </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
+              <div style={{ fontSize: '14px', color: '#141414', fontWeight: '400' }}>
                 {firstTicket?.company_province ?? '--'}
               </div>
             </div>
-            <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
+  
+            {/* Region */}
+            <div style={{ flex: '1 1 auto', minWidth: '60px' }}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                 Region
               </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
+              <div style={{ fontSize: '14px', color: '#141414', fontWeight: '400' }}>
                 --
               </div>
             </div>
-          </div>
   
-          {/* Social Icons */}
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            paddingTop: '16px',
-            borderTop: '1px solid #eaf0f6',
-          }}>
-            <button
-              style={{
-                padding: '8px',
-                backgroundColor: '#f7fafc',
-                border: '1px solid #eaf0f6',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#eaf0f6';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#f7fafc';
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#7c98b6">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-              </svg>
-            </button>
-            <button
-              style={{
-                padding: '8px',
-                backgroundColor: '#f7fafc',
-                border: '1px solid #eaf0f6',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#eaf0f6';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#f7fafc';
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#7c98b6">
-                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-              </svg>
-            </button>
-            <button
-              style={{
-                padding: '8px',
-                backgroundColor: '#f7fafc',
-                border: '1px solid #eaf0f6',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#eaf0f6';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#f7fafc';
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#7c98b6">
-                <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
-              </svg>
-            </button>
+            {/* Social Icons — same row, pushed to the right */}
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'center',
+              flexShrink: 0,
+              marginLeft: 'auto',
+              paddingTop: '2px',
+            }}>
+              {/* Facebook */}
+              <button
+                style={{
+                  padding: '7px',
+                  backgroundColor: '#f0f0f0',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#e0e0e0'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f0f0f0'; }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#555">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                </svg>
+              </button>
+              {/* LinkedIn */}
+              <button
+                style={{
+                  padding: '7px',
+                  backgroundColor: '#f0f0f0',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#e0e0e0'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f0f0f0'; }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#555">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                </svg>
+              </button>
+              {/* X / Twitter */}
+              <button
+                style={{
+                  padding: '7px',
+                  backgroundColor: '#f0f0f0',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#e0e0e0'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f0f0f0'; }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#555">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
   
@@ -714,53 +661,37 @@ const revenueSections: RevenueSection[] = [
             borderRadius: '5px',
             padding: '20px',
           }}>
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
+            <div style={{
+              paddingBottom: '16px',
+              borderBottom: '1px solid #eaf0f6',
+              marginBottom: '16px',
+            }}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                 Industry
               </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
+              <div style={{ fontSize: '14px', color: '#141414', fontWeight: '400' }}>
                 --
               </div>
             </div>
   
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
+            <div style={{
+              paddingBottom: '16px',
+              borderBottom: '1px solid #eaf0f6',
+              marginBottom: '16px',
+            }}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                 Company description
               </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
+              <div style={{ fontSize: '14px', color: '#141414', fontWeight: '400' }}>
                 --
               </div>
             </div>
   
             <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                 Company keywords
               </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
+              <div style={{ fontSize: '14px', color: '#141414', fontWeight: '400' }}>
                 --
               </div>
             </div>
@@ -775,7 +706,7 @@ const revenueSections: RevenueSection[] = [
           }}>
             <h3 style={{
               fontSize: '16px',
-              fontWeight: '600',
+              fontWeight: '700',
               color: '#141414',
               margin: '0 0 16px 0',
             }}>
@@ -783,22 +714,14 @@ const revenueSections: RevenueSection[] = [
             </h3>
   
             <div style={{ marginBottom: '20px' }}>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                 Email
               </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
+              <div style={{ fontSize: '14px', color: '#141414', fontWeight: '400' }}>
                 {prospect?.data?.email ?? '--'}
               </div>
             </div>
-
+  
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
@@ -806,52 +729,28 @@ const revenueSections: RevenueSection[] = [
               marginBottom: '20px',
             }}>
               <div>
-                <div style={{
-                  fontSize: '13px',
-                  color: '#7c98b6',
-                  marginBottom: '6px',
-                }}>
+                <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                   Job sub role
                 </div>
-                <div style={{
-                  fontSize: '14px',
-                  color: '#141414',
-                  fontWeight: '400',
-                }}>
+                <div style={{ fontSize: '14px', color: '#141414', fontWeight: '400' }}>
                   --
                 </div>
               </div>
               <div>
-                <div style={{
-                  fontSize: '13px',
-                  color: '#7c98b6',
-                  marginBottom: '6px',
-                }}>
+                <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                   Job seniority
                 </div>
-                <div style={{
-                  fontSize: '14px',
-                  color: '#141414',
-                  fontWeight: '400',
-                }}>
+                <div style={{ fontSize: '14px', color: '#141414', fontWeight: '400' }}>
                   --
                 </div>
               </div>
             </div>
   
             <div>
-              <div style={{
-                fontSize: '13px',
-                color: '#7c98b6',
-                marginBottom: '6px',
-              }}>
+              <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                 LinkedIn
               </div>
-              <div style={{
-                fontSize: '14px',
-                color: '#141414',
-                fontWeight: '400',
-              }}>
+              <div style={{ fontSize: '14px', color: '#141414', fontWeight: '400' }}>
                 --
               </div>
             </div>
@@ -860,6 +759,8 @@ const revenueSections: RevenueSection[] = [
       </div>
     );
   };
+  
+  
 
   const renderRevenueSection = (section: RevenueSection) => {
     return (
@@ -937,7 +838,7 @@ const revenueSections: RevenueSection[] = [
                   gap: '10px',
                   marginBottom: '12px',
                 }}>
-                  <FileText size={18} color="#7c98b6" />
+                  <FileText size={18} color="#141414" />
                   <a
                     href={item.link}
                     style={{
@@ -1633,7 +1534,7 @@ const revenueSections: RevenueSection[] = [
 </div>
 
       {/* Tab Content */}
-      <div style={{ padding: '14px 0', flex: 1 }}>
+      <div style={{ padding: '14px 20px', flex: 1 }}>
         {activeTab === 'about' && (
           <>
             {/* Breeze Record Summary */}
@@ -1972,9 +1873,9 @@ const revenueSections: RevenueSection[] = [
       {/* Search Input */}
       <div style={{
         position: 'relative',
-        flex: '1',
-        minWidth: '250px',
-        maxWidth: '400px',
+        // flex: '1',
+        maxWidth: '360px',
+        width: '185px',
       }}>
         <Search
           size={18}
@@ -1983,7 +1884,7 @@ const revenueSections: RevenueSection[] = [
             right: '12px',
             top: '50%',
             transform: 'translateY(-50%)',
-            color: '#7c98b6',
+            color: '#141414',
             pointerEvents: 'none',
           }}
         />
@@ -1994,12 +1895,13 @@ const revenueSections: RevenueSection[] = [
           onChange={(e) => setSearchActivity(e.target.value)}
           style={{
             width: '100%',
-            padding: '10px 40px 10px 16px',
-            border: '1px solid #cbd5e0',
+            padding: '10px 40px 10px 13px',
+            border: '1px solid #8a8a8a',
             borderRadius: '20px',
-            fontSize: '14px',
+            fontSize: '16px',
             outline: 'none',
             backgroundColor: '#ffffff',
+            fontWeight: '300',
           }}
         />
       </div>
@@ -2009,7 +1911,7 @@ const revenueSections: RevenueSection[] = [
         style={{
           padding: '8px 16px',
           backgroundColor: '#ffffff',
-          border: '1px solid #cbd5e0',
+          border: '1px solid #8a8a8a',
           borderRadius: '4px',
           fontSize: '14px',
           fontWeight: '500',
@@ -2052,7 +1954,7 @@ const revenueSections: RevenueSection[] = [
             cursor: 'pointer',
             fontSize: '14px',
             fontWeight: activityFilter === filter.id ? '600' : '400',
-            color: activityFilter === filter.id ? '#141414' : '#7c98b6',
+            color: activityFilter === filter.id ? '#141414' : '#141414',
             transition: 'all 0.2s',
             marginBottom: '-2px',
           }}
@@ -2062,69 +1964,249 @@ const revenueSections: RevenueSection[] = [
       ))}
     </div>
 
-    {/* Filter Options */}
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px',
-      marginBottom: '20px',
-    }}>
-      <span style={{
-        fontSize: '14px',
-        color: '#141414',
+    {/* Filter Options or Email Actions */}
+    {activityFilter === 'activity' ? (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        marginBottom: '20px',
       }}>
-        Filter by:
-      </span>
-      <button
-        style={{
-          padding: '6px 12px',
-          backgroundColor: 'transparent',
-          border: 'none',
+        <span style={{
           fontSize: '14px',
+          color: '#141414',
+        }}>
+          Filter by:
+        </span>
+        <button
+          style={{
+            padding: '6px 12px',
+            backgroundColor: 'transparent',
+            border: 'none',
+            fontSize: '14px',
+            fontWeight: '600',
+            color: '#141414',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          Filter activity (22/33)
+          <ChevronDown size={14} />
+        </button>
+        <button
+          style={{
+            padding: '6px 12px',
+            backgroundColor: 'transparent',
+            border: 'none',
+            fontSize: '14px',
+            fontWeight: '600',
+            color: '#141414',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          All users
+          <ChevronDown size={14} />
+        </button>
+      </div>
+    ) : activityFilter === 'emails' ? (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: '12px',
+        marginBottom: '20px',
+      }}>
+        <button
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#ffffff',
+            border: '1px solid #414141',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontWeight: '300',
+            color: '#141414',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s',
+          }}
+          onClick={() => console.log('Log Email')}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f7fafc';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#ffffff';
+          }}
+        >
+          <Mail size={16} />
+          Log Email
+        </button>
+        <button
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#ffffff',
+            border: '1px solid #414141',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontWeight: '300',
+            color: '#141414',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s',
+          }}
+          onClick={() => console.log('Create Email')}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f7fafc';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#ffffff';
+          }}
+        >
+          <Mail size={16} />
+          Create email
+        </button>
+      </div>
+    ) : null}
+
+    {/* Content based on selected activity filter */}
+    {(activityFilter === 'activity' || activityFilter === 'emails') && (
+      <>
+        {/* Month Header */}
+        <h3 style={{
+          fontSize: '16px',
           fontWeight: '600',
           color: '#141414',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}
-      >
-        Filter activity (22/33)
-        <ChevronDown size={14} />
-      </button>
-      <button
-        style={{
-          padding: '6px 12px',
-          backgroundColor: 'transparent',
-          border: 'none',
+          marginBottom: '16px',
+        }}>
+          February 2026
+        </h3>
+
+        {/* Activity List */}
+        <div>
+          {activitiesData.map(activity => renderActivityItem(activity))}
+        </div>
+      </>
+    )}
+
+    {activityFilter === 'notes' && (
+      <div style={{
+        backgroundColor: '#ffffff',
+        border: '1px solid #eaf0f6',
+        borderRadius: '8px',
+        padding: '40px 24px',
+        textAlign: 'center',
+      }}>
+        <FileText size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+        <p style={{
           fontSize: '14px',
-          fontWeight: '600',
           color: '#141414',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}
-      >
-        All users
-        <ChevronDown size={14} />
-      </button>
-    </div>
+          marginBottom: '8px',
+          lineHeight: '1.6',
+        }}>
+          Take notes about this record to keep track of important info. You can even @mention a teammate if you need to.
+        </p>
+        <a href="#" style={{
+          fontSize: '14px',
+          color: '#006162',
+          textDecoration: 'none',
+          fontWeight: '500',
+        }}>
+          Learn more
+        </a>
+      </div>
+    )}
 
-    {/* Month Header */}
-    <h3 style={{
-      fontSize: '16px',
-      fontWeight: '600',
-      color: '#141414',
-      marginBottom: '16px',
-    }}>
-      February 2026
-    </h3>
+    {activityFilter === 'calls' && (
+      <div style={{
+        backgroundColor: '#ffffff',
+        border: '1px solid #eaf0f6',
+        borderRadius: '8px',
+        padding: '40px 24px',
+        textAlign: 'center',
+      }}>
+        <Phone size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+        <p style={{
+          fontSize: '14px',
+          color: '#141414',
+          marginBottom: '8px',
+          lineHeight: '1.6',
+        }}>
+          Keep track of all phone conversations with this contact. Log calls to maintain a complete communication history.
+        </p>
+        <a href="#" style={{
+          fontSize: '14px',
+          color: '#006162',
+          textDecoration: 'none',
+          fontWeight: '500',
+        }}>
+          Learn more
+        </a>
+      </div>
+    )}
 
-    {/* Activity List */}
-    <div>
-      {activitiesData.map(activity => renderActivityItem(activity))}
-    </div>
+    {activityFilter === 'tasks' && (
+      <div style={{
+        backgroundColor: '#ffffff',
+        border: '1px solid #eaf0f6',
+        borderRadius: '8px',
+        padding: '40px 24px',
+        textAlign: 'center',
+      }}>
+        <ClipboardList size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+        <p style={{
+          fontSize: '14px',
+          color: '#141414',
+          marginBottom: '8px',
+          lineHeight: '1.6',
+        }}>
+          Create and manage tasks related to this contact. Set due dates and track progress to stay organized.
+        </p>
+        <a href="#" style={{
+          fontSize: '14px',
+          color: '#006162',
+          textDecoration: 'none',
+          fontWeight: '500',
+        }}>
+          Learn more
+        </a>
+      </div>
+    )}
+
+    {activityFilter === 'meetings' && (
+      <div style={{
+        backgroundColor: '#ffffff',
+        border: '1px solid #eaf0f6',
+        borderRadius: '8px',
+        padding: '40px 24px',
+        textAlign: 'center',
+      }}>
+        <Calendar size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+        <p style={{
+          fontSize: '14px',
+          color: '#141414',
+          marginBottom: '8px',
+          lineHeight: '1.6',
+        }}>
+          Schedule and track meetings with this contact. Keep notes and outcomes to maintain a complete meeting history.
+        </p>
+        <a href="#" style={{
+          fontSize: '14px',
+          color: '#006162',
+          textDecoration: 'none',
+          fontWeight: '500',
+        }}>
+          Learn more
+        </a>
+      </div>
+    )}
   </div>
 )}
 
@@ -2216,7 +2298,7 @@ const revenueSections: RevenueSection[] = [
           <ShoppingCart size={48} style={{ marginBottom: '16px', color: '#cbd5e0' }} />
           <p style={{
             fontSize: '14px',
-            color: '#7c98b6',
+            color: '#141414',
             margin: 0,
           }}>
             No e-commerce data available

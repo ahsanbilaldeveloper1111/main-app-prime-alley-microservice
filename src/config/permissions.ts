@@ -37,6 +37,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/faqs/items',permissions: ['']},
     {path:'/faqs/topics',permissions: ['']},
     {path:'/faqs/types',permissions: ['']},
+    {path:'/crm/company',permissions: ['']},
     {path:'/crm/approvals',permissions: ['']},
     {path:'/crm/deals-approval',permissions: ['']},
     {path:'/crm/deals-approval/approval-detailpage',permissions: ['']},
