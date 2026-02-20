@@ -162,14 +162,15 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     'dashboard',           // 1. Dashboard
     'crm',                 // 2. CRM Workspace
     'live-calls',          // 3. Live Wallboards
+    'ai-ml', // 11. AI ML
     'call-history',        // 4. Call Details
 	'ai-bot-and-analytics', // 5. Outbound AI Agent
     'ai-agent-inbound-and-analytics', // 6. Inbound AI Agent
-    'ai-chat-section', // 7. AI Chat
+   
     'gsm', // 8. GSM
     'tms', // 9. TMS
     'netops', // 10. NetOps
-    'ai-ml', // 11. AI ML
+   
     'dncr', // 12. DNCR
     'accounts',            // 10. Billing & Payments
     'work-planner',        // 11. Work Planner
@@ -273,16 +274,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
 
-    {
-      id: 'live-calls',
-      key: 'live-calls',
-      permission: PERMISSIONS.VIEW_CTI,
-      icon: <MonitorCheck size={16} />,
-      color: MENU_COLORS.LIVE_CALLS,
-      title: "Live Wallboards",
-      label: "Live Wallboards",
-      url: '/live-calls'
-    },
+    
+    
 
     {
       id: 'call-history',
@@ -315,6 +308,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_CALL_RECORDINGS,
           url: '/call-recordings'
         },
+        {
+          id: 'ai-ml-calls-analysis',
+          title: 'Calls Analysis',
+          icon: <FileChartPie size={16} />,
+          permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML,
+          url: '/ai-ml/analyze-recordings'
+        },
+        {
+          id: 'live-calls',
+          title: "Live Wallboards",
+          icon: <MonitorCheck size={16} />,
+          permission: PERMISSIONS.VIEW_CTI,
+          url: '/live-calls'
+        },
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
 
@@ -328,20 +335,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: "Outbound AI Agent",
       url: '',
       subItems: [
-        {
-          id: 'ai-agent-outbound-trunk-profiles',
-          title: 'Trunk Profiles',
-          icon: <Bot size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-agent/outbound/trunk-profiles'
-        },
-        {
-          id: 'ai-agent-outbound-voice-bot-profiles',
-          title: 'Voice Bot Profiles',
-          icon: <Bot size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-ml/profiles'
-        },
+        
         {
           id: 'ai-agent-outbound-campaigns',
           title: 'Campaigns',
@@ -372,7 +366,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'ai-agent-outbound-campaign-reports',
-          title: 'Campaign Reports',
+          title: 'Outbound Analytics',
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
           url: '/ai-ml/campaign-reports'
@@ -397,20 +391,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: "Inbound AI Agent",
       url: '',
       subItems: [
-        {
-          id: 'ai-agent-inbound-trunk-profiles',
-          title: 'Trunk Profiles',
-          icon: <MonitorCheck size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-agent/inbound/trunk-profiles'
-        },
-        {
-          id: 'inbound-ai-bot-bot-profiles',
-          title: 'Bot Profiles',
-          icon: <MonitorCheck size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-agent/inbound/bot-profiles'
-        },
+       
         {
           id: 'inbound-ai-bot-live-monitoring',
           title: 'Live Monitoring',
@@ -418,16 +399,10 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
           url: '/ai-agent/inbound/live-monitoring'
         },
-        {
-          id: 'inbound-ai-bot-faqs',
-          title: 'FAQs',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-agent/inbound/faqs'
-        },
+        
         {
           id: 'inbound-ai-bot-campaign-reports',
-          title: 'Reports',
+          title: 'Inbound Analytics',
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
           url: '/ai-agent/inbound/campaign-reports'
@@ -442,53 +417,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       ]
     },
 
-    {
-      id: 'ai-chat-section',
-      key: 'ai-chat-section',
-      permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-      icon: <Workflow size={16} />,
-      color: MENU_COLORS.AUTOMATION,
-      title: "AI Chat",
-      label: "AI Chat",
-      url: '',
-      subItems: [
-        {
-          id: 'ai-chat-tools-profiles',
-          title: 'Tools Profiles',
-          icon: <MonitorCheck size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/chat/tools-profiles'
-        },
-        {
-          id: 'ai-chat-faqs',
-          title: 'FAQs Profiles',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/chat/faq-profiles'
-        },
-        {
-          id: 'ai-chat-tenant-profiles',
-          title: 'Tenant Profiles',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/chat/ai-faqs/tenant'
-        },
-        {
-          id: 'ai-chat-faqs-tenant',
-          title: 'Global Profiles',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/chat/ai-faqs/global'
-        },
-        {
-          id: 'ai-chat-usage-reports',
-          title: 'Usage Reports',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/chat/usage-reports'
-        }
-      ]
-    },
+   
 
     {
       id: 'gsm',
@@ -514,13 +443,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_GSM_MANAGEMENT,
           url: '/gsm/list'
         },
-        {
-          id: 'gsm-assign',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY_ASSIGN,
-          icon: <ClipboardCheck size={16} />,
-          permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT,
-          url: '/gsm/assign'
-        },
+        // {
+        //   id: 'gsm-assign',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY_ASSIGN,
+        //   icon: <ClipboardCheck size={16} />,
+        //   permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT,
+        //   url: '/gsm/assign'
+        // },
         {
           id: 'gsm-ports',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.PORTS,
@@ -582,13 +511,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_NETOPS_DASHBOARD,
           url: '/netops/dashboard'
         },
-        {
-          id: 'netops-devices',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DEVICES,
-          icon: <MonitorSpeaker size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: '/netops/devices'
-        },
+        // {
+        //   id: 'netops-devices',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DEVICES,
+        //   icon: <MonitorSpeaker size={16} />,
+        //   permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
+        //   url: '/netops/devices'
+        // },
         {
           id: 'netops-hosts',
           title: 'Hosts',
@@ -610,20 +539,20 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
           url: '/netops/hosts/alerts'
         },
-        {
-          id: 'netops-services',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_SERVICES,
-          icon: <Server size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_SERVICES,
-          url: '/netops/services'
-        },
-        {
-          id: 'netops-alerts',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_ALERTS,
-          icon: <Megaphone size={16} />,
-          permission: PERMISSIONS.VIEW_NETOPS_ALERTS,
-          url: '/netops/alerts'
-        },
+        // {
+        //   id: 'netops-services',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_SERVICES,
+        //   icon: <Server size={16} />,
+        //   permission: PERMISSIONS.VIEW_NETOPS_SERVICES,
+        //   url: '/netops/services'
+        // },
+        // {
+        //   id: 'netops-alerts',
+        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_ALERTS,
+        //   icon: <Megaphone size={16} />,
+        //   permission: PERMISSIONS.VIEW_NETOPS_ALERTS,
+        //   url: '/netops/alerts'
+        // },
         {
           id: 'netops-uptime-sla',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_UPTIME_SLA,
@@ -633,61 +562,22 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'netops-select-server',
-          title: 'Select Server',
+          title: 'Server Insights',
           icon: <Server size={16} />,
           permission: PERMISSIONS.NETOPS_SERVICES,
           url: '/netops/select-server'
         },
-        {
-          id: 'netops-application-monitoring',
-          title: 'Application Monitoring',
-          icon: <Monitor size={16} />,
-          permission: PERMISSIONS.NETOPS_SERVICES,
-          url: '/netops/application-monitoring'
-        }
+        // {
+        //   id: 'netops-application-monitoring',
+        //   title: 'Application Monitoring',
+        //   icon: <Monitor size={16} />,
+        //   permission: PERMISSIONS.NETOPS_SERVICES,
+        //   url: '/netops/application-monitoring'
+        // }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
 
-    {
-      id: 'ai-ml',
-      key: 'ai-ml',
-      permission: PERMISSIONS.AI_ML_SERVICES,
-      icon: <FileChartPie size={16} />,
-      color: MENU_COLORS.AI_INSIGHTS,
-      title: MENU_LABELS.AI_INSIGHTS,
-      label: MENU_LABELS.AI_INSIGHTS,
-      url: '',
-      subItems: [
-        {
-          id: 'ai-ml-analysis',
-          title: "Manual Analysis",
-          icon: <CassetteTape size={16} />,
-          permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML,
-          url: '/ai-ml/analysis'
-        },
-        {
-          id: 'call-ai-analysis',
-          title: 'Calls AI Analysis',
-          icon: <ChartNoAxesCombined size={16} />,
-          permission: PERMISSIONS.TRANSCRIPTION_ANALYZE_RECORDINGS_AIML,
-          url: '/ai-ml/analyze-recordings'
-        },
-        {
-          id: 'ai-ml-translate',
-          title: 'Backend Operations',
-          icon: <Languages size={16} />,
-          permission: PERMISSIONS.TRANSLATE_AIML,
-          url: '/ai-ml/translate'
-        },
-        {
-          id: 'ai-ml-manage-extensions',
-          title: 'Manage Extensions',
-          icon: <Settings size={16} />,
-          permission: PERMISSIONS.MANAGE_EXTENSIONS_AIML,
-          url: '/ai-ml/manage-extensions'
-        },
-      ].filter(item => !item.permission || hasPermission(item.permission))
-    },
+    
 
     {
       id: 'dncr',
@@ -756,7 +646,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
         { 
           id: 'orders-billing', 
-          title: 'Orders', 
+          title: 'Order invoicing', 
           icon: <ShoppingBag size={16} />, 
           url: '/accounting/customer/orders', 
           permission: PERMISSIONS.VIEW_INVOICES_BILLING 
@@ -790,7 +680,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       subItems: [
         { 
           id: 'work-planner-orders', 
-          title: 'Orders', 
+          title: 'Orders Delivery', 
           icon: <ReceiptText size={16} />, 
           url: '/work-planner/orders', 
           permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
@@ -830,13 +720,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/work-planner/projects',
           permission: PERMISSIONS.WORK_PLANNER_SERVICES 
         },
-        {
-          id: 'work-planner-statuses',
-          title: 'Statuses',
-          icon: <List size={16} />,
-          url: '/work-planner/statuses',
-          permission: PERMISSIONS.WORK_PLANNER_SERVICES 
-        },
+        // {
+        //   id: 'work-planner-statuses',
+        //   title: 'Statuses',
+        //   icon: <List size={16} />,
+        //   url: '/work-planner/statuses',
+        //   permission: PERMISSIONS.WORK_PLANNER_SERVICES 
+        // },
       ].filter(item => !item.permission || hasPermission(item.permission))
     }, 
 
@@ -846,7 +736,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES,
       icon: <Users size={16} />,
       color: MENU_COLORS.BILLING,
-      title: "Staff Management",
+      title: "Staff Insights",
       label: "Staff Management",
       url: '',
       subItems: [
@@ -892,13 +782,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/staff-management/organizational-chart', 
           permission: PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT 
         },
-        {
-          id:'staff-management-request-categories',
-          title: 'Request Categories',
-          icon: <List size={16} />,
-          url: '/staff-management/request-categories',
-          permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT
-        },
+        // {
+        //   id:'staff-management-request-categories',
+        //   title: 'Request Categories',
+        //   icon: <List size={16} />,
+        //   url: '/staff-management/request-categories',
+        //   permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT
+        // },
         // {
         //   id:'staff-management-locations',
         //   title: 'Manage Locations',
@@ -932,6 +822,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.VIEW_CALL_REPORTS,
           url: '/call-reports'
+        },
+        {
+          id: 'ai-chat-usage-reports',
+          title: 'Chat Usage',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.TMS_SERVICES,
+          url: '/chat/usage-reports'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
@@ -1199,7 +1096,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     .sidebar-footer {
       flex-shrink: 0;
       padding: 12px 16px;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      border-top: 0px solid rgba(255, 255, 255, 0.1);
       display: flex;
       align-items: center;
       justify-content: ${isSidebarExpanded ? 'flex-end' : 'center'};
@@ -1684,11 +1581,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     item.id !== 'dashboard' && 
     item.id !== 'dashboard-unified-workspace' && 
     item.id !== 'settings' && 
-    item.id !== 'resources'
+    item.id !== 'resources' &&
+    item.id !== 'reports' &&
+    item.id !== 'audit-logs'
   );
 
   const systemItems = mainMenuItems.filter(item => 
-    item.id === 'settings' || item.id === 'resources'
+    item.id === 'settings' || item.id === 'resources' || item.id === 'reports' || item.id === 'audit-logs'
   );
 
   const activeModuleData = mainMenuItems.find(m => m.id === activeModule);

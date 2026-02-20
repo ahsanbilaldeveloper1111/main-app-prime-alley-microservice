@@ -28,7 +28,17 @@ import {
   ArrowUp,
   HelpCircle,
   Tag,
-  FileText
+  FileText,
+  ClipboardList,
+  CalendarCheck,
+  Bot,
+  Wrench,
+  MessageCircle,
+  Globe,
+  BarChart2,
+  Settings as SettingsCogIcon,
+  PhoneOutgoing,
+  PhoneIncoming
 } from 'lucide-react';
 
 import "@assets/scss/common.scss";
@@ -75,6 +85,28 @@ import FAQTopics from "@pages/faqs/topics";
 import FAQItems from "@pages/faqs/items";
 import FAQTypes from "@pages/faqs/types";
 
+// Import Staff Insights & Work Planner components
+import RequestCategories from "@pages/staff-management/request-categories";
+import WorkPlannerStatuses from "@pages/work-planner/statuses";
+
+// Import AI Chat components
+import ToolProfiles from "@pages/chat/tools-profiles";
+import FaqProfiles from "@pages/chat/faq-profiles";
+import AIChatFAQsTenant from "@pages/chat/ai-faqs/tenant";
+import AIChatFAQsGlobal from "@pages/chat/ai-faqs/global";
+
+// Import AI Analysis (ai-ml) components
+import ManageExtensions from "@pages/ai-ml/manage-extensions";
+import BackendOperations from "@pages/ai-ml/backend-operations";
+import ManualAnalysis from "@pages/ai-ml/analysis";
+import AIMLProfiles from "@pages/ai-ml/profiles";
+
+// Import Outbound / Inbound AI Agent components
+import OutboundTrunkProfiles from "@pages/ai-agent/outbound/trunk-profiles";
+import InboundTrunkProfiles from "@pages/ai-agent/inbound/trunk-profiles";
+import InboundBotProfiles from "@pages/ai-agent/inbound/bot-profiles";
+import InboundFAQs from "@pages/ai-agent/inbound/faqs";
+
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 
 // Destructure constants for easier use
@@ -91,7 +123,13 @@ const Settings = () => {
   const [activeTelcoTab, setActiveTelcoTab] = useState<string>("assign-devices");
   const [activeNetopsTab, setActiveNetopsTab] = useState<string>("devices-list");
   const [activeHelpCenterTab, setActiveHelpCenterTab] = useState<string>("modules");
-  
+  const [activeStaffInsightsTab, setActiveStaffInsightsTab] = useState<string>("request-categories");
+  const [activeWorkPlannerTab, setActiveWorkPlannerTab] = useState<string>("statuses");
+  const [activeAIChatTab, setActiveAIChatTab] = useState<string>("tools-profiles");
+  const [activeAIAnalysisTab, setActiveAIAnalysisTab] = useState<string>("manage-extensions");
+  const [activeOutboundAIAgentTab, setActiveOutboundAIAgentTab] = useState<string>("trunk-profiles");
+  const [activeInboundAIAgentTab, setActiveInboundAIAgentTab] = useState<string>("trunk-profiles");
+
   // Track which tabs have been visited to prevent re-mounting
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["user-management"]));
   const [visitedUserManagementTabs, setVisitedUserManagementTabs] = useState<Set<string>>(new Set(["user-directory"]));
@@ -101,6 +139,12 @@ const Settings = () => {
   const [visitedNetopsTabs, setVisitedNetopsTabs] = useState<Set<string>>(new Set(["devices-list"]));
   const [visitedBillingTab, setVisitedBillingTab] = useState<boolean>(false);
   const [visitedHelpCenterTabs, setVisitedHelpCenterTabs] = useState<Set<string>>(new Set(["modules"]));
+  const [visitedStaffInsightsTabs, setVisitedStaffInsightsTabs] = useState<Set<string>>(new Set(["request-categories"]));
+  const [visitedWorkPlannerTabs, setVisitedWorkPlannerTabs] = useState<Set<string>>(new Set(["statuses"]));
+  const [visitedAIChatTabs, setVisitedAIChatTabs] = useState<Set<string>>(new Set(["tools-profiles"]));
+  const [visitedAIAnalysisTabs, setVisitedAIAnalysisTabs] = useState<Set<string>>(new Set(["manage-extensions"]));
+  const [visitedOutboundAIAgentTabs, setVisitedOutboundAIAgentTabs] = useState<Set<string>>(new Set(["trunk-profiles"]));
+  const [visitedInboundAIAgentTabs, setVisitedInboundAIAgentTabs] = useState<Set<string>>(new Set(["trunk-profiles"]));
 
   // Initialize tabs from URL on mount
   useEffect(() => {
@@ -139,6 +183,30 @@ const Settings = () => {
               setActiveHelpCenterTab(subtab);
               setVisitedHelpCenterTabs(prev => new Set(prev).add(subtab));
               break;
+            case "staff-insights":
+              setActiveStaffInsightsTab(subtab);
+              setVisitedStaffInsightsTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "work-planner":
+              setActiveWorkPlannerTab(subtab);
+              setVisitedWorkPlannerTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "ai-chat":
+              setActiveAIChatTab(subtab);
+              setVisitedAIChatTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "ai-analysis":
+              setActiveAIAnalysisTab(subtab);
+              setVisitedAIAnalysisTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "outbound-ai-agent":
+              setActiveOutboundAIAgentTab(subtab);
+              setVisitedOutboundAIAgentTabs(prev => new Set(prev).add(subtab));
+              break;
+            case "inbound-ai-agent":
+              setActiveInboundAIAgentTab(subtab);
+              setVisitedInboundAIAgentTabs(prev => new Set(prev).add(subtab));
+              break;
             case "billing":
               setVisitedBillingTab(true);
               break;
@@ -169,6 +237,30 @@ const Settings = () => {
             case "help-center":
               setActiveHelpCenterTab("modules");
               setVisitedHelpCenterTabs(prev => new Set(prev).add("modules"));
+              break;
+            case "staff-insights":
+              setActiveStaffInsightsTab("request-categories");
+              setVisitedStaffInsightsTabs(prev => new Set(prev).add("request-categories"));
+              break;
+            case "work-planner":
+              setActiveWorkPlannerTab("statuses");
+              setVisitedWorkPlannerTabs(prev => new Set(prev).add("statuses"));
+              break;
+            case "ai-chat":
+              setActiveAIChatTab("tools-profiles");
+              setVisitedAIChatTabs(prev => new Set(prev).add("tools-profiles"));
+              break;
+            case "ai-analysis":
+              setActiveAIAnalysisTab("manage-extensions");
+              setVisitedAIAnalysisTabs(prev => new Set(prev).add("manage-extensions"));
+              break;
+            case "outbound-ai-agent":
+              setActiveOutboundAIAgentTab("trunk-profiles");
+              setVisitedOutboundAIAgentTabs(prev => new Set(prev).add("trunk-profiles"));
+              break;
+            case "inbound-ai-agent":
+              setActiveInboundAIAgentTab("trunk-profiles");
+              setVisitedInboundAIAgentTabs(prev => new Set(prev).add("trunk-profiles"));
               break;
             case "billing":
               setVisitedBillingTab(true);
@@ -213,6 +305,12 @@ const Settings = () => {
       case "telco-gateway": return "assign-devices";
       case "devices-management": return "devices-list";
       case "help-center": return "modules";
+      case "staff-insights": return "request-categories";
+      case "work-planner": return "statuses";
+      case "ai-chat": return "tools-profiles";
+      case "ai-analysis": return "manage-extensions";
+      case "outbound-ai-agent": return "trunk-profiles";
+      case "inbound-ai-agent": return "trunk-profiles";
       default: return "";
     }
   };
@@ -278,6 +376,66 @@ const Settings = () => {
     }, undefined, { shallow: true });
   };
 
+  const handleStaffInsightsTabChange = (key: string | null) => {
+    const tabKey = key || "request-categories";
+    setActiveStaffInsightsTab(tabKey);
+    setVisitedStaffInsightsTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "staff-insights", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleWorkPlannerTabChange = (key: string | null) => {
+    const tabKey = key || "statuses";
+    setActiveWorkPlannerTab(tabKey);
+    setVisitedWorkPlannerTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "work-planner", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleAIChatTabChange = (key: string | null) => {
+    const tabKey = key || "tools-profiles";
+    setActiveAIChatTab(tabKey);
+    setVisitedAIChatTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "ai-chat", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleAIAnalysisTabChange = (key: string | null) => {
+    const tabKey = key || "manage-extensions";
+    setActiveAIAnalysisTab(tabKey);
+    setVisitedAIAnalysisTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "ai-analysis", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleOutboundAIAgentTabChange = (key: string | null) => {
+    const tabKey = key || "trunk-profiles";
+    setActiveOutboundAIAgentTab(tabKey);
+    setVisitedOutboundAIAgentTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "outbound-ai-agent", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
+  const handleInboundAIAgentTabChange = (key: string | null) => {
+    const tabKey = key || "trunk-profiles";
+    setActiveInboundAIAgentTab(tabKey);
+    setVisitedInboundAIAgentTabs(prev => new Set(prev).add(tabKey));
+    router.replace({
+      pathname: router.pathname,
+      query: { ...router.query, tab: "inbound-ai-agent", subtab: tabKey }
+    }, undefined, { shallow: true });
+  };
+
   // Check if a tab should render
   const shouldRenderTab = (mainTab: string, subTab?: string) => {
     if (!visitedTabs.has(mainTab)) return false;
@@ -299,6 +457,18 @@ const Settings = () => {
           return visitedBillingTab;
         case "help-center":
           return visitedHelpCenterTabs.has(subTab) && activeHelpCenterTab === subTab;
+        case "staff-insights":
+          return visitedStaffInsightsTabs.has(subTab) && activeStaffInsightsTab === subTab;
+        case "work-planner":
+          return visitedWorkPlannerTabs.has(subTab) && activeWorkPlannerTab === subTab;
+        case "ai-chat":
+          return visitedAIChatTabs.has(subTab) && activeAIChatTab === subTab;
+        case "ai-analysis":
+          return visitedAIAnalysisTabs.has(subTab) && activeAIAnalysisTab === subTab;
+        case "outbound-ai-agent":
+          return visitedOutboundAIAgentTabs.has(subTab) && activeOutboundAIAgentTab === subTab;
+        case "inbound-ai-agent":
+          return visitedInboundAIAgentTabs.has(subTab) && activeInboundAIAgentTab === subTab;
         default:
           return false;
       }
@@ -357,8 +527,49 @@ const Settings = () => {
       icon: HelpCircle,
       color: "#17a2b8",
       permission: PERMISSIONS.TICKETS_SERVICES // Using tickets permission for now, adjust if needed
+    },
+    {
+      key: "staff-insights",
+      title: "Staff Insights",
+      icon: ClipboardList,
+      color: "#5c6bc0",
+      permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT
+    },
+    {
+      key: "work-planner",
+      title: "Work Planner",
+      icon: CalendarCheck,
+      color: "#26a69a",
+      permission: PERMISSIONS.WORK_PLANNER_SERVICES
+    },
+    {
+      key: "ai-chat",
+      title: "AI Chat",
+      icon: Bot,
+      color: "#7c4dff",
+      permission: PERMISSIONS.AI_ML_SERVICES
+    },
+    {
+      key: "ai-analysis",
+      title: "AI Analysis",
+      icon: BarChart2,
+      color: "#00bcd4",
+      permission: PERMISSIONS.AI_ML_SERVICES
+    },
+    {
+      key: "outbound-ai-agent",
+      title: "Outbound Ai Agent",
+      icon: PhoneOutgoing,
+      color: "#00897b",
+      permission: PERMISSIONS.AI_ML_SERVICES
+    },
+    {
+      key: "inbound-ai-agent",
+      title: "Inbound Ai Agent",
+      icon: PhoneIncoming,
+      color: "#5e35b1",
+      permission: PERMISSIONS.AI_ML_SERVICES
     }
-    
   ];
 
   // Define sub-tabs for each main tab
@@ -399,6 +610,32 @@ const Settings = () => {
       { key: "topics", title: "FAQ Topics", icon: Tag, color: "#ff9800", permission: PERMISSIONS.TICKETS_SERVICES },
       { key: "items", title: "FAQ Items", icon: HelpCircle, color: "#198754", permission: PERMISSIONS.TICKETS_SERVICES },
       { key: "types", title: "FAQ Types", icon: Tag, color: "#17a2b8", permission: PERMISSIONS.TICKETS_SERVICES }
+    ],
+    "staff-insights": [
+      { key: "request-categories", title: "Request Categories", icon: ClipboardList, color: "#5c6bc0", permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT }
+    ],
+    "work-planner": [
+      { key: "statuses", title: "Statuses", icon: CalendarCheck, color: "#26a69a", permission: PERMISSIONS.WORK_PLANNER_SERVICES }
+    ],
+    "ai-chat": [
+      { key: "tools-profiles", title: "Tools Profiles", icon: Wrench, color: "#7c4dff", permission: PERMISSIONS.AI_ML_SERVICES },
+      { key: "faq-profiles", title: "FAQ Profiles", icon: MessageCircle, color: "#7c4dff", permission: PERMISSIONS.AI_ML_SERVICES },
+      { key: "tenant-profile", title: "Tenant Profile", icon: Building2, color: "#7c4dff", permission: PERMISSIONS.AI_ML_SERVICES },
+      { key: "global-faqs", title: "Global FAQs", icon: Globe, color: "#7c4dff", permission: PERMISSIONS.AI_ML_SERVICES }
+    ],
+    "ai-analysis": [
+      { key: "manage-extensions", title: "Manage Extensions", icon: SettingsCogIcon, color: "#00bcd4", permission: PERMISSIONS.MANAGE_EXTENSIONS_AIML },
+      { key: "backend-operations", title: "Backend Operations", icon: Wrench, color: "#00bcd4", permission: PERMISSIONS.TRANSLATE_AIML },
+      { key: "manual-analysis", title: "Manual Analysis", icon: FileText, color: "#00bcd4", permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML }
+    ],
+    "outbound-ai-agent": [
+      { key: "trunk-profiles", title: "Trunk Profiles", icon: SettingsCogIcon, color: "#00897b", permission: PERMISSIONS.AI_ML_SERVICES },
+      { key: "bot-profiles", title: "Bot Profiles", icon: Bot, color: "#00897b", permission: PERMISSIONS.AI_ML_SERVICES }
+    ],
+    "inbound-ai-agent": [
+      { key: "trunk-profiles", title: "Trunk Profiles", icon: SettingsCogIcon, color: "#5e35b1", permission: PERMISSIONS.AI_ML_SERVICES },
+      { key: "bot-profiles", title: "Bot Profiles", icon: Bot, color: "#5e35b1", permission: PERMISSIONS.AI_ML_SERVICES },
+      { key: "faqs", title: "FAQs", icon: HelpCircle, color: "#5e35b1", permission: PERMISSIONS.AI_ML_SERVICES }
     ]
   };
 
@@ -410,6 +647,12 @@ const Settings = () => {
       case "telco-gateway": return activeTelcoTab;
       case "devices-management": return activeNetopsTab;
       case "help-center": return activeHelpCenterTab;
+      case "staff-insights": return activeStaffInsightsTab;
+      case "work-planner": return activeWorkPlannerTab;
+      case "ai-chat": return activeAIChatTab;
+      case "ai-analysis": return activeAIAnalysisTab;
+      case "outbound-ai-agent": return activeOutboundAIAgentTab;
+      case "inbound-ai-agent": return activeInboundAIAgentTab;
       default: return "";
     }
   };
@@ -422,6 +665,12 @@ const Settings = () => {
       case "telco-gateway": handleTelcoTabChange(subTabKey); break;
       case "devices-management": handleNetopsTabChange(subTabKey); break;
       case "help-center": handleHelpCenterTabChange(subTabKey); break;
+      case "staff-insights": handleStaffInsightsTabChange(subTabKey); break;
+      case "work-planner": handleWorkPlannerTabChange(subTabKey); break;
+      case "ai-chat": handleAIChatTabChange(subTabKey); break;
+      case "ai-analysis": handleAIAnalysisTabChange(subTabKey); break;
+      case "outbound-ai-agent": handleOutboundAIAgentTabChange(subTabKey); break;
+      case "inbound-ai-agent": handleInboundAIAgentTabChange(subTabKey); break;
     }
   };
 
@@ -655,6 +904,56 @@ const Settings = () => {
                     {activeHelpCenterTab === "topics" && <FAQTopics />}
                     {activeHelpCenterTab === "items" && <FAQItems />}
                     {activeHelpCenterTab === "types" && <FAQTypes />}
+                  </div>
+                )}
+
+                {/* Staff Insights Content */}
+                {activeTab === "staff-insights" && shouldRenderTab("staff-insights", activeStaffInsightsTab) && (
+                  <div>
+                    {activeStaffInsightsTab === "request-categories" && <RequestCategories />}
+                  </div>
+                )}
+
+                {/* Work Planner Content */}
+                {activeTab === "work-planner" && shouldRenderTab("work-planner", activeWorkPlannerTab) && (
+                  <div>
+                    {activeWorkPlannerTab === "statuses" && <WorkPlannerStatuses />}
+                  </div>
+                )}
+
+                {/* AI Chat Content */}
+                {activeTab === "ai-chat" && shouldRenderTab("ai-chat", activeAIChatTab) && (
+                  <div>
+                    {activeAIChatTab === "tools-profiles" && <ToolProfiles />}
+                    {activeAIChatTab === "faq-profiles" && <FaqProfiles />}
+                    {activeAIChatTab === "tenant-profile" && <AIChatFAQsTenant />}
+                    {activeAIChatTab === "global-faqs" && <AIChatFAQsGlobal />}
+                  </div>
+                )}
+
+                {/* AI Analysis Content */}
+                {activeTab === "ai-analysis" && shouldRenderTab("ai-analysis", activeAIAnalysisTab) && (
+                  <div>
+                    {activeAIAnalysisTab === "manage-extensions" && <ManageExtensions />}
+                    {activeAIAnalysisTab === "backend-operations" && <BackendOperations />}
+                    {activeAIAnalysisTab === "manual-analysis" && <ManualAnalysis />}
+                  </div>
+                )}
+
+                {/* Outbound Ai Agent Content */}
+                {activeTab === "outbound-ai-agent" && shouldRenderTab("outbound-ai-agent", activeOutboundAIAgentTab) && (
+                  <div>
+                    {activeOutboundAIAgentTab === "trunk-profiles" && <OutboundTrunkProfiles />}
+                    {activeOutboundAIAgentTab === "bot-profiles" && <AIMLProfiles />}
+                  </div>
+                )}
+
+                {/* Inbound Ai Agent Content */}
+                {activeTab === "inbound-ai-agent" && shouldRenderTab("inbound-ai-agent", activeInboundAIAgentTab) && (
+                  <div>
+                    {activeInboundAIAgentTab === "trunk-profiles" && <InboundTrunkProfiles />}
+                    {activeInboundAIAgentTab === "bot-profiles" && <InboundBotProfiles />}
+                    {activeInboundAIAgentTab === "faqs" && <InboundFAQs />}
                   </div>
                 )}
               </div>

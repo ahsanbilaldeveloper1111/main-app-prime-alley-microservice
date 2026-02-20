@@ -31,6 +31,7 @@ import {
   MessageCircle,
   Plus,
   Ticket,
+  MonitorCheck,
     } from 'lucide-react';
 import { Badge, Button, Dropdown } from 'react-bootstrap';
 import { useCti } from '@hooks/useCti';
@@ -1163,6 +1164,19 @@ const Layout = ({ children }: LayoutProps) => {
                   title="Open Dialer"
                 >
                   <Phone size={14} />
+                </button>
+              )}
+
+                {/* Dialer Button */}
+              {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
+                <button
+                  className="crm-prime-topbar-icon"
+                  onClick={(e) => {
+                    router.push('/live-calls');
+                  }}
+                  title="Live Wallboards"
+                >
+                  <MonitorCheck size={14} />
                 </button>
               )}
 

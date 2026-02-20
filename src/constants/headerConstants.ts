@@ -35,7 +35,7 @@ export const HEADER_CONSTANTS = {
 
     REPORTS: 'Unified Reports',
     CALL_REPORTS: 'Call Analytics',
-    AI_INSIGHTS: 'AI Insights',
+    AI_INSIGHTS: 'Calls Analysis',
     LIVE_CALLS: 'Live Calls',
     TICKETS: 'Tickets',
     AUTOMATION: 'Campaign Manager',

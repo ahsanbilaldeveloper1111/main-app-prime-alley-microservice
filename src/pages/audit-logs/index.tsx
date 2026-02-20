@@ -188,6 +188,53 @@ const AuditLogColumnsByModule: Record<string, TableColumn<Record<string, unknown
     { key: "description", label: "Description", sortable: false, type: "text", emptyValue: "—" },
     changesSummaryColumn(),
   ],
+  "Main App": [
+    {
+      key: "formatted_timestamp",
+      label: "Date & Time",
+      sortable: true,
+      type: "text",
+      accessor: (row: Record<string, unknown>) =>
+        (row.formatted_timestamp as string) || (row.created_at ? moment(String(row.created_at)).format("MMM D, YYYY HH:mm:ss") : null) || "—",
+      emptyValue: "—",
+    },
+    {
+      key: "formatted_action",
+      label: "Action",
+      sortable: true,
+      type: "text",
+      accessor: (row: Record<string, unknown>) =>
+        (row.formatted_action as string) || formatLabel(row.action) || (row.action as string) || "—",
+      emptyValue: "—",
+    },
+    {
+      key: "resource_type",
+      label: "Resource",
+      sortable: true,
+      type: "text",
+      accessor: (row: Record<string, unknown>) => formatLabel((row.record_type ?? row.resource_type) as string) || "—",
+      emptyValue: "—",
+    },
+    {
+      key: "user_id",
+      label: "User",
+      sortable: true,
+      type: "text",
+      accessor: (row: Record<string, unknown>) => {
+        if (row.user_display != null && row.user_display !== "") return String(row.user_display);
+        const uExt = row.user_extension;
+        if (uExt && typeof uExt === "object" && !Array.isArray(uExt))
+          return (uExt as any).display_name || (uExt as any).name || (uExt as any).email || "—";
+        const u = row.user_id;
+        if (u && typeof u === "object" && !Array.isArray(u)) return (u as any).display_name || (u as any).name || "—";
+        if (u != null && u !== "") return String(u);
+        if (uExt != null && uExt !== "") return String(uExt);
+        return "—";
+      },
+      emptyValue: "—",
+    },
+    changesSummaryColumn(),
+  ],
 };
 
 /** Default columns when module has no specific definition. */
@@ -257,19 +304,31 @@ const AUDIT_SIDEBAR_FIELDS_BY_MODULE: Record<
     { label: "Entity name", key: "entity_name" },
     { label: "Description", key: "description", showWhenKey: "description" },
   ],
+  "Main App": [
+    { label: "Date & time", key: "formatted_timestamp", copyable: true },
+    { label: "Action", key: "formatted_action" },
+    { label: "Resource", key: "resource_type" },
+    { label: "User", key: "user_id" },
+    { label: "Changes", key: "changes_summary" },
+  ],
 };
 
 const DEFAULT_SIDEBAR_FIELDS = AUDIT_SIDEBAR_FIELDS_BY_MODULE["Staff management"];
 
 function getSidebarFieldValue(row: Record<string, unknown>, key: string): string {
-  if (key === "user") {
+  if (key === "user" || key === "user_id") {
+    if (row.user_display != null && row.user_display !== "") return String(row.user_display);
+    const uExt = row.user_extension;
+    if (uExt && typeof uExt === "object" && !Array.isArray(uExt))
+      return (uExt as any).display_name || (uExt as any).name || (uExt as any).email || "—";
+    if (uExt != null && uExt !== "") return String(uExt);
     const u = row.user as any;
-    return u?.display_name || u?.email || (row.user_id as string) || "—";
+    return u?.display_name || u?.email || (row.user_id != null ? String(row.user_id) : "—") || "—";
   }
   if (key === "company") {
     return (row.company as any)?.name || "—";
   }
-  if (key === "resource_type") return formatLabel(row.resource_type);
+  if (key === "resource_type") return formatLabel(row.record_type ?? row.resource_type);
   if (key === "formatted_timestamp") {
     const v = row.formatted_timestamp;
     if (v != null && v !== "") return String(v);
@@ -291,6 +350,11 @@ function getSidebarFieldValue(row: Record<string, unknown>, key: string): string
     return (row.action_display as string) || formatLabel(row.event) || "—";
   }
   if (key === "entity_type") return formatLabel(row.entity_type) || "—";
+  if (key === "changes_summary") {
+    const summary = row.changes_summary as ChangeItem[] | undefined;
+    if (!summary?.length) return "—";
+    return `${summary.length} change${summary.length !== 1 ? "s" : ""}: ${summary.map((c) => c.field).filter(Boolean).join(", ")}`;
+  }
   const v = row[key];
   return v != null && v !== "" ? String(v) : "—";
 }
@@ -468,12 +532,17 @@ const AuditLogsNewPage = () => {
   }, [auditLogsSummary, auditLogsData?.length, auditTotal]);
 
   useEffect(() => {
-    if (!selectedAuditService || (selectedAuditService.users !== "hierarchy" && selectedAuditService.users !== "dropdown")) {
-      setAuditUserOptions([]);
-      return;
-    }
-    const moduleSlug = selectedAuditService.moduleSlug;
-    if (!moduleSlug) {
+    const moduleSlug =
+      selectedAuditModule?.moduleSlug ??
+      selectedAuditService?.moduleSlug ??
+      selectedAuditModule?.services?.[0]?.moduleSlug;
+    const moduleUsesHierarchy =
+      !!selectedAuditModule?.moduleSlug ||
+      selectedAuditModule?.users === "hierarchy" ||
+      selectedAuditModule?.users === "dropdown" ||
+      selectedAuditService?.users === "hierarchy" ||
+      selectedAuditService?.users === "dropdown";
+    if (!moduleSlug || !moduleUsesHierarchy) {
       setAuditUserOptions([]);
       return;
     }
@@ -490,11 +559,11 @@ const AuditLogsNewPage = () => {
       })
       .catch(() => { if (!cancelled) setAuditUserOptions([]); });
     return () => { cancelled = true; };
-  }, [selectedAuditService?.serviceName, selectedAuditService?.moduleSlug, selectedAuditService?.users]);
+  }, [selectedAuditModule, selectedAuditService?.serviceName, selectedAuditService?.moduleSlug, selectedAuditService?.users, selectedAuditModule?.users]);
 
   useEffect(() => {
     if (!selectedAuditModule || typeof selectedAuditModule.endpoint !== "function") return;
-    const moduleSlug = selectedAuditService?.moduleSlug ?? selectedAuditModule.services[0]?.moduleSlug;
+    const moduleSlug = selectedAuditModule?.moduleSlug ?? selectedAuditService?.moduleSlug ?? selectedAuditModule?.services?.[0]?.moduleSlug;
     const pageKey = selectedAuditModule.pageKey ?? "page";
     const perPageKey = selectedAuditModule.perPageKey ?? "limit";
     const params: Record<string, unknown> = {
@@ -505,9 +574,10 @@ const AuditLogsNewPage = () => {
     if (selectedAuditService) {
       if (selectedAuditService.serviceKey) params[selectedAuditService.serviceKey] = selectedAuditService.serviceValue;
       else params.service = selectedAuditService.serviceName;
-      if (selectedAuditUser) {
-        params[selectedAuditService.userKey || "user_id"] = selectedAuditUser;
-      }
+    }
+    if (selectedAuditUser) {
+      const userKey = selectedAuditService?.userKey ?? selectedAuditModule?.userKey ?? "user_id";
+      params[userKey] = selectedAuditUser;
     }
     if (selectedAuditAction) {
       if (selectedAuditService?.actionKey) params[selectedAuditService.actionKey] = selectedAuditAction;
@@ -566,10 +636,29 @@ const AuditLogsNewPage = () => {
     setSelectedRow(null);
   }, []);
 
-  /** Normalize rows: Accounts/Automation derive changes from old_values/new_values; CRM use changes as changes_summary. */
+  /** Normalize rows: Main App / Accounts / Automation derive changes from old_values/new_values; CRM use changes as changes_summary. */
   const dataList = useMemo(() => {
     const raw = auditLogsData ?? [];
     const moduleName = selectedAuditModule?.moduleName ?? "";
+    if (moduleName === "Main App") {
+      return raw.map((row: any) => {
+        const derived = deriveChangesFromOldNew(row.old_values, row.new_values);
+        const ext = row.user_extension != null ? String(row.user_extension) : "";
+        const userDisplay =
+          auditUserOptions.find((o) => String(o.value) === ext)?.label ??
+          (row.user_extension && typeof row.user_extension === "object"
+            ? (row.user_extension as any).display_name || (row.user_extension as any).name
+            : null);
+        return {
+          ...row,
+          resource_type: row.record_type ?? row.resource_type,
+          formatted_timestamp: row.formatted_timestamp ?? (row.created_at ? moment(String(row.created_at)).format("MMM D, YYYY HH:mm:ss") : null),
+          formatted_action: row.formatted_action ?? (row.action ? formatLabel(row.action) : null) ?? row.action,
+          changes_summary: row.changes_summary ?? derived,
+          ...(userDisplay != null && userDisplay !== "" ? { user_display: userDisplay } : {}),
+        };
+      });
+    }
     if (moduleName === "Accounts" || moduleName === "Automation") {
       return raw.map((row: any) => {
         const existing = row.changes_summary;
@@ -646,7 +735,9 @@ const AuditLogsNewPage = () => {
         { label: "Custom range...", value: "custom", onClick: () => { setCustomStartDate(auditStartDate || ""); setCustomEndDate(auditEndDate || ""); setShowAuditDateCustomModal(true); } },
       ],
     });
-    const showUserPill = selectedAuditService && (selectedAuditService.users === "hierarchy" || selectedAuditService.users === "dropdown");
+    const showUserPill =
+      (selectedAuditModule && (selectedAuditModule.users === "hierarchy" || selectedAuditModule.users === "dropdown")) ||
+      (selectedAuditService && (selectedAuditService.users === "hierarchy" || selectedAuditService.users === "dropdown"));
     if (showUserPill) {
       pills.push({
         id: "audit_user",

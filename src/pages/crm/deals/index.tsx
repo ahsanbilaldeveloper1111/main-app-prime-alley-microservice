@@ -2462,7 +2462,7 @@ const [dealToConvert, setDealToConvert] = useState<number | null>(null);
           columns={dealsColumns}
           actions={dealsActions}
           showActions={false}
-          customizableColumns={true}
+          // customizableColumns={true}
           defaultSelectedColumns={['name', 'company', 'stage', 'status', 'approvalStatus', 'dealType', 'value', 'assignedUser', 'closeDate', 'owner']}
           columnStorageKey="dealsSelectedColumns"
           onColumnChange={(cols) => setSelectedDealsColumns(cols)}
