@@ -5,6 +5,7 @@ import { AuditLogsWorkPlanner } from "@utils/work-planner";
 import { GetTmsAuditLogs } from "@utils/tms/List";
 import { GetAccountAuditLogs } from "@utils/accounting";
 import { getCrmAuditLogs } from "@utils/crm";
+import { mainAppAuditLogs } from "@utils/users";
 
 export interface AuditFilterService {
   serviceName: string;
@@ -27,6 +28,12 @@ export interface AuditFilterNode {
   pageKey?: string;
   perPageKey?: string;
   timestamp?: string | [string, string] | [string];
+  /** When set, hierarchy data is fetched on module selection and listing user names depend on it. */
+  moduleSlug?: string;
+  /** When "dropdown" or "hierarchy", user dropdown shows on module selection and hierarchy API is used. */
+  users?: string;
+  /** API param key for user filter (e.g. "user_id"). Used when no service is selected. */
+  userKey?: string;
 }
 
 export const AuditFilterActions = {
@@ -36,7 +43,8 @@ export const AuditFilterActions = {
   UPDATED: "updated",
   REMOVE: "Remove",
   REMOVED: "Removed",
-  DELETED: "deleted"
+  DELETED: "deleted",
+  LOGIN: "login"
 
 } as const;
 
@@ -470,10 +478,47 @@ const CrmAuditLogsServices = {
   ],
 };
 
+const MainAppAuditLogsServices = {
+  moduleName: "Main App",
+  isShow: HEADER_CONSTANTS.PERMISSIONS.CONTROL_HUB_SERVICES,
+  endpoint: mainAppAuditLogs as (params: Record<string, unknown>) => Promise<unknown>,
+  responsePattern: [],
+  perPageKey: "per_page",
+  pageKey: "page",
+  timestamp: ["date_from", "date_to"] as [string, string],
+  users: "dropdown",
+  userKey: "user_id",
+  moduleSlug: ModuleSlug.USER_DIRECTORY,
+
+  services: [
+    {
+      serviceName: "User",
+      serviceValue: "user",
+      serviceKey: "record_type",
+      isShow: HEADER_CONSTANTS.PERMISSIONS.CONTROL_HUB_SERVICES,
+      actions: [AuditFilterActions.CREATE, AuditFilterActions.MODIFY, AuditFilterActions.LOGIN],
+      users: "dropdown",
+      userKey: "user_id",
+      moduleSlug: ModuleSlug.USER_DIRECTORY,
+    },
+    {
+      serviceName: "Test",
+      serviceValue: "test",
+      serviceKey: "record_type",
+      isShow: HEADER_CONSTANTS.PERMISSIONS.CONTROL_HUB_SERVICES,
+      actions: [AuditFilterActions.CREATE, AuditFilterActions.MODIFY, AuditFilterActions.LOGIN],
+      users: "dropdown",
+      userKey: "user_id",
+      moduleSlug: ModuleSlug.USER_DIRECTORY,
+    },
+  ],
+};
+
 export const AuditFilterConfig: AuditFilterNode[] = [
   StaffManagementServices,
   WorkPlannerServices,
   AccountingAuditLogsServices,
   TmsAuditLogsServices,
   CrmAuditLogsServices,
+  MainAppAuditLogsServices,
 ];
