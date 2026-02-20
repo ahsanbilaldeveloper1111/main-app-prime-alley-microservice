@@ -1,6 +1,7 @@
 import { toast } from "react-toastify";
 import { reportApiError } from "./sentryLogger";
 import axiosInstance from "./axios";
+import tokenService from "./tokenService";
 import { ModuleSlug } from "./Helper";
 
 // API Response Structure from Controlhub
@@ -2665,22 +2666,47 @@ export const deleteLeadFollowUp = async (
   }
 };
 
-// Meetings API
-export const createMeeting = async (data: {
+// Meetings API (POST /v1/api/meetings per CRM Meetings API spec)
+export interface CreateMeetingPayload {
   name: string;
   meeting_type: string;
-  meeting_date: string;
-  meeting_time: string;
+  meeting_date: string; // Y-m-d
+  meeting_time: string; // H:i
+  extensions: string[]; // at least one, max 15 chars each
   meeting_outcome?: string;
-  lead_id?: string;
-  deal_id?: string;
-  extensions: string[];
-}): Promise<MeetingData> => {
+  lead_id?: number | string;
+  deal_id?: number | string;
+  status?: string; // default: scheduled
+  tenant_id?: string; // uuid for Google Meet
+  extension_user?: string; // extension of user creating meeting (max 64)
+  attendees?: string[]; // email addresses
+  summary?: string; // max 255
+}
+
+export const createMeeting = async (data: CreateMeetingPayload): Promise<MeetingData> => {
   try {
-    const response = await axiosInstance.post(`/crm/create-meeting`, data);
-    const responseData: any = response.data?.data;
-    toast.success("Meeting created successfully");
-    return responseData?.data || responseData || response.data;
+    const response = await axiosInstance.post<{ success: boolean; data: MeetingData; message?: string }>(
+      "/crm/create-meeting",
+      {
+        name: data.name,
+        meeting_type: data.meeting_type,
+        meeting_date: data.meeting_date,
+        meeting_time: data.meeting_time,
+        extensions: data.extensions,
+        ...(data.meeting_outcome != null && { meeting_outcome: data.meeting_outcome }),
+        ...(data.lead_id != null && { lead_id: Number(data.lead_id) }),
+        ...(data.deal_id != null && { deal_id: Number(data.deal_id) }),
+        ...(data.status != null && { status: data.status }),
+        ...(data.tenant_id != null && { tenant_id: data.tenant_id }),
+        ...(data.extension_user != null && { extension_user: data.extension_user }),
+        ...(data.attendees != null && data.attendees.length > 0 && { attendees: data.attendees }),
+        ...(data.summary != null && data.summary !== "" && { summary: data.summary }),
+      }
+    );
+    const body = response.data;
+    const responseData = body?.data;
+    toast.success(body?.message ?? "Meeting created successfully");
+    return responseData;
   } catch (error: any) {
     toast.error(
       error?.response?.data?.message ||
