@@ -2067,16 +2067,6 @@ const CrmProspectsManagement = () => {
       createTask,
       taskDueDate,
     });
-
-    // Here you would typically:
-    // 1. Save the note to your backend/database
-    // 2. If createTask is true, create a task with the due date
-    // 3. Update the UI to show the new note
-    // 4. Maybe refresh the notes section
-
-    alert(
-      `Note saved successfully!\n\nNote: ${note}\nCreate Task: ${createTask}\nDue Date: ${taskDueDate || "N/A"}`,
-    );
   };
   // Handle call button click
   const handleCallClick = useCallback(
@@ -8198,6 +8188,8 @@ const CrmProspectsManagement = () => {
               name: selectedProspect?.name || "NA",
               gradient: getRandomColor(selectedProspect?.name || ""),
             }}
+            recordType="prospect"
+            recordId={selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined}
             onNoteCreate={handleNoteCreate}
             breezeRecordSummary={{
               content:
