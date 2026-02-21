@@ -70,6 +70,7 @@ import logodark from '@assets/images/Prime-Alley-Logo.png';
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
 import { getCurrentUserCompanyImage } from "@utils/company";
+import { useSession } from "next-auth/react";
 
 // Destructure constants for easier use
 const { MENU_LABELS, ICONS, PERMISSIONS, MENU_COLORS, BASE_URL } = HEADER_CONSTANTS;
@@ -114,6 +115,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
   isSidebarExpanded: controlledExpanded,
   setSidebarExpanded: setControlledExpanded,
 }) => {
+  const { data: session, status } = useSession();
   const [internalExpanded, setInternalExpanded] = useState(false);
   const isSidebarExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
   const setIsSidebarExpanded = setControlledExpanded ?? setInternalExpanded;
@@ -127,6 +129,15 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
   const prevPathnameRef = useRef<string>('');
   const [currentUserCompanyImageUrl, setCurrentUserCompanyImageUrl] = useState<string | null>(null);
   const companyImageUrlRef = useRef<string | null>(null);
+
+  const [userCompanyName, setUserCompanyName] = useState('');
+  useEffect(() => {
+		if (status !=="loading" && session) {
+		  if (typeof window !== "undefined") {
+		    setUserCompanyName(session.user.company_name || '');
+		  }
+		}
+	}, [ status, session]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1611,7 +1622,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         {/* Header */}
         <div className="sidebar-header">
           {isSidebarExpanded && <div className="sidebar-logo">
-            PRIME ALLEY
+            {userCompanyName}
             {/* {currentUserCompanyImageUrl ? (
               <img
                 src={currentUserCompanyImageUrl}
