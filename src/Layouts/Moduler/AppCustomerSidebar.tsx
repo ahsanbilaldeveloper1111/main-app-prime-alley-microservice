@@ -711,22 +711,16 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: 'Projects Dashboard',
           icon: <Folder size={16} />,
           url: '/work-planner/projects/dashboard',
-          permission: PERMISSIONS.WORK_PLANNER_SERVICES 
+          permission: PERMISSIONS.VIEW_PROJECTS_DASHBOARD_WORK_PLANNER 
         },
         {
           id: 'work-planner-projects',
           title: 'Projects',
           icon: <Folder size={16} />,
           url: '/work-planner/projects',
-          permission: PERMISSIONS.WORK_PLANNER_SERVICES 
+          permission: PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER 
         },
-        // {
-        //   id: 'work-planner-statuses',
-        //   title: 'Statuses',
-        //   icon: <List size={16} />,
-        //   url: '/work-planner/statuses',
-        //   permission: PERMISSIONS.WORK_PLANNER_SERVICES 
-        // },
+       
       ].filter(item => !item.permission || hasPermission(item.permission))
     }, 
 

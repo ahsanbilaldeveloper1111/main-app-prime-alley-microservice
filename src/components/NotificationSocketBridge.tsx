@@ -1,21 +1,25 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useNotifications, type AddNotificationPayload } from '../contexts/NotificationContext';
-import { useNotificationSocket, SocketNotificationPayload } from '../hooks/useNotificationSocket';
+import {
+  useNotificationSocket,
+  type SocketNotificationPayload,
+} from '../hooks/useNotificationSocket';
 
 /**
- * Maps socket notification payload to AddNotificationPayload and adds it via addNotification.
+ * Maps a socket notification event to the shape expected by NotificationContext.
  */
-function socketNotificationToPayload(notification: SocketNotificationPayload): AddNotificationPayload {
+function mapSocketToPayload(notification: SocketNotificationPayload): AddNotificationPayload {
+  const id = String(notification.id);
   return {
-    messageId: notification.id,
+    messageId: id,
     notification: {
-      title: notification.title || 'Notification',
+      title: notification.title ?? 'Notification',
       body: notification.description ?? '',
     },
     data: {
-      notification_id: notification.id,
+      notification_id: id,
       title: notification.title,
       description: notification.description,
       created_at: notification.created_at,
@@ -25,19 +29,23 @@ function socketNotificationToPayload(notification: SocketNotificationPayload): A
 }
 
 /**
- * Connects the notification Socket.IO when the user is logged in, subscribes to
- * 'notifications' and 'extension.<session.user.phone>', and pushes each incoming
- * notification into NotificationContext so it appears in the UI.
- * Mount this inside a layout that is only rendered for authenticated users (e.g. main Layout).
+ * Subscribes to the notification socket when the user is authenticated and
+ * pushes each incoming notification into NotificationContext.
+ * Mount once in the app (e.g. in _app or layout).
  */
-export default function NotificationSocketBridge() {
+export default function NotificationSocketBridge(): null {
   const { addNotification } = useNotifications();
+
+  const handleNotification = useCallback(
+    (notification: SocketNotificationPayload) => {
+      addNotification(mapSocketToPayload(notification));
+    },
+    [addNotification]
+  );
 
   useNotificationSocket({
     enabled: true,
-    onNotification: (notification) => {
-      addNotification(socketNotificationToPayload(notification));
-    },
+    onNotification: handleNotification,
   });
 
   return null;

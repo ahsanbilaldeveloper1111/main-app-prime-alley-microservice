@@ -15,21 +15,19 @@ interface PaginationParams {
 export const ListNotifications = async (params: PaginationParams = {}) => {
   try {
     const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '' } = params;
-    
-    const response = await axiosInstance.get(
-      `/notifications`,
-      {
+
+    const response = await axiosInstance.get(`/notifications`, {
+      params: {
         page,
         perPage,
         search,
         draw,
         ...filters,
         isExport,
-        exportType
+        exportType,
       },
-      
-    );
-  
+    });
+
     return response?.data;
   } catch (error) {
     console.error('API Error:', error);

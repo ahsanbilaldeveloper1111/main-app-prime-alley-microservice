@@ -559,12 +559,11 @@ export const routePermissions: RoutePermission[] = [
             { path: '/orders',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
             { path: '/recurring-reminders',permissions: [PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER]},
             { path: '/todo',permissions: [PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER]},
-            { path: '/tasks-list',permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER]},
-            { path: '/projects',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
-            { path: '/projects/dashboard',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
-            { path: '/saved-views',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
-            { path: '/roles-settings',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
-            { path: '/statuses',permissions: [PERMISSIONS.WORK_PLANNER_SERVICES]},
+            { path: '/tasks-list', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER] },
+            {path: '/tasks-list/:id', permissions: [PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER]},
+            { path: '/projects',permissions: [PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER]},
+            { path: '/projects/dashboard',permissions: [PERMISSIONS.VIEW_PROJECTS_DASHBOARD_WORK_PLANNER]},
+            { path: '/statuses',permissions: [PERMISSIONS.VIEW_STATUSES_WORK_PLANNER]},
         ]
     },
     // management services start

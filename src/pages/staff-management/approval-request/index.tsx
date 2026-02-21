@@ -1,5 +1,6 @@
 import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/router";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
@@ -9,7 +10,7 @@ import { useSession } from "next-auth/react";
 import {
   getUserRequestCategories,
   getUserRequestCategoryFields,
-  getUserRequests,
+  getUserRequests,getUserRequest,
   updateUserRequest,
   deleteUserRequest,
   downloadUserRequestAttachment,
@@ -113,6 +114,7 @@ function getDateRangeForOption(option: string): { start_date_from: string; start
 }
 
 const ApprovalRequest = () => {
+  const router = useRouter();
   const { data: session } = useSession();
   const { mainAppUsers } = useMainAppLookups();
 
@@ -249,6 +251,29 @@ const ApprovalRequest = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedRequestedByUserId, selectedDate]);
+
+  // Open sidebar when navigating from notification with ?openId= (target_id)
+  useEffect(() => {
+    if (!router.isReady || !router.query.openId) return;
+    const openId = router.query.openId;
+    const id = typeof openId === "string" ? openId : Array.isArray(openId) ? openId[0] : undefined;
+    if (!id || Number.isNaN(Number(id))) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const request = await getUserRequest(Number(id));
+        if (!cancelled && request) setSelectedRequest(request);
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) {
+          const { openId: _, ...rest } = router.query;
+          router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [router.isReady, router.query.openId]);
 
   const refreshRequests = useCallback(() => {
     loadRequests(currentPage);
@@ -933,7 +958,12 @@ const ApprovalRequest = () => {
                     return (
                       <tr
                         key={request.id}
-                        onClick={() => setSelectedRequest(request)}
+                        onClick={() => {
+                          setSelectedRequest(request);
+                          getUserRequest(request.id).then((request) => {
+                            setSelectedRequest(request);
+                          });
+                        }}
                         style={{
                           borderBottom: index < requests.length - 1 ? "1px solid #f3f4f6" : "none",
                           cursor: "pointer",
