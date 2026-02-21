@@ -18,7 +18,7 @@ import GenericTable, {
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
-import ConvertToOrderModal from "@components/ConvertToOrderModal";
+import ConvertDealToOrderModal from "@components/ConvertDealToOrderModal";
 import { CreateDealSidebar } from "@components/renderCreateDealForm";
 import {
   FiUpload,
@@ -1309,7 +1309,8 @@ const CrmDeals = () => {
   // Handle first column click - navigates to detail page
   const handleFirstColumnClick = useCallback(
     (deal: any) => {
-      router.push("/crm/deals/deals-detailpage");
+      const id = deal?.id ?? deal?.rawData?.id;
+      router.push(id ? `/crm/deals/deals-detailpage?id=${id}` : "/crm/deals/deals-detailpage");
     },
     [router],
   );
@@ -2495,112 +2496,6 @@ const CrmDeals = () => {
     handleMarkLost,
   ]);
 
-  // Render Add Deals button with dropdown
-  const renderAddDealsButton = () => (
-    <div
-      ref={addDealsRef}
-      style={{
-        position: "absolute",
-        right: "19px",
-        top: "18px",
-        width: "146px",
-      }}
-    >
-      <button
-        onClick={() => setShowAddDealsDropdown(!showAddDealsDropdown)}
-        style={{
-          padding: "9px 13px",
-          backgroundColor: "#000000",
-          color: "#ffffff",
-          border: "none",
-          borderRadius: "4px",
-          fontSize: "12px",
-          fontWeight: "500",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "#1a1a1a";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "#000000";
-        }}
-      >
-        Add deals
-        <ChevronDown size={16} />
-      </button>
-
-      {showAddDealsDropdown && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            right: 0,
-            marginTop: "4px",
-            backgroundColor: "#ffffff",
-            border: "1px solid #e2e8f0",
-            borderRadius: "5px",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-            minWidth: "160px",
-            zIndex: 1000,
-            overflow: "hidden",
-          }}
-        >
-          <button
-            onClick={() => {
-              setShowAddDealsDropdown(false);
-              setShowCreateDealSidebar(true);
-            }}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              backgroundColor: "transparent",
-              border: "none",
-              textAlign: "left",
-              fontSize: "14px",
-              color: "#141414",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            Create new
-          </button>
-          <button
-            onClick={() => {
-              setShowAddDealsDropdown(false);
-              console.log("Import deals");
-            }}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              backgroundColor: "transparent",
-              border: "none",
-              textAlign: "left",
-              fontSize: "14px",
-              color: "#d97706",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            Import
-          </button>
-        </div>
-      )}
-    </div>
-  );
-
   if (!session?.user?.permissions?.includes("list-crm-deals")) {
     return null;
   }
@@ -2659,9 +2554,6 @@ const CrmDeals = () => {
         mainLink="/crm/dashboard"
         subTitle="Deals"
       />
-
-      {/* Add Deals Button */}
-      {renderAddDealsButton()}
 
       {/* Main flex container for content and sidebar */}
       <div
@@ -2861,6 +2753,10 @@ const CrmDeals = () => {
                 toolbar={{
                   // Tabs
                   showTabs: true,
+                  showImport: false,
+                  onImportClick: () => {
+                    console.log("Import prospects");
+                  },
                   tabsDropdownLabel: "Deals",
                   tabs: [
                     {
@@ -3000,7 +2896,9 @@ const CrmDeals = () => {
               type: RECORD_TYPES.DEAL,
             }}
             recordType="deal"
-            recordId={selectedDeal?.id ?? selectedDeal?.rawData?.id ?? undefined}
+            recordId={
+              selectedDeal?.id ?? selectedDeal?.rawData?.id ?? undefined
+            }
             onNoteCreate={handleNoteCreate}
             breezeRecordSummary={{
               content: `This deal was created on ${selectedDeal?.created_at ? moment(selectedDeal.created_at).format("MMMM DD, YYYY") : "recent date"}. ${selectedDeal?.stage?.name ? `Currently in ${selectedDeal.stage.name} stage.` : ""} ${selectedDeal?.value ? `Deal value: ${selectedDeal.currency || "AED"} ${parseFloat(String(selectedDeal.value)).toLocaleString()}.` : ""} ${selectedDeal?.company_name || selectedDeal?.company ? `Company: ${selectedDeal.company_name || selectedDeal.company}.` : ""}`,
@@ -7368,7 +7266,7 @@ const CrmDeals = () => {
 
       {/* Convert to Order Modal */}
       {dealToConvert && (
-        <ConvertToOrderModal
+        <ConvertDealToOrderModal
           show={showConvertToOrderModal}
           onHide={() => {
             setShowConvertToOrderModal(false);
@@ -7376,8 +7274,6 @@ const CrmDeals = () => {
           }}
           dealId={dealToConvert}
           onSuccess={() => {
-            // Optionally refresh deals list or show success message
-            // toast.success("Order created successfully!");
             setRefreshKey((prev) => prev + 1);
           }}
         />

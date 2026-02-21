@@ -1,12 +1,16 @@
 import React, { useState, useRef, useEffect, ReactElement } from 'react';
+import { useRouter } from 'next/router';
 import {
-  X, ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
-  Calendar, MessageSquare, ClipboardList, ExternalLink, Copy, RefreshCw,
-  ThumbsUp, ThumbsDown, Sparkles, User, Building2, Briefcase,
-  FileText, Ticket, Paperclip, Link2, Tag, DollarSign,
-  Search, Filter, AlertCircle, ShoppingCart, Handshake
+  ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
+  Calendar, ClipboardList, ExternalLink, Copy, RefreshCw,
+  ThumbsUp, ThumbsDown, Sparkles, FileText, Paperclip,
+  AlertCircle, ShoppingCart, Handshake
 } from 'lucide-react';
 import Layout from "@layout/index";
+import { getDeal, type DealData } from '@utils/crm';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+import CrmActivitiesPanel from '@components/CrmActivitiesPanel';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -21,24 +25,6 @@ interface KeyInfoField {
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
 };
-
-interface ActivityItem {
-  id: string;
-  type: 'invoice' | 'email' | 'subscription' | 'note' | 'call' | 'meeting' | 'task';
-  title: string;
-  description: string;
-  timestamp: string;
-  user?: string;
-  userLink?: string;
-  entityLink?: string;
-  entityName?: string;
-  alert?: {
-    message: string;
-    link?: string;
-    linkText?: string;
-  };
-  expanded?: boolean;
-}
 
 interface SubscriptionItem {
   id: string;
@@ -68,16 +54,50 @@ interface RevenueSection {
 // ============================================================================
 
 const DealRecordPage: NextPageWithLayout = () => {
+  const router = useRouter();
+  const { id: dealId } = router.query;
+  const { hasPermission } = usePermissions();
+  const canSendWhatsApp = hasPermission(HEADER_CONSTANTS.PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM);
+
+  const [deal, setDeal] = useState<DealData | null>(null);
+  const [dealLoading, setDealLoading] = useState(true);
+  const [dealError, setDealError] = useState<string | null>(null);
+
   const [activeTab, setActiveTab] = useState('about');
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [showMoreActivities, setShowMoreActivities] = useState(false);
-  const [activityFilter, setActivityFilter] = useState('activity');
-  const [searchActivity, setSearchActivity] = useState('');
-  const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Set());
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
+
+  // Load deal by ID from URL
+  useEffect(() => {
+    if (!router.isReady || dealId == null || dealId === '') {
+      setDealLoading(false);
+      return;
+    }
+    const id = Number(dealId);
+    if (Number.isNaN(id)) {
+      setDealError('Invalid deal ID');
+      setDealLoading(false);
+      return;
+    }
+    setDealLoading(true);
+    setDealError(null);
+    getDeal(id)
+      .then((data: DealData) => {
+        setDeal(data);
+        setDealError(null);
+      })
+      .catch(() => {
+        setDeal(null);
+        setDealError('Failed to load deal');
+      })
+      .finally(() => {
+        setDealLoading(false);
+      });
+  }, [router.isReady, dealId]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -92,237 +112,6 @@ const DealRecordPage: NextPageWithLayout = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const toggleActivity = (activityId: string) => {
-    setExpandedActivities(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(activityId)) {
-        newSet.delete(activityId);
-      } else {
-        newSet.add(activityId);
-      }
-      return newSet;
-    });
-  };
-  
-  // Sample activity data
-  const activitiesData: ActivityItem[] = [
-    {
-      id: '1',
-      type: 'invoice',
-      title: 'Invoice activity',
-      description: 'sent invoice INV-1004 to',
-      timestamp: 'Feb 14, 2026 at 2:50 AM GMT+5',
-      user: 'Rizwan Haider',
-      userLink: '#',
-      entityName: 'Ahmad Hussain <ahmad@gmail.com>',
-      entityLink: '#',
-    },
-    {
-      id: '2',
-      type: 'email',
-      title: 'Marketing email',
-      description: 'sent to Ahmad Hussain <Ahmad Hussain <ahmad@gmail.com>>',
-      timestamp: 'Feb 14, 2026 at 2:50 AM GMT+5',
-      alert: {
-        message: 'There was an issue sending an email to this contact. An email to this recipient has bounced.',
-        link: '#',
-        linkText: 'Learn more.',
-      },
-      expanded: true,
-    },
-    {
-      id: '3',
-      type: 'invoice',
-      title: 'Invoice activity',
-      description: 'finalized invoice INV-1004',
-      timestamp: 'Feb 14, 2026 at 2:50 AM GMT+5',
-      user: 'Rizwan Haider',
-      userLink: '#',
-    },
-    {
-      id: '4',
-      type: 'meeting',
-      title: 'Meeting scheduled',
-      description: 'Meeting scheduled with',
-      timestamp: 'Feb 14, 2026 at 2:49 AM GMT+5',
-      entityName: 'Ahmad Hussain',
-      entityLink: '#',
-      user: 'Rizwan Haider',
-      userLink: '#',
-    },
-  ];
-  
-  const renderActivityItem = (activity: ActivityItem) => {
-    const isExpanded = expandedActivities.has(activity.id) || activity.expanded;
-    
-    return (
-      <div
-        key={activity.id}
-        style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #eaf0f6',
-          borderRadius: '5px',
-          padding: '16px 20px',
-          marginBottom: '12px',
-        }}
-      >
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: '12px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flex: 1 }}>
-            {activity.expanded !== undefined && (
-              <button
-                onClick={() => toggleActivity(activity.id)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  padding: '4px',
-                  cursor: 'pointer',
-                  color: '#141414',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              </button>
-            )}
-            
-            <div style={{ flex: 1 }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '4px',
-              }}>
-                <h4 style={{
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  margin: 0,
-                }}>
-                  {activity.title}
-                </h4>
-                <FileText size={14} color="#7c98b6" />
-              </div>
-              
-              <p style={{
-                fontSize: '14px',
-                color: '#141414',
-                margin: '4px 0',
-                lineHeight: '1.6',
-              }}>
-                {activity.user && (
-                  <>
-                    <a
-                      href={activity.userLink}
-                      style={{
-                        color: '#006162',
-                        textDecoration: 'none',
-                        fontWeight: '500',
-                      }}
-                    >
-                      {activity.user}
-                    </a>
-                    {' '}
-                  </>
-                )}
-                {activity.description}
-                {activity.entityName && (
-                  <>
-                    {' '}
-                    <a
-                      href={activity.entityLink}
-                      style={{
-                        color: '#006162',
-                        textDecoration: 'none',
-                        fontWeight: '500',
-                      }}
-                    >
-                      {activity.entityName}
-                    </a>
-                  </>
-                )}
-              </p>
-              
-              {activity.alert && isExpanded && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '12px 16px',
-                  backgroundColor: '#fff5f5',
-                  border: '1px solid #feb2b2',
-                  borderRadius: '5px',
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '8px',
-                  }}>
-                    <AlertCircle size={16} color="#e53e3e" style={{ marginTop: '2px', flexShrink: 0 }} />
-                    <div>
-                      <p style={{
-                        fontSize: '14px',
-                        color: '#141414',
-                        margin: 0,
-                        lineHeight: '1.6',
-                      }}>
-                        <strong>{activity.alert.message.split('.')[0]}.</strong>
-                        {' '}
-                        {activity.alert.message.split('.').slice(1).join('.')}
-                        {activity.alert.link && (
-                          <>
-                            {' '}
-                            <a
-                              href={activity.alert.link}
-                              style={{
-                                color: '#006162',
-                                textDecoration: 'none',
-                                fontWeight: '500',
-                              }}
-                            >
-                              {activity.alert.linkText}
-                            </a>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {isExpanded && activity.type === 'email' && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '12px',
-                  backgroundColor: '#f7fafc',
-                  borderRadius: '5px',
-                }}>
-                  <p style={{
-                    fontSize: '13px',
-                    color: '#7c98b6',
-                    margin: 0,
-                  }}>
-                    Transactional email Invoice from Prime Alley Technology
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <div style={{
-            fontSize: '13px',
-            color: '#7c98b6',
-            whiteSpace: 'nowrap',
-          }}>
-            {activity.timestamp}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   const toggleSection = (sectionId: string) => {
     setCollapsedSections(prev => {
@@ -405,6 +194,15 @@ const DealRecordPage: NextPageWithLayout = () => {
     navigator.clipboard.writeText(text);
   };
 
+  const formatDealAmount = (d: DealData | null) => {
+    if (!d) return '--';
+    const curr = d.currency ?? '';
+    const val = d.net_value ?? d.grand_total ?? '';
+    return val ? `${curr} ${val}` : '--';
+  };
+  const formatDate = (d: string | null | undefined) =>
+    d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '--';
+
   // Tabs
   const tabs = [
     { id: 'about', label: 'About' },
@@ -413,16 +211,29 @@ const DealRecordPage: NextPageWithLayout = () => {
     { id: 'intelligence', label: 'Intelligence' },
   ];
 
-  // Key Information Fields - Deal specific
+  // Key Information Fields - from deal API
   const keyInfoFields: KeyInfoField[] = [
-    { label: 'Deal Value', value: 'AED 50,000', copyable: true },
-    { label: 'Stage', value: 'Presentation Scheduled' },
-    { label: 'Probability', value: '75%' },
-    { label: 'Expected Close Date', value: 'March 1, 2026' },
-    { label: 'Deal Type', value: 'New Sale' },
-    { label: 'Company Name', value: 'Ahmad Hussain LTD' },
-    { label: 'Deal Owner', value: 'Rizwan Haider' },
+    { label: 'Deal Value', value: formatDealAmount(deal), copyable: true },
+    { label: 'Stage', value: deal?.stage?.name ?? deal?.status ?? '--' },
+    { label: 'Probability', value: deal != null ? `${deal.probability ?? 0}%` : '--' },
+    { label: 'Expected Close Date', value: formatDate(deal?.expected_close_date) },
+    { label: 'Deal Type', value: deal?.deal_type ?? '--' },
+    { label: 'Company Name', value: deal?.company_name ?? '--' },
+    { label: 'Deal Owner', value: deal?.assigned_to ?? '--' },
   ];
+
+  // Normalize deal for CrmActivitiesPanel
+  const dealRecord = deal
+    ? {
+        id: deal.id,
+        data: {
+          id: deal.id,
+          name: deal.name,
+          phone: deal.decision_maker_phone ?? (deal as any).phone ?? null,
+          data: {},
+        },
+      }
+    : null;
 
   const renderIntelligenceTab = () => {
     return (
@@ -453,7 +264,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                Presentation Scheduled
+                {deal?.stage?.name ?? deal?.status ?? '--'}
               </div>
             </div>
             <div>
@@ -464,23 +275,13 @@ const DealRecordPage: NextPageWithLayout = () => {
               }}>
                 Related Company
               </div>
-              <a
-                href="#"
-                style={{
-                  fontSize: '14px',
-                  color: '#006162',
-                  textDecoration: 'none',
-                  fontWeight: '500',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.textDecoration = 'underline';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.textDecoration = 'none';
-                }}
-              >
-                Ahmad Hussain LTD
-              </a>
+              <span style={{
+                fontSize: '14px',
+                color: '#006162',
+                fontWeight: '500',
+              }}>
+                {deal?.company_name ?? '--'}
+              </span>
             </div>
             <div>
               <div style={{
@@ -495,7 +296,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                AED 50,000
+                {formatDealAmount(deal)}
               </div>
             </div>
             <div>
@@ -511,7 +312,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                75%
+                {deal != null ? `${deal.probability ?? 0}%` : '--'}
               </div>
             </div>
             <div>
@@ -527,7 +328,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                March 1, 2026
+                {formatDate(deal?.expected_close_date)}
               </div>
             </div>
             <div>
@@ -543,7 +344,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                New Sale
+                {deal?.deal_type ?? '--'}
               </div>
             </div>
           </div>
@@ -573,7 +374,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                Technology
+                {deal?.industry ?? '--'}
               </div>
             </div>
 
@@ -590,7 +391,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                Leading technology solutions provider
+                {deal?.company_name ? `${deal.company_name} deal` : '--'}
               </div>
             </div>
           </div>
@@ -623,7 +424,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 color: '#141414',
                 fontWeight: '400',
               }}>
-                Rizwan Haider
+                {deal?.assigned_to ?? '--'}
               </div>
             </div>
 
@@ -646,7 +447,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                   color: '#141414',
                   fontWeight: '400',
                 }}>
-                  Pending
+                  {deal?.is_lost ? 'Lost' : (deal?.status ?? '--')}
                 </div>
               </div>
               <div>
@@ -662,7 +463,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                   color: '#141414',
                   fontWeight: '400',
                 }}>
-                  AED
+                  {deal?.currency ?? '--'}
                 </div>
               </div>
             </div>
@@ -1043,7 +844,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 margin: '0 0 4px 0',
                 lineHeight: '1.3',
               }}>
-                Ahmad Hussain LTD - New Deal
+                {deal?.name ?? 'Unknown'}
               </h2>
               <p style={{
                 fontSize: '14px',
@@ -1051,7 +852,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                 margin: '0 0 8px 0',
                 lineHeight: '1.4',
               }}>
-                AED 50,000 • Presentation Scheduled
+                {formatDealAmount(deal)} • {deal?.stage?.name ?? deal?.status ?? '--'}
               </p>
               <div style={{
                 display: 'flex',
@@ -1062,7 +863,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                   fontSize: '14px',
                   color: '#718096',
                 }}>
-                  Expected Close: March 1, 2026
+                  Expected Close: {formatDate(deal?.expected_close_date)}
                 </span>
               </div>
             </div>
@@ -1470,7 +1271,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                     padding: '18px 20px',
                     borderRadius: '10px',
                   }}>
-                    This deal for Ahmad Hussain LTD is currently in the Presentation Scheduled stage with a value of AED 50,000 and a 75% probability of closing. The expected close date is March 1, 2026. Recent activity shows strong engagement with scheduled meetings and follow-ups. The deal owner, Rizwan Haider, has been actively managing this opportunity. Recommended next steps: prepare presentation materials, schedule final negotiation meeting, and ensure all stakeholders are aligned before the expected close date.
+                    {deal?.name ?? 'This deal'} for {deal?.company_name ?? 'N/A'} is currently in the {deal?.stage?.name ?? deal?.status ?? 'N/A'} stage with a value of {formatDealAmount(deal)} and a {deal?.probability ?? 0}% probability of closing. The expected close date is {formatDate(deal?.expected_close_date)}. The deal owner is {deal?.assigned_to ?? 'N/A'}. Recommended next steps: prepare presentation materials, schedule final negotiation meeting, and ensure all stakeholders are aligned before the expected close date.
                   </div>
 
                   <div style={{
@@ -1608,14 +1409,14 @@ const DealRecordPage: NextPageWithLayout = () => {
                   gap: '20px',
                 }}>
                   {[
-                    { label: 'Deal Name', value: 'Ahmad Hussain LTD - New Deal' },
-                    { label: 'Company Name', value: 'Ahmad Hussain LTD' },
-                    { label: 'Deal Value', value: 'AED 50,000' },
-                    { label: 'Stage', value: 'Presentation Scheduled' },
-                    { label: 'Probability', value: '75%' },
-                    { label: 'Expected Close Date', value: 'March 1, 2026' },
-                    { label: 'Deal Type', value: 'New Sale' },
-                    { label: 'Deal Owner', value: 'Rizwan Haider' },
+                    { label: 'Deal Name', value: deal?.name ?? '--' },
+                    { label: 'Company Name', value: deal?.company_name ?? '--' },
+                    { label: 'Deal Value', value: formatDealAmount(deal) },
+                    { label: 'Stage', value: deal?.stage?.name ?? deal?.status ?? '--' },
+                    { label: 'Probability', value: deal != null ? `${deal.probability ?? 0}%` : '--' },
+                    { label: 'Expected Close Date', value: formatDate(deal?.expected_close_date) },
+                    { label: 'Deal Type', value: deal?.deal_type ?? '--' },
+                    { label: 'Deal Owner', value: deal?.assigned_to ?? '--' },
                   ].map((field, index) => (
                     <div key={index}>
                       <div style={{
@@ -1640,118 +1441,14 @@ const DealRecordPage: NextPageWithLayout = () => {
         )}
 
         {activeTab === 'activities' && (
-          <div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '20px',
-              gap: '16px',
-              flexWrap: 'wrap',
-            }}>
-              <div style={{
-                position: 'relative',
-                flex: '1',
-                minWidth: '250px',
-                maxWidth: '400px',
-              }}>
-                <Search
-                  size={18}
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#7c98b6',
-                    pointerEvents: 'none',
-                  }}
-                />
-                <input
-                  type="text"
-                  placeholder="Search activities"
-                  value={searchActivity}
-                  onChange={(e) => setSearchActivity(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 40px 10px 16px',
-                    border: '1px solid #cbd5e0',
-                    borderRadius: '20px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    backgroundColor: '#ffffff',
-                  }}
-                />
-              </div>
-
-              <button
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #cbd5e0',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#141414',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-                onClick={() => setExpandedActivities(new Set())}
-              >
-                Collapse all
-                <ChevronDown size={14} />
-              </button>
-            </div>
-
-            <div style={{
-              display: 'flex',
-              gap: '24px',
-              marginBottom: '16px',
-              borderBottom: '2px solid #eaf0f6',
-            }}>
-              {[
-                { id: 'activity', label: 'Activity' },
-                { id: 'notes', label: 'Notes' },
-                { id: 'emails', label: 'Emails' },
-                { id: 'calls', label: 'Calls' },
-                { id: 'tasks', label: 'Tasks' },
-                { id: 'meetings', label: 'Meetings' },
-              ].map(filter => (
-                <button
-                  key={filter.id}
-                  onClick={() => setActivityFilter(filter.id)}
-                  style={{
-                    padding: '10px 0',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    borderBottom: activityFilter === filter.id ? '2px solid #141414' : '2px solid transparent',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: activityFilter === filter.id ? '600' : '400',
-                    color: activityFilter === filter.id ? '#141414' : '#7c98b6',
-                    transition: 'all 0.2s',
-                    marginBottom: '-2px',
-                  }}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-
-            <h3 style={{
-              fontSize: '16px',
-              fontWeight: '600',
-              color: '#141414',
-              marginBottom: '16px',
-            }}>
-              February 2026
-            </h3>
-
-            <div>
-              {activitiesData.map(activity => renderActivityItem(activity))}
-            </div>
-          </div>
+          <CrmActivitiesPanel
+            recordType="deal"
+            recordId={Number(dealId) || deal?.id || 0}
+            record={dealRecord}
+            recordLoading={dealLoading}
+            recordName={deal?.name ?? 'Deal'}
+            canSendWhatsApp={canSendWhatsApp}
+          />
         )}
 
         {activeTab === 'revenue' && (
@@ -1948,7 +1645,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                     margin: 0,
                     lineHeight: '1.2',
                   }}>
-                    Companies (1)
+                    Companies ({deal?.company_name ? 1 : 0})
                   </h3>
                 </div>
                 <button
@@ -1979,61 +1676,65 @@ const DealRecordPage: NextPageWithLayout = () => {
 
               {!collapsedSections.has('companies') && (
                 <div style={{ padding: '20px' }}>
-                  <div style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      marginBottom: '8px',
-                    }}>
+                  {deal?.company_name ? (
+                    <>
+                      <div style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          marginBottom: '8px',
+                        }}>
+                          <span style={{
+                            fontSize: '14px',
+                            color: '#006162',
+                            fontWeight: '500',
+                          }}>
+                            {deal.company_name}
+                          </span>
+                          <span style={{
+                            padding: '2px 8px',
+                            backgroundColor: '#e6f3ff',
+                            color: '#006162',
+                            borderRadius: '3px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                          }}>
+                            Primary
+                          </span>
+                        </div>
+                        {deal.industry && (
+                          <p style={{
+                            fontSize: '13px',
+                            color: '#666666',
+                            margin: '4px 0',
+                          }}>
+                            Industry: {deal.industry}
+                          </p>
+                        )}
+                      </div>
                       <a
                         href="#"
                         style={{
-                          fontSize: '14px',
-                          color: '#006162',
+                          fontSize: '12px',
+                          color: '#141414',
                           textDecoration: 'none',
-                          fontWeight: '500',
+                          fontWeight: '300',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          border: '1px solid #cccccc',
+                          borderRadius: '6px',
+                          padding: '6px 12px',
                         }}
                       >
-                        Ahmad Hussain LTD
+                        View all associated Companies
+                        <ExternalLink size={12} />
                       </a>
-                      <span style={{
-                        padding: '2px 8px',
-                        backgroundColor: '#e6f3ff',
-                        color: '#006162',
-                        borderRadius: '3px',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                      }}>
-                        Primary
-                      </span>
-                    </div>
-                    <p style={{
-                      fontSize: '13px',
-                      color: '#666666',
-                      margin: '4px 0',
-                    }}>
-                      Company Domain Name: ahmadhussain.com
-                    </p>
-                  </div>
-                  <a
-                    href="#"
-                    style={{
-                      fontSize: '12px',
-                      color: '#141414',
-                      textDecoration: 'none',
-                      fontWeight: '300',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      border: '1px solid #cccccc',
-                      borderRadius: '6px',
-                      padding: '6px 12px',
-                    }}
-                  >
-                    View all associated Companies
-                    <ExternalLink size={12} />
-                  </a>
+                    </>
+                  ) : (
+                    <p style={{ fontSize: '13px', color: '#666666', margin: 0 }}>No companies associated.</p>
+                  )}
                 </div>
               )}
             </div>
@@ -2073,7 +1774,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                     margin: 0,
                     lineHeight: '1.2',
                   }}>
-                    Contacts (1)
+                    Contacts ({deal?.decision_maker_name ?? deal?.decision_maker_email ? 1 : 0})
                   </h3>
                 </div>
                 <button
@@ -2104,53 +1805,55 @@ const DealRecordPage: NextPageWithLayout = () => {
 
               {!collapsedSections.has('contacts') && (
                 <div style={{ padding: '20px' }}>
-                  <div style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
-                    <a
-                      href="#"
-                      style={{
-                        fontSize: '14px',
-                        color: '#006162',
-                        textDecoration: 'none',
-                        fontWeight: '500',
-                        display: 'block',
-                        marginBottom: '8px',
-                      }}
-                    >
-                      Ahmad Hussain
-                    </a>
-                    <p style={{
-                      fontSize: '13px',
-                      color: '#666666',
-                      margin: '4px 0',
-                    }}>
-                      Email: ahmad@gmail.com
-                    </p>
-                    <p style={{
-                      fontSize: '13px',
-                      color: '#666666',
-                      margin: '4px 0',
-                    }}>
-                      Phone: +92-300-8009002
-                    </p>
-                  </div>
-                  <a
-                    href="#"
-                    style={{
-                      fontSize: '12px',
-                      color: '#141414',
-                      textDecoration: 'none',
-                      fontWeight: '300',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      border: '1px solid #cccccc',
-                      borderRadius: '6px',
-                      padding: '6px 12px',
-                    }}
-                  >
-                    View all associated Contacts
-                    <ExternalLink size={12} />
-                  </a>
+                  {(deal?.decision_maker_name ?? deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.name) ? (
+                    <>
+                      <div style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
+                        <span style={{
+                          fontSize: '14px',
+                          color: '#006162',
+                          fontWeight: '500',
+                          display: 'block',
+                          marginBottom: '8px',
+                        }}>
+                          {deal?.decision_maker_name ?? (deal as any)?.main_decision_maker?.name ?? 'Contact'}
+                        </span>
+                        <p style={{
+                          fontSize: '13px',
+                          color: '#666666',
+                          margin: '4px 0',
+                        }}>
+                          Email: {deal?.decision_maker_email ?? (deal as any)?.main_decision_maker?.email ?? '--'}
+                        </p>
+                        <p style={{
+                          fontSize: '13px',
+                          color: '#666666',
+                          margin: '4px 0',
+                        }}>
+                          Phone: {[deal?.decision_maker_phone_country_code, deal?.decision_maker_phone].filter(Boolean).join(' ') || (deal as any)?.main_decision_maker?.phone || '--'}
+                        </p>
+                      </div>
+                      <a
+                        href="#"
+                        style={{
+                          fontSize: '12px',
+                          color: '#141414',
+                          textDecoration: 'none',
+                          fontWeight: '300',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          border: '1px solid #cccccc',
+                          borderRadius: '6px',
+                          padding: '6px 12px',
+                        }}
+                      >
+                        View all associated Contacts
+                        <ExternalLink size={12} />
+                      </a>
+                    </>
+                  ) : (
+                    <p style={{ fontSize: '13px', color: '#666666', margin: 0 }}>No contacts associated.</p>
+                  )}
                 </div>
               )}
             </div>
@@ -2190,7 +1893,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                     margin: 0,
                     lineHeight: '1.2',
                   }}>
-                    Attachments
+                    Attachments ({deal?.attachments?.length ?? 0})
                   </h3>
                 </div>
                 <button
@@ -2220,19 +1923,55 @@ const DealRecordPage: NextPageWithLayout = () => {
               </div>
 
               {!collapsedSections.has('attachments') && (
-                <div style={{
-                  padding: '32px 20px',
-                  textAlign: 'center',
-                }}>
-                  <Paperclip size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
-                  <p style={{
-                    fontSize: '14px',
-                    color: '#718096',
-                    margin: 0,
-                    lineHeight: '1.6',
-                  }}>
-                    No attachments yet
-                  </p>
+                <div style={{ padding: '20px' }}>
+                  {(deal?.attachments?.length ?? 0) > 0 ? (
+                    <>
+                      {deal!.attachments!.map((att: any) => (
+                        <div
+                          key={att.id}
+                          style={{
+                            marginBottom: '12px',
+                            border: '1px solid #cccccc',
+                            borderRadius: '8px',
+                            padding: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <Paperclip size={18} style={{ color: '#718096' }} />
+                          <a
+                            href={att.file_path}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              fontSize: '14px',
+                              color: '#006162',
+                              textDecoration: 'none',
+                              fontWeight: '500',
+                            }}
+                          >
+                            {att.file_path?.split('/').pop() ?? `Attachment ${att.id}`}
+                          </a>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <div style={{
+                      padding: '32px 20px',
+                      textAlign: 'center',
+                    }}>
+                      <Paperclip size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+                      <p style={{
+                        fontSize: '14px',
+                        color: '#718096',
+                        margin: 0,
+                        lineHeight: '1.6',
+                      }}>
+                        No attachments yet
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2245,6 +1984,65 @@ const DealRecordPage: NextPageWithLayout = () => {
   // ============================================================================
   // MAIN RENDER
   // ============================================================================
+
+  if (dealLoading) {
+    return (
+      <Layout>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 'calc(100vh - 120px)',
+          flexDirection: 'column',
+          gap: '12px',
+        }}>
+          <RefreshCw size={32} style={{ color: '#006162', animation: 'spin 1s linear infinite' }} />
+          <p style={{ fontSize: '14px', color: '#718096' }}>Loading deal...</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (dealError || (!dealId && !deal)) {
+    return (
+      <Layout>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 'calc(100vh - 120px)',
+          flexDirection: 'column',
+          gap: '12px',
+          padding: '24px',
+        }}>
+          <AlertCircle size={48} style={{ color: '#e53e3e' }} />
+          <p style={{ fontSize: '16px', color: '#141414', fontWeight: 500 }}>
+            {dealError || 'No deal selected'}
+          </p>
+          <button
+            onClick={() => router.push('/crm/deals')}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#006162',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            Back to deals
+          </button>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!deal) {
+    return null;
+  }
 
   return (
     <>

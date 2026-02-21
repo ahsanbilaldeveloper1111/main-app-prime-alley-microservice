@@ -149,7 +149,7 @@ import { useCti } from "../../../contexts/CtiContext";
 import type { StatsCardData } from "@components/GenericStatsCards";
 import CreateLeadModal from "@components/CreateLeadModal";
 
-import ConvertToDealModal from "@components/ConvertToDealModal";
+import ConvertLeadToDealModal from "@components/ConvertLeadToDealModal";
 // Type definition for transformed lead data
 interface LeadData {
   id: any;
@@ -3709,6 +3709,10 @@ const CrmLeads = () => {
                   // Tabs
                   showTabs: true,
                   tabsDropdownLabel: "Leads",
+                  showImport: false,
+                  onImportClick: () => {
+                    console.log("Import leads");
+                  },
                   tabs: [
                     {
                       id: "all",
@@ -4005,7 +4009,9 @@ const CrmLeads = () => {
               gradient: getRandomColor(selectedLead?.name || ""),
             }}
             recordType="lead"
-            recordId={selectedLead?.id ?? selectedLead?.rawData?.id ?? undefined}
+            recordId={
+              selectedLead?.id ?? selectedLead?.rawData?.id ?? undefined
+            }
             onNoteCreate={handleNoteCreate}
             breezeRecordSummary={{
               content: `This lead was created on ${selectedLead?.created_at ? moment(selectedLead.created_at).format("MMMM DD, YYYY") : "recent date"}. ${selectedLead?.stage?.name ? `Currently in ${selectedLead.stage.name} stage.` : ""} ${selectedLead?.lead_potential || selectedLead?.leadPotential ? `Lead potential: ${selectedLead.lead_potential || selectedLead.leadPotential}.` : ""} ${selectedLead?.company_name || selectedLead?.company ? `Company: ${selectedLead.company_name || selectedLead.company}.` : ""}`,
@@ -9892,8 +9898,8 @@ const CrmLeads = () => {
         }}
       />
 
-      {convertingLeadId && (
-        <ConvertToDealModal
+      {convertingLeadId != null && (
+        <ConvertLeadToDealModal
           show={showConvertToDealModal}
           onHide={() => {
             setShowConvertToDealModal(false);

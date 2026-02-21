@@ -1225,7 +1225,12 @@ const CrmDeals = () => {
   // Handle first column click - navigates to detail page
   const handleFirstColumnClick = useCallback(
     (deal: any) => {
-      router.push("/crm/deals-approval/approval-detailpage");
+      const id = deal?.id ?? deal?.rawData?.id;
+      router.push(
+        id
+          ? `/crm/deals-approval/approval-detailpage?id=${id}`
+          : "/crm/deals-approval/approval-detailpage",
+      );
     },
     [router],
   );
@@ -3105,6 +3110,10 @@ const CrmDeals = () => {
               toolbar={{
                 // Tabs
                 showTabs: true,
+                showImport: false,
+                onImportClick: () => {
+                  console.log("Import prospects");
+                },
                 tabsDropdownLabel: "Deals",
                 tabs: [
                   {
@@ -3240,7 +3249,9 @@ const CrmDeals = () => {
               type: RECORD_TYPES.DEAL,
             }}
             recordType="deal"
-            recordId={selectedDeal?.id ?? selectedDeal?.rawData?.id ?? undefined}
+            recordId={
+              selectedDeal?.id ?? selectedDeal?.rawData?.id ?? undefined
+            }
             onNoteCreate={handleNoteCreate}
             breezeRecordSummary={{
               content: `This deal was created on ${selectedDeal?.created_at ? moment(selectedDeal.created_at).format("MMMM DD, YYYY") : "recent date"}. ${selectedDeal?.stage?.name ? `Currently in ${selectedDeal.stage.name} stage.` : ""} ${selectedDeal?.value ? `Deal value: ${selectedDeal.currency || "AED"} ${parseFloat(String(selectedDeal.value)).toLocaleString()}.` : ""} ${selectedDeal?.company_name || selectedDeal?.company ? `Company: ${selectedDeal.company_name || selectedDeal.company}.` : ""}`,

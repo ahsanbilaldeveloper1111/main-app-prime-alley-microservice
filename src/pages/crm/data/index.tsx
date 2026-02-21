@@ -5137,6 +5137,10 @@ const CrmProspectsManagement = () => {
                 toolbar={{
                   // Tabs
                   showTabs: true,
+                  showImport: true,
+                  onImportClick: () => {
+                    console.log("Import prospects");
+                  },
                   tabsDropdownLabel: "Prospects",
                   tabs: [
                     {
@@ -8125,7 +8129,6 @@ const CrmProspectsManagement = () => {
         </div>{" "}
         {/* End main content area */}
         {/* Prospect Detail Sidebar */}
-
         {showProspectSidebar && (
           <GenericSidebar
             isOpen={showProspectSidebar}
@@ -8144,7 +8147,9 @@ const CrmProspectsManagement = () => {
               gradient: getRandomColor(selectedProspect?.name || ""),
             }}
             recordType="prospect"
-            recordId={selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined}
+            recordId={
+              selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined
+            }
             onNoteCreate={handleNoteCreate}
             breezeRecordSummary={{
               content:
