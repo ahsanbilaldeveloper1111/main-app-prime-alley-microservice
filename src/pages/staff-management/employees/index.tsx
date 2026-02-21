@@ -1,5 +1,6 @@
 import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/router";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import EmployeeDetailSidebar from "@components/employee-sidebar";
@@ -175,6 +176,7 @@ function hierarchyLabel(item: unknown): string {
 }
 
 const Employees = () => {
+  const router = useRouter();
   const { data: session } = useSession();
   const { mainAppDepartments, mainAppUsers, loadingDepartments, loadingUsers, companyIdentifier } = useMainAppLookups();
 
@@ -301,6 +303,29 @@ const Employees = () => {
   useEffect(() => {
     loadProfiles(currentPage);
   }, [currentPage, loadProfiles]);
+
+  // Open sidebar when navigating from notification with ?openId= (target_id)
+  useEffect(() => {
+    if (!router.isReady || !router.query.openId) return;
+    const openId = router.query.openId;
+    const id = typeof openId === "string" ? openId : Array.isArray(openId) ? openId[0] : undefined;
+    if (!id || Number.isNaN(Number(id))) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await getUserProfile(Number(id));
+        if (!cancelled && profile) setSelectedProfile(profile);
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) {
+          const { openId: _openId, ...rest } = router.query;
+          router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [router.isReady, router.query.openId]);
 
   const loadProfilesRef = useRef(loadProfiles);
   loadProfilesRef.current = loadProfiles;

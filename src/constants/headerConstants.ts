@@ -289,7 +289,9 @@ MENU_COLORS: {
     VIEW_RECURRING_REMINDERS_WORK_PLANNER: 'view-recurring-reminders-work-planner',
     VIEW_DIAL_TODO_WORK_PLANNER: 'view-dial-todo-work-planner',
     VIEW_TASKSLIST_WORK_PLANNER: 'view-tasks-work-planner',
-
+    VIEW_PROJECTS_WORK_PLANNER: 'view-projects-work-planner',
+    VIEW_PROJECTS_DASHBOARD_WORK_PLANNER: 'view-projects-dashboard-work-planner',
+    VIEW_STATUSES_WORK_PLANNER: 'view-statuses-work-planner',
 
     CALL_LOGS_SERVICES: 'call-logs-services',
     CALL_RECORDINGS_SERVICES: 'call-recordings-services',

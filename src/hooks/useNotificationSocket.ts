@@ -1,78 +1,39 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
-import { useTokenService } from './useTokenService';
+import { io, type Socket } from 'socket.io-client';
 import { useSession } from 'next-auth/react';
+import { useTokenService } from './useTokenService';
 
-/** Same socket server as WhatsApp; can override with NEXT_PUBLIC_NOTIFICATION_SOCKET_URL. */
+// -----------------------------------------------------------------------------
+// Constants
+// -----------------------------------------------------------------------------
+
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_NOTIFICATION_SOCKET_URL ||
   process.env.NEXT_PUBLIC_WHATSAPP_SOCKET_URL;
 
+// -----------------------------------------------------------------------------
+// Types
+// -----------------------------------------------------------------------------
+
 type ConnectionStateListener = (connected: boolean, error: string | null) => void;
 
-let notificationSocket: Socket | null = null;
-let refCount = 0;
-const connectionListeners = new Set<ConnectionStateListener>();
-
-function notifyConnectionState(connected: boolean, error: string | null) {
-  connectionListeners.forEach((cb) => cb(connected, error));
-}
-
-function getOrCreateNotificationSocket(getAccessToken: () => string | null): Socket | null {
-  if (notificationSocket?.connected) return notificationSocket;
-  const token = getAccessToken();
-  if (!token || !SOCKET_URL) return null;
-
-  if (notificationSocket) {
-    if (!notificationSocket.connected) notificationSocket.connect();
-    return notificationSocket;
-  }
-
-  const socket = io(SOCKET_URL, {
-    path: '/socket.io/',
-    auth: { token: token.startsWith('Bearer ') ? token : `Bearer ${token}` },
-    transports: ['polling', 'websocket'],
-  });
-
-  socket.on('connect', () => notifyConnectionState(true, null));
-  socket.on('disconnect', () => notifyConnectionState(false, null));
-  socket.on('connect_error', (err) => notifyConnectionState(false, err.message || 'Connection failed'));
-
-  notificationSocket = socket;
-  return socket;
-}
-
-function releaseNotificationSocket() {
-  refCount--;
-  if (refCount <= 0) {
-    refCount = 0;
-    if (notificationSocket) {
-      notificationSocket.removeAllListeners();
-      notificationSocket.disconnect();
-      notificationSocket = null;
-    }
-    notifyConnectionState(false, null);
-  }
-}
-
-/**
- * Shape of the notification event from the socket (matches GET /api/notifications dataList items).
- */
+/** Notification event payload from the socket (matches API notification shape). */
 export interface SocketNotificationPayload {
-  id: string;
-  extension_id?: string;
-  triggered_by_extension_id?: string;
-  source_service?: string;
+  id: string | number;
+  extension_id?: string | number;
+  triggered_by_extension_id?: string | number | null;
+  source_service?: string | null;
   action?: string;
   target_id?: string;
   target_type?: string;
+  module?: string;
   changes?: Record<string, unknown>;
   description?: string;
   title?: string;
   priority?: string;
-  status?: string;
+  status?: string | null;
   created_at?: string;
   [key: string]: unknown;
 }
@@ -87,13 +48,81 @@ export interface UseNotificationSocketReturn {
   isConnected: boolean;
   error: string | null;
   subscribe: (channels: string | string[]) => void;
+  unsubscribe: (channels: string | string[]) => void;
 }
 
+// -----------------------------------------------------------------------------
+// Module state (single shared socket per tab)
+// -----------------------------------------------------------------------------
+
+let sharedSocket: Socket | null = null;
+let refCount = 0;
+const connectionListeners = new Set<ConnectionStateListener>();
+
+function broadcastState(connected: boolean, error: string | null): void {
+  connectionListeners.forEach((cb) => cb(connected, error));
+}
+
+// -----------------------------------------------------------------------------
+// Socket lifecycle
+// -----------------------------------------------------------------------------
+
+function getOrCreateSocket(getAccessToken: () => string | null): Socket | null {
+  if (sharedSocket?.connected) return sharedSocket;
+
+  const token = getAccessToken();
+  if (!token || !SOCKET_URL) return null;
+
+  if (sharedSocket) {
+    if (!sharedSocket.connected) sharedSocket.connect();
+    return sharedSocket;
+  }
+
+  const socket = io(SOCKET_URL, {
+    auth: { token, module_slug: '' },
+    transports: ['websocket', 'polling'],
+  });
+
+  socket.on('connect', () => broadcastState(true, null));
+  socket.on('disconnect', () => broadcastState(false, null));
+  socket.on('connect_error', (err: Error) =>
+    broadcastState(false, err?.message ?? 'Connection failed')
+  );
+
+  sharedSocket = socket;
+  return socket;
+}
+
+function releaseSocket(): void {
+  refCount--;
+  if (refCount <= 0) {
+    refCount = 0;
+    if (sharedSocket) {
+      sharedSocket.removeAllListeners();
+      sharedSocket.disconnect();
+      sharedSocket = null;
+    }
+    broadcastState(false, null);
+  }
+}
+
+function getSubscriptionChannels(extensionId: string | undefined): string[] {
+  const channels = ['notifications'];
+  if (extensionId) channels.push(`extension.${extensionId}`);
+  return channels;
+}
+
+function emitSubscribe(socket: Socket, extensionId: string | undefined): void {
+  socket.emit('subscribe', getSubscriptionChannels(extensionId));
+}
+
+// -----------------------------------------------------------------------------
+// Hook
+// -----------------------------------------------------------------------------
+
 /**
- * Global notification socket: one connection per app (per tab) when user is logged in.
- * Same pattern as useAppSocket. Connects to the same socket server (or NOTIFICATION_SOCKET_URL).
- * Subscribes to 'notifications' and 'extension.<session.user.phone>'; forwards 'notification' events.
- * Does not touch WhatsApp (useAppSocket / useWhatsAppSocket).
+ * Shared notification socket: one connection per tab when the user is authenticated.
+ * Subscribes to `notifications` and `extension.<phone>`; forwards `notification` events.
  */
 export function useNotificationSocket(
   options: UseNotificationSocketOptions = {}
@@ -101,7 +130,8 @@ export function useNotificationSocket(
   const { onNotification, enabled = true } = options;
   const { data: session, status } = useSession();
   const { getAccessToken } = useTokenService();
-  const [socket, setSocketState] = useState<Socket | null>(null);
+
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const listenerRef = useRef<ConnectionStateListener | null>(null);
@@ -111,20 +141,25 @@ export function useNotificationSocket(
   const extensionId = (session?.user as { phone?: string } | undefined)?.phone ?? undefined;
 
   const subscribe = useCallback((channels: string | string[]) => {
-    const s = notificationSocket;
-    if (!s?.connected) return;
+    if (!sharedSocket?.connected) return;
     const list = Array.isArray(channels) ? channels : [channels];
-    s.emit('subscribe', list);
+    sharedSocket.emit('subscribe', list);
+  }, []);
+
+  const unsubscribe = useCallback((channels: string | string[]) => {
+    if (!sharedSocket?.connected) return;
+    const list = Array.isArray(channels) ? channels : [channels];
+    sharedSocket.emit('unsubscribe', list);
   }, []);
 
   useEffect(() => {
-    const shouldConnect =
+    const isAuthenticated =
       enabled &&
       status === 'authenticated' &&
-      !!session &&
-      !!getAccessToken();
+      Boolean(session) &&
+      Boolean(getAccessToken());
 
-    if (!shouldConnect) return;
+    if (!isAuthenticated) return;
 
     refCount++;
     const listener: ConnectionStateListener = (connected, err) => {
@@ -134,61 +169,57 @@ export function useNotificationSocket(
     listenerRef.current = listener;
     connectionListeners.add(listener);
 
-    const sock = getOrCreateNotificationSocket(getAccessToken);
-    if (sock) {
-      setSocketState(sock);
-      setConnected(sock.connected);
+    const sock = getOrCreateSocket(getAccessToken);
+
+    const cleanup = (): void => {
+      connectionListeners.delete(listener);
+      listenerRef.current = null;
+      releaseSocket();
+      setSocket(null);
+      setConnected(false);
       setError(null);
+    };
 
-      const handleNotification = (payload: SocketNotificationPayload) => {
-        onNotificationRef.current?.(payload);
-      };
-      sock.on('notification', handleNotification);
+    if (!sock) {
+      return cleanup;
+    }
 
-      const onConnect = () => {
-        setConnected(true);
-        setError(null);
-        const ch: string[] = ['notifications'];
-        if (extensionId) ch.push(`extension.${extensionId}`);
-        sock.emit('subscribe', ch);
-      };
-      const onDisconnect = () => setConnected(false);
-      const onConnectError = (err: Error) => {
-        setConnected(false);
-        setError(err?.message || 'Connection failed');
-      };
+    setSocket(sock);
+    setConnected(sock.connected);
+    setError(null);
 
-      sock.on('connect', onConnect);
-      sock.on('disconnect', onDisconnect);
-      sock.on('connect_error', onConnectError);
+    const handleNotification = (payload: SocketNotificationPayload) => {
+      onNotificationRef.current?.(payload);
+    };
 
-      if (sock.connected) {
-        const ch: string[] = ['notifications'];
-        if (extensionId) ch.push(`extension.${extensionId}`);
-        sock.emit('subscribe', ch);
-      }
+    const onConnect = (): void => {
+      setConnected(true);
+      setError(null);
+      emitSubscribe(sock, extensionId);
+    };
 
-      return () => {
-        sock.off('notification', handleNotification);
-        sock.off('connect', onConnect);
-        sock.off('disconnect', onDisconnect);
-        sock.off('connect_error', onConnectError);
-        connectionListeners.delete(listener);
-        listenerRef.current = null;
-        releaseNotificationSocket();
-        setSocketState(null);
-        setConnected(false);
-        setError(null);
-      };
+    const onDisconnect = (): void => setConnected(false);
+
+    const onConnectError = (err: Error): void => {
+      setConnected(false);
+      setError(err?.message ?? 'Connection failed');
+    };
+
+    sock.on('notification', handleNotification);
+    sock.on('connect', onConnect);
+    sock.on('disconnect', onDisconnect);
+    sock.on('connect_error', onConnectError);
+
+    if (sock.connected) {
+      emitSubscribe(sock, extensionId);
     }
 
     return () => {
-      connectionListeners.delete(listener);
-      listenerRef.current = null;
-      releaseNotificationSocket();
-      setSocketState(null);
-      setConnected(false);
-      setError(null);
+      sock.off('notification', handleNotification);
+      sock.off('connect', onConnect);
+      sock.off('disconnect', onDisconnect);
+      sock.off('connect_error', onConnectError);
+      cleanup();
     };
   }, [enabled, status, session, extensionId, getAccessToken]);
 
@@ -197,5 +228,6 @@ export function useNotificationSocket(
     isConnected,
     error,
     subscribe,
+    unsubscribe,
   };
 }

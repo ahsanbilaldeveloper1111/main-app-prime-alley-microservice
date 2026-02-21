@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useRef
 } from "react";
+import { useRouter } from "next/router";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
@@ -106,6 +107,7 @@ interface ApiTask {
 }
 
 const TasksList = () => {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -691,12 +693,12 @@ const TasksList = () => {
       icon: <MoreVertical size={16} />,
       dropdown: {
         options: [
-          { label: 'Edit Task', icon: <Pencil size={14} />, onClick: (row) => { setSelectedTask(row); setShowTaskDetail(false); setEditingTask(row.rawData); setShowCreateTask(true); } },
+          { label: 'Edit Task', icon: <Pencil size={14} />, onClick: (row) => { const id = row.rawData?.id ?? row.id; if (id) router.push(`/work-planner/tasks-list/${id}`); } },
           { label: 'Delete Task', icon: <Trash2 size={14} />, onClick: (row) => { setSelectedTask(row); setShowDeleteModal(true); }, className: 'text-danger', divider: true },
         ],
       },
     },
-  ], []);
+  ], [router]);
 
   const hasActiveFilters = searchTerm !== '' || filterProject !== 'All Projects' || filterAssignee.length > 0 || filterStatus !== 'All Status' || filterPriority !== 'All Priority' || filterCreatedAtFrom !== '' || filterCreatedAtTo !== '';
 

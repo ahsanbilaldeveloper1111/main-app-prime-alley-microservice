@@ -15,6 +15,7 @@ import Router, { useRouter } from "next/router";
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
 import ChatbotWidget from "@components/chatbot";
+import NotificationSocketBridge from "@components/NotificationSocketBridge";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@utils/permissionUtils";
 
@@ -93,6 +94,7 @@ const AppContent: React.FC<{ Component: NextPageWithLayout; pageProps: any; getL
 
   return (
     <>
+      <NotificationSocketBridge />
       {getLayout(<Component {...pageProps} />)}
       {status === 'authenticated' && session && hasPermission('live-chat-users') && shouldShowChatbot && <ChatbotWidget />}
     </>

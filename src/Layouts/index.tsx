@@ -42,7 +42,6 @@ import UserDummyImage from "@assets/images/user-dummy.jpg";
 import { getStorageImageUrl } from "@utils/imageUtils";
 import DeviceSelectionModal from '../components/DeviceSelectionModal';
 import GlobalFloatingCallBar from '../components/GlobalFloatingCallBar';
-import NotificationSocketBridge from '../components/NotificationSocketBridge';
 
 interface LayoutProps {
 	children: ReactNode;
@@ -197,7 +196,7 @@ const Layout = ({ children }: LayoutProps) => {
 		return groups;
 	};
 
-	const totalUnreadCount = unreadCount + getDummyNotifications().filter(n => !n.read).length;
+	const totalUnreadCount = unreadCount;
 
 	const [loggedInName, setLoggedInName] = useState('');
 	const [loggedInUserRole, setLoggedInUserRole] = useState('');
@@ -572,7 +571,6 @@ const Layout = ({ children }: LayoutProps) => {
 
 	return (
 		<>
-		<NotificationSocketBridge />
 		<style>{`
         .main-content-wrapper {
           transition: margin-left 0.3s ease-in-out;
