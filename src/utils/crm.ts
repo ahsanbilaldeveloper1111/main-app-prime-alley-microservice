@@ -856,6 +856,26 @@ export interface CrmDataTicket {
   [key: string]: any;
 }
 
+/** Single entry from prospect audit_trail (history) */
+export interface AuditTrailEntry {
+  id: number;
+  auditable_type?: string;
+  auditable_id?: string;
+  event: string;
+  changes?: Record<string, unknown> | unknown[];
+  description?: string | null;
+  user_extension?: string | null;
+  created_at: string;
+  updated_at?: string;
+  action?: string | null;
+  user_id?: number | null;
+  user_extension_done_by?: string | null;
+  user_extension_done_to?: string | null;
+  total_records?: number | null;
+  details?: unknown;
+  snapshot_data?: unknown;
+}
+
 export interface CrmDataItem {
   id: number;
   phone: string | null;
@@ -870,6 +890,8 @@ export interface CrmDataItem {
   note?: string | null;
   /** Leads associated with this prospect (API: tickets) */
   tickets?: CrmDataTicket[];
+  /** Prospect history / audit trail from API */
+  audit_trail?: AuditTrailEntry[];
 }
 
 export interface CrmDataPagination {
@@ -945,6 +967,18 @@ export const getCrmDataById = async (id: number): Promise<CrmDataItem> => {
   try {
     const response = await axiosInstance.get(`/crm/crm-data/${id}`);
     return response.data?.data?.data;
+  } catch (error: any) {
+    toast.error(
+      error?.response?.data?.message || "Failed to fetch CRM data record",
+    );
+    throw error;
+  }
+};
+
+export const getAllCrmDataById = async (id: number): Promise<CrmDataItem> => {
+  try {
+    const response = await axiosInstance.get(`/crm/crm-data/${id}`);
+    return response.data?.data;
   } catch (error: any) {
     toast.error(
       error?.response?.data?.message || "Failed to fetch CRM data record",

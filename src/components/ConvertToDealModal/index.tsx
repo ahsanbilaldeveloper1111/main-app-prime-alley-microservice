@@ -99,6 +99,7 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
     assigned_to: null as string | null,
     expected_close_date: "",
     company_name: "",
+    company_domain: "",
     industry_ids: [] as number[],
     decision_maker_title: "",
     decision_maker_name: "",
@@ -193,6 +194,7 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
         assigned_to: leadData.user_extension ? String(leadData.user_extension) : null,
         expected_close_date: formattedCloseDate,
         company_name: leadData.company_name || "",
+        company_domain: (leadData as any).company_domain ?? "",
         industry_ids: [],
         decision_maker_title: primaryContact.title || leadDataAny.contact_person_title || "",
         decision_maker_name: contactPersonName,
@@ -461,6 +463,7 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
         assigned_to: formData.assigned_to,
         expected_close_date: formData.expected_close_date,
         company_name: formData.company_name,
+        ...(formData.company_domain && { company_domain: formData.company_domain }),
         industry_ids: formData.industry_ids,
         ...(businessTypeId ? { business_type_id: String(businessTypeId) } : {}),
         ...(businessTypeOther ? { business_type_other: businessTypeOther } : {}),
@@ -791,6 +794,17 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
                           onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
                           placeholder="Enter company name" 
                           required 
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Company domain</Form.Label>
+                        <Form.Control 
+                          type="text" 
+                          value={formData.company_domain}
+                          onChange={(e) => setFormData({ ...formData, company_domain: e.target.value })}
+                          placeholder="e.g. example.com" 
                         />
                       </Form.Group>
                     </Col>

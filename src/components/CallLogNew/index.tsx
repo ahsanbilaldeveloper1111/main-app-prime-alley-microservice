@@ -49,7 +49,7 @@ interface AudioPlayerState {
 
 // ── Audio Player ──────────────────────────────────────────────────────────────
 
-const AudioPlayer: React.FC<{ duration: number }> = ({ duration }) => {
+const AudioPlayer: React.FC<{ duration: number; onExternalPlay?: () => void }> = ({ duration, onExternalPlay }) => {
   const [state, setState] = useState<AudioPlayerState>({
     isPlaying: false,
     currentTime: 0,
@@ -61,6 +61,14 @@ const AudioPlayer: React.FC<{ duration: number }> = ({ duration }) => {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     return `${m}:${String(s).padStart(2, '0')}`;
+  };
+
+  const handlePlayClick = () => {
+    if (onExternalPlay) {
+      onExternalPlay();
+      return;
+    }
+    togglePlay();
   };
 
   const togglePlay = () => {
@@ -97,7 +105,7 @@ const AudioPlayer: React.FC<{ duration: number }> = ({ duration }) => {
     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 0' }}>
       {/* Play/Pause */}
       <button
-        onClick={togglePlay}
+        onClick={handlePlayClick}
         style={{
           width: '32px',
           height: '32px',
@@ -324,9 +332,16 @@ const AICallNotesCard: React.FC<{ summary: string; generatedDate: string }> = ({
 
 // ── Single Call Card ──────────────────────────────────────────────────────────
 
-const CallCard: React.FC<{ call: CallEntry; defaultExpanded?: boolean }> = ({
+const CallCard: React.FC<{
+  call: CallEntry;
+  defaultExpanded?: boolean;
+  recordingApiRow?: any;
+  onPlayRecording?: (rec: any) => void;
+}> = ({
   call,
   defaultExpanded = false,
+  recordingApiRow,
+  onPlayRecording,
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [outcome, setOutcome] = useState(call.outcome || '');
@@ -566,7 +581,10 @@ const CallCard: React.FC<{ call: CallEntry; defaultExpanded?: boolean }> = ({
           {/* Audio Player */}
           {call.hasRecording && call.duration !== undefined && (
             <>
-              <AudioPlayer duration={call.duration} />
+              <AudioPlayer
+                duration={call.duration}
+                onExternalPlay={recordingApiRow && onPlayRecording ? () => onPlayRecording(recordingApiRow) : undefined}
+              />
               <div style={{ borderTop: '1px solid #eaf0f6', marginTop: '4px', marginBottom: '16px' }} />
             </>
           )}
@@ -872,43 +890,50 @@ const CallCard: React.FC<{ call: CallEntry; defaultExpanded?: boolean }> = ({
 
 // ── Main CallLog Component ────────────────────────────────────────────────────
 
-const SAMPLE_CALLS: CallEntry[] = [
-  {
-    id: '1',
-    callerName: 'Rizwan Haider',
-    withName: 'Rizwan haider',
-    timestamp: '12 Feb 2026 at 19:18 GMT+5',
+/** Map API recording row to CallEntry for display */
+function mapRecordingToCallEntry(
+  rec: any,
+  index: number,
+  getExtensionName?: (id: string) => string
+): CallEntry {
+  const rawDuration = rec.Duration ?? rec.duration ?? rec.CallDuration ?? 0;
+  const durationSec = parseInt(String(rawDuration), 10) / 10000000 || 0;
+  const dateStr = rec.DateTime ?? rec.start_time ?? rec.created_at ?? '';
+  const timestamp = dateStr ? (dateStr.length > 10 ? new Date(dateStr).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : dateStr) : '—';
+  const dir = rec.Direction ?? rec.direction ?? rec.CallDirection ?? '';
+  const direction = dir.includes('INBOUND') || dir === 'Inbound' ? 'Inbound' : 'Outbound';
+  const extId = String(rec.AgentExtension ?? '');
+  const callerName =
+    (getExtensionName && extId ? getExtensionName(extId) : null) ||
+    rec.RemotePartyNumber ||
+    rec.remote_party_number ||
+    (extId || undefined) ||
+    'Unknown';
+  return {
+    id: rec.Id ?? rec.id ?? String(index),
+    callerName,
+    timestamp,
     hasRecording: true,
-    duration: 85,
-    aiSummary:
-      'Rizwan Haider discusses the five key questions to prepare for during a job interview, emphasizing the importance of demonstrating passion, understanding your value, and maintaining a positive outlook about current employers.',
-    aiGeneratedDate: '21 Feb 2026',
-    outcome: '',
-    direction: 'Outbound',
-    associations: 2,
-  },
-  {
-    id: '2',
-    callerName: 'Rizwan Haider',
-    timestamp: '12 Feb 2026 at 19:16 GMT+5',
-    hasRecording: true,
-    duration: 47,
-    direction: 'Outbound',
-    associations: 1,
-  },
-  {
-    id: '3',
-    callerName: 'Rizwan Haider',
-    timestamp: '12 Feb 2026 at 19:12 GMT+5',
-    hasRecording: true,
-    duration: 120,
-    direction: 'Inbound',
-    associations: 2,
-  },
-];
+    duration: Math.max(0, Math.floor(durationSec)),
+    direction,
+  };
+}
 
-const CallLog: React.FC = () => {
+interface CallLogProps {
+  recordings?: any[];
+  onPlayRecording?: (rec: any) => void;
+  /** Map extension id (e.g. "101") to display name from users/hierarchyData */
+  extensionNameMap?: Record<string, string>;
+}
+
+const CallLog: React.FC<CallLogProps> = ({ recordings, onPlayRecording, extensionNameMap }) => {
   const [isLogCallOpen, setIsLogCallOpen] = useState(false);
+  const getExtensionName = extensionNameMap
+    ? (id: string) => extensionNameMap[id] || ''
+    : undefined;
+  const calls: CallEntry[] = recordings?.length
+    ? recordings.map((rec, i) => mapRecordingToCallEntry(rec, i, getExtensionName))
+    : [];
 
   return (
     <>
@@ -968,8 +993,14 @@ const CallLog: React.FC = () => {
       </div>
 
       {/* Call list */}
-      {SAMPLE_CALLS.map((call, index) => (
-        <CallCard key={call.id} call={call} defaultExpanded={index === 0} />
+      {calls.map((call, index) => (
+        <CallCard
+          key={call.id}
+          call={call}
+          defaultExpanded={index === 0}
+          recordingApiRow={recordings?.[index]}
+          onPlayRecording={onPlayRecording}
+        />
       ))}
 
       {/* Log Call Modal */}

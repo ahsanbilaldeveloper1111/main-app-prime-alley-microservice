@@ -1248,10 +1248,11 @@ const CrmLeads = () => {
     [fetchLeadFollowUps, fetchMeetings],
   );
 
-  // Handle first column click - navigates to detail page
+  // Handle first column click - navigates to detail page with lead ID in URL (same as prospect)
   const handleFirstColumnClick = useCallback(
     (lead: LeadData) => {
-      router.push("/crm/leads/leads-detailpage");
+      const leadId = lead?.rawData?.id ?? lead?.id ?? "";
+      router.push(`/crm/leads/leads-detailpage?id=${leadId}`);
     },
     [router],
   );

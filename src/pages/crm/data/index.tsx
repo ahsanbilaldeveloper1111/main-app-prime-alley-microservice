@@ -655,8 +655,7 @@ const CrmProspectsManagement = () => {
     lifecycle_stage: "Lead",
     disposition: "",
     legal_basis: [] as string[],
-    last_called: "",
-    last_call_status: "",
+    company_domain: "",
     next_call: "",
     scheduled_call_at: "",
     tags: [] as Array<{ value: string; label: string; id?: number }>,
@@ -764,11 +763,7 @@ const CrmProspectsManagement = () => {
           lifecycle_stage: d.lifecycle_stage ?? "Lead",
           disposition: d.disposition ?? (item as any).disposition ?? "",
           legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
-          last_called: toDatetimeLocal(
-            d.last_called ?? (item as any).last_called_at,
-          ),
-          last_call_status:
-            d.last_call_status ?? (item as any).last_call_end_reason ?? "",
+          company_domain: d.company_domain ?? (item as any).company_domain ?? "",
           next_call: toDatetimeLocal(d.next_call),
           scheduled_call_at: toDatetimeLocal(
             item.scheduled_call_at ?? d.scheduled_call_at,
@@ -1672,13 +1667,9 @@ const CrmProspectsManagement = () => {
   // Fetch call recordings (not call logs) for the selected prospect
   // Filters by current user's extension and prospect's phone number
   const fetchCallRecordings = useCallback(
-    async (phoneNumber: string, userExtension?: string) => {
-      if (!phoneNumber) {
-        setCallRecordings([]);
-        return;
-      }
-
-      if (!userExtension) {
+    async (phoneNumber: string) => {
+      const normalizedPhone = (phoneNumber || '').replace(/\s/g, '');
+      if (!normalizedPhone) {
         setCallRecordings([]);
         return;
       }
@@ -1686,8 +1677,7 @@ const CrmProspectsManagement = () => {
       setCallRecordingsLoading(true);
       try {
         const filters = {
-          remote_party_number: [phoneNumber],
-          extension: [userExtension],
+          remote_party_number: [normalizedPhone]
         };
 
         // Use ListCallLogs with reportType 'recordings' to fetch call recordings
@@ -1740,8 +1730,7 @@ const CrmProspectsManagement = () => {
   useEffect(() => {
     if (showProspectSidebar && selectedProspect?.phone) {
       fetchCallRecordings(
-        selectedProspect.phone,
-        selectedProspect.user_extension,
+        selectedProspect.phone
       );
     } else if (!showProspectSidebar && !showViewModal) {
       setCallRecordings([]);
@@ -3105,8 +3094,7 @@ const CrmProspectsManagement = () => {
                 lifecycle_stage: "Lead",
                 disposition: "",
                 legal_basis: [],
-                last_called: "",
-                last_call_status: "",
+                company_domain: "",
                 next_call: "",
                 scheduled_call_at: "",
                 tags: [],
@@ -3192,8 +3180,7 @@ const CrmProspectsManagement = () => {
             user_extension: userExtension,
             uploaded_by: uploadedBy,
             campaign_id: contactForm.campaign_id ?? undefined,
-            last_called: contactForm.last_called || undefined,
-            last_call_status: contactForm.last_call_status || undefined,
+            company_domain: contactForm.company_domain || undefined,
             disposition: contactForm.disposition || undefined,
             next_call: contactForm.next_call || undefined,
             tags: contactForm.tags?.length
@@ -3220,8 +3207,7 @@ const CrmProspectsManagement = () => {
           lifecycle_stage: "Lead",
           disposition: "",
           legal_basis: [],
-          last_called: "",
-          last_call_status: "",
+          company_domain: "",
           next_call: "",
           scheduled_call_at: "",
           tags: [],
@@ -3262,8 +3248,7 @@ const CrmProspectsManagement = () => {
         data: {
           email: contactForm.email.trim(),
           campaign_id: contactForm.campaign_id ?? undefined,
-          last_called: contactForm.last_called || undefined,
-          last_call_status: contactForm.last_call_status || undefined,
+          company_domain: contactForm.company_domain || undefined,
           disposition: contactForm.disposition || undefined,
           next_call: contactForm.next_call || undefined,
           tags: contactForm.tags?.length
@@ -3944,53 +3929,18 @@ const CrmProspectsManagement = () => {
                           marginBottom: "8px",
                         }}
                       >
-                        Last called
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={contactForm.last_called}
-                        onChange={(e) =>
-                          setContactForm({
-                            ...contactForm,
-                            last_called: e.target.value,
-                          })
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          border: "1px solid #8a8a8a",
-                          borderRadius: "4px",
-                          fontSize: "14px",
-                          outline: "none",
-                        }}
-                      />
-                    </div>
-                    <div
-                      className="contact-form-field"
-                      style={{ marginBottom: "20px" }}
-                    >
-                      <label
-                        className="contact-form-label"
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#141414",
-                          marginBottom: "8px",
-                        }}
-                      >
-                        Last call status
+                        Company domain
                       </label>
                       <input
                         type="text"
-                        value={contactForm.last_call_status}
+                        value={contactForm.company_domain}
                         onChange={(e) =>
                           setContactForm({
                             ...contactForm,
-                            last_call_status: e.target.value,
+                            company_domain: e.target.value,
                           })
                         }
-                        placeholder="e.g. Answered, No answer"
+                        placeholder="e.g. example.com"
                         style={{
                           width: "100%",
                           padding: "10px 12px",

@@ -5,16 +5,15 @@ import {
   Calendar, MessageSquare, ClipboardList, ExternalLink, Copy, RefreshCw,
   ThumbsUp, ThumbsDown, Sparkles, User, Building2, Briefcase,
   FileText, Ticket, Paperclip, Link2, Tag, DollarSign,
-  Search, Filter, AlertCircle, ShoppingCart, Pencil, Trash2
+  Search, Filter, AlertCircle, ShoppingCart, Pencil, Trash2, MessageCircle
 } from 'lucide-react';
 import Layout from "@layout/index";
-import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
-import { getCrmDataById, getCrmNotes, updateCrmNote, deleteCrmNote, getCrmMeetingsForRecord, updateMeeting, deleteMeeting, type CrmDataItem, type CrmNoteItem, type CrmMeetingListItem } from '@utils/crm';
-import CallLog from '@components/CallLogNew';
-import NotesModal from '@components/NotesModal';
-import EmailModal from '@components/EmailModal';
-import TaskModal from '@components/TaskModal';
-import MeetingModal from '@components/MeetingModal';
+import { getAllCrmDataById, type CrmDataItem } from '@utils/crm';
+import { GlobalDateTimeFormat } from '@utils/Helper';
+import moment from 'moment-timezone';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+import CrmActivitiesPanel from '@components/CrmActivitiesPanel';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -30,26 +29,6 @@ interface KeyInfoField {
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
 };
-
-// Add these interfaces near the top with other type definitions
-interface ActivityItem {
-  id: string;
-  type: 'invoice' | 'email' | 'subscription' | 'note' | 'call' | 'meeting' | 'task';
-  title: string;
-  description: string;
-  timestamp: string;
-  user?: string;
-  userLink?: string;
-  entityLink?: string;
-  entityName?: string;
-  alert?: {
-    message: string;
-    link?: string;
-    linkText?: string;
-  };
-  expanded?: boolean;
-}
-
 
 interface SubscriptionItem {
   id: string;
@@ -74,17 +53,6 @@ interface RevenueSection {
   onAddClick?: () => void;
 }
 
-/** Activity sub-tabs: Notes, Emails, Calls, etc. */
-const ACTIVITY_TYPE_TABS = [
-  { id: 'activity', label: 'Activity' },
-  { id: 'notes', label: 'Notes' },
-  { id: 'emails', label: 'Emails' },
-  { id: 'calls', label: 'Calls' },
-  { id: 'tasks', label: 'Tasks' },
-  { id: 'meetings', label: 'Meetings' },
-] as const;
-
-
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -92,6 +60,8 @@ const ACTIVITY_TYPE_TABS = [
 const ContactRecordPage: NextPageWithLayout = () => {
   const router = useRouter();
   const { id: prospectId } = router.query;
+  const { hasPermission } = usePermissions();
+  const canSendWhatsApp = hasPermission(HEADER_CONSTANTS.PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM);
 
   const [prospect, setProspect] = useState<CrmDataItem | null>(null);
   const [prospectLoading, setProspectLoading] = useState(true);
@@ -101,28 +71,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [showMoreActivities, setShowMoreActivities] = useState(false);
-  const [activityFilter, setActivityFilter] = useState('activity');
-const [searchActivity, setSearchActivity] = useState('');
-const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Set());
-  const [notesList, setNotesList] = useState<CrmNoteItem[]>([]);
-  const [notesLoading, setNotesLoading] = useState(false);
-  const [notesError, setNotesError] = useState<string | null>(null);
-  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
-  const [editingText, setEditingText] = useState('');
-  const [noteToDelete, setNoteToDelete] = useState<CrmNoteItem | null>(null);
-  const [noteDeleteLoading, setNoteDeleteLoading] = useState(false);
-  const [meetingsList, setMeetingsList] = useState<CrmMeetingListItem[]>([]);
-  const [meetingsLoading, setMeetingsLoading] = useState(false);
-  const [meetingsError, setMeetingsError] = useState<string | null>(null);
-  const [meetingToDelete, setMeetingToDelete] = useState<CrmMeetingListItem | null>(null);
-  const [meetingDeleteLoading, setMeetingDeleteLoading] = useState(false);
-  const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null);
-  const [editingMeetingForm, setEditingMeetingForm] = useState<{ name: string; meeting_date: string; meeting_time: string; meeting_type: string }>({ name: '', meeting_date: '', meeting_time: '', meeting_type: '' });
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
-  const [showNotesModal, setShowNotesModal] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [showTaskModal, setShowTaskModal] = useState(false);
-  const [showMeetingModal, setShowMeetingModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
 
@@ -140,7 +89,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
     }
     setProspectLoading(true);
     setProspectError(null);
-    getCrmDataById(id)
+    getAllCrmDataById(id)
       .then((data: CrmDataItem) => {
         setProspect(data);
         setProspectError(null);
@@ -153,157 +102,6 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
         setProspectLoading(false);
       });
   }, [router.isReady, prospectId]);
-
-  const fetchNotes = React.useCallback(() => {
-    const id = prospectId != null && prospectId !== '' ? Number(prospectId) : prospect?.id;
-    if (id == null || Number.isNaN(id)) return;
-    setNotesLoading(true);
-    setNotesError(null);
-    getCrmNotes('prospect', Number(id))
-      .then((res: { data: CrmNoteItem[] }) => {
-        setNotesList(res.data ?? []);
-        setNotesError(null);
-      })
-      .catch(() => {
-        setNotesList([]);
-        setNotesError('Failed to load notes');
-      })
-      .finally(() => setNotesLoading(false));
-  }, [prospectId, prospect?.id]);
-
-  // Fetch notes when Activities > Notes tab is active and prospect id is available
-  useEffect(() => {
-    if (activeTab !== 'activities' || activityFilter !== 'notes') return;
-    const id = prospectId != null && prospectId !== '' ? Number(prospectId) : prospect?.id;
-    if (id == null || Number.isNaN(id)) return;
-    fetchNotes();
-  }, [activeTab, activityFilter, prospectId, prospect?.id, fetchNotes]);
-
-  const fetchMeetings = React.useCallback(() => {
-    const id = prospectId != null && prospectId !== '' ? Number(prospectId) : prospect?.id;
-    if (id == null || Number.isNaN(id)) return;
-    setMeetingsLoading(true);
-    setMeetingsError(null);
-    getCrmMeetingsForRecord('prospect', Number(id))
-      .then((res: { data: CrmMeetingListItem[] }) => {
-        setMeetingsList(res.data ?? []);
-        setMeetingsError(null);
-      })
-      .catch(() => {
-        setMeetingsList([]);
-        setMeetingsError('Failed to load meetings');
-      })
-      .finally(() => setMeetingsLoading(false));
-  }, [prospectId, prospect?.id]);
-
-  useEffect(() => {
-    if (activeTab !== 'activities' || activityFilter !== 'meetings') return;
-    const id = prospectId != null && prospectId !== '' ? Number(prospectId) : prospect?.id;
-    if (id == null || Number.isNaN(id)) return;
-    fetchMeetings();
-  }, [activeTab, activityFilter, prospectId, prospect?.id, fetchMeetings]);
-
-  const handleNoteCreate = async (note: string, createTask: boolean, taskDueDate?: string) => {
-    const id = prospectId != null && prospectId !== '' ? Number(prospectId) : prospect?.id;
-    if (id == null || Number.isNaN(id)) {
-      console.log('No prospect ID available');
-      return;
-    }
-    
-    try {
-      console.log('Creating note:', { note, createTask, taskDueDate, prospectId: id });
-      // Here you would call your API to create the note
-      // await createCrmNote('prospect', id, note);
-      // Refresh notes list
-      fetchNotes();
-    } catch (error) {
-      console.error('Failed to create note:', error);
-    }
-  };
-
-  const handleEmailSend = async (emailData: {
-    to: string[];
-    cc: string[];
-    bcc: string[];
-    subject: string;
-    body: string;
-    createTask: boolean;
-    taskDueDate?: string;
-    attachments?: File[];
-  }) => {
-    const id = prospectId != null && prospectId !== '' ? Number(prospectId) : prospect?.id;
-    if (id == null || Number.isNaN(id)) {
-      console.log('No prospect ID available');
-      return;
-    }
-    
-    try {
-      console.log('Sending email:', { ...emailData, prospectId: id });
-      // Here you would call your API to send the email
-      // await sendCrmEmail('prospect', id, emailData);
-      // You might want to refresh emails list or show success notification
-    } catch (error) {
-      console.error('Failed to send email:', error);
-    }
-  };
-
-  const handleTaskCreate = async (taskData: {
-    title: string;
-    activityDate: string;
-    activityTime: string;
-    reminder: string;
-    repeat: boolean;
-    taskType: string;
-    priority: string;
-    queue: string;
-    assignedTo: string;
-    notes: string;
-  }) => {
-    const id = prospectId != null && prospectId !== '' ? Number(prospectId) : prospect?.id;
-    if (id == null || Number.isNaN(id)) {
-      console.log('No prospect ID available');
-      return;
-    }
-    
-    try {
-      console.log('Creating task:', { ...taskData, prospectId: id });
-      // Here you would call your API to create the task
-      // await createCrmTask('prospect', id, taskData);
-      // You might want to refresh tasks list or show success notification
-    } catch (error) {
-      console.error('Failed to create task:', error);
-    }
-  };
-
-  const handleMeetingSchedule = async (meetingData: {
-    title: string;
-    hostType: 'user' | 'rotation';
-    hostEmail: string;
-    startDate: string;
-    startTime: string;
-    endTime: string;
-    attendees: string[];
-    location: string;
-    reminders: string[];
-    description: string;
-    internalNote: string;
-  }) => {
-    const id = prospectId != null && prospectId !== '' ? Number(prospectId) : prospect?.id;
-    if (id == null || Number.isNaN(id)) {
-      console.log('No prospect ID available');
-      return;
-    }
-    
-    try {
-      console.log('Scheduling meeting:', { ...meetingData, prospectId: id });
-      // Here you would call your API to schedule the meeting
-      // await scheduleCrmMeeting('prospect', id, meetingData);
-      // You might want to refresh meetings list or show success notification
-      await fetchMeetings();
-    } catch (error) {
-      console.error('Failed to schedule meeting:', error);
-    }
-  };
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -319,252 +117,6 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-
-  const toggleActivity = (activityId: string) => {
-    setExpandedActivities(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(activityId)) {
-        newSet.delete(activityId);
-      } else {
-        newSet.add(activityId);
-      }
-      return newSet;
-    });
-  };
-  
-  // Sample activity data - add this before the render functions
-  const activitiesData: ActivityItem[] = [
-    {
-      id: '1',
-      type: 'invoice',
-      title: 'Invoice activity',
-      description: 'sent invoice INV-1004 to',
-      timestamp: 'Feb 14, 2026 at 2:50 AM GMT+5',
-      user: 'Rizwan Haider',
-      userLink: '#',
-      entityName: 'Ahmad Hussain <ahmad@gmail.com>',
-      entityLink: '#',
-    },
-    {
-      id: '2',
-      type: 'email',
-      title: 'Marketing email',
-      description: 'sent to Ahmad Hussain <Ahmad Hussain <ahmad@gmail.com>>',
-      timestamp: 'Feb 14, 2026 at 2:50 AM GMT+5',
-      alert: {
-        message: 'There was an issue sending an email to this contact. An email to this recipient has bounced.',
-        link: '#',
-        linkText: 'Learn more.',
-      },
-      expanded: true,
-    },
-    {
-      id: '3',
-      type: 'invoice',
-      title: 'Invoice activity',
-      description: 'finalized invoice INV-1004',
-      timestamp: 'Feb 14, 2026 at 2:50 AM GMT+5',
-      user: 'Rizwan Haider',
-      userLink: '#',
-    },
-    {
-      id: '4',
-      type: 'invoice',
-      title: 'Invoice activity',
-      description: 'Invoice INV-1003 was sent by a subscription.',
-      timestamp: 'Feb 14, 2026 at 2:49 AM GMT+5',
-    },
-    {
-      id: '5',
-      type: 'invoice',
-      title: 'Invoice activity',
-      description: 'Invoice INV-1003 was finalized',
-      timestamp: 'Feb 14, 2026 at 2:49 AM GMT+5',
-    },
-    {
-      id: '6',
-      type: 'subscription',
-      title: 'Subscription activity',
-      description: 'was created by',
-      timestamp: 'Feb 14, 2026 at 2:49 AM GMT+5',
-      entityName: 'Connect Pro',
-      entityLink: '#',
-      user: 'Rizwan Haider',
-      userLink: '#',
-    },
-  ];
-  
-  // Add this function to render activity items
-  const renderActivityItem = (activity: ActivityItem) => {
-    const isExpanded = expandedActivities.has(activity.id) || activity.expanded;
-    
-    return (
-      <div
-        key={activity.id}
-        style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #eaf0f6',
-          borderRadius: '5px',
-          padding: '16px 20px',
-          marginBottom: '12px',
-        }}
-      >
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: '12px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flex: 1 }}>
-            {activity.expanded !== undefined && (
-              <button
-                onClick={() => toggleActivity(activity.id)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  padding: '4px',
-                  cursor: 'pointer',
-                  color: '#141414',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              </button>
-            )}
-            
-            <div style={{ flex: 1 }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '4px',
-              }}>
-                <h4 style={{
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  margin: 0,
-                }}>
-                  {activity.title}
-                </h4>
-                <FileText size={14} color="#141414" />
-              </div>
-              
-              <p style={{
-                fontSize: '14px',
-                color: '#141414',
-                margin: '4px 0',
-                lineHeight: '1.6',
-              }}>
-                {activity.user && (
-                  <>
-                    <a
-                      href={activity.userLink}
-                      style={{
-                        color: '#006162',
-                        textDecoration: 'none',
-                        fontWeight: '500',
-                      }}
-                    >
-                      {activity.user}
-                    </a>
-                    {' '}
-                  </>
-                )}
-                {activity.description}
-                {activity.entityName && (
-                  <>
-                    {' '}
-                    <a
-                      href={activity.entityLink}
-                      style={{
-                        color: '#006162',
-                        textDecoration: 'none',
-                        fontWeight: '500',
-                      }}
-                    >
-                      {activity.entityName}
-                    </a>
-                  </>
-                )}
-              </p>
-              
-              {activity.alert && isExpanded && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '12px 16px',
-                  backgroundColor: '#fff5f5',
-                  border: '1px solid #feb2b2',
-                  borderRadius: '5px',
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '8px',
-                  }}>
-                    <AlertCircle size={16} color="#e53e3e" style={{ marginTop: '2px', flexShrink: 0 }} />
-                    <div>
-                      <p style={{
-                        fontSize: '14px',
-                        color: '#141414',
-                        margin: 0,
-                        lineHeight: '1.6',
-                      }}>
-                        <strong>{activity.alert.message.split('.')[0]}.</strong>
-                        {' '}
-                        {activity.alert.message.split('.').slice(1).join('.')}
-                        {activity.alert.link && (
-                          <>
-                            {' '}
-                            <a
-                              href={activity.alert.link}
-                              style={{
-                                color: '#006162',
-                                textDecoration: 'none',
-                                fontWeight: '500',
-                              }}
-                            >
-                              {activity.alert.linkText}
-                            </a>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {isExpanded && activity.type === 'email' && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '12px',
-                  backgroundColor: '#f7fafc',
-                  borderRadius: '5px',
-                }}>
-                  <p style={{
-                    fontSize: '13px',
-                    color: '#141414',
-                    margin: 0,
-                  }}>
-                    Transactional email Invoice from Prime Alley Technology
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <div style={{
-            fontSize: '13px',
-            color: '#141414',
-            whiteSpace: 'nowrap',
-          }}>
-            {activity.timestamp}
-          </div>
-        </div>
-      </div>
-    );
-  };
   const toggleSection = (sectionId: string) => {
     setCollapsedSections(prev => {
       const newSet = new Set(prev);
@@ -577,72 +129,6 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
     });
   };
 
-  // Revenue data
-const subscriptionsData: SubscriptionItem[] = [
-  {
-    id: '1',
-    name: 'Connect Pro',
-    status: 'active',
-    nextBillingDate: '03/13/2026',
-    nextPaymentAmount: '$500.00',
-    contactEmail: 'ahmad@gmail.com',
-    link: '#',
-  },
-];
-
-const revenueSections: RevenueSection[] = [
-  {
-    id: 'quotes',
-    title: 'Quotes',
-    count: 0,
-    description: 'Track the sales documents associated with this record.',
-    buttonText: 'Create quote',
-    buttonIcon: FileText,
-    onButtonClick: () => console.log('Create quote'),
-    addButtonText: 'Add',
-    onAddClick: () => console.log('Add quote'),
-  },
-  {
-    id: 'invoices',
-    title: 'Invoices',
-    count: 0,
-    description: 'Send your customer a request for payment and associate it with this record.',
-    buttonText: 'Set up payments',
-    onButtonClick: () => console.log('Set up payments'),
-    addButtonText: 'Add',
-    onAddClick: () => console.log('Add invoice'),
-  },
-  {
-    id: 'payment-links',
-    title: 'Payment Links',
-    count: 0,
-    description: 'Add a payment link to accept a payment and associate it with this record.',
-    buttonText: 'Set up payments',
-    onButtonClick: () => console.log('Set up payments'),
-    addButtonText: 'Add',
-    onAddClick: () => console.log('Add payment link'),
-  },
-  {
-    id: 'subscriptions',
-    title: 'Subscriptions',
-    count: 1,
-    description: '',
-    buttonText: '',
-    items: subscriptionsData,
-    onButtonClick: () => console.log('Subscriptions'),
-    addButtonText: 'Add',
-    onAddClick: () => console.log('Add subscription'),
-  },
-  {
-    id: 'payments',
-    title: 'Payments',
-    count: 0,
-    description: 'Track payments associated with this record. A payment is created when a customer pays or a recurring payment is processed.',
-    buttonText: 'Set up payments',
-    onButtonClick: () => console.log('Set up payments'),
-  },
-];
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
@@ -651,16 +137,15 @@ const revenueSections: RevenueSection[] = [
   const tabs = [
     { id: 'about', label: 'About' },
     { id: 'activities', label: 'Activities' },
-    { id: 'revenue', label: 'Revenue' },
     { id: 'intelligence', label: 'Intelligence' },
   ];
 
   // Key Information Fields (from prospect + tickets/leads)
-  const firstTicket = prospect?.tickets?.[0];
+  const firstTicket = prospect?.data?.tickets?.[0];
   const keyInfoFields: KeyInfoField[] = [
-    { label: 'Email', value: prospect?.data?.email ?? '--', copyable: true },
-    { label: 'Phone Number', value: prospect?.phone ?? '--', copyable: true },
-    { label: 'Company Name', value: firstTicket?.company_name ?? prospect?.data?.company_name ?? prospect?.name ?? '--' },
+    { label: 'Email', value: prospect?.data?.data?.email ?? '--', copyable: true },
+    { label: 'Phone Number', value: prospect?.data?.phone ?? '--', copyable: true },
+    { label: 'Company Name', value: firstTicket?.company_name ?? prospect?.data?.company_name ?? prospect?.data?.name ?? '--' },
     { label: 'Lead Status', value: firstTicket?.status ?? prospect?.data?.disposition ?? '--' },
     { label: 'Lifecycle Stage', value: prospect?.data?.lifecycle_stage ?? '--' },
     { label: 'Buying Role', value: prospect?.data?.buying_role ?? '--' },
@@ -902,7 +387,7 @@ const revenueSections: RevenueSection[] = [
                 Email
               </div>
               <div style={{ fontSize: '14px', color: '#141414', fontWeight: '400' }}>
-                {prospect?.data?.email ?? '--'}
+                {prospect?.data?.data?.email ?? '--'}
               </div>
             </div>
   
@@ -1315,7 +800,7 @@ const revenueSections: RevenueSection[] = [
               color: '#141414',
               flexShrink: 0,
             }}>
-              {prospect?.name ? prospect.name.trim().split(/\s+/).map((s: string) => s[0]).join('').toUpperCase().slice(0, 2) : 'NA'}
+              {prospect?.data?.name ? prospect?.data.name.trim().split(/\s+/).map((s: string) => s[0]).join('').toUpperCase().slice(0, 2) : 'NA'}
             </div>
             <div style={{ flex: 1 }}>
               <h2 style={{
@@ -1325,7 +810,7 @@ const revenueSections: RevenueSection[] = [
                 margin: '0 0 4px 0',
                 lineHeight: '1.3',
               }}>
-                {prospect?.name ?? 'Unknown'}
+                {prospect?.data?.name ?? 'Unknown'}
               </h2>
               <p style={{
                 fontSize: '14px',
@@ -1340,10 +825,10 @@ const revenueSections: RevenueSection[] = [
                 alignItems: 'center',
                 gap: '8px',
               }}>
-                {prospect?.data?.email ? (
+                {prospect?.data?.data?.email ? (
                   <>
                     <a
-                      href={`mailto:${prospect?.data?.email}`}
+                      href={`mailto:${prospect?.data?.data?.email}`}
                       style={{
                         fontSize: '14px',
                         color: '#006162',
@@ -1357,10 +842,10 @@ const revenueSections: RevenueSection[] = [
                         e.currentTarget.style.textDecoration = 'none';
                       }}
                     >
-                      {prospect?.data?.email}
+                      {prospect?.data?.data?.email}
                     </a>
                     <button
-                      onClick={() => copyToClipboard(prospect?.data?.email ?? '')}
+                      onClick={() => copyToClipboard(prospect?.data?.data?.email ?? '')}
                       style={{
                         background: 'transparent',
                         border: 'none',
@@ -1807,7 +1292,7 @@ const revenueSections: RevenueSection[] = [
                     padding: '18px 20px',
                     borderRadius: '10px',
                   }}>
-                    {prospect?.name ?? 'This prospect'} is a Director at {firstTicket?.company_name ?? prospect?.data?.company_name ?? 'N/A'}, currently in the Opportunity stage. Recent activity shows strong engagement. The contact is revenue-generating. Recommended next steps: consider a follow-up call to discuss potential opportunities.
+                    {prospect?.data?.name ?? 'This prospect'} is a Director at {firstTicket?.company_name ?? prospect?.data?.company_name ?? 'N/A'}, currently in the Opportunity stage. Recent activity shows strong engagement. The contact is revenue-generating. Recommended next steps: consider a follow-up call to discuss potential opportunities.
                   </div>
 
                   <div style={{
@@ -1952,7 +1437,7 @@ const revenueSections: RevenueSection[] = [
                     { label: 'City', value: firstTicket?.company_city ?? '--' },
                     { label: 'Postal code', value: '--' },
                     { label: 'State', value: firstTicket?.company_province ?? '--' },
-                    { label: 'Email', value: prospect?.data?.email ?? '--', link: true },
+                    { label: 'Email', value: prospect?.data?.data?.email ?? '--', link: true },
                   ].map((field, index) => (
                     <div key={index}>
                       <div style={{
@@ -2044,962 +1529,16 @@ const revenueSections: RevenueSection[] = [
         )}
 
 {activeTab === 'activities' && (
-  <div>
-    {/* Search and Filter Bar */}
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: '20px',
-      gap: '16px',
-      flexWrap: 'wrap',
-    }}>
-      {/* Search Input */}
-      <div style={{
-        position: 'relative',
-        // flex: '1',
-        maxWidth: '360px',
-        width: '185px',
-      }}>
-        <Search
-          size={18}
-          style={{
-            position: 'absolute',
-            right: '12px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            color: '#141414',
-            pointerEvents: 'none',
-          }}
-        />
-        <input
-          type="text"
-          placeholder="Search activities"
-          value={searchActivity}
-          onChange={(e) => setSearchActivity(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '10px 40px 10px 13px',
-            border: '1px solid #8a8a8a',
-            borderRadius: '20px',
-            fontSize: '16px',
-            outline: 'none',
-            backgroundColor: '#ffffff',
-            fontWeight: '300',
-          }}
-        />
-      </div>
-
-      {/* Collapse All Button */}
-      <button
-        style={{
-          padding: '8px 16px',
-          backgroundColor: '#ffffff',
-          border: '1px solid #8a8a8a',
-          borderRadius: '4px',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: '#141414',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}
-        onClick={() => setExpandedActivities(new Set())}
-      >
-        Collapse all
-        <ChevronDown size={14} />
-      </button>
-    </div>
-
-    {/* Activity Type Tabs */}
-    <div style={{
-      display: 'flex',
-      gap: '24px',
-      marginBottom: '16px',
-      borderBottom: '2px solid #eaf0f6',
-    }}>
-      {ACTIVITY_TYPE_TABS.map(filter => (
-        <button
-          key={filter.id}
-          onClick={() => setActivityFilter(filter.id)}
-          style={{
-            padding: '10px 0',
-            backgroundColor: 'transparent',
-            border: 'none',
-            borderBottom: activityFilter === filter.id ? '2px solid #141414' : '2px solid transparent',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: activityFilter === filter.id ? '600' : '400',
-            color: activityFilter === filter.id ? '#141414' : '#141414',
-            transition: 'all 0.2s',
-            marginBottom: '-2px',
-          }}
-        >
-          {filter.label}
-        </button>
-      ))}
-    </div>
-
-    {/* Filter Options or Email Actions */}
-    {activityFilter === 'activity' ? (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        marginBottom: '20px',
-      }}>
-        <span style={{
-          fontSize: '14px',
-          color: '#141414',
-        }}>
-          Filter by:
-        </span>
-        <button
-          style={{
-            padding: '6px 12px',
-            backgroundColor: 'transparent',
-            border: 'none',
-            fontSize: '14px',
-            fontWeight: '600',
-            color: '#141414',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          Filter activity (22/33)
-          <ChevronDown size={14} />
-        </button>
-        <button
-          style={{
-            padding: '6px 12px',
-            backgroundColor: 'transparent',
-            border: 'none',
-            fontSize: '14px',
-            fontWeight: '600',
-            color: '#141414',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          All users
-          <ChevronDown size={14} />
-        </button>
-      </div>
-    ) : activityFilter === 'emails' ? (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        gap: '12px',
-        marginBottom: '20px',
-      }}>
-        <button
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#ffffff',
-            border: '1px solid #414141',
-            borderRadius: '4px',
-            fontSize: '12px',
-            fontWeight: '300',
-            color: '#141414',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'all 0.2s',
-          }}
-          onClick={() => console.log('Log Email')}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#f7fafc';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff';
-          }}
-        >
-          <Mail size={16} />
-          Log Email
-        </button>
-        <button
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#ffffff',
-            border: '1px solid #414141',
-            borderRadius: '4px',
-            fontSize: '12px',
-            fontWeight: '300',
-            color: '#141414',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'all 0.2s',
-          }}
-          onClick={() => setShowEmailModal(true)}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#f7fafc';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff';
-          }}
-        >
-          <Mail size={16} />
-          Create email
-        </button>
-      </div>
-    ) : activityFilter === 'notes' ? (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        gap: '12px',
-        marginBottom: '20px',
-      }}>
-        <button
-          style={{
-            padding: '8px 16px',
-            backgroundColor: '#ffffff',
-            border: '1px solid #414141',
-            borderRadius: '4px',
-            fontSize: '12px',
-            fontWeight: '300',
-            color: '#141414',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'all 0.2s',
-          }}
-          onClick={() => setShowNotesModal(true)}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#f7fafc';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff';
-          }}
-        >
-          <ClipboardList size={16} />
-          Create note
-        </button>
-      </div>
-    ) : null}
-
-    {/* Content based on selected activity filter */}
-    {(activityFilter === 'activity' || activityFilter === 'emails') && (
-      <>
-        {/* Month Header */}
-        <h3 style={{
-          fontSize: '16px',
-          fontWeight: '600',
-          color: '#141414',
-          marginBottom: '16px',
-        }}>
-          February 2026
-        </h3>
-
-        {/* Activity List */}
-        <div>
-          {activitiesData.map(activity => renderActivityItem(activity))}
-        </div>
-      </>
-    )}
-
-    {activityFilter === 'notes' && (
-      <>
-        {notesLoading ? (
-          <div style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #eaf0f6',
-            borderRadius: '8px',
-            padding: '40px 24px',
-            textAlign: 'center',
-          }}>
-            <p style={{ fontSize: '14px', color: '#666', margin: 0 }}>Loading notes…</p>
-          </div>
-        ) : notesError ? (
-          <div style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #eaf0f6',
-            borderRadius: '8px',
-            padding: '40px 24px',
-            textAlign: 'center',
-          }}>
-            <AlertCircle size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
-            <p style={{ fontSize: '14px', color: '#141414', margin: 0 }}>{notesError}</p>
-          </div>
-        ) : notesList.length === 0 ? (
-          <div style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #eaf0f6',
-            borderRadius: '8px',
-            padding: '40px 24px',
-            textAlign: 'center',
-          }}>
-            <FileText size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
-            <p style={{
-              fontSize: '14px',
-              color: '#141414',
-              marginBottom: '8px',
-              lineHeight: '1.6',
-            }}>
-              Take notes about this record to keep track of important info. You can even @mention a teammate if you need to.
-            </p>
-            <a href="#" style={{
-              fontSize: '14px',
-              color: '#006162',
-              textDecoration: 'none',
-              fontWeight: '500',
-            }}>
-              Learn more
-            </a>
-          </div>
-        ) : (
-          <div>
-            {notesList.map((note) => {
-              const updatedAt = new Date(note.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-              const isEditing = editingNoteId === note.id;
-              const iconBtnStyle: React.CSSProperties = {
-                background: 'transparent',
-                border: 'none',
-                padding: '4px',
-                cursor: 'pointer',
-                color: '#718096',
-                display: 'flex',
-                alignItems: 'center',
-              };
-              return (
-                <div
-                  key={note.id}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #eaf0f6',
-                    borderRadius: '5px',
-                    padding: '16px 20px',
-                    marginBottom: '12px',
-                  }}
-                >
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flex: 1, minWidth: 0 }}>
-                      <div style={{ flex: 1 }}>
-                        {isEditing ? (
-                          <>
-                            <textarea
-                              value={editingText}
-                              onChange={(e) => setEditingText(e.target.value)}
-                              style={{
-                                width: '100%',
-                                minHeight: '80px',
-                                padding: '10px 12px',
-                                border: '1px solid #cbd5e0',
-                                borderRadius: '5px',
-                                fontSize: '14px',
-                                color: '#141414',
-                                lineHeight: '1.6',
-                                resize: 'vertical',
-                                fontFamily: 'inherit',
-                              }}
-                              autoFocus
-                            />
-                            <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  const text = editingText.trim();
-                                  if (!text || editingNoteId == null) return;
-                                  try {
-                                    await updateCrmNote(editingNoteId, { text });
-                                    setEditingNoteId(null);
-                                    setEditingText('');
-                                    fetchNotes();
-                                  } catch {
-                                    // toast handled in updateCrmNote
-                                  }
-                                }}
-                                style={{
-                                  padding: '6px 14px',
-                                  backgroundColor: '#141414',
-                                  border: 'none',
-                                  borderRadius: '4px',
-                                  fontSize: '14px',
-                                  fontWeight: '500',
-                                  color: '#ffffff',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingNoteId(null);
-                                  setEditingText('');
-                                }}
-                                style={{
-                                  padding: '6px 14px',
-                                  backgroundColor: '#ffffff',
-                                  border: '1px solid #8a8a8a',
-                                  borderRadius: '4px',
-                                  fontSize: '14px',
-                                  fontWeight: '500',
-                                  color: '#141414',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <p style={{
-                            fontSize: '14px',
-                            color: '#141414',
-                            margin: '4px 0',
-                            lineHeight: '1.6',
-                            whiteSpace: 'pre-wrap',
-                          }}>
-                            {note.text}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    {!isEditing && (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        flexShrink: 0,
-                      }}>
-                        <span style={{
-                          fontSize: '13px',
-                          color: '#718096',
-                          whiteSpace: 'nowrap',
-                          marginRight: '4px',
-                        }}>
-                          {updatedAt}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingNoteId(note.id);
-                            setEditingText(note.text);
-                          }}
-                          style={iconBtnStyle}
-                          title="Edit note"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setNoteToDelete(note)}
-                          style={{ ...iconBtnStyle, color: '#e53e3e' }}
-                          title="Delete note"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </>
-    )}
-
-    {activityFilter === 'calls' && <CallLog />}
-
-    {activityFilter === 'tasks' && (
-      <>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: '12px',
-          marginBottom: '20px',
-        }}>
-          <button
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #414141',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: '300',
-              color: '#141414',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s',
-            }}
-            onClick={() => setShowTaskModal(true)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f7fafc';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#ffffff';
-            }}
-          >
-            <ClipboardList size={16} />
-            Create task
-          </button>
-        </div>
-        <div style={{
-         
-          padding: '40px 24px',
-          textAlign: 'center',
-        }}>
-          
-          <p style={{
-            fontSize: '14px',
-            color: '#141414',
-            marginBottom: '8px',
-            lineHeight: '1.6',
-          }}>
-            Create and manage tasks related to this contact. Set due dates and track progress to stay organized.
-          </p>
-          <a href="#" style={{
-            fontSize: '14px',
-            color: '#006162',
-            textDecoration: 'none',
-            fontWeight: '500',
-          }}>
-            Learn more
-          </a>
-        </div>
-      </>
-    )}
-
-    {activityFilter === 'meetings' && (
-      <>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: '12px',
-          marginBottom: '20px',
-        }}>
-          <button
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #414141',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: '300',
-              color: '#141414',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s',
-            }}
-            onClick={() => console.log('Log Meeting')}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f7fafc';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#ffffff';
-            }}
-          >
-            <Calendar size={16} />
-            Log meeting
-          </button>
-          <button
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #414141',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: '300',
-              color: '#141414',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.2s',
-            }}
-            onClick={() => setShowMeetingModal(true)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f7fafc';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#ffffff';
-            }}
-          >
-            <Calendar size={16} />
-            Create meeting
-          </button>
-        </div>
-        {meetingsLoading ? (
-          <div style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #eaf0f6',
-            borderRadius: '8px',
-            padding: '40px 24px',
-            textAlign: 'center',
-          }}>
-            <p style={{ fontSize: '14px', color: '#666', margin: 0 }}>Loading meetings…</p>
-          </div>
-        ) : meetingsError ? (
-          <div style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #eaf0f6',
-            borderRadius: '8px',
-            padding: '40px 24px',
-            textAlign: 'center',
-          }}>
-            <AlertCircle size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
-            <p style={{ fontSize: '14px', color: '#141414', margin: 0 }}>{meetingsError}</p>
-          </div>
-        ) : meetingsList.length === 0 ? (
-          <div style={{
-           
-            padding: '40px 24px',
-            textAlign: 'center',
-          }}>
-            
-            <p style={{
-              fontSize: '14px',
-              color: '#141414',
-              marginBottom: '8px',
-              lineHeight: '1.6',
-            }}>
-              Schedule and track meetings with this contact. Keep notes and outcomes to maintain a complete meeting history.
-            </p>
-            <a href="#" style={{
-              fontSize: '14px',
-              color: '#006162',
-              textDecoration: 'none',
-              fontWeight: '500',
-            }}>
-              Learn more
-            </a>
-          </div>
-        ) : (
-          <div>
-            {meetingsList.map((meeting) => {
-              const meetingUpdatedAt = new Date(meeting.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-              const meetingDate = meeting.meeting_date?.slice(0, 10) ?? '';
-              const isEditingMeeting = editingMeetingId === meeting.id;
-              const iconBtnStyle: React.CSSProperties = {
-                background: 'transparent',
-                border: 'none',
-                padding: '4px',
-                cursor: 'pointer',
-                color: '#718096',
-                display: 'flex',
-                alignItems: 'center',
-              };
-              return (
-                <div
-                  key={meeting.id}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #eaf0f6',
-                    borderRadius: '5px',
-                    padding: '16px 20px',
-                    marginBottom: '12px',
-                  }}
-                >
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flex: 1, minWidth: 0 }}>
-                      <div style={{ flex: 1 }}>
-                        {isEditingMeeting ? (
-                          <>
-                            <input
-                              type="text"
-                              value={editingMeetingForm.name}
-                              onChange={(e) => setEditingMeetingForm((p) => ({ ...p, name: e.target.value }))}
-                              placeholder="Meeting name"
-                              style={{
-                                width: '100%',
-                                padding: '8px 12px',
-                                border: '1px solid #cbd5e0',
-                                borderRadius: '5px',
-                                fontSize: '14px',
-                                marginBottom: '8px',
-                              }}
-                            />
-                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
-                              <input
-                                type="date"
-                                value={editingMeetingForm.meeting_date}
-                                onChange={(e) => setEditingMeetingForm((p) => ({ ...p, meeting_date: e.target.value }))}
-                                style={{
-                                  padding: '8px 12px',
-                                  border: '1px solid #cbd5e0',
-                                  borderRadius: '5px',
-                                  fontSize: '14px',
-                                }}
-                              />
-                              <input
-                                type="time"
-                                value={editingMeetingForm.meeting_time}
-                                onChange={(e) => setEditingMeetingForm((p) => ({ ...p, meeting_time: e.target.value }))}
-                                style={{
-                                  padding: '8px 12px',
-                                  border: '1px solid #cbd5e0',
-                                  borderRadius: '5px',
-                                  fontSize: '14px',
-                                }}
-                              />
-                              <select
-                                value={editingMeetingForm.meeting_type}
-                                onChange={(e) => setEditingMeetingForm((p) => ({ ...p, meeting_type: e.target.value }))}
-                                style={{
-                                  padding: '8px 12px',
-                                  border: '1px solid #cbd5e0',
-                                  borderRadius: '5px',
-                                  fontSize: '14px',
-                                }}
-                              >
-                                <option value="Video">Video</option>
-                                <option value="Phone">Phone</option>
-                                <option value="In Person">In Person</option>
-                              </select>
-                            </div>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  if (editingMeetingId == null) return;
-                                  try {
-                                    await updateMeeting(editingMeetingId, {
-                                      name: editingMeetingForm.name,
-                                      meeting_date: editingMeetingForm.meeting_date ? `${editingMeetingForm.meeting_date}T00:00:00.000Z` : undefined,
-                                      meeting_time: editingMeetingForm.meeting_time,
-                                      meeting_type: editingMeetingForm.meeting_type,
-                                    });
-                                    setEditingMeetingId(null);
-                                    fetchMeetings();
-                                  } catch {
-                                    // toast in updateMeeting
-                                  }
-                                }}
-                                style={{
-                                  padding: '6px 14px',
-                                  backgroundColor: '#141414',
-                                  border: 'none',
-                                  borderRadius: '4px',
-                                  fontSize: '14px',
-                                  fontWeight: '500',
-                                  color: '#ffffff',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingMeetingId(null);
-                                }}
-                                style={{
-                                  padding: '6px 14px',
-                                  backgroundColor: '#ffffff',
-                                  border: '1px solid #8a8a8a',
-                                  borderRadius: '4px',
-                                  fontSize: '14px',
-                                  fontWeight: '500',
-                                  color: '#141414',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <p style={{
-                              fontSize: '14px',
-                              fontWeight: '600',
-                              color: '#141414',
-                              margin: '0 0 4px 0',
-                              lineHeight: '1.4',
-                            }}>
-                              {meeting.name}
-                            </p>
-                            <p style={{
-                              fontSize: '14px',
-                              color: '#141414',
-                              margin: '4px 0',
-                              lineHeight: '1.6',
-                            }}>
-                              {meeting.meeting_type} · {meetingDate ? new Date(meeting.meeting_date).toLocaleDateString('en-US') : '—'} {meeting.meeting_time ? meeting.meeting_time : ''}
-                              {meeting.status ? ` · ${meeting.status}` : ''}
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {!isEditingMeeting && (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        flexShrink: 0,
-                      }}>
-                        <span style={{
-                          fontSize: '13px',
-                          color: '#718096',
-                          whiteSpace: 'nowrap',
-                          marginRight: '4px',
-                        }}>
-                          {meetingUpdatedAt}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingMeetingId(meeting.id);
-                            setEditingMeetingForm({
-                              name: meeting.name,
-                              meeting_date: meeting.meeting_date?.slice(0, 10) ?? '',
-                              meeting_time: meeting.meeting_time ?? '',
-                              meeting_type: meeting.meeting_type ?? 'Video',
-                            });
-                          }}
-                          style={iconBtnStyle}
-                          title="Edit meeting"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setMeetingToDelete(meeting)}
-                          style={{ ...iconBtnStyle, color: '#e53e3e' }}
-                          title="Delete meeting"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </>
-    )}
-  </div>
+  <CrmActivitiesPanel
+    recordType="prospect"
+    recordId={Number(prospectId) || prospect?.data?.id || 0}
+    record={prospect}
+    recordLoading={prospectLoading}
+    recordName={prospect?.data?.name ?? 'Prospect'}
+    canSendWhatsApp={canSendWhatsApp}
+  />
 )}
 
-{activeTab === 'revenue' && (
-  <div>
-    {/* Quote-to-cash Section */}
-    <div style={{
-      marginBottom: '24px',
-    }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '16px',
-          cursor: 'pointer',
-        }}
-        onClick={() => toggleSection('quote-to-cash')}
-      >
-        <ChevronDown
-          size={20}
-          style={{
-            color: '#141414',
-            transform: collapsedSections.has('quote-to-cash') ? 'rotate(-90deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s ease',
-          }}
-        />
-        <h2 style={{
-          fontSize: '18px',
-          fontWeight: '600',
-          color: '#141414',
-          margin: 0,
-        }}>
-          Quote-to-cash
-        </h2>
-      </div>
-
-      {!collapsedSections.has('quote-to-cash') && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-          gap: '16px',
-        }}>
-          {revenueSections.slice(0, 5).map(section => renderRevenueSection(section))}
-        </div>
-      )}
-    </div>
-
-    {/* e-Commerce Section */}
-    <div style={{
-      marginBottom: '24px',
-    }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '16px',
-          cursor: 'pointer',
-        }}
-        onClick={() => toggleSection('e-commerce')}
-      >
-        <ChevronDown
-          size={20}
-          style={{
-            color: '#141414',
-            transform: collapsedSections.has('e-commerce') ? 'rotate(-90deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s ease',
-          }}
-        />
-        <h2 style={{
-          fontSize: '18px',
-          fontWeight: '600',
-          color: '#141414',
-          margin: 0,
-        }}>
-          e-Commerce
-        </h2>
-      </div>
-
-      {!collapsedSections.has('e-commerce') && (
-        <div style={{
-          padding: '40px',
-          textAlign: 'center',
-          backgroundColor: '#f7fafc',
-          borderRadius: '5px',
-          border: '1px solid #eaf0f6',
-        }}>
-          <ShoppingCart size={48} style={{ marginBottom: '16px', color: '#cbd5e0' }} />
-          <p style={{
-            fontSize: '14px',
-            color: '#141414',
-            margin: 0,
-          }}>
-            No e-commerce data available
-          </p>
-        </div>
-      )}
-    </div>
-  </div>
-)}
 {activeTab === 'intelligence' && renderIntelligenceTab()}
       </div>
     </div>
@@ -3069,8 +1608,8 @@ const revenueSections: RevenueSection[] = [
         }}>
         {/* Companies - from prospect name + unique company_name from tickets */}
         {(() => {
-          const companyNames: string[] = prospect?.tickets?.length
-            ? Array.from(new Set(prospect.tickets.map((t: any) => t.company_name).filter(Boolean)))
+          const companyNames: string[] = prospect?.data?.tickets?.length
+            ? Array.from(new Set(prospect?.data.tickets.map((t: any) => t.company_name).filter(Boolean)))
             : [];
           const companiesCount = companyNames.length;
           return (
@@ -3113,30 +1652,6 @@ const revenueSections: RevenueSection[] = [
               Companies ({companiesCount})
             </h3>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#141414',
-              fontSize: '12px',
-              fontWeight: '500',
-              padding: '6px',
-              borderRadius: '3px',
-              transition: 'background-color 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f5f8fa';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-          </button>
         </div>
 
         {!collapsedSections.has('companies') && (
@@ -3155,7 +1670,7 @@ const revenueSections: RevenueSection[] = [
                         </span>
                       )}
                     </div>
-                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Phone: {prospect?.phone ?? '--'}</p>
+                    <p style={{ fontSize: '13px', color: '#666666', margin: '4px 0' }}>Phone: {prospect?.data?.phone ?? '--'}</p>
                   </div>
                 ))}
                 <a
@@ -3184,9 +1699,9 @@ const revenueSections: RevenueSection[] = [
           );
         })()}
 
-      {/* Deals - from prospect.tickets[].deals */}
+      {/* Deals - from prospect.data.tickets[].deals */}
       {(() => {
-        const allDeals = prospect?.tickets?.flatMap((t: any) => t.deals ?? []) ?? [];
+        const allDeals = prospect?.data?.tickets?.flatMap((t: any) => t.deals ?? []) ?? [];
         const dealsCount = allDeals.length;
         const formatAmount = (deal: any) => {
           const curr = deal.currency ?? '';
@@ -3234,29 +1749,6 @@ const revenueSections: RevenueSection[] = [
               Deals ({dealsCount})
             </h3>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#141414',
-              fontSize: '20px',
-              padding: '6px',
-              borderRadius: '3px',
-              transition: 'background-color 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f5f8fa';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-          </button>
         </div>
 
         {!collapsedSections.has('deals') && (
@@ -3300,7 +1792,7 @@ const revenueSections: RevenueSection[] = [
 
       {/* Leads (API: tickets) */}
       {(() => {
-        const leads = prospect?.tickets ?? [];
+        const leads = prospect?.data?.tickets ?? [];
         const leadsCount = leads.length;
         return (
       <div style={{
@@ -3341,29 +1833,6 @@ const revenueSections: RevenueSection[] = [
               Leads ({leadsCount})
             </h3>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#141414',
-              fontSize: '20px',
-              padding: '6px',
-              borderRadius: '3px',
-              transition: 'background-color 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f5f8fa';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-          </button>
         </div>
 
         {!collapsedSections.has('tickets') && (
@@ -3411,89 +1880,6 @@ const revenueSections: RevenueSection[] = [
       </div>
         );
       })()}
-
-      {/* Attachments */}
-      <div style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '10px',
-        overflow: 'hidden',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
-        border: '1px solid #cccccc',
-      }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '14px 20px 0',
-            cursor: 'pointer',
-            backgroundColor: '#ffffff',
-           
-          }}
-          onClick={() => toggleSection('attachments')}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-            <ChevronDown
-              size={18}
-              style={{
-                color: '#141414',
-                transform: collapsedSections.has('attachments') ? 'rotate(-90deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease',
-              }}
-            />
-            <h3 style={{
-              fontSize: '16px',
-              fontWeight: '600',
-              color: '#141414',
-              margin: 0,
-              lineHeight: '1.2',
-            }}>
-              Attachments
-            </h3>
-          </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#141414',
-              fontSize: '14px',
-              fontWeight: '500',
-              padding: '6px',
-              borderRadius: '3px',
-              transition: 'background-color 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f5f8fa';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-          </button>
-        </div>
-
-        {!collapsedSections.has('attachments') && (
-          <div style={{
-            padding: '32px 20px',
-            textAlign: 'center',
-          }}>
-            <Paperclip size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
-            <p style={{
-              fontSize: '14px',
-              color: '#718096',
-              margin: 0,
-              lineHeight: '1.6',
-            }}>
-              No attachments yet
-            </p>
-          </div>
-        )}
-        </div>
         </div>
         </div>
       )}
@@ -3630,87 +2016,8 @@ const revenueSections: RevenueSection[] = [
         {renderRightSidebar()}
       </div>
 
-      {/* Notes Modal */}
-      <NotesModal
-        isOpen={showNotesModal}
-        onClose={() => setShowNotesModal(false)}
-        recordName={prospect?.name || 'Prospect'}
-        onSave={handleNoteCreate}
-      />
+      {/* Activities modals (Notes, Email, Task, Meeting, Recording, SMS, WhatsApp, Delete confirmations) are rendered inside CrmActivitiesPanel */}
 
-      {/* Email Modal */}
-      <EmailModal
-        isOpen={showEmailModal}
-        onClose={() => setShowEmailModal(false)}
-        recipientEmail={prospect?.data?.email}
-        recipientName={prospect?.name || undefined}
-        senderEmail="user@example.com"
-        senderName="Your Name"
-        onSend={handleEmailSend}
-      />
-
-      {/* Task Modal */}
-      <TaskModal
-        isOpen={showTaskModal}
-        onClose={() => setShowTaskModal(false)}
-        assignedToName="Unassigned"
-        onSave={handleTaskCreate}
-      />
-
-      {/* Meeting Modal */}
-      <MeetingModal
-        isOpen={showMeetingModal}
-        onClose={() => setShowMeetingModal(false)}
-        hostEmail="user@example.com"
-        hostName="Your Name"
-        attendeeEmail={prospect?.data?.email}
-        attendeeName={prospect?.name || undefined}
-        onSchedule={handleMeetingSchedule}
-      />
-
-      {/* Delete note confirmation */}
-      <DeleteConfirmationModal
-        show={noteToDelete != null}
-        onHide={() => setNoteToDelete(null)}
-        onConfirm={async () => {
-          if (!noteToDelete) return;
-          setNoteDeleteLoading(true);
-          try {
-            await deleteCrmNote(noteToDelete.id);
-            setNoteToDelete(null);
-            fetchNotes();
-          } catch {
-            // toast handled in deleteCrmNote
-          } finally {
-            setNoteDeleteLoading(false);
-          }
-        }}
-        itemName={noteToDelete ? (noteToDelete.text.length > 50 ? `note "${noteToDelete.text.slice(0, 50)}…"` : `note "${noteToDelete.text}"`) : undefined}
-        itemType="note"
-        loading={noteDeleteLoading}
-      />
-
-      {/* Delete meeting confirmation */}
-      <DeleteConfirmationModal
-        show={meetingToDelete != null}
-        onHide={() => setMeetingToDelete(null)}
-        onConfirm={async () => {
-          if (!meetingToDelete) return;
-          setMeetingDeleteLoading(true);
-          try {
-            await deleteMeeting(meetingToDelete.id);
-            setMeetingToDelete(null);
-            fetchMeetings();
-          } catch {
-            // toast handled in deleteMeeting
-          } finally {
-            setMeetingDeleteLoading(false);
-          }
-        }}
-        itemName={meetingToDelete ? `meeting "${meetingToDelete.name}"` : undefined}
-        itemType="meeting"
-        loading={meetingDeleteLoading}
-      />
     </>
   );
 };
