@@ -69,6 +69,7 @@ const CreateLead = () => {
     description: "",
     source: "",
     company_name: "",
+    company_domain: "",
     company_contact: "",
     company_description: "",
     industry: "",
@@ -440,6 +441,7 @@ const CreateLead = () => {
               crmDataRecord.data?.company_name ||
               crmDataRecord.data?.company ||
               "",
+            company_domain: crmDataRecord.data?.company_domain || "",
             company_contact:
               crmDataRecord.data?.company_contact ||
               crmDataRecord.data?.contact ||
@@ -786,6 +788,7 @@ const CreateLead = () => {
         ...(formData.source && { source: formData.source }),
         ...(formData.description && { description: formData.description }),
         ...(formData.company_name && { company_name: formData.company_name }),
+        ...(formData.company_domain && { company_domain: formData.company_domain }),
         ...(formData.industry && { industry: formData.industry }),
         ...(businessTypeId && { business_type_id: String(businessTypeId) }),
         ...(businessTypeOther && { business_type_other: businessTypeOther }),
@@ -1115,6 +1118,8 @@ const CreateLead = () => {
           crmDataRecord.data?.company_name ||
           crmDataRecord.data?.company ||
           prev.company_name,
+        company_domain:
+          crmDataRecord.data?.company_domain ?? prev.company_domain,
         company_contact:
           crmDataRecord.data?.company_contact ||
           crmDataRecord.data?.contact ||

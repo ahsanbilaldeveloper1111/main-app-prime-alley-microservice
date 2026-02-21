@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, ReactElement } from 'react';
+import { useRouter } from 'next/router';
 import {
   X, ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
   Calendar, MessageSquare, ClipboardList, ExternalLink, Copy, RefreshCw,
@@ -7,6 +8,10 @@ import {
   Search, Filter, AlertCircle, ShoppingCart
 } from 'lucide-react';
 import Layout from "@layout/index";
+import { getLead, type LeadData } from '@utils/crm';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+import CrmActivitiesPanel from '@components/CrmActivitiesPanel';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -15,33 +20,13 @@ import Layout from "@layout/index";
 
 interface KeyInfoField {
   label: string;
-  value: string;
+  value?: string;
   copyable?: boolean;
 }
 
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
 };
-
-// Add these interfaces near the top with other type definitions
-interface ActivityItem {
-  id: string;
-  type: 'invoice' | 'email' | 'subscription' | 'note' | 'call' | 'meeting' | 'task';
-  title: string;
-  description: string;
-  timestamp: string;
-  user?: string;
-  userLink?: string;
-  entityLink?: string;
-  entityName?: string;
-  alert?: {
-    message: string;
-    link?: string;
-    linkText?: string;
-  };
-  expanded?: boolean;
-}
-
 
 interface SubscriptionItem {
   id: string;
@@ -73,16 +58,56 @@ interface RevenueSection {
 // ============================================================================
 
 const ContactRecordPage: NextPageWithLayout = () => {
+  const router = useRouter();
+  const { id: leadId } = (router.query as { id?: string }) ?? {};
+  const [lead, setLead] = useState<LeadData | null>(null);
+  const [leadLoading, setLeadLoading] = useState(true);
+  const [leadError, setLeadError] = useState<string | null>(null);
+  const { hasPermission } = usePermissions();
+  const canSendWhatsApp = hasPermission(HEADER_CONSTANTS.PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM);
+
   const [activeTab, setActiveTab] = useState('about');
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [showMoreActivities, setShowMoreActivities] = useState(false);
-  const [activityFilter, setActivityFilter] = useState('activity');
-const [searchActivity, setSearchActivity] = useState('');
-const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Set());
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
+
+  // Fetch lead detail by ID from URL (same pattern as prospect detail page)
+  useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+    if (leadId == null || leadId === '') {
+      setLeadLoading(false);
+      setLead(null);
+      setLeadError(null);
+      return;
+    }
+    const id = Number(leadId);
+    if (Number.isNaN(id)) {
+      setLeadError('Invalid lead ID');
+      setLeadLoading(false);
+      setLead(null);
+      return;
+    }
+    setLeadLoading(true);
+    setLeadError(null);
+    getLead(id)
+      .then((data: LeadData) => {
+        console.log("data", data);
+        setLead(data);
+        setLeadError(null);
+      })
+      .catch(() => {
+        setLead(null);
+        setLeadError('Failed to load lead');
+      })
+      .finally(() => {
+        setLeadLoading(false);
+      });
+  }, [router.isReady, leadId]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -98,252 +123,19 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-
-  const toggleActivity = (activityId: string) => {
-    setExpandedActivities(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(activityId)) {
-        newSet.delete(activityId);
-      } else {
-        newSet.add(activityId);
+  // Normalize lead for CrmActivitiesPanel (panel expects record.data / record.audit_trail)
+  const leadRecord = lead
+    ? {
+        data: {
+          id: lead.id,
+          name: lead.name,
+          phone: (lead as any).phone ?? lead.company_contact ?? null,
+          data: lead.campaign_field_values ?? {},
+        },
+        audit_trail: lead.audit_trail,
       }
-      return newSet;
-    });
-  };
-  
-  // Sample activity data - add this before the render functions
-  const activitiesData: ActivityItem[] = [
-    {
-      id: '1',
-      type: 'invoice',
-      title: 'Invoice activity',
-      description: 'sent invoice INV-1004 to',
-      timestamp: 'Feb 14, 2026 at 2:50 AM GMT+5',
-      user: 'Rizwan Haider',
-      userLink: '#',
-      entityName: 'Ahmad Hussain <ahmad@gmail.com>',
-      entityLink: '#',
-    },
-    {
-      id: '2',
-      type: 'email',
-      title: 'Marketing email',
-      description: 'sent to Ahmad Hussain <Ahmad Hussain <ahmad@gmail.com>>',
-      timestamp: 'Feb 14, 2026 at 2:50 AM GMT+5',
-      alert: {
-        message: 'There was an issue sending an email to this contact. An email to this recipient has bounced.',
-        link: '#',
-        linkText: 'Learn more.',
-      },
-      expanded: true,
-    },
-    {
-      id: '3',
-      type: 'invoice',
-      title: 'Invoice activity',
-      description: 'finalized invoice INV-1004',
-      timestamp: 'Feb 14, 2026 at 2:50 AM GMT+5',
-      user: 'Rizwan Haider',
-      userLink: '#',
-    },
-    {
-      id: '4',
-      type: 'invoice',
-      title: 'Invoice activity',
-      description: 'Invoice INV-1003 was sent by a subscription.',
-      timestamp: 'Feb 14, 2026 at 2:49 AM GMT+5',
-    },
-    {
-      id: '5',
-      type: 'invoice',
-      title: 'Invoice activity',
-      description: 'Invoice INV-1003 was finalized',
-      timestamp: 'Feb 14, 2026 at 2:49 AM GMT+5',
-    },
-    {
-      id: '6',
-      type: 'subscription',
-      title: 'Subscription activity',
-      description: 'was created by',
-      timestamp: 'Feb 14, 2026 at 2:49 AM GMT+5',
-      entityName: 'Connect Pro',
-      entityLink: '#',
-      user: 'Rizwan Haider',
-      userLink: '#',
-    },
-  ];
-  
-  // Add this function to render activity items
-  const renderActivityItem = (activity: ActivityItem) => {
-    const isExpanded = expandedActivities.has(activity.id) || activity.expanded;
-    
-    return (
-      <div
-        key={activity.id}
-        style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #eaf0f6',
-          borderRadius: '5px',
-          padding: '16px 20px',
-          marginBottom: '12px',
-        }}
-      >
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: '12px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flex: 1 }}>
-            {activity.expanded !== undefined && (
-              <button
-                onClick={() => toggleActivity(activity.id)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  padding: '4px',
-                  cursor: 'pointer',
-                  color: '#141414',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              </button>
-            )}
-            
-            <div style={{ flex: 1 }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '4px',
-              }}>
-                <h4 style={{
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  margin: 0,
-                }}>
-                  {activity.title}
-                </h4>
-                <FileText size={14} color="#7c98b6" />
-              </div>
-              
-              <p style={{
-                fontSize: '14px',
-                color: '#141414',
-                margin: '4px 0',
-                lineHeight: '1.6',
-              }}>
-                {activity.user && (
-                  <>
-                    <a
-                      href={activity.userLink}
-                      style={{
-                        color: '#006162',
-                        textDecoration: 'none',
-                        fontWeight: '500',
-                      }}
-                    >
-                      {activity.user}
-                    </a>
-                    {' '}
-                  </>
-                )}
-                {activity.description}
-                {activity.entityName && (
-                  <>
-                    {' '}
-                    <a
-                      href={activity.entityLink}
-                      style={{
-                        color: '#006162',
-                        textDecoration: 'none',
-                        fontWeight: '500',
-                      }}
-                    >
-                      {activity.entityName}
-                    </a>
-                  </>
-                )}
-              </p>
-              
-              {activity.alert && isExpanded && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '12px 16px',
-                  backgroundColor: '#fff5f5',
-                  border: '1px solid #feb2b2',
-                  borderRadius: '5px',
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '8px',
-                  }}>
-                    <AlertCircle size={16} color="#e53e3e" style={{ marginTop: '2px', flexShrink: 0 }} />
-                    <div>
-                      <p style={{
-                        fontSize: '14px',
-                        color: '#141414',
-                        margin: 0,
-                        lineHeight: '1.6',
-                      }}>
-                        <strong>{activity.alert.message.split('.')[0]}.</strong>
-                        {' '}
-                        {activity.alert.message.split('.').slice(1).join('.')}
-                        {activity.alert.link && (
-                          <>
-                            {' '}
-                            <a
-                              href={activity.alert.link}
-                              style={{
-                                color: '#006162',
-                                textDecoration: 'none',
-                                fontWeight: '500',
-                              }}
-                            >
-                              {activity.alert.linkText}
-                            </a>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {isExpanded && activity.type === 'email' && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '12px',
-                  backgroundColor: '#f7fafc',
-                  borderRadius: '5px',
-                }}>
-                  <p style={{
-                    fontSize: '13px',
-                    color: '#7c98b6',
-                    margin: 0,
-                  }}>
-                    Transactional email Invoice from Prime Alley Technology
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <div style={{
-            fontSize: '13px',
-            color: '#7c98b6',
-            whiteSpace: 'nowrap',
-          }}>
-            {activity.timestamp}
-          </div>
-        </div>
-      </div>
-    );
-  };
+    : null;
+
   const toggleSection = (sectionId: string) => {
     setCollapsedSections(prev => {
       const newSet = new Set(prev);
@@ -356,72 +148,6 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
     });
   };
 
-  // Revenue data
-const subscriptionsData: SubscriptionItem[] = [
-  {
-    id: '1',
-    name: 'Connect Pro',
-    status: 'active',
-    nextBillingDate: '03/13/2026',
-    nextPaymentAmount: '$500.00',
-    contactEmail: 'ahmad@gmail.com',
-    link: '#',
-  },
-];
-
-const revenueSections: RevenueSection[] = [
-  {
-    id: 'quotes',
-    title: 'Quotes',
-    count: 0,
-    description: 'Track the sales documents associated with this record.',
-    buttonText: 'Create quote',
-    buttonIcon: FileText,
-    onButtonClick: () => console.log('Create quote'),
-    addButtonText: 'Add',
-    onAddClick: () => console.log('Add quote'),
-  },
-  {
-    id: 'invoices',
-    title: 'Invoices',
-    count: 0,
-    description: 'Send your customer a request for payment and associate it with this record.',
-    buttonText: 'Set up payments',
-    onButtonClick: () => console.log('Set up payments'),
-    addButtonText: 'Add',
-    onAddClick: () => console.log('Add invoice'),
-  },
-  {
-    id: 'payment-links',
-    title: 'Payment Links',
-    count: 0,
-    description: 'Add a payment link to accept a payment and associate it with this record.',
-    buttonText: 'Set up payments',
-    onButtonClick: () => console.log('Set up payments'),
-    addButtonText: 'Add',
-    onAddClick: () => console.log('Add payment link'),
-  },
-  {
-    id: 'subscriptions',
-    title: 'Subscriptions',
-    count: 1,
-    description: '',
-    buttonText: '',
-    items: subscriptionsData,
-    onButtonClick: () => console.log('Subscriptions'),
-    addButtonText: 'Add',
-    onAddClick: () => console.log('Add subscription'),
-  },
-  {
-    id: 'payments',
-    title: 'Payments',
-    count: 0,
-    description: 'Track payments associated with this record. A payment is created when a customer pays or a recurring payment is processed.',
-    buttonText: 'Set up payments',
-    onButtonClick: () => console.log('Set up payments'),
-  },
-];
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
@@ -430,19 +156,18 @@ const revenueSections: RevenueSection[] = [
   const tabs = [
     { id: 'about', label: 'About' },
     { id: 'activities', label: 'Activities' },
-    { id: 'revenue', label: 'Revenue' },
     { id: 'intelligence', label: 'Intelligence' },
   ];
 
-  // Key Information Fields
+  // Key Information Fields – values from lead API response only (exact key names, undefined if missing)
   const keyInfoFields: KeyInfoField[] = [
-    { label: 'Email', value: 'ahmad@gmail.com', copyable: true },
-    { label: 'Phone Number', value: '+92-300-8009002', copyable: true },
-    { label: 'Company Name', value: 'Ahmad Hussain LTD' },
-    { label: 'Lead Status', value: 'New' },
-    { label: 'Lifecycle Stage', value: 'Opportunity' },
-    { label: 'Buying Role', value: '--' },
-    { label: 'Contact owner', value: 'Rizwan Haider' },
+    { label: 'Email', value: (lead as any)?.contact_persons?.[0]?.email ?? (lead as any)?.crm_data?.data?.email ?? undefined, copyable: true },
+    { label: 'Phone Number', value: (lead as any)?.contact_persons?.[0]?.phone ?? (lead as any)?.crm_data?.phone ?? undefined, copyable: true },
+    { label: 'Company Name', value: lead?.company_name ?? undefined },
+    { label: 'Lead Status', value: lead?.status ?? undefined },
+    { label: 'Lifecycle Stage', value: (lead as any)?.crm_data?.data?.lifecycle_stage ?? lead?.stage?.name ?? undefined },
+    { label: 'Contact owner', value: (lead as any)?.created_by ?? lead?.user_extension ?? undefined },
+    { label: 'Source', value: (lead as any)?.source ?? undefined },
   ];
 
   const renderIntelligenceTab = () => {
@@ -1192,7 +917,7 @@ const revenueSections: RevenueSection[] = [
               color: '#141414',
               flexShrink: 0,
             }}>
-              AH
+              {lead?.name ? (lead.name.match(/\b\w/g) ?? []).slice(0, 2).join('').toUpperCase() : '—'}
             </div>
             <div style={{ flex: 1 }}>
               <h2 style={{
@@ -1202,7 +927,7 @@ const revenueSections: RevenueSection[] = [
                 margin: '0 0 4px 0',
                 lineHeight: '1.3',
               }}>
-                Ahmad Hussain
+                {lead?.name ?? '—'}
               </h2>
               <p style={{
                 fontSize: '14px',
@@ -1210,59 +935,68 @@ const revenueSections: RevenueSection[] = [
                 margin: '0 0 8px 0',
                 lineHeight: '1.4',
               }}>
-                Director at Ahmad Hussain LTD
+                {[
+                  'Director',
+                  lead?.company_name,
+                ].filter(Boolean).join(' at ') || '—'}
               </p>
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
               }}>
-                <a
-                  href="mailto:ahmad@gmail.com"
-                  style={{
-                    fontSize: '14px',
-                    color: '#006162',
-                    textDecoration: 'none',
-                    fontWeight: '500',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.textDecoration = 'underline';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.textDecoration = 'none';
-                  }}
-                >
-                  ahmad@gmail.com
-                </a>
-                <button
-                  onClick={() => copyToClipboard('ahmad@gmail.com')}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    padding: '4px',
-                    cursor: 'pointer',
-                    color: '#718096',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                  title="Copy email"
-                >
-                  <Copy size={14} />
-                </button>
-                <button
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    padding: '4px',
-                    cursor: 'pointer',
-                    color: '#718096',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                  title="Link"
-                >
-                  <Link2 size={14} />
-                </button>
+                {((lead as any)?.contact_persons?.[0]?.email ?? (lead as any)?.crm_data?.data?.email) ? (
+                  <>
+                    <a
+                      href={`mailto:${(lead as any)?.contact_persons?.[0]?.email ?? (lead as any)?.crm_data?.data?.email}`}
+                      style={{
+                        fontSize: '14px',
+                        color: '#006162',
+                        textDecoration: 'none',
+                        fontWeight: '500',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.textDecoration = 'underline';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.textDecoration = 'none';
+                      }}
+                    >
+                      {(lead as any)?.contact_persons?.[0]?.email ?? (lead as any)?.crm_data?.data?.email}
+                    </a>
+                    <button
+                      onClick={() => copyToClipboard((lead as any)?.contact_persons?.[0]?.email ?? (lead as any)?.crm_data?.data?.email ?? '')}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        padding: '4px',
+                        cursor: 'pointer',
+                        color: '#718096',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                      title="Copy email"
+                    >
+                      <Copy size={14} />
+                    </button>
+                    <button
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        padding: '4px',
+                        cursor: 'pointer',
+                        color: '#718096',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                      title="Link"
+                    >
+                      <Link2 size={14} />
+                    </button>
+                  </>
+                ) : (
+                  <span style={{ fontSize: '14px', color: '#718096' }}>—</span>
+                )}
               </div>
             </div>
           </div>
@@ -1487,11 +1221,11 @@ const revenueSections: RevenueSection[] = [
                     fontWeight: '400',
                     flex: 1,
                   }}>
-                    {field.value}
+                    {field.value ?? '—'}
                   </div>
-                  {field.copyable && (
+                  {field.copyable && field.value != null && field.value !== '' && (
                     <button
-                      onClick={() => copyToClipboard(field.value)}
+                      onClick={() => copyToClipboard(field.value ?? '')}
                       style={{
                         background: 'transparent',
                         border: 'none',
@@ -1644,42 +1378,53 @@ const revenueSections: RevenueSection[] = [
 
               {!collapsedSections.has('breeze') && (
                 <div style={{ padding: '20px' }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '13px',
-                    color: '#141414',
-                    marginBottom: '12px',
-                  }}>
-                    <span>Generated Feb 14, 2026</span>
-                    <button
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        padding: '2px',
-                        cursor: 'pointer',
-                        color: '#141414',
+                  {(lead as any)?.crm_summary?.summary != null && (
+                    <>
+                      <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                      }}
-                      title="Refresh"
-                    >
-                      <RefreshCw size={12} />
-                    </button>
-                  </div>
+                        gap: '6px',
+                        fontSize: '13px',
+                        color: '#141414',
+                        marginBottom: '12px',
+                      }}>
+                        {lead?.updated_at && (
+                          <span>
+                            Updated {new Date(lead.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        )}
+                        <button
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            padding: '2px',
+                            cursor: 'pointer',
+                            color: '#141414',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                          title="Refresh"
+                        >
+                          <RefreshCw size={12} />
+                        </button>
+                      </div>
 
-                  <div style={{
-                    fontSize: '14px',
-                    color: '#141414',
-                    lineHeight: '1.6',
-                    marginBottom: '16px',
-                    border: '1px solid #ff9fcc',
-                    padding: '18px 20px',
-                    borderRadius: '10px',
-                  }}>
-                    Ahmad Hussain is a Director at Ahmad Hussain LTD, currently in the Opportunity stage. Recent activity shows strong engagement: Invoice INV-1004 ($500.00) was sent on Feb 14, and the contact maintains an active Connect Pro subscription with the next billing scheduled for Mar 13, 2026. However, there's a critical email deliverability issue - a recent marketing email bounced, which may impact future communications. The contact is revenue-generating with stable MRR from the subscription. Recommended next steps: address the email bounce issue immediately and consider a follow-up call to discuss potential upsell opportunities.
-                  </div>
+                      <div style={{
+                        fontSize: '14px',
+                        color: '#141414',
+                        lineHeight: '1.6',
+                        marginBottom: '16px',
+                        border: '1px solid #ff9fcc',
+                        padding: '18px 20px',
+                        borderRadius: '10px',
+                      }}>
+                        {(lead as any)?.crm_summary?.summary}
+                      </div>
+                    </>
+                  )}
+                  {(lead as any)?.crm_summary?.summary == null && (
+                    <div style={{ fontSize: '14px', color: '#718096' }}>No summary available.</div>
+                  )}
 
                   <div style={{
                     display: 'flex',
@@ -1915,273 +1660,16 @@ const revenueSections: RevenueSection[] = [
         )}
 
 {activeTab === 'activities' && (
-  <div>
-    {/* Search and Filter Bar */}
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: '20px',
-      gap: '16px',
-      flexWrap: 'wrap',
-    }}>
-      {/* Search Input */}
-      <div style={{
-        position: 'relative',
-        flex: '1',
-        minWidth: '250px',
-        maxWidth: '400px',
-      }}>
-        <Search
-          size={18}
-          style={{
-            position: 'absolute',
-            right: '12px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            color: '#7c98b6',
-            pointerEvents: 'none',
-          }}
-        />
-        <input
-          type="text"
-          placeholder="Search activities"
-          value={searchActivity}
-          onChange={(e) => setSearchActivity(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '10px 40px 10px 16px',
-            border: '1px solid #cbd5e0',
-            borderRadius: '20px',
-            fontSize: '14px',
-            outline: 'none',
-            backgroundColor: '#ffffff',
-          }}
-        />
-      </div>
-
-      {/* Collapse All Button */}
-      <button
-        style={{
-          padding: '8px 16px',
-          backgroundColor: '#ffffff',
-          border: '1px solid #cbd5e0',
-          borderRadius: '4px',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: '#141414',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}
-        onClick={() => setExpandedActivities(new Set())}
-      >
-        Collapse all
-        <ChevronDown size={14} />
-      </button>
-    </div>
-
-    {/* Activity Type Tabs */}
-    <div style={{
-      display: 'flex',
-      gap: '24px',
-      marginBottom: '16px',
-      borderBottom: '2px solid #eaf0f6',
-    }}>
-      {[
-        { id: 'activity', label: 'Activity' },
-        { id: 'notes', label: 'Notes' },
-        { id: 'emails', label: 'Emails' },
-        { id: 'calls', label: 'Calls' },
-        { id: 'tasks', label: 'Tasks' },
-        { id: 'meetings', label: 'Meetings' },
-      ].map(filter => (
-        <button
-          key={filter.id}
-          onClick={() => setActivityFilter(filter.id)}
-          style={{
-            padding: '10px 0',
-            backgroundColor: 'transparent',
-            border: 'none',
-            borderBottom: activityFilter === filter.id ? '2px solid #141414' : '2px solid transparent',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: activityFilter === filter.id ? '600' : '400',
-            color: activityFilter === filter.id ? '#141414' : '#7c98b6',
-            transition: 'all 0.2s',
-            marginBottom: '-2px',
-          }}
-        >
-          {filter.label}
-        </button>
-      ))}
-    </div>
-
-    {/* Filter Options */}
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px',
-      marginBottom: '20px',
-    }}>
-      <span style={{
-        fontSize: '14px',
-        color: '#141414',
-      }}>
-        Filter by:
-      </span>
-      <button
-        style={{
-          padding: '6px 12px',
-          backgroundColor: 'transparent',
-          border: 'none',
-          fontSize: '14px',
-          fontWeight: '600',
-          color: '#141414',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}
-      >
-        Filter activity (22/33)
-        <ChevronDown size={14} />
-      </button>
-      <button
-        style={{
-          padding: '6px 12px',
-          backgroundColor: 'transparent',
-          border: 'none',
-          fontSize: '14px',
-          fontWeight: '600',
-          color: '#141414',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}
-      >
-        All users
-        <ChevronDown size={14} />
-      </button>
-    </div>
-
-    {/* Month Header */}
-    <h3 style={{
-      fontSize: '16px',
-      fontWeight: '600',
-      color: '#141414',
-      marginBottom: '16px',
-    }}>
-      February 2026
-    </h3>
-
-    {/* Activity List */}
-    <div>
-      {activitiesData.map(activity => renderActivityItem(activity))}
-    </div>
-  </div>
+  <CrmActivitiesPanel
+    recordType="lead"
+    recordId={Number(leadId) || lead?.id || 0}
+    record={leadRecord}
+    recordLoading={leadLoading}
+    recordName={lead?.name ?? leadRecord?.data?.name ?? 'Lead'}
+    canSendWhatsApp={canSendWhatsApp}
+  />
 )}
 
-{activeTab === 'revenue' && (
-  <div>
-    {/* Quote-to-cash Section */}
-    <div style={{
-      marginBottom: '24px',
-    }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '16px',
-          cursor: 'pointer',
-        }}
-        onClick={() => toggleSection('quote-to-cash')}
-      >
-        <ChevronDown
-          size={20}
-          style={{
-            color: '#141414',
-            transform: collapsedSections.has('quote-to-cash') ? 'rotate(-90deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s ease',
-          }}
-        />
-        <h2 style={{
-          fontSize: '18px',
-          fontWeight: '600',
-          color: '#141414',
-          margin: 0,
-        }}>
-          Quote-to-cash
-        </h2>
-      </div>
-
-      {!collapsedSections.has('quote-to-cash') && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-          gap: '16px',
-        }}>
-          {revenueSections.slice(0, 5).map(section => renderRevenueSection(section))}
-        </div>
-      )}
-    </div>
-
-    {/* e-Commerce Section */}
-    <div style={{
-      marginBottom: '24px',
-    }}>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '16px',
-          cursor: 'pointer',
-        }}
-        onClick={() => toggleSection('e-commerce')}
-      >
-        <ChevronDown
-          size={20}
-          style={{
-            color: '#141414',
-            transform: collapsedSections.has('e-commerce') ? 'rotate(-90deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s ease',
-          }}
-        />
-        <h2 style={{
-          fontSize: '18px',
-          fontWeight: '600',
-          color: '#141414',
-          margin: 0,
-        }}>
-          e-Commerce
-        </h2>
-      </div>
-
-      {!collapsedSections.has('e-commerce') && (
-        <div style={{
-          padding: '40px',
-          textAlign: 'center',
-          backgroundColor: '#f7fafc',
-          borderRadius: '5px',
-          border: '1px solid #eaf0f6',
-        }}>
-          <ShoppingCart size={48} style={{ marginBottom: '16px', color: '#cbd5e0' }} />
-          <p style={{
-            fontSize: '14px',
-            color: '#7c98b6',
-            margin: 0,
-          }}>
-            No e-commerce data available
-          </p>
-        </div>
-      )}
-    </div>
-  </div>
-)}
 {activeTab === 'intelligence' && renderIntelligenceTab()}
       </div>
     </div>
@@ -2534,171 +2022,6 @@ const revenueSections: RevenueSection[] = [
         )}
       </div>
 
-      {/* Tickets */}
-      <div style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '10px',
-        marginBottom: '12px',
-        overflow: 'hidden',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
-        border: '1px solid #cccccc',
-      }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '14px 20px 0',
-            cursor: 'pointer',
-            backgroundColor: '#ffffff',
-            
-          }}
-          onClick={() => toggleSection('tickets')}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-            <ChevronDown
-              size={18}
-              style={{
-                color: '#141414',
-                transform: collapsedSections.has('tickets') ? 'rotate(-90deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease',
-              }}
-            />
-            <h3 style={{
-              fontSize: '16px',
-              fontWeight: '600',
-              color: '#141414',
-              margin: 0,
-              lineHeight: '1.2',
-            }}>
-              Tickets (0)
-            </h3>
-          </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#141414',
-              fontSize: '20px',
-              padding: '6px',
-              borderRadius: '3px',
-              transition: 'background-color 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f5f8fa';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-          </button>
-        </div>
-
-        {!collapsedSections.has('tickets') && (
-          <div style={{
-            padding: '32px 20px',
-            textAlign: 'center',
-          }}>
-            <Ticket size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
-            <p style={{
-              fontSize: '14px',
-              color: '#718096',
-              margin: 0,
-              lineHeight: '1.6',
-            }}>
-              Track the customer requests associated with this record.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Attachments */}
-      <div style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '10px',
-        overflow: 'hidden',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
-        border: '1px solid #cccccc',
-      }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '14px 20px 0',
-            cursor: 'pointer',
-            backgroundColor: '#ffffff',
-           
-          }}
-          onClick={() => toggleSection('attachments')}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-            <ChevronDown
-              size={18}
-              style={{
-                color: '#141414',
-                transform: collapsedSections.has('attachments') ? 'rotate(-90deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease',
-              }}
-            />
-            <h3 style={{
-              fontSize: '16px',
-              fontWeight: '600',
-              color: '#141414',
-              margin: 0,
-              lineHeight: '1.2',
-            }}>
-              Attachments
-            </h3>
-          </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#141414',
-              fontSize: '14px',
-              fontWeight: '500',
-              padding: '6px',
-              borderRadius: '3px',
-              transition: 'background-color 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f5f8fa';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            <span style={{ fontSize: '14px', fontWeight: '300' }}>+</span> <span style={{ fontSize: '12px', fontWeight: '500' }}>Add</span>
-          </button>
-        </div>
-
-        {!collapsedSections.has('attachments') && (
-          <div style={{
-            padding: '32px 20px',
-            textAlign: 'center',
-          }}>
-            <Paperclip size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
-            <p style={{
-              fontSize: '14px',
-              color: '#718096',
-              margin: 0,
-              lineHeight: '1.6',
-            }}>
-              No attachments yet
-            </p>
-          </div>
-        )}
-        </div>
         </div>
         </div>
       )}

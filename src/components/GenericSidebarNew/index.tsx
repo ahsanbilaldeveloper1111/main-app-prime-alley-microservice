@@ -35,7 +35,8 @@ import WhatsAppMessageModal from '@components/WhatsAppMessageModalNew';
 import LogSmsModal from '@components/LogSms';
 import { Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
-import { sendEmail } from "@utils/communication";
+import { sendEmail, sendSms, sendWhatsApp } from "@utils/communication";
+import { useSession } from "next-auth/react";
 import { createMeeting, createCrmNote } from "@utils/crm";
 import { RECORD_TYPES } from "@utils/Helper";
 
@@ -5319,6 +5320,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   onWhatsAppLog,
   onSmsLog,
 }) => {
+  const { data: session } = useSession();
+  const extension = (session?.user as { extension?: string; phone?: string } | undefined)?.extension
+    ?? (session?.user as { extension?: string; phone?: string } | undefined)?.phone
+    ?? 'unknown';
+  const tenantId = (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant_id
+    ?? (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant
+    ?? '';
+
   // Parse comma-separated email/phone into arrays for multiple contact support
   const emailList = useMemo(() => {
     if (!email || typeof email !== "string") return [];
@@ -5603,21 +5612,29 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowWhatsAppModal(false);
   };
 
-  const handleWhatsAppLog = (whatsappData: {
-    message: string;
-    contacts: Array<{ id: string; name: string; email?: string }>;
-    activityDate: string;
-    createTask: boolean;
-    taskDueDate?: string;
-    attachments: File[];
+  const handleWhatsAppLog = async (whatsappData: {
+    content_sid: string;
+    content_variables: Record<string, string>;
   }) => {
-    console.log('WhatsApp message logged:', whatsappData);
-    if (onWhatsAppLog) {
-      onWhatsAppLog(whatsappData);
-    } else {
-      console.log('No onWhatsAppLog callback provided');
+    const rawNumber = (phoneList && phoneList[0]) || (typeof phone === 'string' ? phone.trim() : '') || '';
+    const number = rawNumber.replace(/\s/g, '');
+    if (!number) {
+      toast.error('No phone number available for this record.');
+      return;
     }
-    setShowWhatsAppModal(false);
+    try {
+      await sendWhatsApp({
+        number,
+        content_sid: whatsappData.content_sid,
+        content_variables: Object.keys(whatsappData.content_variables || {}).length > 0
+          ? whatsappData.content_variables
+          : undefined,
+      });
+      setShowWhatsAppModal(false);
+      // if (onWhatsAppLog) onWhatsAppLog(whatsappData);
+    } catch {
+      // sendWhatsApp shows toast on error
+    }
   };
 
   const handleSmsClick = () => {
@@ -5628,7 +5645,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowSmsModal(false);
   };
 
-  const handleSmsLog = (smsData: {
+  const handleSmsLog = async (smsData: {
     message: string;
     contacts: Array<{ id: string; name: string; email?: string }>;
     activityDate: string;
@@ -5636,13 +5653,28 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     taskDueDate?: string;
     attachments: File[];
   }) => {
-    console.log('SMS message logged:', smsData);
-    if (onSmsLog) {
-      onSmsLog(smsData);
-    } else {
-      console.log('No onSmsLog callback provided');
+    const rawTo = (phoneList && phoneList[0]) || (typeof phone === 'string' ? phone.trim() : '') || '';
+    const to = rawTo.replace(/\s/g, '');
+    const body = smsData.message?.trim() || '';
+    if (!to || !body) {
+      if (!to) toast.error('No phone number available for this record.');
+      if (!body) toast.error('Please enter a message.');
+      return;
     }
-    setShowSmsModal(false);
+    try {
+      await sendSms({
+        to,
+        message: body,
+        tenant_id: tenantId || 'default',
+        extension,
+        ...(recordType && { record_type: recordType }),
+        ...(recordId != null && { record_id: Number(recordId) }),
+      });
+      setShowSmsModal(false);
+      if (onSmsLog) onSmsLog(smsData);
+    } catch {
+      // sendSms already shows toast on error
+    }
   };
 
   const handleMoreClick = (e: React.MouseEvent<HTMLButtonElement>) => {

@@ -105,6 +105,10 @@ export interface SendSmsPayload {
   tenant_id: string;
   /** Sender/extension (max 64 chars, e.g. "536"). */
   extension: string;
+  /** Optional record type for CRM association (e.g. "lead", "deal"). */
+  record_type?: string;
+  /** Optional record ID for CRM association. */
+  record_id?: number;
 }
 
 /** Success response (200) for send-sms. */

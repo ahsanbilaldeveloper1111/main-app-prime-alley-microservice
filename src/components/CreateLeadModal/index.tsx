@@ -87,6 +87,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     description: "",
     source: "",
     company_name: "",
+    company_domain: "",
     company_contact: "",
     company_description: "",
     industry: "",
@@ -438,6 +439,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
               crmDataRecord.data?.company_name ||
               crmDataRecord.data?.company ||
               "",
+            company_domain: crmDataRecord.data?.company_domain || "",
             company_contact:
               crmDataRecord.data?.company_contact ||
               crmDataRecord.data?.contact ||
@@ -860,6 +862,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         ...(formData.source && { source: formData.source }),
         ...(formData.description && { description: formData.description }),
         ...(formData.company_name && { company_name: formData.company_name }),
+        ...(formData.company_domain && { company_domain: formData.company_domain }),
         ...(formData.industry && { industry: formData.industry }),
         ...(businessTypeId && { business_type_id: String(businessTypeId) }),
         ...(businessTypeOther && { business_type_other: businessTypeOther }),
@@ -928,6 +931,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
           description: "",
           source: "",
           company_name: "",
+          company_domain: "",
           company_contact: "",
           company_description: "",
           industry: "",
@@ -1260,6 +1264,8 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
           crmDataRecord.data?.company_name ||
           crmDataRecord.data?.company ||
           prev.company_name,
+        company_domain:
+          crmDataRecord.data?.company_domain ?? prev.company_domain,
         company_contact:
           crmDataRecord.data?.company_contact ||
           crmDataRecord.data?.contact ||
@@ -1430,6 +1436,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         description: "",
         source: "",
         company_name: "",
+        company_domain: "",
         company_contact: "",
         company_description: "",
         industry: "",
@@ -1790,6 +1797,20 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                     value={formData.company_name}
                     onChange={(e) => handleInputChange("company_name", e.target.value)}
                     placeholder="Enter person name/company name"
+                    style={inputStyle}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
+                  />
+                </div>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label" style={labelStyle}>
+                    Company domain
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.company_domain}
+                    onChange={(e) => handleInputChange("company_domain", e.target.value)}
+                    placeholder="e.g. example.com"
                     style={inputStyle}
                     onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
                     onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
