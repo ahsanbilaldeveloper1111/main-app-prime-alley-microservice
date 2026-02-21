@@ -163,7 +163,7 @@ export interface GenericSidebarProps {
   // Context payload for integrations
   contextPayload?: Record<string, unknown>;
   
-  recordType?: 'prospect' | 'lead' | 'deal' | 'order' | 'company';
+  recordType?: 'prospect' | 'lead' | 'deal' | 'order';
   recordId?: number;
   
   onNoteCreate?: (note: string, createTask: boolean, taskDueDate?: string) => void;
@@ -5353,10 +5353,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [moreModalPosition, setMoreModalPosition] = useState({ top: 0, left: 0 });
-  const [moreModalPosition, setMoreModalPosition] = useState({
-    top: 0,
-    left: 0,
-  });
   const dropdownRef = useRef<HTMLDivElement>(null);
   const sectionDropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>(
     {},
