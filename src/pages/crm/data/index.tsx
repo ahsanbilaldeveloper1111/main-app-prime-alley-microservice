@@ -11,7 +11,6 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 import {
   Button,
   Card,
@@ -139,6 +138,7 @@ import {
   GlobalDateFormat,
   GlobalTimeFormat,
   GlobalDateTimeFormat,
+  RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
@@ -8184,6 +8184,10 @@ const CrmProspectsManagement = () => {
             subtitle={selectedProspect?.phone || ""}
             email={selectedProspect?.data?.email}
             phone={selectedProspect?.phone}
+            record={{
+              id: selectedProspect?.id,
+              type: RECORD_TYPES.PROSPECT,
+            }}
             avatar={{
               initials: getInitials(selectedProspect?.name || "NA"),
               name: selectedProspect?.name || "NA",

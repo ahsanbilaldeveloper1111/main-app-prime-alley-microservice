@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import parsePhoneNumber from 'libphonenumber-js'
+import parsePhoneNumber from "libphonenumber-js";
 import { toast } from "react-toastify";
 import { getSession } from "next-auth/react";
 import type { Session } from "next-auth";
@@ -16,19 +16,17 @@ export const generateCustomId = (prefix = "", length = 12) => {
 };
 
 export const generateComplexId = (length = 8) => {
-  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const lower = 'abcdefghijklmnopqrstuvwxyz';
-  const digits = '0123456789';
-  const special = '!@';
-
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const digits = "0123456789";
+  const special = "!@";
 
   // Ensure at least one of each type
-  let result = '';
+  let result = "";
   result += upper.charAt(Math.floor(Math.random() * upper.length));
   result += lower.charAt(Math.floor(Math.random() * lower.length));
   result += digits.charAt(Math.floor(Math.random() * digits.length));
   result += special.charAt(Math.floor(Math.random() * special.length));
-
 
   // Fill remaining length with random chars from all types
   const allChars = upper + lower + digits + special;
@@ -37,10 +35,12 @@ export const generateComplexId = (length = 8) => {
     result += allChars.charAt(Math.floor(Math.random() * allChars.length));
   }
 
-
   // Shuffle the result
-  result = result.split('').sort(() => Math.random() - 0.5).join('');
-  
+  result = result
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
+
   return result;
 };
 
@@ -86,7 +86,7 @@ export interface TimezoneConversionOptions {
  */
 export const convertUTCToUserTimezone = (
   utcDateTime: string | Date,
-  options: TimezoneConversionOptions = {}
+  options: TimezoneConversionOptions = {},
 ): string => {
   const {
     inputFormat = "YYYY-MM-DD HH:mm:ss",
@@ -116,7 +116,7 @@ export const convertUTCToUserTimezone = (
       if (fallbackToUTC) {
         console.warn(
           "Invalid datetime provided, falling back to UTC:",
-          utcDateTime
+          utcDateTime,
         );
         return moment.utc().format(outputFormat) + (showTimezone ? " UTC" : "");
       }
@@ -152,7 +152,7 @@ export const convertUTCToUserTimezone = (
  */
 export const convertUTCTimeToUserTimezone = (
   utcDateTime: string | Date,
-  timeFormat: string = "hh:mm:ss A"
+  timeFormat: string = "hh:mm:ss A",
 ): string => {
   return convertUTCToUserTimezone(utcDateTime, {
     inputFormat: "YYYY-MM-DD HH:mm:ss",
@@ -171,7 +171,7 @@ export const convertUTCTimeToUserTimezone = (
 export const convertDubaiDateTimeToUserTimezone = (
   date: string,
   time: string,
-  outputFormat: string = "YYYY-MM-DD hh:mm:ss A"
+  outputFormat: string = "YYYY-MM-DD hh:mm:ss A",
 ): string => {
   try {
     // Clean up the time string to remove extra decimal places
@@ -182,7 +182,7 @@ export const convertDubaiDateTimeToUserTimezone = (
 
     // Parse as UTC and convert to user's timezone
     const momentObj = moment(utcDateTime, "YYYY-MM-DD HH:mm:ss").tz(
-      "Asia/Dubai"
+      "Asia/Dubai",
     );
     if (!momentObj.isValid()) {
       console.warn("Invalid datetime format:", { date, time, utcDateTime });
@@ -208,7 +208,7 @@ export const convertDubaiDateTimeToUserTimezone = (
 export const convertUTCSeparateDateTimeToUserTime = (
   date: string,
   time: string,
-  timeFormat: string = "hh:mm:ss A"
+  timeFormat: string = "hh:mm:ss A",
 ): string => {
   try {
     // Clean up the time string to remove extra decimal places
@@ -243,7 +243,7 @@ export const convertUTCSeparateDateTimeToUserTime = (
 export const convertUTCSeparateDateTimeToUserDate = (
   date: string,
   time: string,
-  dateFormat: string = "YYYY-MM-DD"
+  dateFormat: string = "YYYY-MM-DD",
 ): string => {
   try {
     // Clean up the time string to remove extra decimal places
@@ -276,7 +276,7 @@ export const convertUTCSeparateDateTimeToUserDate = (
  */
 export const convertUTCDateToUserTimezone = (
   utcDateTime: string | Date,
-  dateFormat: string = "YYYY-MM-DD"
+  dateFormat: string = "YYYY-MM-DD",
 ): string => {
   return convertUTCToUserTimezone(utcDateTime, {
     inputFormat: "YYYY-MM-DD HH:mm:ss",
@@ -336,7 +336,7 @@ export const formatDuration = (seconds: number): string => {
   const secs = Math.floor(seconds % 60);
 
   // Format with leading zeros (e.g., 00:00:03 instead of 0:0:3)
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 };
 
 /**
@@ -358,12 +358,12 @@ export const formatDateTimeToLocal = (
   datetime: string | Date,
   format: string = "YYYY-MM-DD hh:mm:ss A",
   inputFormat?: string,
-  targetTimezone?: string
+  targetTimezone?: string,
 ): string => {
   try {
     // Auto-detect timezone if not provided
     const timezone = targetTimezone || getAutoTimezone();
-    
+
     let momentObj: moment.Moment;
 
     if (datetime instanceof Date) {
@@ -374,21 +374,21 @@ export const formatDateTimeToLocal = (
     } else {
       // Check if datetime string contains timezone offset (e.g., +04:00, -05:00, Z)
       const hasTimezone = /[+-]\d{2}:\d{2}$|Z$/.test(datetime);
-      
+
       if (hasTimezone) {
         // Parse with timezone offset - ZZ format handles +04:00 (with colon)
         // Try ZZ first (handles +04:00), then Z (handles +0400), then auto-detect
         momentObj = moment.parseZone(datetime, "YYYY-MM-DD HH:mm:ss ZZ");
-        
+
         if (!momentObj.isValid()) {
           momentObj = moment.parseZone(datetime, "YYYY-MM-DD HH:mm:ss Z");
         }
-        
+
         // If format parsing fails, try without format (for ISO formats)
         if (!momentObj.isValid()) {
           momentObj = moment.parseZone(datetime);
         }
-        
+
         // parseZone preserves the timezone offset
         // Convert to UTC first, then we'll convert to target timezone
         // This ensures proper timezone conversion
@@ -416,7 +416,7 @@ export const formatDateTimeToLocal = (
     if (momentObj.isValid()) {
       return momentObj.tz(timezone).format(format);
     }
-    
+
     return "Invalid Date";
   } catch (error) {
     console.error("Error formatting datetime:", error);
@@ -430,45 +430,45 @@ export const formatDateTimeToLocal = (
  * @param targetTimezone - Target timezone (default: auto-detected from browser/system)
  * @param outputFormat - Optional output format (default: "YYYY-MM-DD hh:mm:ss A")
  * @returns Formatted datetime string in target timezone
- * 
+ *
  * @example
  * convertDateTimeWithOffsetToLocal("2025-12-24 13:04:08 +04:00")
  * // Returns: converted to auto-detected timezone
- * 
+ *
  * convertDateTimeWithOffsetToLocal("2025-12-24 13:04:08 +04:00", "Asia/Karachi", "YYYY-MM-DD HH:mm:ss")
  * // Returns: "2025-12-24 14:04:08"
- * 
+ *
  * convertDateTimeWithOffsetToLocal("2025-12-24 13:04:08 +04:00", "America/New_York")
  * // Returns: "2025-12-24 05:04:08 AM" (converted to America/New_York)
  */
 export const convertDateTimeWithOffsetToLocal = (
   datetimeString: string,
   targetTimezone?: string,
-  outputFormat: string = "YYYY-MM-DD hh:mm:ss A"
+  outputFormat: string = "YYYY-MM-DD hh:mm:ss A",
 ): string => {
   try {
     // Auto-detect timezone if not provided
     const timezone = targetTimezone || getAutoTimezone();
-    
+
     // Parse the datetime with timezone offset using parseZone to preserve the offset
     // ZZ format handles +04:00 (with colon)
     let momentObj = moment.parseZone(datetimeString, "YYYY-MM-DD HH:mm:ss ZZ");
-    
+
     // If that fails, try Z format (handles +0400 without colon)
     if (!momentObj.isValid()) {
       momentObj = moment.parseZone(datetimeString, "YYYY-MM-DD HH:mm:ss Z");
     }
-    
+
     // If format parsing fails, try auto-detect
     if (!momentObj.isValid()) {
       momentObj = moment.parseZone(datetimeString);
     }
-    
+
     if (!momentObj.isValid()) {
       console.warn("Invalid datetime format:", datetimeString);
       return "Invalid Date";
     }
-    
+
     // Convert to target timezone and format
     return momentObj.tz(timezone).format(outputFormat);
   } catch (error) {
@@ -517,7 +517,7 @@ export const GlobalDateTimeFormat = "DD MMM YYYY hh:mm:ss A";
  * @returns Formatted date string (e.g., "13 Dec, 2025")
  */
 export const formatDateForTable = (
-  date: string | Date | null | undefined
+  date: string | Date | null | undefined,
 ): string => {
   if (!date) return "";
 
@@ -562,7 +562,7 @@ export const formatMinutesAndSeconds = (seconds: number): string => {
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
 
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 
   // if (minutes === 0) return `${secs}s`;
   // return `${minutes}m ${secs}s`;
@@ -642,7 +642,7 @@ export const formatCurrency = (amount: number | null): string => {
 
 export const formatNumber = (
   amount: number | string | null | undefined,
-  withoutDecimals?: boolean
+  withoutDecimals?: boolean,
 ): string => {
   const defaultZero = withoutDecimals ? "0" : "0.00";
 
@@ -721,7 +721,7 @@ const getCachedSession = async (): Promise<Session | null> => {
  */
 export const hasPermission = async (
   permission: string,
-  session?: Session | null
+  session?: Session | null,
 ): Promise<boolean> => {
   if (!permission) {
     return false;
@@ -776,7 +776,7 @@ const xorCipher = (text: string, key: string): string => {
 const rotateChars = (
   text: string,
   shift: number,
-  forward: boolean = true
+  forward: boolean = true,
 ): string => {
   return text
     .split("")
@@ -813,7 +813,7 @@ const applyMultiLayerEncoding = (text: string, secretKey: string): string => {
   // Step 4: Apply XOR cipher again on base64 string
   const xorLayer2 = xorCipher(
     base64Layer1,
-    secretKey.split("").reverse().join("")
+    secretKey.split("").reverse().join(""),
   );
 
   // Step 5: Apply reverse character rotation
@@ -832,7 +832,7 @@ const applyMultiLayerEncoding = (text: string, secretKey: string): string => {
  */
 const applyMultiLayerDecoding = (
   encodedText: string,
-  secretKey: string
+  secretKey: string,
 ): string => {
   // Step 1: Decode final base64 layer
   const base64Decoded1 = atob(encodedText);
@@ -843,7 +843,7 @@ const applyMultiLayerDecoding = (
   // Step 3: Reverse XOR cipher (second layer)
   const xorDecrypted1 = xorCipher(
     derotated1,
-    secretKey.split("").reverse().join("")
+    secretKey.split("").reverse().join(""),
   );
 
   // Step 4: Decode first base64 layer
@@ -911,7 +911,7 @@ export const encodeAnalysisData = (dataObject: {
  * // Returns: { id: '123', file: 'path/to/file', direction: 'IN', phone: '1234567890', imagicle: 'node1', duration: '1234567890' }
  */
 export const decodeAnalysisData = (
-  encodedData: string
+  encodedData: string,
 ): {
   uuid: string;
   direction: string;
@@ -961,14 +961,16 @@ export enum ValidationType {
 }
 
 const customErrorMessages: Record<ValidationType, (name: string) => string> = {
-  [ValidationType.EMAIL]: (name: string) => `${name} is not a valid email address`,
-  [ValidationType.PHONE]: (name: string) => `${name} is not a valid phone number`,
+  [ValidationType.EMAIL]: (name: string) =>
+    `${name} is not a valid email address`,
+  [ValidationType.PHONE]: (name: string) =>
+    `${name} is not a valid phone number`,
 };
 
 type validationRule<
   T extends {
     [key: string]: unknown;
-  }
+  },
 > =
   | keyof T
   | {
@@ -980,7 +982,7 @@ type validationRule<
 export function checkRequiredFields<
   T extends {
     [key: string]: unknown;
-  }
+  },
 >(object: T, requiredFields: validationRule<T>[]): boolean {
   let isValid = true;
   const missingFields: string[] = [];
@@ -989,7 +991,7 @@ export function checkRequiredFields<
     let value: unknown = "";
     let name: string = "";
     const isRequired =
-      typeof field === "object" ? field?.required ?? true : true;
+      typeof field === "object" ? (field?.required ?? true) : true;
     if (typeof field === "string") {
       value = object[field];
       name = field;
@@ -1016,7 +1018,7 @@ export function checkRequiredFields<
   }
   if (!isValid && missingFields.length > 0) {
     toast.error(
-      `The following fields are required: ${missingFields.join(", ")}`
+      `The following fields are required: ${missingFields.join(", ")}`,
     );
   }
   for (const errorMessage of errorMessages) {
@@ -1048,7 +1050,6 @@ function isValidEmail(value: unknown): boolean {
   return false;
 }
 
-
 function isValide164PhoneNumber(value: unknown): boolean {
   if (typeof value === "string") {
     const phoneNumber = parsePhoneNumber(value);
@@ -1058,3 +1059,11 @@ function isValide164PhoneNumber(value: unknown): boolean {
 }
 
 export const getGlobalExcludedPaths = () => ["/auth/signin"];
+
+export enum RECORD_TYPES {
+  PROSPECT = "prospect",
+  LEAD = "lead",
+  DEAL = "deal",
+  COMPANY = "company",
+  ORDER = "order",
+}

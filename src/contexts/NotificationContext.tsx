@@ -1,5 +1,15 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, ReactNode } from 'react';
-import { NotificationPayload } from '@services/fcmService';
+
+/** Payload shape for addNotification (socket, push, or any source). */
+export interface AddNotificationPayload {
+  messageId?: string;
+  notification?: {
+    title?: string;
+    body?: string;
+    icon?: string;
+  };
+  data?: Record<string, unknown>;
+}
 
 export interface NotificationItem {
   id: string;
@@ -20,7 +30,7 @@ const MAX_NOTIFICATIONS = 100; // Limit stored notifications
 interface NotificationContextType {
   notifications: NotificationItem[];
   unreadCount: number;
-  addNotification: (payload: NotificationPayload) => void;
+  addNotification: (payload: AddNotificationPayload) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearNotification: (id: string) => void;
@@ -103,7 +113,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     }
   }, [notifications]);
 
-  const addNotification = useCallback((payload: NotificationPayload) => {
+  const addNotification = useCallback((payload: AddNotificationPayload) => {
     // console.log('📬 [NotificationContext] ========== ADDING NOTIFICATION ==========');
     // console.log('[NotificationContext] addNotification called with payload:', payload);
     // console.log('[NotificationContext] Payload structure:', {
@@ -117,24 +127,26 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     
     // Extract notification ID - check multiple sources for uniqueness
     // Priority: payload.messageId (Firebase's unique ID) > data.notification_id > data.messageId > generated
-    const notificationId = payload.messageId 
-      || payload.data?.notification_id 
-      || payload.data?.messageId 
-      || `notification-${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${performance.now()}`;
+    const notificationId = String(
+      payload.messageId
+      ?? payload.data?.notification_id
+      ?? payload.data?.messageId
+      ?? `notification-${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${performance.now()}`
+    );
     
     // console.log('[NotificationContext] ✅ Using notification ID:', notificationId);
     
     // Get title from data.title (preferred) or notification.title
-    const title = payload.data?.title || payload.notification?.title || 'New Notification';
+    const title = String(payload.data?.title ?? payload.notification?.title ?? 'New Notification');
     
     // Get description from data.description (preferred) or notification.body
-    const description = payload.data?.description || payload.notification?.body || '';
+    const description = String(payload.data?.description ?? payload.notification?.body ?? '');
     
     // Get module from data.module
-    const notificationModule = payload.data?.module || '';
+    const notificationModule = String(payload.data?.module ?? '');
     
     // Get body for backward compatibility
-    const body = payload.notification?.body || payload.data?.description || '';
+    const body = String(payload.notification?.body ?? payload.data?.description ?? '');
 
     const notification: NotificationItem = {
       id: notificationId,
@@ -142,11 +154,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       body,
       description,
       module: notificationModule,
-      timestamp: payload.data?.created_at ? new Date(payload.data.created_at) : new Date(),
-      data: payload.data,
+      timestamp: payload.data?.created_at ? new Date(String(payload.data.created_at)) : new Date(),
+      data: payload.data as { [key: string]: string } | undefined,
       read: false,
       icon: payload.notification?.icon,
-      url: payload.data?.url,
+      url: payload.data?.url != null ? String(payload.data.url) : undefined,
     };
 
     // console.log('[NotificationContext] 📋 Created notification object:', notification);
