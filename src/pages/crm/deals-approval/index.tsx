@@ -3239,6 +3239,8 @@ const CrmDeals = () => {
               id: selectedDeal?.id || selectedDeal?.rawData?.id,
               type: RECORD_TYPES.DEAL,
             }}
+            recordType="deal"
+            recordId={selectedDeal?.id ?? selectedDeal?.rawData?.id ?? undefined}
             onNoteCreate={handleNoteCreate}
             breezeRecordSummary={{
               content: `This deal was created on ${selectedDeal?.created_at ? moment(selectedDeal.created_at).format("MMMM DD, YYYY") : "recent date"}. ${selectedDeal?.stage?.name ? `Currently in ${selectedDeal.stage.name} stage.` : ""} ${selectedDeal?.value ? `Deal value: ${selectedDeal.currency || "AED"} ${parseFloat(String(selectedDeal.value)).toLocaleString()}.` : ""} ${selectedDeal?.company_name || selectedDeal?.company ? `Company: ${selectedDeal.company_name || selectedDeal.company}.` : ""}`,

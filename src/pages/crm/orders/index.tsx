@@ -2869,6 +2869,8 @@ const CrmOrders = () => {
               name: selectedOrder?.customer_name || "NA",
               gradient: getRandomColor(selectedOrder?.customer_name || ""),
             }}
+            recordType="order"
+            recordId={selectedOrder?.id ?? selectedOrder?.rawData?.id ?? undefined}
             breezeRecordSummary={{
               content: `This order was created on ${selectedOrder?.created_at ? moment(selectedOrder.created_at).format("MMMM DD, YYYY") : "recent date"}. ${selectedOrder?.stage?.name ? `Currently in ${selectedOrder.stage.name} stage.` : ""} ${selectedOrder?.final_amount || selectedOrder?.total_amount ? `Order value: ${selectedOrder.currency || "AED"} ${parseFloat(String(selectedOrder.final_amount || selectedOrder.total_amount)).toLocaleString()}.` : ""} ${selectedOrder?.customer_name ? `Customer: ${selectedOrder.customer_name}.` : ""}`,
               timestamp: selectedOrder?.updated_at

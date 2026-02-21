@@ -34,7 +34,7 @@ import {
 import { Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { sendEmail } from "@utils/communication";
-import { createMeeting } from "@utils/crm";
+import { createMeeting, createCrmNote } from "@utils/crm";
 import { RECORD_TYPES } from "@utils/Helper";
 
 // ============================================================================
@@ -160,14 +160,12 @@ export interface GenericSidebarProps {
 
   // Context payload for integrations
   contextPayload?: Record<string, unknown>;
-
-  // Note modal callbacks
-  onNoteCreate?: (
-    note: string,
-    createTask: boolean,
-    taskDueDate?: string,
-  ) => void;
-
+  
+  recordType?: 'prospect' | 'lead' | 'deal' | 'order';
+  recordId?: number;
+  
+  onNoteCreate?: (note: string, createTask: boolean, taskDueDate?: string) => void;
+  
   // Email modal callbacks
   onEmailSend?: (emailData: {
     to: string[];
@@ -5282,6 +5280,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   actionsDropdown,
   permissionMessage,
   contextPayload,
+  recordType,
+  recordId,
   onNoteCreate,
   onEmailSend,
   senderEmail,
@@ -5396,13 +5396,21 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowNotesModal(false);
   };
 
-  const handleNoteSave = (
-    note: string,
-    createTask: boolean,
-    taskDueDate?: string,
-  ) => {
+  const handleNoteSave = async (note: string, createTask: boolean, taskDueDate?: string) => {
+    const text = note.trim();
+    if (!text) return;
+    if (recordType && recordId != null) {
+      try {
+        await createCrmNote({ record_type: recordType, record_id: Number(recordId), text });
+        setShowNotesModal(false);
+        toast.success('Note created successfully');
+        onNoteCreate?.(note, createTask, taskDueDate);
+      } catch {
+        // createCrmNote already shows toast on error
+      }
+      return;
+    }
     onNoteCreate?.(note, createTask, taskDueDate);
-    console.log("Note saved:", { note, createTask, taskDueDate });
   };
 
   const handleEmailClick = () => {
