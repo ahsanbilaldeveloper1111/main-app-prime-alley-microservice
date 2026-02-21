@@ -1,8 +1,8 @@
-import { toast } from 'react-toastify';
-import axiosInstance from './axios';
+import { toast } from "react-toastify";
+import axiosInstance from "./axios";
 
-const prefix = 'communications';
-const meetingsPrefix = prefix + '/meetings';
+const prefix = "communications";
+const meetingsPrefix = prefix + "/meetings";
 
 // ==================== Types ====================
 
@@ -14,8 +14,12 @@ export interface SendEmailPayload {
   subject: string;
   /** Body (HTML or plain text). */
   content: string;
+  /** Record ID. */
+  record_id?: number;
+  /** Record type. */
+  record_type?: string;
   /** `text/html` (default) or `text/plain`. */
-  content_type?: 'text/html' | 'text/plain';
+  content_type?: "text/html" | "text/plain";
   /** Sender/extension identifier (default: `unknown`). */
   created_by?: string;
   /** CC addresses; each must be email. */
@@ -35,14 +39,14 @@ export interface SendEmailSuccessData {
 }
 
 export interface SendEmailSuccessResponse {
-  status: 'success';
+  status: "success";
   message: string;
   data: SendEmailSuccessData;
 }
 
 /** Error response (e.g. 422 validation) for send-email. */
 export interface SendEmailErrorResponse {
-  status: 'error';
+  status: "error";
   message: string;
   errors?: Record<string, string[]>;
 }
@@ -78,14 +82,14 @@ export interface SendWhatsAppSuccessData {
 }
 
 export interface SendWhatsAppSuccessResponse {
-  status: 'success';
+  status: "success";
   message: string;
   data: SendWhatsAppSuccessData;
 }
 
 /** Error response (e.g. 400 window expired) for send-whatsapp. */
 export interface SendWhatsAppErrorResponse {
-  status: 'error';
+  status: "error";
   message: string;
   window_expired?: boolean;
   window_started_at?: string;
@@ -113,14 +117,14 @@ export interface SendSmsSuccessData {
 }
 
 export interface SendSmsSuccessResponse {
-  status: 'success';
+  status: "success";
   message: string;
   data: SendSmsSuccessData;
 }
 
 /** Error response (e.g. 422) for send-sms. */
 export interface SendSmsErrorResponse {
-  status: 'error';
+  status: "error";
   message: string;
   errors?: Record<string, string[]>;
   data?: SendSmsSuccessData;
@@ -190,7 +194,7 @@ export interface MeetingSuccessData {
 }
 
 export interface MeetingSuccessResponse {
-  status: 'success';
+  status: "success";
   message: string;
   data: MeetingSuccessData;
 }
@@ -287,18 +291,18 @@ export interface GenerateSmsSuccessResponse {
  * Sends an email with the given payload.
  */
 export const sendEmail = async (
-  data: SendEmailPayload
+  data: SendEmailPayload,
 ): Promise<SendEmailSuccessResponse> => {
   const response = await axiosInstance.post<SendEmailSuccessResponse>(
     `${prefix}/send-email`,
-    data
+    data,
   );
-  if(response?.status ===200){
-    toast.success(response.data.message || 'Email sent successfully');
+  if (response?.status === 200) {
+    toast.success(response.data.message || "Email sent successfully");
     return response.data;
   } else {
-    toast.error(response.data.message || 'Failed to send Email');
-    throw new Error(response.data.message || 'Failed to send Email');
+    toast.error(response.data.message || "Failed to send Email");
+    throw new Error(response.data.message || "Failed to send Email");
   }
 };
 
@@ -309,19 +313,21 @@ export const sendEmail = async (
  * Template / outside 24h: send `content_sid`; use `content_variables` if the template has placeholders.
  */
 export const sendWhatsApp = async (
-  data: SendWhatsAppPayload
+  data: SendWhatsAppPayload,
 ): Promise<SendWhatsAppSuccessResponse> => {
   const response = await axiosInstance.post<SendWhatsAppSuccessResponse>(
     `${prefix}/send-whatsapp`,
-    data
+    data,
   );
- if(response?.status ===200){
-  toast.success(response.data.message || 'WhatsApp message sent successfully');
-  return response.data;
- } else {
-  toast.error(response.data.message || 'Failed to send WhatsApp message');
-  throw new Error(response.data.message || 'Failed to send WhatsApp message');
- }
+  if (response?.status === 200) {
+    toast.success(
+      response.data.message || "WhatsApp message sent successfully",
+    );
+    return response.data;
+  } else {
+    toast.error(response.data.message || "Failed to send WhatsApp message");
+    throw new Error(response.data.message || "Failed to send WhatsApp message");
+  }
 };
 
 /**
@@ -329,18 +335,22 @@ export const sendWhatsApp = async (
  * Creates an instant meeting.
  */
 export const createInstantMeeting = async (
-  data: CreateInstantMeetingPayload = {}
+  data: CreateInstantMeetingPayload = {},
 ): Promise<MeetingSuccessResponse> => {
   const response = await axiosInstance.post<MeetingSuccessResponse>(
     `${meetingsPrefix}/instant`,
-    data
+    data,
   );
-  if(response?.status ===200){
-    toast.success(response.data.message || 'Instant meeting created successfully');
+  if (response?.status === 200) {
+    toast.success(
+      response.data.message || "Instant meeting created successfully",
+    );
     return response.data;
   } else {
-    toast.error(response.data.message || 'Failed to create instant meeting');
-    throw new Error(response.data.message || 'Failed to create instant meeting');
+    toast.error(response.data.message || "Failed to create instant meeting");
+    throw new Error(
+      response.data.message || "Failed to create instant meeting",
+    );
   }
 };
 
@@ -349,18 +359,22 @@ export const createInstantMeeting = async (
  * Creates a scheduled meeting.
  */
 export const createScheduledMeeting = async (
-  data: CreateScheduledMeetingPayload
+  data: CreateScheduledMeetingPayload,
 ): Promise<MeetingSuccessResponse> => {
   const response = await axiosInstance.post<MeetingSuccessResponse>(
     `${meetingsPrefix}/scheduled`,
-    data
+    data,
   );
-  if(response?.status ===200){
-    toast.success(response.data.message || 'Scheduled meeting created successfully');
+  if (response?.status === 200) {
+    toast.success(
+      response.data.message || "Scheduled meeting created successfully",
+    );
     return response.data;
   } else {
-    toast.error(response.data.message || 'Failed to create scheduled meeting');
-    throw new Error(response.data.message || 'Failed to create scheduled meeting');
+    toast.error(response.data.message || "Failed to create scheduled meeting");
+    throw new Error(
+      response.data.message || "Failed to create scheduled meeting",
+    );
   }
 };
 
@@ -369,11 +383,11 @@ export const createScheduledMeeting = async (
  * Generates email content from a natural-language prompt.
  */
 export const generateEmail = async (
-  data: GenerateEmailPayload
+  data: GenerateEmailPayload,
 ): Promise<GenerateEmailSuccessResponse> => {
   const response = await axiosInstance.post<GenerateEmailSuccessResponse>(
     `${prefix}/generate-email`,
-    data
+    data,
   );
   return response.data;
 };
@@ -383,11 +397,11 @@ export const generateEmail = async (
  * Generates WhatsApp message content from a natural-language prompt.
  */
 export const generateWhatsApp = async (
-  data: GenerateWhatsAppPayload
+  data: GenerateWhatsAppPayload,
 ): Promise<GenerateWhatsAppSuccessResponse> => {
   const response = await axiosInstance.post<GenerateWhatsAppSuccessResponse>(
     `${prefix}/generate-whatsapp`,
-    data
+    data,
   );
   return response.data;
 };
@@ -397,11 +411,11 @@ export const generateWhatsApp = async (
  * Generates SMS message content from a natural-language prompt.
  */
 export const generateSms = async (
-  data: GenerateSmsPayload
+  data: GenerateSmsPayload,
 ): Promise<GenerateSmsSuccessResponse> => {
   const response = await axiosInstance.post<GenerateSmsSuccessResponse>(
     `${prefix}/generate-sms`,
-    data
+    data,
   );
   return response.data;
 };
@@ -422,10 +436,10 @@ export const getMeetingsTestConnection = async (): Promise<unknown> => {
  * Fetches a single meeting by event ID.
  */
 export const getMeetingByEventId = async (
-  eventId: string
+  eventId: string,
 ): Promise<unknown> => {
   const response = await axiosInstance.get(
-    `${meetingsPrefix}/${encodeURIComponent(eventId)}`
+    `${meetingsPrefix}/${encodeURIComponent(eventId)}`,
   );
   return response.data;
 };
@@ -434,7 +448,9 @@ export const getMeetingByEventId = async (
  * GET emails
  * Fetches emails list.
  */
-export const getEmails = async (params?: Record<string, string>): Promise<unknown> => {
+export const getEmails = async (
+  params?: Record<string, string>,
+): Promise<unknown> => {
   const response = await axiosInstance.get(`${prefix}/emails`, { params });
   return response.data;
 };
@@ -443,7 +459,9 @@ export const getEmails = async (params?: Record<string, string>): Promise<unknow
  * GET chats
  * Fetches chats list.
  */
-export const getChats = async (params?: Record<string, string>): Promise<unknown> => {
+export const getChats = async (
+  params?: Record<string, string>,
+): Promise<unknown> => {
   const response = await axiosInstance.get(`${prefix}/chats`, { params });
   return response.data;
 };
@@ -452,14 +470,19 @@ export const getChats = async (params?: Record<string, string>): Promise<unknown
  * GET whatsapp-templates
  * Fetches WhatsApp templates list (name, id, content_sid, params).
  */
-export const getWhatsAppTemplates = async (params?: Record<string, string>): Promise<WhatsAppTemplateItem[]> => {
-  const response = await axiosInstance.get<WhatsAppTemplateItem[] | { data?: WhatsAppTemplateItem[] }>(
-    `${prefix}/whatsapp-templates`,
-    { params }
-  );
+export const getWhatsAppTemplates = async (
+  params?: Record<string, string>,
+): Promise<WhatsAppTemplateItem[]> => {
+  const response = await axiosInstance.get<
+    WhatsAppTemplateItem[] | { data?: WhatsAppTemplateItem[] }
+  >(`${prefix}/whatsapp-templates`, { params });
   const data = response.data;
   if (Array.isArray(data)) return data;
-  if (data && typeof data === 'object' && Array.isArray((data as { data?: WhatsAppTemplateItem[] }).data)) {
+  if (
+    data &&
+    typeof data === "object" &&
+    Array.isArray((data as { data?: WhatsAppTemplateItem[] }).data)
+  ) {
     return (data as { data: WhatsAppTemplateItem[] }).data;
   }
   return [];
@@ -469,7 +492,9 @@ export const getWhatsAppTemplates = async (params?: Record<string, string>): Pro
  * GET meetings
  * Fetches meetings list.
  */
-export const getMeetings = async (params?: Record<string, string>): Promise<unknown> => {
+export const getMeetings = async (
+  params?: Record<string, string>,
+): Promise<unknown> => {
   const response = await axiosInstance.get(`${meetingsPrefix}`, { params });
   return response.data;
 };
@@ -479,12 +504,11 @@ export const getMeetings = async (params?: Record<string, string>): Promise<unkn
  * Fetches WhatsApp chat messages.
  */
 export const getWhatsAppChatMessages = async (
-  params?: Record<string, string>
+  params?: Record<string, string>,
 ): Promise<unknown> => {
-  const response = await axiosInstance.get(
-    `${prefix}/whatsapp/chat-messages`,
-    { params }
-  );
+  const response = await axiosInstance.get(`${prefix}/whatsapp/chat-messages`, {
+    params,
+  });
   return response.data;
 };
 
@@ -493,11 +517,11 @@ export const getWhatsAppChatMessages = async (
  * Fetches WhatsApp message status (e.g. by message_sid).
  */
 export const getWhatsAppMessageStatus = async (
-  params?: Record<string, string>
+  params?: Record<string, string>,
 ): Promise<unknown> => {
   const response = await axiosInstance.get(
     `${prefix}/whatsapp/message-status`,
-    { params }
+    { params },
   );
   return response.data;
 };
@@ -507,18 +531,18 @@ export const getWhatsAppMessageStatus = async (
  * Sends SMS via backend gateway and stores the record.
  */
 export const sendSms = async (
-  data: SendSmsPayload
+  data: SendSmsPayload,
 ): Promise<SendSmsSuccessResponse> => {
   const response = await axiosInstance.post<SendSmsSuccessResponse>(
     `${prefix}/send-sms`,
-    data
+    data,
   );
   if (response?.status === 200) {
-    toast.success(response.data.message || 'SMS sent successfully');
+    toast.success(response.data.message || "SMS sent successfully");
     return response.data;
   } else {
-    toast.error(response.data.message || 'Failed to send SMS');
-    throw new Error(response.data.message || 'Failed to send SMS');
+    toast.error(response.data.message || "Failed to send SMS");
+    throw new Error(response.data.message || "Failed to send SMS");
   }
 };
 
@@ -527,19 +551,19 @@ export const sendSms = async (
  * Paginated list of sent SMS records. Optional filter by user_extension.
  */
 export const getSmsList = async (
-  params?: Record<string, string | number | string[]>
+  params?: Record<string, string | number | string[]>,
 ): Promise<{ data: SmsListItem[]; meta: SmsListMeta }> => {
   const normalized = params
     ? Object.fromEntries(
         Object.entries(params).map(([k, v]) => [
           k,
           Array.isArray(v) ? v : String(v),
-        ])
+        ]),
       )
     : undefined;
-  const response = await axiosInstance.get<{ data: SmsListItem[]; meta: SmsListMeta }>(
-    `${prefix}/sms`,
-    { params: normalized }
-  );
+  const response = await axiosInstance.get<{
+    data: SmsListItem[];
+    meta: SmsListMeta;
+  }>(`${prefix}/sms`, { params: normalized });
   return response.data;
 };

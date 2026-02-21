@@ -95,13 +95,15 @@ import GenericTable, {
   TabConfig,
 } from "@components/GenericTable";
 
-import GenericSidebar, { 
-  SidebarSection, 
+import GenericSidebar, {
+  SidebarSection,
   QuickAction,
   BreezeRecordSummary,
-  SidebarField
-} from '@components/GenericSidebarNew';
-import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
+  SidebarField,
+} from "@components/GenericSidebarNew";
+import GenericFilterSidebar, {
+  FilterField,
+} from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import {
   getCrmData,
@@ -130,7 +132,15 @@ import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import FormModal from "../../partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import { ModuleSlug, formatDuration, formatDateTimeToLocal, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat } from "@utils/Helper";
+import {
+  ModuleSlug,
+  formatDuration,
+  formatDateTimeToLocal,
+  GlobalDateFormat,
+  GlobalTimeFormat,
+  GlobalDateTimeFormat,
+  RECORD_TYPES,
+} from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
@@ -138,7 +148,7 @@ import { ListCallLogs, DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import CircularProgressCircle from "@components/CircularProgressCircle";
 
-import renderCreateCompany from '@components/renderCreateCompany';
+import renderCreateCompany from "@components/renderCreateCompany";
 
 // KPI Card Component (from crm-new.tsx design)
 interface KPICardData {
@@ -151,7 +161,13 @@ interface KPICardData {
   onClick?: () => void;
 }
 
-const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => void }) => {
+const PhoneContainer = ({
+  phone,
+  onClick,
+}: {
+  phone: string;
+  onClick?: () => void;
+}) => {
   const [showPopover, setShowPopover] = useState(false);
 
   const parsePhone = useCallback((phone: string) => {
@@ -189,10 +205,10 @@ const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => voi
   const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
 
   const phoneBadge = (
-    <Badge 
-      bg="info" 
+    <Badge
+      bg="info"
       className="bg-opacity-10 text-dark"
-      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      style={{ cursor: onClick ? "pointer" : "default" }}
       onMouseEnter={() => setShowPopover(true)}
       onMouseLeave={() => setShowPopover(false)}
     >
@@ -210,23 +226,23 @@ const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => voi
   }
 
   const popover = (
-    <Popover 
-      id={`phone-popover-${phone}`} 
-      style={{ 
-        maxWidth: '160px', 
-        pointerEvents: 'auto',
-        border: 'none',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-        borderRadius: '8px'
+    <Popover
+      id={`phone-popover-${phone}`}
+      style={{
+        maxWidth: "160px",
+        pointerEvents: "auto",
+        border: "none",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+        borderRadius: "8px",
       }}
       onMouseEnter={() => setShowPopover(true)}
       onMouseLeave={() => setShowPopover(false)}
     >
-      <Popover.Body 
+      <Popover.Body
         className="p-0"
-        style={{ 
-          padding: '8px',
-          borderRadius: '8px'
+        style={{
+          padding: "8px",
+          borderRadius: "8px",
         }}
       >
         <Button
@@ -238,27 +254,27 @@ const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => voi
             setShowPopover(false);
           }}
           className="d-flex align-items-center justify-content-center gap-2 w-100"
-          style={{ 
-            fontSize: '13px', 
-            fontWeight: '600',
-            padding: '8px 16px',
-            borderRadius: '6px',
-            border: '1px solid #dee2e6',
-            backgroundColor: 'transparent',
-            color: '#212529',
-            boxShadow: 'none',
-            transition: 'all 0.2s ease',
-            minHeight: '36px'
+          style={{
+            fontSize: "13px",
+            fontWeight: "600",
+            padding: "8px 16px",
+            borderRadius: "6px",
+            border: "1px solid #dee2e6",
+            backgroundColor: "transparent",
+            color: "#212529",
+            boxShadow: "none",
+            transition: "all 0.2s ease",
+            minHeight: "36px",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-1px)';
-            e.currentTarget.style.backgroundColor = '#f8f9fa';
-            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+            e.currentTarget.style.transform = "translateY(-1px)";
+            e.currentTarget.style.backgroundColor = "#f8f9fa";
+            e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.boxShadow = "none";
           }}
         >
           <Phone size={18} style={{ strokeWidth: 2.5 }} />
@@ -275,7 +291,7 @@ const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => voi
       overlay={popover}
       trigger={[]}
     >
-      <span style={{ display: 'inline-block' }}>{phoneBadge}</span>
+      <span style={{ display: "inline-block" }}>{phoneBadge}</span>
     </OverlayTrigger>
   );
 };
@@ -392,28 +408,27 @@ const FilterBar: React.FC<FilterBarProps> = ({
 
               return (
                 <Button
-  key={filter.id}
-  variant={
-    hasCustomColor
-      ? undefined
-      : isActive
-      ? filter.variant || "primary"
-      : "outline-secondary"
-  }
-  onClick={() => onFilterChange && onFilterChange(filter.id)}
-  className="d-flex align-items-center gap-2 "
-  style={hasCustomColor ? buttonStyle : undefined}
->
-  <span className="d-flex align-items-center gap-2">
-    {filter.icon && (
-      <span className="d-flex align-items-center">
-        {filter.icon}
-      </span>
-    )}
-    {filter.label}
-  </span>
-</Button>
-
+                  key={filter.id}
+                  variant={
+                    hasCustomColor
+                      ? undefined
+                      : isActive
+                        ? filter.variant || "primary"
+                        : "outline-secondary"
+                  }
+                  onClick={() => onFilterChange && onFilterChange(filter.id)}
+                  className="d-flex align-items-center gap-2 "
+                  style={hasCustomColor ? buttonStyle : undefined}
+                >
+                  <span className="d-flex align-items-center gap-2">
+                    {filter.icon && (
+                      <span className="d-flex align-items-center">
+                        {filter.icon}
+                      </span>
+                    )}
+                    {filter.label}
+                  </span>
+                </Button>
               );
             })}
           </div>
@@ -438,14 +453,19 @@ const FilterBar: React.FC<FilterBarProps> = ({
                       }
                     }}
                   />
-                  <Button variant="outline-secondary" onClick={() => onSearch?.()}>
+                  <Button
+                    variant="outline-secondary"
+                    onClick={() => onSearch?.()}
+                  >
                     <FiSearch size={16} />
                   </Button>
                 </InputGroup>
               )}
               {onToggleAdvancedFilters && (
                 <Button
-                  variant={showAdvancedFilters ? "primary" : "outline-secondary"}
+                  variant={
+                    showAdvancedFilters ? "primary" : "outline-secondary"
+                  }
                   onClick={onToggleAdvancedFilters}
                   className="d-flex align-items-center flex-shrink-0"
                 >
@@ -481,7 +501,7 @@ const getInitials = (name: string): string => {
     // First letter of first two words
     const firstLetter1 = words[0].match(/[a-z]/i)?.[0];
     const firstLetter2 = words[1].match(/[a-z]/i)?.[0];
-    
+
     if (firstLetter1 && firstLetter2) {
       return (firstLetter1 + firstLetter2).toUpperCase();
     }
@@ -532,7 +552,7 @@ const CrmCompanyManagement = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedDataItem, setSelectedDataItem] = useState<CrmDataItem | null>(
-    null
+    null,
   );
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<CrmDataItem | null>(null);
@@ -540,12 +560,14 @@ const CrmCompanyManagement = () => {
   const [showAfterCallModal, setShowAfterCallModal] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [selectedCampaigns, setSelectedCampaigns] = useState<readonly any[]>(
-    []
+    [],
   );
   const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
   const [assignToCampaignUsers, setAssignToCampaignUsers] = useState(false);
   const [showConvertToLeadModal, setShowConvertToLeadModal] = useState(false);
-const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(null);
+  const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(
+    null,
+  );
 
   // Data assignment modal states
   const [assignmentFilters, setAssignmentFilters] = useState({
@@ -553,7 +575,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
     selectedCampaigns: [] as readonly any[],
   });
   const [assignmentCampaign, setAssignmentCampaign] = useState<readonly any[]>(
-    []
+    [],
   );
   const [assignmentDistribution, setAssignmentDistribution] = useState<
     "equal" | "custom"
@@ -582,7 +604,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
     }>
   >([]);
   const [campaignsById, setCampaignsById] = useState<Record<number, string>>(
-    {}
+    {},
   );
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
@@ -623,30 +645,34 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
 
   // Add Contacts button states
   const [showAddContactsDropdown, setShowAddContactsDropdown] = useState(false);
-  const [showCreateContactSidebar, setShowCreateContactSidebar] = useState(false);
-  const [showCreateCompanySidebar, setShowCreateCompanySidebar] = useState(false);
+  const [showCreateContactSidebar, setShowCreateContactSidebar] =
+    useState(false);
+  const [showCreateCompanySidebar, setShowCreateCompanySidebar] =
+    useState(false);
   const addContactsRef = useRef<HTMLDivElement>(null);
   const [contactForm, setContactForm] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phoneNumber: '',
+    firstName: "",
+    lastName: "",
+    email: "",
+    phoneNumber: "",
     campaign_id: null as number | null,
     contact_owner: null as string | null,
-    lifecycle_stage: 'Lead',
-    disposition: '',
+    lifecycle_stage: "Lead",
+    disposition: "",
     legal_basis: [] as string[],
-    last_called: '',
-    last_call_status: '',
-    next_call: '',
-    scheduled_call_at: '',
+    last_called: "",
+    last_call_status: "",
+    next_call: "",
+    scheduled_call_at: "",
     tags: [] as Array<{ value: string; label: string; id?: number }>,
-    note: '',
+    note: "",
     is_viewed: false,
   });
   const [createContactLoading, setCreateContactLoading] = useState(false);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
-  const [contactFormLoadError, setContactFormLoadError] = useState<string | null>(null);
+  const [contactFormLoadError, setContactFormLoadError] = useState<
+    string | null
+  >(null);
   const [contactFormLoading, setContactFormLoading] = useState(false);
 
   // Call recordings state
@@ -654,19 +680,24 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
   const [callRecordingsLoading, setCallRecordingsLoading] = useState(false);
   const [callRecordingsTotal, setCallRecordingsTotal] = useState(0);
   const [selectedRecording, setSelectedRecording] = useState<any>(null);
-  const [showRecordingPlayerModal, setShowRecordingPlayerModal] = useState(false);
-  const [downloadingRecordings, setDownloadingRecordings] = useState<Set<string>>(new Set());
-  const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
+  const [showRecordingPlayerModal, setShowRecordingPlayerModal] =
+    useState(false);
+  const [downloadingRecordings, setDownloadingRecordings] = useState<
+    Set<string>
+  >(new Set());
+  const [downloadProgress, setDownloadProgress] = useState<
+    Record<string, number>
+  >({});
 
   const [showCompanyAnalytics, setShowCompanyAnalytics] = useState(false);
   const [showAllCompanyStats, setShowAllCompanyStats] = useState(false);
-  
+
   // Valid filter IDs
   const validFilters = ["all", "scheduled", "has_leads"];
-  
+
   // Initialize activeFilter state
   const [activeFilter, setActiveFilter] = useState("all");
-  
+
   // Read tab from URL on mount and when router is ready
   useEffect(() => {
     if (router.isReady && router.query.tab) {
@@ -676,18 +707,22 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
       }
     }
   }, [router.isReady, router.query.tab]);
-  
+
   // Close Add Contacts dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (addContactsRef.current && !addContactsRef.current.contains(event.target as Node)) {
+      if (
+        addContactsRef.current &&
+        !addContactsRef.current.contains(event.target as Node)
+      ) {
         setShowAddContactsDropdown(false);
       }
     };
-    
+
     if (showAddContactsDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showAddContactsDropdown]);
 
@@ -705,66 +740,83 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
       .then((item: CrmDataItem & { data?: Record<string, any> }) => {
         if (cancelled) return;
         const d = item.data || {};
-        const nameParts = (item.name || '').trim().split(/\s+/);
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
+        const nameParts = (item.name || "").trim().split(/\s+/);
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(" ") || "";
         const toDatetimeLocal = (v: string | null | undefined) => {
-          if (!v) return '';
+          if (!v) return "";
           const m = moment(v);
-          return m.isValid() ? m.format('YYYY-MM-DDTHH:mm') : '';
+          return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
         };
         const rawTags = item?.data?.tags ?? d.tags ?? [];
         const tagsArray = Array.isArray(rawTags)
-          ? rawTags.map((t: any) => (typeof t === 'string' ? { value: t, label: t } : { value: t.name ?? t.value ?? '', label: t.name ?? t.label ?? t.value ?? '' }))
+          ? rawTags.map((t: any) =>
+              typeof t === "string"
+                ? { value: t, label: t }
+                : {
+                    value: t.name ?? t.value ?? "",
+                    label: t.name ?? t.label ?? t.value ?? "",
+                  },
+            )
           : [];
         setContactForm({
           firstName,
           lastName,
-          email: d.email ?? (item as any).email ?? '',
-          phoneNumber: item.phone ?? '',
+          email: d.email ?? (item as any).email ?? "",
+          phoneNumber: item.phone ?? "",
           campaign_id: item.campaign_id ?? d.campaign_id ?? null,
           contact_owner: d.contact_owner ?? (item as any).contact_owner ?? null,
-          lifecycle_stage: d.lifecycle_stage ?? 'Lead',
-          disposition: d.disposition ?? (item as any).disposition ?? '',
+          lifecycle_stage: d.lifecycle_stage ?? "Lead",
+          disposition: d.disposition ?? (item as any).disposition ?? "",
           legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
-          last_called: toDatetimeLocal(d.last_called ?? (item as any).last_called_at),
-          last_call_status: d.last_call_status ?? (item as any).last_call_end_reason ?? '',
+          last_called: toDatetimeLocal(
+            d.last_called ?? (item as any).last_called_at,
+          ),
+          last_call_status:
+            d.last_call_status ?? (item as any).last_call_end_reason ?? "",
           next_call: toDatetimeLocal(d.next_call),
-          scheduled_call_at: toDatetimeLocal(item.scheduled_call_at ?? d.scheduled_call_at),
+          scheduled_call_at: toDatetimeLocal(
+            item.scheduled_call_at ?? d.scheduled_call_at,
+          ),
           tags: tagsArray,
-          note: item.note ?? d.note ?? '',
+          note: item.note ?? d.note ?? "",
           is_viewed: item.is_viewed ?? d.is_viewed ?? false,
         });
         if (!cancelled) setContactFormLoading(false);
       })
       .catch(() => {
         if (!cancelled) {
-          setContactFormLoadError('Failed to load company');
+          setContactFormLoadError("Failed to load company");
           setContactFormLoading(false);
         }
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [showCreateContactSidebar, editingContactId]);
 
   // Handler to update filter and URL
-  const handleFilterChange = useCallback((filterId: string) => {
-    setActiveFilter(filterId);
-    setPagination((prev) => ({ ...prev, currentPage: 1 }));
-    // Prevent showing stale totalRecords on "Convert to Leads" tab until new data loads
-    if (filterId === 'has_leads') {
-      setLoading(true);
-    }
-    
-    // Update URL with tab query parameter
-    router.push(
-      {
-        pathname: router.pathname,
-        query: { ...router.query, tab: filterId }
-      },
-      undefined,
-      { shallow: true }
-    );
-  }, [router]);
+  const handleFilterChange = useCallback(
+    (filterId: string) => {
+      setActiveFilter(filterId);
+      setPagination((prev) => ({ ...prev, currentPage: 1 }));
+      // Prevent showing stale totalRecords on "Convert to Leads" tab until new data loads
+      if (filterId === "has_leads") {
+        setLoading(true);
+      }
+
+      // Update URL with tab query parameter
+      router.push(
+        {
+          pathname: router.pathname,
+          query: { ...router.query, tab: filterId },
+        },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [router],
+  );
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [companySearch, setCompanySearch] = useState("");
   const [showColumnEditor, setShowColumnEditor] = useState(false);
@@ -792,8 +844,12 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
     "country",
     "industry",
   ];
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => defaultSelectedColumns);
-  const [draftSelectedColumns, setDraftSelectedColumns] = useState<string[]>([]);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(
+    () => defaultSelectedColumns,
+  );
+  const [draftSelectedColumns, setDraftSelectedColumns] = useState<string[]>(
+    [],
+  );
 
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -971,7 +1027,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
         setHistoryLoading(false);
       }
     },
-    [fetchCampaignsByIds]
+    [fetchCampaignsByIds],
   );
 
   // Custom select styles
@@ -1020,30 +1076,48 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
-  const buildCrmDataParams = useCallback((overrides: { page?: number; per_page?: number } = {}) => {
-    const params: any = {
-      page: pagination.currentPage,
-      per_page: pagination.rowsPerPage,
-      ...overrides,
-    };
-    if (memoizedFilters.search) params.search = memoizedFilters.search;
-    if (memoizedFilters.campaign_id?.length) params.campaign_ids = memoizedFilters.campaign_id;
-    if (memoizedFilters.tags?.length) params.tags = memoizedFilters.tags;
-    if (memoizedFilters.assignment_status) params.assignment_status = memoizedFilters.assignment_status;
-    if (memoizedFilters.user_extension?.length) params.user_extensions = memoizedFilters.user_extension;
-    if (memoizedFilters.is_viewed !== undefined && memoizedFilters.is_viewed !== '') params.is_viewed = memoizedFilters.is_viewed;
-    if (memoizedFilters.start_date) params.date_from = memoizedFilters.start_date;
-    if (memoizedFilters.end_date) params.date_to = memoizedFilters.end_date;
-    if (memoizedFilters.has_scheduled_calls !== undefined) params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
-    if (memoizedFilters.has_tickets !== undefined) params.has_tickets = memoizedFilters.has_tickets;
-    if (memoizedFilters.scheduled_call_status) params.scheduled_call_status = memoizedFilters.scheduled_call_status;
-    if (memoizedFilters.scheduled_call_from) params.scheduled_call_from = memoizedFilters.scheduled_call_from;
-    if (memoizedFilters.scheduled_call_to) params.scheduled_call_to = memoizedFilters.scheduled_call_to;
-    if (memoizedFilters.source_file) params.source_file = memoizedFilters.source_file;
-    if (memoizedFilters.tag_ids?.length) params.tag_ids = memoizedFilters.tag_ids;
-    params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
-    return params;
-  }, [memoizedFilters, pagination.currentPage, pagination.rowsPerPage]);
+  const buildCrmDataParams = useCallback(
+    (overrides: { page?: number; per_page?: number } = {}) => {
+      const params: any = {
+        page: pagination.currentPage,
+        per_page: pagination.rowsPerPage,
+        ...overrides,
+      };
+      if (memoizedFilters.search) params.search = memoizedFilters.search;
+      if (memoizedFilters.campaign_id?.length)
+        params.campaign_ids = memoizedFilters.campaign_id;
+      if (memoizedFilters.tags?.length) params.tags = memoizedFilters.tags;
+      if (memoizedFilters.assignment_status)
+        params.assignment_status = memoizedFilters.assignment_status;
+      if (memoizedFilters.user_extension?.length)
+        params.user_extensions = memoizedFilters.user_extension;
+      if (
+        memoizedFilters.is_viewed !== undefined &&
+        memoizedFilters.is_viewed !== ""
+      )
+        params.is_viewed = memoizedFilters.is_viewed;
+      if (memoizedFilters.start_date)
+        params.date_from = memoizedFilters.start_date;
+      if (memoizedFilters.end_date) params.date_to = memoizedFilters.end_date;
+      if (memoizedFilters.has_scheduled_calls !== undefined)
+        params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
+      if (memoizedFilters.has_tickets !== undefined)
+        params.has_tickets = memoizedFilters.has_tickets;
+      if (memoizedFilters.scheduled_call_status)
+        params.scheduled_call_status = memoizedFilters.scheduled_call_status;
+      if (memoizedFilters.scheduled_call_from)
+        params.scheduled_call_from = memoizedFilters.scheduled_call_from;
+      if (memoizedFilters.scheduled_call_to)
+        params.scheduled_call_to = memoizedFilters.scheduled_call_to;
+      if (memoizedFilters.source_file)
+        params.source_file = memoizedFilters.source_file;
+      if (memoizedFilters.tag_ids?.length)
+        params.tag_ids = memoizedFilters.tag_ids;
+      params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
+      return params;
+    },
+    [memoizedFilters, pagination.currentPage, pagination.rowsPerPage],
+  );
 
   // Extract unique source_file values from dataList for creatable select
   const uniqueSources = useMemo(() => {
@@ -1053,10 +1127,12 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
         sources.add(item.source_file.trim());
       }
     });
-    return Array.from(sources).sort().map((source) => ({
-      value: source,
-      label: source,
-    }));
+    return Array.from(sources)
+      .sort()
+      .map((source) => ({
+        value: source,
+        label: source,
+      }));
   }, [dataList]);
 
   // Set draft selected columns when column editor is shown
@@ -1069,7 +1145,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
     const fetchExtensions = async () => {
       try {
         const hierarchyData = await GetHierarchyData(
-          ModuleSlug.CRM_DATA_MANAGEMENT
+          ModuleSlug.CRM_DATA_MANAGEMENT,
         );
         if (hierarchyData?.extensions) {
           setExtensions(hierarchyData.extensions);
@@ -1112,7 +1188,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
             value: tag.value,
             label: tag.label,
             id: parseInt(tag.value.replace("tag-", "")) || 0,
-          }))
+          })),
         );
       }
     };
@@ -1196,7 +1272,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
   const sortData = <T extends Record<string, any>>(
     data: T[],
     sortColumn: string,
-    sortDirection: "asc" | "desc"
+    sortDirection: "asc" | "desc",
   ): T[] => {
     if (!sortColumn) return data;
 
@@ -1219,7 +1295,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
   const paginateData = <T,>(
     data: T[],
     currentPage: number,
-    rowsPerPage: number
+    rowsPerPage: number,
   ): T[] => {
     const startIndex = (currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
@@ -1367,96 +1443,96 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
       const dummyCompanies = [
         {
           id: 1,
-          name: 'Acme Corp',
-          phone: '+14155552671',
-          created_at: '2024-01-15T10:30:00Z',
-          updated_at: '2024-02-10T14:20:00Z',
-          last_called_at: '2024-02-10T14:20:00Z',
-          user_extension: '1001',
+          name: "Acme Corp",
+          phone: "+14155552671",
+          created_at: "2024-01-15T10:30:00Z",
+          updated_at: "2024-02-10T14:20:00Z",
+          last_called_at: "2024-02-10T14:20:00Z",
+          user_extension: "1001",
           campaign_id: 1,
-          campaign: { id: 1, name: 'Winter Campaign 2024' },
+          campaign: { id: 1, name: "Winter Campaign 2024" },
           is_viewed: true,
           scheduled_call_at: null,
-          status: 'active',
+          status: "active",
           source_file: null,
           tags: null,
           note: null,
           data: {
-            email: 'contact@acmecorp.com',
-            city: 'New York',
-            country: 'United States',
-            industry: 'Technology'
-          }
+            email: "contact@acmecorp.com",
+            city: "New York",
+            country: "United States",
+            industry: "Technology",
+          },
         },
         {
           id: 2,
-          name: 'TechVision Inc',
-          phone: '+14155552672',
-          created_at: '2024-01-20T09:15:00Z',
-          updated_at: '2024-02-12T11:45:00Z',
-          last_called_at: '2024-02-12T11:45:00Z',
-          user_extension: '1002',
+          name: "TechVision Inc",
+          phone: "+14155552672",
+          created_at: "2024-01-20T09:15:00Z",
+          updated_at: "2024-02-12T11:45:00Z",
+          last_called_at: "2024-02-12T11:45:00Z",
+          user_extension: "1002",
           campaign_id: 1,
-          campaign: { id: 1, name: 'Winter Campaign 2024' },
+          campaign: { id: 1, name: "Winter Campaign 2024" },
           is_viewed: false,
-          scheduled_call_at: '2024-02-21T15:00:00Z',
-          status: 'active',
+          scheduled_call_at: "2024-02-21T15:00:00Z",
+          status: "active",
           source_file: null,
           tags: null,
-          note: 'Follow-up needed',
+          note: "Follow-up needed",
           data: {
-            email: 'info@techvision.com',
-            city: 'Los Angeles',
-            country: 'United States',
-            industry: 'Healthcare'
-          }
+            email: "info@techvision.com",
+            city: "Los Angeles",
+            country: "United States",
+            industry: "Healthcare",
+          },
         },
         {
           id: 3,
-          name: 'Global Solutions Ltd',
-          phone: '+14155552673',
-          created_at: '2024-01-25T16:20:00Z',
-          updated_at: '2024-01-25T16:20:00Z',
+          name: "Global Solutions Ltd",
+          phone: "+14155552673",
+          created_at: "2024-01-25T16:20:00Z",
+          updated_at: "2024-01-25T16:20:00Z",
           last_called_at: null,
           user_extension: null,
           campaign_id: 2,
-          campaign: { id: 2, name: 'Spring Outreach' },
+          campaign: { id: 2, name: "Spring Outreach" },
           is_viewed: false,
           scheduled_call_at: null,
-          status: 'active',
+          status: "active",
           source_file: null,
           tags: null,
           note: null,
           data: {
-            email: 'hello@globalsolutions.com',
-            city: 'Chicago',
-            country: 'United States',
-            industry: 'Finance'
-          }
+            email: "hello@globalsolutions.com",
+            city: "Chicago",
+            country: "United States",
+            industry: "Finance",
+          },
         },
         {
           id: 4,
-          name: 'Innovation Labs',
-          phone: '+14155552674',
-          created_at: '2024-02-01T08:30:00Z',
-          updated_at: '2024-02-14T10:15:00Z',
-          last_called_at: '2024-02-14T10:15:00Z',
-          user_extension: '1001',
+          name: "Innovation Labs",
+          phone: "+14155552674",
+          created_at: "2024-02-01T08:30:00Z",
+          updated_at: "2024-02-14T10:15:00Z",
+          last_called_at: "2024-02-14T10:15:00Z",
+          user_extension: "1001",
           campaign_id: 2,
-          campaign: { id: 2, name: 'Spring Outreach' },
+          campaign: { id: 2, name: "Spring Outreach" },
           is_viewed: true,
-          scheduled_call_at: '2024-02-22T09:30:00Z',
-          status: 'active',
+          scheduled_call_at: "2024-02-22T09:30:00Z",
+          status: "active",
           source_file: null,
           tags: null,
-          note: 'High priority client',
+          note: "High priority client",
           data: {
-            email: 'contact@innovationlabs.com',
-            city: 'Houston',
-            country: 'United States',
-            industry: 'Manufacturing'
-          }
-        }
+            email: "contact@innovationlabs.com",
+            city: "Houston",
+            country: "United States",
+            industry: "Manufacturing",
+          },
+        },
       ];
 
       // Only update state if this is still the latest request
@@ -1508,7 +1584,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
 
   // CSV validation function
   const validateCsvFile = (
-    file: File
+    file: File,
   ): { isValid: boolean; errors: string[] } => {
     const errors: string[] = [];
 
@@ -1610,7 +1686,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
         selectedFile,
         [], // No campaigns selected
         tagValues,
-        true // No auto-assignment
+        true, // No auto-assignment
       );
 
       clearInterval(progressInterval);
@@ -1650,7 +1726,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
         toast.error(
           `Upload failed: All ${validationFailures} record${
             validationFailures !== 1 ? "s" : ""
-          } failed validation`
+          } failed validation`,
         );
       } else {
         toast.error("Upload completed but no companies were processed");
@@ -1684,57 +1760,60 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
 
   // Fetch call recordings (not call logs) for the selected company
   // Filters by current user's extension and company's phone number
-  const fetchCallRecordings = useCallback(async (phoneNumber: string, userExtension?: string) => {
-    if (!phoneNumber) {
-      setCallRecordings([]);
-      return;
-    }
-
-    if (!userExtension) {
-      setCallRecordings([]);
-      return;
-    }
-
-    setCallRecordingsLoading(true);
-    try {
-      const filters = {
-        remote_party_number: [phoneNumber],
-        extension: [userExtension],
-      };
-
-      // Use ListCallLogs with reportType 'recordings' to fetch call recordings
-      const response = await ListCallLogs(
-        {
-          page: 1,
-          perPage: 5,
-          search: "",
-          filters,
-          reportType: "recordings", // This ensures we get recordings, not logs
-          moduleSlug: ModuleSlug.CALL_RECORDINGS,
-        },
-        "call-logs/recordings" // Endpoint for call recordings
-      );
-
-      if (response?.dataList) {
-        setCallRecordings(response.dataList);
-      } else {
+  const fetchCallRecordings = useCallback(
+    async (phoneNumber: string, userExtension?: string) => {
+      if (!phoneNumber) {
         setCallRecordings([]);
+        return;
       }
 
-      // Store total count from pagination
-      if (response?.total !== undefined) {
-        setCallRecordingsTotal(response.total);
-      } else {
-        setCallRecordingsTotal(0);
+      if (!userExtension) {
+        setCallRecordings([]);
+        return;
       }
-    } catch (error) {
-      console.error("Failed to fetch call recordings:", error);
-      setCallRecordings([]);
-      setCallRecordingsTotal(0);
-    } finally {
-      setCallRecordingsLoading(false);
-    }
-  }, [session]);
+
+      setCallRecordingsLoading(true);
+      try {
+        const filters = {
+          remote_party_number: [phoneNumber],
+          extension: [userExtension],
+        };
+
+        // Use ListCallLogs with reportType 'recordings' to fetch call recordings
+        const response = await ListCallLogs(
+          {
+            page: 1,
+            perPage: 5,
+            search: "",
+            filters,
+            reportType: "recordings", // This ensures we get recordings, not logs
+            moduleSlug: ModuleSlug.CALL_RECORDINGS,
+          },
+          "call-logs/recordings", // Endpoint for call recordings
+        );
+
+        if (response?.dataList) {
+          setCallRecordings(response.dataList);
+        } else {
+          setCallRecordings([]);
+        }
+
+        // Store total count from pagination
+        if (response?.total !== undefined) {
+          setCallRecordingsTotal(response.total);
+        } else {
+          setCallRecordingsTotal(0);
+        }
+      } catch (error) {
+        console.error("Failed to fetch call recordings:", error);
+        setCallRecordings([]);
+        setCallRecordingsTotal(0);
+      } finally {
+        setCallRecordingsLoading(false);
+      }
+    },
+    [session],
+  );
 
   // Load call recordings when view modal opens
   useEffect(() => {
@@ -1749,7 +1828,10 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
   // Load call recordings when company sidebar (preview modal) opens
   useEffect(() => {
     if (showCompanySidebar && selectedCompany?.phone) {
-      fetchCallRecordings(selectedCompany.phone, selectedCompany.user_extension);
+      fetchCallRecordings(
+        selectedCompany.phone,
+        selectedCompany.user_extension,
+      );
     } else if (!showCompanySidebar && !showViewModal) {
       setCallRecordings([]);
       setCallRecordingsTotal(0);
@@ -1765,15 +1847,15 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
   // Handle download call recording
   const handleDownloadCallRecording = useCallback(async (recording: any) => {
     const { Id, AgentExtension } = recording;
-    
+
     // Add to downloading set and initialize progress
-    setDownloadingRecordings(prev => new Set(prev).add(Id));
-    setDownloadProgress(prev => ({ ...prev, [Id]: 0 }));
-    
+    setDownloadingRecordings((prev) => new Set(prev).add(Id));
+    setDownloadProgress((prev) => ({ ...prev, [Id]: 0 }));
+
     try {
       // Simulate progress updates
       const progressInterval = setInterval(() => {
-        setDownloadProgress(prev => {
+        setDownloadProgress((prev) => {
           const currentProgress = prev[Id] || 0;
           if (currentProgress < 90) {
             return { ...prev, [Id]: currentProgress + Math.random() * 15 };
@@ -1785,39 +1867,38 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
       await DownloadCallRecording(
         Id,
         AgentExtension,
-        'call-logs/recordings/download',
-        recording.imagicle
+        "call-logs/recordings/download",
+        recording.imagicle,
       );
-      
+
       // Complete the progress
       clearInterval(progressInterval);
-      setDownloadProgress(prev => ({ ...prev, [Id]: 100 }));
-      
+      setDownloadProgress((prev) => ({ ...prev, [Id]: 100 }));
+
       // Show completion briefly before hiding
       setTimeout(() => {
-        setDownloadingRecordings(prev => {
+        setDownloadingRecordings((prev) => {
           const newSet = new Set(prev);
           newSet.delete(Id);
           return newSet;
         });
-        setDownloadProgress(prev => {
+        setDownloadProgress((prev) => {
           const newProgress = { ...prev };
           delete newProgress[Id];
           return newProgress;
         });
       }, 1000);
-      
     } catch (error) {
-      console.error('Download error:', error);
-      toast.error('Download failed');
-      
+      console.error("Download error:", error);
+      toast.error("Download failed");
+
       // Remove from downloading set on error
-      setDownloadingRecordings(prev => {
+      setDownloadingRecordings((prev) => {
         const newSet = new Set(prev);
         newSet.delete(Id);
         return newSet;
       });
-      setDownloadProgress(prev => {
+      setDownloadProgress((prev) => {
         const newProgress = { ...prev };
         delete newProgress[Id];
         return newProgress;
@@ -1849,10 +1930,10 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
   const calculateEntryCounts = useCallback(async () => {
     try {
       const campaignIds = Array.from(assignmentFilters.selectedCampaigns).map(
-        (campaign) => parseInt(campaign.value)
+        (campaign) => parseInt(campaign.value),
       );
       const tags = Array.from(assignmentFilters.selectedTags).map(
-        (tag) => tag.value
+        (tag) => tag.value,
       );
 
       const counts = await getCrmDataCounts(campaignIds, tags);
@@ -1933,11 +2014,11 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
     if (assignmentDistribution === "custom") {
       const totalCustomAllocation = Object.values(customDistribution).reduce(
         (sum, count) => sum + count,
-        0
+        0,
       );
       if (totalCustomAllocation !== totalEntriesToAssign) {
         toast.error(
-          `Custom allocation must equal total entries to assign (${totalEntriesToAssign}). Current total: ${totalCustomAllocation}`
+          `Custom allocation must equal total entries to assign (${totalEntriesToAssign}). Current total: ${totalCustomAllocation}`,
         );
         return;
       }
@@ -1945,15 +2026,15 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
 
     try {
       const campaignFilterIds = Array.from(
-        assignmentFilters.selectedCampaigns
+        assignmentFilters.selectedCampaigns,
       ).map((campaign) => parseInt(campaign.value));
       console.log(assignmentFilters.selectedTags, "ZEZA");
       const tagIds = Array.from(assignmentFilters.selectedTags).map((tag) =>
-        parseInt(tag.id)
+        parseInt(tag.id),
       );
 
       const campaignIds = Array.from(assignmentCampaign).map((campaign) =>
-        parseInt(campaign.value)
+        parseInt(campaign.value),
       );
 
       let result;
@@ -1965,7 +2046,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
           totalEntriesToAssign,
           campaignFilterIds,
           tagIds,
-          "equal"
+          "equal",
         );
       } else {
         // Custom distribution - single API call with campaign distribution
@@ -1984,7 +2065,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
           campaignFilterIds,
           tagIds,
           "custom",
-          campaignDistribution
+          campaignDistribution,
         );
       }
 
@@ -2059,48 +2140,57 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
     }
   }, []);
 
-  const handleNoteCreate = (note: string, createTask: boolean, taskDueDate?: string) => {
-    console.log('Note created:', {
+  const handleNoteCreate = (
+    note: string,
+    createTask: boolean,
+    taskDueDate?: string,
+  ) => {
+    console.log("Note created:", {
       companyId: selectedCompany.id,
       note,
       createTask,
-      taskDueDate
+      taskDueDate,
     });
-    
+
     // Here you would typically:
     // 1. Save the note to your backend/database
     // 2. If createTask is true, create a task with the due date
     // 3. Update the UI to show the new note
     // 4. Maybe refresh the notes section
-    
-    alert(`Note saved successfully!\n\nNote: ${note}\nCreate Task: ${createTask}\nDue Date: ${taskDueDate || 'N/A'}`);
+
+    alert(
+      `Note saved successfully!\n\nNote: ${note}\nCreate Task: ${createTask}\nDue Date: ${taskDueDate || "N/A"}`,
+    );
   };
   // Handle call button click
-  const handleCallClick = useCallback(async (item: CrmDataItem) => {
-    const phone = item.phone;
-    if (!phone) {
-      toast.error("No phone number available for this entry");
-      return;
-    }
-    
-    if (!isInitialized) {
-      toast.error("CTI not initialized. Please wait...");
-      return;
-    }
-    
-    try {
-      const result = await dialNumber(phone);
-      
-      if (result.success) {
-        toast.success(`Calling ${item.name || phone}...`);
-      } else {
-        toast.error(result.error || "Failed to make call");
+  const handleCallClick = useCallback(
+    async (item: CrmDataItem) => {
+      const phone = item.phone;
+      if (!phone) {
+        toast.error("No phone number available for this entry");
+        return;
       }
-    } catch (error) {
-      console.error("Call error:", error);
-      toast.error("Failed to make call");
-    }
-  }, [dialNumber, isInitialized]);
+
+      if (!isInitialized) {
+        toast.error("CTI not initialized. Please wait...");
+        return;
+      }
+
+      try {
+        const result = await dialNumber(phone);
+
+        if (result.success) {
+          toast.success(`Calling ${item.name || phone}...`);
+        } else {
+          toast.error(result.error || "Failed to make call");
+        }
+      } catch (error) {
+        console.error("Call error:", error);
+        toast.error("Failed to make call");
+      }
+    },
+    [dialNumber, isInitialized],
+  );
 
   // Handle recording playback
   const handlePlayRecording = useCallback((recordingUrl: string) => {
@@ -2160,7 +2250,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
     if (afterCallData.generateLead === "yes" && selectedDataItem) {
       // Show success message and navigate to create lead page
       toast.success(
-        "Redirecting to create lead page with pre-filled company data..."
+        "Redirecting to create lead page with pre-filled company data...",
       );
       window.location.href = `/crm/leads/create?crm_data_id=${selectedDataItem.id}`;
     } else {
@@ -2168,7 +2258,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
       setShowSuccessfulModal(true);
       setSuccessModalTitle("After Call Successful!");
       setSuccessModalDescription(
-        "The after call data has been successfully saved."
+        "The after call data has been successfully saved.",
       );
     }
   }, [afterCallData, selectedDataItem, handleAfterCallModalClose]);
@@ -2176,7 +2266,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
   // Schedule/Unschedule call handlers
   const handleScheduleCall = useCallback((entry: any) => {
     setSelectedEntryForSchedule(entry);
-    
+
     // Check if entry has a scheduled call - if yes, we're editing
     if (entry.scheduled_call_at) {
       setIsEditingSchedule(true);
@@ -2202,23 +2292,20 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
     setShowUnscheduleModal(true);
   }, []);
 
-  const confirmUnscheduleCall = useCallback(
-    async () => {
-      if (!entryToUnschedule) return;
+  const confirmUnscheduleCall = useCallback(async () => {
+    if (!entryToUnschedule) return;
 
-      try {
-        const userExtension = (session?.user as any)?.extension || "default";
-        await unscheduleCall(entryToUnschedule.id, userExtension);
-        setRefreshKey((prev) => prev + 1);
-        setShowUnscheduleModal(false);
-        setEntryToUnschedule(null);
-        toast.success("Call unscheduled successfully");
-      } catch (error) {
-        console.error("Failed to unschedule call:", error);
-      }
-    },
-    [entryToUnschedule, session]
-  );
+    try {
+      const userExtension = (session?.user as any)?.extension || "default";
+      await unscheduleCall(entryToUnschedule.id, userExtension);
+      setRefreshKey((prev) => prev + 1);
+      setShowUnscheduleModal(false);
+      setEntryToUnschedule(null);
+      toast.success("Call unscheduled successfully");
+    } catch (error) {
+      console.error("Failed to unschedule call:", error);
+    }
+  }, [entryToUnschedule, session]);
 
   // Schedule modal handlers
   const handleScheduleModalClose = useCallback(() => {
@@ -2245,14 +2332,14 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
     try {
       const userExtension = (session?.user as any)?.extension || "default";
       const scheduledDateTime = moment(
-        `${scheduleData.date} ${scheduleData.time}`
+        `${scheduleData.date} ${scheduleData.time}`,
       ).toISOString();
 
       await scheduleCall(
         selectedEntryForSchedule.id,
         scheduledDateTime,
         userExtension,
-        scheduleData.notes
+        scheduleData.notes,
       );
       setRefreshKey((prev) => prev + 1);
       handleScheduleModalClose();
@@ -2260,19 +2347,19 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
       setSuccessModalTitle(
         isEditingSchedule
           ? "Call Schedule Updated!"
-          : "Schedule Call Successful!"
+          : "Schedule Call Successful!",
       );
       setSuccessModalDescription(
         isEditingSchedule
           ? "The call schedule has been successfully updated."
-          : "The call has been successfully scheduled."
+          : "The call has been successfully scheduled.",
       );
     } catch (error) {
       console.error(
         isEditingSchedule
           ? "Failed to update scheduled call:"
           : "Failed to schedule call:",
-        error
+        error,
       );
     }
   }, [
@@ -2335,178 +2422,227 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
   }, []);
 
   // Handle first column click - navigates to detail page with company ID in URL
-  const handleFirstColumnClick = useCallback((company: any) => {
-    router.push(`/crm/data/companies-detailpage?id=${company?.id ?? ''}`);
-  }, [router]);
+  const handleFirstColumnClick = useCallback(
+    (company: any) => {
+      router.push(`/crm/data/companies-detailpage?id=${company?.id ?? ""}`);
+    },
+    [router],
+  );
 
   // Stats cards data for metrics
-  const companyStatsCards: StatsCardData[] = useMemo(() => [
-    {
-      title: 'Companies missing Owner',
-      value: dataList.filter((p: any) => !p.user_extension || p.user_extension === '').length
-    },
-    {
-      title: 'Companies missing Lead Status',
-      value: dataList.filter((p: any) => !p.disposition || p.disposition === '').length
-    },
-    {
-      title: 'Companies never called',
-      value: dataList.filter((p: any) => !p.last_called_at).length
-    },
-    {
-      title: 'Companies with no recent activity',
-      value: dataList.filter((p: any) => {
-        if (!p.last_called_at) return true;
-        const daysSinceActivity = moment().diff(moment(p.last_called_at), 'days');
-        return daysSinceActivity > 30;
-      }).length
-    }
-  ], [dataList]);
-
-  // Define columns for GenericTable - Clean declarative definitions
- const companyColumns: TableColumn<any>[] = useMemo(
+  const companyStatsCards: StatsCardData[] = useMemo(
     () => [
       {
-        key: 'name',
-        label: 'Company Name',
+        title: "Companies missing Owner",
+        value: dataList.filter(
+          (p: any) => !p.user_extension || p.user_extension === "",
+        ).length,
+      },
+      {
+        title: "Companies missing Lead Status",
+        value: dataList.filter(
+          (p: any) => !p.disposition || p.disposition === "",
+        ).length,
+      },
+      {
+        title: "Companies never called",
+        value: dataList.filter((p: any) => !p.last_called_at).length,
+      },
+      {
+        title: "Companies with no recent activity",
+        value: dataList.filter((p: any) => {
+          if (!p.last_called_at) return true;
+          const daysSinceActivity = moment().diff(
+            moment(p.last_called_at),
+            "days",
+          );
+          return daysSinceActivity > 30;
+        }).length,
+      },
+    ],
+    [dataList],
+  );
+
+  // Define columns for GenericTable - Clean declarative definitions
+  const companyColumns: TableColumn<any>[] = useMemo(
+    () => [
+      {
+        key: "name",
+        label: "Company Name",
         sortable: true,
-        type: 'avatar',
+        type: "avatar",
         avatar: {
           getInitials: (row) => getInitials(row.name),
-          getColor: (row) => getRandomColor(row.name)
+          getColor: (row) => getRandomColor(row.name),
         },
-        emptyValue: 'N/A'
+        emptyValue: "N/A",
       },
       {
-        key: 'created_at',
-        label: 'Create Date',
+        key: "created_at",
+        label: "Create Date",
         sortable: true,
-        type: 'text',
-        accessor: (row) => row.created_at ? moment(row.created_at).format("MMM DD, YYYY") : '-'
+        type: "text",
+        accessor: (row) =>
+          row.created_at ? moment(row.created_at).format("MMM DD, YYYY") : "-",
       },
       {
-        key: 'phone',
-        label: 'Phone Number',
+        key: "phone",
+        label: "Phone Number",
         sortable: true,
-        type: 'custom',
-        align: 'left',
+        type: "custom",
+        align: "left",
         render: (row) => (
-          <PhoneContainer phone={row?.phone} onClick={() => handleCallClick(row)} />
-        )
+          <PhoneContainer
+            phone={row?.phone}
+            onClick={() => handleCallClick(row)}
+          />
+        ),
       },
       {
-        key: 'last_called_at',
-        label: 'Last Activity Date',
+        key: "last_called_at",
+        label: "Last Activity Date",
         sortable: true,
-        type: 'text',
-        accessor: (row) => row.last_called_at ? moment(row.last_called_at).format("MMM DD, YYYY") : '-'
+        type: "text",
+        accessor: (row) =>
+          row.last_called_at
+            ? moment(row.last_called_at).format("MMM DD, YYYY")
+            : "-",
       },
       {
-        key: 'city',
-        label: 'City',
+        key: "city",
+        label: "City",
         sortable: true,
-        type: 'text',
-        accessor: (row) => row.data?.city || row.city || 'N/A',
-        emptyValue: 'N/A'
+        type: "text",
+        accessor: (row) => row.data?.city || row.city || "N/A",
+        emptyValue: "N/A",
       },
       {
-        key: 'country',
-        label: 'Country/Region',
+        key: "country",
+        label: "Country/Region",
         sortable: true,
-        type: 'text',
-        accessor: (row) => row.data?.country || row.country || 'N/A',
-        emptyValue: 'N/A'
+        type: "text",
+        accessor: (row) => row.data?.country || row.country || "N/A",
+        emptyValue: "N/A",
       },
       {
-        key: 'industry',
-        label: 'Industry',
+        key: "industry",
+        label: "Industry",
         sortable: true,
-        type: 'badge',
-        accessor: (row) => row.data?.industry || row.industry || 'N/A',
+        type: "badge",
+        accessor: (row) => row.data?.industry || row.industry || "N/A",
         badge: {
-          getVariant: () => 'primary'
+          getVariant: () => "primary",
         },
-        emptyValue: 'N/A'
-      }
+        emptyValue: "N/A",
+      },
     ],
-    [extensions, callEndReasons, handleCallClick]
+    [extensions, callEndReasons, handleCallClick],
   );
 
   // Define table actions
   const companyActions: TableAction<any>[] = useMemo(
     () => [
-      ...(session?.user?.permissions?.includes('view-crm-data-management') ? [{
-        label: 'View',
-        icon: <Eye size={16} />,
-        onClick: (row: any) => handleViewData(row),
-        variant: 'link' as const
-      }] : []),
-      ...(session?.user?.permissions?.includes('view-crm-data-management') ? [{
-        label: 'Edit',
-        icon: <FiEdit size={16} />,
-        onClick: (row: any) => {
-          setEditingContactId(row.id);
-          setShowCreateContactSidebar(true);
-        },
-        variant: 'link' as const
-      }] : []),
-      ...(session?.user?.permissions?.includes('call-service-crm-data-management') ? [{
-        label: 'Call',
-        icon: <PhoneIcon size={16} />,
-        onClick: (row: any) => handleCallClick(row),
-        variant: 'link' as const,
-        className: 'text-success'
-      }] : []),
-      ...(activeFilter !== 'has_leads' ? [{
-        label: 'More Actions',
-        icon: <MoreVertical size={16} />,
-        variant: 'link' as const,
-        dropdown: {
-          align: 'end' as const,
-          options: [
-            ...(session?.user?.permissions?.includes('call-service-crm-data-management') ? [
-              {
-                label: 'Schedule Call',
-                icon: <FiCalendar size={14} />,
-                onClick: (row: any) => handleScheduleCall(row),
-                show: (row: any) => !row.scheduled_call_at
-              },
-              {
-                label: 'Edit Scheduled Call',
-                icon: <FiCalendar size={14} />,
-                onClick: (row: any) => handleScheduleCall(row),
-                show: (row: any) => !!row.scheduled_call_at
-              },
-              {
-                label: 'Unschedule Call',
-                icon: <FiX size={14} />,
-                onClick: (row: any) => handleUnscheduleCallClick(row),
-                className: 'text-danger',
-                show: (row: any) => !!row.scheduled_call_at,
-                divider: true
-              }
-            ] : []),
+      ...(session?.user?.permissions?.includes("view-crm-data-management")
+        ? [
             {
-              label: 'Convert to Lead',
-              icon: <FiTarget size={14} />,
-              onClick: (row: any) => {
-                setConvertingCompanyId(row.id);
-                setShowConvertToLeadModal(true);
-              }
+              label: "View",
+              icon: <Eye size={16} />,
+              onClick: (row: any) => handleViewData(row),
+              variant: "link" as const,
             },
-            {
-              label: 'Send Email',
-              icon: <Mail size={14} />,
-              onClick: (row: any) => {
-                window.location.href = `mailto:${row.email}`;
-              },
-              show: (row: any) => !!row.email
-            }
           ]
-        }
-      }] : [])
+        : []),
+      ...(session?.user?.permissions?.includes("view-crm-data-management")
+        ? [
+            {
+              label: "Edit",
+              icon: <FiEdit size={16} />,
+              onClick: (row: any) => {
+                setEditingContactId(row.id);
+                setShowCreateContactSidebar(true);
+              },
+              variant: "link" as const,
+            },
+          ]
+        : []),
+      ...(session?.user?.permissions?.includes(
+        "call-service-crm-data-management",
+      )
+        ? [
+            {
+              label: "Call",
+              icon: <PhoneIcon size={16} />,
+              onClick: (row: any) => handleCallClick(row),
+              variant: "link" as const,
+              className: "text-success",
+            },
+          ]
+        : []),
+      ...(activeFilter !== "has_leads"
+        ? [
+            {
+              label: "More Actions",
+              icon: <MoreVertical size={16} />,
+              variant: "link" as const,
+              dropdown: {
+                align: "end" as const,
+                options: [
+                  ...(session?.user?.permissions?.includes(
+                    "call-service-crm-data-management",
+                  )
+                    ? [
+                        {
+                          label: "Schedule Call",
+                          icon: <FiCalendar size={14} />,
+                          onClick: (row: any) => handleScheduleCall(row),
+                          show: (row: any) => !row.scheduled_call_at,
+                        },
+                        {
+                          label: "Edit Scheduled Call",
+                          icon: <FiCalendar size={14} />,
+                          onClick: (row: any) => handleScheduleCall(row),
+                          show: (row: any) => !!row.scheduled_call_at,
+                        },
+                        {
+                          label: "Unschedule Call",
+                          icon: <FiX size={14} />,
+                          onClick: (row: any) => handleUnscheduleCallClick(row),
+                          className: "text-danger",
+                          show: (row: any) => !!row.scheduled_call_at,
+                          divider: true,
+                        },
+                      ]
+                    : []),
+                  {
+                    label: "Convert to Lead",
+                    icon: <FiTarget size={14} />,
+                    onClick: (row: any) => {
+                      setConvertingCompanyId(row.id);
+                      setShowConvertToLeadModal(true);
+                    },
+                  },
+                  {
+                    label: "Send Email",
+                    icon: <Mail size={14} />,
+                    onClick: (row: any) => {
+                      window.location.href = `mailto:${row.email}`;
+                    },
+                    show: (row: any) => !!row.email,
+                  },
+                ],
+              },
+            },
+          ]
+        : []),
     ],
-    [session, activeFilter, handleViewData, handleCallClick, handleScheduleCall, handleUnscheduleCallClick]
+    [
+      session,
+      activeFilter,
+      handleViewData,
+      handleCallClick,
+      handleScheduleCall,
+      handleUnscheduleCallClick,
+    ],
   );
 
   // Define old columns for GenericListPage (keep for backward compatibility if needed)
@@ -2550,7 +2686,9 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
         cell: (props: any) => (
           <div>
             {props.source_file ? (
-              <span className="status-badge secondary">{props.source_file}</span>
+              <span className="status-badge secondary">
+                {props.source_file}
+              </span>
             ) : (
               <span className="text-muted">N/A</span>
             )}
@@ -2568,7 +2706,8 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
               <span className="status-badge success">
                 {extensions.find(
                   (extension: any) =>
-                    extension.id.toString() === props.user_extension?.toString()
+                    extension.id.toString() ===
+                    props.user_extension?.toString(),
                 )?.display_name || props.user_extension}
               </span>
             ) : (
@@ -2618,7 +2757,9 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
           return (
             <div className="d-flex align-items-center">
               <span className="text-uppercase">
-                {lastCalled ? moment(lastCalled).format(GlobalDateTimeFormat) : '-'}
+                {lastCalled
+                  ? moment(lastCalled).format(GlobalDateTimeFormat)
+                  : "-"}
               </span>
             </div>
           );
@@ -2690,7 +2831,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
 
           const isOverdue = moment(props.scheduled_call_at).isBefore(moment());
           const isNextHour = moment(props.scheduled_call_at).isBefore(
-            moment().add(1, "hour")
+            moment().add(1, "hour"),
           );
 
           return (
@@ -2700,7 +2841,9 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
                   isOverdue ? "danger" : isNextHour ? "warning" : ""
                 }`}
               >
-                {props.scheduled_call_at ? moment(props.scheduled_call_at).format(GlobalDateTimeFormat) : '-'}
+                {props.scheduled_call_at
+                  ? moment(props.scheduled_call_at).format(GlobalDateTimeFormat)
+                  : "-"}
                 {isOverdue && <span className="ms-1 fw-bold">(Overdue)</span>}
                 {isNextHour && !isOverdue && (
                   <span className="ms-1 fw-bold">(Soon)</span>
@@ -2741,7 +2884,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
         cell: (props: any) => (
           <div className="d-flex gap-1">
             {session?.user?.permissions?.includes(
-              "call-service-crm-data-management"
+              "call-service-crm-data-management",
             ) && (
               <Button
                 variant="success"
@@ -2764,35 +2907,35 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
                 <FiMoreVertical size={14} />
               </Dropdown.Toggle>
               <Dropdown.Menu>
-                    {session?.user?.permissions?.includes(
-                      "call-service-crm-data-management"
-                    )  && (
+                {session?.user?.permissions?.includes(
+                  "call-service-crm-data-management",
+                ) && (
+                  <>
+                    {props.scheduled_call_at ? (
                       <>
-                        {props.scheduled_call_at ? (
-                          <>
-                            <Dropdown.Item
-                              onClick={() => handleScheduleCall(props)}
-                            >
-                              <FiCalendar size={14} className="me-2" />
-                              Edit Scheduled Call
-                            </Dropdown.Item>
-                            <Dropdown.Item
-                              onClick={() => handleUnscheduleCallClick(props)}
-                              className="text-danger"
-                            >
-                              <FiX size={14} className="me-2" />
-                              Unschedule Call
-                            </Dropdown.Item>
-                          </>
-                        ) : (
-                          <Dropdown.Item onClick={() => handleScheduleCall(props)}>
-                            <FiCalendar size={14} className="me-2" />
-                            Schedule Call
-                          </Dropdown.Item>
-                        )}
-                        <Dropdown.Divider />
+                        <Dropdown.Item
+                          onClick={() => handleScheduleCall(props)}
+                        >
+                          <FiCalendar size={14} className="me-2" />
+                          Edit Scheduled Call
+                        </Dropdown.Item>
+                        <Dropdown.Item
+                          onClick={() => handleUnscheduleCallClick(props)}
+                          className="text-danger"
+                        >
+                          <FiX size={14} className="me-2" />
+                          Unschedule Call
+                        </Dropdown.Item>
                       </>
+                    ) : (
+                      <Dropdown.Item onClick={() => handleScheduleCall(props)}>
+                        <FiCalendar size={14} className="me-2" />
+                        Schedule Call
+                      </Dropdown.Item>
                     )}
+                    <Dropdown.Divider />
+                  </>
+                )}
                 <Dropdown.Item
                   onClick={() => {
                     window.location.href = `/crm/leads/create?crm_data_id=${props.id}`;
@@ -2856,32 +2999,40 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
       callEndReasons,
       handleScheduleCall,
       handleUnscheduleCallClick,
-    ]
+    ],
   );
 
   // Render Add Contacts Button with Dropdown
   const renderAddContactsButton = () => (
-    <div style={{ position: 'absolute', right: '19px', top: '18px', width: '146px' }} ref={addContactsRef}>
+    <div
+      style={{
+        position: "absolute",
+        right: "19px",
+        top: "18px",
+        width: "146px",
+      }}
+      ref={addContactsRef}
+    >
       <button
         onClick={() => setShowAddContactsDropdown(!showAddContactsDropdown)}
         style={{
-          padding: '9px 13px',
-          backgroundColor: '#000000',
-          color: '#ffffff',
-          border: 'none',
-          borderRadius: '4px',
-          fontSize: '12px',
-          fontWeight: '500',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
+          padding: "9px 13px",
+          backgroundColor: "#000000",
+          color: "#ffffff",
+          border: "none",
+          borderRadius: "4px",
+          fontSize: "12px",
+          fontWeight: "500",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = '#1a1a1a';
+          e.currentTarget.style.backgroundColor = "#1a1a1a";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = '#000000';
+          e.currentTarget.style.backgroundColor = "#000000";
         }}
       >
         Add companies
@@ -2889,39 +3040,41 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
       </button>
 
       {showAddContactsDropdown && (
-        <div style={{
-          position: 'absolute',
-          top: '100%',
-          right: 0,
-          marginTop: '4px',
-          backgroundColor: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: '5px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-          minWidth: '160px',
-          zIndex: 1000,
-          overflow: 'hidden',
-        }}>
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            right: 0,
+            marginTop: "4px",
+            backgroundColor: "#ffffff",
+            border: "1px solid #e2e8f0",
+            borderRadius: "5px",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+            minWidth: "160px",
+            zIndex: 1000,
+            overflow: "hidden",
+          }}
+        >
           <button
             onClick={() => {
               setShowAddContactsDropdown(false);
               setShowCreateCompanySidebar(true);
             }}
             style={{
-              width: '100%',
-              padding: '12px 16px',
-              backgroundColor: 'transparent',
-              border: 'none',
-              textAlign: 'left',
-              fontSize: '14px',
-              color: '#141414',
-              cursor: 'pointer',
+              width: "100%",
+              padding: "12px 16px",
+              backgroundColor: "transparent",
+              border: "none",
+              textAlign: "left",
+              fontSize: "14px",
+              color: "#141414",
+              cursor: "pointer",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f7fafc';
+              e.currentTarget.style.backgroundColor = "#f7fafc";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.backgroundColor = "transparent";
             }}
           >
             Create new
@@ -2929,23 +3082,23 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
           <button
             onClick={() => {
               setShowAddContactsDropdown(false);
-              console.log('Import contacts');
+              console.log("Import contacts");
             }}
             style={{
-              width: '100%',
-              padding: '12px 16px',
-              backgroundColor: 'transparent',
-              border: 'none',
-              textAlign: 'left',
-              fontSize: '14px',
-              color: '#d97706',
-              cursor: 'pointer',
+              width: "100%",
+              padding: "12px 16px",
+              backgroundColor: "transparent",
+              border: "none",
+              textAlign: "left",
+              fontSize: "14px",
+              color: "#d97706",
+              cursor: "pointer",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f7fafc';
+              e.currentTarget.style.backgroundColor = "#f7fafc";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.backgroundColor = "transparent";
             }}
           >
             Import
@@ -2956,76 +3109,93 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
   );
 
   // Create company (contact) API submit - POST crm/crm-data { name, phone, data }
-  const handleCreateContactSubmit = useCallback(async (addAnother: boolean) => {
-    const name = [contactForm.firstName, contactForm.lastName].filter(Boolean).join(' ').trim();
-    if (!name || !contactForm.email || !contactForm.phoneNumber?.trim()) {
-      toast.error("Name, email and phone are required");
-      return;
-    }
-    const sessionUser = session?.user as any;
-    const userExtension = String(sessionUser?.phone ?? "");
-    const assignedTo = userExtension;
-    const uploadedBy = userExtension;
-
-    setCreateContactLoading(true);
-    try {
-      await createCrmData({
-        name,
-        phone: contactForm.phoneNumber.trim(),
-        user_extension: userExtension,
-        campaign_id: contactForm.campaign_id ?? null,
-        data: {
-          email: contactForm.email.trim(),
-          assigned_to: assignedTo,
-          user_extension: userExtension,
-          uploaded_by: uploadedBy,
-          campaign_id: contactForm.campaign_id ?? undefined,
-          last_called: contactForm.last_called || undefined,
-          last_call_status: contactForm.last_call_status || undefined,
-          disposition: contactForm.disposition || undefined,
-          next_call: contactForm.next_call || undefined,
-          tags: contactForm.tags?.length ? contactForm.tags.map((t) => t.value || t.label) : undefined,
-          is_viewed: contactForm.is_viewed,
-          scheduled_call_at: contactForm.scheduled_call_at || undefined,
-          note: contactForm.note || undefined,
-          contact_owner: contactForm.contact_owner ?? undefined,
-          lifecycle_stage: contactForm.lifecycle_stage || undefined,
-          legal_basis: contactForm.legal_basis?.length ? contactForm.legal_basis : undefined,
-        },
-      });
-      fetchCrmData();
-      setContactForm({
-        firstName: '',
-        lastName: '',
-        email: '',
-        phoneNumber: '',
-        campaign_id: null,
-        contact_owner: null,
-        lifecycle_stage: 'Lead',
-        disposition: '',
-        legal_basis: [],
-        last_called: '',
-        last_call_status: '',
-        next_call: '',
-        scheduled_call_at: '',
-        tags: [],
-        note: '',
-        is_viewed: false,
-      });
-      if (!addAnother) {
-        setShowCreateContactSidebar(false);
+  const handleCreateContactSubmit = useCallback(
+    async (addAnother: boolean) => {
+      const name = [contactForm.firstName, contactForm.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      if (!name || !contactForm.email || !contactForm.phoneNumber?.trim()) {
+        toast.error("Name, email and phone are required");
+        return;
       }
-    } catch {
-      // Error already shown by createCrmData
-    } finally {
-      setCreateContactLoading(false);
-    }
-  }, [contactForm, fetchCrmData, session?.user]);
+      const sessionUser = session?.user as any;
+      const userExtension = String(sessionUser?.phone ?? "");
+      const assignedTo = userExtension;
+      const uploadedBy = userExtension;
+
+      setCreateContactLoading(true);
+      try {
+        await createCrmData({
+          name,
+          phone: contactForm.phoneNumber.trim(),
+          user_extension: userExtension,
+          campaign_id: contactForm.campaign_id ?? null,
+          data: {
+            email: contactForm.email.trim(),
+            assigned_to: assignedTo,
+            user_extension: userExtension,
+            uploaded_by: uploadedBy,
+            campaign_id: contactForm.campaign_id ?? undefined,
+            last_called: contactForm.last_called || undefined,
+            last_call_status: contactForm.last_call_status || undefined,
+            disposition: contactForm.disposition || undefined,
+            next_call: contactForm.next_call || undefined,
+            tags: contactForm.tags?.length
+              ? contactForm.tags.map((t) => t.value || t.label)
+              : undefined,
+            is_viewed: contactForm.is_viewed,
+            scheduled_call_at: contactForm.scheduled_call_at || undefined,
+            note: contactForm.note || undefined,
+            contact_owner: contactForm.contact_owner ?? undefined,
+            lifecycle_stage: contactForm.lifecycle_stage || undefined,
+            legal_basis: contactForm.legal_basis?.length
+              ? contactForm.legal_basis
+              : undefined,
+          },
+        });
+        fetchCrmData();
+        setContactForm({
+          firstName: "",
+          lastName: "",
+          email: "",
+          phoneNumber: "",
+          campaign_id: null,
+          contact_owner: null,
+          lifecycle_stage: "Lead",
+          disposition: "",
+          legal_basis: [],
+          last_called: "",
+          last_call_status: "",
+          next_call: "",
+          scheduled_call_at: "",
+          tags: [],
+          note: "",
+          is_viewed: false,
+        });
+        if (!addAnother) {
+          setShowCreateContactSidebar(false);
+        }
+      } catch {
+        // Error already shown by createCrmData
+      } finally {
+        setCreateContactLoading(false);
+      }
+    },
+    [contactForm, fetchCrmData, session?.user],
+  );
 
   const handleUpdateContactSubmit = useCallback(async () => {
     if (editingContactId == null) return;
-    const name = [contactForm.firstName, contactForm.lastName].filter(Boolean).join(' ').trim();
-    if (!name || !contactForm.email?.trim() || !contactForm.phoneNumber?.trim()) {
+    const name = [contactForm.firstName, contactForm.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    if (
+      !name ||
+      !contactForm.email?.trim() ||
+      !contactForm.phoneNumber?.trim()
+    ) {
       toast.error("Name, email and phone are required");
       return;
     }
@@ -3041,13 +3211,17 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
           last_call_status: contactForm.last_call_status || undefined,
           disposition: contactForm.disposition || undefined,
           next_call: contactForm.next_call || undefined,
-          tags: contactForm.tags?.length ? contactForm.tags.map((t) => t.value || t.label) : undefined,
+          tags: contactForm.tags?.length
+            ? contactForm.tags.map((t) => t.value || t.label)
+            : undefined,
           is_viewed: contactForm.is_viewed,
           scheduled_call_at: contactForm.scheduled_call_at || undefined,
           note: contactForm.note || undefined,
           contact_owner: contactForm.contact_owner ?? undefined,
           lifecycle_stage: contactForm.lifecycle_stage || undefined,
-          legal_basis: contactForm.legal_basis?.length ? contactForm.legal_basis : undefined,
+          legal_basis: contactForm.legal_basis?.length
+            ? contactForm.legal_basis
+            : undefined,
         },
       });
       fetchCrmData();
@@ -3075,7 +3249,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
         <div
           className="contact-sidebar-overlay"
           style={{
-            position: 'fixed',
+            position: "fixed",
             top: 0,
             left: 0,
             right: 0,
@@ -3089,33 +3263,39 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
         <div
           className="contact-sidebar-container"
           style={{
-            position: 'fixed',
+            position: "fixed",
             top: 0,
             right: 0,
-            width: '600px',
-            height: '100vh',
-            backgroundColor: '#ffffff',
-            boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.1)',
+            width: "600px",
+            height: "100vh",
+            backgroundColor: "#ffffff",
+            boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
             zIndex: 1001,
-            display: 'flex',
-            flexDirection: 'column',
+            display: "flex",
+            flexDirection: "column",
           }}
         >
           {/* Header */}
-          <div className="contact-sidebar-header" style={{
-            padding: '20px 24px',
-            borderBottom: '1px solid #eaf0f6',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <h2 className="contact-sidebar-title" style={{
-              fontSize: '20px',
-              fontWeight: '600',
-              color: '#141414',
-              margin: 0,
-            }}>
-              {editingContactId ? 'Edit Contact' : 'Create Contact'}
+          <div
+            className="contact-sidebar-header"
+            style={{
+              padding: "20px 24px",
+              borderBottom: "1px solid #eaf0f6",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <h2
+              className="contact-sidebar-title"
+              style={{
+                fontSize: "20px",
+                fontWeight: "600",
+                color: "#141414",
+                margin: 0,
+              }}
+            >
+              {editingContactId ? "Edit Contact" : "Create Contact"}
             </h2>
             <button
               className="contact-sidebar-close-btn"
@@ -3126,13 +3306,13 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
                 setContactFormLoading(false);
               }}
               style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '4px',
-                cursor: 'pointer',
-                color: '#718096',
-                display: 'flex',
-                alignItems: 'center',
+                background: "transparent",
+                border: "none",
+                padding: "4px",
+                cursor: "pointer",
+                color: "#718096",
+                display: "flex",
+                alignItems: "center",
               }}
             >
               <X size={24} />
@@ -3142,329 +3322,936 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (!isFormValid || createContactLoading || (editingContactId != null && contactFormLoading)) return;
+              if (
+                !isFormValid ||
+                createContactLoading ||
+                (editingContactId != null && contactFormLoading)
+              )
+                return;
               if (editingContactId) handleUpdateContactSubmit();
               else handleCreateContactSubmit(false);
             }}
-            style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+            }}
           >
-          {contactFormLoadError && (
-            <div style={{ padding: '12px 24px', background: '#fef2f2', color: '#b91c1c', fontSize: '14px' }}>
-              {contactFormLoadError}
-            </div>
-          )}
-          {/* Form Content */}
-          <div className="contact-sidebar-content" style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '40px',
-          }}>
-            {editingContactId && contactFormLoading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 280, gap: '16px' }}>
-                <Spinner animation="border" role="status" style={{ width: '2.5rem', height: '2.5rem', color: '#0091ae' }} />
-                <span style={{ fontSize: '14px', color: '#64748b' }}>Loading company...</span>
-              </div>
-            ) : (
-            <>
-            {/* Required: Name, Email, Phone */}
-            <div className="contact-form-section">
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label contact-form-label-required" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>
-                  First name <span style={{ color: '#f2545b' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  data-test-id="firstname-input"
-                  value={contactForm.firstName}
-                  onChange={(e) => setContactForm({ ...contactForm, firstName: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = '#8a8a8a')}
-                />
-              </div>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label contact-form-label-required" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>
-                  Last name <span style={{ color: '#f2545b' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  data-test-id="lastname-input"
-                  value={contactForm.lastName}
-                  onChange={(e) => setContactForm({ ...contactForm, lastName: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = '#8a8a8a')}
-                />
-              </div>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label contact-form-label-required" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>
-                  Email <span style={{ color: '#f2545b' }}>*</span>
-                </label>
-                <input
-                  type="email"
-                  data-test-id="email-input"
-                  value={contactForm.email}
-                  onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = '#8a8a8a')}
-                />
-              </div>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label contact-form-label-required" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>
-                  Phone <span style={{ color: '#f2545b' }}>*</span>
-                </label>
-                <input
-                  type="tel"
-                  data-test-id="phone-input"
-                  value={contactForm.phoneNumber}
-                  onChange={(e) => setContactForm({ ...contactForm, phoneNumber: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = '#8a8a8a')}
-                />
-              </div>
-            </div>
-
-            {/* Optional: Campaign, Contact owner, Lifecycle stage, Disposition, Legal basis */}
-            <div className="contact-form-section" style={{ marginTop: '24px' }}>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Campaign</label>
-                <Select
-                  value={contactForm.campaign_id != null ? (() => { const c = availableCampaigns.find((x) => x.id === contactForm.campaign_id); return c ? { value: String(c.id), label: c.label } : null; })() : null}
-                  onChange={(opt: any) => setContactForm({ ...contactForm, campaign_id: opt?.value ? Number(opt.value) : null })}
-                  options={availableCampaigns.map((c) => ({ value: String(c.id), label: c.label }))}
-                  placeholder="Select campaign"
-                  isClearable
-                  isSearchable
-                  styles={{ control: (base) => ({ ...base, minHeight: 40, border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px' }) }}
-                />
-              </div>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Contact owner</label>
-                <Select
-                  value={(() => {
-                    const opts = extensions.map((ext: any) => ({ value: String(ext.extension ?? ext.id ?? ''), label: ext.display_name || ext.name || ext.extension || String(ext.id || '') }));
-                    return contactForm.contact_owner != null ? opts.find((o) => o.value === contactForm.contact_owner) || null : null;
-                  })()}
-                  onChange={(opt: any) => setContactForm({ ...contactForm, contact_owner: opt?.value ?? null })}
-                  options={extensions.map((ext: any) => ({ value: String(ext.extension ?? ext.id ?? ''), label: ext.display_name || ext.name || ext.extension || String(ext.id || '') }))}
-                  placeholder="Select contact owner"
-                  isClearable
-                  isSearchable
-                  styles={{ control: (base) => ({ ...base, minHeight: 40, border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px' }) }}
-                />
-              </div>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Lifecycle stage</label>
-                <Dropdown>
-                  <Dropdown.Toggle variant="outline-secondary" style={{ width: '100%', textAlign: 'left', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', backgroundColor: '#fff' }}>
-                    {contactForm.lifecycle_stage || 'Select...'}
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu style={{ width: '100%' }}>
-                    {['Lead', 'Prospect', 'Customer', 'Evangelist'].map((stage) => (
-                      <Dropdown.Item key={stage} onClick={() => setContactForm({ ...contactForm, lifecycle_stage: stage })}>{stage}</Dropdown.Item>
-                    ))}
-                  </Dropdown.Menu>
-                </Dropdown>
-              </div>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Disposition</label>
-                <Dropdown>
-                  <Dropdown.Toggle variant="outline-secondary" style={{ width: '100%', textAlign: 'left', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', backgroundColor: '#fff', color: contactForm.disposition ? '#141414' : '#a0aec0' }}>
-                    {contactForm.disposition || 'Select...'}
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu style={{ width: '100%' }}>
-                    {['interested', 'not_interested', 'callback_requested', 'no_answer', 'busy', 'do_not_call', 'wrong_number', 'follow_up'].map((d) => (
-                      <Dropdown.Item key={d} onClick={() => setContactForm({ ...contactForm, disposition: d })}>{d.replace(/_/g, ' ')}</Dropdown.Item>
-                    ))}
-                  </Dropdown.Menu>
-                </Dropdown>
-              </div>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Legal basis for processing contact&apos;s data</label>
-                <Dropdown>
-                  <Dropdown.Toggle variant="outline-secondary" style={{ width: '100%', textAlign: 'left', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', backgroundColor: '#fff', color: contactForm.legal_basis?.length ? '#141414' : '#a0aec0' }}>
-                    {contactForm.legal_basis?.length ? contactForm.legal_basis.join(', ') : 'Select...'}
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu style={{ width: '100%', padding: '8px' }}>
-                    {['Legitimate interest', 'Consent', 'Contract', 'Legal obligation', 'Vital interests', 'Public task'].map((option) => (
-                      <Dropdown.Item
-                        key={option}
-                        as="div"
-                        style={{ padding: '4px 8px' }}
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); const isSelected = contactForm.legal_basis.includes(option); setContactForm({ ...contactForm, legal_basis: isSelected ? contactForm.legal_basis.filter((b) => b !== option) : [...contactForm.legal_basis, option] }); }}
-                      >
-                        <Form.Check type="checkbox" label={option} checked={contactForm.legal_basis.includes(option)} onChange={() => {}} />
-                      </Dropdown.Item>
-                    ))}
-                  </Dropdown.Menu>
-                </Dropdown>
-              </div>
-            </div>
-
-            {/* Optional: Datetime and text fields */}
-            <div className="contact-form-section" style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid #eaf0f6' }}>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Last called</label>
-                <input
-                  type="datetime-local"
-                  value={contactForm.last_called}
-                  onChange={(e) => setContactForm({ ...contactForm, last_called: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
-                />
-              </div>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Last call status</label>
-                <input
-                  type="text"
-                  value={contactForm.last_call_status}
-                  onChange={(e) => setContactForm({ ...contactForm, last_call_status: e.target.value })}
-                  placeholder="e.g. Answered, No answer"
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = '#8a8a8a')}
-                />
-              </div>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Next call</label>
-                <input
-                  type="datetime-local"
-                  value={contactForm.next_call}
-                  onChange={(e) => setContactForm({ ...contactForm, next_call: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
-                />
-              </div>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Scheduled call at</label>
-                <input
-                  type="datetime-local"
-                  value={contactForm.scheduled_call_at}
-                  onChange={(e) => setContactForm({ ...contactForm, scheduled_call_at: e.target.value })}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
-                />
-              </div>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Tags</label>
-                <CreatableSelect
-                  isMulti
-                  value={contactForm.tags}
-                  onChange={(selected) => setContactForm({ ...contactForm, tags: selected ? [...selected] : [] })}
-                  options={availableTags.map((t: any) => ({ value: t.value, label: t.label, id: t.id }))}
-                  placeholder="Select or create tags"
-                  styles={{ control: (base) => ({ ...base, minHeight: 40, border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px' }) }}
-                />
-              </div>
-              <div className="contact-form-field" style={{ marginBottom: '20px' }}>
-                <label className="contact-form-label" style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>Note</label>
-                <textarea
-                  rows={3}
-                  value={contactForm.note}
-                  onChange={(e) => setContactForm({ ...contactForm, note: e.target.value })}
-                  placeholder="Notes about this contact"
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = '#0091ae')}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = '#8a8a8a')}
-                />
-              </div>
-              <div className="contact-form-field">
-                <Form.Check
-                  type="checkbox"
-                  checked={contactForm.is_viewed}
-                  onChange={(e) => setContactForm({ ...contactForm, is_viewed: e.target.checked })}
-                  label={<span style={{ fontSize: '14px', color: '#141414', fontWeight: 500 }}>Is viewed</span>}
-                />
-              </div>
-            </div>
-            </>
-            )}
-          </div>
-
-          {/* Footer Buttons */}
-          <div className="contact-sidebar-footer" style={{
-            padding: '16px 24px',
-            borderTop: '1px solid #eaf0f6',
-            display: 'flex',
-            gap: '12px',
-            justifyContent: 'flex-start',
-          }}>
-            <button
-              type="submit"
-              className="contact-form-btn-create"
-              disabled={!isFormValid || createContactLoading || (!!editingContactId && contactFormLoading)}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: isFormValid && !createContactLoading ? '#0091ae' : '#cbd5e0',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: isFormValid && !createContactLoading ? 'pointer' : 'not-allowed',
-              }}
-              onMouseEnter={(e) => {
-                if (isFormValid && !createContactLoading) e.currentTarget.style.backgroundColor = '#007a94';
-              }}
-              onMouseLeave={(e) => {
-                if (isFormValid && !createContactLoading) e.currentTarget.style.backgroundColor = '#0091ae';
-              }}
-            >
-              {createContactLoading
-                ? (editingContactId ? 'Updating...' : 'Creating...')
-                : (editingContactId ? 'Update' : 'Create')}
-            </button>
-            {!editingContactId && (
-              <button
-                type="button"
-                className="contact-form-btn-create-another"
-                disabled={!isFormValid || createContactLoading}
-                onClick={() => handleCreateContactSubmit(true)}
+            {contactFormLoadError && (
+              <div
                 style={{
-                  padding: '10px 20px',
-                  backgroundColor: 'transparent',
-                  color: isFormValid && !createContactLoading ? '#141414' : '#a0aec0',
-                  border: '1px solid #8a8a8a',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: isFormValid && !createContactLoading ? 'pointer' : 'not-allowed',
-                }}
-                onMouseEnter={(e) => {
-                  if (isFormValid && !createContactLoading) e.currentTarget.style.backgroundColor = '#f7fafc';
-                }}
-                onMouseLeave={(e) => {
-                  if (isFormValid && !createContactLoading) e.currentTarget.style.backgroundColor = 'transparent';
+                  padding: "12px 24px",
+                  background: "#fef2f2",
+                  color: "#b91c1c",
+                  fontSize: "14px",
                 }}
               >
-                Create and add another
-              </button>
+                {contactFormLoadError}
+              </div>
             )}
-            <button
-              type="button"
-              className="contact-form-btn-cancel"
-              disabled={createContactLoading}
-              onClick={() => {
-                setShowCreateContactSidebar(false);
-                setEditingContactId(null);
-                setContactFormLoadError(null);
-                setContactFormLoading(false);
-              }}
+            {/* Form Content */}
+            <div
+              className="contact-sidebar-content"
               style={{
-                padding: '10px 20px',
-                backgroundColor: 'transparent',
-                color: '#141414',
-                border: '1px solid #8a8a8a',
-                borderRadius: '4px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
+                flex: 1,
+                overflowY: "auto",
+                padding: "40px",
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f7fafc'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
-              Cancel
-            </button>
-          </div>
+              {editingContactId && contactFormLoading ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minHeight: 280,
+                    gap: "16px",
+                  }}
+                >
+                  <Spinner
+                    animation="border"
+                    role="status"
+                    style={{
+                      width: "2.5rem",
+                      height: "2.5rem",
+                      color: "#0091ae",
+                    }}
+                  />
+                  <span style={{ fontSize: "14px", color: "#64748b" }}>
+                    Loading company...
+                  </span>
+                </div>
+              ) : (
+                <>
+                  {/* Required: Name, Email, Phone */}
+                  <div className="contact-form-section">
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label contact-form-label-required"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        First name <span style={{ color: "#f2545b" }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        data-test-id="firstname-input"
+                        value={contactForm.firstName}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            firstName: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                        }}
+                        onFocus={(e) =>
+                          (e.currentTarget.style.borderColor = "#0091ae")
+                        }
+                        onBlur={(e) =>
+                          (e.currentTarget.style.borderColor = "#8a8a8a")
+                        }
+                      />
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label contact-form-label-required"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Last name <span style={{ color: "#f2545b" }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        data-test-id="lastname-input"
+                        value={contactForm.lastName}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            lastName: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                        }}
+                        onFocus={(e) =>
+                          (e.currentTarget.style.borderColor = "#0091ae")
+                        }
+                        onBlur={(e) =>
+                          (e.currentTarget.style.borderColor = "#8a8a8a")
+                        }
+                      />
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label contact-form-label-required"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Email <span style={{ color: "#f2545b" }}>*</span>
+                      </label>
+                      <input
+                        type="email"
+                        data-test-id="email-input"
+                        value={contactForm.email}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            email: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                        }}
+                        onFocus={(e) =>
+                          (e.currentTarget.style.borderColor = "#0091ae")
+                        }
+                        onBlur={(e) =>
+                          (e.currentTarget.style.borderColor = "#8a8a8a")
+                        }
+                      />
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label contact-form-label-required"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Phone <span style={{ color: "#f2545b" }}>*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        data-test-id="phone-input"
+                        value={contactForm.phoneNumber}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            phoneNumber: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                        }}
+                        onFocus={(e) =>
+                          (e.currentTarget.style.borderColor = "#0091ae")
+                        }
+                        onBlur={(e) =>
+                          (e.currentTarget.style.borderColor = "#8a8a8a")
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {/* Optional: Campaign, Contact owner, Lifecycle stage, Disposition, Legal basis */}
+                  <div
+                    className="contact-form-section"
+                    style={{ marginTop: "24px" }}
+                  >
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Campaign
+                      </label>
+                      <Select
+                        value={
+                          contactForm.campaign_id != null
+                            ? (() => {
+                                const c = availableCampaigns.find(
+                                  (x) => x.id === contactForm.campaign_id,
+                                );
+                                return c
+                                  ? { value: String(c.id), label: c.label }
+                                  : null;
+                              })()
+                            : null
+                        }
+                        onChange={(opt: any) =>
+                          setContactForm({
+                            ...contactForm,
+                            campaign_id: opt?.value ? Number(opt.value) : null,
+                          })
+                        }
+                        options={availableCampaigns.map((c) => ({
+                          value: String(c.id),
+                          label: c.label,
+                        }))}
+                        placeholder="Select campaign"
+                        isClearable
+                        isSearchable
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            minHeight: 40,
+                            border: "1px solid #8a8a8a",
+                            borderRadius: "4px",
+                            fontSize: "14px",
+                          }),
+                        }}
+                      />
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Contact owner
+                      </label>
+                      <Select
+                        value={(() => {
+                          const opts = extensions.map((ext: any) => ({
+                            value: String(ext.extension ?? ext.id ?? ""),
+                            label:
+                              ext.display_name ||
+                              ext.name ||
+                              ext.extension ||
+                              String(ext.id || ""),
+                          }));
+                          return contactForm.contact_owner != null
+                            ? opts.find(
+                                (o) => o.value === contactForm.contact_owner,
+                              ) || null
+                            : null;
+                        })()}
+                        onChange={(opt: any) =>
+                          setContactForm({
+                            ...contactForm,
+                            contact_owner: opt?.value ?? null,
+                          })
+                        }
+                        options={extensions.map((ext: any) => ({
+                          value: String(ext.extension ?? ext.id ?? ""),
+                          label:
+                            ext.display_name ||
+                            ext.name ||
+                            ext.extension ||
+                            String(ext.id || ""),
+                        }))}
+                        placeholder="Select contact owner"
+                        isClearable
+                        isSearchable
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            minHeight: 40,
+                            border: "1px solid #8a8a8a",
+                            borderRadius: "4px",
+                            fontSize: "14px",
+                          }),
+                        }}
+                      />
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Lifecycle stage
+                      </label>
+                      <Dropdown>
+                        <Dropdown.Toggle
+                          variant="outline-secondary"
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            padding: "10px 12px",
+                            border: "1px solid #8a8a8a",
+                            borderRadius: "4px",
+                            fontSize: "14px",
+                            backgroundColor: "#fff",
+                          }}
+                        >
+                          {contactForm.lifecycle_stage || "Select..."}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu style={{ width: "100%" }}>
+                          {["Lead", "Prospect", "Customer", "Evangelist"].map(
+                            (stage) => (
+                              <Dropdown.Item
+                                key={stage}
+                                onClick={() =>
+                                  setContactForm({
+                                    ...contactForm,
+                                    lifecycle_stage: stage,
+                                  })
+                                }
+                              >
+                                {stage}
+                              </Dropdown.Item>
+                            ),
+                          )}
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Disposition
+                      </label>
+                      <Dropdown>
+                        <Dropdown.Toggle
+                          variant="outline-secondary"
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            padding: "10px 12px",
+                            border: "1px solid #8a8a8a",
+                            borderRadius: "4px",
+                            fontSize: "14px",
+                            backgroundColor: "#fff",
+                            color: contactForm.disposition
+                              ? "#141414"
+                              : "#a0aec0",
+                          }}
+                        >
+                          {contactForm.disposition || "Select..."}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu style={{ width: "100%" }}>
+                          {[
+                            "interested",
+                            "not_interested",
+                            "callback_requested",
+                            "no_answer",
+                            "busy",
+                            "do_not_call",
+                            "wrong_number",
+                            "follow_up",
+                          ].map((d) => (
+                            <Dropdown.Item
+                              key={d}
+                              onClick={() =>
+                                setContactForm({
+                                  ...contactForm,
+                                  disposition: d,
+                                })
+                              }
+                            >
+                              {d.replace(/_/g, " ")}
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Legal basis for processing contact&apos;s data
+                      </label>
+                      <Dropdown>
+                        <Dropdown.Toggle
+                          variant="outline-secondary"
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            padding: "10px 12px",
+                            border: "1px solid #8a8a8a",
+                            borderRadius: "4px",
+                            fontSize: "14px",
+                            backgroundColor: "#fff",
+                            color: contactForm.legal_basis?.length
+                              ? "#141414"
+                              : "#a0aec0",
+                          }}
+                        >
+                          {contactForm.legal_basis?.length
+                            ? contactForm.legal_basis.join(", ")
+                            : "Select..."}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu
+                          style={{ width: "100%", padding: "8px" }}
+                        >
+                          {[
+                            "Legitimate interest",
+                            "Consent",
+                            "Contract",
+                            "Legal obligation",
+                            "Vital interests",
+                            "Public task",
+                          ].map((option) => (
+                            <Dropdown.Item
+                              key={option}
+                              as="div"
+                              style={{ padding: "4px 8px" }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const isSelected =
+                                  contactForm.legal_basis.includes(option);
+                                setContactForm({
+                                  ...contactForm,
+                                  legal_basis: isSelected
+                                    ? contactForm.legal_basis.filter(
+                                        (b) => b !== option,
+                                      )
+                                    : [...contactForm.legal_basis, option],
+                                });
+                              }}
+                            >
+                              <Form.Check
+                                type="checkbox"
+                                label={option}
+                                checked={contactForm.legal_basis.includes(
+                                  option,
+                                )}
+                                onChange={() => {}}
+                              />
+                            </Dropdown.Item>
+                          ))}
+                        </Dropdown.Menu>
+                      </Dropdown>
+                    </div>
+                  </div>
+
+                  {/* Optional: Datetime and text fields */}
+                  <div
+                    className="contact-form-section"
+                    style={{
+                      marginTop: "24px",
+                      paddingTop: "24px",
+                      borderTop: "1px solid #eaf0f6",
+                    }}
+                  >
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Last called
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={contactForm.last_called}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            last_called: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                        }}
+                      />
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Last call status
+                      </label>
+                      <input
+                        type="text"
+                        value={contactForm.last_call_status}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            last_call_status: e.target.value,
+                          })
+                        }
+                        placeholder="e.g. Answered, No answer"
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                        }}
+                        onFocus={(e) =>
+                          (e.currentTarget.style.borderColor = "#0091ae")
+                        }
+                        onBlur={(e) =>
+                          (e.currentTarget.style.borderColor = "#8a8a8a")
+                        }
+                      />
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Next call
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={contactForm.next_call}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            next_call: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                        }}
+                      />
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Scheduled call at
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={contactForm.scheduled_call_at}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            scheduled_call_at: e.target.value,
+                          })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                        }}
+                      />
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Tags
+                      </label>
+                      <CreatableSelect
+                        isMulti
+                        value={contactForm.tags}
+                        onChange={(selected) =>
+                          setContactForm({
+                            ...contactForm,
+                            tags: selected ? [...selected] : [],
+                          })
+                        }
+                        options={availableTags.map((t: any) => ({
+                          value: t.value,
+                          label: t.label,
+                          id: t.id,
+                        }))}
+                        placeholder="Select or create tags"
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            minHeight: 40,
+                            border: "1px solid #8a8a8a",
+                            borderRadius: "4px",
+                            fontSize: "14px",
+                          }),
+                        }}
+                      />
+                    </div>
+                    <div
+                      className="contact-form-field"
+                      style={{ marginBottom: "20px" }}
+                    >
+                      <label
+                        className="contact-form-label"
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#141414",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Note
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={contactForm.note}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            note: e.target.value,
+                          })
+                        }
+                        placeholder="Notes about this contact"
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                          resize: "vertical",
+                          fontFamily: "inherit",
+                        }}
+                        onFocus={(e) =>
+                          (e.currentTarget.style.borderColor = "#0091ae")
+                        }
+                        onBlur={(e) =>
+                          (e.currentTarget.style.borderColor = "#8a8a8a")
+                        }
+                      />
+                    </div>
+                    <div className="contact-form-field">
+                      <Form.Check
+                        type="checkbox"
+                        checked={contactForm.is_viewed}
+                        onChange={(e) =>
+                          setContactForm({
+                            ...contactForm,
+                            is_viewed: e.target.checked,
+                          })
+                        }
+                        label={
+                          <span
+                            style={{
+                              fontSize: "14px",
+                              color: "#141414",
+                              fontWeight: 500,
+                            }}
+                          >
+                            Is viewed
+                          </span>
+                        }
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div
+              className="contact-sidebar-footer"
+              style={{
+                padding: "16px 24px",
+                borderTop: "1px solid #eaf0f6",
+                display: "flex",
+                gap: "12px",
+                justifyContent: "flex-start",
+              }}
+            >
+              <button
+                type="submit"
+                className="contact-form-btn-create"
+                disabled={
+                  !isFormValid ||
+                  createContactLoading ||
+                  (!!editingContactId && contactFormLoading)
+                }
+                style={{
+                  padding: "10px 20px",
+                  backgroundColor:
+                    isFormValid && !createContactLoading
+                      ? "#0091ae"
+                      : "#cbd5e0",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  cursor:
+                    isFormValid && !createContactLoading
+                      ? "pointer"
+                      : "not-allowed",
+                }}
+                onMouseEnter={(e) => {
+                  if (isFormValid && !createContactLoading)
+                    e.currentTarget.style.backgroundColor = "#007a94";
+                }}
+                onMouseLeave={(e) => {
+                  if (isFormValid && !createContactLoading)
+                    e.currentTarget.style.backgroundColor = "#0091ae";
+                }}
+              >
+                {createContactLoading
+                  ? editingContactId
+                    ? "Updating..."
+                    : "Creating..."
+                  : editingContactId
+                    ? "Update"
+                    : "Create"}
+              </button>
+              {!editingContactId && (
+                <button
+                  type="button"
+                  className="contact-form-btn-create-another"
+                  disabled={!isFormValid || createContactLoading}
+                  onClick={() => handleCreateContactSubmit(true)}
+                  style={{
+                    padding: "10px 20px",
+                    backgroundColor: "transparent",
+                    color:
+                      isFormValid && !createContactLoading
+                        ? "#141414"
+                        : "#a0aec0",
+                    border: "1px solid #8a8a8a",
+                    borderRadius: "4px",
+                    fontSize: "14px",
+                    fontWeight: "500",
+                    cursor:
+                      isFormValid && !createContactLoading
+                        ? "pointer"
+                        : "not-allowed",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (isFormValid && !createContactLoading)
+                      e.currentTarget.style.backgroundColor = "#f7fafc";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (isFormValid && !createContactLoading)
+                      e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  Create and add another
+                </button>
+              )}
+              <button
+                type="button"
+                className="contact-form-btn-cancel"
+                disabled={createContactLoading}
+                onClick={() => {
+                  setShowCreateContactSidebar(false);
+                  setEditingContactId(null);
+                  setContactFormLoadError(null);
+                  setContactFormLoading(false);
+                }}
+                style={{
+                  padding: "10px 20px",
+                  backgroundColor: "transparent",
+                  color: "#141414",
+                  border: "1px solid #8a8a8a",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  cursor: "pointer",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#f7fafc")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
+              >
+                Cancel
+              </button>
+            </div>
           </form>
         </div>
       </>
@@ -3559,13 +4346,18 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
         mainLink="/crm/dashboard"
         subTitle="Companies"
       />
-
       {/* Main flex container for content and sidebar */}
-      <div style={{ display: 'flex', gap: '0', height: 'calc(100vh)', overflow: 'hidden' }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "0",
+          height: "calc(100vh)",
+          overflow: "hidden",
+        }}
+      >
         {/* Main content area */}
         <div className="prospects-scrollable-content" style={{ flex: 1 }}>
-
-      {/* <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-0">
+          {/* <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-0">
         <div className="mb-3 mb-md-0">
   <nav aria-label="breadcrumb">
     <ol className="breadcrumb mb-0">
@@ -3621,9 +4413,9 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
 
         </div>
       </div> */}
-        
-        {/* Stats Cards */}
-      {/* <StatsCards 
+
+          {/* Stats Cards */}
+          {/* <StatsCards 
         data={[
           {
             title: 'All Companies',
@@ -3691,481 +4483,542 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
         gridMinWidth="180px"
       /> */}
 
-      <div className="container-fluid">
-        {/* Analytics Section - Collapsible */}
-        {showCompanyAnalytics && (
-          <>
-            {/* Summary Stats Grid - Using KPICard design */}
-            <Row className="mb-2">
-              <Col xl={3} lg={4} md={6} className="mb-3">
-                <KPICard
-                  title="Total Companies"
-                  value={totalRecords}
-                  icon={<Users size={24} />}
-                  color="primary"
-                />
-              </Col>
-              <Col xl={3} lg={4} md={6} className="mb-3">
-                <KPICard
-                  title="Companies with Calls Scheduled"
-                  value={metrics.scheduled_records}
-                  icon={<Calendar size={24} />}
-                  color="success"
-                />
-              </Col>
-              <Col xl={3} lg={4} md={6} className="mb-3">
-                <KPICard
-                  title="Companies with No Calls Scheduled"
-                  value={metrics.not_scheduled_records}
-                  icon={<XCircle size={24} />}
-                  color="secondary"
-                />
-              </Col>
-              <Col xl={3} lg={4} md={6} className="mb-3">
-                <KPICard
-                  title="Meetings in Next Hour"
-                  value={metrics.scheduled_next_hour_records}
-                  icon={<ClockIcon size={24} />}
-                  color="info"
-                />
-              </Col>
-              {showAllCompanyStats && (
-                <>
+          <div className="container-fluid">
+            {/* Analytics Section - Collapsible */}
+            {showCompanyAnalytics && (
+              <>
+                {/* Summary Stats Grid - Using KPICard design */}
+                <Row className="mb-2">
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
-                      title="Meetings in Next 24h"
-                      value={metrics.scheduled_next_24_hours_records}
-                      icon={<Calendar size={24} />}
-                      color="warning"
-                    />
-                  </Col>
-
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title=" Companies Assigned to Team Members"
-                      value={metrics.assigned_records}
-                      icon={<UserPlus size={24} />}
+                      title="Total Companies"
+                      value={totalRecords}
+                      icon={<Users size={24} />}
                       color="primary"
                     />
                   </Col>
                   <Col xl={3} lg={4} md={6} className="mb-3">
                     <KPICard
-                      title="Companies Not Assigned to Team Members"
-                      value={metrics.unassigned_records}
-                      icon={<AlertCircleIcon size={24} />}
-                      color="warning"
+                      title="Companies with Calls Scheduled"
+                      value={metrics.scheduled_records}
+                      icon={<Calendar size={24} />}
+                      color="success"
                     />
                   </Col>
-                </>
-              )}
-            </Row>
-
-            <div className="text-center mb-4">
-              <Button
-                variant="link"
-                onClick={() => setShowAllCompanyStats(!showAllCompanyStats)}
-                className="text-decoration-none"
-              >
-                {showAllCompanyStats ? (
-                  <>
-                    <ArrowUp size={16} className="me-1" />
-                    Show Less
-                  </>
-                ) : (
-                  <>
-                    <ArrowDown size={16} className="me-1" />
-                    Show More Stats
-                  </>
-                )}
-              </Button>
-            </div>
-          </>
-        )}
-
-        {/* Filter Bar */}
-        {showFilterBar && session?.user?.permissions?.includes("list-crm-data-management") && (
-          <FilterBar
-            quickFilters={[
-              {
-                id: "all",
-                label: "All Companies",
-                color: "#0d6efd",
-                icon: <Users size={16} />,
-              },
-              {
-                id: "scheduled",
-                label: "Scheduled",
-                color: "#20c997",
-                icon: <FiCalendar size={16} />,
-              },
-              {
-                id: "has_leads",
-                label: "Converted to Leads",
-                color: "#0dcaf0",
-                icon: <FiTarget size={16} />,
-              },
-            ]}
-            activeFilter={activeFilter}
-            onFilterChange={handleFilterChange}
-            // searchValue={prospectsSearch}
-            // onSearchChange={(value) => {
-            //   setProspectsSearch(value);
-            // }}
-            // onSearch={() =>
-            //   handleFiltersChange({
-            //     ...currentFilters,
-            //     search: prospectsSearch,
-            //   })
-            // }
-            // searchPlaceholder="Search by name or phone..."
-            // showAdvancedFilters={showAdvancedFilters}
-            // onToggleAdvancedFilters={() =>
-            //   setShowAdvancedFilters(!showAdvancedFilters)
-            // }
-            // advancedFilterCount={
-            //   (companyFilters.assignedTo !== null ? 1 : 0) +
-            //   (companyFilters.campaigns !== null &&
-            //   companyFilters.campaigns.length > 0
-            //     ? 1
-            //     : 0) +
-            //   (companyFilters.nextCallScheduled !== null ? 1 : 0) +
-            //   (companyFilters.sourceFile !== null ? 1 : 0) +
-            //   (companyFilters.tags !== null &&
-            //   companyFilters.tags.length > 0
-            //     ? 1
-            //     : 0)
-            // }
-          />
-        )}
-
-        {/* Advanced Filters */}
-        {showAdvancedFilters &&
-          session?.user?.permissions?.includes("list-crm-data-management") && (
-            <Card className="border-0 shadow-sm mb-4">
-              <Card.Body>
-                <Row className="g-3 align-items-end">
-                  <Col md={4}>
-                    <Form.Label className="small fw-bold mb-2">
-                      Search
-                    </Form.Label>
-                    <Form.Control
-                      type="text"
-                      placeholder="Search by name or phone..."
-                      value={companySearch}
-                      onChange={(e) => setCompanySearch(e.target.value)}
+                  <Col xl={3} lg={4} md={6} className="mb-3">
+                    <KPICard
+                      title="Companies with No Calls Scheduled"
+                      value={metrics.not_scheduled_records}
+                      icon={<XCircle size={24} />}
+                      color="secondary"
                     />
                   </Col>
-                  <Col md={4}>
-                    <Form.Label className="small fw-bold mb-2">
-                      Assigned To
-                    </Form.Label>
-                    <Select
-                      options={extensions.map((ext: any) => ({
-                        value: ext.id || ext.extension,
-                        label:
-                          ext.display_name ||
-                          ext.name ||
-                          ext.id ||
-                          ext.extension,
-                      }))}
-                      value={
-                        companyFilters.assignedTo
-                          ? (() => {
-                              const assignedToId = companyFilters.assignedTo;
-                              const ext = extensions.find(
-                                (e: any) =>
-                                  (e.id || e.extension) === assignedToId
-                              );
-                              return ext
-                                ? {
-                                    value: assignedToId,
-                                    label:
-                                      ext.display_name ||
-                                      ext.name ||
-                                      assignedToId,
-                                  }
-                                : { value: assignedToId, label: assignedToId };
-                            })()
-                          : null
-                      }
-                      onChange={(selected) => {
-                        const assignedToValue = selected
-                          ? selected.value
-                          : null;
-                        setCompanyFilters((prev) => ({
-                          ...prev,
-                          assignedTo: assignedToValue,
-                        }));
-                        // Reset to all when assigned filter changes
-                        setActiveFilter("all");
-                      }}
-                      placeholder="Select user..."
-                      styles={customSelectStyles}
-                      isClearable
+                  <Col xl={3} lg={4} md={6} className="mb-3">
+                    <KPICard
+                      title="Meetings in Next Hour"
+                      value={metrics.scheduled_next_hour_records}
+                      icon={<ClockIcon size={24} />}
+                      color="info"
                     />
                   </Col>
-                  <Col md={4}>
-                    <Form.Label className="small fw-bold mb-2">
-                      Campaigns
-                    </Form.Label>
-                    <Select
-                      isMulti
-                      options={availableCampaigns.map((c) => ({
-                        value: c.value,
-                        label: c.label,
-                      }))}
-                      value={
-                        companyFilters.campaigns
-                          ? companyFilters.campaigns.map(
-                              (campaignId: string) => {
-                                const campaign = availableCampaigns.find(
-                                  (c: any) => c.value === campaignId
-                                );
-                                return campaign
-                                  ? { value: campaignId, label: campaign.label }
-                                  : { value: campaignId, label: campaignId };
-                              }
-                            )
-                          : null
-                      }
-                      onChange={(selected) => {
-                        const campaignValues = selected
-                          ? selected.map((s: any) => s.value)
-                          : null;
-                        setCompanyFilters((prev) => ({
-                          ...prev,
-                          campaigns: campaignValues,
-                        }));
-                        // Reset to all when campaign filter changes
-                        setActiveFilter("all");
-                      }}
-                      placeholder="Select campaigns..."
-                      styles={customSelectStyles}
-                      isClearable
-                    />
-                  </Col>
-                  <Col md={4}>
-                    <Form.Label className="small fw-bold mb-2">
-                      Next Call Scheduled
-                    </Form.Label>
-                    <Form.Select
-                      value={companyFilters.nextCallScheduled || ''}
-                      onChange={(e) => {
-                        const value = e.target.value || null;
-                        setCompanyFilters((prev) => ({
-                          ...prev,
-                          nextCallScheduled: value,
-                          nextCallDateFrom: null,
-                          nextCallDateTo: null,
-                        }));
-                        setActiveFilter("all");
-                      }}
-                    >
-                      <option value="">Select option...</option>
-                      <option value="today">Today</option>
-                      <option value="tomorrow">Tomorrow</option>
-                      <option value="this_week">This Week</option>
-                      <option value="next_week">Next Week</option>
-                      <option value="overdue">Overdue Calls</option>
-                      <option value="custom">Custom Date Range</option>
-                    </Form.Select>
-                  </Col>
-                  {companyFilters.nextCallScheduled === 'custom' && (
+                  {showAllCompanyStats && (
                     <>
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Next Call Date From
-                        </Form.Label>
-                        <Form.Control
-                          type="date"
-                          value={companyFilters.nextCallDateFrom || ''}
-                          onChange={(e) => {
-                            const dateValue = e.target.value || null;
-                            setCompanyFilters((prev) => ({
-                              ...prev,
-                              nextCallDateFrom: dateValue,
-                            }));
-                          }}
+                      <Col xl={3} lg={4} md={6} className="mb-3">
+                        <KPICard
+                          title="Meetings in Next 24h"
+                          value={metrics.scheduled_next_24_hours_records}
+                          icon={<Calendar size={24} />}
+                          color="warning"
                         />
                       </Col>
-                      <Col md={4}>
-                        <Form.Label className="small fw-bold mb-2">
-                          Next Call Date To
-                        </Form.Label>
-                        <Form.Control
-                          type="date"
-                          value={companyFilters.nextCallDateTo || ''}
-                          onChange={(e) => {
-                            const dateValue = e.target.value || null;
-                            setCompanyFilters((prev) => ({
-                              ...prev,
-                              nextCallDateTo: dateValue,
-                            }));
-                          }}
+
+                      <Col xl={3} lg={4} md={6} className="mb-3">
+                        <KPICard
+                          title=" Companies Assigned to Team Members"
+                          value={metrics.assigned_records}
+                          icon={<UserPlus size={24} />}
+                          color="primary"
+                        />
+                      </Col>
+                      <Col xl={3} lg={4} md={6} className="mb-3">
+                        <KPICard
+                          title="Companies Not Assigned to Team Members"
+                          value={metrics.unassigned_records}
+                          icon={<AlertCircleIcon size={24} />}
+                          color="warning"
                         />
                       </Col>
                     </>
                   )}
-                  <Col md={4}>
-                    <Form.Label className="small fw-bold mb-2">
-                      Source Name
-                    </Form.Label>
-                    <CreatableSelect
-                      options={uniqueSources}
-                      value={
-                        companyFilters.sourceFile
-                          ? { value: companyFilters.sourceFile, label: companyFilters.sourceFile }
-                          : null
-                      }
-                      onChange={(selected) => {
-                        const sourceValue = selected ? selected.value : null;
-                        setCompanyFilters((prev) => ({
-                          ...prev,
-                          sourceFile: sourceValue,
-                        }));
-                        setActiveFilter("all");
-                      }}
-                      placeholder="Select or create source..."
-                      styles={customSelectStyles}
-                      isClearable
-                    />
-                  </Col>
-                  <Col md={4}>
-                    <Form.Label className="small fw-bold mb-2">
-                      Tags
-                    </Form.Label>
-                    <Select
-                      isMulti
-                      options={availableTags.map((tag) => ({
-                        value: tag.value,
-                        label: tag.label,
-                      }))}
-                      value={
-                        companyFilters.tags
-                          ? companyFilters.tags.map((tagValue: string) => {
-                              const tag = availableTags.find((t: any) => t.value === tagValue);
-                              return tag
-                                ? { value: tagValue, label: tag.label }
-                                : { value: tagValue, label: tagValue };
-                            })
-                          : null
-                      }
-                      onChange={(selected) => {
-                        const tagValues = selected
-                          ? selected.map((s: any) => s.value)
-                          : null;
-                        setCompanyFilters((prev) => ({
-                          ...prev,
-                          tags: tagValues,
-                        }));
-                        setActiveFilter("all");
-                      }}
-                      placeholder="Select tags..."
-                      styles={customSelectStyles}
-                      isClearable
-                    />
-                  </Col>
-                  <Col md={4}>
-                    <div className="d-flex gap-2">
-                      <Button
-                        variant="outline-secondary"
-                        className="d-flex align-items-center justify-content-center"
-                        onClick={() => {
-                          // Map companyFilters to the format expected by handleFiltersChange
-                          const filtersToApply: Record<string, any> = {};
-                          
-                          if (companySearch) {
-                            filtersToApply.search = companySearch;
-                          }
-                          if (companyFilters.assignedTo) {
-                            filtersToApply.user_extension = [companyFilters.assignedTo];
-                          }
-                          if (companyFilters.campaigns && companyFilters.campaigns.length > 0) {
-                            filtersToApply.campaign_id = companyFilters.campaigns;
-                          }
-                          if (companyFilters.sourceFile) {
-                            filtersToApply.source_file = companyFilters.sourceFile;
-                          }
-                          if (companyFilters.tags && companyFilters.tags.length > 0) {
-                            filtersToApply.tags = companyFilters.tags;
-                          }
-                          
-                          // Handle next call scheduled filters
-                          const now = moment();
-                          if (companyFilters.nextCallScheduled === 'today') {
-                            const today = now.format('YYYY-MM-DD');
-                            filtersToApply.scheduled_call_from = today;
-                            filtersToApply.scheduled_call_to = today;
-                          } else if (companyFilters.nextCallScheduled === 'tomorrow') {
-                            const tomorrow = moment().add(1, 'day').format('YYYY-MM-DD');
-                            filtersToApply.scheduled_call_from = tomorrow;
-                            filtersToApply.scheduled_call_to = tomorrow;
-                          } else if (companyFilters.nextCallScheduled === 'this_week') {
-                            const startOfWeek = moment().startOf('week').format('YYYY-MM-DD');
-                            const endOfWeek = moment().endOf('week').format('YYYY-MM-DD');
-                            filtersToApply.scheduled_call_from = startOfWeek;
-                            filtersToApply.scheduled_call_to = endOfWeek;
-                          } else if (companyFilters.nextCallScheduled === 'next_week') {
-                            const nextWeekStart = moment().add(1, 'week').startOf('week').format('YYYY-MM-DD');
-                            const nextWeekEnd = moment().add(1, 'week').endOf('week').format('YYYY-MM-DD');
-                            filtersToApply.scheduled_call_from = nextWeekStart;
-                            filtersToApply.scheduled_call_to = nextWeekEnd;
-                          } else if (companyFilters.nextCallScheduled === 'overdue') {
-                            filtersToApply.scheduled_call_status = 'overdue';
-                          } else if (companyFilters.nextCallScheduled === 'custom') {
-                            if (companyFilters.nextCallDateFrom) {
-                              filtersToApply.scheduled_call_from = companyFilters.nextCallDateFrom;
-                            }
-                            if (companyFilters.nextCallDateTo) {
-                              filtersToApply.scheduled_call_to = companyFilters.nextCallDateTo;
-                            }
-                          }
-                          
-                          handleFiltersChange(filtersToApply);
-                          setPagination((prev) => ({
-                            ...prev,
-                            currentPage: 1,
-                          }));
-                          setRefreshKey((prev) => prev + 1);
-                        }}
-                      >
-                        Submit Filters
-                      </Button>
-                      <Button
-                        variant="outline-secondary"
-                        className="d-flex align-items-center justify-content-center"
-                        onClick={() => {
-                          setCompanySearch("");
-                          setCompanyFilters({
-                            assignedTo: null,
-                            campaigns: null,
-                            nextCallScheduled: null,
-                            nextCallDateFrom: null,
-                            nextCallDateTo: null,
-                            sourceFile: null,
-                            tags: null,
-                          });
-                          handleFiltersChange({});
-                          setCurrentFilters({});
-                          setActiveFilter("all");
-                          setPagination((prev) => ({
-                            ...prev,
-                            currentPage: 1,
-                          }));
-                          setRefreshKey((prev) => prev + 1);
-                        }}
-                      >
-                         Reset Filters
-                      </Button>
-                    </div>
-                  </Col>
                 </Row>
-              </Card.Body>
-            </Card>
-          )}
 
-        {/* Bulk Actions */}
-        {/* {selectedItems.length > 0 &&
+                <div className="text-center mb-4">
+                  <Button
+                    variant="link"
+                    onClick={() => setShowAllCompanyStats(!showAllCompanyStats)}
+                    className="text-decoration-none"
+                  >
+                    {showAllCompanyStats ? (
+                      <>
+                        <ArrowUp size={16} className="me-1" />
+                        Show Less
+                      </>
+                    ) : (
+                      <>
+                        <ArrowDown size={16} className="me-1" />
+                        Show More Stats
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {/* Filter Bar */}
+            {showFilterBar &&
+              session?.user?.permissions?.includes(
+                "list-crm-data-management",
+              ) && (
+                <FilterBar
+                  quickFilters={[
+                    {
+                      id: "all",
+                      label: "All Companies",
+                      color: "#0d6efd",
+                      icon: <Users size={16} />,
+                    },
+                    {
+                      id: "scheduled",
+                      label: "Scheduled",
+                      color: "#20c997",
+                      icon: <FiCalendar size={16} />,
+                    },
+                    {
+                      id: "has_leads",
+                      label: "Converted to Leads",
+                      color: "#0dcaf0",
+                      icon: <FiTarget size={16} />,
+                    },
+                  ]}
+                  activeFilter={activeFilter}
+                  onFilterChange={handleFilterChange}
+                  // searchValue={prospectsSearch}
+                  // onSearchChange={(value) => {
+                  //   setProspectsSearch(value);
+                  // }}
+                  // onSearch={() =>
+                  //   handleFiltersChange({
+                  //     ...currentFilters,
+                  //     search: prospectsSearch,
+                  //   })
+                  // }
+                  // searchPlaceholder="Search by name or phone..."
+                  // showAdvancedFilters={showAdvancedFilters}
+                  // onToggleAdvancedFilters={() =>
+                  //   setShowAdvancedFilters(!showAdvancedFilters)
+                  // }
+                  // advancedFilterCount={
+                  //   (companyFilters.assignedTo !== null ? 1 : 0) +
+                  //   (companyFilters.campaigns !== null &&
+                  //   companyFilters.campaigns.length > 0
+                  //     ? 1
+                  //     : 0) +
+                  //   (companyFilters.nextCallScheduled !== null ? 1 : 0) +
+                  //   (companyFilters.sourceFile !== null ? 1 : 0) +
+                  //   (companyFilters.tags !== null &&
+                  //   companyFilters.tags.length > 0
+                  //     ? 1
+                  //     : 0)
+                  // }
+                />
+              )}
+
+            {/* Advanced Filters */}
+            {showAdvancedFilters &&
+              session?.user?.permissions?.includes(
+                "list-crm-data-management",
+              ) && (
+                <Card className="border-0 shadow-sm mb-4">
+                  <Card.Body>
+                    <Row className="g-3 align-items-end">
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Search
+                        </Form.Label>
+                        <Form.Control
+                          type="text"
+                          placeholder="Search by name or phone..."
+                          value={companySearch}
+                          onChange={(e) => setCompanySearch(e.target.value)}
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Assigned To
+                        </Form.Label>
+                        <Select
+                          options={extensions.map((ext: any) => ({
+                            value: ext.id || ext.extension,
+                            label:
+                              ext.display_name ||
+                              ext.name ||
+                              ext.id ||
+                              ext.extension,
+                          }))}
+                          value={
+                            companyFilters.assignedTo
+                              ? (() => {
+                                  const assignedToId =
+                                    companyFilters.assignedTo;
+                                  const ext = extensions.find(
+                                    (e: any) =>
+                                      (e.id || e.extension) === assignedToId,
+                                  );
+                                  return ext
+                                    ? {
+                                        value: assignedToId,
+                                        label:
+                                          ext.display_name ||
+                                          ext.name ||
+                                          assignedToId,
+                                      }
+                                    : {
+                                        value: assignedToId,
+                                        label: assignedToId,
+                                      };
+                                })()
+                              : null
+                          }
+                          onChange={(selected) => {
+                            const assignedToValue = selected
+                              ? selected.value
+                              : null;
+                            setCompanyFilters((prev) => ({
+                              ...prev,
+                              assignedTo: assignedToValue,
+                            }));
+                            // Reset to all when assigned filter changes
+                            setActiveFilter("all");
+                          }}
+                          placeholder="Select user..."
+                          styles={customSelectStyles}
+                          isClearable
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Campaigns
+                        </Form.Label>
+                        <Select
+                          isMulti
+                          options={availableCampaigns.map((c) => ({
+                            value: c.value,
+                            label: c.label,
+                          }))}
+                          value={
+                            companyFilters.campaigns
+                              ? companyFilters.campaigns.map(
+                                  (campaignId: string) => {
+                                    const campaign = availableCampaigns.find(
+                                      (c: any) => c.value === campaignId,
+                                    );
+                                    return campaign
+                                      ? {
+                                          value: campaignId,
+                                          label: campaign.label,
+                                        }
+                                      : {
+                                          value: campaignId,
+                                          label: campaignId,
+                                        };
+                                  },
+                                )
+                              : null
+                          }
+                          onChange={(selected) => {
+                            const campaignValues = selected
+                              ? selected.map((s: any) => s.value)
+                              : null;
+                            setCompanyFilters((prev) => ({
+                              ...prev,
+                              campaigns: campaignValues,
+                            }));
+                            // Reset to all when campaign filter changes
+                            setActiveFilter("all");
+                          }}
+                          placeholder="Select campaigns..."
+                          styles={customSelectStyles}
+                          isClearable
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Next Call Scheduled
+                        </Form.Label>
+                        <Form.Select
+                          value={companyFilters.nextCallScheduled || ""}
+                          onChange={(e) => {
+                            const value = e.target.value || null;
+                            setCompanyFilters((prev) => ({
+                              ...prev,
+                              nextCallScheduled: value,
+                              nextCallDateFrom: null,
+                              nextCallDateTo: null,
+                            }));
+                            setActiveFilter("all");
+                          }}
+                        >
+                          <option value="">Select option...</option>
+                          <option value="today">Today</option>
+                          <option value="tomorrow">Tomorrow</option>
+                          <option value="this_week">This Week</option>
+                          <option value="next_week">Next Week</option>
+                          <option value="overdue">Overdue Calls</option>
+                          <option value="custom">Custom Date Range</option>
+                        </Form.Select>
+                      </Col>
+                      {companyFilters.nextCallScheduled === "custom" && (
+                        <>
+                          <Col md={4}>
+                            <Form.Label className="small fw-bold mb-2">
+                              Next Call Date From
+                            </Form.Label>
+                            <Form.Control
+                              type="date"
+                              value={companyFilters.nextCallDateFrom || ""}
+                              onChange={(e) => {
+                                const dateValue = e.target.value || null;
+                                setCompanyFilters((prev) => ({
+                                  ...prev,
+                                  nextCallDateFrom: dateValue,
+                                }));
+                              }}
+                            />
+                          </Col>
+                          <Col md={4}>
+                            <Form.Label className="small fw-bold mb-2">
+                              Next Call Date To
+                            </Form.Label>
+                            <Form.Control
+                              type="date"
+                              value={companyFilters.nextCallDateTo || ""}
+                              onChange={(e) => {
+                                const dateValue = e.target.value || null;
+                                setCompanyFilters((prev) => ({
+                                  ...prev,
+                                  nextCallDateTo: dateValue,
+                                }));
+                              }}
+                            />
+                          </Col>
+                        </>
+                      )}
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Source Name
+                        </Form.Label>
+                        <CreatableSelect
+                          options={uniqueSources}
+                          value={
+                            companyFilters.sourceFile
+                              ? {
+                                  value: companyFilters.sourceFile,
+                                  label: companyFilters.sourceFile,
+                                }
+                              : null
+                          }
+                          onChange={(selected) => {
+                            const sourceValue = selected
+                              ? selected.value
+                              : null;
+                            setCompanyFilters((prev) => ({
+                              ...prev,
+                              sourceFile: sourceValue,
+                            }));
+                            setActiveFilter("all");
+                          }}
+                          placeholder="Select or create source..."
+                          styles={customSelectStyles}
+                          isClearable
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Label className="small fw-bold mb-2">
+                          Tags
+                        </Form.Label>
+                        <Select
+                          isMulti
+                          options={availableTags.map((tag) => ({
+                            value: tag.value,
+                            label: tag.label,
+                          }))}
+                          value={
+                            companyFilters.tags
+                              ? companyFilters.tags.map((tagValue: string) => {
+                                  const tag = availableTags.find(
+                                    (t: any) => t.value === tagValue,
+                                  );
+                                  return tag
+                                    ? { value: tagValue, label: tag.label }
+                                    : { value: tagValue, label: tagValue };
+                                })
+                              : null
+                          }
+                          onChange={(selected) => {
+                            const tagValues = selected
+                              ? selected.map((s: any) => s.value)
+                              : null;
+                            setCompanyFilters((prev) => ({
+                              ...prev,
+                              tags: tagValues,
+                            }));
+                            setActiveFilter("all");
+                          }}
+                          placeholder="Select tags..."
+                          styles={customSelectStyles}
+                          isClearable
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <div className="d-flex gap-2">
+                          <Button
+                            variant="outline-secondary"
+                            className="d-flex align-items-center justify-content-center"
+                            onClick={() => {
+                              // Map companyFilters to the format expected by handleFiltersChange
+                              const filtersToApply: Record<string, any> = {};
+
+                              if (companySearch) {
+                                filtersToApply.search = companySearch;
+                              }
+                              if (companyFilters.assignedTo) {
+                                filtersToApply.user_extension = [
+                                  companyFilters.assignedTo,
+                                ];
+                              }
+                              if (
+                                companyFilters.campaigns &&
+                                companyFilters.campaigns.length > 0
+                              ) {
+                                filtersToApply.campaign_id =
+                                  companyFilters.campaigns;
+                              }
+                              if (companyFilters.sourceFile) {
+                                filtersToApply.source_file =
+                                  companyFilters.sourceFile;
+                              }
+                              if (
+                                companyFilters.tags &&
+                                companyFilters.tags.length > 0
+                              ) {
+                                filtersToApply.tags = companyFilters.tags;
+                              }
+
+                              // Handle next call scheduled filters
+                              const now = moment();
+                              if (
+                                companyFilters.nextCallScheduled === "today"
+                              ) {
+                                const today = now.format("YYYY-MM-DD");
+                                filtersToApply.scheduled_call_from = today;
+                                filtersToApply.scheduled_call_to = today;
+                              } else if (
+                                companyFilters.nextCallScheduled === "tomorrow"
+                              ) {
+                                const tomorrow = moment()
+                                  .add(1, "day")
+                                  .format("YYYY-MM-DD");
+                                filtersToApply.scheduled_call_from = tomorrow;
+                                filtersToApply.scheduled_call_to = tomorrow;
+                              } else if (
+                                companyFilters.nextCallScheduled === "this_week"
+                              ) {
+                                const startOfWeek = moment()
+                                  .startOf("week")
+                                  .format("YYYY-MM-DD");
+                                const endOfWeek = moment()
+                                  .endOf("week")
+                                  .format("YYYY-MM-DD");
+                                filtersToApply.scheduled_call_from =
+                                  startOfWeek;
+                                filtersToApply.scheduled_call_to = endOfWeek;
+                              } else if (
+                                companyFilters.nextCallScheduled === "next_week"
+                              ) {
+                                const nextWeekStart = moment()
+                                  .add(1, "week")
+                                  .startOf("week")
+                                  .format("YYYY-MM-DD");
+                                const nextWeekEnd = moment()
+                                  .add(1, "week")
+                                  .endOf("week")
+                                  .format("YYYY-MM-DD");
+                                filtersToApply.scheduled_call_from =
+                                  nextWeekStart;
+                                filtersToApply.scheduled_call_to = nextWeekEnd;
+                              } else if (
+                                companyFilters.nextCallScheduled === "overdue"
+                              ) {
+                                filtersToApply.scheduled_call_status =
+                                  "overdue";
+                              } else if (
+                                companyFilters.nextCallScheduled === "custom"
+                              ) {
+                                if (companyFilters.nextCallDateFrom) {
+                                  filtersToApply.scheduled_call_from =
+                                    companyFilters.nextCallDateFrom;
+                                }
+                                if (companyFilters.nextCallDateTo) {
+                                  filtersToApply.scheduled_call_to =
+                                    companyFilters.nextCallDateTo;
+                                }
+                              }
+
+                              handleFiltersChange(filtersToApply);
+                              setPagination((prev) => ({
+                                ...prev,
+                                currentPage: 1,
+                              }));
+                              setRefreshKey((prev) => prev + 1);
+                            }}
+                          >
+                            Submit Filters
+                          </Button>
+                          <Button
+                            variant="outline-secondary"
+                            className="d-flex align-items-center justify-content-center"
+                            onClick={() => {
+                              setCompanySearch("");
+                              setCompanyFilters({
+                                assignedTo: null,
+                                campaigns: null,
+                                nextCallScheduled: null,
+                                nextCallDateFrom: null,
+                                nextCallDateTo: null,
+                                sourceFile: null,
+                                tags: null,
+                              });
+                              handleFiltersChange({});
+                              setCurrentFilters({});
+                              setActiveFilter("all");
+                              setPagination((prev) => ({
+                                ...prev,
+                                currentPage: 1,
+                              }));
+                              setRefreshKey((prev) => prev + 1);
+                            }}
+                          >
+                            Reset Filters
+                          </Button>
+                        </div>
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
+              )}
+
+            {/* Bulk Actions */}
+            {/* {selectedItems.length > 0 &&
           session?.user?.permissions?.includes(
             "delete-crm-data-management"
           ) && (
@@ -4188,1330 +5041,1887 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
             </div>
           )} */}
 
-        {/* Companies Table */}
-        <div className="companies-table-wrapper" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <GenericTable
-  data={dataList}
-  columns={companyColumns.filter((c) => selectedColumns.includes(c.key))}
-  actions={companyActions}
-  showActions={false}
-  
-  // Selection
-  selectable={session?.user?.permissions?.includes("delete-crm-data-management")}
-  selectedRows={dataList.filter(item => selectedItems.includes(item.id))}
-  onSelectionChange={(selected) => {
-    setSelectedItems(selected.map(item => item.id));
-    setClearSelectedRows(false);
-  }}
-  
-  // Column customization
-  // customizableColumns={true}
-  // defaultSelectedColumns={defaultSelectedColumns}
-  // columnStorageKey="crmDataSelectedColumns"
-  
-  // Pagination
-  pagination={{
-    currentPage: pagination.currentPage,
-    rowsPerPage: pagination.rowsPerPage,
-    totalRows: totalRecords,
-    pageSizeOptions: [10, 15, 25, 50, 100]
-  }}
-  onPaginationChange={(page, rowsPerPage) => {
-    setPagination({
-      ...pagination,
-      currentPage: page,
-      rowsPerPage
-    });
-  }}
-  
-  // Sorting
-  sortable={true}
-  defaultSortColumn={pagination.sortColumn}
-  defaultSortDirection={pagination.sortDirection}
-  onSort={(column, direction) => {
-    setPagination({
-      ...pagination,
-      sortColumn: column,
-      sortDirection: direction
-    });
-  }}
-  
-  // Row interactions
-  onPreviewClick={(row) => handlePreviewClick(row)}
-  onFirstColumnClick={(row) => handleFirstColumnClick(row)}
-  onRowDoubleClick={(row) => {
-    if (session?.user?.permissions?.includes("view-crm-data-management")) {
-      handleViewData(row);
-    }
-  }}
-  
-  // Loading & styling
-  loading={loading}
-  emptyMessage="No companies found matching your criteria"
-  loadingMessage="Loading companies..."
-  hover={true}
-  uniqueKey="id"
-  
-  // Fixed height mode
-  fixedHeight={true}
-  maxHeight="calc(100vh - 345px)"
-  
-  // Toolbar
-  showToolbar={true}
-  toolbar={{
-    // Tabs
-    showTabs: true,
-    tabsDropdownLabel: "Companies",
-    tabs: [
-      { id: 'all', label: 'All companies', count: totalAllCompanies, removable: false },
-      ...customTabs.map(tab =>
-        tab.id === 'has_leads'
-          ? { ...tab, count: activeFilter === 'has_leads' && !loading ? totalRecords : undefined }
-          : tab
-      )
-    ],
-    activeTab: activeFilter,
-    onTabChange: handleFilterChange,
-    onTabAdd: () => setShowTabModal(true),
-    onTabRemove: (tabId) => {
-      setCustomTabs(tabs => tabs.filter(t => t.id !== tabId));
-      if (activeFilter === tabId) {
-        handleFilterChange('all');
-      }
-    },
-    
-    // Search
-    showSearch: true,
-    searchValue: companySearch,
-    searchPlaceholder: "Search companies...",
-    onSearchChange: (value) => {
-      setCompanySearch(value);
-      // Clear search on empty value
-      if (!value) {
-        const newFilters = { ...currentFilters };
-        delete newFilters.search;
-        handleFiltersChange(newFilters);
-        setRefreshKey((prev) => prev + 1);
-      }
-    },
-    onSearch: () => {
-      if (companySearch) {
-        handleFiltersChange({
-          ...currentFilters,
-          search: companySearch
-        });
-        setRefreshKey((prev) => prev + 1);
-      }
-    },
-    
-    // Actions
-    showTableViewDropdown: true,
-    tableViewLabel: "Table view",
-    showViewSwitcher: true,
-    showEditColumns: true,
-    onEditColumnsClick: () => setShowColumnEditor(true),
-    showPipelineDropdown: true,
-    pipelineLabel: "All Pipelines",
-    showFiltersButton: true,
-    onFiltersClick: handleOpenFiltersSidebar,
-    showSortButton: true,
-    showExportButton: true,
-    onExportClick: () => setShowExportModal(true),
-    showSaveButton: true,
-    onSaveClick: () => console.log('Save view'),
-    
-    // Filter Pills
-    filterPills: [
-      { 
-        id: 'company_owner', 
-        label: 'Company owner', 
-        showDropdown: true,
-        dropdownOptions: [
-          { label: 'All Owners', value: 'all', onClick: () => {
-            const newFilters = { ...currentFilters };
-            delete newFilters.user_extension;
-            handleFiltersChange(newFilters);
-            setRefreshKey((prev) => prev + 1);
-          }},
-          ...extensions.map(ext => ({
-            label: ext.name || ext.extension,
-            value: ext.extension,
-            onClick: () => {
-              handleFiltersChange({ ...currentFilters, user_extension: ext.extension });
-              setRefreshKey((prev) => prev + 1);
-            }
-          }))
-        ]
-      },
-      { 
-        id: 'create_date', 
-        label: 'Create date', 
-        showDropdown: true,
-        dropdownOptions: [
-          { label: 'All Time', value: 'all', onClick: () => {
-            const newFilters = { ...currentFilters };
-            delete newFilters.created_at_from;
-            delete newFilters.created_at_to;
-            handleFiltersChange(newFilters);
-            setRefreshKey((prev) => prev + 1);
-          }},
-          { label: 'Today', value: 'today', onClick: () => {
-            const today = moment().format('YYYY-MM-DD');
-            handleFiltersChange({ ...currentFilters, created_at_from: today, created_at_to: today });
-            setRefreshKey((prev) => prev + 1);
-          }},
-          { label: 'Last 7 Days', value: 'week', onClick: () => {
-            const from = moment().subtract(7, 'days').format('YYYY-MM-DD');
-            const to = moment().format('YYYY-MM-DD');
-            handleFiltersChange({ ...currentFilters, created_at_from: from, created_at_to: to });
-            setRefreshKey((prev) => prev + 1);
-          }},
-          { label: 'Last 30 Days', value: 'month', onClick: () => {
-            const from = moment().subtract(30, 'days').format('YYYY-MM-DD');
-            const to = moment().format('YYYY-MM-DD');
-            handleFiltersChange({ ...currentFilters, created_at_from: from, created_at_to: to });
-            setRefreshKey((prev) => prev + 1);
-          }}
-        ]
-      },
-      { 
-        id: 'last_activity', 
-        label: 'Last activity date', 
-        showDropdown: true,
-        dropdownOptions: [
-          { label: 'All Time', value: 'all', onClick: () => {
-            const newFilters = { ...currentFilters };
-            delete newFilters.last_called_at_from;
-            delete newFilters.last_called_at_to;
-            handleFiltersChange(newFilters);
-            setRefreshKey((prev) => prev + 1);
-          }},
-          { label: 'Today', value: 'today', onClick: () => {
-            const today = moment().format('YYYY-MM-DD');
-            handleFiltersChange({ ...currentFilters, last_called_at_from: today, last_called_at_to: today });
-            setRefreshKey((prev) => prev + 1);
-          }},
-          { label: 'Last 7 Days', value: 'week', onClick: () => {
-            const from = moment().subtract(7, 'days').format('YYYY-MM-DD');
-            const to = moment().format('YYYY-MM-DD');
-            handleFiltersChange({ ...currentFilters, last_called_at_from: from, last_called_at_to: to });
-            setRefreshKey((prev) => prev + 1);
-          }},
-          { label: 'Last 30 Days', value: 'month', onClick: () => {
-            const from = moment().subtract(30, 'days').format('YYYY-MM-DD');
-            const to = moment().format('YYYY-MM-DD');
-            handleFiltersChange({ ...currentFilters, last_called_at_from: from, last_called_at_to: to });
-            setRefreshKey((prev) => prev + 1);
-          }}
-        ]
-      },
-      { 
-        id: 'lead_status', 
-        label: 'Lead Status', 
-        showDropdown: true,
-        dropdownOptions: [
-          { label: 'All Status', value: 'all', onClick: () => {
-            const newFilters = { ...currentFilters };
-            delete newFilters.disposition;
-            handleFiltersChange(newFilters);
-            setRefreshKey((prev) => prev + 1);
-          }},
-          { label: 'Hot Lead', value: 'hot_lead', onClick: () => {
-            handleFiltersChange({ ...currentFilters, disposition: 'hot_lead' });
-            setRefreshKey((prev) => prev + 1);
-          }},
-          { label: 'Warm Lead', value: 'warm_lead', onClick: () => {
-            handleFiltersChange({ ...currentFilters, disposition: 'warm_lead' });
-            setRefreshKey((prev) => prev + 1);
-          }},
-          { label: 'Cold Lead', value: 'cold_lead', onClick: () => {
-            handleFiltersChange({ ...currentFilters, disposition: 'cold_lead' });
-            setRefreshKey((prev) => prev + 1);
-          }},
-          { label: 'Qualified', value: 'qualified', onClick: () => {
-            handleFiltersChange({ ...currentFilters, disposition: 'qualified' });
-            setRefreshKey((prev) => prev + 1);
-          }},
-          { label: 'Not Interested', value: 'not_interested', onClick: () => {
-            handleFiltersChange({ ...currentFilters, disposition: 'not_interested' });
-            setRefreshKey((prev) => prev + 1);
-          }}
-        ]
-      },
-    ],
-    showAdvancedFilters: true,
-    onAdvancedFiltersClick: handleOpenFiltersSidebar,
-
-    // Right-aligned custom actions
-    rightActions: renderAddContactsButton()
-  }}
-  
-  // Stats cards for metrics
-  statsCards={companyStatsCards}
-/>
-        </div>
-      </div>
-
-      {/* Upload Modal */}
-      {session?.user?.permissions?.includes("add-crm-data-management") && (
-        <Modal
-          show={showUploadModal}
-          onHide={() => setShowUploadModal(false)}
-          size="lg"
-          centered
-        >
-          <Modal.Header closeButton className="border-bottom bg-light">
-            <Modal.Title>Import Companies</Modal.Title>
-          </Modal.Header>
-          <Modal.Body className="p-4">
-            <div className="alert alert-info mb-4">
-              <AlertCircleIcon size={18} className="me-2" />
-              <strong>📋 Import Guidelines:</strong>
-              <ul className="mb-0 mt-2">
-                <li>
-                  <strong>Headers:</strong> First row must contain column
-                  headers
-                </li>
-                <li>
-                  <strong>Name Column:</strong> Include a "name" column (case
-                  insensitive) for first name and last name, or use separate
-                  "first name" and "last name" columns
-                </li>
-                <li>
-                  <strong>Phone Column:</strong> Include a "phone" column (case
-                  insensitive) for contact information. Phone must follow the
-                  E.164 format. (e.g., +14155552671)
-                </li>
-                <li>
-                  <strong>Email Column:</strong> Include a "email" column for contact information. Email must be a valid email address.
-                </li>
-                <li>
-                  <strong>File Size:</strong> Maximum 2MB per file
-                </li>
-                <li>
-                  <strong>Formats:</strong> CSV files supported
-                </li>
-                <li>
-                  <strong>Data Quality:</strong> Clean, valid data imports
-                  faster and works better
-                </li>
-              </ul>
-            </div>
-            <Form>
-              <Form.Group className="mb-3">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <Form.Label className="fw-semibold mb-0">
-                    Select CSV File <span className="text-danger">*</span>
-                  </Form.Label>
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    onClick={downloadExampleCsv}
-                    className="d-flex align-items-center gap-1"
-                  >
-                    <Download size={14} />
-                    Download Example CSV
-                  </Button>
-                </div>
-                <Form.Control
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileInputChange}
-                />
-                <Form.Text className="text-muted">
-                  Supported formats: CSV
-                </Form.Text>
-              </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Tags (Optional)</Form.Label>
-                <CreatableSelect
-                  isMulti
-                  value={fieldTags}
-                  onChange={(selected) => setFieldTags(selected || [])}
-                  options={availableTags}
-                  placeholder="Add tags to organize and filter this data..."
-                  styles={{
-                    control: (base) => ({
-                      ...base,
-                      borderColor: "#ced4da",
-                      boxShadow: "none",
-                      fontSize: "14px",
-                    }),
-                  }}
-                />
-                <Form.Text className="text-muted">
-                  Add descriptive tags to help categorize and filter your data
-                  later. You can create new tags by typing them.
-                </Form.Text>
-              </Form.Group>
-              <div className="alert alert-warning">
-                <small>
-                  <strong>Note:</strong> The data will be uploaded even if some
-                  fields remain empty.
-                </small>
-              </div>
-            </Form>
-          </Modal.Body>
-          <Modal.Footer className="border-top">
-            <Button
-              variant="secondary"
-              onClick={() => setShowUploadModal(false)}
+            {/* Companies Table */}
+            <div
+              className="companies-table-wrapper"
+              style={{
+                flex: 1,
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+              }}
             >
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={() => handleUpload()}>
-              <Download size={16} className="me-2" />
-              Upload & Import
-            </Button>
-          </Modal.Footer>
-        </Modal>
-      )}
+              <GenericTable
+                data={dataList}
+                columns={companyColumns.filter((c) =>
+                  selectedColumns.includes(c.key),
+                )}
+                actions={companyActions}
+                showActions={false}
+                // Selection
+                selectable={session?.user?.permissions?.includes(
+                  "delete-crm-data-management",
+                )}
+                selectedRows={dataList.filter((item) =>
+                  selectedItems.includes(item.id),
+                )}
+                onSelectionChange={(selected) => {
+                  setSelectedItems(selected.map((item) => item.id));
+                  setClearSelectedRows(false);
+                }}
+                // Column customization
+                // customizableColumns={true}
+                // defaultSelectedColumns={defaultSelectedColumns}
+                // columnStorageKey="crmDataSelectedColumns"
 
-      {/* View Data Modal - Redesigned */}
-      {selectedDataItem && (
-      <Modal
-      show={showViewModal}
-      onHide={() => setShowViewModal(false)}
-      size="xl"
-      centered
-      className="prospect-view-modal"
-    >
-      {/* Modern Header with Gradient */}
-      <div
-        style={{
-          background: "#fff",
-          color: "black",
-          padding: "24px 32px",
-          position: "relative",
-          borderTopLeftRadius: "12px",
-          borderTopRightRadius: "12px",
-          boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-          borderBottom: "1px solid #ccc",
-        }}
-      >
-        <button
-          onClick={() => setShowViewModal(false)}
-          style={{
-            position: "absolute",
-            top: "16px",
-            right: "16px",
-            background: "rgba(255,255,255,0.15)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255,255,255,0.2)",
-            color: "black",
-            width: "32px",
-            height: "32px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-            e.currentTarget.style.transform = "scale(1.05)";
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-            e.currentTarget.style.transform = "scale(1)";
-          }}
-        >
-          <X size={18} />
-        </button>
-        
-        {/* Header Content */}
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <div
-            style={{
-              width: "64px",
-              height: "64px",
-              borderRadius: "16px",
-              background: "#2563eb",
-              backdropFilter: "blur(10px)",
-              border: "2px solid rgba(255,255,255,0.3)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "28px",
-              fontWeight: "700",
-              flexShrink: 0,
-              color: "#fff",
-            }}
-          >
-            {selectedDataItem.name
-              ? selectedDataItem.name.charAt(0).toUpperCase()
-              : "P"}
+                // Pagination
+                pagination={{
+                  currentPage: pagination.currentPage,
+                  rowsPerPage: pagination.rowsPerPage,
+                  totalRows: totalRecords,
+                  pageSizeOptions: [10, 15, 25, 50, 100],
+                }}
+                onPaginationChange={(page, rowsPerPage) => {
+                  setPagination({
+                    ...pagination,
+                    currentPage: page,
+                    rowsPerPage,
+                  });
+                }}
+                // Sorting
+                sortable={true}
+                defaultSortColumn={pagination.sortColumn}
+                defaultSortDirection={pagination.sortDirection}
+                onSort={(column, direction) => {
+                  setPagination({
+                    ...pagination,
+                    sortColumn: column,
+                    sortDirection: direction,
+                  });
+                }}
+                // Row interactions
+                onPreviewClick={(row) => handlePreviewClick(row)}
+                onFirstColumnClick={(row) => handleFirstColumnClick(row)}
+                onRowDoubleClick={(row) => {
+                  if (
+                    session?.user?.permissions?.includes(
+                      "view-crm-data-management",
+                    )
+                  ) {
+                    handleViewData(row);
+                  }
+                }}
+                // Loading & styling
+                loading={loading}
+                emptyMessage="No companies found matching your criteria"
+                loadingMessage="Loading companies..."
+                hover={true}
+                uniqueKey="id"
+                // Fixed height mode
+                fixedHeight={true}
+                maxHeight="calc(100vh - 345px)"
+                // Toolbar
+                showToolbar={true}
+                toolbar={{
+                  // Tabs
+                  showTabs: true,
+                  tabsDropdownLabel: "Companies",
+                  tabs: [
+                    {
+                      id: "all",
+                      label: "All companies",
+                      count: totalAllCompanies,
+                      removable: false,
+                    },
+                    ...customTabs.map((tab) =>
+                      tab.id === "has_leads"
+                        ? {
+                            ...tab,
+                            count:
+                              activeFilter === "has_leads" && !loading
+                                ? totalRecords
+                                : undefined,
+                          }
+                        : tab,
+                    ),
+                  ],
+                  activeTab: activeFilter,
+                  onTabChange: handleFilterChange,
+                  onTabAdd: () => setShowTabModal(true),
+                  onTabRemove: (tabId) => {
+                    setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
+                    if (activeFilter === tabId) {
+                      handleFilterChange("all");
+                    }
+                  },
+
+                  // Search
+                  showSearch: true,
+                  searchValue: companySearch,
+                  searchPlaceholder: "Search companies...",
+                  onSearchChange: (value) => {
+                    setCompanySearch(value);
+                    // Clear search on empty value
+                    if (!value) {
+                      const newFilters = { ...currentFilters };
+                      delete newFilters.search;
+                      handleFiltersChange(newFilters);
+                      setRefreshKey((prev) => prev + 1);
+                    }
+                  },
+                  onSearch: () => {
+                    if (companySearch) {
+                      handleFiltersChange({
+                        ...currentFilters,
+                        search: companySearch,
+                      });
+                      setRefreshKey((prev) => prev + 1);
+                    }
+                  },
+
+                  // Actions
+                  showTableViewDropdown: true,
+                  tableViewLabel: "Table view",
+                  showViewSwitcher: true,
+                  showEditColumns: true,
+                  onEditColumnsClick: () => setShowColumnEditor(true),
+                  showPipelineDropdown: true,
+                  pipelineLabel: "All Pipelines",
+                  showFiltersButton: true,
+                  onFiltersClick: handleOpenFiltersSidebar,
+                  showSortButton: true,
+                  showExportButton: true,
+                  onExportClick: () => setShowExportModal(true),
+                  showSaveButton: true,
+                  onSaveClick: () => console.log("Save view"),
+
+                  // Filter Pills
+                  filterPills: [
+                    {
+                      id: "company_owner",
+                      label: "Company owner",
+                      showDropdown: true,
+                      dropdownOptions: [
+                        {
+                          label: "All Owners",
+                          value: "all",
+                          onClick: () => {
+                            const newFilters = { ...currentFilters };
+                            delete newFilters.user_extension;
+                            handleFiltersChange(newFilters);
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        ...extensions.map((ext) => ({
+                          label: ext.name || ext.extension,
+                          value: ext.extension,
+                          onClick: () => {
+                            handleFiltersChange({
+                              ...currentFilters,
+                              user_extension: ext.extension,
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        })),
+                      ],
+                    },
+                    {
+                      id: "create_date",
+                      label: "Create date",
+                      showDropdown: true,
+                      dropdownOptions: [
+                        {
+                          label: "All Time",
+                          value: "all",
+                          onClick: () => {
+                            const newFilters = { ...currentFilters };
+                            delete newFilters.created_at_from;
+                            delete newFilters.created_at_to;
+                            handleFiltersChange(newFilters);
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Today",
+                          value: "today",
+                          onClick: () => {
+                            const today = moment().format("YYYY-MM-DD");
+                            handleFiltersChange({
+                              ...currentFilters,
+                              created_at_from: today,
+                              created_at_to: today,
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Last 7 Days",
+                          value: "week",
+                          onClick: () => {
+                            const from = moment()
+                              .subtract(7, "days")
+                              .format("YYYY-MM-DD");
+                            const to = moment().format("YYYY-MM-DD");
+                            handleFiltersChange({
+                              ...currentFilters,
+                              created_at_from: from,
+                              created_at_to: to,
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Last 30 Days",
+                          value: "month",
+                          onClick: () => {
+                            const from = moment()
+                              .subtract(30, "days")
+                              .format("YYYY-MM-DD");
+                            const to = moment().format("YYYY-MM-DD");
+                            handleFiltersChange({
+                              ...currentFilters,
+                              created_at_from: from,
+                              created_at_to: to,
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      id: "last_activity",
+                      label: "Last activity date",
+                      showDropdown: true,
+                      dropdownOptions: [
+                        {
+                          label: "All Time",
+                          value: "all",
+                          onClick: () => {
+                            const newFilters = { ...currentFilters };
+                            delete newFilters.last_called_at_from;
+                            delete newFilters.last_called_at_to;
+                            handleFiltersChange(newFilters);
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Today",
+                          value: "today",
+                          onClick: () => {
+                            const today = moment().format("YYYY-MM-DD");
+                            handleFiltersChange({
+                              ...currentFilters,
+                              last_called_at_from: today,
+                              last_called_at_to: today,
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Last 7 Days",
+                          value: "week",
+                          onClick: () => {
+                            const from = moment()
+                              .subtract(7, "days")
+                              .format("YYYY-MM-DD");
+                            const to = moment().format("YYYY-MM-DD");
+                            handleFiltersChange({
+                              ...currentFilters,
+                              last_called_at_from: from,
+                              last_called_at_to: to,
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Last 30 Days",
+                          value: "month",
+                          onClick: () => {
+                            const from = moment()
+                              .subtract(30, "days")
+                              .format("YYYY-MM-DD");
+                            const to = moment().format("YYYY-MM-DD");
+                            handleFiltersChange({
+                              ...currentFilters,
+                              last_called_at_from: from,
+                              last_called_at_to: to,
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      id: "lead_status",
+                      label: "Lead Status",
+                      showDropdown: true,
+                      dropdownOptions: [
+                        {
+                          label: "All Status",
+                          value: "all",
+                          onClick: () => {
+                            const newFilters = { ...currentFilters };
+                            delete newFilters.disposition;
+                            handleFiltersChange(newFilters);
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Hot Lead",
+                          value: "hot_lead",
+                          onClick: () => {
+                            handleFiltersChange({
+                              ...currentFilters,
+                              disposition: "hot_lead",
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Warm Lead",
+                          value: "warm_lead",
+                          onClick: () => {
+                            handleFiltersChange({
+                              ...currentFilters,
+                              disposition: "warm_lead",
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Cold Lead",
+                          value: "cold_lead",
+                          onClick: () => {
+                            handleFiltersChange({
+                              ...currentFilters,
+                              disposition: "cold_lead",
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Qualified",
+                          value: "qualified",
+                          onClick: () => {
+                            handleFiltersChange({
+                              ...currentFilters,
+                              disposition: "qualified",
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                        {
+                          label: "Not Interested",
+                          value: "not_interested",
+                          onClick: () => {
+                            handleFiltersChange({
+                              ...currentFilters,
+                              disposition: "not_interested",
+                            });
+                            setRefreshKey((prev) => prev + 1);
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  showAdvancedFilters: true,
+                  onAdvancedFiltersClick: handleOpenFiltersSidebar,
+
+                  // Right-aligned custom actions
+                  rightActions: renderAddContactsButton(),
+                }}
+                // Stats cards for metrics
+                statsCards={companyStatsCards}
+              />
+            </div>
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ 
-              margin: 0, 
-              fontWeight: 700, 
-              fontSize: "26px",
-              textShadow: "0 2px 4px rgba(0,0,0,0.1)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}>
-              {selectedDataItem.name || `Company #${selectedDataItem.id}`}
-            </h2>
-            <div style={{ 
-              marginTop: "6px", 
-              opacity: 0.95, 
-              fontSize: "14px",
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              flexWrap: "wrap",
-              color: "#000",
-            }}>
-              <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <PhoneIcon size={14} />
-                {selectedDataItem.phone || "No phone"}
-              </span>
-              <span>•</span>
-              <span>
-                Added {selectedDataItem.created_at
-                  ? moment(selectedDataItem.created_at).format("MMM DD, YYYY")
-                  : "N/A"}
-              </span>
-              {selectedDataItem.is_viewed && (
-                <>
-                  <span>•</span>
-                  <Badge 
-                    bg="light" 
-                    text="dark"
+
+          {/* Upload Modal */}
+          {session?.user?.permissions?.includes("add-crm-data-management") && (
+            <Modal
+              show={showUploadModal}
+              onHide={() => setShowUploadModal(false)}
+              size="lg"
+              centered
+            >
+              <Modal.Header closeButton className="border-bottom bg-light">
+                <Modal.Title>Import Companies</Modal.Title>
+              </Modal.Header>
+              <Modal.Body className="p-4">
+                <div className="alert alert-info mb-4">
+                  <AlertCircleIcon size={18} className="me-2" />
+                  <strong>📋 Import Guidelines:</strong>
+                  <ul className="mb-0 mt-2">
+                    <li>
+                      <strong>Headers:</strong> First row must contain column
+                      headers
+                    </li>
+                    <li>
+                      <strong>Name Column:</strong> Include a "name" column
+                      (case insensitive) for first name and last name, or use
+                      separate "first name" and "last name" columns
+                    </li>
+                    <li>
+                      <strong>Phone Column:</strong> Include a "phone" column
+                      (case insensitive) for contact information. Phone must
+                      follow the E.164 format. (e.g., +14155552671)
+                    </li>
+                    <li>
+                      <strong>Email Column:</strong> Include a "email" column
+                      for contact information. Email must be a valid email
+                      address.
+                    </li>
+                    <li>
+                      <strong>File Size:</strong> Maximum 2MB per file
+                    </li>
+                    <li>
+                      <strong>Formats:</strong> CSV files supported
+                    </li>
+                    <li>
+                      <strong>Data Quality:</strong> Clean, valid data imports
+                      faster and works better
+                    </li>
+                  </ul>
+                </div>
+                <Form>
+                  <Form.Group className="mb-3">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <Form.Label className="fw-semibold mb-0">
+                        Select CSV File <span className="text-danger">*</span>
+                      </Form.Label>
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={downloadExampleCsv}
+                        className="d-flex align-items-center gap-1"
+                      >
+                        <Download size={14} />
+                        Download Example CSV
+                      </Button>
+                    </div>
+                    <Form.Control
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileInputChange}
+                    />
+                    <Form.Text className="text-muted">
+                      Supported formats: CSV
+                    </Form.Text>
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-semibold">
+                      Tags (Optional)
+                    </Form.Label>
+                    <CreatableSelect
+                      isMulti
+                      value={fieldTags}
+                      onChange={(selected) => setFieldTags(selected || [])}
+                      options={availableTags}
+                      placeholder="Add tags to organize and filter this data..."
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderColor: "#ced4da",
+                          boxShadow: "none",
+                          fontSize: "14px",
+                        }),
+                      }}
+                    />
+                    <Form.Text className="text-muted">
+                      Add descriptive tags to help categorize and filter your
+                      data later. You can create new tags by typing them.
+                    </Form.Text>
+                  </Form.Group>
+                  <div className="alert alert-warning">
+                    <small>
+                      <strong>Note:</strong> The data will be uploaded even if
+                      some fields remain empty.
+                    </small>
+                  </div>
+                </Form>
+              </Modal.Body>
+              <Modal.Footer className="border-top">
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowUploadModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button variant="primary" onClick={() => handleUpload()}>
+                  <Download size={16} className="me-2" />
+                  Upload & Import
+                </Button>
+              </Modal.Footer>
+            </Modal>
+          )}
+
+          {/* View Data Modal - Redesigned */}
+          {selectedDataItem && (
+            <Modal
+              show={showViewModal}
+              onHide={() => setShowViewModal(false)}
+              size="xl"
+              centered
+              className="prospect-view-modal"
+            >
+              {/* Modern Header with Gradient */}
+              <div
+                style={{
+                  background: "#fff",
+                  color: "black",
+                  padding: "24px 32px",
+                  position: "relative",
+                  borderTopLeftRadius: "12px",
+                  borderTopRightRadius: "12px",
+                  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+                  borderBottom: "1px solid #ccc",
+                }}
+              >
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  style={{
+                    position: "absolute",
+                    top: "16px",
+                    right: "16px",
+                    background: "rgba(255,255,255,0.15)",
+                    backdropFilter: "blur(10px)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    color: "black",
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+                    e.currentTarget.style.transform = "scale(1.05)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                >
+                  <X size={18} />
+                </button>
+
+                {/* Header Content */}
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "16px" }}
+                >
+                  <div
                     style={{
-                      background: "rgba(255,255,255,0.25)",
-                      border: "1px solid rgba(255,255,255,0.3)",
-                      color: "white",
-                      fontWeight: 500,
+                      width: "64px",
+                      height: "64px",
+                      borderRadius: "16px",
+                      background: "#2563eb",
+                      backdropFilter: "blur(10px)",
+                      border: "2px solid rgba(255,255,255,0.3)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "28px",
+                      fontWeight: "700",
+                      flexShrink: 0,
+                      color: "#fff",
                     }}
                   >
-                    Viewed
-                  </Badge>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <Modal.Body style={{ padding: 0, maxHeight: "calc(90vh - 200px)", overflowY: "auto" }}>
-        {/* Main Content Grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", minHeight: "500px" }}>
-          
-          {/* Left Panel - Main Information */}
-          <div style={{ padding: "32px", borderRight: "1px solid #e5e7eb" }}>
-            
-            {/* Quick Info Cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px", marginBottom: "28px" }}>
-              <div
-                style={{
-                  background: "#f9fafb",
-                  border: "1px solid #e5e7eb",
-                  padding: "20px",
-                  borderRadius: "12px",
-                  transition: "all 0.3s ease",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = "translateY(-4px)";
-                  e.currentTarget.style.boxShadow = "0 8px 16px rgba(102, 126, 234, 0.15)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "none";
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <div style={{
-                    width: "44px",
-                    height: "44px",
-                    borderRadius: "10px",
-                    background: "#2563eb",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}>
-                    <User size={20} style={{ color: "white" }} />
+                    {selectedDataItem.name
+                      ? selectedDataItem.name.charAt(0).toUpperCase()
+                      : "P"}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      color: "#2563eb",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.8px",
-                      marginBottom: "4px",
-                    }}>
-                      Assigned Agent
-                    </div>
-                    <div style={{
-                      fontSize: "15px",
-                      color: "#1f2937",
-                      fontWeight: 600,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}>
-                      {selectedDataItem.user_extension
-                        ? extensions.find(
-                            (extension: any) =>
-                              extension.id.toString() ===
-                              selectedDataItem.user_extension?.toString()
-                          )?.display_name || selectedDataItem.user_extension
-                        : "Unassigned"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  background: "#f9fafb",
-                  border: "1px solid #f093fb30",
-                  padding: "20px",
-                  borderRadius: "12px",
-                  transition: "all 0.3s ease",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = "translateY(-4px)";
-                  e.currentTarget.style.boxShadow = "0 8px 16px rgba(240, 147, 251, 0.15)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "none";
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <div style={{
-                    width: "44px",
-                    height: "44px",
-                    borderRadius: "10px",
-                    background: "#0284c7",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}>
-                    <Target size={20} style={{ color: "white" }} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      color: "#f5576c",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.8px",
-                      marginBottom: "4px",
-                    }}>
-                      Campaign
-                    </div>
-                    <div style={{
-                      fontSize: "15px",
-                      color: "#1f2937",
-                      fontWeight: 600,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}>
-                      {availableCampaigns.find(
-                        (c) => c.value === selectedDataItem.campaign_id?.toString()
-                      )?.label || "No Campaign"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Contact Information Section */}
-            <div style={{ marginBottom: "28px" }}>
-              <h5 style={{
-                fontSize: "15px",
-                fontWeight: 700,
-                color: "#1f2937",
-                marginBottom: "16px",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}>
-                <div style={{
-                  width: "4px",
-                  height: "18px",
-                  background: "linear-gradient(135deg, #f093fb15 0%, #f5576c15 100%)",
-                  borderRadius: "2px",
-                }} />
-                Contact Details
-              </h5>
-              <div style={{
-                background: "#f9fafb",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "20px",
-              }}>
-                <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
-                    <PhoneIcon size={16} style={{ color: "#2563eb" }} />
-                    Phone
-                  </div>
-                  <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
-                    {selectedDataItem.phone || "N/A"}
-                  </div>
-                  
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
-                    <Calendar size={16} style={{ color: "#2563eb" }} />
-                    Created
-                  </div>
-                  <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
-                    {selectedDataItem.created_at
-                      ? moment(selectedDataItem.created_at).format("MMMM DD, YYYY [at] hh:mm A")
-                      : "N/A"}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Call Note Section */}
-            {selectedDataItem?.note && (
-              <div style={{ marginBottom: "28px" }}>
-                <h5 style={{
-                  fontSize: "15px",
-                  fontWeight: 700,
-                  color: "#1f2937",
-                  marginBottom: "16px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}>
-                  <div style={{
-                    width: "4px",
-                    height: "18px",
-                    background: "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                    borderRadius: "2px",
-                  }} />
-                  Call Notes
-                </h5>
-                <div style={{
-                  background: "#fffbeb",
-                  border: "1px solid #fcd34d",
-                  borderRadius: "12px",
-                  padding: "16px 20px",
-                  fontSize: "14px",
-                  color: "#78350f",
-                  lineHeight: "1.6",
-                }}>
-                  {selectedDataItem.note}
-                </div>
-              </div>
-            )}
-
-            {/* Custom Data Fields Section */}
-            {selectedDataItem.data &&
-              Object.keys(selectedDataItem.data).length > 0 && (
-                <div style={{ marginBottom: "28px" }}>
-                  <h5 style={{
-                    fontSize: "15px",
-                    fontWeight: 700,
-                    color: "#1f2937",
-                    marginBottom: "16px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}>
-                    <div style={{
-                      width: "4px",
-                      height: "18px",
-                      background: "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                      borderRadius: "2px",
-                    }} />
-                    Additional Information
-                  </h5>
-                  <div style={{
-                    background: "#f9fafb",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "12px",
-                    padding: "20px",
-                  }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
-                      {Object.entries(selectedDataItem.data).map(
-                        ([key, value]) => (
-                          <div key={key}>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              {key
-                                .replace(/_/g, " ")
-                                .replace(/\b\w/g, (l) => l.toUpperCase())}
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
+                    <h2
+                      style={{
+                        margin: 0,
+                        fontWeight: 700,
+                        fontSize: "26px",
+                        textShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {selectedDataItem.name ||
+                        `Company #${selectedDataItem.id}`}
+                    </h2>
+                    <div
+                      style={{
+                        marginTop: "6px",
+                        opacity: 0.95,
+                        fontSize: "14px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        flexWrap: "wrap",
+                        color: "#000",
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                      >
+                        <PhoneIcon size={14} />
+                        {selectedDataItem.phone || "No phone"}
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Added{" "}
+                        {selectedDataItem.created_at
+                          ? moment(selectedDataItem.created_at).format(
+                              "MMM DD, YYYY",
+                            )
+                          : "N/A"}
+                      </span>
+                      {selectedDataItem.is_viewed && (
+                        <>
+                          <span>•</span>
+                          <Badge
+                            bg="light"
+                            text="dark"
+                            style={{
+                              background: "rgba(255,255,255,0.25)",
+                              border: "1px solid rgba(255,255,255,0.3)",
+                              color: "white",
                               fontWeight: 500,
-                              wordBreak: "break-word",
-                            }}>
-                              {value !== null && value !== undefined
-                                ? typeof value === "object"
-                                  ? JSON.stringify(value)
-                                  : String(value)
-                                : "N/A"}
-                            </div>
-                          </div>
-                        )
+                            }}
+                          >
+                            Viewed
+                          </Badge>
+                        </>
                       )}
                     </div>
                   </div>
                 </div>
-              )}
-
-
-
-            {/* Call Recordings Section */}
-            <div style={{ marginBottom: "20px" }}>
-              <h5 style={{
-                fontSize: "15px",
-                fontWeight: 700,
-                color: "#1f2937",
-                marginBottom: "16px",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}>
-                <div style={{
-                  width: "4px",
-                  height: "18px",
-                  background: "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                  borderRadius: "2px",
-                }} />
-                Call Recordings
-                <Badge 
-                  bg="secondary"
-                  style={{
-                    marginLeft: "8px",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    padding: "4px 10px",
-                    borderRadius: "6px",
-                  }}
-                >
-                  {callRecordingsTotal > 0 ? callRecordingsTotal : callRecordings.length}
-                </Badge>
-              </h5>
-
-              {callRecordingsLoading ? (
-                <div style={{
-                  padding: "48px 20px",
-                  background: "#f9fafb",
-                  borderRadius: "12px",
-                  textAlign: "center",
-                }}>
-                  <Spinner animation="border" variant="primary" size="sm" style={{ marginBottom: "12px" }} />
-                  <p className="mb-0" style={{ color: "#6b7280", fontSize: "14px" }}>Loading recordings...</p>
-                </div>
-              ) : callRecordings.length === 0 ? (
-                <div style={{
-                  padding: "48px 20px",
-                  background: "#f9fafb",
-                  border: "2px dashed #d1d5db",
-                  borderRadius: "12px",
-                  textAlign: "center",
-                }}>
-                  <History size={40} style={{ color: "#9ca3af", marginBottom: "12px" }} />
-                  <p className="mb-0" style={{ color: "#6b7280", fontSize: "14px", fontWeight: 500 }}>
-                    No call recordings found
-                  </p>
-                </div>
-              ) : (
-                <div style={{
-                  background: "white",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "12px",
-                  overflow: "hidden",
-                }}>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                      <thead>
-                        <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                          <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                            Date & Time
-                          </th>
-                          <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                            Extension
-                          </th>
-                          <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                            Direction
-                          </th>
-                          <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                            Duration
-                          </th>
-                          <th style={{ padding: "12px 16px", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", width: "100px" }}>
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {callRecordings.map((recording: any, index: number) => {
-                          const duration =
-                            parseInt(recording.Duration?.toString() || "0") / 10000000 || 0;
-                          const isDownloading = downloadingRecordings.has(recording.Id);
-                          const progress = downloadProgress[recording.Id] || 0;
-                          const isOutgoing = recording.Direction === "CALL_OUTGOING";
-                          
-                          return (
-                            <tr 
-                              key={recording.Id || index}
-                              style={{
-                                borderBottom: "1px solid #f3f4f6",
-                                transition: "background 0.2s ease",
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.background = "#f9fafb";
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.background = "white";
-                              }}
-                            >
-                              <td style={{ padding: "14px 16px" }}>
-                                <div style={{ fontSize: "13px", color: "#1f2937", fontWeight: 500 }}>
-                                  {formatDateTimeToLocal(
-                                    recording.DateTime,
-                                    GlobalDateFormat
-                                  )}
-                                </div>
-                                <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>
-                                  {formatDateTimeToLocal(
-                                    recording.DateTime,
-                                    GlobalTimeFormat,
-                                    "YYYY-MM-DD HH:mm:ss.SSSSSSS"
-                                  )}
-                                </div>
-                              </td>
-                              <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937", fontWeight: 500 }}>
-                                {recording.AgentExtension || "N/A"}
-                              </td>
-                              <td style={{ padding: "14px 16px" }}>
-                                <span style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "6px",
-                                  padding: "4px 10px",
-                                  borderRadius: "6px",
-                                  fontSize: "12px",
-                                  fontWeight: 600,
-                                  background: isOutgoing ? "#dbeafe" : "#d1fae5",
-                                  color: isOutgoing ? "#1e40af" : "#065f46",
-                                }}>
-                                  {isOutgoing ? "Outgoing" : "Incoming"}
-                                </span>
-                              </td>
-                              <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937", fontWeight: 500 }}>
-                                {formatDuration(duration)}
-                              </td>
-                              <td style={{ padding: "14px 16px" }}>
-                                <div style={{ display: "flex", gap: "8px", alignItems: "center", justifyContent: "center" }}>
-                                  <button
-                                    style={{
-                                      background: "transparent",
-                                      border: "none",
-                                      color: "#2563eb",
-                                      cursor: "pointer",
-                                      padding: "6px",
-                                      borderRadius: "6px",
-                                      transition: "all 0.2s ease",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                    }}
-                                    title="Play Recording"
-                                    onClick={() => handlePlayCallRecording(recording)}
-                                    onMouseOver={(e) => {
-                                      e.currentTarget.style.background = "#ede9fe";
-                                    }}
-                                    onMouseOut={(e) => {
-                                      e.currentTarget.style.background = "transparent";
-                                    }}
-                                  >
-                                    <FiPlay size={16} />
-                                  </button>
-                                  {isDownloading ? (
-                                    <CircularProgressCircle 
-                                      progress={progress}
-                                      size="small" 
-                                      color="#28a745"
-                                      backgroundColor="#e9ecef"
-                                      textColor="#495057"
-                                      showPercentage={false}
-                                      className="circular-progress-inline"
-                                    />
-                                  ) : (
-                                    <button
-                                      style={{
-                                        background: "transparent",
-                                        border: "none",
-                                        color: "#2563eb",
-                                        cursor: "pointer",
-                                        padding: "6px",
-                                        borderRadius: "6px",
-                                        transition: "all 0.2s ease",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                      }}
-                                      title="Download Recording"
-                                      onClick={() => handleDownloadCallRecording(recording)}
-                                      onMouseOver={(e) => {
-                                        e.currentTarget.style.background = "#ede9fe";
-                                      }}
-                                      onMouseOut={(e) => {
-                                        e.currentTarget.style.background = "transparent";
-                                      }}
-                                    >
-                                      <Download size={16} />
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Panel - Quick Actions & Timeline */}
-          <div style={{ 
-            padding: "32px 24px", 
-            background: "#fafbfc",
-            display: "flex",
-            flexDirection: "column",
-            gap: "24px",
-          }}>
-            
-            {/* Quick Actions */}
-            <div>
-              <h6 style={{
-                fontSize: "13px",
-                fontWeight: 700,
-                color: "#6b7280",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-                marginBottom: "14px",
-              }}>
-                Quick Actions
-              </h6>
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                <button
-                  style={{
-                    background: "white",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "10px",
-                    padding: "12px 16px",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    color: "#1f2937",
-                  }}
-                  onClick={() => {
-                    // Handle call action
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.borderColor = "#2563eb";
-                    e.currentTarget.style.background = "#eff6ff";
-                    e.currentTarget.style.transform = "translateX(4px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.borderColor = "#e5e7eb";
-                    e.currentTarget.style.background = "white";
-                    e.currentTarget.style.transform = "translateX(0)";
-                  }}
-                >
-                  <div style={{
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "8px",
-                    background: "#2563eb",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}>
-                    <PhoneIcon size={16} style={{ color: "white" }} />
-                  </div>
-                  Call Prospect
-                </button>
-                
-                <button
-                  style={{
-                    background: "white",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "10px",
-                    padding: "12px 16px",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                    color: "#1f2937",
-                  }}
-                  onClick={() => {
-                    // Handle message action
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.borderColor = "#2563eb";
-                    e.currentTarget.style.background = "#eff6ff";
-                    e.currentTarget.style.transform = "translateX(4px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.borderColor = "#e5e7eb";
-                    e.currentTarget.style.background = "white";
-                    e.currentTarget.style.transform = "translateX(0)";
-                  }}
-                >
-                  <div style={{
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "8px",
-                    background: "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}>
-                    <Mail size={16} style={{ color: "white" }} />
-                  </div>
-                  Send Message
-                </button>
               </div>
-            </div>
 
-            {/* Status Overview */}
-            <div>
-              <h6 style={{
-                fontSize: "13px",
-                fontWeight: 700,
-                color: "#6b7280",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-                marginBottom: "14px",
-              }}>
-                Status Overview
-              </h6>
-              <div style={{
-                background: "white",
-                border: "1px solid #e5e7eb",
-                borderRadius: "10px",
-                padding: "16px",
-              }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
-                      Status
-                    </span>
-                    <Badge 
-                      bg={selectedDataItem.is_viewed ? "success" : "primary"}
+              <Modal.Body
+                style={{
+                  padding: 0,
+                  maxHeight: "calc(90vh - 200px)",
+                  overflowY: "auto",
+                }}
+              >
+                {/* Main Content Grid */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 360px",
+                    minHeight: "500px",
+                  }}
+                >
+                  {/* Left Panel - Main Information */}
+                  <div
+                    style={{
+                      padding: "32px",
+                      borderRight: "1px solid #e5e7eb",
+                    }}
+                  >
+                    {/* Quick Info Cards */}
+                    <div
                       style={{
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        padding: "4px 10px",
-                        borderRadius: "6px",
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, 1fr)",
+                        gap: "16px",
+                        marginBottom: "28px",
                       }}
                     >
-                      {selectedDataItem.is_viewed ? "Viewed" : "New"}
-                    </Badge>
-                  </div>
-                  
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
-                      Total Calls
-                    </span>
-                    <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
-                      {callRecordings.length}
-                    </span>
-                  </div>
-                  
-                  {selectedDataItem.scheduled_call_at && (
-                    <div style={{ 
-                      marginTop: "8px",
-                      paddingTop: "14px",
-                      borderTop: "1px solid #f3f4f6",
-                    }}>
-                      <div style={{ 
-                        display: "flex", 
-                        alignItems: "center", 
-                        gap: "8px",
-                        marginBottom: "6px",
-                      }}>
-                        <Calendar size={14} style={{ color: "#2563eb" }} />
-                        <span style={{ fontSize: "12px", color: "#6b7280", fontWeight: 600 }}>
-                          Scheduled Call
-                        </span>
-                      </div>
-                      <div style={{ fontSize: "13px", color: "#1f2937", fontWeight: 500, marginLeft: "22px" }}>
-                        {moment(selectedDataItem.scheduled_call_at).format("MMM DD, YYYY [at] hh:mm A")}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Activity Timeline */}
-            <div style={{ flex: 1 }}>
-              <h6 style={{
-                fontSize: "13px",
-                fontWeight: 700,
-                color: "#6b7280",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-                marginBottom: "14px",
-              }}>
-                Recent Activity
-              </h6>
-              <div style={{
-                background: "white",
-                border: "1px solid #e5e7eb",
-                borderRadius: "10px",
-                padding: "16px",
-                maxHeight: "300px",
-                overflowY: "auto",
-              }}>
-                {callRecordings.length > 0 ? (
-                  <div style={{ position: "relative" }}>
-                    {/* Timeline line */}
-                    <div style={{
-                      position: "absolute",
-                      left: "7px",
-                      top: "8px",
-                      bottom: "8px",
-                      width: "2px",
-                      background: "#e5e7eb",
-                    }} />
-                    
-                    {callRecordings.slice(0, 5).map((recording: any, index: number) => {
-                      const isOutgoing = recording.Direction === "CALL_OUTGOING";
-                      return (
-                        <div 
-                          key={recording.Id || index}
-                          style={{ 
-                            position: "relative",
-                            paddingLeft: "28px",
-                            paddingBottom: index < Math.min(callRecordings.length, 5) - 1 ? "16px" : "0",
+                      <div
+                        style={{
+                          background: "#f9fafb",
+                          border: "1px solid #e5e7eb",
+                          padding: "20px",
+                          borderRadius: "12px",
+                          transition: "all 0.3s ease",
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = "translateY(-4px)";
+                          e.currentTarget.style.boxShadow =
+                            "0 8px 16px rgba(102, 126, 234, 0.15)";
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
                           }}
                         >
-                          {/* Timeline dot */}
-                          <div style={{
-                            position: "absolute",
-                            left: "0",
-                            top: "4px",
-                            width: "16px",
-                            height: "16px",
-                            borderRadius: "50%",
-                            background: isOutgoing ? "#2563eb" : "#10b981",
-                            border: "3px solid white",
-                            boxShadow: "0 0 0 1px #e5e7eb",
-                          }} />
-                          
-                          <div>
-                            <div style={{ fontSize: "12px", color: "#1f2937", fontWeight: 600, marginBottom: "4px" }}>
-                              {isOutgoing ? "Outgoing Call" : "Incoming Call"}
+                          <div
+                            style={{
+                              width: "44px",
+                              height: "44px",
+                              borderRadius: "10px",
+                              background: "#2563eb",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <User size={20} style={{ color: "white" }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                color: "#2563eb",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.8px",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              Assigned Agent
                             </div>
-                            <div style={{ fontSize: "11px", color: "#6b7280" }}>
-                              {moment(recording.DateTime).format("MMM DD, hh:mm A")}
+                            <div
+                              style={{
+                                fontSize: "15px",
+                                color: "#1f2937",
+                                fontWeight: 600,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {selectedDataItem.user_extension
+                                ? extensions.find(
+                                    (extension: any) =>
+                                      extension.id.toString() ===
+                                      selectedDataItem.user_extension?.toString(),
+                                  )?.display_name ||
+                                  selectedDataItem.user_extension
+                                : "Unassigned"}
                             </div>
                           </div>
                         </div>
-                      );
-                    })}
-                    
-                    {callRecordings.length > 5 && (
-                      <div style={{
-                        textAlign: "center",
-                        marginTop: "12px",
-                        paddingTop: "12px",
-                        borderTop: "1px solid #f3f4f6",
-                      }}>
-                        <span style={{ fontSize: "12px", color: "#2563eb", fontWeight: 600 }}>
-                          +{callRecordings.length - 5} more activities
-                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          background: "#f9fafb",
+                          border: "1px solid #f093fb30",
+                          padding: "20px",
+                          borderRadius: "12px",
+                          transition: "all 0.3s ease",
+                        }}
+                        onMouseOver={(e) => {
+                          e.currentTarget.style.transform = "translateY(-4px)";
+                          e.currentTarget.style.boxShadow =
+                            "0 8px 16px rgba(240, 147, 251, 0.15)";
+                        }}
+                        onMouseOut={(e) => {
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: "44px",
+                              height: "44px",
+                              borderRadius: "10px",
+                              background: "#0284c7",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Target size={20} style={{ color: "white" }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                color: "#f5576c",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.8px",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              Campaign
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "15px",
+                                color: "#1f2937",
+                                fontWeight: 600,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {availableCampaigns.find(
+                                (c) =>
+                                  c.value ===
+                                  selectedDataItem.campaign_id?.toString(),
+                              )?.label || "No Campaign"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Contact Information Section */}
+                    <div style={{ marginBottom: "28px" }}>
+                      <h5
+                        style={{
+                          fontSize: "15px",
+                          fontWeight: 700,
+                          color: "#1f2937",
+                          marginBottom: "16px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "4px",
+                            height: "18px",
+                            background:
+                              "linear-gradient(135deg, #f093fb15 0%, #f5576c15 100%)",
+                            borderRadius: "2px",
+                          }}
+                        />
+                        Contact Details
+                      </h5>
+                      <div
+                        style={{
+                          background: "#f9fafb",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "12px",
+                          padding: "20px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "140px 1fr",
+                            gap: "16px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              color: "#6b7280",
+                              fontSize: "14px",
+                              fontWeight: 600,
+                            }}
+                          >
+                            <PhoneIcon size={16} style={{ color: "#2563eb" }} />
+                            Phone
+                          </div>
+                          <div
+                            style={{
+                              color: "#1f2937",
+                              fontSize: "15px",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {selectedDataItem.phone || "N/A"}
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              color: "#6b7280",
+                              fontSize: "14px",
+                              fontWeight: 600,
+                            }}
+                          >
+                            <Calendar size={16} style={{ color: "#2563eb" }} />
+                            Created
+                          </div>
+                          <div
+                            style={{
+                              color: "#1f2937",
+                              fontSize: "15px",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {selectedDataItem.created_at
+                              ? moment(selectedDataItem.created_at).format(
+                                  "MMMM DD, YYYY [at] hh:mm A",
+                                )
+                              : "N/A"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Call Note Section */}
+                    {selectedDataItem?.note && (
+                      <div style={{ marginBottom: "28px" }}>
+                        <h5
+                          style={{
+                            fontSize: "15px",
+                            fontWeight: 700,
+                            color: "#1f2937",
+                            marginBottom: "16px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: "4px",
+                              height: "18px",
+                              background:
+                                "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
+                              borderRadius: "2px",
+                            }}
+                          />
+                          Call Notes
+                        </h5>
+                        <div
+                          style={{
+                            background: "#fffbeb",
+                            border: "1px solid #fcd34d",
+                            borderRadius: "12px",
+                            padding: "16px 20px",
+                            fontSize: "14px",
+                            color: "#78350f",
+                            lineHeight: "1.6",
+                          }}
+                        >
+                          {selectedDataItem.note}
+                        </div>
                       </div>
                     )}
+
+                    {/* Custom Data Fields Section */}
+                    {selectedDataItem.data &&
+                      Object.keys(selectedDataItem.data).length > 0 && (
+                        <div style={{ marginBottom: "28px" }}>
+                          <h5
+                            style={{
+                              fontSize: "15px",
+                              fontWeight: 700,
+                              color: "#1f2937",
+                              marginBottom: "16px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "4px",
+                                height: "18px",
+                                background:
+                                  "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
+                                borderRadius: "2px",
+                              }}
+                            />
+                            Additional Information
+                          </h5>
+                          <div
+                            style={{
+                              background: "#f9fafb",
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "12px",
+                              padding: "20px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                gap: "16px 24px",
+                              }}
+                            >
+                              {Object.entries(selectedDataItem.data).map(
+                                ([key, value]) => (
+                                  <div key={key}>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        color: "#6b7280",
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.5px",
+                                        marginBottom: "6px",
+                                      }}
+                                    >
+                                      {key
+                                        .replace(/_/g, " ")
+                                        .replace(/\b\w/g, (l) =>
+                                          l.toUpperCase(),
+                                        )}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "#1f2937",
+                                        fontWeight: 500,
+                                        wordBreak: "break-word",
+                                      }}
+                                    >
+                                      {value !== null && value !== undefined
+                                        ? typeof value === "object"
+                                          ? JSON.stringify(value)
+                                          : String(value)
+                                        : "N/A"}
+                                    </div>
+                                  </div>
+                                ),
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Call Recordings Section */}
+                    <div style={{ marginBottom: "20px" }}>
+                      <h5
+                        style={{
+                          fontSize: "15px",
+                          fontWeight: 700,
+                          color: "#1f2937",
+                          marginBottom: "16px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "4px",
+                            height: "18px",
+                            background:
+                              "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
+                            borderRadius: "2px",
+                          }}
+                        />
+                        Call Recordings
+                        <Badge
+                          bg="secondary"
+                          style={{
+                            marginLeft: "8px",
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            padding: "4px 10px",
+                            borderRadius: "6px",
+                          }}
+                        >
+                          {callRecordingsTotal > 0
+                            ? callRecordingsTotal
+                            : callRecordings.length}
+                        </Badge>
+                      </h5>
+
+                      {callRecordingsLoading ? (
+                        <div
+                          style={{
+                            padding: "48px 20px",
+                            background: "#f9fafb",
+                            borderRadius: "12px",
+                            textAlign: "center",
+                          }}
+                        >
+                          <Spinner
+                            animation="border"
+                            variant="primary"
+                            size="sm"
+                            style={{ marginBottom: "12px" }}
+                          />
+                          <p
+                            className="mb-0"
+                            style={{ color: "#6b7280", fontSize: "14px" }}
+                          >
+                            Loading recordings...
+                          </p>
+                        </div>
+                      ) : callRecordings.length === 0 ? (
+                        <div
+                          style={{
+                            padding: "48px 20px",
+                            background: "#f9fafb",
+                            border: "2px dashed #d1d5db",
+                            borderRadius: "12px",
+                            textAlign: "center",
+                          }}
+                        >
+                          <History
+                            size={40}
+                            style={{ color: "#9ca3af", marginBottom: "12px" }}
+                          />
+                          <p
+                            className="mb-0"
+                            style={{
+                              color: "#6b7280",
+                              fontSize: "14px",
+                              fontWeight: 500,
+                            }}
+                          >
+                            No call recordings found
+                          </p>
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            background: "white",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "12px",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div style={{ overflowX: "auto" }}>
+                            <table
+                              style={{
+                                width: "100%",
+                                borderCollapse: "collapse",
+                              }}
+                            >
+                              <thead>
+                                <tr
+                                  style={{
+                                    background: "#f9fafb",
+                                    borderBottom: "1px solid #e5e7eb",
+                                  }}
+                                >
+                                  <th
+                                    style={{
+                                      padding: "12px 16px",
+                                      textAlign: "left",
+                                      fontSize: "11px",
+                                      fontWeight: 700,
+                                      color: "#6b7280",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.5px",
+                                    }}
+                                  >
+                                    Date & Time
+                                  </th>
+                                  <th
+                                    style={{
+                                      padding: "12px 16px",
+                                      textAlign: "left",
+                                      fontSize: "11px",
+                                      fontWeight: 700,
+                                      color: "#6b7280",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.5px",
+                                    }}
+                                  >
+                                    Extension
+                                  </th>
+                                  <th
+                                    style={{
+                                      padding: "12px 16px",
+                                      textAlign: "left",
+                                      fontSize: "11px",
+                                      fontWeight: 700,
+                                      color: "#6b7280",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.5px",
+                                    }}
+                                  >
+                                    Direction
+                                  </th>
+                                  <th
+                                    style={{
+                                      padding: "12px 16px",
+                                      textAlign: "left",
+                                      fontSize: "11px",
+                                      fontWeight: 700,
+                                      color: "#6b7280",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.5px",
+                                    }}
+                                  >
+                                    Duration
+                                  </th>
+                                  <th
+                                    style={{
+                                      padding: "12px 16px",
+                                      textAlign: "center",
+                                      fontSize: "11px",
+                                      fontWeight: 700,
+                                      color: "#6b7280",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.5px",
+                                      width: "100px",
+                                    }}
+                                  >
+                                    Actions
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {callRecordings.map(
+                                  (recording: any, index: number) => {
+                                    const duration =
+                                      parseInt(
+                                        recording.Duration?.toString() || "0",
+                                      ) / 10000000 || 0;
+                                    const isDownloading =
+                                      downloadingRecordings.has(recording.Id);
+                                    const progress =
+                                      downloadProgress[recording.Id] || 0;
+                                    const isOutgoing =
+                                      recording.Direction === "CALL_OUTGOING";
+
+                                    return (
+                                      <tr
+                                        key={recording.Id || index}
+                                        style={{
+                                          borderBottom: "1px solid #f3f4f6",
+                                          transition: "background 0.2s ease",
+                                        }}
+                                        onMouseOver={(e) => {
+                                          e.currentTarget.style.background =
+                                            "#f9fafb";
+                                        }}
+                                        onMouseOut={(e) => {
+                                          e.currentTarget.style.background =
+                                            "white";
+                                        }}
+                                      >
+                                        <td style={{ padding: "14px 16px" }}>
+                                          <div
+                                            style={{
+                                              fontSize: "13px",
+                                              color: "#1f2937",
+                                              fontWeight: 500,
+                                            }}
+                                          >
+                                            {formatDateTimeToLocal(
+                                              recording.DateTime,
+                                              GlobalDateFormat,
+                                            )}
+                                          </div>
+                                          <div
+                                            style={{
+                                              fontSize: "12px",
+                                              color: "#6b7280",
+                                              marginTop: "2px",
+                                            }}
+                                          >
+                                            {formatDateTimeToLocal(
+                                              recording.DateTime,
+                                              GlobalTimeFormat,
+                                              "YYYY-MM-DD HH:mm:ss.SSSSSSS",
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td
+                                          style={{
+                                            padding: "14px 16px",
+                                            fontSize: "13px",
+                                            color: "#1f2937",
+                                            fontWeight: 500,
+                                          }}
+                                        >
+                                          {recording.AgentExtension || "N/A"}
+                                        </td>
+                                        <td style={{ padding: "14px 16px" }}>
+                                          <span
+                                            style={{
+                                              display: "inline-flex",
+                                              alignItems: "center",
+                                              gap: "6px",
+                                              padding: "4px 10px",
+                                              borderRadius: "6px",
+                                              fontSize: "12px",
+                                              fontWeight: 600,
+                                              background: isOutgoing
+                                                ? "#dbeafe"
+                                                : "#d1fae5",
+                                              color: isOutgoing
+                                                ? "#1e40af"
+                                                : "#065f46",
+                                            }}
+                                          >
+                                            {isOutgoing
+                                              ? "Outgoing"
+                                              : "Incoming"}
+                                          </span>
+                                        </td>
+                                        <td
+                                          style={{
+                                            padding: "14px 16px",
+                                            fontSize: "13px",
+                                            color: "#1f2937",
+                                            fontWeight: 500,
+                                          }}
+                                        >
+                                          {formatDuration(duration)}
+                                        </td>
+                                        <td style={{ padding: "14px 16px" }}>
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              gap: "8px",
+                                              alignItems: "center",
+                                              justifyContent: "center",
+                                            }}
+                                          >
+                                            <button
+                                              style={{
+                                                background: "transparent",
+                                                border: "none",
+                                                color: "#2563eb",
+                                                cursor: "pointer",
+                                                padding: "6px",
+                                                borderRadius: "6px",
+                                                transition: "all 0.2s ease",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                              }}
+                                              title="Play Recording"
+                                              onClick={() =>
+                                                handlePlayCallRecording(
+                                                  recording,
+                                                )
+                                              }
+                                              onMouseOver={(e) => {
+                                                e.currentTarget.style.background =
+                                                  "#ede9fe";
+                                              }}
+                                              onMouseOut={(e) => {
+                                                e.currentTarget.style.background =
+                                                  "transparent";
+                                              }}
+                                            >
+                                              <FiPlay size={16} />
+                                            </button>
+                                            {isDownloading ? (
+                                              <CircularProgressCircle
+                                                progress={progress}
+                                                size="small"
+                                                color="#28a745"
+                                                backgroundColor="#e9ecef"
+                                                textColor="#495057"
+                                                showPercentage={false}
+                                                className="circular-progress-inline"
+                                              />
+                                            ) : (
+                                              <button
+                                                style={{
+                                                  background: "transparent",
+                                                  border: "none",
+                                                  color: "#2563eb",
+                                                  cursor: "pointer",
+                                                  padding: "6px",
+                                                  borderRadius: "6px",
+                                                  transition: "all 0.2s ease",
+                                                  display: "flex",
+                                                  alignItems: "center",
+                                                  justifyContent: "center",
+                                                }}
+                                                title="Download Recording"
+                                                onClick={() =>
+                                                  handleDownloadCallRecording(
+                                                    recording,
+                                                  )
+                                                }
+                                                onMouseOver={(e) => {
+                                                  e.currentTarget.style.background =
+                                                    "#ede9fe";
+                                                }}
+                                                onMouseOut={(e) => {
+                                                  e.currentTarget.style.background =
+                                                    "transparent";
+                                                }}
+                                              >
+                                                <Download size={16} />
+                                              </button>
+                                            )}
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  },
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <div style={{
-                    textAlign: "center",
-                    padding: "20px",
-                    color: "#9ca3af",
-                  }}>
-                    <ClockIcon size={32} style={{ marginBottom: "8px", opacity: 0.5 }} />
-                    <div style={{ fontSize: "13px" }}>No activity yet</div>
+
+                  {/* Right Panel - Quick Actions & Timeline */}
+                  <div
+                    style={{
+                      padding: "32px 24px",
+                      background: "#fafbfc",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "24px",
+                    }}
+                  >
+                    {/* Quick Actions */}
+                    <div>
+                      <h6
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          color: "#6b7280",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          marginBottom: "14px",
+                        }}
+                      >
+                        Quick Actions
+                      </h6>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "10px",
+                        }}
+                      >
+                        <button
+                          style={{
+                            background: "white",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "10px",
+                            padding: "12px 16px",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            color: "#1f2937",
+                          }}
+                          onClick={() => {
+                            // Handle call action
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.borderColor = "#2563eb";
+                            e.currentTarget.style.background = "#eff6ff";
+                            e.currentTarget.style.transform = "translateX(4px)";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.borderColor = "#e5e7eb";
+                            e.currentTarget.style.background = "white";
+                            e.currentTarget.style.transform = "translateX(0)";
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              borderRadius: "8px",
+                              background: "#2563eb",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <PhoneIcon size={16} style={{ color: "white" }} />
+                          </div>
+                          Call Prospect
+                        </button>
+
+                        <button
+                          style={{
+                            background: "white",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "10px",
+                            padding: "12px 16px",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            color: "#1f2937",
+                          }}
+                          onClick={() => {
+                            // Handle message action
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.borderColor = "#2563eb";
+                            e.currentTarget.style.background = "#eff6ff";
+                            e.currentTarget.style.transform = "translateX(4px)";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.borderColor = "#e5e7eb";
+                            e.currentTarget.style.background = "white";
+                            e.currentTarget.style.transform = "translateX(0)";
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              borderRadius: "8px",
+                              background:
+                                "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Mail size={16} style={{ color: "white" }} />
+                          </div>
+                          Send Message
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Status Overview */}
+                    <div>
+                      <h6
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          color: "#6b7280",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          marginBottom: "14px",
+                        }}
+                      >
+                        Status Overview
+                      </h6>
+                      <div
+                        style={{
+                          background: "white",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "10px",
+                          padding: "16px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "14px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: "#6b7280",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Status
+                            </span>
+                            <Badge
+                              bg={
+                                selectedDataItem.is_viewed
+                                  ? "success"
+                                  : "primary"
+                              }
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                padding: "4px 10px",
+                                borderRadius: "6px",
+                              }}
+                            >
+                              {selectedDataItem.is_viewed ? "Viewed" : "New"}
+                            </Badge>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: "#6b7280",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Total Calls
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {callRecordings.length}
+                            </span>
+                          </div>
+
+                          {selectedDataItem.scheduled_call_at && (
+                            <div
+                              style={{
+                                marginTop: "8px",
+                                paddingTop: "14px",
+                                borderTop: "1px solid #f3f4f6",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  marginBottom: "6px",
+                                }}
+                              >
+                                <Calendar
+                                  size={14}
+                                  style={{ color: "#2563eb" }}
+                                />
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#6b7280",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  Scheduled Call
+                                </span>
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: "13px",
+                                  color: "#1f2937",
+                                  fontWeight: 500,
+                                  marginLeft: "22px",
+                                }}
+                              >
+                                {moment(
+                                  selectedDataItem.scheduled_call_at,
+                                ).format("MMM DD, YYYY [at] hh:mm A")}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Activity Timeline */}
+                    <div style={{ flex: 1 }}>
+                      <h6
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          color: "#6b7280",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          marginBottom: "14px",
+                        }}
+                      >
+                        Recent Activity
+                      </h6>
+                      <div
+                        style={{
+                          background: "white",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "10px",
+                          padding: "16px",
+                          maxHeight: "300px",
+                          overflowY: "auto",
+                        }}
+                      >
+                        {callRecordings.length > 0 ? (
+                          <div style={{ position: "relative" }}>
+                            {/* Timeline line */}
+                            <div
+                              style={{
+                                position: "absolute",
+                                left: "7px",
+                                top: "8px",
+                                bottom: "8px",
+                                width: "2px",
+                                background: "#e5e7eb",
+                              }}
+                            />
+
+                            {callRecordings
+                              .slice(0, 5)
+                              .map((recording: any, index: number) => {
+                                const isOutgoing =
+                                  recording.Direction === "CALL_OUTGOING";
+                                return (
+                                  <div
+                                    key={recording.Id || index}
+                                    style={{
+                                      position: "relative",
+                                      paddingLeft: "28px",
+                                      paddingBottom:
+                                        index <
+                                        Math.min(callRecordings.length, 5) - 1
+                                          ? "16px"
+                                          : "0",
+                                    }}
+                                  >
+                                    {/* Timeline dot */}
+                                    <div
+                                      style={{
+                                        position: "absolute",
+                                        left: "0",
+                                        top: "4px",
+                                        width: "16px",
+                                        height: "16px",
+                                        borderRadius: "50%",
+                                        background: isOutgoing
+                                          ? "#2563eb"
+                                          : "#10b981",
+                                        border: "3px solid white",
+                                        boxShadow: "0 0 0 1px #e5e7eb",
+                                      }}
+                                    />
+
+                                    <div>
+                                      <div
+                                        style={{
+                                          fontSize: "12px",
+                                          color: "#1f2937",
+                                          fontWeight: 600,
+                                          marginBottom: "4px",
+                                        }}
+                                      >
+                                        {isOutgoing
+                                          ? "Outgoing Call"
+                                          : "Incoming Call"}
+                                      </div>
+                                      <div
+                                        style={{
+                                          fontSize: "11px",
+                                          color: "#6b7280",
+                                        }}
+                                      >
+                                        {moment(recording.DateTime).format(
+                                          "MMM DD, hh:mm A",
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                            {callRecordings.length > 5 && (
+                              <div
+                                style={{
+                                  textAlign: "center",
+                                  marginTop: "12px",
+                                  paddingTop: "12px",
+                                  borderTop: "1px solid #f3f4f6",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#2563eb",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  +{callRecordings.length - 5} more activities
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              textAlign: "center",
+                              padding: "20px",
+                              color: "#9ca3af",
+                            }}
+                          >
+                            <ClockIcon
+                              size={32}
+                              style={{ marginBottom: "8px", opacity: 0.5 }}
+                            />
+                            <div style={{ fontSize: "13px" }}>
+                              No activity yet
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                )}
+                </div>
+              </Modal.Body>
+
+              {/* Footer */}
+              <div
+                style={{
+                  padding: "20px 32px",
+                  borderTop: "1px solid #e5e7eb",
+                  background: "white",
+                  borderBottomLeftRadius: "12px",
+                  borderBottomRightRadius: "12px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <div style={{ fontSize: "13px", color: "#6b7280" }}>
+                  Company ID: <strong>#{selectedDataItem.id}</strong>
+                </div>
+                <Button
+                  variant="outline-secondary"
+                  onClick={() => setShowViewModal(false)}
+                  style={{
+                    padding: "10px 24px",
+                    borderRadius: "8px",
+                    fontWeight: 600,
+                    fontSize: "14px",
+                    border: "2px solid #e5e7eb",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.borderColor = "#2563eb";
+                    e.currentTarget.style.color = "#2563eb";
+                    e.currentTarget.style.background = "#eff6ff";
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.borderColor = "#e5e7eb";
+                    e.currentTarget.style.color = "#6c757d";
+                    e.currentTarget.style.background = "white";
+                  }}
+                >
+                  Close
+                </Button>
               </div>
-            </div>
-          </div>
-        </div>
-      </Modal.Body>
+            </Modal>
+          )}
 
-      {/* Footer */}
-      <div style={{
-        padding: "20px 32px",
-        borderTop: "1px solid #e5e7eb",
-        background: "white",
-        borderBottomLeftRadius: "12px",
-        borderBottomRightRadius: "12px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}>
-        <div style={{ fontSize: "13px", color: "#6b7280" }}>
-          Company ID: <strong>#{selectedDataItem.id}</strong>
-        </div>
-        <Button
-          variant="outline-secondary"
-          onClick={() => setShowViewModal(false)}
-          style={{
-            padding: "10px 24px",
-            borderRadius: "8px",
-            fontWeight: 600,
-            fontSize: "14px",
-            border: "2px solid #e5e7eb",
-            transition: "all 0.2s ease",
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.borderColor = "#2563eb";
-            e.currentTarget.style.color = "#2563eb";
-            e.currentTarget.style.background = "#eff6ff";
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.borderColor = "#e5e7eb";
-            e.currentTarget.style.color = "#6c757d";
-            e.currentTarget.style.background = "white";
-          }}
-        >
-          Close
-        </Button>
-      </div>
-    </Modal>
-      )}
-
-      {/* Audio Player Modal */}
-      {/* {getCallHistory(selectedDataItem.id).length > 0 && (
+          {/* Audio Player Modal */}
+          {/* {getCallHistory(selectedDataItem.id).length > 0 && (
               <>
                 <div style={{
                   fontSize: '16px',
@@ -5615,131 +7025,132 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
               </>
             )} */}
 
-      {/* Delete Confirmation Modal */}
-      <DeleteConfirmationModal
-        show={showDeleteModal}
-        onHide={() => {
-          setShowDeleteModal(false);
-          setItemToDelete(null);
-        }}
-        onConfirm={confirmDelete}
-        itemName={
-          itemToDelete ? `company entry #${itemToDelete.id}` : undefined
-        }
-        itemType="company entry"
-        additionalInfo={
-          itemToDelete ? (
-            <div className="alert alert-warning mb-3">
-              <strong>Entry ID:</strong> #{itemToDelete.id}
-              <br />
-              <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
-              <br />
-              <strong>Assigned To:</strong>{" "}
-              {itemToDelete.user_extension
-                ? extensions.find(
-                    (extension: any) =>
-                      extension.id.toString() ===
-                      itemToDelete.user_extension?.toString()
-                  )?.display_name || itemToDelete.user_extension
-                : "Unassigned"}
-              <br />
-              <strong>Created:</strong>{" "}
-              {moment(itemToDelete.created_at).format("MMM DD, YYYY HH:mm")}
-            </div>
-          ) : undefined
-        }
-      />
+          {/* Delete Confirmation Modal */}
+          <DeleteConfirmationModal
+            show={showDeleteModal}
+            onHide={() => {
+              setShowDeleteModal(false);
+              setItemToDelete(null);
+            }}
+            onConfirm={confirmDelete}
+            itemName={
+              itemToDelete ? `company entry #${itemToDelete.id}` : undefined
+            }
+            itemType="company entry"
+            additionalInfo={
+              itemToDelete ? (
+                <div className="alert alert-warning mb-3">
+                  <strong>Entry ID:</strong> #{itemToDelete.id}
+                  <br />
+                  <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
+                  <br />
+                  <strong>Assigned To:</strong>{" "}
+                  {itemToDelete.user_extension
+                    ? extensions.find(
+                        (extension: any) =>
+                          extension.id.toString() ===
+                          itemToDelete.user_extension?.toString(),
+                      )?.display_name || itemToDelete.user_extension
+                    : "Unassigned"}
+                  <br />
+                  <strong>Created:</strong>{" "}
+                  {moment(itemToDelete.created_at).format("MMM DD, YYYY HH:mm")}
+                </div>
+              ) : undefined
+            }
+          />
 
-      {/* Data Assignment Success Modal */}
-      <FormModal
-        show={showDataAssignmentModal}
-        onHide={handleDataAssignmentModalClose}
-        title="Smart Company Distribution"
-        desc="Please fill the details below to smart company distribution."
-        size="lg"
-        formHtml={
-          <>
-            <div className="mb-4">
-              <div className="d-flex align-items-center mb-3">
-                <FiFilter className="me-2 text-primary" />
-                <h6 className="mb-0">Step 1: Filter Your Prospects</h6>
-              </div>
-              <p className="text-muted small mb-3">
-                Choose which prospects to assign by filtering by tags and
-                campaigns.
-              </p>
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Filter by Tags</Form.Label>
-                    <CreatableSelect
-                      isMulti
-                      value={assignmentFilters.selectedTags}
-                      onChange={(selected) =>
-                        setAssignmentFilters((prev) => ({
-                          ...prev,
-                          selectedTags: selected || [],
-                        }))
-                      }
-                      options={availableTags}
-                      placeholder="Select tags to filter prospects..."
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          borderColor: "#ced4da",
-                          boxShadow: "none",
-                          fontSize: "14px",
-                        }),
-                      }}
-                    />
-                    <Form.Text className="text-muted">
-                      Only prospects with these tags will be considered for
-                      assignment.
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Filter by Campaigns</Form.Label>
-                    <CreatableSelect
-                      isMulti
-                      value={assignmentFilters.selectedCampaigns}
-                      onChange={(selected) =>
-                        setAssignmentFilters((prev) => ({
-                          ...prev,
-                          selectedCampaigns: selected || [],
-                        }))
-                      }
-                      options={availableCampaigns}
-                      placeholder="Select campaigns to filter prospects..."
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          borderColor: "#ced4da",
-                          boxShadow: "none",
-                          fontSize: "14px",
-                        }),
-                      }}
-                    />
-                    <Form.Text className="text-muted">
-                      Only prospects from these campaigns will be considered for
-                      assignment.
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-              </Row>
-            </div>
+          {/* Data Assignment Success Modal */}
+          <FormModal
+            show={showDataAssignmentModal}
+            onHide={handleDataAssignmentModalClose}
+            title="Smart Company Distribution"
+            desc="Please fill the details below to smart company distribution."
+            size="lg"
+            formHtml={
+              <>
+                <div className="mb-4">
+                  <div className="d-flex align-items-center mb-3">
+                    <FiFilter className="me-2 text-primary" />
+                    <h6 className="mb-0">Step 1: Filter Your Prospects</h6>
+                  </div>
+                  <p className="text-muted small mb-3">
+                    Choose which prospects to assign by filtering by tags and
+                    campaigns.
+                  </p>
+                  <Row>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Filter by Tags</Form.Label>
+                        <CreatableSelect
+                          isMulti
+                          value={assignmentFilters.selectedTags}
+                          onChange={(selected) =>
+                            setAssignmentFilters((prev) => ({
+                              ...prev,
+                              selectedTags: selected || [],
+                            }))
+                          }
+                          options={availableTags}
+                          placeholder="Select tags to filter prospects..."
+                          styles={{
+                            control: (base) => ({
+                              ...base,
+                              borderColor: "#ced4da",
+                              boxShadow: "none",
+                              fontSize: "14px",
+                            }),
+                          }}
+                        />
+                        <Form.Text className="text-muted">
+                          Only prospects with these tags will be considered for
+                          assignment.
+                        </Form.Text>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Filter by Campaigns</Form.Label>
+                        <CreatableSelect
+                          isMulti
+                          value={assignmentFilters.selectedCampaigns}
+                          onChange={(selected) =>
+                            setAssignmentFilters((prev) => ({
+                              ...prev,
+                              selectedCampaigns: selected || [],
+                            }))
+                          }
+                          options={availableCampaigns}
+                          placeholder="Select campaigns to filter prospects..."
+                          styles={{
+                            control: (base) => ({
+                              ...base,
+                              borderColor: "#ced4da",
+                              boxShadow: "none",
+                              fontSize: "14px",
+                            }),
+                          }}
+                        />
+                        <Form.Text className="text-muted">
+                          Only prospects from these campaigns will be considered
+                          for assignment.
+                        </Form.Text>
+                      </Form.Group>
+                    </Col>
+                  </Row>
+                </div>
 
-            <div className="mb-4">
-              <div className="d-flex align-items-center mb-3">
-                <FiDatabase className="me-2 text-info" />
-                <h6 className="mb-0">Step 2: Review Available Prospects</h6>
-              </div>
-              <p className="text-muted small mb-3">
-                Based on your filters, here's what's available for assignment.
-              </p>
+                <div className="mb-4">
+                  <div className="d-flex align-items-center mb-3">
+                    <FiDatabase className="me-2 text-info" />
+                    <h6 className="mb-0">Step 2: Review Available Prospects</h6>
+                  </div>
+                  <p className="text-muted small mb-3">
+                    Based on your filters, here's what's available for
+                    assignment.
+                  </p>
 
-              {/* <div className="row">
+                  {/* <div className="row">
               <div className="col-md-4">
                 <div className="card bg-light border-primary">
                   <div className="card-body text-center">
@@ -5771,1455 +7182,1577 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
               </div>
             </div> */}
 
-              <Row>
-                <Col md={12} className="text-left">
-                  <PageSummaryGrid
-                    gridColumns={3}
-                    cardHeading="h5"
-                    gridTextAlign="center"
-                    cards={[
-                      {
-                        id: "total-entries",
-                        title: "Total Prospects",
-                        value: assignmentCounts?.total || 0,
-                        description: "Matching your filters",
-                      },
-                      {
-                        id: "assigned-entries",
-                        title: "Assigned Prospects",
-                        value: assignmentCounts?.assigned || 0,
-                        description: "In use by team members",
-                      },
-                      {
-                        id: "available-entries",
-                        title: "Available Prospects",
-                        value: assignmentCounts?.unassigned || 0,
-                        description: "Ready for assignment",
-                      },
-                    ]}
-                  />
-                </Col>
-              </Row>
-            </div>
-
-            <div className="mb-4">
-              <div className="d-flex align-items-center mb-3">
-                <FiUsers className="me-2 text-success" />
-                <h6 className="mb-0">Step 3: Configure Assignment</h6>
-              </div>
-              <p className="text-muted small mb-3">
-                You have{" "}
-                <strong>{assignmentCounts.unassigned.toLocaleString()}</strong>{" "}
-                prospects ready for assignment out of{" "}
-                <strong>{assignmentCounts.total.toLocaleString()}</strong> total
-                matching prospects.
-              </p>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Target Campaigns *</Form.Label>
-                <CreatableSelect
-                  isMulti
-                  value={assignmentCampaign}
-                  onChange={(selected) => setAssignmentCampaign(selected || [])}
-                  options={availableCampaigns}
-                  placeholder="Choose which campaigns to assign prospects to..."
-                  styles={{
-                    control: (base) => ({
-                      ...base,
-                      borderColor: "#ced4da",
-                      boxShadow: "none",
-                      fontSize: "14px",
-                    }),
-                  }}
-                />
-                <Form.Text className="text-muted">
-                  <strong>Smart Distribution:</strong> Prospects will be
-                  automatically distributed among users in the selected
-                  campaigns based on their workload and availability.
-                </Form.Text>
-              </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Assignment Quantity</Form.Label>
-                <Form.Control
-                  type="number"
-                  min="0"
-                  max={assignmentCounts.unassigned}
-                  value={totalEntriesToAssign}
-                  onChange={(e) =>
-                    setTotalEntriesToAssign(parseInt(e.target.value) || 0)
-                  }
-                  placeholder="How many prospects to assign?"
-                />
-                <Form.Text className="text-muted">
-                  <strong>Maximum:</strong>{" "}
-                  {assignmentCounts.unassigned.toLocaleString()} prospects
-                  available. Start with a smaller batch to test the assignment
-                  process.
-                </Form.Text>
-              </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Distribution Strategy</Form.Label>
-                <div>
-                  <Form.Check
-                    type="radio"
-                    id="equal-distribution"
-                    name="assignmentDistribution"
-                    label="Auto-balance across campaigns"
-                    value="equal"
-                    checked={assignmentDistribution === "equal"}
-                    onChange={() => setAssignmentDistribution("equal")}
-                    className="mb-2"
-                  />
-                  <Form.Check
-                    type="radio"
-                    id="custom-distribution"
-                    name="assignmentDistribution"
-                    label="Custom allocation per campaign"
-                    value="custom"
-                    checked={assignmentDistribution === "custom"}
-                    onChange={() => setAssignmentDistribution("custom")}
-                  />
+                  <Row>
+                    <Col md={12} className="text-left">
+                      <PageSummaryGrid
+                        gridColumns={3}
+                        cardHeading="h5"
+                        gridTextAlign="center"
+                        cards={[
+                          {
+                            id: "total-entries",
+                            title: "Total Prospects",
+                            value: assignmentCounts?.total || 0,
+                            description: "Matching your filters",
+                          },
+                          {
+                            id: "assigned-entries",
+                            title: "Assigned Prospects",
+                            value: assignmentCounts?.assigned || 0,
+                            description: "In use by team members",
+                          },
+                          {
+                            id: "available-entries",
+                            title: "Available Prospects",
+                            value: assignmentCounts?.unassigned || 0,
+                            description: "Ready for assignment",
+                          },
+                        ]}
+                      />
+                    </Col>
+                  </Row>
                 </div>
-                <Form.Text className="text-muted">
-                  <strong>Auto-balance:</strong> Prospects are distributed
-                  evenly. <strong>Custom:</strong> You specify exactly how many
-                  prospects each campaign gets.
-                </Form.Text>
-              </Form.Group>
 
-              {assignmentDistribution === "custom" &&
-                assignmentCampaign.length > 0 && (
+                <div className="mb-4">
+                  <div className="d-flex align-items-center mb-3">
+                    <FiUsers className="me-2 text-success" />
+                    <h6 className="mb-0">Step 3: Configure Assignment</h6>
+                  </div>
+                  <p className="text-muted small mb-3">
+                    You have{" "}
+                    <strong>
+                      {assignmentCounts.unassigned.toLocaleString()}
+                    </strong>{" "}
+                    prospects ready for assignment out of{" "}
+                    <strong>{assignmentCounts.total.toLocaleString()}</strong>{" "}
+                    total matching prospects.
+                  </p>
+
                   <Form.Group className="mb-3">
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                      <Form.Label className="mb-0">
-                        Custom Distribution
-                      </Form.Label>
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => {
-                          const equalDistribution = Math.floor(
-                            totalEntriesToAssign / assignmentCampaign.length
-                          );
-                          const remainder =
-                            totalEntriesToAssign % assignmentCampaign.length;
-                          const newCustomDistribution: Record<string, number> =
-                            {};
-
-                          Array.from(assignmentCampaign).forEach(
-                            (campaign: any, index: number) => {
-                              newCustomDistribution[campaign.value] =
-                                equalDistribution + (index < remainder ? 1 : 0);
-                            }
-                          );
-
-                          setCustomDistribution(newCustomDistribution);
-                        }}
-                      >
-                        Auto-fill Equal
-                      </Button>
-                    </div>
-                    <div className="border rounded p-3 bg-light">
-                      <p className="small text-muted mb-3">
-                        Total to assign: <strong>{totalEntriesToAssign}</strong>{" "}
-                        | Allocated:{" "}
-                        <strong>
-                          {Object.values(customDistribution).reduce(
-                            (sum, count) => sum + count,
-                            0
-                          )}
-                        </strong>{" "}
-                        | Remaining:{" "}
-                        <strong>
-                          {totalEntriesToAssign -
-                            Object.values(customDistribution).reduce(
-                              (sum, count) => sum + count,
-                              0
-                            )}
-                        </strong>
-                      </p>
-                      {Array.from(assignmentCampaign).map((campaign: any) => (
-                        <div key={campaign.value} className="mb-2">
-                          <Row>
-                            <Col md={6}>
-                              <Form.Label className="small mb-0">
-                                {campaign.label}
-                              </Form.Label>
-                            </Col>
-                            <Col md={6}>
-                              <Form.Control
-                                type="number"
-                                min="0"
-                                max={totalEntriesToAssign}
-                                value={customDistribution[campaign.value] || 0}
-                                onChange={(e) =>
-                                  setCustomDistribution((prev) => ({
-                                    ...prev,
-                                    [campaign.value]:
-                                      parseInt(e.target.value) || 0,
-                                  }))
-                                }
-                                size="sm"
-                              />
-                            </Col>
-                          </Row>
-                        </div>
-                      ))}
-                    </div>
+                    <Form.Label>Target Campaigns *</Form.Label>
+                    <CreatableSelect
+                      isMulti
+                      value={assignmentCampaign}
+                      onChange={(selected) =>
+                        setAssignmentCampaign(selected || [])
+                      }
+                      options={availableCampaigns}
+                      placeholder="Choose which campaigns to assign prospects to..."
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderColor: "#ced4da",
+                          boxShadow: "none",
+                          fontSize: "14px",
+                        }),
+                      }}
+                    />
+                    <Form.Text className="text-muted">
+                      <strong>Smart Distribution:</strong> Prospects will be
+                      automatically distributed among users in the selected
+                      campaigns based on their workload and availability.
+                    </Form.Text>
                   </Form.Group>
-                )}
 
-              <Alert variant="info" className="mt-3">
-                <strong>Assignment Info:</strong> Prospects will be
-                automatically assigned to users within the selected campaigns
-                based on their campaign user extensions. The system will
-                distribute prospects equally among users in each campaign.
-              </Alert>
-            </div>
-          </>
-        }
-        submitButtonText="OK"
-        cancelButtonText="Cancel"
-        onSubmit={handleDataAssignmentSubmit}
-        onCancel={handleDataAssignmentModalClose}
-      />
+                  <Form.Group className="mb-3">
+                    <Form.Label>Assignment Quantity</Form.Label>
+                    <Form.Control
+                      type="number"
+                      min="0"
+                      max={assignmentCounts.unassigned}
+                      value={totalEntriesToAssign}
+                      onChange={(e) =>
+                        setTotalEntriesToAssign(parseInt(e.target.value) || 0)
+                      }
+                      placeholder="How many prospects to assign?"
+                    />
+                    <Form.Text className="text-muted">
+                      <strong>Maximum:</strong>{" "}
+                      {assignmentCounts.unassigned.toLocaleString()} prospects
+                      available. Start with a smaller batch to test the
+                      assignment process.
+                    </Form.Text>
+                  </Form.Group>
 
-      <FormModal
-        show={showAfterCallModal}
-        onHide={() => setShowAfterCallModal(false)}
-        title="After Call Dialog"
-        desc="Please fill the details below to record call outcomes and schedule follow-up actions."
-        size="lg"
-        formHtml={
-          <>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Disposition *</Form.Label>
-                  <Form.Select
-                    value={afterCallData.disposition}
-                    onChange={(e) =>
-                      setAfterCallData({
-                        ...afterCallData,
-                        disposition: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="">Select Disposition</option>
-                    <option value="interested">Interested</option>
-                    <option value="not_interested">Not Interested</option>
-                    <option value="callback_requested">
-                      Call Back Requested
-                    </option>
-                    <option value="follow_up">Follow Up</option>
-                    <option value="do_not_call">Do Not Call</option>
-                    <option value="wrong_number">Wrong Number</option>
-                    <option value="spam">Spam</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Call Status *</Form.Label>
-                  <Form.Select
-                    value={afterCallData.callStatus}
-                    onChange={(e) =>
-                      setAfterCallData({
-                        ...afterCallData,
-                        callStatus: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="">Select Call Status</option>
-                    <option value="answered">Answered</option>
-                    <option value="no_answer">No Answer</option>
-                    <option value="busy">Busy</option>
-                    <option value="voicemail">Voicemail</option>
-                    <option value="disconnected">Disconnected</option>
-                    <option value="network_error">Network Error</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-            </Row>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Distribution Strategy</Form.Label>
+                    <div>
+                      <Form.Check
+                        type="radio"
+                        id="equal-distribution"
+                        name="assignmentDistribution"
+                        label="Auto-balance across campaigns"
+                        value="equal"
+                        checked={assignmentDistribution === "equal"}
+                        onChange={() => setAssignmentDistribution("equal")}
+                        className="mb-2"
+                      />
+                      <Form.Check
+                        type="radio"
+                        id="custom-distribution"
+                        name="assignmentDistribution"
+                        label="Custom allocation per campaign"
+                        value="custom"
+                        checked={assignmentDistribution === "custom"}
+                        onChange={() => setAssignmentDistribution("custom")}
+                      />
+                    </div>
+                    <Form.Text className="text-muted">
+                      <strong>Auto-balance:</strong> Prospects are distributed
+                      evenly. <strong>Custom:</strong> You specify exactly how
+                      many prospects each campaign gets.
+                    </Form.Text>
+                  </Form.Group>
 
-            <Form.Group className="mb-3">
-              <Form.Label>Call Comment *</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={4}
-                value={afterCallData.comment}
-                onChange={(e) =>
-                  setAfterCallData({
-                    ...afterCallData,
-                    comment: e.target.value,
-                  })
-                }
-                placeholder="Enter call details, client response, and any important notes..."
-              />
-            </Form.Group>
+                  {assignmentDistribution === "custom" &&
+                    assignmentCampaign.length > 0 && (
+                      <Form.Group className="mb-3">
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <Form.Label className="mb-0">
+                            Custom Distribution
+                          </Form.Label>
+                          <Button
+                            variant="outline-secondary"
+                            size="sm"
+                            onClick={() => {
+                              const equalDistribution = Math.floor(
+                                totalEntriesToAssign /
+                                  assignmentCampaign.length,
+                              );
+                              const remainder =
+                                totalEntriesToAssign %
+                                assignmentCampaign.length;
+                              const newCustomDistribution: Record<
+                                string,
+                                number
+                              > = {};
 
-            <Form.Group className="mb-3">
-              <Form.Label>Generate Lead *</Form.Label>
-              <div className="d-flex gap-4">
-                <Form.Check
-                  type="radio"
-                  id="generate-lead-yes"
-                  name="generateLead"
-                  value="yes"
-                  checked={afterCallData.generateLead === "yes"}
-                  onChange={(e) =>
-                    setAfterCallData({
-                      ...afterCallData,
-                      generateLead: e.target.value,
-                    })
-                  }
-                  label="Yes, generate lead"
-                />
-                <Form.Check
-                  type="radio"
-                  id="generate-lead-no"
-                  name="generateLead"
-                  value="no"
-                  checked={afterCallData.generateLead === "no"}
-                  onChange={(e) =>
-                    setAfterCallData({
-                      ...afterCallData,
-                      generateLead: e.target.value,
-                    })
-                  }
-                  label="No, do not generate lead"
-                />
-              </div>
-              <Form.Text className="text-muted">
-                Select "Yes" if this call resulted in a qualified lead that
-                should be created in the CRM system.
-              </Form.Text>
-            </Form.Group>
+                              Array.from(assignmentCampaign).forEach(
+                                (campaign: any, index: number) => {
+                                  newCustomDistribution[campaign.value] =
+                                    equalDistribution +
+                                    (index < remainder ? 1 : 0);
+                                },
+                              );
 
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Schedule Next Call (Optional)</Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={afterCallData.nextCallDate}
-                    onChange={(e) =>
-                      setAfterCallData({
-                        ...afterCallData,
-                        nextCallDate: e.target.value,
-                      })
-                    }
-                    min={moment().format("YYYY-MM-DD")}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Time (Optional)</Form.Label>
-                  <Form.Control
-                    type="time"
-                    value={afterCallData.nextCallTime}
-                    onChange={(e) =>
-                      setAfterCallData({
-                        ...afterCallData,
-                        nextCallTime: e.target.value,
-                      })
-                    }
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+                              setCustomDistribution(newCustomDistribution);
+                            }}
+                          >
+                            Auto-fill Equal
+                          </Button>
+                        </div>
+                        <div className="border rounded p-3 bg-light">
+                          <p className="small text-muted mb-3">
+                            Total to assign:{" "}
+                            <strong>{totalEntriesToAssign}</strong> | Allocated:{" "}
+                            <strong>
+                              {Object.values(customDistribution).reduce(
+                                (sum, count) => sum + count,
+                                0,
+                              )}
+                            </strong>{" "}
+                            | Remaining:{" "}
+                            <strong>
+                              {totalEntriesToAssign -
+                                Object.values(customDistribution).reduce(
+                                  (sum, count) => sum + count,
+                                  0,
+                                )}
+                            </strong>
+                          </p>
+                          {Array.from(assignmentCampaign).map(
+                            (campaign: any) => (
+                              <div key={campaign.value} className="mb-2">
+                                <Row>
+                                  <Col md={6}>
+                                    <Form.Label className="small mb-0">
+                                      {campaign.label}
+                                    </Form.Label>
+                                  </Col>
+                                  <Col md={6}>
+                                    <Form.Control
+                                      type="number"
+                                      min="0"
+                                      max={totalEntriesToAssign}
+                                      value={
+                                        customDistribution[campaign.value] || 0
+                                      }
+                                      onChange={(e) =>
+                                        setCustomDistribution((prev) => ({
+                                          ...prev,
+                                          [campaign.value]:
+                                            parseInt(e.target.value) || 0,
+                                        }))
+                                      }
+                                      size="sm"
+                                    />
+                                  </Col>
+                                </Row>
+                              </div>
+                            ),
+                          )}
+                        </div>
+                      </Form.Group>
+                    )}
 
-            <Alert variant="info">
-              <strong>Note:</strong> This dialog will be used to record call
-              outcomes and schedule follow-up actions. All fields marked with *
-              are required.
-            </Alert>
-          </>
-        }
-        submitButtonText="Save Call Data"
-        cancelButtonText="Cancel"
-        onSubmit={() => handleAfterCallSubmit()}
-        onCancel={() => setShowAfterCallModal(false)}
-      />
-
-      <FormModal
-        show={showScheduleModal}
-        onHide={() => setShowScheduleModal(false)}
-        title={isEditingSchedule ? "Edit Scheduled Call" : "Schedule Call"}
-        desc={
-          isEditingSchedule
-            ? "Please update the details below to modify the scheduled call."
-            : "Please fill the details below to schedule a call."
-        }
-        size="lg"
-        formHtml={
-          <>
-            {selectedEntryForSchedule && (
-              <div className="mb-3">
-                <h6>Schedule Call For:</h6>
-                <div className="bg-light p-3 rounded">
-                  <div>
-                    <strong>Name:</strong>{" "}
-                    {selectedEntryForSchedule.name || "N/A"}
-                  </div>
-                  <div>
-                    <strong>Phone:</strong>{" "}
-                    {selectedEntryForSchedule.phone || "N/A"}
-                  </div>
-                  <div>
-                    <strong>Email:</strong>{" "}
-                    {selectedEntryForSchedule?.data?.email || "N/A"}
-                  </div>
+                  <Alert variant="info" className="mt-3">
+                    <strong>Assignment Info:</strong> Prospects will be
+                    automatically assigned to users within the selected
+                    campaigns based on their campaign user extensions. The
+                    system will distribute prospects equally among users in each
+                    campaign.
+                  </Alert>
                 </div>
-              </div>
-            )}
+              </>
+            }
+            submitButtonText="OK"
+            cancelButtonText="Cancel"
+            onSubmit={handleDataAssignmentSubmit}
+            onCancel={handleDataAssignmentModalClose}
+          />
 
-            <Row>
-              <Col md={6}>
+          <FormModal
+            show={showAfterCallModal}
+            onHide={() => setShowAfterCallModal(false)}
+            title="After Call Dialog"
+            desc="Please fill the details below to record call outcomes and schedule follow-up actions."
+            size="lg"
+            formHtml={
+              <>
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Disposition *</Form.Label>
+                      <Form.Select
+                        value={afterCallData.disposition}
+                        onChange={(e) =>
+                          setAfterCallData({
+                            ...afterCallData,
+                            disposition: e.target.value,
+                          })
+                        }
+                      >
+                        <option value="">Select Disposition</option>
+                        <option value="interested">Interested</option>
+                        <option value="not_interested">Not Interested</option>
+                        <option value="callback_requested">
+                          Call Back Requested
+                        </option>
+                        <option value="follow_up">Follow Up</option>
+                        <option value="do_not_call">Do Not Call</option>
+                        <option value="wrong_number">Wrong Number</option>
+                        <option value="spam">Spam</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Call Status *</Form.Label>
+                      <Form.Select
+                        value={afterCallData.callStatus}
+                        onChange={(e) =>
+                          setAfterCallData({
+                            ...afterCallData,
+                            callStatus: e.target.value,
+                          })
+                        }
+                      >
+                        <option value="">Select Call Status</option>
+                        <option value="answered">Answered</option>
+                        <option value="no_answer">No Answer</option>
+                        <option value="busy">Busy</option>
+                        <option value="voicemail">Voicemail</option>
+                        <option value="disconnected">Disconnected</option>
+                        <option value="network_error">Network Error</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                </Row>
+
                 <Form.Group className="mb-3">
-                  <Form.Label>Date *</Form.Label>
+                  <Form.Label>Call Comment *</Form.Label>
                   <Form.Control
-                    type="date"
-                    value={scheduleData.date}
+                    as="textarea"
+                    rows={4}
+                    value={afterCallData.comment}
                     onChange={(e) =>
-                      setScheduleData({ ...scheduleData, date: e.target.value })
+                      setAfterCallData({
+                        ...afterCallData,
+                        comment: e.target.value,
+                      })
                     }
-                    min={moment().format("YYYY-MM-DD")}
+                    placeholder="Enter call details, client response, and any important notes..."
                   />
                 </Form.Group>
-              </Col>
-              <Col md={6}>
+
                 <Form.Group className="mb-3">
-                  <Form.Label>Time *</Form.Label>
+                  <Form.Label>Generate Lead *</Form.Label>
+                  <div className="d-flex gap-4">
+                    <Form.Check
+                      type="radio"
+                      id="generate-lead-yes"
+                      name="generateLead"
+                      value="yes"
+                      checked={afterCallData.generateLead === "yes"}
+                      onChange={(e) =>
+                        setAfterCallData({
+                          ...afterCallData,
+                          generateLead: e.target.value,
+                        })
+                      }
+                      label="Yes, generate lead"
+                    />
+                    <Form.Check
+                      type="radio"
+                      id="generate-lead-no"
+                      name="generateLead"
+                      value="no"
+                      checked={afterCallData.generateLead === "no"}
+                      onChange={(e) =>
+                        setAfterCallData({
+                          ...afterCallData,
+                          generateLead: e.target.value,
+                        })
+                      }
+                      label="No, do not generate lead"
+                    />
+                  </div>
+                  <Form.Text className="text-muted">
+                    Select "Yes" if this call resulted in a qualified lead that
+                    should be created in the CRM system.
+                  </Form.Text>
+                </Form.Group>
+
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Schedule Next Call (Optional)</Form.Label>
+                      <Form.Control
+                        type="date"
+                        value={afterCallData.nextCallDate}
+                        onChange={(e) =>
+                          setAfterCallData({
+                            ...afterCallData,
+                            nextCallDate: e.target.value,
+                          })
+                        }
+                        min={moment().format("YYYY-MM-DD")}
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Time (Optional)</Form.Label>
+                      <Form.Control
+                        type="time"
+                        value={afterCallData.nextCallTime}
+                        onChange={(e) =>
+                          setAfterCallData({
+                            ...afterCallData,
+                            nextCallTime: e.target.value,
+                          })
+                        }
+                      />
+                    </Form.Group>
+                  </Col>
+                </Row>
+
+                <Alert variant="info">
+                  <strong>Note:</strong> This dialog will be used to record call
+                  outcomes and schedule follow-up actions. All fields marked
+                  with * are required.
+                </Alert>
+              </>
+            }
+            submitButtonText="Save Call Data"
+            cancelButtonText="Cancel"
+            onSubmit={() => handleAfterCallSubmit()}
+            onCancel={() => setShowAfterCallModal(false)}
+          />
+
+          <FormModal
+            show={showScheduleModal}
+            onHide={() => setShowScheduleModal(false)}
+            title={isEditingSchedule ? "Edit Scheduled Call" : "Schedule Call"}
+            desc={
+              isEditingSchedule
+                ? "Please update the details below to modify the scheduled call."
+                : "Please fill the details below to schedule a call."
+            }
+            size="lg"
+            formHtml={
+              <>
+                {selectedEntryForSchedule && (
+                  <div className="mb-3">
+                    <h6>Schedule Call For:</h6>
+                    <div className="bg-light p-3 rounded">
+                      <div>
+                        <strong>Name:</strong>{" "}
+                        {selectedEntryForSchedule.name || "N/A"}
+                      </div>
+                      <div>
+                        <strong>Phone:</strong>{" "}
+                        {selectedEntryForSchedule.phone || "N/A"}
+                      </div>
+                      <div>
+                        <strong>Email:</strong>{" "}
+                        {selectedEntryForSchedule?.data?.email || "N/A"}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <Row>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Date *</Form.Label>
+                      <Form.Control
+                        type="date"
+                        value={scheduleData.date}
+                        onChange={(e) =>
+                          setScheduleData({
+                            ...scheduleData,
+                            date: e.target.value,
+                          })
+                        }
+                        min={moment().format("YYYY-MM-DD")}
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Time *</Form.Label>
+                      <Form.Control
+                        type="time"
+                        value={scheduleData.time}
+                        onChange={(e) =>
+                          setScheduleData({
+                            ...scheduleData,
+                            time: e.target.value,
+                          })
+                        }
+                      />
+                    </Form.Group>
+                  </Col>
+                </Row>
+
+                <Form.Group className="mb-3">
+                  <Form.Label>Notes (Optional)</Form.Label>
                   <Form.Control
-                    type="time"
-                    value={scheduleData.time}
+                    as="textarea"
+                    rows={3}
+                    value={scheduleData.notes}
                     onChange={(e) =>
-                      setScheduleData({ ...scheduleData, time: e.target.value })
+                      setScheduleData({
+                        ...scheduleData,
+                        notes: e.target.value,
+                      })
                     }
+                    placeholder="Add any notes or reminders for this call..."
                   />
                 </Form.Group>
-              </Col>
-            </Row>
 
-            <Form.Group className="mb-3">
-              <Form.Label>Notes (Optional)</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                value={scheduleData.notes}
-                onChange={(e) =>
-                  setScheduleData({ ...scheduleData, notes: e.target.value })
-                }
-                placeholder="Add any notes or reminders for this call..."
-              />
-            </Form.Group>
+                <Alert variant="info">
+                  <strong>Note:</strong> The call will be scheduled and you'll
+                  receive a reminder at the selected time.
+                </Alert>
+              </>
+            }
+            submitButtonText={
+              isEditingSchedule ? "Update Schedule" : "Schedule Call"
+            }
+            cancelButtonText="Cancel"
+            onSubmit={() => handleScheduleSubmit()}
+            onCancel={() => handleScheduleModalClose()}
+          />
 
-            <Alert variant="info">
-              <strong>Note:</strong> The call will be scheduled and you'll
-              receive a reminder at the selected time.
-            </Alert>
-          </>
-        }
-        submitButtonText={isEditingSchedule ? "Update Schedule" : "Schedule Call"}
-        cancelButtonText="Cancel"
-        onSubmit={() => handleScheduleSubmit()}
-        onCancel={() => handleScheduleModalClose()}
-      />
-
-      {/* Unschedule Confirmation Modal */}
-      <Modal
-        show={showUnscheduleModal}
-        onHide={() => {
-          setShowUnscheduleModal(false);
-          setEntryToUnschedule(null);
-        }}
-        centered
-      >
-        <Modal.Header closeButton className="border-bottom">
-          <Modal.Title>Confirm Unschedule</Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="p-4">
-          <div className="text-center">
-            <AlertCircleIcon size={48} className="text-warning mb-3" />
-            <p className="mb-0">
-              Are you sure you want to unschedule the call for{" "}
-              <strong>
-                {entryToUnschedule
-                  ? entryToUnschedule.name ||
-                    `prospect #${entryToUnschedule.id}`
-                  : "this prospect"}
-              </strong>
-              ?
-            </p>
-            <p className="text-muted small mb-3">
-              This action cannot be undone.
-            </p>
-
-            {entryToUnschedule && entryToUnschedule.scheduled_call_at && (
-              <div className="alert alert-warning mb-3 text-start">
-                <strong>Prospect:</strong>{" "}
-                {entryToUnschedule.name || `#${entryToUnschedule.id}`}
-                <br />
-                <strong>Phone:</strong> {entryToUnschedule.phone || "N/A"}
-                <br />
-                <strong>Scheduled Date:</strong>{" "}
-                {moment(entryToUnschedule.scheduled_call_at).format(
-                  "MMM DD, YYYY HH:mm"
-                )}
-                {entryToUnschedule.note && (
-                  <>
-                    <br />
-                    <strong>Note:</strong> {entryToUnschedule.note}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </Modal.Body>
-        <Modal.Footer className="border-top">
-          <Button
-            variant="secondary"
-            onClick={() => {
+          {/* Unschedule Confirmation Modal */}
+          <Modal
+            show={showUnscheduleModal}
+            onHide={() => {
               setShowUnscheduleModal(false);
               setEntryToUnschedule(null);
             }}
+            centered
           >
-            Cancel
-          </Button>
-          <Button variant="warning" onClick={confirmUnscheduleCall}>
-            Unschedule
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      <FormModal
-        show={showHistoryModal}
-        onHide={() => setShowHistoryModal(false)}
-        title="Activity History"
-        desc="Please fill the details below to view the activity history."
-        size="lg"
-        formHtml={
-          <>
-            <div className="mb-4">
-              <div className="d-flex justify-content-between align-items-center">
-                <div>
-                  <h5 className="mb-1">System Activity Log</h5>
-                  <p className="text-muted mb-0">
-                    Track all user activities including CSV uploads, data
-                    assignments, and campaign management.
-                  </p>
-                </div>
-                <div className="text-end">
-                  <Badge bg="info" className="me-2">
-                    {historyPagination.total} Total Activities
-                  </Badge>
-                  <Badge bg="secondary">
-                    Page {historyPagination.current_page} of{" "}
-                    {historyPagination.last_page}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            {historyLoading ? (
-              <div className="text-center py-5">
-                <Spinner animation="border" variant="primary" />
-                <p className="mt-3 text-muted">Loading activity history...</p>
-              </div>
-            ) : historyData.length === 0 ? (
-              <div className="text-center py-5">
-                <FiClock size={48} className="text-muted mb-3" />
-                <h6 className="text-muted">No Activity Found</h6>
-                <p className="text-muted">
-                  No activities have been recorded yet.
+            <Modal.Header closeButton className="border-bottom">
+              <Modal.Title>Confirm Unschedule</Modal.Title>
+            </Modal.Header>
+            <Modal.Body className="p-4">
+              <div className="text-center">
+                <AlertCircleIcon size={48} className="text-warning mb-3" />
+                <p className="mb-0">
+                  Are you sure you want to unschedule the call for{" "}
+                  <strong>
+                    {entryToUnschedule
+                      ? entryToUnschedule.name ||
+                        `prospect #${entryToUnschedule.id}`
+                      : "this prospect"}
+                  </strong>
+                  ?
                 </p>
+                <p className="text-muted small mb-3">
+                  This action cannot be undone.
+                </p>
+
+                {entryToUnschedule && entryToUnschedule.scheduled_call_at && (
+                  <div className="alert alert-warning mb-3 text-start">
+                    <strong>Prospect:</strong>{" "}
+                    {entryToUnschedule.name || `#${entryToUnschedule.id}`}
+                    <br />
+                    <strong>Phone:</strong> {entryToUnschedule.phone || "N/A"}
+                    <br />
+                    <strong>Scheduled Date:</strong>{" "}
+                    {moment(entryToUnschedule.scheduled_call_at).format(
+                      "MMM DD, YYYY HH:mm",
+                    )}
+                    {entryToUnschedule.note && (
+                      <>
+                        <br />
+                        <strong>Note:</strong> {entryToUnschedule.note}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="timeline ">
-                {historyData.map((activity, index) => {
-                  const getActivityIcon = (action: string) => {
-                    switch (action) {
-                      case "upload":
-                        return <FiUpload size={18} className="text-white" />;
-                      case "assign":
-                        return <FiUsers size={18} className="text-white" />;
-                      case "schedule_call":
-                      case "reschedule_call":
-                        return <FiCalendar size={18} className="text-white" />;
-                      case "cancel_call":
-                      case "unschedule_call":
-                        return <FiX size={18} className="text-white" />;
-                      default:
-                        return <FiUser size={18} className="text-white" />;
-                    }
-                  };
+            </Modal.Body>
+            <Modal.Footer className="border-top">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowUnscheduleModal(false);
+                  setEntryToUnschedule(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button variant="warning" onClick={confirmUnscheduleCall}>
+                Unschedule
+              </Button>
+            </Modal.Footer>
+          </Modal>
 
-                  const getActivityColor = (action: string) => {
-                    switch (action) {
-                      case "upload":
-                        return "primary";
-                      case "assign":
-                        return "success";
-                      case "schedule_call":
-                      case "reschedule_call":
-                        return "info";
-                      case "cancel_call":
-                      case "unschedule_call":
-                        return "warning";
-                      default:
-                        return "secondary";
-                    }
-                  };
-
-                  const formatActivityDetails = (activity: any) => {
-                    const details = activity.details || {};
-                    switch (activity.action) {
-                      case "upload":
-                        const campaignNames =
-                          details.campaign_ids
-                            ?.map(
-                              (id: number) =>
-                                campaignsById[id] || `Campaign #${id}`
-                            )
-                            .join(", ") || "No campaigns";
-                        const tags = details.tags?.join(", ") || "No tags";
-                        return (
-                          <div>
-                            <div className="mb-1">
-                              <strong>
-                                Uploaded {activity.total_records || 0} prospects
-                              </strong>
-                            </div>
-                            <div className="small text-muted">
-                              <div>
-                                <strong>Campaigns:</strong> {campaignNames}
-                              </div>
-                              <div>
-                                <strong>Tags:</strong> {tags}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      case "assign":
-                        return (
-                          <div>
-                            <div className="mb-1">
-                              <strong>
-                                Assigned {activity.total_records || 0} prospects
-                              </strong>
-                            </div>
-                            <div className="small text-muted">
-                              <strong>To:</strong>{" "}
-                              {getNameByExtension(
-                                activity.user_extension_done_to
-                              ) || "Campaign team"}
-                            </div>
-                          </div>
-                        );
-                      case "schedule_call":
-                        return (
-                          <div>
-                            <div className="mb-1">
-                              <strong>Scheduled call</strong>
-                            </div>
-                            <div className="small text-muted">
-                              <div>
-                                <strong>Phone:</strong> {details.phone || "N/A"}
-                              </div>
-                              <div>
-                                <strong>Time:</strong>{" "}
-                                {moment(details.scheduled_call_at).format(
-                                  "MMM DD, YYYY HH:mm"
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      case "reschedule_call":
-                        return (
-                          <div>
-                            <div className="mb-1">
-                              <strong>Rescheduled call</strong>
-                            </div>
-                            <div className="small text-muted">
-                              <div>
-                                <strong>Phone:</strong> {details.phone || "N/A"}
-                              </div>
-                              <div>
-                                <strong>From:</strong>{" "}
-                                {moment(details.old_scheduled_call_at).format(
-                                  "MMM DD, HH:mm"
-                                )}
-                              </div>
-                              <div>
-                                <strong>To:</strong>{" "}
-                                {moment(details.new_scheduled_call_at).format(
-                                  "MMM DD, HH:mm"
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      case "cancel_call":
-                      case "unschedule_call":
-                        return (
-                          <div>
-                            <div className="mb-1">
-                              <strong>Cancelled call</strong>
-                            </div>
-                            <div className="small text-muted">
-                              <div>
-                                <strong>Phone:</strong> {details.phone || "N/A"}
-                              </div>
-                              <div>
-                                <strong>Was scheduled:</strong>{" "}
-                                {moment(
-                                  details.cancelled_scheduled_call_at ||
-                                    details.unscheduled_call_at
-                                ).format("MMM DD, HH:mm")}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      default:
-                        return (
-                          <div>
-                            <div className="mb-1">
-                              <strong>
-                                {activity.action
-                                  ?.replace("_", " ")
-                                  .replace(/\b\w/g, (l: string) =>
-                                    l.toUpperCase()
-                                  )}
-                              </strong>
-                            </div>
-                            <div className="small text-muted">
-                              {activity.details?.description ||
-                                "No details available"}
-                            </div>
-                          </div>
-                        );
-                    }
-                  };
-
-                  return (
-                    <div key={activity.id} className="timeline-item mb-4 ">
-                      <div className="d-flex">
-                        <div className="timeline-marker me-3">
-                          <div
-                            className={`bg-${getActivityColor(
-                              activity.action
-                            )} rounded-circle d-flex align-items-center justify-content-center shadow-sm`}
-                            style={{ width: "36px", height: "36px" }}
-                          >
-                            {getActivityIcon(activity.action)}
-                          </div>
-                        </div>
-                        <div className="timeline-content flex-grow-1">
-                          <div className="card border-0 shadow-sm">
-                            <div className="card-body p-3">
-                              <div className="d-flex justify-content-between align-items-start mb-2">
-                                <div className="flex-grow-1">
-                                  <h6 className="mb-1 d-flex align-items-center">
-                                    <strong className="text-primary">
-                                      {getNameByExtension(
-                                        activity.user_extension_done_by
-                                      ) || "System"}
-                                    </strong>
-                                    <Badge
-                                      bg={getActivityColor(activity.action)}
-                                      className="ms-2 small"
-                                    >
-                                      {activity.action
-                                        ?.replace("_", " ")
-                                        .replace(/\b\w/g, (l: string) =>
-                                          l.toUpperCase()
-                                        )}
-                                    </Badge>
-                                  </h6>
-                                  <div className="text-muted">
-                                    {formatActivityDetails(activity)}
-                                  </div>
-                                </div>
-                                <div className="text-end">
-                                  <small className="text-muted">
-                                    {moment(activity.created_at).format(
-                                      "MMM DD, YYYY"
-                                    )}
-                                  </small>
-                                  <br />
-                                  <small className="text-muted">
-                                    {moment(activity.created_at).format(
-                                      "HH:mm:ss"
-                                    )}
-                                  </small>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="timeline-line"></div>
-                        </div>
-                      </div>
+          <FormModal
+            show={showHistoryModal}
+            onHide={() => setShowHistoryModal(false)}
+            title="Activity History"
+            desc="Please fill the details below to view the activity history."
+            size="lg"
+            formHtml={
+              <>
+                <div className="mb-4">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <div>
+                      <h5 className="mb-1">System Activity Log</h5>
+                      <p className="text-muted mb-0">
+                        Track all user activities including CSV uploads, data
+                        assignments, and campaign management.
+                      </p>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Pagination */}
-            {!historyLoading &&
-              historyData.length > 0 &&
-              historyPagination.last_page > 1 && (
-                <div className="d-flex justify-content-center mt-4">
-                  <div className="btn-group" role="group">
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      disabled={historyPagination.current_page === 1}
-                      onClick={() =>
-                        fetchHistoryData(historyPagination.current_page - 1)
-                      }
-                    >
-                      Previous
-                    </Button>
-                    <Button variant="outline-secondary" size="sm" disabled>
-                      {historyPagination.current_page} /{" "}
-                      {historyPagination.last_page}
-                    </Button>
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      disabled={
-                        historyPagination.current_page ===
-                        historyPagination.last_page
-                      }
-                      onClick={() =>
-                        fetchHistoryData(historyPagination.current_page + 1)
-                      }
-                    >
-                      Next
-                    </Button>
+                    <div className="text-end">
+                      <Badge bg="info" className="me-2">
+                        {historyPagination.total} Total Activities
+                      </Badge>
+                      <Badge bg="secondary">
+                        Page {historyPagination.current_page} of{" "}
+                        {historyPagination.last_page}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-              )}
-          </>
-        }
-        submitButtonText="Close"
-        cancelButtonText="Cancel"
-        onSubmit={() => setShowHistoryModal(false)}
-        onCancel={() => setShowHistoryModal(false)}
-      />
 
-      {/* Bulk Delete Modal */}
-      <Modal
-        show={showBulkDeleteModal}
-        onHide={() => setShowBulkDeleteModal(false)}
-      >
-        <Modal.Header closeButton>
-          <Modal.Title className="d-flex align-items-center">
-            <FiTrash2 className="me-2" />
-            Bulk Delete Prospects
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>
-            Are you sure you want to delete {selectedItems.length} selected
-            prospects?
-          </p>
-          <div className="alert alert-warning">
-            <strong>Warning:</strong> This action cannot be undone. All selected
-            entries will be permanently deleted.
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setShowBulkDeleteModal(false)}
-          >
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={handleBulkDelete}>
-            Delete {selectedItems.length} Entries
-          </Button>
-        </Modal.Footer>
-      </Modal>
-      <SuccessfulModal
-        show={showSuccessfulModal}
-        onHide={() => setShowSuccessfulModal(false)}
-        title={successModalTitle}
-        description={successModalDescription}
-      />
+                {historyLoading ? (
+                  <div className="text-center py-5">
+                    <Spinner animation="border" variant="primary" />
+                    <p className="mt-3 text-muted">
+                      Loading activity history...
+                    </p>
+                  </div>
+                ) : historyData.length === 0 ? (
+                  <div className="text-center py-5">
+                    <FiClock size={48} className="text-muted mb-3" />
+                    <h6 className="text-muted">No Activity Found</h6>
+                    <p className="text-muted">
+                      No activities have been recorded yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="timeline ">
+                    {historyData.map((activity, index) => {
+                      const getActivityIcon = (action: string) => {
+                        switch (action) {
+                          case "upload":
+                            return (
+                              <FiUpload size={18} className="text-white" />
+                            );
+                          case "assign":
+                            return <FiUsers size={18} className="text-white" />;
+                          case "schedule_call":
+                          case "reschedule_call":
+                            return (
+                              <FiCalendar size={18} className="text-white" />
+                            );
+                          case "cancel_call":
+                          case "unschedule_call":
+                            return <FiX size={18} className="text-white" />;
+                          default:
+                            return <FiUser size={18} className="text-white" />;
+                        }
+                      };
 
-      {/* Call Recording Player Modal */}
-      <CallRecordingPlayerModal
-        show={showRecordingPlayerModal}
-        onHide={() => {
-          setShowRecordingPlayerModal(false);
-          setSelectedRecording(null);
-        }}
-        recording={selectedRecording}
-      />
+                      const getActivityColor = (action: string) => {
+                        switch (action) {
+                          case "upload":
+                            return "primary";
+                          case "assign":
+                            return "success";
+                          case "schedule_call":
+                          case "reschedule_call":
+                            return "info";
+                          case "cancel_call":
+                          case "unschedule_call":
+                            return "warning";
+                          default:
+                            return "secondary";
+                        }
+                      };
 
-        </div> {/* End main content area */}
-
-      {/* Company Detail Sidebar */}
-      {showCompanySidebar && (
-      <GenericSidebar
-        isOpen={showCompanySidebar}
-        onClose={handleCloseCompanySidebar}
-        title={selectedCompany?.name || 'Company Details'}
-        subtitle={selectedCompany?.phone || ''}
-        email={selectedCompany?.data?.email}
-        phone={selectedCompany?.phone}
-        avatar={{
-          initials: getInitials(selectedCompany?.name || 'NA'),
-          name: selectedCompany?.name || 'NA',
-          gradient: getRandomColor(selectedCompany?.name || '')
-        }}
-        onNoteCreate={handleNoteCreate}
-        breezeRecordSummary={{
-          content: "This company was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
-          timestamp: "Generated on Feb 14, 2026 at 2:30 PM",
-          onRefresh: () => console.log('Refresh AI summary'),
-          onThumbsUp: () => console.log('Thumbs up'),
-          onThumbsDown: () => console.log('Thumbs down'),
-          onCopy: () => {
-            navigator.clipboard.writeText("This company was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.");
-            console.log('Summary copied');
-          },
-          onAskQuestion: () => console.log('Ask AI a question')
-        }}
-        recordLink={{
-          label: 'View record',
-          onClick: () => console.log('View full company record')
-        }}
-        actionsDropdown={{
-          label: 'Actions',
-          items: [
-            { 
-              label: 'Convert to Lead', 
-              onClick: () => {
-                setConvertingCompanyId(selectedCompany?.id);
-                setShowConvertToLeadModal(true);
-              }
-            },
-            { label: 'Assign to User', onClick: () => console.log('Assign') },
-            { 
-              label: 'Delete', 
-              onClick: () => handleDeleteData(selectedCompany)
-            }
-          ]
-        }}
-        quickActions={[
-          { 
-            id: 'note', 
-            label: 'Note', 
-            icon: FileText, 
-            onClick: () => {}, // This is handled internally now
-            disabled: false 
-          },
-          { 
-            id: 'call', 
-            label: 'Call', 
-            icon: Phone, 
-            onClick: () => {},
-            disabled: !selectedCompany?.phone 
-          },
-          { 
-            id: 'email', 
-            label: 'Email', 
-            icon: Mail, 
-            onClick: () => {},
-            //disabled: !selectedCompany?.email 
-          },
-          { 
-            id: 'task', 
-            label: 'Task', 
-            icon: CheckSquare, 
-            onClick: () => {},
-            disabled: false 
-          },
-          { 
-            id: 'meeting', 
-            label: 'Meeting', 
-            icon: Calendar, 
-            onClick: () => {},
-            disabled: false 
-          },
-          { 
-            id: 'more', 
-            label: 'More', 
-            icon: MoreVertical, 
-            onClick: () => console.log('More actions'),
-            disabled: false 
-          }
-        ]}
-        sections={[
-          {
-            id: 'about-company',
-            title: 'About this company',
-            icon: Target,
-            collapsible: true,
-            defaultExpanded: true,
-            actions: [
-              { label: 'Edit all properties', onClick: () => console.log('Edit all') }
-            ],
-            fields: [
-              {
-                label: 'Name',
-                value: selectedCompany?.name || 'N/A',
-                copyable: true
-              },
-              {
-                label: 'Phone',
-                value: selectedCompany?.phone || 'N/A',
-                type: 'phone',
-                copyable: true,
-                externalLink: selectedCompany?.phone ? `tel:${selectedCompany.phone}` : undefined
-              },
-              {
-                label: 'Email',
-                value: selectedCompany?.data?.email || 'N/A',
-                type: 'email',
-                copyable: true,
-                externalLink: selectedCompany?.data?.email ? `mailto:${selectedCompany.data.email}` : undefined,
-                show: !!selectedCompany?.data?.email
-              },
-              {
-                label: 'Assigned To',
-                value: selectedCompany?.user_extension ? getNameByExtension(selectedCompany.user_extension) : 'Unassigned',
-                hasDetails: true,
-                onDetailsClick: () => console.log('Show user details')
-              },
-              {
-                label: 'Campaign',
-                value: selectedCompany?.campaign?.name || 'No Campaign',
-                show: !!selectedCompany?.campaign,
-                hasDetails: !!selectedCompany?.campaign,
-                onDetailsClick: () => console.log('Show campaign details')
-              },
-              {
-                label: 'Status',
-                value: selectedCompany?.status || 'Active',
-                type: 'text'
-              },
-              {
-                label: 'Created Date',
-                value: selectedCompany?.created_at ? moment(selectedCompany.created_at).format('MMM DD, YYYY') : 'N/A',
-                type: 'date'
-              },
-              {
-                label: 'Last Updated',
-                value: selectedCompany?.updated_at ? moment(selectedCompany.updated_at).format('MMM DD, YYYY') : 'N/A',
-                type: 'date'
-              }
-            ]
-          },
-          {
-            id: 'recent-activities',
-            title: 'Recent activities',
-            icon: History,
-            collapsible: true,
-            defaultExpanded: true,
-            count: 0,
-            emptyState: {
-              icon: History,
-              message: 'No recent activities for this prospect.',
-              action: {
-                label: 'Log activity',
-                onClick: () => console.log('Log activity')
-              }
-            }
-          },
-          {
-            id: 'call-recordings',
-            title: 'Call Recordings',
-            icon: PhoneIcon,
-            collapsible: true,
-            defaultExpanded: true,
-            count: callRecordingsTotal ?? callRecordings.length,
-            isLoading: callRecordingsLoading,
-            actions: [
-              { label: 'View all recordings', onClick: () => console.log('View all') }
-            ],
-            ...(callRecordings.length > 0
-              ? {
-                  customContent: (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {callRecordings.map((recording: any, index: number) => {
-                        const duration = parseInt(recording.Duration?.toString() || '0') / 10000000 || 0;
-                        const isOutgoing = recording.Direction === 'CALL_OUTGOING';
-                        return (
-                          <div
-                            key={recording.Id || index}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '10px 12px',
-                              background: '#f9fafb',
-                              borderRadius: '8px',
-                              border: '1px solid #e5e7eb',
-                            }}
-                          >
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: '13px', fontWeight: 500, color: '#1f2937' }}>
-                                {formatDateTimeToLocal(recording.DateTime, GlobalDateFormat)}
+                      const formatActivityDetails = (activity: any) => {
+                        const details = activity.details || {};
+                        switch (activity.action) {
+                          case "upload":
+                            const campaignNames =
+                              details.campaign_ids
+                                ?.map(
+                                  (id: number) =>
+                                    campaignsById[id] || `Campaign #${id}`,
+                                )
+                                .join(", ") || "No campaigns";
+                            const tags = details.tags?.join(", ") || "No tags";
+                            return (
+                              <div>
+                                <div className="mb-1">
+                                  <strong>
+                                    Uploaded {activity.total_records || 0}{" "}
+                                    prospects
+                                  </strong>
+                                </div>
+                                <div className="small text-muted">
+                                  <div>
+                                    <strong>Campaigns:</strong> {campaignNames}
+                                  </div>
+                                  <div>
+                                    <strong>Tags:</strong> {tags}
+                                  </div>
+                                </div>
                               </div>
-                              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
-                                {formatDuration(duration)} · {isOutgoing ? 'Outgoing' : 'Incoming'}
+                            );
+                          case "assign":
+                            return (
+                              <div>
+                                <div className="mb-1">
+                                  <strong>
+                                    Assigned {activity.total_records || 0}{" "}
+                                    prospects
+                                  </strong>
+                                </div>
+                                <div className="small text-muted">
+                                  <strong>To:</strong>{" "}
+                                  {getNameByExtension(
+                                    activity.user_extension_done_to,
+                                  ) || "Campaign team"}
+                                </div>
+                              </div>
+                            );
+                          case "schedule_call":
+                            return (
+                              <div>
+                                <div className="mb-1">
+                                  <strong>Scheduled call</strong>
+                                </div>
+                                <div className="small text-muted">
+                                  <div>
+                                    <strong>Phone:</strong>{" "}
+                                    {details.phone || "N/A"}
+                                  </div>
+                                  <div>
+                                    <strong>Time:</strong>{" "}
+                                    {moment(details.scheduled_call_at).format(
+                                      "MMM DD, YYYY HH:mm",
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          case "reschedule_call":
+                            return (
+                              <div>
+                                <div className="mb-1">
+                                  <strong>Rescheduled call</strong>
+                                </div>
+                                <div className="small text-muted">
+                                  <div>
+                                    <strong>Phone:</strong>{" "}
+                                    {details.phone || "N/A"}
+                                  </div>
+                                  <div>
+                                    <strong>From:</strong>{" "}
+                                    {moment(
+                                      details.old_scheduled_call_at,
+                                    ).format("MMM DD, HH:mm")}
+                                  </div>
+                                  <div>
+                                    <strong>To:</strong>{" "}
+                                    {moment(
+                                      details.new_scheduled_call_at,
+                                    ).format("MMM DD, HH:mm")}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          case "cancel_call":
+                          case "unschedule_call":
+                            return (
+                              <div>
+                                <div className="mb-1">
+                                  <strong>Cancelled call</strong>
+                                </div>
+                                <div className="small text-muted">
+                                  <div>
+                                    <strong>Phone:</strong>{" "}
+                                    {details.phone || "N/A"}
+                                  </div>
+                                  <div>
+                                    <strong>Was scheduled:</strong>{" "}
+                                    {moment(
+                                      details.cancelled_scheduled_call_at ||
+                                        details.unscheduled_call_at,
+                                    ).format("MMM DD, HH:mm")}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          default:
+                            return (
+                              <div>
+                                <div className="mb-1">
+                                  <strong>
+                                    {activity.action
+                                      ?.replace("_", " ")
+                                      .replace(/\b\w/g, (l: string) =>
+                                        l.toUpperCase(),
+                                      )}
+                                  </strong>
+                                </div>
+                                <div className="small text-muted">
+                                  {activity.details?.description ||
+                                    "No details available"}
+                                </div>
+                              </div>
+                            );
+                        }
+                      };
+
+                      return (
+                        <div key={activity.id} className="timeline-item mb-4 ">
+                          <div className="d-flex">
+                            <div className="timeline-marker me-3">
+                              <div
+                                className={`bg-${getActivityColor(
+                                  activity.action,
+                                )} rounded-circle d-flex align-items-center justify-content-center shadow-sm`}
+                                style={{ width: "36px", height: "36px" }}
+                              >
+                                {getActivityIcon(activity.action)}
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: '#2563eb',
-                                cursor: 'pointer',
-                                padding: '6px',
-                                borderRadius: '6px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                              title="Play Recording"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePlayCallRecording(recording);
-                              }}
-                            >
-                              <FiPlay size={18} />
-                            </button>
+                            <div className="timeline-content flex-grow-1">
+                              <div className="card border-0 shadow-sm">
+                                <div className="card-body p-3">
+                                  <div className="d-flex justify-content-between align-items-start mb-2">
+                                    <div className="flex-grow-1">
+                                      <h6 className="mb-1 d-flex align-items-center">
+                                        <strong className="text-primary">
+                                          {getNameByExtension(
+                                            activity.user_extension_done_by,
+                                          ) || "System"}
+                                        </strong>
+                                        <Badge
+                                          bg={getActivityColor(activity.action)}
+                                          className="ms-2 small"
+                                        >
+                                          {activity.action
+                                            ?.replace("_", " ")
+                                            .replace(/\b\w/g, (l: string) =>
+                                              l.toUpperCase(),
+                                            )}
+                                        </Badge>
+                                      </h6>
+                                      <div className="text-muted">
+                                        {formatActivityDetails(activity)}
+                                      </div>
+                                    </div>
+                                    <div className="text-end">
+                                      <small className="text-muted">
+                                        {moment(activity.created_at).format(
+                                          "MMM DD, YYYY",
+                                        )}
+                                      </small>
+                                      <br />
+                                      <small className="text-muted">
+                                        {moment(activity.created_at).format(
+                                          "HH:mm:ss",
+                                        )}
+                                      </small>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="timeline-line"></div>
+                            </div>
                           </div>
-                        );
-                      })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Pagination */}
+                {!historyLoading &&
+                  historyData.length > 0 &&
+                  historyPagination.last_page > 1 && (
+                    <div className="d-flex justify-content-center mt-4">
+                      <div className="btn-group" role="group">
+                        <Button
+                          variant="outline-secondary"
+                          size="sm"
+                          disabled={historyPagination.current_page === 1}
+                          onClick={() =>
+                            fetchHistoryData(historyPagination.current_page - 1)
+                          }
+                        >
+                          Previous
+                        </Button>
+                        <Button variant="outline-secondary" size="sm" disabled>
+                          {historyPagination.current_page} /{" "}
+                          {historyPagination.last_page}
+                        </Button>
+                        <Button
+                          variant="outline-secondary"
+                          size="sm"
+                          disabled={
+                            historyPagination.current_page ===
+                            historyPagination.last_page
+                          }
+                          onClick={() =>
+                            fetchHistoryData(historyPagination.current_page + 1)
+                          }
+                        >
+                          Next
+                        </Button>
+                      </div>
                     </div>
-                  ),
-                }
-              : {
-                  emptyState: {
-                    icon: PhoneIcon,
-                    message: 'No call recordings available yet.',
-                    action: {
-                      label: 'Make a call',
-                      onClick: () => selectedCompany?.phone && handleCallClick(selectedCompany),
-                    },
+                  )}
+              </>
+            }
+            submitButtonText="Close"
+            cancelButtonText="Cancel"
+            onSubmit={() => setShowHistoryModal(false)}
+            onCancel={() => setShowHistoryModal(false)}
+          />
+
+          {/* Bulk Delete Modal */}
+          <Modal
+            show={showBulkDeleteModal}
+            onHide={() => setShowBulkDeleteModal(false)}
+          >
+            <Modal.Header closeButton>
+              <Modal.Title className="d-flex align-items-center">
+                <FiTrash2 className="me-2" />
+                Bulk Delete Prospects
+              </Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <p>
+                Are you sure you want to delete {selectedItems.length} selected
+                prospects?
+              </p>
+              <div className="alert alert-warning">
+                <strong>Warning:</strong> This action cannot be undone. All
+                selected entries will be permanently deleted.
+              </div>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button
+                variant="secondary"
+                onClick={() => setShowBulkDeleteModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleBulkDelete}>
+                Delete {selectedItems.length} Entries
+              </Button>
+            </Modal.Footer>
+          </Modal>
+          <SuccessfulModal
+            show={showSuccessfulModal}
+            onHide={() => setShowSuccessfulModal(false)}
+            title={successModalTitle}
+            description={successModalDescription}
+          />
+
+          {/* Call Recording Player Modal */}
+          <CallRecordingPlayerModal
+            show={showRecordingPlayerModal}
+            onHide={() => {
+              setShowRecordingPlayerModal(false);
+              setSelectedRecording(null);
+            }}
+            recording={selectedRecording}
+          />
+        </div>{" "}
+        {/* End main content area */}
+        {/* Company Detail Sidebar */}
+        {showCompanySidebar && (
+          <GenericSidebar
+            isOpen={showCompanySidebar}
+            onClose={handleCloseCompanySidebar}
+            title={selectedCompany?.name || "Company Details"}
+            subtitle={selectedCompany?.phone || ""}
+            email={selectedCompany?.data?.email}
+            phone={selectedCompany?.phone}
+            avatar={{
+              initials: getInitials(selectedCompany?.name || "NA"),
+              name: selectedCompany?.name || "NA",
+              gradient: getRandomColor(selectedCompany?.name || ""),
+            }}
+            onNoteCreate={handleNoteCreate}
+            breezeRecordSummary={{
+              content:
+                "This company was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
+              timestamp: "Generated on Feb 14, 2026 at 2:30 PM",
+              onRefresh: () => console.log("Refresh AI summary"),
+              onThumbsUp: () => console.log("Thumbs up"),
+              onThumbsDown: () => console.log("Thumbs down"),
+              onCopy: () => {
+                navigator.clipboard.writeText(
+                  "This company was first contacted on February 10, 2026 through the Winter Campaign. They showed initial interest in our premium product line during the first call. Follow-up scheduled for next week to discuss pricing and implementation timeline. High priority lead with strong buying signals.",
+                );
+                console.log("Summary copied");
+              },
+              onAskQuestion: () => console.log("Ask AI a question"),
+            }}
+            record={{
+              id: selectedCompany?.id || selectedCompany?.rawData?.id,
+              type: RECORD_TYPES.COMPANY,
+            }}
+            recordLink={{
+              label: "View record",
+              onClick: () => console.log("View full company record"),
+            }}
+            actionsDropdown={{
+              label: "Actions",
+              items: [
+                {
+                  label: "Convert to Lead",
+                  onClick: () => {
+                    setConvertingCompanyId(selectedCompany?.id);
+                    setShowConvertToLeadModal(true);
                   },
-                }
-            ),
-          },
-          {
-            id: 'notes',
-            title: 'Notes',
-            icon: FileText,
-            collapsible: true,
-            defaultExpanded: true,
-            count: 0,
-            emptyState: {
-              icon: FileText,
-              message: 'No notes added yet.',
-              action: {
-                label: 'Add note',
-                onClick: () => console.log('Add note')
+                },
+                {
+                  label: "Assign to User",
+                  onClick: () => console.log("Assign"),
+                },
+                {
+                  label: "Delete",
+                  onClick: () => handleDeleteData(selectedCompany),
+                },
+              ],
+            }}
+            quickActions={[
+              {
+                id: "note",
+                label: "Note",
+                icon: FileText,
+                onClick: () => {}, // This is handled internally now
+                disabled: false,
+              },
+              {
+                id: "call",
+                label: "Call",
+                icon: Phone,
+                onClick: () => {},
+                disabled: !selectedCompany?.phone,
+              },
+              {
+                id: "email",
+                label: "Email",
+                icon: Mail,
+                onClick: () => {},
+                //disabled: !selectedCompany?.email
+              },
+              {
+                id: "task",
+                label: "Task",
+                icon: CheckSquare,
+                onClick: () => {},
+                disabled: false,
+              },
+              {
+                id: "meeting",
+                label: "Meeting",
+                icon: Calendar,
+                onClick: () => {},
+                disabled: false,
+              },
+              {
+                id: "more",
+                label: "More",
+                icon: MoreVertical,
+                onClick: () => console.log("More actions"),
+                disabled: false,
+              },
+            ]}
+            sections={[
+              {
+                id: "about-company",
+                title: "About this company",
+                icon: Target,
+                collapsible: true,
+                defaultExpanded: true,
+                actions: [
+                  {
+                    label: "Edit all properties",
+                    onClick: () => console.log("Edit all"),
+                  },
+                ],
+                fields: [
+                  {
+                    label: "Name",
+                    value: selectedCompany?.name || "N/A",
+                    copyable: true,
+                  },
+                  {
+                    label: "Phone",
+                    value: selectedCompany?.phone || "N/A",
+                    type: "phone",
+                    copyable: true,
+                    externalLink: selectedCompany?.phone
+                      ? `tel:${selectedCompany.phone}`
+                      : undefined,
+                  },
+                  {
+                    label: "Email",
+                    value: selectedCompany?.data?.email || "N/A",
+                    type: "email",
+                    copyable: true,
+                    externalLink: selectedCompany?.data?.email
+                      ? `mailto:${selectedCompany.data.email}`
+                      : undefined,
+                    show: !!selectedCompany?.data?.email,
+                  },
+                  {
+                    label: "Assigned To",
+                    value: selectedCompany?.user_extension
+                      ? getNameByExtension(selectedCompany.user_extension)
+                      : "Unassigned",
+                    hasDetails: true,
+                    onDetailsClick: () => console.log("Show user details"),
+                  },
+                  {
+                    label: "Campaign",
+                    value: selectedCompany?.campaign?.name || "No Campaign",
+                    show: !!selectedCompany?.campaign,
+                    hasDetails: !!selectedCompany?.campaign,
+                    onDetailsClick: () => console.log("Show campaign details"),
+                  },
+                  {
+                    label: "Status",
+                    value: selectedCompany?.status || "Active",
+                    type: "text",
+                  },
+                  {
+                    label: "Created Date",
+                    value: selectedCompany?.created_at
+                      ? moment(selectedCompany.created_at).format(
+                          "MMM DD, YYYY",
+                        )
+                      : "N/A",
+                    type: "date",
+                  },
+                  {
+                    label: "Last Updated",
+                    value: selectedCompany?.updated_at
+                      ? moment(selectedCompany.updated_at).format(
+                          "MMM DD, YYYY",
+                        )
+                      : "N/A",
+                    type: "date",
+                  },
+                ],
+              },
+              {
+                id: "recent-activities",
+                title: "Recent activities",
+                icon: History,
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                emptyState: {
+                  icon: History,
+                  message: "No recent activities for this prospect.",
+                  action: {
+                    label: "Log activity",
+                    onClick: () => console.log("Log activity"),
+                  },
+                },
+              },
+              {
+                id: "call-recordings",
+                title: "Call Recordings",
+                icon: PhoneIcon,
+                collapsible: true,
+                defaultExpanded: true,
+                count: callRecordingsTotal ?? callRecordings.length,
+                isLoading: callRecordingsLoading,
+                actions: [
+                  {
+                    label: "View all recordings",
+                    onClick: () => console.log("View all"),
+                  },
+                ],
+                ...(callRecordings.length > 0
+                  ? {
+                      customContent: (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "8px",
+                          }}
+                        >
+                          {callRecordings.map(
+                            (recording: any, index: number) => {
+                              const duration =
+                                parseInt(
+                                  recording.Duration?.toString() || "0",
+                                ) / 10000000 || 0;
+                              const isOutgoing =
+                                recording.Direction === "CALL_OUTGOING";
+                              return (
+                                <div
+                                  key={recording.Id || index}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    padding: "10px 12px",
+                                    background: "#f9fafb",
+                                    borderRadius: "8px",
+                                    border: "1px solid #e5e7eb",
+                                  }}
+                                >
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div
+                                      style={{
+                                        fontSize: "13px",
+                                        fontWeight: 500,
+                                        color: "#1f2937",
+                                      }}
+                                    >
+                                      {formatDateTimeToLocal(
+                                        recording.DateTime,
+                                        GlobalDateFormat,
+                                      )}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        color: "#6b7280",
+                                        marginTop: "2px",
+                                      }}
+                                    >
+                                      {formatDuration(duration)} ·{" "}
+                                      {isOutgoing ? "Outgoing" : "Incoming"}
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    style={{
+                                      background: "transparent",
+                                      border: "none",
+                                      color: "#2563eb",
+                                      cursor: "pointer",
+                                      padding: "6px",
+                                      borderRadius: "6px",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
+                                    title="Play Recording"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handlePlayCallRecording(recording);
+                                    }}
+                                  >
+                                    <FiPlay size={18} />
+                                  </button>
+                                </div>
+                              );
+                            },
+                          )}
+                        </div>
+                      ),
+                    }
+                  : {
+                      emptyState: {
+                        icon: PhoneIcon,
+                        message: "No call recordings available yet.",
+                        action: {
+                          label: "Make a call",
+                          onClick: () =>
+                            selectedCompany?.phone &&
+                            handleCallClick(selectedCompany),
+                        },
+                      },
+                    }),
+              },
+              {
+                id: "notes",
+                title: "Notes",
+                icon: FileText,
+                collapsible: true,
+                defaultExpanded: true,
+                count: 0,
+                emptyState: {
+                  icon: FileText,
+                  message: "No notes added yet.",
+                  action: {
+                    label: "Add note",
+                    onClick: () => console.log("Add note"),
+                  },
+                },
+              },
+            ]}
+          />
+        )}
+        {/* Filters Sidebar */}
+        <GenericFilterSidebar
+          isOpen={showFiltersSidebar}
+          onClose={handleCloseFiltersSidebar}
+          title="Filters"
+          subtitle="Filter companies by various criteria"
+          width="400px"
+          filters={[
+            {
+              id: "search",
+              label: "Search",
+              type: "text",
+              value: companySearch,
+              onChange: (value) => setCompanySearch(value),
+              placeholder: "Search by name or phone...",
+            },
+            {
+              id: "assignedTo",
+              label: "Assigned To",
+              type: "select",
+              value: companyFilters.assignedTo
+                ? (() => {
+                    const assignedToId = companyFilters.assignedTo;
+                    const ext = extensions.find(
+                      (e: any) => (e.id || e.extension) === assignedToId,
+                    );
+                    return ext
+                      ? {
+                          value: assignedToId,
+                          label: ext.display_name || ext.name || assignedToId,
+                        }
+                      : { value: assignedToId, label: assignedToId };
+                  })()
+                : null,
+              onChange: (selected) => {
+                const assignedToValue = selected ? selected.value : null;
+                setCompanyFilters((prev) => ({
+                  ...prev,
+                  assignedTo: assignedToValue,
+                }));
+                setActiveFilter("all");
+              },
+              options: extensions.map((ext: any) => ({
+                value: ext.id || ext.extension,
+                label: ext.display_name || ext.name || ext.id || ext.extension,
+              })),
+              placeholder: "Select user...",
+              isClearable: true,
+              styles: customSelectStyles,
+            },
+            {
+              id: "campaigns",
+              label: "Campaigns",
+              type: "multi-select",
+              value: companyFilters.campaigns
+                ? companyFilters.campaigns.map((campaignId: string) => {
+                    const campaign = availableCampaigns.find(
+                      (c: any) => c.value === campaignId,
+                    );
+                    return campaign
+                      ? { value: campaignId, label: campaign.label }
+                      : { value: campaignId, label: campaignId };
+                  })
+                : [],
+              onChange: (selected) => {
+                const campaignValues = selected
+                  ? selected.map((s: any) => s.value)
+                  : null;
+                setCompanyFilters((prev) => ({
+                  ...prev,
+                  campaigns: campaignValues,
+                }));
+                setActiveFilter("all");
+              },
+              options: availableCampaigns.map((c) => ({
+                value: c.value,
+                label: c.label,
+              })),
+              placeholder: "Select campaigns...",
+              isClearable: true,
+              styles: customSelectStyles,
+            },
+            {
+              id: "nextCallScheduled",
+              label: "Next Call Scheduled",
+              type: "dropdown",
+              value: companyFilters.nextCallScheduled || "",
+              onChange: (value) => {
+                const selectedValue = value || null;
+                setCompanyFilters((prev) => ({
+                  ...prev,
+                  nextCallScheduled: selectedValue,
+                  nextCallDateFrom: null,
+                  nextCallDateTo: null,
+                }));
+                setActiveFilter("all");
+              },
+              options: [
+                { value: "", label: "Select option..." },
+                { value: "today", label: "Today" },
+                { value: "tomorrow", label: "Tomorrow" },
+                { value: "this_week", label: "This Week" },
+                { value: "next_week", label: "Next Week" },
+                { value: "overdue", label: "Overdue Calls" },
+                { value: "custom", label: "Custom Date Range" },
+              ],
+            },
+            {
+              id: "nextCallDateFrom",
+              label: "Next Call Date (From)",
+              type: "date",
+              value: companyFilters.nextCallDateFrom || "",
+              onChange: (value) => {
+                const dateValue = value || null;
+                setCompanyFilters((prev) => ({
+                  ...prev,
+                  nextCallDateFrom: dateValue,
+                }));
+              },
+              placeholder: "From date",
+            },
+            {
+              id: "nextCallDateTo",
+              label: "Next Call Date (To)",
+              type: "date",
+              value: companyFilters.nextCallDateTo || "",
+              onChange: (value) => {
+                const dateValue = value || null;
+                setCompanyFilters((prev) => ({
+                  ...prev,
+                  nextCallDateTo: dateValue,
+                }));
+              },
+              placeholder: "To date",
+            },
+            {
+              id: "sourceFile",
+              label: "Source Name",
+              type: "select",
+              value: companyFilters.sourceFile
+                ? {
+                    value: companyFilters.sourceFile,
+                    label: companyFilters.sourceFile,
+                  }
+                : null,
+              onChange: (selected) => {
+                const sourceValue = selected ? selected.value : null;
+                setCompanyFilters((prev) => ({
+                  ...prev,
+                  sourceFile: sourceValue,
+                }));
+                setActiveFilter("all");
+              },
+              options: uniqueSources,
+              placeholder: "Select source...",
+              isClearable: true,
+              styles: customSelectStyles,
+            },
+            {
+              id: "tags",
+              label: "Tags",
+              type: "multi-select",
+              value: companyFilters.tags
+                ? companyFilters.tags.map((tagValue: string) => {
+                    const tag = availableTags.find(
+                      (t: any) => t.value === tagValue,
+                    );
+                    return tag
+                      ? { value: tagValue, label: tag.label }
+                      : { value: tagValue, label: tagValue };
+                  })
+                : [],
+              onChange: (selected) => {
+                const tagValues = selected
+                  ? selected.map((s: any) => s.value)
+                  : null;
+                setCompanyFilters((prev) => ({
+                  ...prev,
+                  tags: tagValues,
+                }));
+                setActiveFilter("all");
+              },
+              options: availableTags.map((tag) => ({
+                value: tag.value,
+                label: tag.label,
+              })),
+              placeholder: "Select tags...",
+              isClearable: true,
+              styles: customSelectStyles,
+            },
+          ]}
+          onApply={() => {
+            const filtersToApply: Record<string, any> = {};
+
+            if (companySearch) {
+              filtersToApply.search = companySearch;
+            }
+            if (companyFilters.assignedTo) {
+              filtersToApply.user_extension = [companyFilters.assignedTo];
+            }
+            if (
+              companyFilters.campaigns &&
+              companyFilters.campaigns.length > 0
+            ) {
+              filtersToApply.campaign_id = companyFilters.campaigns;
+            }
+            if (companyFilters.sourceFile) {
+              filtersToApply.source_file = companyFilters.sourceFile;
+            }
+            if (companyFilters.tags && companyFilters.tags.length > 0) {
+              filtersToApply.tags = companyFilters.tags;
+            }
+
+            // Handle next call scheduled filters
+            const now = moment();
+            if (companyFilters.nextCallScheduled === "today") {
+              const today = now.format("YYYY-MM-DD");
+              filtersToApply.scheduled_call_from = today;
+              filtersToApply.scheduled_call_to = today;
+            } else if (companyFilters.nextCallScheduled === "tomorrow") {
+              const tomorrow = moment().add(1, "day").format("YYYY-MM-DD");
+              filtersToApply.scheduled_call_from = tomorrow;
+              filtersToApply.scheduled_call_to = tomorrow;
+            } else if (companyFilters.nextCallScheduled === "this_week") {
+              const startOfWeek = moment().startOf("week").format("YYYY-MM-DD");
+              const endOfWeek = moment().endOf("week").format("YYYY-MM-DD");
+              filtersToApply.scheduled_call_from = startOfWeek;
+              filtersToApply.scheduled_call_to = endOfWeek;
+            } else if (companyFilters.nextCallScheduled === "next_week") {
+              const nextWeekStart = moment()
+                .add(1, "week")
+                .startOf("week")
+                .format("YYYY-MM-DD");
+              const nextWeekEnd = moment()
+                .add(1, "week")
+                .endOf("week")
+                .format("YYYY-MM-DD");
+              filtersToApply.scheduled_call_from = nextWeekStart;
+              filtersToApply.scheduled_call_to = nextWeekEnd;
+            } else if (companyFilters.nextCallScheduled === "overdue") {
+              filtersToApply.scheduled_call_status = "overdue";
+            } else if (companyFilters.nextCallScheduled === "custom") {
+              if (companyFilters.nextCallDateFrom) {
+                filtersToApply.scheduled_call_from =
+                  companyFilters.nextCallDateFrom;
+              }
+              if (companyFilters.nextCallDateTo) {
+                filtersToApply.scheduled_call_to =
+                  companyFilters.nextCallDateTo;
               }
             }
-          }
-        ]}
-      />
-      )}
 
-      {/* Filters Sidebar */}
-      <GenericFilterSidebar
-        isOpen={showFiltersSidebar}
-        onClose={handleCloseFiltersSidebar}
-        title="Filters"
-        subtitle="Filter companies by various criteria"
-        width="400px"
-        filters={[
-          {
-            id: 'search',
-            label: 'Search',
-            type: 'text',
-            value: companySearch,
-            onChange: (value) => setCompanySearch(value),
-            placeholder: 'Search by name or phone...'
-          },
-          {
-            id: 'assignedTo',
-            label: 'Assigned To',
-            type: 'select',
-            value: companyFilters.assignedTo
-              ? (() => {
-                  const assignedToId = companyFilters.assignedTo;
-                  const ext = extensions.find(
-                    (e: any) => (e.id || e.extension) === assignedToId
-                  );
-                  return ext
-                    ? {
-                        value: assignedToId,
-                        label: ext.display_name || ext.name || assignedToId,
-                      }
-                    : { value: assignedToId, label: assignedToId };
-                })()
-              : null,
-            onChange: (selected) => {
-              const assignedToValue = selected ? selected.value : null;
-              setCompanyFilters((prev) => ({
-                ...prev,
-                assignedTo: assignedToValue,
-              }));
-              setActiveFilter("all");
-            },
-            options: extensions.map((ext: any) => ({
-              value: ext.id || ext.extension,
-              label: ext.display_name || ext.name || ext.id || ext.extension,
-            })),
-            placeholder: 'Select user...',
-            isClearable: true,
-            styles: customSelectStyles
-          },
-          {
-            id: 'campaigns',
-            label: 'Campaigns',
-            type: 'multi-select',
-            value: companyFilters.campaigns
-              ? companyFilters.campaigns.map((campaignId: string) => {
-                  const campaign = availableCampaigns.find((c: any) => c.value === campaignId);
-                  return campaign
-                    ? { value: campaignId, label: campaign.label }
-                    : { value: campaignId, label: campaignId };
-                })
-              : [],
-            onChange: (selected) => {
-              const campaignValues = selected ? selected.map((s: any) => s.value) : null;
-              setCompanyFilters((prev) => ({
-                ...prev,
-                campaigns: campaignValues,
-              }));
-              setActiveFilter("all");
-            },
-            options: availableCampaigns.map((c) => ({
-              value: c.value,
-              label: c.label,
-            })),
-            placeholder: 'Select campaigns...',
-            isClearable: true,
-            styles: customSelectStyles
-          },
-          {
-            id: 'nextCallScheduled',
-            label: 'Next Call Scheduled',
-            type: 'dropdown',
-            value: companyFilters.nextCallScheduled || '',
-            onChange: (value) => {
-              const selectedValue = value || null;
-              setCompanyFilters((prev) => ({
-                ...prev,
-                nextCallScheduled: selectedValue,
-                nextCallDateFrom: null,
-                nextCallDateTo: null,
-              }));
-              setActiveFilter("all");
-            },
-            options: [
-              { value: '', label: 'Select option...' },
-              { value: 'today', label: 'Today' },
-              { value: 'tomorrow', label: 'Tomorrow' },
-              { value: 'this_week', label: 'This Week' },
-              { value: 'next_week', label: 'Next Week' },
-              { value: 'overdue', label: 'Overdue Calls' },
-              { value: 'custom', label: 'Custom Date Range' }
-            ]
-          },
-          {
-            id: 'nextCallDateFrom',
-            label: 'Next Call Date (From)',
-            type: 'date',
-            value: companyFilters.nextCallDateFrom || '',
-            onChange: (value) => {
-              const dateValue = value || null;
-              setCompanyFilters((prev) => ({
-                ...prev,
-                nextCallDateFrom: dateValue,
-              }));
-            },
-            placeholder: 'From date'
-          },
-          {
-            id: 'nextCallDateTo',
-            label: 'Next Call Date (To)',
-            type: 'date',
-            value: companyFilters.nextCallDateTo || '',
-            onChange: (value) => {
-              const dateValue = value || null;
-              setCompanyFilters((prev) => ({
-                ...prev,
-                nextCallDateTo: dateValue,
-              }));
-            },
-            placeholder: 'To date'
-          },
-          {
-            id: 'sourceFile',
-            label: 'Source Name',
-            type: 'select',
-            value: companyFilters.sourceFile
-              ? { value: companyFilters.sourceFile, label: companyFilters.sourceFile }
-              : null,
-            onChange: (selected) => {
-              const sourceValue = selected ? selected.value : null;
-              setCompanyFilters((prev) => ({
-                ...prev,
-                sourceFile: sourceValue,
-              }));
-              setActiveFilter("all");
-            },
-            options: uniqueSources,
-            placeholder: 'Select source...',
-            isClearable: true,
-            styles: customSelectStyles
-          },
-          {
-            id: 'tags',
-            label: 'Tags',
-            type: 'multi-select',
-            value: companyFilters.tags
-              ? companyFilters.tags.map((tagValue: string) => {
-                  const tag = availableTags.find((t: any) => t.value === tagValue);
-                  return tag ? { value: tagValue, label: tag.label } : { value: tagValue, label: tagValue };
-                })
-              : [],
-            onChange: (selected) => {
-              const tagValues = selected ? selected.map((s: any) => s.value) : null;
-              setCompanyFilters((prev) => ({
-                ...prev,
-                tags: tagValues,
-              }));
-              setActiveFilter("all");
-            },
-            options: availableTags.map((tag) => ({
-              value: tag.value,
-              label: tag.label,
-            })),
-            placeholder: 'Select tags...',
-            isClearable: true,
-            styles: customSelectStyles
-          }
-        ]}
-        onApply={() => {
-          const filtersToApply: Record<string, any> = {};
-          
-          if (companySearch) {
-            filtersToApply.search = companySearch;
-          }
-          if (companyFilters.assignedTo) {
-            filtersToApply.user_extension = [companyFilters.assignedTo];
-          }
-          if (companyFilters.campaigns && companyFilters.campaigns.length > 0) {
-            filtersToApply.campaign_id = companyFilters.campaigns;
-          }
-          if (companyFilters.sourceFile) {
-            filtersToApply.source_file = companyFilters.sourceFile;
-          }
-          if (companyFilters.tags && companyFilters.tags.length > 0) {
-            filtersToApply.tags = companyFilters.tags;
-          }
-          
-          // Handle next call scheduled filters
-          const now = moment();
-          if (companyFilters.nextCallScheduled === 'today') {
-            const today = now.format('YYYY-MM-DD');
-            filtersToApply.scheduled_call_from = today;
-            filtersToApply.scheduled_call_to = today;
-          } else if (companyFilters.nextCallScheduled === 'tomorrow') {
-            const tomorrow = moment().add(1, 'day').format('YYYY-MM-DD');
-            filtersToApply.scheduled_call_from = tomorrow;
-            filtersToApply.scheduled_call_to = tomorrow;
-          } else if (companyFilters.nextCallScheduled === 'this_week') {
-            const startOfWeek = moment().startOf('week').format('YYYY-MM-DD');
-            const endOfWeek = moment().endOf('week').format('YYYY-MM-DD');
-            filtersToApply.scheduled_call_from = startOfWeek;
-            filtersToApply.scheduled_call_to = endOfWeek;
-          } else if (companyFilters.nextCallScheduled === 'next_week') {
-            const nextWeekStart = moment().add(1, 'week').startOf('week').format('YYYY-MM-DD');
-            const nextWeekEnd = moment().add(1, 'week').endOf('week').format('YYYY-MM-DD');
-            filtersToApply.scheduled_call_from = nextWeekStart;
-            filtersToApply.scheduled_call_to = nextWeekEnd;
-          } else if (companyFilters.nextCallScheduled === 'overdue') {
-            filtersToApply.scheduled_call_status = 'overdue';
-          } else if (companyFilters.nextCallScheduled === 'custom') {
-            if (companyFilters.nextCallDateFrom) {
-              filtersToApply.scheduled_call_from = companyFilters.nextCallDateFrom;
-            }
-            if (companyFilters.nextCallDateTo) {
-              filtersToApply.scheduled_call_to = companyFilters.nextCallDateTo;
-            }
-          }
-          
-          handleFiltersChange(filtersToApply);
-          setPagination((prev) => ({
-            ...prev,
-            currentPage: 1,
-          }));
-          setRefreshKey((prev) => prev + 1);
-          setShowFiltersSidebar(false);
-        }}
-        onReset={() => {
-          setCompanySearch("");
-          setCompanyFilters({
-            assignedTo: null,
-            campaigns: null,
-            nextCallScheduled: null,
-            nextCallDateFrom: null,
-            nextCallDateTo: null,
-            sourceFile: null,
-            tags: null,
-          });
-          handleFiltersChange({});
-          setCurrentFilters({});
-          setActiveFilter("all");
-          setPagination((prev) => ({
-            ...prev,
-            currentPage: 1,
-          }));
-          setRefreshKey((prev) => prev + 1);
-        }}
-      />
-
-      </div> {/* End flex container */}
-
+            handleFiltersChange(filtersToApply);
+            setPagination((prev) => ({
+              ...prev,
+              currentPage: 1,
+            }));
+            setRefreshKey((prev) => prev + 1);
+            setShowFiltersSidebar(false);
+          }}
+          onReset={() => {
+            setCompanySearch("");
+            setCompanyFilters({
+              assignedTo: null,
+              campaigns: null,
+              nextCallScheduled: null,
+              nextCallDateFrom: null,
+              nextCallDateTo: null,
+              sourceFile: null,
+              tags: null,
+            });
+            handleFiltersChange({});
+            setCurrentFilters({});
+            setActiveFilter("all");
+            setPagination((prev) => ({
+              ...prev,
+              currentPage: 1,
+            }));
+            setRefreshKey((prev) => prev + 1);
+          }}
+        />
+      </div>{" "}
+      {/* End flex container */}
       {/* Convert to Lead Modal */}
-{convertingCompanyId && (
-  <ConvertToLeadModal
-    show={showConvertToLeadModal}
-    onHide={() => {
-      setShowConvertToLeadModal(false);
-      setConvertingCompanyId(null);
-    }}
-    prospectId={convertingCompanyId}
-    onSuccess={() => {
-      setRefreshKey((prev) => prev + 1);
-      toast.success("Company converted to lead successfully!");
-    }}
-  />
-)}
-
+      {convertingCompanyId && (
+        <ConvertToLeadModal
+          show={showConvertToLeadModal}
+          onHide={() => {
+            setShowConvertToLeadModal(false);
+            setConvertingCompanyId(null);
+          }}
+          prospectId={convertingCompanyId}
+          onSuccess={() => {
+            setRefreshKey((prev) => prev + 1);
+            toast.success("Company converted to lead successfully!");
+          }}
+        />
+      )}
       {/* Column Editor Modal */}
-      <Modal show={showColumnEditor} onHide={() => setShowColumnEditor(false)} size="lg">
+      <Modal
+        show={showColumnEditor}
+        onHide={() => setShowColumnEditor(false)}
+        size="lg"
+      >
         <Modal.Header closeButton>
           <Modal.Title>Customize Columns</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <p className="text-muted mb-3">Select which columns to display in the table</p>
+          <p className="text-muted mb-3">
+            Select which columns to display in the table
+          </p>
           <Row>
             {companyColumns.map((col) => {
               const isChecked = draftSelectedColumns.includes(col.key);
-              const isOnlySelected = isChecked && draftSelectedColumns.length === 1;
+              const isOnlySelected =
+                isChecked && draftSelectedColumns.length === 1;
               return (
                 <Col key={col.key} md={6} className="mb-2">
                   <Form.Check
@@ -7230,9 +8763,13 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
                     onChange={(e) => {
                       const checked = e.target.checked;
                       if (checked) {
-                        setDraftSelectedColumns((prev) => (prev.includes(col.key) ? prev : [...prev, col.key]));
+                        setDraftSelectedColumns((prev) =>
+                          prev.includes(col.key) ? prev : [...prev, col.key],
+                        );
                       } else if (!isOnlySelected) {
-                        setDraftSelectedColumns((prev) => prev.filter((k) => k !== col.key));
+                        setDraftSelectedColumns((prev) =>
+                          prev.filter((k) => k !== col.key),
+                        );
                       }
                     }}
                   />
@@ -7242,15 +8779,23 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
           </Row>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowColumnEditor(false)}>
+          <Button
+            variant="secondary"
+            onClick={() => setShowColumnEditor(false)}
+          >
             Cancel
           </Button>
-          <Button variant="primary" onClick={() => { setSelectedColumns(draftSelectedColumns); setShowColumnEditor(false); }}>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setSelectedColumns(draftSelectedColumns);
+              setShowColumnEditor(false);
+            }}
+          >
             Apply Changes
           </Button>
         </Modal.Footer>
       </Modal>
-
       {/* Export Modal */}
       <Modal show={showExportModal} onHide={() => setShowExportModal(false)}>
         <Modal.Header closeButton>
@@ -7262,7 +8807,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
             <Form.Label>File Name</Form.Label>
             <Form.Control
               type="text"
-              defaultValue={`prospects_${moment().format('YYYY-MM-DD')}`}
+              defaultValue={`prospects_${moment().format("YYYY-MM-DD")}`}
               placeholder="Enter file name"
             />
           </Form.Group>
@@ -7276,7 +8821,7 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
             disabled={exporting || totalRecords === 0}
             onClick={async () => {
               if (totalRecords === 0) {
-                toast.info('No prospects to export');
+                toast.info("No prospects to export");
                 return;
               }
               setExporting(true);
@@ -7285,17 +8830,26 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
                 const allData: CrmDataItem[] = [];
                 let page = 1;
                 for (;;) {
-                  const response = await getCrmData(buildCrmDataParams({ page, per_page: PER_PAGE }));
+                  const response = await getCrmData(
+                    buildCrmDataParams({ page, per_page: PER_PAGE }),
+                  );
                   const chunk = response?.data || [];
                   allData.push(...chunk);
-                  if (chunk.length < PER_PAGE || allData.length >= totalRecords) break;
+                  if (chunk.length < PER_PAGE || allData.length >= totalRecords)
+                    break;
                   page += 1;
                 }
-                const exportColumns = companyColumns.filter((c) => selectedColumns.includes(c.key));
+                const exportColumns = companyColumns.filter((c) =>
+                  selectedColumns.includes(c.key),
+                );
                 const getCellValue = (row: any, col: TableColumn<any>) => {
-                  const raw = (col as any).accessor ? (col as any).accessor(row) : row[col.key as keyof CrmDataItem];
-                  if (raw == null) return '';
-                  return typeof raw === 'object' ? JSON.stringify(raw) : String(raw);
+                  const raw = (col as any).accessor
+                    ? (col as any).accessor(row)
+                    : row[col.key as keyof CrmDataItem];
+                  if (raw == null) return "";
+                  return typeof raw === "object"
+                    ? JSON.stringify(raw)
+                    : String(raw);
                 };
                 const escapeCsv = (val: string) => {
                   const s = String(val);
@@ -7303,23 +8857,27 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
                   return s;
                 };
                 const csvContent = [
-                  exportColumns.map((col) => escapeCsv(col.label)).join(','),
+                  exportColumns.map((col) => escapeCsv(col.label)).join(","),
                   ...allData.map((row) =>
-                    exportColumns.map((col) => escapeCsv(getCellValue(row, col))).join(',')
+                    exportColumns
+                      .map((col) => escapeCsv(getCellValue(row, col)))
+                      .join(","),
                   ),
-                ].join('\n');
+                ].join("\n");
 
-                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const blob = new Blob([csvContent], { type: "text/csv" });
                 const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
+                const a = document.createElement("a");
                 a.href = url;
-                a.download = `prospects_${moment().format('YYYY-MM-DD')}.csv`;
+                a.download = `prospects_${moment().format("YYYY-MM-DD")}.csv`;
                 a.click();
                 window.URL.revokeObjectURL(url);
                 setShowExportModal(false);
-                toast.success(`Exported ${allData.length} prospects successfully!`);
+                toast.success(
+                  `Exported ${allData.length} prospects successfully!`,
+                );
               } catch (err) {
-                toast.error('Failed to export prospects');
+                toast.error("Failed to export prospects");
               } finally {
                 setExporting(false);
               }
@@ -7339,7 +8897,6 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
           </Button>
         </Modal.Footer>
       </Modal>
-
       {/* Add Tab Modal */}
       <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>
         <Modal.Header closeButton>
@@ -7351,18 +8908,21 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
             <Button
               variant="outline-primary"
               onClick={() => {
-                if (!customTabs.find(t => t.id === 'scheduled')) {
-                  setCustomTabs([...customTabs, {
-                    id: 'scheduled',
-                    label: 'Scheduled',
-                    count: metrics.scheduled_records,
-                    removable: true
-                  }]);
+                if (!customTabs.find((t) => t.id === "scheduled")) {
+                  setCustomTabs([
+                    ...customTabs,
+                    {
+                      id: "scheduled",
+                      label: "Scheduled",
+                      count: metrics.scheduled_records,
+                      removable: true,
+                    },
+                  ]);
                   setShowTabModal(false);
-                  toast.success('Tab added successfully!');
+                  toast.success("Tab added successfully!");
                 }
               }}
-              disabled={customTabs.some(t => t.id === 'scheduled')}
+              disabled={customTabs.some((t) => t.id === "scheduled")}
             >
               <FiCalendar size={16} className="me-2" />
               Scheduled
@@ -7370,17 +8930,20 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
             <Button
               variant="outline-primary"
               onClick={() => {
-                if (!customTabs.find(t => t.id === 'has_leads')) {
-                  setCustomTabs([...customTabs, {
-                    id: 'has_leads',
-                    label: 'Convert to Leads',
-                    removable: true
-                  }]);
+                if (!customTabs.find((t) => t.id === "has_leads")) {
+                  setCustomTabs([
+                    ...customTabs,
+                    {
+                      id: "has_leads",
+                      label: "Convert to Leads",
+                      removable: true,
+                    },
+                  ]);
                   setShowTabModal(false);
-                  toast.success('Tab added successfully!');
+                  toast.success("Tab added successfully!");
                 }
               }}
-              disabled={customTabs.some(t => t.id === 'has_leads')}
+              disabled={customTabs.some((t) => t.id === "has_leads")}
             >
               <FiTarget size={16} className="me-2" />
               Convert to Leads
@@ -7393,12 +8956,13 @@ const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(nu
           </Button>
         </Modal.Footer>
       </Modal>
-
       {/* Create Contact Sidebar */}
       {renderCreateContactSidebar()}
-
       {/* Create Company Sidebar */}
-      {renderCreateCompany(showCreateCompanySidebar, setShowCreateCompanySidebar)}
+      {renderCreateCompany(
+        showCreateCompanySidebar,
+        setShowCreateCompanySidebar,
+      )}
     </React.Fragment>
   );
 };
