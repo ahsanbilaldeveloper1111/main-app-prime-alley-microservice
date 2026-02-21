@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 import { useSession, signOut } from "next-auth/react";
+import { getLogoutCallbackUrl } from '../../utils/logoutRedirect';
 import { useRouter } from 'next/router';
 import { getStorageImageUrl } from '@utils/imageUtils';
 import ResetPasswordModal from '@components/ResetPasswordModal';
@@ -610,7 +611,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                   onClick={() => {
                     onClose?.();
                     clearSessionCookiesClient(true);
-                    signOut({ callbackUrl: '/auth/signin', redirect: true });
+                    signOut({ callbackUrl: getLogoutCallbackUrl(), redirect: true });
                   }}
                 >
                   <div className="profile-menu-content">

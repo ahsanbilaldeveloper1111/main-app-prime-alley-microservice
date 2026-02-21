@@ -4,6 +4,7 @@ import { initializeTokensFromSession, hasTokens } from '../utils/tokenUtils';
 import { useTokenService } from './useTokenService';
 import { sessionStore } from '../utils/sessionStore';
 import { clearSessionCookiesClient } from '../utils/cookieUtils';
+import { getLogoutCallbackUrl } from '../utils/logoutRedirect';
 
 export const useAuth = () => {
   const { data: session, status } = useSession();
@@ -30,18 +31,18 @@ export const useAuth = () => {
     try {
       clearTokens();
       clearSessionCookiesClient(true);
-      await signOut();
+      const callbackUrl = getLogoutCallbackUrl();
+      await signOut({ callbackUrl, redirect: false });
 
-      // Simple redirect to login page
+      // Redirect to login on current domain
       if (typeof window !== 'undefined') {
-        window.location.href = '/auth/signin';
+        window.location.href = callbackUrl;
       }
       
     } catch (error) {
       console.error('Logout error:', error);
-      // Still redirect even if signOut fails
       if (typeof window !== 'undefined') {
-        window.location.href = '/auth/signin';
+        window.location.href = getLogoutCallbackUrl();
       }
     }
   };

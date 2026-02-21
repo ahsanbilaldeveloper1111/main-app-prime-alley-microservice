@@ -23,6 +23,12 @@ const calculateTokenExpiry = (expiresIn: number, now: number = Date.now()): numb
   return now + (expiresIn * 1000);
 };
 
+// Trusted origins for redirects (signout, etc.) so logout stays on same domain
+const getTrustedOrigins = (): string[] => {
+  const env = process.env.NEXTAUTH_TRUSTED_ORIGINS ?? '';
+  return env.split(',').map((o) => o.trim()).filter(Boolean);
+};
+
 declare module 'next-auth' {
   interface Session {
     user: {
@@ -210,6 +216,19 @@ export const authOptions: NextAuthOptions = {
   },
 
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      // Allow relative URLs (resolve against current request origin via client)
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      try {
+        const urlOrigin = new URL(url).origin;
+        const trusted = getTrustedOrigins();
+        if (trusted.includes(urlOrigin)) return url;
+        if (urlOrigin === new URL(baseUrl).origin) return url;
+      } catch {
+        // invalid url
+      }
+      return baseUrl;
+    },
     async jwt({ token, user }) {
       // Initial login - store user data and tokens
       if (user) {

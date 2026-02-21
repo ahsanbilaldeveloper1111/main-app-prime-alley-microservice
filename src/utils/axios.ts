@@ -1,6 +1,7 @@
 import axios from "axios";
 import * as Sentry from "@sentry/nextjs";
 import { signOut } from 'next-auth/react';
+import { getLogoutCallbackUrl } from './logoutRedirect';
 import { toast } from "react-toastify";
 import tokenService from "./tokenService";
 import { clearSessionCookiesClient } from './cookieUtils';
@@ -130,8 +131,11 @@ axiosInstance.interceptors.response.use(
             if (typeof window !== 'undefined') {
               clearSessionCookiesClient(true);
               sessionStorage.clear();
+              const callbackUrl = getLogoutCallbackUrl();
+              signOut({ callbackUrl, redirect: false }).then(() => {
+                window.location.href = callbackUrl;
+              });
             }
-            signOut();
             return Promise.reject(error);
           }
         } catch (refreshError) {
