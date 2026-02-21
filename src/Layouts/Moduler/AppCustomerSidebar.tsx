@@ -265,6 +265,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/crm/company'
         },
         {
+          id: 'crm-inbox',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.INBOX_CRM,
+          icon: <ReceiptText size={16} />,
+          permission: PERMISSIONS.VIEW_CRM_ORDERS,
+          url: '/crm/inbox'
+        },
+        {
           id: 'crm-history',
           title: 'Activity Tracker',
           icon: <Activity size={16} />,
