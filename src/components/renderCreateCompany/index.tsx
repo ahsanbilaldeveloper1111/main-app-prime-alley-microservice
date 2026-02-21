@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { Dropdown } from 'react-bootstrap';
+import Select from 'react-select';
+import { Country, State, City } from 'country-state-city';
 
 // ─── Type Definitions ─────────────────────────────────────────────────────────
 interface FieldLabelProps {
@@ -25,6 +27,7 @@ const companyDataMapping: Record<string, Partial<typeof initialCompanyForm>> = {
   'American Broadcasting': {
     companyOwner: 'Rizwan Haider',
     industry: 'Broadcast Media',
+    country: 'United States',
     city: 'Burbank',
     stateRegion: 'California',
     postalCode: '91501',
@@ -42,6 +45,7 @@ const initialCompanyForm = {
   companyOwner: 'Rizwan Haider',
   industry: '',
   type: '',
+  country: '',
   city: '',
   stateRegion: '',
   postalCode: '',
@@ -164,15 +168,141 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({ value, options, onChang
   </Dropdown>
 );
 
+// ─── Country/State/City Helper Functions ─────────────────────────────────────
+// Get country flag image URL
+const getCountryFlagUrl = (isoCode: string): string => {
+  return `https://flagcdn.com/w20/${isoCode.toLowerCase()}.png`;
+};
+
+// Get all countries for dropdown
+const getCountries = () => {
+  return Country.getAllCountries().map((country: { isoCode: string; name: string }) => ({
+    value: country.isoCode,
+    label: country.name,
+    isoCode: country.isoCode,
+  }));
+};
+
+// Get states/provinces for selected country
+const getStates = (countryCode: string) => {
+  if (!countryCode) return [];
+  return State.getStatesOfCountry(countryCode).map((state: { isoCode: string; name: string }) => ({
+    value: state.isoCode,
+    label: state.name,
+  }));
+};
+
+// Get cities for selected country and state
+const getCities = (countryCode: string, stateCode: string) => {
+  if (!countryCode || !stateCode) return [];
+  return City.getCitiesOfState(countryCode, stateCode).map((city: { name: string }) => ({
+    value: city.name,
+    label: city.name,
+  }));
+};
+
 // ─── Main Sidebar Component ───────────────────────────────────────────────────
 export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({ onClose }) => {
   const [companyForm, setCompanyForm] = useState(initialCompanyForm);
+  
+  // Location state for country/state/city dropdowns
+  const [selectedCountry, setSelectedCountry] = useState<{
+    value: string;
+    label: string;
+    isoCode: string;
+  } | null>(null);
+  const [selectedState, setSelectedState] = useState<{
+    value: string;
+    label: string;
+  } | null>(null);
+  const [selectedCity, setSelectedCity] = useState<{
+    value: string;
+    label: string;
+  } | null>(null);
+  const locationInitialized = useRef(false);
 
   const set = (key: keyof typeof initialCompanyForm) => (val: string) =>
     setCompanyForm((prev) => ({ ...prev, [key]: val }));
 
   const setE = (key: keyof typeof initialCompanyForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setCompanyForm((prev) => ({ ...prev, [key]: e.target.value }));
+
+  // Handle country change
+  const handleCountryChange = (selectedOption: any) => {
+    setSelectedCountry(selectedOption);
+    setSelectedState(null);
+    setSelectedCity(null);
+    setCompanyForm((prev) => ({
+      ...prev,
+      country: selectedOption?.label || '',
+      stateRegion: '',
+      city: '',
+    }));
+  };
+
+  // Handle state/province change
+  const handleStateChange = (selectedOption: any) => {
+    setSelectedState(selectedOption);
+    setSelectedCity(null);
+    setCompanyForm((prev) => ({
+      ...prev,
+      stateRegion: selectedOption?.label || '',
+      city: '',
+    }));
+  };
+
+  // Handle city change
+  const handleCityChange = (selectedOption: any) => {
+    setSelectedCity(selectedOption);
+    setCompanyForm((prev) => ({
+      ...prev,
+      city: selectedOption?.label || '',
+    }));
+  };
+
+  // Initialize location from form data when country is set
+  useEffect(() => {
+    if (
+      companyForm.country &&
+      !selectedCountry &&
+      !locationInitialized.current
+    ) {
+      const country = Country.getAllCountries().find(
+        (c: { name: string }) => c.name === companyForm.country
+      );
+      if (country) {
+        setSelectedCountry({
+          value: country.isoCode,
+          label: country.name,
+          isoCode: country.isoCode,
+        });
+        locationInitialized.current = true;
+
+        if (companyForm.stateRegion && !selectedState) {
+          const states = getStates(country.isoCode);
+          const state = states.find((s) => s.label === companyForm.stateRegion);
+          if (state) {
+            setSelectedState(state);
+
+            if (companyForm.city && !selectedCity) {
+              const cities = getCities(country.isoCode, state.value);
+              const city = cities.find((c) => c.label === companyForm.city);
+              if (city) {
+                setSelectedCity(city);
+              }
+            }
+          }
+        }
+      }
+    }
+  }, [
+    companyForm.country,
+    companyForm.stateRegion,
+    companyForm.city,
+    selectedCountry,
+    selectedState,
+    selectedCity,
+  ]);
 
   // Auto-fill form when company name matches known data
   useEffect(() => {
@@ -281,7 +411,7 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({ onCl
               value={companyForm.companyDomainName}
               onChange={setE('companyDomainName')}
               placeholder="e.g. abc.com"
-              style={inputStyle}
+              style={{ ...inputStyle, textTransform: 'lowercase' }}
               onFocus={focusStyle}
               onBlur={blurStyle}
             />
@@ -336,31 +466,83 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({ onCl
             />
           </div>
 
-          {/* City */}
+          {/* Country */}
           <div style={fieldWrap}>
-            <FieldLabel text="City" />
-            <input
-              type="text"
-              data-test-id="city-input"
-              value={companyForm.city}
-              onChange={setE('city')}
-              style={inputStyle}
-              onFocus={focusStyle}
-              onBlur={blurStyle}
+            <FieldLabel text="Country" />
+            <Select
+              value={selectedCountry}
+              onChange={handleCountryChange}
+              options={getCountries()}
+              placeholder="Select country..."
+              isClearable
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  borderColor: '#8a8a8a',
+                  fontSize: '16px',
+                  fontWeight: 300,
+                  minHeight: '44px',
+                }),
+                option: (base) => ({
+                  ...base,
+                  display: 'flex',
+                  alignItems: 'center',
+                }),
+              }}
+              formatOptionLabel={(option: any) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <img
+                    src={getCountryFlagUrl(option.isoCode)}
+                    alt={option.label}
+                    style={{ width: '20px', height: '15px' }}
+                  />
+                  <span>{option.label}</span>
+                </div>
+              )}
             />
           </div>
 
           {/* State/Region */}
           <div style={fieldWrap}>
             <FieldLabel text="State/Region" />
-            <input
-              type="text"
-              data-test-id="state-input"
-              value={companyForm.stateRegion}
-              onChange={setE('stateRegion')}
-              style={inputStyle}
-              onFocus={focusStyle}
-              onBlur={blurStyle}
+            <Select
+              value={selectedState}
+              onChange={handleStateChange}
+              options={getStates(selectedCountry?.value || '')}
+              placeholder="Select state/region..."
+              isClearable
+              isDisabled={!selectedCountry}
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  borderColor: '#8a8a8a',
+                  fontSize: '16px',
+                  fontWeight: 300,
+                  minHeight: '44px',
+                }),
+              }}
+            />
+          </div>
+
+          {/* City */}
+          <div style={fieldWrap}>
+            <FieldLabel text="City" />
+            <Select
+              value={selectedCity}
+              onChange={handleCityChange}
+              options={getCities(selectedCountry?.value || '', selectedState?.value || '')}
+              placeholder="Select city..."
+              isClearable
+              isDisabled={!selectedState}
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  borderColor: '#8a8a8a',
+                  fontSize: '16px',
+                  fontWeight: 300,
+                  minHeight: '44px',
+                }),
+              }}
             />
           </div>
 
@@ -533,8 +715,6 @@ const renderCreateCompany = (showCreateCompanySidebar: boolean, setShowCreateCom
 };
 
 export default renderCreateCompany;
-
-
 
 /**
  * Usage:

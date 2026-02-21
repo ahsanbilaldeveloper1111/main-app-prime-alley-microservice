@@ -1077,8 +1077,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     }
 
     .expand-toggle-btn {
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+     
       border-radius: 6px;
       padding: 6px;
       cursor: pointer;
@@ -1087,6 +1086,8 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       justify-content: center;
       color: white;
       transition: all 0.2s;
+      background: transparent;
+      border: none;
     }
 
     .expand-toggle-btn:hover {
@@ -1109,6 +1110,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       padding: 12px 8px;
       display: flex;
       flex-direction: column;
+      overflow-x: hidden;
     }
 
     .sidebar-menu::-webkit-scrollbar {

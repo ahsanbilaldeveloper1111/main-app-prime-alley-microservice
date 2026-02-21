@@ -16,7 +16,12 @@ import GenericTable, {
   TableAction,
   TabConfig,
 } from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebarNew";
+import GenericSidebar, {
+  SidebarSection,
+  QuickAction,
+  BreezeRecordSummary,
+  SidebarField,
+} from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import {
   getLeads,

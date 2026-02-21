@@ -8175,6 +8175,7 @@ const CrmProspectsManagement = () => {
         </div>{" "}
         {/* End main content area */}
         {/* Prospect Detail Sidebar */}
+
         {showProspectSidebar && (
           <GenericSidebar
             isOpen={showProspectSidebar}

@@ -10,6 +10,11 @@ import {
 import Layout from "@layout/index";
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import { getCrmDataById, getCrmNotes, updateCrmNote, deleteCrmNote, getCrmMeetingsForRecord, updateMeeting, deleteMeeting, type CrmDataItem, type CrmNoteItem, type CrmMeetingListItem } from '@utils/crm';
+import CallLog from '@components/CallLogNew';
+import NotesModal from '@components/NotesModal';
+import EmailModal from '@components/EmailModal';
+import TaskModal from '@components/TaskModal';
+import MeetingModal from '@components/MeetingModal';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -114,6 +119,10 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
   const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null);
   const [editingMeetingForm, setEditingMeetingForm] = useState<{ name: string; meeting_date: string; meeting_time: string; meeting_type: string }>({ name: '', meeting_date: '', meeting_time: '', meeting_type: '' });
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
 
@@ -132,7 +141,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
     setProspectLoading(true);
     setProspectError(null);
     getCrmDataById(id)
-      .then((data) => {
+      .then((data: CrmDataItem) => {
         setProspect(data);
         setProspectError(null);
       })
@@ -151,7 +160,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
     setNotesLoading(true);
     setNotesError(null);
     getCrmNotes('prospect', Number(id))
-      .then((res) => {
+      .then((res: { data: CrmNoteItem[] }) => {
         setNotesList(res.data ?? []);
         setNotesError(null);
       })
@@ -176,7 +185,7 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
     setMeetingsLoading(true);
     setMeetingsError(null);
     getCrmMeetingsForRecord('prospect', Number(id))
-      .then((res) => {
+      .then((res: { data: CrmMeetingListItem[] }) => {
         setMeetingsList(res.data ?? []);
         setMeetingsError(null);
       })
@@ -193,6 +202,108 @@ const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Se
     if (id == null || Number.isNaN(id)) return;
     fetchMeetings();
   }, [activeTab, activityFilter, prospectId, prospect?.id, fetchMeetings]);
+
+  const handleNoteCreate = async (note: string, createTask: boolean, taskDueDate?: string) => {
+    const id = prospectId != null && prospectId !== '' ? Number(prospectId) : prospect?.id;
+    if (id == null || Number.isNaN(id)) {
+      console.log('No prospect ID available');
+      return;
+    }
+    
+    try {
+      console.log('Creating note:', { note, createTask, taskDueDate, prospectId: id });
+      // Here you would call your API to create the note
+      // await createCrmNote('prospect', id, note);
+      // Refresh notes list
+      fetchNotes();
+    } catch (error) {
+      console.error('Failed to create note:', error);
+    }
+  };
+
+  const handleEmailSend = async (emailData: {
+    to: string[];
+    cc: string[];
+    bcc: string[];
+    subject: string;
+    body: string;
+    createTask: boolean;
+    taskDueDate?: string;
+    attachments?: File[];
+  }) => {
+    const id = prospectId != null && prospectId !== '' ? Number(prospectId) : prospect?.id;
+    if (id == null || Number.isNaN(id)) {
+      console.log('No prospect ID available');
+      return;
+    }
+    
+    try {
+      console.log('Sending email:', { ...emailData, prospectId: id });
+      // Here you would call your API to send the email
+      // await sendCrmEmail('prospect', id, emailData);
+      // You might want to refresh emails list or show success notification
+    } catch (error) {
+      console.error('Failed to send email:', error);
+    }
+  };
+
+  const handleTaskCreate = async (taskData: {
+    title: string;
+    activityDate: string;
+    activityTime: string;
+    reminder: string;
+    repeat: boolean;
+    taskType: string;
+    priority: string;
+    queue: string;
+    assignedTo: string;
+    notes: string;
+  }) => {
+    const id = prospectId != null && prospectId !== '' ? Number(prospectId) : prospect?.id;
+    if (id == null || Number.isNaN(id)) {
+      console.log('No prospect ID available');
+      return;
+    }
+    
+    try {
+      console.log('Creating task:', { ...taskData, prospectId: id });
+      // Here you would call your API to create the task
+      // await createCrmTask('prospect', id, taskData);
+      // You might want to refresh tasks list or show success notification
+    } catch (error) {
+      console.error('Failed to create task:', error);
+    }
+  };
+
+  const handleMeetingSchedule = async (meetingData: {
+    title: string;
+    hostType: 'user' | 'rotation';
+    hostEmail: string;
+    startDate: string;
+    startTime: string;
+    endTime: string;
+    attendees: string[];
+    location: string;
+    reminders: string[];
+    description: string;
+    internalNote: string;
+  }) => {
+    const id = prospectId != null && prospectId !== '' ? Number(prospectId) : prospect?.id;
+    if (id == null || Number.isNaN(id)) {
+      console.log('No prospect ID available');
+      return;
+    }
+    
+    try {
+      console.log('Scheduling meeting:', { ...meetingData, prospectId: id });
+      // Here you would call your API to schedule the meeting
+      // await scheduleCrmMeeting('prospect', id, meetingData);
+      // You might want to refresh meetings list or show success notification
+      await fetchMeetings();
+    } catch (error) {
+      console.error('Failed to schedule meeting:', error);
+    }
+  };
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -1204,7 +1315,7 @@ const revenueSections: RevenueSection[] = [
               color: '#141414',
               flexShrink: 0,
             }}>
-              {prospect?.name ? prospect.name.trim().split(/\s+/).map((s) => s[0]).join('').toUpperCase().slice(0, 2) : 'NA'}
+              {prospect?.name ? prospect.name.trim().split(/\s+/).map((s: string) => s[0]).join('').toUpperCase().slice(0, 2) : 'NA'}
             </div>
             <div style={{ flex: 1 }}>
               <h2 style={{
@@ -2128,7 +2239,7 @@ const revenueSections: RevenueSection[] = [
             gap: '6px',
             transition: 'all 0.2s',
           }}
-          onClick={() => console.log('Create Email')}
+          onClick={() => setShowEmailModal(true)}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = '#f7fafc';
           }}
@@ -2138,6 +2249,41 @@ const revenueSections: RevenueSection[] = [
         >
           <Mail size={16} />
           Create email
+        </button>
+      </div>
+    ) : activityFilter === 'notes' ? (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: '12px',
+        marginBottom: '20px',
+      }}>
+        <button
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#ffffff',
+            border: '1px solid #414141',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontWeight: '300',
+            color: '#141414',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s',
+          }}
+          onClick={() => setShowNotesModal(true)}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f7fafc';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#ffffff';
+          }}
+        >
+          <ClipboardList size={16} />
+          Create note
         </button>
       </div>
     ) : null}
@@ -2370,64 +2516,132 @@ const revenueSections: RevenueSection[] = [
       </>
     )}
 
-    {activityFilter === 'calls' && (
-      <div style={{
-        backgroundColor: '#ffffff',
-        border: '1px solid #eaf0f6',
-        borderRadius: '8px',
-        padding: '40px 24px',
-        textAlign: 'center',
-      }}>
-        <Phone size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
-        <p style={{
-          fontSize: '14px',
-          color: '#141414',
-          marginBottom: '8px',
-          lineHeight: '1.6',
-        }}>
-          Keep track of all phone conversations with this contact. Log calls to maintain a complete communication history.
-        </p>
-        <a href="#" style={{
-          fontSize: '14px',
-          color: '#006162',
-          textDecoration: 'none',
-          fontWeight: '500',
-        }}>
-          Learn more
-        </a>
-      </div>
-    )}
+    {activityFilter === 'calls' && <CallLog />}
 
     {activityFilter === 'tasks' && (
-      <div style={{
-        backgroundColor: '#ffffff',
-        border: '1px solid #eaf0f6',
-        borderRadius: '8px',
-        padding: '40px 24px',
-        textAlign: 'center',
-      }}>
-        <ClipboardList size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
-        <p style={{
-          fontSize: '14px',
-          color: '#141414',
-          marginBottom: '8px',
-          lineHeight: '1.6',
+      <>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: '12px',
+          marginBottom: '20px',
         }}>
-          Create and manage tasks related to this contact. Set due dates and track progress to stay organized.
-        </p>
-        <a href="#" style={{
-          fontSize: '14px',
-          color: '#006162',
-          textDecoration: 'none',
-          fontWeight: '500',
+          <button
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #414141',
+              borderRadius: '4px',
+              fontSize: '12px',
+              fontWeight: '300',
+              color: '#141414',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s',
+            }}
+            onClick={() => setShowTaskModal(true)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f7fafc';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffffff';
+            }}
+          >
+            <ClipboardList size={16} />
+            Create task
+          </button>
+        </div>
+        <div style={{
+         
+          padding: '40px 24px',
+          textAlign: 'center',
         }}>
-          Learn more
-        </a>
-      </div>
+          
+          <p style={{
+            fontSize: '14px',
+            color: '#141414',
+            marginBottom: '8px',
+            lineHeight: '1.6',
+          }}>
+            Create and manage tasks related to this contact. Set due dates and track progress to stay organized.
+          </p>
+          <a href="#" style={{
+            fontSize: '14px',
+            color: '#006162',
+            textDecoration: 'none',
+            fontWeight: '500',
+          }}>
+            Learn more
+          </a>
+        </div>
+      </>
     )}
 
     {activityFilter === 'meetings' && (
       <>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: '12px',
+          marginBottom: '20px',
+        }}>
+          <button
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #414141',
+              borderRadius: '4px',
+              fontSize: '12px',
+              fontWeight: '300',
+              color: '#141414',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s',
+            }}
+            onClick={() => console.log('Log Meeting')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f7fafc';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffffff';
+            }}
+          >
+            <Calendar size={16} />
+            Log meeting
+          </button>
+          <button
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #414141',
+              borderRadius: '4px',
+              fontSize: '12px',
+              fontWeight: '300',
+              color: '#141414',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s',
+            }}
+            onClick={() => setShowMeetingModal(true)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f7fafc';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffffff';
+            }}
+          >
+            <Calendar size={16} />
+            Create meeting
+          </button>
+        </div>
         {meetingsLoading ? (
           <div style={{
             backgroundColor: '#ffffff',
@@ -2451,13 +2665,11 @@ const revenueSections: RevenueSection[] = [
           </div>
         ) : meetingsList.length === 0 ? (
           <div style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #eaf0f6',
-            borderRadius: '8px',
+           
             padding: '40px 24px',
             textAlign: 'center',
           }}>
-            <Calendar size={48} style={{ color: '#cbd5e0', marginBottom: '16px' }} />
+            
             <p style={{
               fontSize: '14px',
               color: '#141414',
@@ -2857,7 +3069,7 @@ const revenueSections: RevenueSection[] = [
         }}>
         {/* Companies - from prospect name + unique company_name from tickets */}
         {(() => {
-          const companyNames = prospect?.tickets?.length
+          const companyNames: string[] = prospect?.tickets?.length
             ? Array.from(new Set(prospect.tickets.map((t: any) => t.company_name).filter(Boolean)))
             : [];
           const companiesCount = companyNames.length;
@@ -2933,7 +3145,7 @@ const revenueSections: RevenueSection[] = [
               <p style={{ fontSize: '13px', color: '#666666', margin: 0 }}>No companies associated.</p>
             ) : (
               <>
-                {companyNames.map((companyName: string, idx: number) => (
+                {(companyNames as string[]).map((companyName: string, idx: number) => (
                   <div key={idx} style={{ marginBottom: '16px', border: '1px solid #cccccc', borderRadius: '10px', padding: '15px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                       <span style={{ fontSize: '14px', color: '#006162', fontWeight: '500' }}>{companyName}</span>
@@ -3417,6 +3629,44 @@ const revenueSections: RevenueSection[] = [
         {/* Right Sidebar - Associated Records */}
         {renderRightSidebar()}
       </div>
+
+      {/* Notes Modal */}
+      <NotesModal
+        isOpen={showNotesModal}
+        onClose={() => setShowNotesModal(false)}
+        recordName={prospect?.name || 'Prospect'}
+        onSave={handleNoteCreate}
+      />
+
+      {/* Email Modal */}
+      <EmailModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        recipientEmail={prospect?.data?.email}
+        recipientName={prospect?.name || undefined}
+        senderEmail="user@example.com"
+        senderName="Your Name"
+        onSend={handleEmailSend}
+      />
+
+      {/* Task Modal */}
+      <TaskModal
+        isOpen={showTaskModal}
+        onClose={() => setShowTaskModal(false)}
+        assignedToName="Unassigned"
+        onSave={handleTaskCreate}
+      />
+
+      {/* Meeting Modal */}
+      <MeetingModal
+        isOpen={showMeetingModal}
+        onClose={() => setShowMeetingModal(false)}
+        hostEmail="user@example.com"
+        hostName="Your Name"
+        attendeeEmail={prospect?.data?.email}
+        attendeeName={prospect?.name || undefined}
+        onSchedule={handleMeetingSchedule}
+      />
 
       {/* Delete note confirmation */}
       <DeleteConfirmationModal
