@@ -1,10 +1,9 @@
 import React, { useState, useRef, useEffect, ReactElement } from 'react';
 import {
-  X, ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
-  Calendar, MessageSquare, ClipboardList, ExternalLink, Copy, RefreshCw,
-  ThumbsUp, ThumbsDown, Sparkles, User, Building2, Briefcase,
-  FileText, Ticket, Paperclip, Link2, Tag, DollarSign,
-  Search, Filter, AlertCircle, ShoppingCart, ShoppingBag
+  ChevronDown, ChevronRight, ChevronLeft, Mail, Phone, MoreHorizontal,
+  Calendar, ClipboardList, ExternalLink, Copy, RefreshCw,
+  ThumbsUp, ThumbsDown, Sparkles, FileText, Paperclip,
+  ShoppingCart, ShoppingBag, Building2
 } from 'lucide-react';
 import Layout from "@layout/index";
 import { useRouter } from 'next/router';
@@ -13,6 +12,9 @@ import { GetHierarchyData } from "@utils/users";
 import { formatDateForTable, ModuleSlug } from "@utils/Helper";
 import { toast } from "react-toastify";
 import moment from "moment";
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+import CrmActivitiesPanel, { CrmActivitiesRecord } from '@components/CrmActivitiesPanel';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -27,24 +29,6 @@ interface KeyInfoField {
 type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
 };
-
-interface ActivityItem {
-  id: string;
-  type: 'invoice' | 'email' | 'subscription' | 'note' | 'call' | 'meeting' | 'task';
-  title: string;
-  description: string;
-  timestamp: string;
-  user?: string;
-  userLink?: string;
-  entityLink?: string;
-  entityName?: string;
-  alert?: {
-    message: string;
-    link?: string;
-    linkText?: string;
-  };
-  expanded?: boolean;
-}
 
 interface SubscriptionItem {
   id: string;
@@ -80,15 +64,15 @@ const OrderRecordPage: NextPageWithLayout = () => {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [showMoreActivities, setShowMoreActivities] = useState(false);
-  const [activityFilter, setActivityFilter] = useState('activity');
-  const [searchActivity, setSearchActivity] = useState('');
-  const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Set());
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const [orderData, setOrderData] = useState<any>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [relatedDeal, setRelatedDeal] = useState<any>(null);
   const [relatedLead, setRelatedLead] = useState<any>(null);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { hasPermission } = usePermissions();
+  const canSendWhatsApp = hasPermission(HEADER_CONSTANTS.PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
 
@@ -115,8 +99,10 @@ const OrderRecordPage: NextPageWithLayout = () => {
       
       try {
         setLoading(true);
+        setOrderError(null);
         const order = await getOrder(Number(id));
         setOrderData(order);
+        setOrderError(null);
 
         // Fetch related deal if deal_id exists
         if (order.deal_id) {
@@ -139,6 +125,8 @@ const OrderRecordPage: NextPageWithLayout = () => {
         }
       } catch (error) {
         console.error("Failed to fetch order:", error);
+        setOrderData(null);
+        setOrderError("Failed to load order details");
         toast.error("Failed to load order details");
       } finally {
         setLoading(false);
@@ -161,211 +149,6 @@ const OrderRecordPage: NextPageWithLayout = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const toggleActivity = (activityId: string) => {
-    setExpandedActivities(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(activityId)) {
-        newSet.delete(activityId);
-      } else {
-        newSet.add(activityId);
-      }
-      return newSet;
-    });
-  };
-  
-  // Sample activity data
-  const activitiesData: ActivityItem[] = [
-    {
-      id: '1',
-      type: 'invoice',
-      title: 'Order activity',
-      description: 'Order was created',
-      timestamp: orderData?.created_at ? formatDateForTable(orderData.created_at) : 'N/A',
-      user: 'System',
-      userLink: '#',
-    },
-    {
-      id: '2',
-      type: 'email',
-      title: 'Order confirmation email',
-      description: 'sent to',
-      timestamp: orderData?.created_at ? formatDateForTable(orderData.created_at) : 'N/A',
-      entityName: orderData?.customer_email || 'Customer',
-      entityLink: '#',
-    },
-  ];
-  
-  const renderActivityItem = (activity: ActivityItem) => {
-    const isExpanded = expandedActivities.has(activity.id) || activity.expanded;
-    
-    return (
-      <div
-        key={activity.id}
-        style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #eaf0f6',
-          borderRadius: '5px',
-          padding: '16px 20px',
-          marginBottom: '12px',
-        }}
-      >
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: '12px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flex: 1 }}>
-            {activity.expanded !== undefined && (
-              <button
-                onClick={() => toggleActivity(activity.id)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  padding: '4px',
-                  cursor: 'pointer',
-                  color: '#141414',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              </button>
-            )}
-            
-            <div style={{ flex: 1 }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '4px',
-              }}>
-                <h4 style={{
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#141414',
-                  margin: 0,
-                }}>
-                  {activity.title}
-                </h4>
-                <FileText size={14} color="#7c98b6" />
-              </div>
-              
-              <p style={{
-                fontSize: '14px',
-                color: '#141414',
-                margin: '4px 0',
-                lineHeight: '1.6',
-              }}>
-                {activity.user && (
-                  <>
-                    <a
-                      href={activity.userLink}
-                      style={{
-                        color: '#006162',
-                        textDecoration: 'none',
-                        fontWeight: '500',
-                      }}
-                    >
-                      {activity.user}
-                    </a>
-                    {' '}
-                  </>
-                )}
-                {activity.description}
-                {activity.entityName && (
-                  <>
-                    {' '}
-                    <a
-                      href={activity.entityLink}
-                      style={{
-                        color: '#006162',
-                        textDecoration: 'none',
-                        fontWeight: '500',
-                      }}
-                    >
-                      {activity.entityName}
-                    </a>
-                  </>
-                )}
-              </p>
-              
-              {activity.alert && isExpanded && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '12px 16px',
-                  backgroundColor: '#fff5f5',
-                  border: '1px solid #feb2b2',
-                  borderRadius: '5px',
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '8px',
-                  }}>
-                    <AlertCircle size={16} color="#e53e3e" style={{ marginTop: '2px', flexShrink: 0 }} />
-                    <div>
-                      <p style={{
-                        fontSize: '14px',
-                        color: '#141414',
-                        margin: 0,
-                        lineHeight: '1.6',
-                      }}>
-                        <strong>{activity.alert.message.split('.')[0]}.</strong>
-                        {' '}
-                        {activity.alert.message.split('.').slice(1).join('.')}
-                        {activity.alert.link && (
-                          <>
-                            {' '}
-                            <a
-                              href={activity.alert.link}
-                              style={{
-                                color: '#006162',
-                                textDecoration: 'none',
-                                fontWeight: '500',
-                              }}
-                            >
-                              {activity.alert.linkText}
-                            </a>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {isExpanded && activity.type === 'email' && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '12px',
-                  backgroundColor: '#f7fafc',
-                  borderRadius: '5px',
-                }}>
-                  <p style={{
-                    fontSize: '13px',
-                    color: '#7c98b6',
-                    margin: 0,
-                  }}>
-                    Order confirmation email sent to customer
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <div style={{
-            fontSize: '13px',
-            color: '#7c98b6',
-            whiteSpace: 'nowrap',
-          }}>
-            {activity.timestamp}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   const toggleSection = (sectionId: string) => {
     setCollapsedSections(prev => {
@@ -458,6 +241,18 @@ const OrderRecordPage: NextPageWithLayout = () => {
     { id: 'revenue', label: 'Revenue' },
     { id: 'intelligence', label: 'Intelligence' },
   ];
+
+  const orderRecord: CrmActivitiesRecord | null = orderData
+    ? {
+        id: orderData.id,
+        data: {
+          id: orderData.id,
+          name: orderData.order_number || orderData.customer_name || '',
+          phone: orderData.customer_phone || '',
+          data: orderData,
+        },
+      }
+    : null;
 
   // Key Information Fields - Order specific
   const keyInfoFields: KeyInfoField[] = [
@@ -1753,118 +1548,14 @@ const OrderRecordPage: NextPageWithLayout = () => {
           )}
 
           {activeTab === 'activities' && (
-            <div>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '20px',
-                gap: '16px',
-                flexWrap: 'wrap',
-              }}>
-                <div style={{
-                  position: 'relative',
-                  flex: '1',
-                  minWidth: '250px',
-                  maxWidth: '400px',
-                }}>
-                  <Search
-                    size={18}
-                    style={{
-                      position: 'absolute',
-                      right: '12px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      color: '#7c98b6',
-                      pointerEvents: 'none',
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search activities"
-                    value={searchActivity}
-                    onChange={(e) => setSearchActivity(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 40px 10px 16px',
-                      border: '1px solid #cbd5e0',
-                      borderRadius: '20px',
-                      fontSize: '14px',
-                      outline: 'none',
-                      backgroundColor: '#ffffff',
-                    }}
-                  />
-                </div>
-
-                <button
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #cbd5e0',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#141414',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                  }}
-                  onClick={() => setExpandedActivities(new Set())}
-                >
-                  Collapse all
-                  <ChevronDown size={14} />
-                </button>
-              </div>
-
-              <div style={{
-                display: 'flex',
-                gap: '24px',
-                marginBottom: '16px',
-                borderBottom: '2px solid #eaf0f6',
-              }}>
-                {[
-                  { id: 'activity', label: 'Activity' },
-                  { id: 'notes', label: 'Notes' },
-                  { id: 'emails', label: 'Emails' },
-                  { id: 'calls', label: 'Calls' },
-                  { id: 'tasks', label: 'Tasks' },
-                  { id: 'meetings', label: 'Meetings' },
-                ].map(filter => (
-                  <button
-                    key={filter.id}
-                    onClick={() => setActivityFilter(filter.id)}
-                    style={{
-                      padding: '10px 0',
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      borderBottom: activityFilter === filter.id ? '2px solid #141414' : '2px solid transparent',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: activityFilter === filter.id ? '600' : '400',
-                      color: activityFilter === filter.id ? '#141414' : '#7c98b6',
-                      transition: 'all 0.2s',
-                      marginBottom: '-2px',
-                    }}
-                  >
-                    {filter.label}
-                  </button>
-                ))}
-              </div>
-
-              <h3 style={{
-                fontSize: '16px',
-                fontWeight: '600',
-                color: '#141414',
-                marginBottom: '16px',
-              }}>
-                {orderData?.created_at ? moment(orderData.created_at).format('MMMM YYYY') : moment().format('MMMM YYYY')}
-              </h3>
-
-              <div>
-                {activitiesData.map(activity => renderActivityItem(activity))}
-              </div>
-            </div>
+            <CrmActivitiesPanel
+              recordType="order"
+              recordId={Number(id) || orderData?.id || 0}
+              record={orderRecord}
+              recordLoading={loading}
+              recordName={orderData?.order_number || orderData?.customer_name || 'Order'}
+              canSendWhatsApp={canSendWhatsApp}
+            />
           )}
 
           {activeTab === 'revenue' && (
@@ -2520,6 +2211,64 @@ const OrderRecordPage: NextPageWithLayout = () => {
       )}
     </div>
   );
+
+  // ============================================================================
+  // FULL-PAGE LOADING & ERROR
+  // ============================================================================
+
+  if (!router.isReady) {
+    return null;
+  }
+
+  if (loading && !orderData) {
+    return (
+      <Layout>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 'calc(100vh - 60px)',
+          backgroundColor: 'transparent',
+        }}>
+          <div style={{ fontSize: '16px', color: '#718096' }}>Loading order details...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (orderError) {
+    return (
+      <Layout>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 'calc(100vh - 60px)',
+          backgroundColor: 'transparent',
+          gap: '16px',
+        }}>
+          <p style={{ fontSize: '16px', color: '#718096', margin: 0 }}>{orderError}</p>
+          <button
+            type="button"
+            onClick={() => router.push('/crm/orders')}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#006162',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+            }}
+          >
+            Back to orders
+          </button>
+        </div>
+      </Layout>
+    );
+  }
 
   // ============================================================================
   // MAIN RENDER

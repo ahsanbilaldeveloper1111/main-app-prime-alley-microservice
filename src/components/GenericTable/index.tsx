@@ -208,6 +208,9 @@ export interface ToolbarConfig {
   showPipelineDropdown?: boolean;
   pipelineLabel?: string;
   onPipelineClick?: () => void;
+
+  showImport?: boolean;
+  onImportClick?: () => void;
 }
 
 export interface GenericTableProps<T = any> {
@@ -883,7 +886,11 @@ const GenericTable = <T extends Record<string, any>>({
                 <MoreVertical size={16} />
               </Dropdown.Toggle>
               <Dropdown.Menu align="end">
-                <Dropdown.Item>Import</Dropdown.Item>
+                {toolbar.showImport && (
+                  <Dropdown.Item onClick={toolbar.onImportClick}>
+                    Import
+                  </Dropdown.Item>
+                )}
                 <Dropdown.Item>Bulk Actions</Dropdown.Item>
                 <Dropdown.Divider />
                 <Dropdown.Item>Settings</Dropdown.Item>
