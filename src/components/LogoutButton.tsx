@@ -3,6 +3,7 @@
 import { signOut } from 'next-auth/react';
 import { Button } from 'react-bootstrap';
 import { clearSessionCookiesClient } from '../utils/cookieUtils';
+import { getLogoutCallbackUrl } from '../utils/logoutRedirect';
 
 interface LogoutButtonProps {
   variant?: string;
@@ -18,7 +19,7 @@ export default function LogoutButton({
   const handleLogout = () => {
     clearSessionCookiesClient(true);
     signOut({
-      callbackUrl: '/auth/signin',
+      callbackUrl: getLogoutCallbackUrl(),
       redirect: true
     });
   };

@@ -1,4 +1,5 @@
 import { signOut } from 'next-auth/react';
+import { getLogoutCallbackUrl } from './logoutRedirect';
 import { toast } from 'react-toastify';
 import { clearAllLocalStorage } from './localStorageUtils';
 import { clearSessionCookiesClient } from './cookieUtils';
@@ -459,8 +460,9 @@ class TokenService {
         sessionStorage.clear();
         clearAllLocalStorage();
         clearSessionCookiesClient(true);
-        signOut();
-        window.location.href = '/auth/signin';
+        const callbackUrl = getLogoutCallbackUrl();
+        signOut({ callbackUrl, redirect: false });
+        window.location.href = callbackUrl;
         toast.error('Session expired - Please login again');
       }
     // } else {

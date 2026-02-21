@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Footer from '@components/Footer';
 import ApplicationCustomerSidebar, { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED } from './Moduler/AppCustomerSidebar';
 import { useSession, signOut } from "next-auth/react";
+import { getLogoutCallbackUrl } from '../utils/logoutRedirect';
 import { useNotifications, NotificationItem } from '../contexts/NotificationContext';
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 import ProfileSidebar from '@components/profile-sidebar';
@@ -1502,7 +1503,7 @@ const Layout = ({ children }: LayoutProps) => {
                           className="user-dropdown-footer-link"
                           onClick={() => {
                             setShowUserDropdown(false);
-                            signOut({ callbackUrl: '/auth/signin', redirect: true });
+                            signOut({ callbackUrl: getLogoutCallbackUrl(), redirect: true });
                           }}
                         >
                           Sign out

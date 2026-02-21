@@ -3,12 +3,13 @@
 import { useEffect } from 'react';
 import { signOut } from 'next-auth/react';
 import { clearSessionCookiesClient } from '../../utils/cookieUtils';
+import { getLogoutCallbackUrl } from '../../utils/logoutRedirect';
 
 export default function SignOut() {
   useEffect(() => {
     clearSessionCookiesClient(true);
     signOut({
-      callbackUrl: '/auth/signin',
+      callbackUrl: getLogoutCallbackUrl(),
       redirect: true
     });
   }, []);

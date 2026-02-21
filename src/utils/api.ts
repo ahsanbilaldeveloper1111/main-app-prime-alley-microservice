@@ -3,6 +3,7 @@ import { getCurrentAccessToken, isTokenExpired } from './tokenUtils';
 import { clearAllLocalStorage } from './localStorageUtils';
 import { clearSessionCookiesClient } from './cookieUtils';
 import { signOut } from 'next-auth/react';
+import { getLogoutCallbackUrl } from './logoutRedirect';
 
 // Same pattern as axios.ts: all requests go through Next.js proxy to avoid 431 (large cookies never sent to backend)
 const apiClient = axios.create({
@@ -53,13 +54,14 @@ apiClient.interceptors.request.use(
                 sessionStorage.clear();
                 clearAllLocalStorage();
                 clearSessionCookiesClient(true);
+                const callbackUrl = getLogoutCallbackUrl();
                 signOut({
-                  callbackUrl: '/auth/signin',
+                  callbackUrl,
                   redirect: false,
                 }).then(() => {
-                  window.location.href = '/auth/signin';
+                  window.location.href = callbackUrl;
                 }).catch(() => {
-                  window.location.href = '/auth/signin';
+                  window.location.href = callbackUrl;
                 });
               }
             }
@@ -86,13 +88,14 @@ apiClient.interceptors.request.use(
             sessionStorage.clear();
             clearAllLocalStorage();
             clearSessionCookiesClient(true);
+            const callbackUrl = getLogoutCallbackUrl();
             signOut({
-              callbackUrl: '/auth/signin',
+              callbackUrl,
               redirect: false,
             }).then(() => {
-              window.location.href = '/auth/signin';
+              window.location.href = callbackUrl;
             }).catch(() => {
-              window.location.href = '/auth/signin';
+              window.location.href = callbackUrl;
             });
           }
         }
@@ -138,13 +141,14 @@ apiClient.interceptors.response.use(
           sessionStorage.clear();
           clearAllLocalStorage();
           clearSessionCookiesClient(true);
+          const callbackUrl = getLogoutCallbackUrl();
           signOut({
-            callbackUrl: '/auth/signin',
+            callbackUrl,
             redirect: false,
           }).then(() => {
-            window.location.href = '/auth/signin';
+            window.location.href = callbackUrl;
           }).catch(() => {
-            window.location.href = '/auth/signin';
+            window.location.href = callbackUrl;
           });
         }
       }
@@ -280,13 +284,14 @@ export const authAPI = {
         sessionStorage.clear();
         clearAllLocalStorage();
         clearSessionCookiesClient(true);
+        const callbackUrl = getLogoutCallbackUrl();
         signOut({
-          callbackUrl: '/auth/signin',
+          callbackUrl,
           redirect: false,
         }).then(() => {
-          window.location.href = '/auth/signin';
+          window.location.href = callbackUrl;
         }).catch(() => {
-          window.location.href = '/auth/signin';
+          window.location.href = callbackUrl;
         });
       }
       throw error;
