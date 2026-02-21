@@ -31,6 +31,8 @@ import {
   MessageCircle,
   Search,
 } from "lucide-react";
+import WhatsAppMessageModal from '@components/WhatsAppMessageModalNew';
+import LogSmsModal from '@components/LogSms';
 import { Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { sendEmail } from "@utils/communication";
@@ -217,6 +219,26 @@ export interface GenericSidebarProps {
   dealId?: number;
   /** Current user extension for meeting participants (required by CRM meetings API) */
   userExtension?: string;
+  
+  // WhatsApp message modal callback
+  onWhatsAppLog?: (whatsappData: {
+    message: string;
+    contacts: Array<{ id: string; name: string; email?: string }>;
+    activityDate: string;
+    createTask: boolean;
+    taskDueDate?: string;
+    attachments: File[];
+  }) => void;
+  
+  // SMS message modal callback
+  onSmsLog?: (smsData: {
+    message: string;
+    contacts: Array<{ id: string; name: string; email?: string }>;
+    activityDate: string;
+    createTask: boolean;
+    taskDueDate?: string;
+    attachments: File[];
+  }) => void;
 }
 
 // ============================================================================
@@ -5294,6 +5316,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   dealId,
   userExtension,
   record,
+  onWhatsAppLog,
+  onSmsLog,
 }) => {
   // Parse comma-separated email/phone into arrays for multiple contact support
   const emailList = useMemo(() => {
@@ -5326,10 +5350,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const [showCallModal, setShowCallModal] = useState(false);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [showMoreModal, setShowMoreModal] = useState(false);
-  const [moreModalPosition, setMoreModalPosition] = useState({
-    top: 0,
-    left: 0,
-  });
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [showSmsModal, setShowSmsModal] = useState(false);
+  const [moreModalPosition, setMoreModalPosition] = useState({ top: 0, left: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
   const sectionDropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>(
     {},
@@ -5572,6 +5595,56 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     }
   };
 
+  const handleWhatsAppClick = () => {
+    setShowWhatsAppModal(true);
+  };
+
+  const handleWhatsAppClose = () => {
+    setShowWhatsAppModal(false);
+  };
+
+  const handleWhatsAppLog = (whatsappData: {
+    message: string;
+    contacts: Array<{ id: string; name: string; email?: string }>;
+    activityDate: string;
+    createTask: boolean;
+    taskDueDate?: string;
+    attachments: File[];
+  }) => {
+    console.log('WhatsApp message logged:', whatsappData);
+    if (onWhatsAppLog) {
+      onWhatsAppLog(whatsappData);
+    } else {
+      console.log('No onWhatsAppLog callback provided');
+    }
+    setShowWhatsAppModal(false);
+  };
+
+  const handleSmsClick = () => {
+    setShowSmsModal(true);
+  };
+
+  const handleSmsClose = () => {
+    setShowSmsModal(false);
+  };
+
+  const handleSmsLog = (smsData: {
+    message: string;
+    contacts: Array<{ id: string; name: string; email?: string }>;
+    activityDate: string;
+    createTask: boolean;
+    taskDueDate?: string;
+    attachments: File[];
+  }) => {
+    console.log('SMS message logged:', smsData);
+    if (onSmsLog) {
+      onSmsLog(smsData);
+    } else {
+      console.log('No onSmsLog callback provided');
+    }
+    setShowSmsModal(false);
+  };
+
   const handleMoreClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (moreButtonRef.current) {
       const rect = moreButtonRef.current.getBoundingClientRect();
@@ -5597,14 +5670,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       case "engage-linkedin":
         console.log("Engage on LinkedIn");
         break;
-      case "log-sms":
-        console.log("Log SMS");
+      case 'log-sms':
+        setShowSmsModal(true);
         break;
       case "log-linkedin":
         console.log("Log LinkedIn message");
         break;
-      case "log-whatsapp":
-        console.log("Log WhatsApp message");
+      case 'log-whatsapp':
+        setShowWhatsAppModal(true);
         break;
       case "log-call":
         console.log("Log a call");
@@ -7098,6 +7171,22 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           {processedSections.map((section) => renderSection(section))}
         </div>
       </div>
+
+      {/* WhatsApp Message Modal */}
+      <WhatsAppMessageModal
+        isOpen={showWhatsAppModal}
+        onClose={handleWhatsAppClose}
+        associatedRecords={title ? [title] : []}
+        onSave={handleWhatsAppLog}
+      />
+
+      {/* SMS Message Modal */}
+      <LogSmsModal
+        isOpen={showSmsModal}
+        onClose={handleSmsClose}
+        associatedRecords={title ? [title] : []}
+        onSave={handleSmsLog}
+      />
     </>
   );
 };

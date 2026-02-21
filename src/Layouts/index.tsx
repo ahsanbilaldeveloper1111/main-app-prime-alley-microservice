@@ -7,6 +7,7 @@ import { useNotifications, NotificationItem } from '../contexts/NotificationCont
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
 import ProfileSidebar from '@components/profile-sidebar';
 import { useDialerModal } from '../contexts/DialerModalContext';
+import NotificationsSidebar from '@components/Notificationssidebar';
 import { getCurrentUserCompanyImage } from "@utils/company";
 import { 
 	Bell, ChevronLeft, ChevronRight, Users,ChevronDown,
@@ -75,6 +76,7 @@ const Layout = ({ children }: LayoutProps) => {
 	const [sidebarOpen, setSidebarOpen] = useState(true);
 	const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 	const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+  const [showNotificationsSidebar, setShowNotificationsSidebar] = useState(false);
 	const [showUserDropdown, setShowUserDropdown] = useState(false);
 	const [showCreateDropdown, setShowCreateDropdown] = useState(false);
 	const dialerButtonRef = useRef<HTMLButtonElement>(null);
@@ -1183,7 +1185,7 @@ const Layout = ({ children }: LayoutProps) => {
               )}
 
               {/* Notifications - always show icon in topbar */}
-              <Dropdown 
+              {/* <Dropdown 
                 show={showNotificationDropdown} 
                 onToggle={(isOpen) => setShowNotificationDropdown(isOpen)}
                 align="end"
@@ -1295,8 +1297,16 @@ const Layout = ({ children }: LayoutProps) => {
                       </button>
                     </div>
                   </Dropdown.Menu>
-                </Dropdown>
-
+                </Dropdown> */}
+{/* Notifications - opens sidebar */}
+<button
+                className={`crm-prime-topbar-icon ${totalUnreadCount > 0 ? 'has-badge' : ''}`}
+                data-badge={totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                onClick={() => setShowNotificationsSidebar(true)}
+                title="Notifications"
+              >
+                <Bell size={14} />
+              </button>
  {/* Help Icon */}
                 <button className="crm-prime-topbar-icon" title="Help"
                 onClick={() => router.push('/help-center')}
@@ -1712,6 +1722,12 @@ const Layout = ({ children }: LayoutProps) => {
 
 		<Footer />
 		</div>
+
+    	{/* Notifications Sidebar */}
+		<NotificationsSidebar
+			isOpen={showNotificationsSidebar}
+			onClose={() => setShowNotificationsSidebar(false)}
+		/>
 		</>
 	);
 };
