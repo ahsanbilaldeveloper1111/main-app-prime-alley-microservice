@@ -18,7 +18,7 @@ import GenericTable, {
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
-import ConvertToOrderModal from "@components/ConvertToOrderModal";
+import ConvertDealToOrderModal from "@components/ConvertDealToOrderModal";
 import { CreateDealSidebar } from "@components/renderCreateDealForm";
 import {
   FiUpload,
@@ -7266,7 +7266,7 @@ const CrmDeals = () => {
 
       {/* Convert to Order Modal */}
       {dealToConvert && (
-        <ConvertToOrderModal
+        <ConvertDealToOrderModal
           show={showConvertToOrderModal}
           onHide={() => {
             setShowConvertToOrderModal(false);
@@ -7274,8 +7274,6 @@ const CrmDeals = () => {
           }}
           dealId={dealToConvert}
           onSuccess={() => {
-            // Optionally refresh deals list or show success message
-            // toast.success("Order created successfully!");
             setRefreshKey((prev) => prev + 1);
           }}
         />

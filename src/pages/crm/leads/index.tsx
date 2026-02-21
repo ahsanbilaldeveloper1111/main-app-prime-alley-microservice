@@ -149,7 +149,7 @@ import { useCti } from "../../../contexts/CtiContext";
 import type { StatsCardData } from "@components/GenericStatsCards";
 import CreateLeadModal from "@components/CreateLeadModal";
 
-import ConvertToDealModal from "@components/ConvertToDealModal";
+import ConvertLeadToDealModal from "@components/ConvertLeadToDealModal";
 // Type definition for transformed lead data
 interface LeadData {
   id: any;
@@ -9898,8 +9898,8 @@ const CrmLeads = () => {
         }}
       />
 
-      {convertingLeadId && (
-        <ConvertToDealModal
+      {convertingLeadId != null && (
+        <ConvertLeadToDealModal
           show={showConvertToDealModal}
           onHide={() => {
             setShowConvertToDealModal(false);
