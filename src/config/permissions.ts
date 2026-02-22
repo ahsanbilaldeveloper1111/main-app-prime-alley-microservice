@@ -41,6 +41,7 @@ export const routePermissions: RoutePermission[] = [
     {path:'/crm/approvals',permissions: ['']},
     {path:'/crm/deals-approval',permissions: ['']},
     {path:'/crm/deals-approval/approval-detailpage',permissions: ['']},
+    {path:'/crm/inbox',permissions: ['']},
     
     {path:'/ai-ml/tenant-faqs',permissions: ['']},
     { path: '/ai-ml/global-faqs', permissions: [''] },

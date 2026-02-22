@@ -149,6 +149,7 @@ MENU_COLORS: {
     DATA_MANAGEMENT: 'Prospects',
     CAMPAIGNS: 'Campaigns',
     COMPANY: 'Companies',
+    INBOX_CRM: 'Inbox',
     
     // Call Recordings
     RECORDINGS_DASHBOARD: 'Dashboard',
