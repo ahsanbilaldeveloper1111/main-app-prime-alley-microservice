@@ -293,7 +293,7 @@ const AccountOverview = () => {
                 </div>
                 <div className="d-flex gap-2">
                   <Button 
-                    onClick={() => router.push('/accounting/customer/invoices')}
+                    onClick={() => router.push('/finance/invoices')}
                     variant="primary"
                     size="sm"
                     style={{ fontSize: '0.85rem', padding: '0.4rem 1rem', fontWeight: '600' }}
@@ -341,7 +341,7 @@ const AccountOverview = () => {
               </div>
               <div className="d-flex justify-content-end">
               <Button 
-                onClick={() => router.push('/accounting/customer/invoices')}
+                onClick={() => router.push('/finance/invoices')}
                     variant="outline-secondary"
                     size="sm"
                     style={{ fontSize: '0.85rem', padding: '0.4rem 1rem' }}
@@ -598,7 +598,7 @@ const AccountOverview = () => {
                   variant="outline-primary" 
                   size="sm" 
                   className="d-flex align-items-center"
-                  onClick={() => router.push('/accounting/customer/invoices')}
+                  onClick={() => router.push('/finance/invoices')}
                   style={{ textDecoration: 'none', fontSize: '0.75rem' }}
                 >
                   <Eye size={12} className="me-1" /> View All
@@ -804,7 +804,7 @@ const AccountOverview = () => {
                     cursor: 'pointer',
                     transition: 'all 0.2s'
                   }}
-                  onClick={() => router.push('/accounting/customer/invoices')}
+                  onClick={() => router.push('/finance/invoices')}
                 >
                   <div className="rounded d-flex align-items-center justify-content-center" style={{ 
                     width: '24px', 

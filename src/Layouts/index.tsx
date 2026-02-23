@@ -1126,19 +1126,34 @@ const Layout = ({ children }: LayoutProps) => {
                       onClick={() => setShowCreateDropdown(false)}
                     />
                     <div className="create-dropdown-menu">
-                      <button className="create-dropdown-item" onClick={() => { setShowCreateDropdown(false); /* Add Contact handler */ }}>
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false); /* Add Contact handler */
+                          router.push('/crm/leads');
+                        }}>
                         Lead
                       </button>
-                      <button className="create-dropdown-item" onClick={() => { setShowCreateDropdown(false); /* Add Company handler */ }}>
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false); /* Add Company handler */
+                          router.push('/crm/company');
+                        }}>
                         Company
                       </button>
-                      <button className="create-dropdown-item" onClick={() => { setShowCreateDropdown(false); /* Add Deal handler */ }}>
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false); /* Add Deal handler */
+                          router.push('/crm/deals');
+                        }}>
                         Deal
                       </button>
-                      <button className="create-dropdown-item" onClick={() => { setShowCreateDropdown(false); /* Add Ticket handler */ }}>
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false); /* Add Ticket handler */
+                          router.push('/tickets/list');
+                        }}>
                         Ticket
                       </button>
-                      <button className="create-dropdown-item" onClick={() => { setShowCreateDropdown(false); /* Add Task handler */ }}>
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false); /* Add Task handler */
+                          router.push('/planning/tasks');
+                        }}>
                         Task
                       </button>
                     </div>
@@ -1175,9 +1190,9 @@ const Layout = ({ children }: LayoutProps) => {
                 <button
                   className="crm-prime-topbar-icon"
                   onClick={(e) => {
-                    router.push('/live-calls');
+                    router.push('/communications/wallboards-live');
                   }}
-                  title="Live Wallboards"
+                  title="Wallboards (Live)"
                 >
                   <MonitorCheck size={14} />
                 </button>
@@ -1405,10 +1420,10 @@ const Layout = ({ children }: LayoutProps) => {
                         </div>
                         <div className="user-dropdown-header-text">
                           <div className="user-dropdown-name">
-                            {loggedInName || 'Ocean Agent 01'}
+                            {loggedInName || 'User'}
                           </div>
                           <div className="user-dropdown-email">
-                            {session?.user?.email || 'ocean1@sipzon.com'}
+                            {session?.user?.email || 'user@example.com'}
                           </div>
                           <a href="/profile" className="user-dropdown-link">
                             Profile & Preferences

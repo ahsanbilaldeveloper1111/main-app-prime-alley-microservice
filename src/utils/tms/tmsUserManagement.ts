@@ -270,6 +270,17 @@ export const GetUserById = async (id: number | string) => {
   }
 };
 
+export const updateUserProfileData = async (id: number, payload: any) => {
+  try {
+    const response = await axiosInstance.put(`tms/users/profile/`+id, payload);
+    handleTmsAuthError(response);
+    return response?.data;
+  } catch (error: any) {
+    console.error('Error fetching user:', error);
+    throw error;
+  }
+};
+
 const checkResponse = (response: any) => {
   
   const responseData = response?.data;
@@ -280,4 +291,10 @@ const checkResponse = (response: any) => {
     toast.error(responseData?.message);
     return false;
   }
+}
+
+export const GetUserCompany = async () => {
+  const response = await axiosInstance.get(`tms/getCompany`);
+  handleTmsAuthError(response);
+  return response?.data?.data;
 }
