@@ -65,12 +65,12 @@ import GsmSync from "@pages/gsm/sync";
 import CompanyPO from "@pages/gsm/company/po";
 
 // Import Billing components
-import PaymentMethods from "@pages/accounting/customer/payment-methods";
+import PaymentMethods from "@pages/finance/payment-methods";
 
 // Import NetOps components
 import Devices from "@pages/netops/devices";
 import Services from "@pages/netops/services";
-import Alerts from "@pages/netops/alerts";
+import Alerts from "@pages/netops/alerts-old";
 
 // Import Tickets components
 import TicketStatuses from "@pages/tickets/statuses";
@@ -86,8 +86,8 @@ import FAQItems from "@pages/faqs/items";
 import FAQTypes from "@pages/faqs/types";
 
 // Import Staff Insights & Work Planner components
-import RequestCategories from "@pages/staff-management/request-categories";
-import WorkPlannerStatuses from "@pages/work-planner/statuses";
+import RequestCategories from "@pages/workforce/request-categories";
+import WorkPlannerStatuses from "@pages/planner/statuses";
 
 // Import AI Chat components
 import ToolProfiles from "@pages/chat/tools-profiles";
@@ -99,12 +99,12 @@ import AIChatFAQsGlobal from "@pages/chat/ai-faqs/global";
 import ManageExtensions from "@pages/ai-ml/manage-extensions";
 import BackendOperations from "@pages/ai-ml/backend-operations";
 import ManualAnalysis from "@pages/ai-ml/analysis";
-import AIMLProfiles from "@pages/ai-ml/profiles";
+import AIMLProfiles from "@pages/agents/outbound-agent";
 
 // Import Outbound / Inbound AI Agent components
 import OutboundTrunkProfiles from "@pages/ai-agent/outbound/trunk-profiles";
 import InboundTrunkProfiles from "@pages/ai-agent/inbound/trunk-profiles";
-import InboundBotProfiles from "@pages/ai-agent/inbound/bot-profiles";
+import InboundBotProfiles from "@pages/agents/inbound-agent";
 import InboundFAQs from "@pages/ai-agent/inbound/faqs";
 
 import { HEADER_CONSTANTS} from "@constants/headerConstants";

@@ -1293,7 +1293,7 @@ const CreateLead = () => {
         title={router?.query?.crm_data_id ? "Convert to Lead" : "Create Lead"}
         buttons={
           <Link
-            href={router?.query?.crm_data_id ? "/crm/data" : "/crm/leads"}
+            href={router?.query?.crm_data_id ? "/crm/prospects" : "/crm/leads"}
             className="btn btn-primary"
           >
             <FiArrowLeft className="me-2" />

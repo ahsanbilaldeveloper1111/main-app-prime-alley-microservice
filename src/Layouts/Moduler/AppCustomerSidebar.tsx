@@ -170,28 +170,17 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
   // Only these modules are enabled; others are hidden (can re-enable by adding id to this list)
   const ENABLED_MODULE_IDS = [
-    'dashboard',           // 1. Dashboard
-    'crm',                 // 2. CRM Workspace
-    'live-calls',          // 3. Live Wallboards
-    'ai-ml', // 11. AI ML
-    'call-history',        // 4. Call Details
-	'ai-bot-and-analytics', // 5. Outbound AI Agent
-    'ai-agent-inbound-and-analytics', // 6. Inbound AI Agent
-   
-    'gsm', // 8. GSM
-    'tms', // 9. TMS
-    'netops', // 10. NetOps
-   
-    'dncr', // 12. DNCR
-    'accounts',            // 10. Billing & Payments
-    'work-planner',        // 11. Work Planner
-    'staff-management', // 12. Staff Management
-    'reports',
-    'audit-logs', // 13. Audit Logs
-    // 'settings',
-    // 'resources',
-	  
-
+    'dashboard',     
+    'crm',          
+    'communications',
+    'planner',
+    'netops',
+    'virtual-agents',
+    'finance',
+    'compliance',
+    'workforce',
+    'unified-reports',
+    'audit-logs'
   ];
 
   const mainMenuItems: MainMenuItem[] = [
@@ -215,15 +204,16 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: "Unified Workspace",
       url: '/unified-workspace',
     },
-    
+
+    //crm services start
     {
       id: 'crm',
       key: 'crm',
       permission: PERMISSIONS.CRM_SERVICES,
       icon: <Briefcase size={16} />,
       color: MENU_COLORS.CRM,
-      title: "CRM Workspace",
-      label: "CRM Workspace",
+      title: "Sales CRM",
+      label: "Sales CRM",
       url: '',
       subItems: [
         {
@@ -234,11 +224,11 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/crm/dashboard'
         },
         {
-          id: 'crm-data-management',
+          id: 'crm-prospects-management',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DATA_MANAGEMENT,
           icon: <UserSearch size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
-          url: '/crm/data'
+          url: '/crm/data',//prospects
         },
         {
           id: 'crm-leads',
@@ -255,13 +245,6 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/crm/deals'
         },
         {
-          id: 'crm-deals-approval',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS_APPROVAL,
-          icon: <Handshake size={16} />,
-          permission: PERMISSIONS.VIEW_CRM_DEALS,
-          url: '/crm/deals-approval'
-        },
-        {
           id: 'crm-orders',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.ORDERS,
           icon: <ReceiptText size={16} />,
@@ -269,11 +252,19 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/crm/orders'
         },
         {
+          id: 'crm-deals-approval',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS_APPROVAL,
+          icon: <Handshake size={16} />,
+          permission: PERMISSIONS.VIEW_CRM_DEALS,
+          url: '/crm/deals-approval',//approvals 
+        },
+        
+        {
           id: 'crm-company',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY,
           icon: <ReceiptText size={16} />,
           permission: PERMISSIONS.VIEW_CRM_ORDERS,
-          url: '/crm/company'
+          url: '/crm/company'//companies
         },
         {
           id: 'crm-inbox',
@@ -283,26 +274,25 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/crm/inbox'
         },
         {
-          id: 'crm-history',
-          title: 'Activity Tracker',
+          id: 'crm-activities',
+          title: HEADER_CONSTANTS.SUBMENU_LABELS.CRM_ACTIVITY,
           icon: <Activity size={16} />,
           permission: PERMISSIONS.VIEW_CRM_HISTORY,
-          url: '/crm/history'
+          url: '/crm/history',//activities
         },
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
-
+    //crm services end
     
-    
-
+    //communications services start
     {
-      id: 'call-history',
-      key: 'call-history',
+      id: 'communications',
+      key: 'communications',
       permission: PERMISSIONS.CALL_HISTORY_SERVICES,
       icon: <Phone size={16} />,
       color: MENU_COLORS.CALL_HISTORY,
-      title: 'Call Details',
-      label: 'Call Details',
+      title: 'Communications',
+      label: 'Communications',
       url: '',
       subItems: [
         {
@@ -310,208 +300,198 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: 'Dashboard',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_CALL_DASHBOARD,
-          url: '/call-logs/dashboard'
+          url: '/communications/dashboard'
         },
         {
           id: 'call-history-logs',
           title: HEADER_CONSTANTS.MENU_LABELS.CALL_LOGS,
           icon: <Phone size={16} />,
           permission: PERMISSIONS.VIEW_CALL_LOGS,
-          url: '/call-logs'
+          url: '/communications/call-logs'
         },
         {
           id: 'call-history-recordings',
           title: HEADER_CONSTANTS.MENU_LABELS.CALL_RECORDINGS,
           icon: <Voicemail size={16} />,
           permission: PERMISSIONS.VIEW_CALL_RECORDINGS,
-          url: '/call-recordings'
+          url: '/communications/recordings'
         },
         {
           id: 'ai-ml-calls-analysis',
-          title: 'Calls Analysis',
+          title: 'Calls Analytics',
           icon: <FileChartPie size={16} />,
           permission: PERMISSIONS.TRANSCRIPTION_ANALYSIS_AIML,
-          url: '/ai-ml/analyze-recordings'
+          url: '/communications/call-analytics'
         },
         {
-          id: 'live-calls',
-          title: "Live Wallboards",
+          id: 'wallboards-live',
+          title: "Wallboards (Live)",
           icon: <MonitorCheck size={16} />,
           permission: PERMISSIONS.VIEW_CTI,
-          url: '/live-calls'
+          url: '/communications/wallboards-live'
         },
+        {
+          id: 'text-messages-communications',
+          title: "Text Messages",
+          icon: <MessageCircle size={16} />,
+          permission: PERMISSIONS.VIEW_GSM_INBOX,
+          url: '/communications/text-messages'
+        },
+
+        {
+          id: 'live-calls-campaign-manager',
+          title: 'Campaigns Manager',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT,
+          url: '/communications/campaign-manager'
+        },
+        {
+          id: 'live-calls-campaign-console',
+          title: 'Campaign Console',
+          icon: <FileText size={16} />,
+          permission: PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT,
+          url: '/communications/campaign-console'
+        },
+
+
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
+    //communications services end
 
+    //planner services start
     {
-      id: 'ai-bot-and-analytics',
-      key: 'ai-bot-and-analytics',
+      id: 'planner',
+      key: 'planner',
+      permission: PERMISSIONS.WORK_PLANNER_SERVICES,
+      icon: <Calendar size={16} />,
+      color: MENU_COLORS.BILLING,
+      title: "Planner",
+      label: "Planner",
+      url: '',
+      subItems: [
+
+        {
+          id: 'planner-dashboard',
+          title: 'Dashboard',
+          icon: <Folder size={16} />,
+          url: '/planner/dashboard',
+          permission: PERMISSIONS.VIEW_PROJECTS_DASHBOARD_WORK_PLANNER 
+        },
+        {
+          id: 'planner-projects',
+          title: 'Projects',
+          icon: <Folder size={16} />,
+          url: '/planner/projects',
+          permission: PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER 
+        },
+        { 
+          id: 'work-planner-recurring-reminders', 
+          title: 'Recurring Reminders', 
+          icon: <Bell size={16} />, 
+          url: '/planner/recurring-reminders', 
+          permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
+        },
+        { 
+          id: 'planner-todo-list', 
+          title: 'To-Do', 
+          icon: <Clock size={16} />, 
+          url: '/planner/todo', 
+          permission: PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER 
+        },
+        {
+          id: 'planner-tasks',
+          title: 'Tasks',
+          icon: <Clock size={16} />,
+          url: '/planner/tasks',
+          permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
+        },
+
+      
+        { 
+          id: 'work-planner-orders', 
+          title: 'Orders Delivery', 
+          icon: <ReceiptText size={16} />, 
+          url: '/planner/orders-delivery', 
+          permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
+        },
+       
+      ].filter(item => !item.permission || hasPermission(item.permission))
+    },
+    //planner services end
+
+    //virtual agent start
+    {
+      id: 'virtual-agents',
+      key: 'virtual-agents',
       permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
       icon: <Workflow size={16} />,
       color: MENU_COLORS.AUTOMATION,
-      title: "Outbound AI Agent",
-      label: "Outbound AI Agent",
+      title: "Virtual Agents",
+      label: "Virtual Agents",
       url: '',
       subItems: [
-        
         {
-          id: 'ai-agent-outbound-campaigns',
-          title: 'Campaigns',
+          id: 'virtual-agents-outbound-agent',
+          title: 'Outbound Agent',
           icon: <User size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-ml/campaigns'
+          url: '/agents/outbound-agent'
         },
         {
-          id: 'ai-agent-outbound-create-campaigns',
-          title: 'Create Campaign (static)',
+          id: 'virtual-agents-inbound-agent',
+          title: 'Inbound Agent',
           icon: <User size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-ml/campaigns/create-campaign'
+          url: '/agents/inbound-agent'
+        },
+        {
+          id: 'virtual-agents-agent-campaigns',
+          title: 'Agent Campaigns',
+          icon: <User size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/agents/agent-campaigns'
+        },
+        {
+          id: 'virtual-agents-create-campaigns',
+          title: 'Create Campaign',
+          icon: <User size={16} />,
+          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
+          url: '/agents/create-campaign'
         },
         {
           id: 'ai-agent-outbound-campaigns-pitch-deck',
           title: 'Pitch Deck',
           icon: <User size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-agent/outbound/pitch-deck'
+          url: '/agents/pitch-deck'
         },
         {
-          id: 'ai-agent-outbound-live-monitoring',
+          id: 'virtual-agents-live-monitoring',
           title: 'Live Monitoring',
           icon: <MonitorCheck size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-ml/live-monitoring'
+          url: '/agents/live-monitoring'
         },
         {
-          id: 'ai-agent-outbound-campaign-reports',
-          title: 'Outbound Analytics',
+          id: 'virtual-agents-analytics',
+          title: 'Analytics',
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-ml/campaign-reports'
+          url: '/agents/analytics'
         },
         {
-          id: 'ai-agent-outbound-usage-reports',
+          id: 'virtual-agents-usage-reports',
           title: 'Usage Reports',
           icon: <FileText size={16} />,
           permission: PERMISSIONS.TMS_SERVICES,
-          url: '/ai-agent/outbound/usage-reports'
+          url: '/agents/usage-reports'
         }
       ]
     },
+    //virtual agent end
 
-    {
-      id: 'ai-agent-inbound-and-analytics',
-      key: 'ai-agent-inbound-and-analytics',
-      permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-      icon: <Workflow size={20} />,
-      color: MENU_COLORS.AUTOMATION,
-      title: "Inbound AI Agent",
-      label: "Inbound AI Agent",
-      url: '',
-      subItems: [
-       
-        {
-          id: 'inbound-ai-bot-live-monitoring',
-          title: 'Live Monitoring',
-          icon: <MonitorCheck size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-agent/inbound/live-monitoring'
-        },
-        
-        {
-          id: 'inbound-ai-bot-campaign-reports',
-          title: 'Inbound Analytics',
-          icon: <BarChart3 size={16} />,
-          permission: PERMISSIONS.OUTBOUND_CALLS_AIML,
-          url: '/ai-agent/inbound/campaign-reports'
-        },
-        {
-          id: 'inbound-ai-bot-usage-reports',
-          title: 'Usage Reports',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.TMS_SERVICES,
-          url: '/ai-agent/inbound/usage-reports'
-        }
-      ]
-    },
 
-   
-
-    {
-      id: 'gsm',
-      key: 'gsm',
-      permission: PERMISSIONS.GSM_SERVICES,
-      icon: <RadioTower size={16} />,
-      color: MENU_COLORS.SIM_GATEWAY,
-      title: MENU_LABELS.SIM_GATEWAY,
-      label: MENU_LABELS.SIM_GATEWAY,
-      url: '',
-      subItems: [
-        {
-          id: 'gsm-dashboard',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.GSM_DASHBOARD,
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.VIEW_GSM_DASHBOARD,
-          url: '/gsm/dashboard'
-        },
-        {
-          id: 'gsm-list',
-          title: "Devices List",
-          icon: <ClipboardList size={16} />,
-          permission: PERMISSIONS.VIEW_GSM_MANAGEMENT,
-          url: '/gsm/list'
-        },
-        // {
-        //   id: 'gsm-assign',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY_ASSIGN,
-        //   icon: <ClipboardCheck size={16} />,
-        //   permission: PERMISSIONS.VIEW_GSM_ASSIGNMENT,
-        //   url: '/gsm/assign'
-        // },
-        {
-          id: 'gsm-ports',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.PORTS,
-          icon: <Wifi size={16} />,
-          permission: PERMISSIONS.VIEW_GSM_PORTS,
-          url: '/gsm/ports'
-        },
-        {
-          id: 'gsm-inbox',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.INBOX,
-          icon: <Inbox size={16} />,
-          permission: PERMISSIONS.VIEW_GSM_INBOX,
-          url: '/gsm/inbox'
-        },
-      ].filter(item => !item.permission || hasPermission(item.permission))
-    },
-
-    {
-      id: 'tms',
-      key: 'tms',
-      permission: PERMISSIONS.TMS_SERVICES,
-      icon: <Workflow size={16} />,
-      color: MENU_COLORS.AUTOMATION,
-      title: MENU_LABELS.AUTOMATION,
-      label: MENU_LABELS.AUTOMATION,
-      url: '',
-      subItems: [
-        {
-          id: 'live-calls-campaigns-management',
-          title: 'Campaigns Management',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT,
-          url: '/live-calls/management/campaigns'
-        },
-        {
-          id: 'live-calls-agent-management',
-          title: 'Agent Management',
-          icon: <FileText size={16} />,
-          permission: PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT,
-          url: '/live-calls/management/agents'
-        },
-      ].filter(item => !item.permission || hasPermission(item.permission))
-    },
-
+    //netops services start
     {
       id: 'netops',
       key: 'netops',
@@ -529,13 +509,6 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_NETOPS_DASHBOARD,
           url: '/netops/dashboard'
         },
-        // {
-        //   id: 'netops-devices',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_DEVICES,
-        //   icon: <MonitorSpeaker size={16} />,
-        //   permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-        //   url: '/netops/devices'
-        // },
         {
           id: 'netops-hosts',
           title: 'Hosts',
@@ -548,29 +521,15 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: 'Hosts Groups',
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: '/netops/hosts/groups'
+          url: '/netops/host-groups'
         },
         {
           id: 'netops-hosts-alerts',
-          title: 'Hosts Alerts',
+          title: 'Alerts',
           icon: <Server size={16} />,
           permission: PERMISSIONS.VIEW_NETOPS_DEVICES,
-          url: '/netops/hosts/alerts'
+          url: '/netops/alerts'
         },
-        // {
-        //   id: 'netops-services',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_SERVICES,
-        //   icon: <Server size={16} />,
-        //   permission: PERMISSIONS.VIEW_NETOPS_SERVICES,
-        //   url: '/netops/services'
-        // },
-        // {
-        //   id: 'netops-alerts',
-        //   title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_ALERTS,
-        //   icon: <Megaphone size={16} />,
-        //   permission: PERMISSIONS.VIEW_NETOPS_ALERTS,
-        //   url: '/netops/alerts'
-        // },
         {
           id: 'netops-uptime-sla',
           title: HEADER_CONSTANTS.SUBMENU_LABELS.NETOPS_UPTIME_SLA,
@@ -583,23 +542,31 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: 'Server Insights',
           icon: <Server size={16} />,
           permission: PERMISSIONS.NETOPS_SERVICES,
-          url: '/netops/select-server'
+          url: '/netops/server-insights'
         },
-        // {
-        //   id: 'netops-application-monitoring',
-        //   title: 'Application Monitoring',
-        //   icon: <Monitor size={16} />,
-        //   permission: PERMISSIONS.NETOPS_SERVICES,
-        //   url: '/netops/application-monitoring'
-        // }
+        {
+          id: 'netops-gateways',
+          title: 'Gateways',
+          icon: <Wifi size={16} />,
+          permission: PERMISSIONS.NETOPS_SERVICES,
+          url: '/netops/gateways'
+        },
+        {
+          id: 'netops-gateway-ports',
+          title: 'Gateway Ports',
+          icon: <Wifi size={16} />,
+          permission: PERMISSIONS.NETOPS_SERVICES,
+          url: '/netops/gateway-ports'
+        },
+       
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
+    //netops services end
 
-    
-
+    //compliance services start
     {
-      id: 'dncr',
-      key: 'dncr',
+      id: 'compliance',
+      key: 'compliance',
       permission: PERMISSIONS.DNCR_SERVICES,
       icon: <Ban size={16} />,
       color: MENU_COLORS.DNCR,
@@ -608,217 +575,153 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       url: '',
       subItems: [
         {
-          id: 'dncr-api-number-check',
+          id: 'compliance-api-number-check',
           title: "API Number Check",
           icon: <PhoneCall size={16} />,
           permission: PERMISSIONS.CHECK_NUMBERS_DNCR,
-          url: '/dncr/api-number-check'
+          url: '/compliance/api-number-check'
         },
         {
-          id: 'dncr-cdr-records',
+          id: 'compliance-cdr-records',
           title: "CDR Records",
           icon: <FileText size={16} />,
           permission: PERMISSIONS.VIEW_CDR_DNCR,
-          url: '/dncr/cdr-records'
+          url: '/compliance/cdr-records'
         },
         {
           id: 'dncr-local-dnd-call-block',
           title: "Add Records",
           icon: <PhoneCall size={16} />,
           permission: PERMISSIONS.VIEW_LOCAL_DND_CALL_BLOCK_DNCR,
-          url: '/dncr/add-records'
+          url: '/compliance/add-records'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
+    //compliance services end
 
+    //workforce services start
     {
-      id: 'accounts',
-      key: 'accounts',
-      permission: PERMISSIONS.ACCOUNTS_SERVICES,
-      icon: <CreditCard size={16} />,
+      id: 'workforce',
+      key: 'workforce',
+      permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES,
+      icon: <Users size={16} />,
       color: MENU_COLORS.BILLING,
-      title: MENU_LABELS.BILLING,
-      label: MENU_LABELS.BILLING,
+      title: "Workforce",
+      label: "Workforce",
       url: '',
       subItems: [
         { 
-          id: 'customer-dashboard', 
+          id: 'workforce-dashboard', 
           title: 'Dashboard', 
           icon: <LayoutDashboard size={16} />, 
-          url: '/accounting/customer/dashboard', 
+          url: '/workforce/dashboard', 
+          permission: PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT 
+        },
+        { 
+          id: 'workforce-org-chart', 
+          title: 'Org Chart', 
+          icon: <Layers2 size={16} />, 
+          url: '/workforce/org-chart', 
+          permission: PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT 
+        },
+        {
+          id: 'workforce-employees',
+          title: 'Employees',
+          icon: <Users size={16} />,
+          url: '/workforce/employees',
+          permission: PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT 
+        },
+        {
+          id: 'workforce-attendence',
+          title: 'Attendence',
+          icon: <Clock size={16} />,
+          url: '/workforce/attendences',
+          permission: PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT 
+        },
+        { 
+          id: 'workforce-onboarding', 
+          title: 'Onboarding', 
+          icon: <UserPlus size={16} />, 
+          url: '/workforce/onboarding', 
+          permission: PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT 
+        },
+        { 
+          id: 'workforce-approval-requests', 
+          title: 'Approval Requests', 
+          icon: <CheckCheck size={16} />, 
+          url: '/workforce/approval-requests', 
+          permission: PERMISSIONS.VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT 
+        },
+      ].filter(item => !item.permission || hasPermission(item.permission))
+    }, 
+    //workforce services end
+
+    //finance services start
+    {
+      id: 'finance',
+      key: 'finance',
+      permission: PERMISSIONS.ACCOUNTS_SERVICES,
+      icon: <CreditCard size={16} />,
+      color: MENU_COLORS.BILLING,
+      title: 'Finance',
+      label: 'Finance',
+      url: '',
+      subItems: [
+        { 
+          id: 'finance-dashboard', 
+          title: 'Dashboard', 
+          icon: <LayoutDashboard size={16} />, 
+          url: '/finance/dashboard', 
           permission: PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING 
         },
         { 
-          id: 'account-overview', 
+          id: 'finance-account-overview', 
           title: 'Account Overview', 
           icon: <Eye size={16} />, 
-          url: '/accounting/customer/account-overview', 
+          url: '/finance/account-overview', 
           permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING 
         },
         { 
-          id: 'product-details', 
+          id: 'finance-subscriptions', 
           title: 'Subscriptions', 
           icon: <ShoppingBag size={16} />, 
-          url: '/accounting/customer/product-details', 
+          url: '/finance/subscriptions', 
           permission: PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING 
         },
         { 
-          id: 'orders-billing', 
-          title: 'Order invoicing', 
+          id: 'finance-order-invoicing', 
+          title: 'Order Invoicing', 
           icon: <ShoppingBag size={16} />, 
-          url: '/accounting/customer/orders', 
+          url: '/finance/order-invoicing', 
           permission: PERMISSIONS.VIEW_INVOICES_BILLING 
         },
         { 
-          id: 'billing-invoices', 
+          id: 'finance-invoices', 
           title: 'Invoices', 
           icon: <DollarSign size={16} />, 
-          url: '/accounting/customer/invoices', 
+          url: '/finance/invoices', 
           permission: PERMISSIONS.VIEW_INVOICES_BILLING 
         },
         { 
-          id: 'billing-history', 
+          id: 'finance-payment-history', 
           title: 'Payment History', 
           icon: <FileText size={16} />, 
-          url: '/accounting/customer/billing-history', 
+          url: '/finance/payment-history', 
           permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING 
         },
       ].filter(item => !item.permission || hasPermission(item.permission))
     }, 
+    //finance services end
 
+    //reports and audit services start
     {
-      id: 'work-planner',
-      key: 'work-planner',
-      permission: PERMISSIONS.WORK_PLANNER_SERVICES,
-      icon: <Calendar size={16} />,
-      color: MENU_COLORS.BILLING,
-      title: "Work Planner",
-      label: "Work Planner",
-      url: '',
-      subItems: [
-        { 
-          id: 'work-planner-orders', 
-          title: 'Orders Delivery', 
-          icon: <ReceiptText size={16} />, 
-          url: '/work-planner/orders', 
-          permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
-        },
-        { 
-          id: 'work-planner-recurring-reminders', 
-          title: 'Recurring Reminders', 
-          icon: <Bell size={16} />, 
-          url: '/work-planner/recurring-reminders', 
-          permission: PERMISSIONS.VIEW_RECURRING_REMINDERS_WORK_PLANNER 
-        },
-        { 
-          id: 'work-planner-todo-list', 
-          title: 'To Do List', 
-          icon: <Clock size={16} />, 
-          url: '/work-planner/todo', 
-          permission: PERMISSIONS.VIEW_DIAL_TODO_WORK_PLANNER 
-        },
-        {
-          id: 'work-planner-call-time',
-          title: 'Tasks List',
-          icon: <Clock size={16} />,
-          url: '/work-planner/tasks-list',
-          permission: PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER 
-        },
-        {
-          id: 'work-planner-projects-dashboard',
-          title: 'Projects Dashboard',
-          icon: <Folder size={16} />,
-          url: '/work-planner/projects/dashboard',
-          permission: PERMISSIONS.VIEW_PROJECTS_DASHBOARD_WORK_PLANNER 
-        },
-        {
-          id: 'work-planner-projects',
-          title: 'Projects',
-          icon: <Folder size={16} />,
-          url: '/work-planner/projects',
-          permission: PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER 
-        },
-       
-      ].filter(item => !item.permission || hasPermission(item.permission))
-    }, 
-
-    {
-      id: 'staff-management',
-      key: 'staff-management',
-      permission: PERMISSIONS.STAFF_MANAGEMENT_SERVICES,
-      icon: <Users size={16} />,
-      color: MENU_COLORS.BILLING,
-      title: "Staff Insights",
-      label: "Staff Management",
-      url: '',
-      subItems: [
-        { 
-          id: 'staff-management-employees-dashboard', 
-          title: 'Employees Dashboard', 
-          icon: <LayoutDashboard size={16} />, 
-          url: '/staff-management/employees/dashboard', 
-          permission: PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT 
-        },
-        {
-          id: 'staff-management-employees',
-          title: 'Employees',
-          icon: <Users size={16} />,
-          url: '/staff-management/employees',
-          permission: PERMISSIONS.VIEW_EMPLOYEES_STAFF_MANAGEMENT 
-        },
-        {
-          id: 'staff-management-attendence',
-          title: 'Attendence',
-          icon: <Clock size={16} />,
-          url: '/staff-management/attendences',
-          permission: PERMISSIONS.VIEW_ATTENDENCE_STAFF_MANAGEMENT 
-        },
-        { 
-          id: 'staff-management-employees-onboarding', 
-          title: 'Employees Onboarding', 
-          icon: <UserPlus size={16} />, 
-          url: '/staff-management/employees/onboarding', 
-          permission: PERMISSIONS.VIEW_EMPLOYEES_ONBOARDING_STAFF_MANAGEMENT 
-        },
-        { 
-          id: 'staff-management-employees-approval-request', 
-          title: 'Approval Request', 
-          icon: <CheckCheck size={16} />, 
-          url: '/staff-management/approval-request', 
-          permission: PERMISSIONS.VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT 
-        },
-        { 
-          id: 'staff-management-employees-organizational-chart', 
-          title: 'Organizational Chart', 
-          icon: <Layers2 size={16} />, 
-          url: '/staff-management/organizational-chart', 
-          permission: PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT 
-        },
-        // {
-        //   id:'staff-management-request-categories',
-        //   title: 'Request Categories',
-        //   icon: <List size={16} />,
-        //   url: '/staff-management/request-categories',
-        //   permission: PERMISSIONS.VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT
-        // },
-        // {
-        //   id:'staff-management-locations',
-        //   title: 'Manage Locations',
-        //   icon: <Map size={16} />,
-        //   url: '/staff-management/locations',
-        //   permission: PERMISSIONS.VIEW_LOCATIONS_STAFF_MANAGEMENT
-        // }
-      ].filter(item => !item.permission || hasPermission(item.permission))
-    }, 
-
-    {
-      id: 'reports',
-      key: 'reports',
+      id: 'unified-reports',
+      key: 'unified-reports',
       permission: PERMISSIONS.REPORTS_SERVICES,
       icon: <BarChart3 size={16} />,
       color: MENU_COLORS.REPORTS,
-      title: MENU_LABELS.REPORTS,
-      label: MENU_LABELS.REPORTS,
+      title: "Unified Reports",
+      label: "Unified Reports",
       url: '',
       subItems: [
         {
@@ -826,57 +729,39 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: 'CRM Insights',
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.VIEW_CRM_REPORTS,
-          url: '/crm/reports'
+          url: '/reports/crm-insights'
         },
         {
           id: 'call-reports',
           title: 'Call Analytics',
           icon: <BarChart3 size={16} />,
           permission: PERMISSIONS.VIEW_CALL_REPORTS,
-          url: '/call-reports'
+          // url: '/call-reports'
+          url:'/reports/call-analytics'
         },
         {
           id: 'ai-chat-usage-reports',
           title: 'Chat Usage',
           icon: <FileText size={16} />,
           permission: PERMISSIONS.TMS_SERVICES,
-          url: '/chat/usage-reports'
+          url: '/reports/chat-usage'
         }
       ].filter(item => !item.permission || hasPermission(item.permission))
     },
+    //reports and audit services end
 
+    //audit logs services start
     {
       id: 'audit-logs',
       key: 'audit-logs',
-      permission: '',
-      icon: <FileText size={16} />,
-      color: '#0d6efd',
-      title: "Audit Logs",
-      label: "Audit Logs",
-      url: '/audit-logs'
-    },
-
-    {
-      id: 'settings',
-      key: 'settings',
-      permission: '',
-      icon: <Settings size={16} />,
-      color: '#0d6efd',
-      title: "Settings",
-      label: "Settings",
-      url: '/settings'
-    },
-
-    {
-      id: 'resources',
-      key: 'resources',
-      permission: '',
-      icon: <NotebookText size={16} />,
-      color: MENU_COLORS.RESOURCES,
-      title: MENU_LABELS.RESOURCES,
-      label: MENU_LABELS.RESOURCES,
-      url: '/help-center',
+      permission: PERMISSIONS.TMS_SERVICES,
+      icon: <History size={16} />,
+      color: MENU_COLORS.REPORTS,
+      title: 'Audit Logs',
+      label: 'Audit Logs',
+      url: '/audit-logs',
     }
+
   ].filter(item => ENABLED_MODULE_IDS.includes(item.id) && (!item.permission || hasPermission(item.permission)));
 
   const toggleSubModule = (subModuleId: string) => {
@@ -1596,12 +1481,12 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     item.id !== 'dashboard-unified-workspace' && 
     item.id !== 'settings' && 
     item.id !== 'resources' &&
-    item.id !== 'reports' &&
+    item.id !== 'unified-reports' &&
     item.id !== 'audit-logs'
   );
 
   const systemItems = mainMenuItems.filter(item => 
-    item.id === 'settings' || item.id === 'resources' || item.id === 'reports' || item.id === 'audit-logs'
+    item.id === 'settings' || item.id === 'resources' || item.id === 'unified-reports' || item.id === 'audit-logs'
   );
 
   const activeModuleData = mainMenuItems.find(m => m.id === activeModule);

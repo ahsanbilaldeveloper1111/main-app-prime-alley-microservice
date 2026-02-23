@@ -42,7 +42,7 @@ export const HEADER_CONSTANTS = {
     CRM: 'CRM',
     DNCR: 'DNCR',
     COMPLIANCES: 'Compliance',
-
+    FINANCE: 'Finance',
     BILLING: 'Billing & Payments',
     INVOICES_BILLING: 'Invoices',
     EXPENSES_BILLING: 'Expenses',
@@ -54,7 +54,7 @@ export const HEADER_CONSTANTS = {
     SUPPLIERS_BILLING: 'Suppliers',
     PRODUCT_PRICING_BILLING: 'Product Pricing',
 
-    NETOPS: 'Device Insights',
+    NETOPS: 'NetOps',
     SALES: 'Sales',
     WEB_RTC: 'Web RTC',
     OMNI_CHANNEL: 'Omni Channel',
@@ -142,7 +142,7 @@ MENU_COLORS: {
     CRM_DASHBOARD: 'Dashboard',
     LEADS: 'Leads',
     DEALS: 'Deals',
-    DEALS_APPROVAL: 'Deals Approval',
+    DEALS_APPROVAL: 'Approvals',
     OPPORTUNITIES: 'Opportunities',
     STAGES: 'Stages',
     LOST_REASONS_CRM: 'Lost Reasons',
@@ -150,6 +150,7 @@ MENU_COLORS: {
     CAMPAIGNS: 'Campaigns',
     COMPANY: 'Companies',
     INBOX_CRM: 'Inbox',
+    CRM_ACTIVITY: 'Activities',
     
     // Call Recordings
     RECORDINGS_DASHBOARD: 'Dashboard',
@@ -203,7 +204,8 @@ MENU_COLORS: {
     NETOPS_DEVICES: 'Devices',
     NETOPS_SERVICES: 'Service status',
     NETOPS_ALERTS: 'Alerts and Notifications',
-    NETOPS_UPTIME_SLA: 'Uptime & SLA Monitoring',
+    NETOPS_UPTIME_SLA: 'Uptime & SLA',
+    SERVER_INSIGHTS: 'Server Insights',
 
     // Resources
     FAQ: 'FAQ',
@@ -315,7 +317,8 @@ MENU_COLORS: {
     LIVE_CHAT_AIML: 'live-chat-users',
 
     CTI_SERVICES: 'cti-services',
-    VIEW_CTI:'view-cti',
+    VIEW_CTI: 'view-cti',
+    
     DIAL_CALL_CTI:'dial-call-cti',
     CTI_MONITORING:'dashboard-cti',
     VIEW_LIVE_CALLS_CAMPAIGNS_MANAGEMENT: 'view-campaigns-tms',
@@ -362,6 +365,8 @@ MENU_COLORS: {
     VIEW_ALERTS_NETOPS: 'alerts-netops',
     RESOLVE_ALERT: 'resolve-alert-netops',
     MONITER_NETOPS: 'moniter-netops',
+
+    VIEW_COMMUNICATIONS_DASHBOARD: 'view-call-dashboard',
 
 
     CALL_HISTORY_SERVICES: 'call-history-services',

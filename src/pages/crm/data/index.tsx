@@ -2319,7 +2319,7 @@ const CrmProspectsManagement = () => {
   // Handle first column click - navigates to detail page with prospect ID in URL
   const handleFirstColumnClick = useCallback(
     (prospect: any) => {
-      router.push(`/crm/data/prospects-detailpage?id=${prospect?.id ?? ""}`);
+      router.push(`/crm/prospects/prospects-detailpage?id=${prospect?.id ?? ""}`);
     },
     [router],
   );

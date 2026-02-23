@@ -140,7 +140,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DATA_MANAGEMENT,
           icon: <Database size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
-          url: '/crm/data'
+          url: '/crm/prospects'
         },
         {
           id: 'crm-leads',
@@ -197,7 +197,7 @@ const ApplicationSidebar: React.FC<SidebarProps> = ({
           title: 'Activity Tracker',
           icon: <History size={16} />,
           permission: PERMISSIONS.VIEW_CRM_HISTORY,
-          url: '/crm/history'
+          url: '/crm/activities'
         },
         {
           id: 'crm-reports',

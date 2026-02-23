@@ -2775,7 +2775,7 @@ const DealRecordPage: NextPageWithLayout = () => {
             {dealError || "No deal selected"}
           </p>
           <button
-            onClick={() => router.push("/crm/deals-approval")}
+            onClick={() => router.push("/crm/approvals")}
             style={{
               padding: "8px 16px",
               backgroundColor: "#006162",
