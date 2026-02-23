@@ -92,7 +92,7 @@ function payloadToItem(payload: AddNotificationPayload, notificationId: string):
   const title = String(payload.data?.title ?? payload.notification?.title ?? 'New Notification');
   const description = String(payload.data?.description ?? payload.notification?.body ?? '');
   const body = String(payload.notification?.body ?? payload.data?.description ?? '');
-  const module = String(payload.data?.module ?? '');
+  const moduleName = String(payload.data?.module ?? '');
   const timestamp = payload.data?.created_at
     ? new Date(String(payload.data.created_at))
     : new Date();
@@ -102,7 +102,7 @@ function payloadToItem(payload: AddNotificationPayload, notificationId: string):
     title,
     body,
     description,
-    module,
+    module: moduleName,
     timestamp,
     data: payload.data,
     read: false,
