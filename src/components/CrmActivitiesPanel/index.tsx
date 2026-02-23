@@ -181,20 +181,35 @@ export interface CrmActivitiesPanelProps {
   onTasksRefetchReady?: (fetchTasks: () => void) => void;
 }
 
-export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
-  recordType,
-  recordId,
-  record,
-  recordLoading = false,
-  recordName = 'Record',
-  canSendWhatsApp = false,
-  extensions: extensionsProp,
-  campaigns,
-  onOpenNote,
-  onOpenEmail,
-  onOpenTask,
-  onOpenMeeting,
-}) => {
+export interface CrmActivitiesPanelRef {
+  refetchTasks?: () => void;
+  refetchNotes?: () => void;
+  refetchEmails?: () => void;
+  refetchMeetings?: () => void;
+}
+
+const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<CrmActivitiesPanelRef, CrmActivitiesPanelProps> = (
+  {
+    recordType,
+    recordId,
+    record,
+    recordLoading = false,
+    recordName = 'Record',
+    canSendWhatsApp = false,
+    extensions: extensionsProp,
+    campaigns,
+    onOpenNote,
+    onOpenEmail,
+    onOpenTask,
+    onOpenMeeting,
+    onTasksRefetchReady,
+  },
+  ref,
+) => {
+  const { data: session } = useSession();
+  const extension = (session?.user as { extension?: string; phone?: string } | undefined)?.extension
+    ?? (session?.user as { extension?: string; phone?: string } | undefined)?.phone
+    ?? '';
   const useExternalModals = Boolean(onOpenNote ?? onOpenEmail ?? onOpenTask ?? onOpenMeeting);
   const [activityFilter, setActivityFilter] = useState('activity');
   const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Set());
@@ -435,6 +450,17 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
     fetchEmails();
   }, [activityFilter, recordId, fetchEmails]);
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      refetchTasks: fetchTasks,
+      refetchNotes: fetchNotes,
+      refetchEmails: fetchEmails,
+      refetchMeetings: fetchMeetings,
+    }),
+    [fetchTasks, fetchNotes, fetchEmails, fetchMeetings],
+  );
+
   const fetchCallRecordings = useCallback(async (phoneNumber: string) => {
     const normalizedPhone = (phoneNumber || '').replace(/\s/g, '');
     if (!normalizedPhone) {
@@ -564,6 +590,69 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
     await fetchMeetings();
     setShowMeetingModal(false);
   }, [fetchMeetings]);
+
+  const parseTaskDueDate = useCallback((activityDate: string, activityTime: string): string => {
+    const today = new Date();
+    const addDays = (n: number) => {
+      const t = new Date(today);
+      t.setDate(t.getDate() + n);
+      return t.toISOString().slice(0, 10);
+    };
+    if (activityDate === 'Today') return addDays(0);
+    if (activityDate === 'Tomorrow') return addDays(1);
+    if (activityDate?.includes('3 business') || activityDate?.includes('Friday')) return addDays(3);
+    if (activityDate === 'In 1 week') return addDays(7);
+    if (activityDate === 'In 2 weeks') return addDays(14);
+    if (activityDate === 'In 1 month') return addDays(30);
+    return addDays(3);
+  }, []);
+
+  const handleTaskSave = useCallback(async (taskData: {
+    title: string;
+    activityDate: string;
+    activityTime: string;
+    reminder: string;
+    repeat: boolean;
+    taskType: string;
+    priority: string;
+    queue: string;
+    assignedTo: string;
+    notes: string;
+  }) => {
+    if (recordId == null || Number.isNaN(Number(recordId))) return;
+    const due_date = parseTaskDueDate(taskData.activityDate, taskData.activityTime);
+    const urgency = taskData.priority === 'High' ? 'high' : taskData.priority === 'Medium' ? 'med' : 'low';
+    try {
+      await createTask({
+        name: taskData.title.trim() || 'Task',
+        user_extension: extension,
+        created_by: extension,
+        urgency,
+        due_date,
+        time: taskData.activityTime?.length >= 5 ? taskData.activityTime.slice(0, 5) : undefined,
+        status: 'pending',
+        notes: taskData.notes?.trim() ? [{ note: taskData.notes.trim() }] : undefined,
+        record_type: recordType,
+        record_id: Number(recordId),
+      });
+      setShowTaskModal(false);
+      await fetchTasks();
+    } catch {
+      // createTask shows toast on error
+    }
+  }, [recordType, recordId, extension, parseTaskDueDate, fetchTasks]);
+
+  const handleTaskDeleteConfirm = useCallback(async () => {
+    if (!taskToDelete || taskToDelete.id == null) return;
+    setTaskDeleteLoading(true);
+    try {
+      await deleteTask(taskToDelete.id);
+      setTaskToDelete(null);
+      await fetchTasks();
+    } finally {
+      setTaskDeleteLoading(false);
+    }
+  }, [taskToDelete, fetchTasks]);
 
   const handleWhatsAppReplySend = useCallback(async () => {
     if (selectedWhatsAppChatId == null || !whatsappReplyMessage.trim() || !canSendWhatsApp) return;
@@ -1414,12 +1503,13 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
 
       {taskToDelete != null && (
         <DeleteConfirmationModal
-          isOpen={true}
-          onClose={() => setTaskToDelete(null)}
-          onConfirm={handleTaskDeleteConfirm}
-          title="Delete task"
-          message={`Are you sure you want to delete "${taskToDelete.name}"?`}
-          isLoading={taskDeleteLoading}
+          show={true}
+          onHide={() => setTaskToDelete(null)}
+          onConfirm={() => handleTaskDeleteConfirm()}
+          itemName={taskToDelete.name}
+          itemType="task"
+          additionalInfo={`Are you sure you want to delete "${taskToDelete.name}"?`}
+          loading={taskDeleteLoading}
         />
       )}
 
@@ -1549,5 +1639,5 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
   );
 };
 
-export const CrmActivitiesPanel = forwardRef(CrmActivitiesPanelInner);
+export const CrmActivitiesPanel = forwardRef<CrmActivitiesPanelRef, CrmActivitiesPanelProps>(CrmActivitiesPanelInnerRender);
 export default CrmActivitiesPanel;

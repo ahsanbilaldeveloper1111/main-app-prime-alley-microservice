@@ -5340,7 +5340,73 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const tenantId = (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant_id
     ?? (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant
     ?? '';
-
+    const handleCall = useCallback(
+      async (phoneNumber: string) => {
+        const numberToDial = (phoneNumber || "").trim();
+        if (!numberToDial) {
+          toast.error("No phone number available to call");
+          return;
+        }
+        const userDevices = getAllUserDevices?.();
+        if (userDevices && userDevices.length > 1) {
+          setAvailableDevices(userDevices);
+          setPendingDialedNumber(numberToDial);
+          setShowDeviceSelectionModal(true);
+          setShowCallModal(false);
+          return;
+        }
+        setIsDialing(true);
+        try {
+          const result = await ctiDialNumber(numberToDial);
+          if (result?.success) {
+            setShowCallModal(false);
+            onCall?.(numberToDial);
+          } else if (result?.error) {
+            toast.error(result.error);
+          }
+        } catch {
+          toast.error("Failed to make call");
+        } finally {
+          setIsDialing(false);
+        }
+      },
+      [ctiDialNumber, getAllUserDevices, onCall],
+    );
+    const handleDeviceSelect = useCallback(
+      async (device: { deviceType: string; deviceName: string }) => {
+        const numberToDial = pendingDialedNumber;
+        setShowDeviceSelectionModal(false);
+        setAvailableDevices([]);
+        setPendingDialedNumber("");
+        const callerInfo = {
+          callingAddress: ctiUserAddress,
+          callingDeviceName: device.deviceName,
+          callingDeviceType: device.deviceType,
+          selectedAt: new Date().toISOString(),
+        };
+        localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
+        setIsDialing(true);
+        try {
+          const result = await makeCall({
+            callingAddress: ctiUserAddress ?? "",
+            calledAddress: numberToDial,
+            callingDeviceType: device.deviceType,
+            callingDeviceName: device.deviceName,
+          });
+          if (result?.success) {
+            setShowCallModal(false);
+            onCall?.(numberToDial);
+          } else if (result?.error) {
+            toast.error(result.error);
+          }
+        } catch {
+          toast.error("Failed to make call");
+        } finally {
+          setIsDialing(false);
+        }
+      },
+      [pendingDialedNumber, ctiUserAddress, makeCall, onCall],
+    );  
   // Parse comma-separated email/phone into arrays for multiple contact support
   const emailList = useMemo(() => {
     if (!email || typeof email !== "string") return [];
@@ -5646,74 +5712,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   /** Initiate call via CTI (same flow as Layout handleDial): device selection if multiple devices, else dialNumber */
-  const handleCall = useCallback(
-    async (phoneNumber: string) => {
-      const numberToDial = (phoneNumber || "").trim();
-      if (!numberToDial) {
-        toast.error("No phone number available to call");
-        return;
-      }
-      const userDevices = getAllUserDevices?.();
-      if (userDevices && userDevices.length > 1) {
-        setAvailableDevices(userDevices);
-        setPendingDialedNumber(numberToDial);
-        setShowDeviceSelectionModal(true);
-        setShowCallModal(false);
-        return;
-      }
-      setIsDialing(true);
-      try {
-        const result = await ctiDialNumber(numberToDial);
-        if (result?.success) {
-          setShowCallModal(false);
-          onCall?.(numberToDial);
-        } else if (result?.error) {
-          toast.error(result.error);
-        }
-      } catch {
-        toast.error("Failed to make call");
-      } finally {
-        setIsDialing(false);
-      }
-    },
-    [ctiDialNumber, getAllUserDevices, onCall],
-  );
 
-  const handleDeviceSelect = useCallback(
-    async (device: { deviceType: string; deviceName: string }) => {
-      const numberToDial = pendingDialedNumber;
-      setShowDeviceSelectionModal(false);
-      setAvailableDevices([]);
-      setPendingDialedNumber("");
-      const callerInfo = {
-        callingAddress: ctiUserAddress,
-        callingDeviceName: device.deviceName,
-        callingDeviceType: device.deviceType,
-        selectedAt: new Date().toISOString(),
-      };
-      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
-      setIsDialing(true);
-      try {
-        const result = await makeCall({
-          callingAddress: ctiUserAddress ?? "",
-          calledAddress: numberToDial,
-          callingDeviceType: device.deviceType,
-          callingDeviceName: device.deviceName,
-        });
-        if (result?.success) {
-          setShowCallModal(false);
-          onCall?.(numberToDial);
-        } else if (result?.error) {
-          toast.error(result.error);
-        }
-      } catch {
-        toast.error("Failed to make call");
-      } finally {
-        setIsDialing(false);
-      }
-    },
-    [pendingDialedNumber, ctiUserAddress, makeCall, onCall],
-  );
+
 
   const handleMeetingClick = () => {
     setShowMeetingModal(true);

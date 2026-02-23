@@ -119,9 +119,9 @@ const ContactRecordPage: NextPageWithLayout = () => {
     recordEmail: prospectRecordEmail,
     recordPhone: prospect?.data?.phone ?? "",
     onTaskCreated: () => tasksRefetch?.(),
-    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes(),
-    onEmailSent: () => activitiesPanelRef.current?.refetchEmails(),
-    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings(),
+    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes?.(),
+    onEmailSent: () => activitiesPanelRef.current?.refetchEmails?.(),
+    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
   });
 
   // Load prospect by ID from URL
@@ -1916,7 +1916,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
             recordLoading={prospectLoading}
             recordName={prospectRecordName}
             canSendWhatsApp={canSendWhatsApp}
-            onTasksRefetchReady={(fn) => setTasksRefetch(() => fn)}
+            onTasksRefetchReady={(fn: () => void) => setTasksRefetch(() => fn)}
             {...activityModals.crmActivitiesPanelProps}
           />
         )}

@@ -2621,16 +2621,6 @@ const CrmCompanyManagement = () => {
     setShowCompanySidebar(true);
   }, []);
 
-  // Handle first column click - navigates to detail page with company ID in URL
-  const handleFirstColumnClick = useCallback(
-    (company: any) => {
-      router.push(
-        `/crm/prospects/companies-detailpage?id=${company?.id ?? ""}`,
-      );
-    },
-    [router],
-  );
-
   // Stats cards data for metrics
   const companyStatsCards: StatsCardData[] = useMemo(
     () => [
@@ -5107,7 +5097,7 @@ const CrmCompanyManagement = () => {
                 }}
                 // Row interactions
                 onPreviewClick={(row) => handlePreviewClick(row)}
-                onFirstColumnClick={(row) => handleFirstColumnClick(row)}
+                onFirstColumnClick={(row) => handleCompanyClick(row)}
                 onRowDoubleClick={(row) => {
                   if (
                     session?.user?.permissions?.includes(
