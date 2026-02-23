@@ -37,7 +37,7 @@ import {
   Italic,
   Underline,
   Link,
-  Image,
+  Image as ImageIcon,
   List,
   Paperclip,
   Plus,
@@ -729,7 +729,7 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
           </button>
           {/* Image */}
           <button style={toolbarBtnStyle} title="Insert Image" onClick={handleImage} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-            <Image size={16} />
+            <ImageIcon size={16} aria-hidden />
           </button>
           {/* Code / Quote */}
           <button style={toolbarBtnStyle} title="Code" onClick={handleCode} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>

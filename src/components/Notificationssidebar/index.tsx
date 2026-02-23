@@ -121,10 +121,10 @@ function formatRelativeTime(date: Date): string {
 
 function deriveType(item: NotificationItem): Exclude<NotificationType, 'all'> {
   const targetType = (item.data as { target_type?: string } | undefined)?.target_type?.toLowerCase();
-  const module = (item.module ?? '').toLowerCase();
-  if (targetType === 'task' || module.includes('task') || module.includes('work-planner')) return 'task';
-  if (targetType === 'call' || module.includes('call')) return 'call';
-  if (targetType === 'mention' || module.includes('mention')) return 'mention';
+  const moduleName = (item.module ?? '').toLowerCase();
+  if (targetType === 'task' || moduleName.includes('task') || moduleName.includes('work-planner')) return 'task';
+  if (targetType === 'call' || moduleName.includes('call')) return 'call';
+  if (targetType === 'mention' || moduleName.includes('mention')) return 'mention';
   return 'data';
 }
 

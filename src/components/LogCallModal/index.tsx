@@ -39,7 +39,7 @@ import {
   Italic,
   Underline,
   Link,
-  Image,
+  Image as ImageIcon,
   List,
   Paperclip,
   Plus,
@@ -611,7 +611,7 @@ const LogCallModal: React.FC<LogCallModalProps> = ({
               <Link size={16} />
             </button>
             <button style={toolbarBtn} title="Insert Image" onClick={handleImage} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
-              <Image size={16} />
+              <ImageIcon size={16} aria-hidden />
             </button>
             <button style={toolbarBtn} title="Code" onClick={() => toggleFormatting('`')} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
               <MessageSquare size={16} />
