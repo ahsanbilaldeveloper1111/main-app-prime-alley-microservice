@@ -91,7 +91,7 @@ function formatDisplayDate(isoLocal: string): string {
 
 const DEFAULT_GENERATE_QUERY = 'Write a short, professional SMS message (concise, suitable for text).';
 
-const smsMessageModal: React.FC<smsMessageModalProps> = ({
+const SmsMessageModal: React.FC<smsMessageModalProps> = ({
   isOpen,
   onClose,
   associatedRecords = [],
@@ -938,4 +938,4 @@ const smsMessageModal: React.FC<smsMessageModalProps> = ({
   );
 };
 
-export default smsMessageModal;
+export default SmsMessageModal;

@@ -86,7 +86,7 @@ export const routePermissions: RoutePermission[] = [
                 ]
             },
             { 
-                path: '/data',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT],//prospects
+                path: '/prospects',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT],
                 children: [
                     { path: '/',permissions: [PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT]},
                     { path: '/create',permissions: [PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT]},
@@ -126,10 +126,11 @@ export const routePermissions: RoutePermission[] = [
             { path: '/industries',permissions: [PERMISSIONS.VIEW_CRM_INDUSTRIES]},
             { path: '/deal-templates',permissions: [PERMISSIONS.VIEW_CRM_DEAL_TEMPLATES]},
             { path: '/business-types',permissions: [PERMISSIONS.VIEW_CRM_BUSINESS_TYPES]},
-            {path:'/company',permissions: ['']},//companies
-            {path:'/deals-approval',permissions: ['']},//approvals 
-            {path:'/approvals/approval-detailpage',permissions: ['']},
-            {path:'/inbox',permissions: ['']},
+            { path: '/companies', permissions: [''] },
+            { path: '/approvals', permissions: [''] },
+            { path: '/approvals/approval-detailpage', permissions: [''] },
+            { path: '/inbox', permissions: [''] },
+            { path: '/activities', permissions: [''] },
         ]
     },
     //crm services end

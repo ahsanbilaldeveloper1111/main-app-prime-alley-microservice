@@ -228,7 +228,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DATA_MANAGEMENT,
           icon: <UserSearch size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
-          url: '/crm/data',//prospects
+          url: '/crm/prospects',
         },
         {
           id: 'crm-leads',
@@ -256,7 +256,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.DEALS_APPROVAL,
           icon: <Handshake size={16} />,
           permission: PERMISSIONS.VIEW_CRM_DEALS,
-          url: '/crm/deals-approval',//approvals 
+          url: '/crm/approvals', 
         },
         
         {
@@ -264,7 +264,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           title: HEADER_CONSTANTS.SUBMENU_LABELS.COMPANY,
           icon: <ReceiptText size={16} />,
           permission: PERMISSIONS.VIEW_CRM_ORDERS,
-          url: '/crm/company'//companies
+          url: '/crm/companies'
         },
         {
           id: 'crm-inbox',
@@ -275,7 +275,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'crm-activities',
-          title: HEADER_CONSTANTS.SUBMENU_LABELS.CRM_ACTIVITY,
+          title: (HEADER_CONSTANTS.SUBMENU_LABELS as Record<string, string>).CRM_ACTIVITY ?? 'Activities',
           icon: <Activity size={16} />,
           permission: PERMISSIONS.VIEW_CRM_HISTORY,
           url: '/crm/history',//activities

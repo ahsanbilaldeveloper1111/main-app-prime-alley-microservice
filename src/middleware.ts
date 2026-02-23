@@ -59,7 +59,9 @@ export async function middleware(request: NextRequest) {
 
     // Check if user has all required permissions
     // If requiredPermissions is empty or only contains empty string, bypass permission check
-    if (requiredPermissions.length === 0 || (requiredPermissions.length === 1 && requiredPermissions[0] === '')) {
+    console.log('requiredPermissions',requiredPermissions);
+    if (requiredPermissions.length === 0 || (requiredPermissions?.length === 0 || requiredPermissions[requiredPermissions.length - 1] === '')) {
+        console.log('No required permissions, bypassing permission check');
         return NextResponse.next();
     }
 

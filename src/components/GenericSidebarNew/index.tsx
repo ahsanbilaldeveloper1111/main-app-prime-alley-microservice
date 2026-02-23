@@ -37,7 +37,7 @@ import { Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { sendEmail, sendSms, sendWhatsApp } from "@utils/communication";
 import { useSession } from "next-auth/react";
-import { createMeeting, createCrmNote, getCrmNotes, type CrmNoteItem } from "@utils/crm";
+import { createMeeting, createCrmNote, getCrmNotes, createTask, type CrmNoteItem } from "@utils/crm";
 import { RECORD_TYPES, ModuleSlug } from "@utils/Helper";
 import { ListCallLogs } from "@utils/calls";
 import { useCti } from "@hooks/useCti";
@@ -5340,7 +5340,73 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const tenantId = (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant_id
     ?? (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant
     ?? '';
-
+    const handleCall = useCallback(
+      async (phoneNumber: string) => {
+        const numberToDial = (phoneNumber || "").trim();
+        if (!numberToDial) {
+          toast.error("No phone number available to call");
+          return;
+        }
+        const userDevices = getAllUserDevices?.();
+        if (userDevices && userDevices.length > 1) {
+          setAvailableDevices(userDevices);
+          setPendingDialedNumber(numberToDial);
+          setShowDeviceSelectionModal(true);
+          setShowCallModal(false);
+          return;
+        }
+        setIsDialing(true);
+        try {
+          const result = await ctiDialNumber(numberToDial);
+          if (result?.success) {
+            setShowCallModal(false);
+            onCall?.(numberToDial);
+          } else if (result?.error) {
+            toast.error(result.error);
+          }
+        } catch {
+          toast.error("Failed to make call");
+        } finally {
+          setIsDialing(false);
+        }
+      },
+      [ctiDialNumber, getAllUserDevices, onCall],
+    );
+    const handleDeviceSelect = useCallback(
+      async (device: { deviceType: string; deviceName: string }) => {
+        const numberToDial = pendingDialedNumber;
+        setShowDeviceSelectionModal(false);
+        setAvailableDevices([]);
+        setPendingDialedNumber("");
+        const callerInfo = {
+          callingAddress: ctiUserAddress,
+          callingDeviceName: device.deviceName,
+          callingDeviceType: device.deviceType,
+          selectedAt: new Date().toISOString(),
+        };
+        localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
+        setIsDialing(true);
+        try {
+          const result = await makeCall({
+            callingAddress: ctiUserAddress ?? "",
+            calledAddress: numberToDial,
+            callingDeviceType: device.deviceType,
+            callingDeviceName: device.deviceName,
+          });
+          if (result?.success) {
+            setShowCallModal(false);
+            onCall?.(numberToDial);
+          } else if (result?.error) {
+            toast.error(result.error);
+          }
+        } catch {
+          toast.error("Failed to make call");
+        } finally {
+          setIsDialing(false);
+        }
+      },
+      [pendingDialedNumber, ctiUserAddress, makeCall, onCall],
+    );  
   // Parse comma-separated email/phone into arrays for multiple contact support
   const emailList = useMemo(() => {
     if (!email || typeof email !== "string") return [];
@@ -5576,7 +5642,27 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowTaskModal(false);
   };
 
-  const handleTaskSave = (taskData: {
+  const parseTaskDueDate = (activityDate: string, activityTime: string): string => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    const base = `${y}-${m}-${d}`;
+    if (activityDate === "Today") return base;
+    const addDays = (n: number) => {
+      const t = new Date(today);
+      t.setDate(t.getDate() + n);
+      return t.toISOString().slice(0, 10);
+    };
+    if (activityDate === "Tomorrow") return addDays(1);
+    if (activityDate?.includes("3 business") || activityDate?.includes("Friday")) return addDays(3);
+    if (activityDate === "In 1 week") return addDays(7);
+    if (activityDate === "In 2 weeks") return addDays(14);
+    if (activityDate === "In 1 month") return addDays(30);
+    return addDays(3);
+  };
+
+  const handleTaskSave = async (taskData: {
     title: string;
     activityDate: string;
     activityTime: string;
@@ -5588,8 +5674,30 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     assignedTo: string;
     notes: string;
   }) => {
+    if (recordType && recordId != null && !Number.isNaN(Number(recordId))) {
+      const due_date = parseTaskDueDate(taskData.activityDate, taskData.activityTime);
+      const urgency = taskData.priority === "High" ? "high" : taskData.priority === "Medium" ? "med" : "low";
+      try {
+        await createTask({
+          name: taskData.title.trim() || "Task",
+          user_extension: extension,
+          created_by: extension,
+          urgency,
+          due_date,
+          time: taskData.activityTime?.length >= 5 ? taskData.activityTime.slice(0, 5) : undefined,
+          status: "pending",
+          notes: taskData.notes?.trim() ? [{ note: taskData.notes.trim() }] : undefined,
+          record_type: recordType as "prospect" | "lead" | "deal" | "order",
+          record_id: Number(recordId),
+        });
+        setShowTaskModal(false);
+        onTaskCreate?.(taskData);
+      } catch {
+        // createTask shows toast on error
+      }
+      return;
+    }
     onTaskCreate?.(taskData);
-    console.log("Task created:", taskData);
   };
   const handleCallClick = () => {
     if (hasPhone) {
@@ -5604,74 +5712,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   /** Initiate call via CTI (same flow as Layout handleDial): device selection if multiple devices, else dialNumber */
-  const handleCall = useCallback(
-    async (phoneNumber: string) => {
-      const numberToDial = (phoneNumber || "").trim();
-      if (!numberToDial) {
-        toast.error("No phone number available to call");
-        return;
-      }
-      const userDevices = getAllUserDevices?.();
-      if (userDevices && userDevices.length > 1) {
-        setAvailableDevices(userDevices);
-        setPendingDialedNumber(numberToDial);
-        setShowDeviceSelectionModal(true);
-        setShowCallModal(false);
-        return;
-      }
-      setIsDialing(true);
-      try {
-        const result = await ctiDialNumber(numberToDial);
-        if (result?.success) {
-          setShowCallModal(false);
-          onCall?.(numberToDial);
-        } else if (result?.error) {
-          toast.error(result.error);
-        }
-      } catch {
-        toast.error("Failed to make call");
-      } finally {
-        setIsDialing(false);
-      }
-    },
-    [ctiDialNumber, getAllUserDevices, onCall],
-  );
 
-  const handleDeviceSelect = useCallback(
-    async (device: { deviceType: string; deviceName: string }) => {
-      const numberToDial = pendingDialedNumber;
-      setShowDeviceSelectionModal(false);
-      setAvailableDevices([]);
-      setPendingDialedNumber("");
-      const callerInfo = {
-        callingAddress: ctiUserAddress,
-        callingDeviceName: device.deviceName,
-        callingDeviceType: device.deviceType,
-        selectedAt: new Date().toISOString(),
-      };
-      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
-      setIsDialing(true);
-      try {
-        const result = await makeCall({
-          callingAddress: ctiUserAddress ?? "",
-          calledAddress: numberToDial,
-          callingDeviceType: device.deviceType,
-          callingDeviceName: device.deviceName,
-        });
-        if (result?.success) {
-          setShowCallModal(false);
-          onCall?.(numberToDial);
-        } else if (result?.error) {
-          toast.error(result.error);
-        }
-      } catch {
-        toast.error("Failed to make call");
-      } finally {
-        setIsDialing(false);
-      }
-    },
-    [pendingDialedNumber, ctiUserAddress, makeCall, onCall],
-  );
+
 
   const handleMeetingClick = () => {
     setShowMeetingModal(true);
