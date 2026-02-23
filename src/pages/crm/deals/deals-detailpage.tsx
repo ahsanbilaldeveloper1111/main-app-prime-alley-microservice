@@ -10,7 +10,8 @@ import Layout from "@layout/index";
 import { getDeal, type DealData } from '@utils/crm';
 import { usePermissions } from '@utils/permissionUtils';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
-import CrmActivitiesPanel from '@components/CrmActivitiesPanel';
+import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from '@components/CrmActivitiesPanel';
+import { useCrmActivityModals } from '@hooks/useCrmActivityModals';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -70,6 +71,7 @@ const DealRecordPage: NextPageWithLayout = () => {
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
+  const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
 
   // Load deal by ID from URL
   useEffect(() => {
@@ -222,7 +224,7 @@ const DealRecordPage: NextPageWithLayout = () => {
     { label: 'Deal Owner', value: deal?.assigned_to ?? '--' },
   ];
 
-  // Normalize deal for CrmActivitiesPanel
+  // Normalize deal for CrmActivitiesPanel (include audit_trail so Activity tab shows deal history)
   const dealRecord = deal
     ? {
         id: deal.id,
@@ -232,8 +234,26 @@ const DealRecordPage: NextPageWithLayout = () => {
           phone: deal.decision_maker_phone ?? (deal as any).phone ?? null,
           data: {},
         },
+        audit_trail: deal.audit_trail ?? [],
       }
     : null;
+
+  const dealRecordId = Number(dealId) || deal?.id || 0;
+  const dealRecordName = deal?.name ?? 'Deal';
+  const dealRecordEmail = (deal as any)?.decision_maker_email ?? (deal as any)?.contact_email ?? '';
+
+  const dealRecordPhone = deal?.decision_maker_phone ?? (deal as any)?.phone ?? '';
+
+  const activityModals = useCrmActivityModals({
+    recordType: 'deal',
+    recordId: dealRecordId,
+    recordName: dealRecordName,
+    recordEmail: dealRecordEmail,
+    recordPhone: dealRecordPhone,
+    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes(),
+    onEmailSent: () => activitiesPanelRef.current?.refetchEmails(),
+    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings(),
+  });
 
   const renderIntelligenceTab = () => {
     return (
@@ -881,11 +901,11 @@ const DealRecordPage: NextPageWithLayout = () => {
           paddingRight: '24px',
         }}>
           {[
-            { icon: ClipboardList, label: 'Note', disabled: false },
-            { icon: Mail, label: 'Email', disabled: false },
-            { icon: Phone, label: 'Call', disabled: false },
-            { icon: ClipboardList, label: 'Task', disabled: false },
-            { icon: Calendar, label: 'Meeting', disabled: false },
+            { icon: ClipboardList, label: 'Note', disabled: false, onClick: activityModals.openNote },
+            { icon: Mail, label: 'Email', disabled: false, onClick: activityModals.openEmail },
+            { icon: Phone, label: 'Call', disabled: false, onClick: undefined },
+            { icon: ClipboardList, label: 'Task', disabled: false, onClick: activityModals.openTask },
+            { icon: Calendar, label: 'Meeting', disabled: false, onClick: activityModals.openMeeting },
           ].map((action, index) => {
             const Icon = action.icon;
             return (
@@ -896,6 +916,9 @@ const DealRecordPage: NextPageWithLayout = () => {
                 gap: '6px',
               }}>
                 <button
+                  type="button"
+                  disabled={action.disabled}
+                  onClick={action.onClick}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -904,7 +927,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                     background: '#ffffff',
                     border: '1px solid #8a8a8a',
                     borderRadius: '50%',
-                    cursor: 'pointer',
+                    cursor: action.disabled ? 'not-allowed' : 'pointer',
                     width: '30px',
                     height: '30px',
                     color: '#141414',
@@ -968,10 +991,18 @@ const DealRecordPage: NextPageWithLayout = () => {
                 minWidth: '150px',
                 zIndex: 1000,
               }}>
-                {['Message', 'Task', 'WhatsApp'].map((action) => (
+                {[
+                  { label: 'Message', onClick: activityModals.openSms },
+                  { label: 'Task', onClick: activityModals.openTask },
+                  { label: 'WhatsApp', onClick: activityModals.openWhatsApp },
+                ].map(({ label, onClick }) => (
                   <button
-                    key={action}
-                    onClick={() => setShowMoreActivities(false)}
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      setShowMoreActivities(false);
+                      onClick();
+                    }}
                     style={{
                       width: '100%',
                       padding: '10px 16px',
@@ -989,7 +1020,7 @@ const DealRecordPage: NextPageWithLayout = () => {
                       e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
-                    {action}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -1442,12 +1473,14 @@ const DealRecordPage: NextPageWithLayout = () => {
 
         {activeTab === 'activities' && (
           <CrmActivitiesPanel
+            ref={activitiesPanelRef}
             recordType="deal"
-            recordId={Number(dealId) || deal?.id || 0}
+            recordId={dealRecordId}
             record={dealRecord}
             recordLoading={dealLoading}
-            recordName={deal?.name ?? 'Deal'}
+            recordName={dealRecordName}
             canSendWhatsApp={canSendWhatsApp}
+            {...activityModals.crmActivitiesPanelProps}
           />
         )}
 
@@ -2104,6 +2137,8 @@ const DealRecordPage: NextPageWithLayout = () => {
         {renderMainContent()}
         {renderRightSidebar()}
       </div>
+
+      {activityModals.modals}
     </>
   );
 };

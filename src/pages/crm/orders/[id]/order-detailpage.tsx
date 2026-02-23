@@ -14,7 +14,8 @@ import { toast } from "react-toastify";
 import moment from "moment";
 import { usePermissions } from '@utils/permissionUtils';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
-import CrmActivitiesPanel, { CrmActivitiesRecord } from '@components/CrmActivitiesPanel';
+import CrmActivitiesPanel, { CrmActivitiesRecord, type CrmActivitiesPanelRef } from '@components/CrmActivitiesPanel';
+import { useCrmActivityModals } from '@hooks/useCrmActivityModals';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -75,6 +76,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
   const canSendWhatsApp = hasPermission(HEADER_CONSTANTS.PERMISSIONS.SEND_WHATSAPP_MESSAGE_CRM);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
+  const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
 
   // Fetch extensions
   useEffect(() => {
@@ -242,6 +244,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
     { id: 'intelligence', label: 'Intelligence' },
   ];
 
+  // Include audit_trail so Activity tab shows order history
   const orderRecord: CrmActivitiesRecord | null = orderData
     ? {
         id: orderData.id,
@@ -251,8 +254,26 @@ const OrderRecordPage: NextPageWithLayout = () => {
           phone: orderData.customer_phone || '',
           data: orderData,
         },
+        audit_trail: orderData.audit_trail ?? [],
       }
     : null;
+
+  const orderRecordId = Number(id) || orderData?.id || 0;
+  const orderRecordName = orderData?.order_number || orderData?.customer_name || 'Order';
+  const orderRecordEmail = orderData?.customer_email ?? '';
+
+  const orderRecordPhone = orderData?.customer_phone ?? '';
+
+  const activityModals = useCrmActivityModals({
+    recordType: 'order',
+    recordId: orderRecordId,
+    recordName: orderRecordName,
+    recordEmail: orderRecordEmail,
+    recordPhone: orderRecordPhone,
+    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes(),
+    onEmailSent: () => activitiesPanelRef.current?.refetchEmails(),
+    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings(),
+  });
 
   // Key Information Fields - Order specific
   const keyInfoFields: KeyInfoField[] = [
@@ -956,11 +977,11 @@ const OrderRecordPage: NextPageWithLayout = () => {
             paddingRight: '24px',
           }}>
             {[
-              { icon: ClipboardList, label: 'Note', disabled: false },
-              { icon: Mail, label: 'Email', disabled: !orderData?.customer_email },
-              { icon: Phone, label: 'Call', disabled: !orderData?.customer_phone },
-              { icon: ClipboardList, label: 'Task', disabled: false },
-              { icon: Calendar, label: 'Meeting', disabled: false },
+              { icon: ClipboardList, label: 'Note', disabled: false, onClick: activityModals.openNote },
+              { icon: Mail, label: 'Email', disabled: !orderData?.customer_email, onClick: activityModals.openEmail },
+              { icon: Phone, label: 'Call', disabled: !orderData?.customer_phone, onClick: undefined },
+              { icon: ClipboardList, label: 'Task', disabled: false, onClick: activityModals.openTask },
+              { icon: Calendar, label: 'Meeting', disabled: false, onClick: activityModals.openMeeting },
             ].map((action, index) => {
               const Icon = action.icon;
               return (
@@ -971,7 +992,9 @@ const OrderRecordPage: NextPageWithLayout = () => {
                   gap: '6px',
                 }}>
                   <button
+                    type="button"
                     disabled={action.disabled}
+                    onClick={action.disabled ? undefined : action.onClick}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -1045,10 +1068,18 @@ const OrderRecordPage: NextPageWithLayout = () => {
                   minWidth: '150px',
                   zIndex: 1000,
                 }}>
-                  {['Message', 'Task', 'WhatsApp'].map((action) => (
+                  {[
+                    { label: 'Message', onClick: activityModals.openSms },
+                    { label: 'Task', onClick: activityModals.openTask },
+                    { label: 'WhatsApp', onClick: activityModals.openWhatsApp },
+                  ].map(({ label, onClick }) => (
                     <button
-                      key={action}
-                      onClick={() => setShowMoreActivities(false)}
+                      key={label}
+                      type="button"
+                      onClick={() => {
+                        setShowMoreActivities(false);
+                        onClick();
+                      }}
                       style={{
                         width: '100%',
                         padding: '10px 16px',
@@ -1066,7 +1097,7 @@ const OrderRecordPage: NextPageWithLayout = () => {
                         e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
-                      {action}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -1549,12 +1580,15 @@ const OrderRecordPage: NextPageWithLayout = () => {
 
           {activeTab === 'activities' && (
             <CrmActivitiesPanel
+              ref={activitiesPanelRef}
               recordType="order"
-              recordId={Number(id) || orderData?.id || 0}
+              recordId={orderRecordId}
               record={orderRecord}
               recordLoading={loading}
-              recordName={orderData?.order_number || orderData?.customer_name || 'Order'}
+              recordName={orderRecordName}
               canSendWhatsApp={canSendWhatsApp}
+              extensions={extensions}
+              {...activityModals.crmActivitiesPanelProps}
             />
           )}
 
@@ -2334,6 +2368,8 @@ const OrderRecordPage: NextPageWithLayout = () => {
         {renderMainContent()}
         {renderRightSidebar()}
       </div>
+
+      {activityModals.modals}
     </>
   );
 };

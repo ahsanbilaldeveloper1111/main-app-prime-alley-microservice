@@ -1832,7 +1832,7 @@ const CrmLeads = () => {
     }
   }, [leadToMarkLost, lostReasonId, lostFeedback]);
 
-  // Handle view lead
+  // Handle view lead - open GenericSidebar only (no modal)
   const handleViewLead = useCallback(async (leadId: number) => {
     setLoadingLead(true);
     try {
@@ -1851,14 +1851,15 @@ const CrmLeads = () => {
         }
       }
 
-      setViewingLead({
+      const leadWithStage = {
         ...leadData,
         stage: leadData.is_lost
           ? { ...(leadData.stage || {}), name: "Lost" }
           : leadData.stage,
-      });
-      //setActiveTab("lead-info"); // Reset to first tab when opening modal
-      setShowLeadViewModal(true);
+      };
+      setViewingLead(leadWithStage);
+      setSelectedLead(leadWithStage);
+      setShowLeadSidebar(true);
     } catch (error) {
       console.error("Failed to fetch lead:", error);
       toast.error("Failed to load lead details");

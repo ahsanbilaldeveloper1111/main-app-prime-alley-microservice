@@ -18,7 +18,7 @@ import GenericTable, {
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { StatsCardData } from "@components/GenericStatsCards";
-import ConvertToOrderModal from "@components/ConvertToOrderModal";
+import ConvertDealToOrderModal from "@components/ConvertDealToOrderModal";
 import { EditDealApprovalSidebar } from "@components/EditDealApprovalSidebar";
 import {
   getDeals,
@@ -1107,7 +1107,7 @@ const CrmDeals = () => {
     }
   };
 
-  // Handle view deal
+  // Handle view deal - open GenericSidebar only (no modal)
   const handleViewDeal = useCallback(async (dealId: number) => {
     try {
       setLoadingDeal(true);
@@ -1115,6 +1115,8 @@ const CrmDeals = () => {
       setRelatedLead(null);
       const dealData: any = await getDeal(dealId);
       setViewingDeal(dealData);
+      setSelectedDeal(dealData);
+      setShowDealSidebar(true);
 
       // Fetch lead information if ticket_id exists (ticket_id contains the lead_id)
       if (dealData.ticket_id) {
@@ -1140,8 +1142,6 @@ const CrmDeals = () => {
           // Don't show error toast as lead is optional
         }
       }
-
-      setShowDealViewModal(true);
     } catch (error) {
       console.error("Failed to fetch deal:", error);
       toast.error("Failed to load deal details");
@@ -2346,7 +2346,8 @@ const CrmDeals = () => {
               label: "Convert to Order",
               icon: <ShoppingBag size={16} />,
               onClick: (row: any) => {
-                window.location.href = `/crm/orders/create?deal_id=${row.rawData?.id || row.id}`;
+                setDealToConvert(row.rawData?.id || row.id);
+                setShowConvertToOrderModal(true);
               },
               variant: "link" as const,
               className: "text-success",
@@ -7427,7 +7428,7 @@ const CrmDeals = () => {
 
       {/* Convert to Order Modal */}
       {dealToConvert && (
-        <ConvertToOrderModal
+        <ConvertDealToOrderModal
           show={showConvertToOrderModal}
           onHide={() => {
             setShowConvertToOrderModal(false);
@@ -7435,8 +7436,6 @@ const CrmDeals = () => {
           }}
           dealId={dealToConvert}
           onSuccess={() => {
-            // Optionally refresh deals list or show success message
-            // toast.success("Order created successfully!");
             setRefreshKey((prev) => prev + 1);
           }}
         />

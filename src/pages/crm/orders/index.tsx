@@ -1133,10 +1133,13 @@ const CrmOrders = () => {
     }
   }, []);
 
+  // Handle view order - open GenericSidebar only (no modal)
   const handleViewOrder = useCallback(async (orderId: number) => {
-    await fetchOrderDetails(orderId);
     try {
-      setShowOrderViewModal(true);
+      const orderData: any = await getOrder(orderId);
+      setSelectedOrder(orderData);
+      setShowOrderSidebar(true);
+      await fetchOrderDetails(orderId);
     } catch (error) {
       console.error("Failed to fetch order:", error);
       toast.error("Failed to load order details");
@@ -1145,7 +1148,7 @@ const CrmOrders = () => {
       setLoadingDeal(false);
       setLoadingLead(false);
     }
-  }, []);
+  }, [fetchOrderDetails]);
 
   const handleRowClicked = useCallback(async (orderId: number) => {
     try {

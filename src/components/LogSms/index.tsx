@@ -43,7 +43,9 @@ import {
   Plus,
   MessageSquare,
   Strikethrough,
+  Sparkles,
 } from 'lucide-react';
+import { generateSms } from '@utils/communication';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,6 +59,8 @@ interface smsMessageModalProps {
   isOpen: boolean;
   onClose: () => void;
   associatedRecords?: string[];
+  /** Optional context for AI generation (e.g. lead, deal, order from CRM). */
+  contextPayload?: { lead?: unknown; deal?: unknown; order?: unknown };
   onSave: (data: {
     message: string;
     contacts: Contact[];
@@ -85,10 +89,13 @@ function formatDisplayDate(isoLocal: string): string {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+const DEFAULT_GENERATE_QUERY = 'Write a short, professional SMS message (concise, suitable for text).';
+
 const smsMessageModal: React.FC<smsMessageModalProps> = ({
   isOpen,
   onClose,
   associatedRecords = [],
+  contextPayload,
   onSave,
 }) => {
   const [messageText, setMessageText] = useState('');
@@ -101,6 +108,8 @@ const smsMessageModal: React.FC<smsMessageModalProps> = ({
   const [showContactInput, setShowContactInput] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [generatePrompt, setGeneratePrompt] = useState('');
+  const [generateLoading, setGenerateLoading] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -154,7 +163,30 @@ const smsMessageModal: React.FC<smsMessageModalProps> = ({
     setAttachments([]);
     setShowContactInput(false);
     setContactSearch('');
+    setGeneratePrompt('');
     onClose();
+  };
+
+  const handleAutoGenerate = async () => {
+    const query = generatePrompt.trim() || DEFAULT_GENERATE_QUERY;
+    setGenerateLoading(true);
+    try {
+      const res = await generateSms({
+        query,
+        previous_content: messageText.trim() || undefined,
+        ...(contextPayload?.lead != null && { lead: contextPayload.lead }),
+        ...(contextPayload?.deal != null && { deal: contextPayload.deal }),
+        ...(contextPayload?.order != null && { order: contextPayload.order }),
+        tone: 'professional',
+        language: 'en',
+      });
+      const generated = (res?.result ?? '').trim();
+      if (generated) setMessageText(generated);
+    } catch (err) {
+      console.error('SMS auto-generate failed:', err);
+    } finally {
+      setGenerateLoading(false);
+    }
   };
 
   const handleAddContact = () => {
@@ -551,6 +583,72 @@ const smsMessageModal: React.FC<smsMessageModalProps> = ({
               }}
             />
           </div>
+        </div>
+      </div>
+
+      {/* ── Generate SMS (AI) ── */}
+      <div
+        style={{
+          padding: '12px 20px',
+          borderBottom: '1px solid #e2e8f0',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+        }}
+      >
+        <div style={{ fontSize: '12px', color: '#718096', fontWeight: '500' }}>
+          Query for AI (optional)
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            type="text"
+            value={generatePrompt}
+            onChange={(e) => setGeneratePrompt(e.target.value)}
+            placeholder="e.g. Follow-up for a meeting, or confirm appointment time"
+            style={{
+              flex: 1,
+              minWidth: '200px',
+              border: '1px solid #cbd5e0',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontSize: '13px',
+              color: '#141414',
+              fontFamily: 'inherit',
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => void handleAutoGenerate()}
+            disabled={generateLoading}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              border: '1px solid #141414',
+              borderRadius: '6px',
+              backgroundColor: 'transparent',
+              color: '#141414',
+              fontSize: '13px',
+              fontWeight: '500',
+              cursor: generateLoading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {generateLoading ? (
+              <>
+                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" style={{ width: '14px', height: '14px', borderWidth: '2px' }} />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles size={16} />
+                Auto Generate
+              </>
+            )}
+          </button>
+        </div>
+        <div style={{ fontSize: '12px', color: '#718096' }}>
+          Leave empty to use a default prompt for a short professional SMS.
         </div>
       </div>
 

@@ -992,6 +992,7 @@ export const updateCrmData = async (
   payload: {
     name: string;
     phone: string;
+    campaign_id: number | null;
     data: Record<string, any>;
   },
 ): Promise<any> => {
@@ -1879,6 +1880,8 @@ export interface DealData {
     id: number;
     [key: string]: any;
   }>;
+  /** Deal history / audit trail from API */
+  audit_trail?: AuditTrailEntry[];
 }
 
 export const getDeals = async (
@@ -2253,6 +2256,8 @@ export interface OrderData {
     description: string;
     product?: any;
   }>;
+  /** Order history / audit trail from API */
+  audit_trail?: AuditTrailEntry[];
 }
 
 export const getOrders = async (

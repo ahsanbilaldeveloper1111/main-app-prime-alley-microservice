@@ -35,7 +35,8 @@ import Layout from "@layout/index";
 import { getLead, type LeadData } from "@utils/crm";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import CrmActivitiesPanel from "@components/CrmActivitiesPanel";
+import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from "@components/CrmActivitiesPanel";
+import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -99,6 +100,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
+  const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
 
   // Fetch lead detail by ID from URL (same pattern as prospect detail page)
   useEffect(() => {
@@ -166,6 +168,30 @@ const ContactRecordPage: NextPageWithLayout = () => {
         audit_trail: lead.audit_trail,
       }
     : null;
+
+  const leadRecordId = Number(leadId) || lead?.id || 0;
+  const leadRecordName = lead?.name ?? leadRecord?.data?.name ?? "Lead";
+  const leadRecordEmail =
+    (lead as any)?.contact_persons?.[0]?.email ??
+    (lead as any)?.crm_data?.data?.email ??
+    "";
+
+  const leadRecordPhone =
+    (lead as any)?.contact_persons?.[0]?.phone ??
+    (lead as any)?.crm_data?.phone ??
+    lead?.company_contact ??
+    "";
+
+  const activityModals = useCrmActivityModals({
+    recordType: "lead",
+    recordId: leadRecordId,
+    recordName: leadRecordName,
+    recordEmail: leadRecordEmail,
+    recordPhone: leadRecordPhone,
+    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes(),
+    onEmailSent: () => activitiesPanelRef.current?.refetchEmails(),
+    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings(),
+  });
 
   const toggleSection = (sectionId: string) => {
     setCollapsedSections((prev) => {
@@ -1185,11 +1211,11 @@ const ContactRecordPage: NextPageWithLayout = () => {
           }}
         >
           {[
-            { icon: ClipboardList, label: "Note", disabled: false },
-            { icon: Mail, label: "Email", disabled: true },
-            { icon: Phone, label: "Call", disabled: true },
-            { icon: ClipboardList, label: "Task", disabled: true },
-            { icon: Calendar, label: "Meeting", disabled: false },
+            { icon: ClipboardList, label: "Note", disabled: false, onClick: activityModals.openNote },
+            { icon: Mail, label: "Email", disabled: false, onClick: activityModals.openEmail },
+            { icon: Phone, label: "Call", disabled: true, onClick: undefined },
+            { icon: ClipboardList, label: "Task", disabled: false, onClick: activityModals.openTask },
+            { icon: Calendar, label: "Meeting", disabled: false, onClick: activityModals.openMeeting },
           ].map((action, index) => {
             const Icon = action.icon;
             return (
@@ -1203,7 +1229,9 @@ const ContactRecordPage: NextPageWithLayout = () => {
                 }}
               >
                 <button
-                  // disabled={action.disabled}
+                  type="button"
+                  disabled={action.disabled}
+                  onClick={action.onClick}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -1212,7 +1240,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                     background: "#ffffff",
                     border: "1px solid #8a8a8a",
                     borderRadius: "50%",
-                    cursor: "pointer",
+                    cursor: action.disabled ? "not-allowed" : "pointer",
                     width: "30px",
                     height: "30px",
                     color: "#141414",
@@ -1285,10 +1313,18 @@ const ContactRecordPage: NextPageWithLayout = () => {
                   zIndex: 1000,
                 }}
               >
-                {["Message", "Task", "WhatsApp"].map((action) => (
+                {[
+                  { label: "Message", onClick: activityModals.openSms },
+                  { label: "Task", onClick: activityModals.openTask },
+                  { label: "WhatsApp", onClick: activityModals.openWhatsApp },
+                ].map(({ label, onClick }) => (
                   <button
-                    key={action}
-                    onClick={() => setShowMoreActivities(false)}
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      setShowMoreActivities(false);
+                      onClick();
+                    }}
                     style={{
                       width: "100%",
                       padding: "10px 16px",
@@ -1306,7 +1342,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
                       e.currentTarget.style.backgroundColor = "transparent";
                     }}
                   >
-                    {action}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -1938,12 +1974,14 @@ const ContactRecordPage: NextPageWithLayout = () => {
 
         {activeTab === "activities" && (
           <CrmActivitiesPanel
+            ref={activitiesPanelRef}
             recordType="lead"
-            recordId={Number(leadId) || lead?.id || 0}
+            recordId={leadRecordId}
             record={leadRecord}
             recordLoading={leadLoading}
-            recordName={lead?.name ?? leadRecord?.data?.name ?? "Lead"}
+            recordName={leadRecordName}
             canSendWhatsApp={canSendWhatsApp}
+            {...activityModals.crmActivitiesPanelProps}
           />
         )}
 
@@ -2528,6 +2566,8 @@ const ContactRecordPage: NextPageWithLayout = () => {
         {/* Right Sidebar - Associated Records */}
         {renderRightSidebar()}
       </div>
+
+      {activityModals.modals}
     </>
   );
 };
