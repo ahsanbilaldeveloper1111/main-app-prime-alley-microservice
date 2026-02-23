@@ -35,7 +35,7 @@ import Layout from "@layout/index";
 import { getLead, type LeadData } from "@utils/crm";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-import CrmActivitiesPanel from "@components/CrmActivitiesPanel";
+import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from "@components/CrmActivitiesPanel";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 
 // ============================================================================
@@ -100,6 +100,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
+  const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
 
   // Fetch lead detail by ID from URL (same pattern as prospect detail page)
   useEffect(() => {
@@ -187,6 +188,9 @@ const ContactRecordPage: NextPageWithLayout = () => {
     recordName: leadRecordName,
     recordEmail: leadRecordEmail,
     recordPhone: leadRecordPhone,
+    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes(),
+    onEmailSent: () => activitiesPanelRef.current?.refetchEmails(),
+    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings(),
   });
 
   const toggleSection = (sectionId: string) => {
@@ -1970,6 +1974,7 @@ const ContactRecordPage: NextPageWithLayout = () => {
 
         {activeTab === "activities" && (
           <CrmActivitiesPanel
+            ref={activitiesPanelRef}
             recordType="lead"
             recordId={leadRecordId}
             record={leadRecord}

@@ -10,7 +10,7 @@ import Layout from "@layout/index";
 import { getDeal, type DealData } from '@utils/crm';
 import { usePermissions } from '@utils/permissionUtils';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
-import CrmActivitiesPanel from '@components/CrmActivitiesPanel';
+import CrmActivitiesPanel, { type CrmActivitiesPanelRef } from '@components/CrmActivitiesPanel';
 import { useCrmActivityModals } from '@hooks/useCrmActivityModals';
 
 // ============================================================================
@@ -71,6 +71,7 @@ const DealRecordPage: NextPageWithLayout = () => {
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
+  const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
 
   // Load deal by ID from URL
   useEffect(() => {
@@ -223,7 +224,7 @@ const DealRecordPage: NextPageWithLayout = () => {
     { label: 'Deal Owner', value: deal?.assigned_to ?? '--' },
   ];
 
-  // Normalize deal for CrmActivitiesPanel
+  // Normalize deal for CrmActivitiesPanel (include audit_trail so Activity tab shows deal history)
   const dealRecord = deal
     ? {
         id: deal.id,
@@ -233,6 +234,7 @@ const DealRecordPage: NextPageWithLayout = () => {
           phone: deal.decision_maker_phone ?? (deal as any).phone ?? null,
           data: {},
         },
+        audit_trail: deal.audit_trail ?? [],
       }
     : null;
 
@@ -248,6 +250,9 @@ const DealRecordPage: NextPageWithLayout = () => {
     recordName: dealRecordName,
     recordEmail: dealRecordEmail,
     recordPhone: dealRecordPhone,
+    onNoteCreated: () => activitiesPanelRef.current?.refetchNotes(),
+    onEmailSent: () => activitiesPanelRef.current?.refetchEmails(),
+    onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings(),
   });
 
   const renderIntelligenceTab = () => {
@@ -1468,6 +1473,7 @@ const DealRecordPage: NextPageWithLayout = () => {
 
         {activeTab === 'activities' && (
           <CrmActivitiesPanel
+            ref={activitiesPanelRef}
             recordType="deal"
             recordId={dealRecordId}
             record={dealRecord}
