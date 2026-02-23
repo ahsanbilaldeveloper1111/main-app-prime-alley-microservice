@@ -2,7 +2,7 @@
  * CrmActivitiesPanel – reusable Activities tab content for CRM record detail pages
  * (prospect, lead, deal, order). Renders activity sub-tabs and their content.
  */
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import {
   X, ChevronDown, ChevronRight, Mail, Calendar, MessageSquare, ClipboardList,
   FileText, Pencil, Trash2, MessageCircle, AlertCircle, Phone,
@@ -178,20 +178,30 @@ export interface CrmActivitiesPanelProps {
   onOpenMeeting?: () => void;
 }
 
-export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
-  recordType,
-  recordId,
-  record,
-  recordLoading = false,
-  recordName = 'Record',
-  canSendWhatsApp = false,
-  extensions: extensionsProp,
-  campaigns,
-  onOpenNote,
-  onOpenEmail,
-  onOpenTask,
-  onOpenMeeting,
-}) => {
+/** Ref handle for parent to trigger refetch (e.g. after creating note/email/meeting in external modal). */
+export interface CrmActivitiesPanelRef {
+  refetchNotes: () => void;
+  refetchEmails: () => void;
+  refetchMeetings: () => void;
+}
+
+const CrmActivitiesPanelInner = (
+  {
+    recordType,
+    recordId,
+    record,
+    recordLoading = false,
+    recordName = 'Record',
+    canSendWhatsApp = false,
+    extensions: extensionsProp,
+    campaigns,
+    onOpenNote,
+    onOpenEmail,
+    onOpenTask,
+    onOpenMeeting,
+  }: CrmActivitiesPanelProps,
+  ref: React.Ref<CrmActivitiesPanelRef>,
+) => {
   const useExternalModals = Boolean(onOpenNote ?? onOpenEmail ?? onOpenTask ?? onOpenMeeting);
   const [activityFilter, setActivityFilter] = useState('activity');
   const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Set());
@@ -529,6 +539,8 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
     await fetchMeetings();
     setShowMeetingModal(false);
   }, [fetchMeetings]);
+
+  useImperativeHandle(ref, () => ({ refetchNotes: fetchNotes, refetchEmails: fetchEmails, refetchMeetings: fetchMeetings }), [fetchNotes, fetchEmails, fetchMeetings]);
 
   const handleWhatsAppReplySend = useCallback(async () => {
     if (selectedWhatsAppChatId == null || !whatsappReplyMessage.trim() || !canSendWhatsApp) return;
@@ -1379,4 +1391,5 @@ export const CrmActivitiesPanel: React.FC<CrmActivitiesPanelProps> = ({
   );
 };
 
+export const CrmActivitiesPanel = forwardRef(CrmActivitiesPanelInner);
 export default CrmActivitiesPanel;
