@@ -69,6 +69,7 @@ const DealRecordPage: NextPageWithLayout = () => {
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [showMoreActivities, setShowMoreActivities] = useState(false);
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
+  const [tasksRefetch, setTasksRefetch] = useState<(() => void) | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const moreActivitiesRef = useRef<HTMLDivElement>(null);
   const activitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
@@ -250,6 +251,7 @@ const DealRecordPage: NextPageWithLayout = () => {
     recordName: dealRecordName,
     recordEmail: dealRecordEmail,
     recordPhone: dealRecordPhone,
+    onTaskCreated: () => tasksRefetch?.(),
     onNoteCreated: () => activitiesPanelRef.current?.refetchNotes(),
     onEmailSent: () => activitiesPanelRef.current?.refetchEmails(),
     onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings(),
@@ -1480,6 +1482,7 @@ const DealRecordPage: NextPageWithLayout = () => {
             recordLoading={dealLoading}
             recordName={dealRecordName}
             canSendWhatsApp={canSendWhatsApp}
+            onTasksRefetchReady={(fn) => setTasksRefetch(() => fn)}
             {...activityModals.crmActivitiesPanelProps}
           />
         )}

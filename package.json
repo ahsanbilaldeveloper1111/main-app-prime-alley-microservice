@@ -5,11 +5,13 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "NODE_OPTIONS='--max-old-space-size=8192' next build",
+    "build:win": "set NODE_OPTIONS='--max-old-space-size=8192' && next build",
     "build:no-lint": "NODE_OPTIONS='--max-old-space-size=8192' next build --no-lint",
     "build:silent": "NODE_OPTIONS='--max-old-space-size=8192' next build",
     "start": "next start",
     "lint": "next lint",
     "build:all-ts-errors": "__NEXT_TEST_MODE=true npm run build",
+    "build:all-ts-errors-win": "set __NEXT_TEST_MODE=true && npm run build:win",
     "test": "node src/__tests__/run-all-tests.js"
   },
   "dependencies": {
